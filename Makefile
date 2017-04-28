@@ -1,5 +1,5 @@
-compile_opts = -g
-#compile_opts = -O3 -Wall
+#compile_opts = -g
+compile_opts = -O3 -Wall
 
 all: nano_bwt
 
@@ -9,3 +9,5 @@ nano_bwt: nano_bwt.o
 nano_bwt.o: nano_bwt.cpp
 	gcc -c nano_bwt.cpp $(compile_opts)
 
+clean:
+	rm nano_bwt.o nano_bwt

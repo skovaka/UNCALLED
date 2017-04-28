@@ -33,10 +33,10 @@ class NanoFMI {
     //Sparseness of suffix and tally arrays
     int tally_dist, sa_dist;
 
-    std::vector<mer_id> bwt; //L array
-    std::vector<int> mer_counts; //F array
-    std::vector< std::vector<int> > mer_tally; //Rank tally
-    std::map<unsigned int, mer_id> sparse_sa; //Sparse suffix array
+    std::vector<mer_id> bwt;                        //L array
+    std::vector<int> mer_counts;                    //F array
+    std::vector< std::vector<int> > mer_tally;      //Rank tally
+    std::map<unsigned int, unsigned int> sparse_sa; //Sparse suffix array
 };
 
 
@@ -61,7 +61,7 @@ NanoFMI::NanoFMI(std::ifstream &model_in,
     tally_dist = tally_sp;
     
     mer_seq_tmp = &mer_seq;
-    std::vector<mer_id> suffix_ar(mer_seq.size());
+    std::vector<unsigned int> suffix_ar(mer_seq.size());
 
     std::cerr << "Creating suffix array\n";
 
@@ -79,7 +79,7 @@ NanoFMI::NanoFMI(std::ifstream &model_in,
     mer_tally.resize(alph_size);
     
     for (mer_id i = 0; i < alph_size; i++)
-        mer_tally[i].resize(mer_seq.size() / tally_dist);
+        mer_tally[i].resize((mer_seq.size() / tally_dist) + 1);
     
     
     std::cerr << "Creating FM Index\n";
@@ -100,8 +100,8 @@ NanoFMI::NanoFMI(std::ifstream &model_in,
                 mer_tally[j][i / tally_dist] = mer_counts[bwt[i]];
     }
 
-    for (mer_id i = 0; i < alph_size; i++)
-        std::cout << i << "\t" << mer_counts[i] << "\n";
+    //for (mer_id i = 0; i < alph_size; i++)
+    //    std::cout << i << "\t" << mer_counts[i] << "\n";
 }
     
 bool NanoFMI::operator() (unsigned int rot1, unsigned int rot2) {
@@ -126,6 +126,8 @@ bool NanoFMI::operator() (unsigned int rot1, unsigned int rot2) {
 
        return false;
     }
+
+    return false;
 }
 
 int NanoFMI::signal_compare(mer_id mer1, mer_id mer2) {
