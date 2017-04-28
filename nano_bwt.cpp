@@ -1,9 +1,10 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
-#include <map>
+#include <unordered_map>
 #include <vector>
 #include <math.h>
+#include "timer.h"
 
 #define MER_LEN 6
 
@@ -21,6 +22,7 @@ class NanoFMI {
             std::vector<mer_id> &mer_seq,
             int sa_sp, int tally_sp);
     //std::vector<mer_id> get_bwt();
+    
 
     bool operator() (unsigned int rot1, unsigned int rot2);
 
@@ -36,7 +38,7 @@ class NanoFMI {
     std::vector<mer_id> bwt;                        //L array
     std::vector<int> mer_counts;                    //F array
     std::vector< std::vector<int> > mer_tally;      //Rank tally
-    std::map<unsigned int, unsigned int> sparse_sa; //Sparse suffix array
+    std::unordered_map<unsigned int, unsigned int> sparse_sa; //Sparse suffix array
 };
 
 
@@ -63,27 +65,31 @@ NanoFMI::NanoFMI(std::ifstream &model_in,
     mer_seq_tmp = &mer_seq;
     std::vector<unsigned int> suffix_ar(mer_seq.size());
 
-    std::cerr << "Creating suffix array\n";
+    Timer timer;
 
     for (unsigned int i = 0; i < suffix_ar.size(); i++) {
         suffix_ar[i] = i;
     }
 
+    std::cerr << "SA init time: " << timer.lap() << "\n";
+
     std::sort(suffix_ar.begin(), suffix_ar.end(), *this);
 
-    std::cerr << "Done\n";
-    
+    std::cerr << "SA sort time: " << timer.lap() << "\n";
+
     //Allocate space
     bwt.resize(mer_seq.size());
     mer_counts.resize(alph_size);
     mer_tally.resize(alph_size);
+    sparse_sa.reserve((mer_seq.size() / sa_dist) + 1);
     
     for (mer_id i = 0; i < alph_size; i++)
         mer_tally[i].resize((mer_seq.size() / tally_dist) + 1);
     
-    
-    std::cerr << "Creating FM Index\n";
+    std::cerr << "FM init time: " << timer.lap() << "\n";
 
+    int tally_mod = 0;
+    
     for (unsigned int i = 0; i < suffix_ar.size(); i++) {
         if (suffix_ar[i] % sa_dist == 0)
             sparse_sa[i] = suffix_ar[i];
@@ -95,10 +101,15 @@ NanoFMI::NanoFMI(std::ifstream &model_in,
 
         mer_counts[bwt[i]]++;
 
-        if (i % tally_dist == 0)
+        if (tally_mod == tally_dist) {
             for (mer_id j = 0; j < alph_size; j++)
                 mer_tally[j][i / tally_dist] = mer_counts[bwt[i]];
+            tally_mod = 0;
+        }
+        tally_mod += 1;
     }
+
+    std::cerr << "FM build time: " << timer.lap() << "\n";
 
     //for (mer_id i = 0; i < alph_size; i++)
     //    std::cout << i << "\t" << mer_counts[i] << "\n";
@@ -211,7 +222,10 @@ int main(int argc, char **argv) {
     init_base_ids();
 
     std::ifstream model_in(argv[1]), fasta_in(argv[2]);
+
+    int suff_gap = atoi(argv[3]), tally_gap = atoi(argv[4]);
+
     std::vector<mer_id> ids = parse_fasta(fasta_in);
 
-    NanoFMI bwt(model_in, ids, 5, 5);
+    NanoFMI bwt(model_in, ids, suff_gap, tally_gap);
 }
