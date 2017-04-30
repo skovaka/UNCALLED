@@ -1,0 +1,6 @@
+*.o
+sigalign
+nano_bwt
+.*.swp
+.*.swo
+src/hdf5
