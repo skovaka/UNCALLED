@@ -5,48 +5,19 @@
 #include <vector>
 #include <math.h>
 #include "timer.h"
+#include "nano_bwt.hpp"
 
 #define MER_LEN 6
 
+const int alph_size = (int) pow(4, MER_LEN);
 int BASE_IDS[(int) ('t'+1)];
-
-typedef unsigned short int mer_id;
-
-std::vector<mer_id> parse_fasta(std::ifstream &fasta_in);
 mer_id mer_to_id(std::string seq, int i);
-
-class NanoFMI {
-    public:
-
-    NanoFMI(std::ifstream &model_in, 
-            std::vector<mer_id> &mer_seq,
-            int sa_sp, int tally_sp);
-    //std::vector<mer_id> get_bwt();
-    
-
-    bool operator() (unsigned int rot1, unsigned int rot2);
-
-    private:
-    int signal_compare(mer_id mer1, mer_id mer2);
-
-    std::vector<double> em_means, em_stdevs, es_means, es_stdevs;
-    std::vector<mer_id> *mer_seq_tmp;
-    
-    //Sparseness of suffix and tally arrays
-    int tally_dist, sa_dist;
-
-    std::vector<mer_id> bwt;                        //L array
-    std::vector<int> mer_counts;                    //F array
-    std::vector< std::vector<int> > mer_tally;      //Rank tally
-    std::unordered_map<unsigned int, unsigned int> sparse_sa; //Sparse suffix array
-};
+void init_base_ids();
 
 
-NanoFMI::NanoFMI(std::ifstream &model_in, 
-                 std::vector<mer_id> &mer_seq,
-                 int sa_sp, int tally_sp) {
+/* TODO: read the actual file instead of the dummy version */
+NanoFMI::NanoFMI(std::ifstream &model_in, std::vector<mer_id> mer_seq_tmp, int sa_sp, int tally_sp) {
 
-    int alph_size = (int) pow(4, MER_LEN);
     double em_mean, em_stdev, es_mean, es_stdev;
     
     std::cerr << "Reading model\n";
@@ -62,7 +33,37 @@ NanoFMI::NanoFMI(std::ifstream &model_in,
     sa_dist = sa_sp;
     tally_dist = tally_sp;
     
-    mer_seq_tmp = &mer_seq;
+    // mer_seq_tmp = &mer_seq;
+    mer_seq = mer_seq_tmp;
+
+    // create bwt
+    make_bwt();
+}
+
+NanoFMI::NanoFMI(std::vector<double> model_in, std::vector<mer_id> mer_seq_tmp, int sa_sp, int tally_sp) {
+
+    
+    std::cerr << "Reading model\n";
+
+    for (int i = 0; i < 4096; i++) {
+        em_means.push_back(model_in[4*i+0]);
+        em_stdevs.push_back(model_in[4*i+1]);
+        es_means.push_back(model_in[4*i+2]);
+        es_stdevs.push_back(model_in[4*i+3]);
+    }
+
+    sa_dist = sa_sp;
+    tally_dist = tally_sp;
+    
+    //mer_seq_tmp = &mer_seq;
+    mer_seq = mer_seq_tmp;
+    // create bwt
+    make_bwt();
+}
+
+void NanoFMI::make_bwt() 
+{
+
     std::vector<unsigned int> suffix_ar(mer_seq.size());
 
     Timer timer;
@@ -118,16 +119,16 @@ NanoFMI::NanoFMI(std::ifstream &model_in,
 bool NanoFMI::operator() (unsigned int rot1, unsigned int rot2) {
     
     int c;
-    for (unsigned int i = 0; i < mer_seq_tmp->size(); i++) {
+    for (unsigned int i = 0; i < mer_seq.size(); i++) {
         
-        if (rot1+i >= mer_seq_tmp->size())
+        if (rot1+i >= mer_seq.size())
             return true;
         
-        if (rot2+i >= mer_seq_tmp->size())
+        if (rot2+i >= mer_seq.size())
             return false;
 
-        c = signal_compare(mer_seq_tmp->at(rot1+i), 
-                           mer_seq_tmp->at(rot2+i));
+        c = signal_compare(mer_seq.at(rot1+i), 
+                           mer_seq.at(rot2+i));
         
         if (c == 0)
             continue;
@@ -165,13 +166,14 @@ int NanoFMI::signal_compare(mer_id mer1, mer_id mer2) {
     return 0;
 }
 
-void init_base_ids() {
+void init_base_ids() 
+{
     for (unsigned int i = 0; i < ('t'+1); i++)
         BASE_IDS[i] = -1;
-    BASE_IDS['A'] = BASE_IDS['a'] = 0;
-    BASE_IDS['C'] = BASE_IDS['c'] = 1;
-    BASE_IDS['G'] = BASE_IDS['g'] = 2;
-    BASE_IDS['T'] = BASE_IDS['t'] = 3;
+    BASE_IDS[(unsigned int) 'A'] = BASE_IDS[(unsigned int) 'a'] = 0;
+    BASE_IDS[(unsigned int) 'C'] = BASE_IDS[(unsigned int) 'c'] = 1;
+    BASE_IDS[(unsigned int) 'G'] = BASE_IDS[(unsigned int) 'g'] = 2;
+    BASE_IDS[(unsigned int) 'T'] = BASE_IDS[(unsigned int) 't'] = 3;
 }
 
 //std::string id_to_mer(int id);
@@ -182,13 +184,14 @@ void init_base_ids() {
 //    return "".join(ret)
 
 mer_id mer_to_id(std::string seq, unsigned int i) {
-    mer_id id = BASE_IDS[seq[i]];
+    mer_id id = BASE_IDS[(unsigned int) seq[i]];
     for (unsigned int j = 1; j < MER_LEN; j++)
-        id = (id << 2) | BASE_IDS[seq[i+j]];
+        id = (id << 2) | BASE_IDS[(unsigned int) seq[i+j]];
     return id;
 }
 
 std::vector<mer_id> parse_fasta(std::ifstream &fasta_in) {
+    init_base_ids();
     std::vector<mer_id> ids;
     std::string cur_line, prev_line, full_seq;
 
@@ -213,10 +216,12 @@ std::vector<mer_id> parse_fasta(std::ifstream &fasta_in) {
 
 
 
+/*
 int main(int argc, char **argv) {
     
     if (argc < 3) {
         std::cerr << "Usage: nano_bwt <pore_model.txt> <reference.fasta>\n";
+        return 1;
     }
 
     init_base_ids();
@@ -229,3 +234,4 @@ int main(int argc, char **argv) {
 
     NanoFMI bwt(model_in, ids, suff_gap, tally_gap);
 }
+*/

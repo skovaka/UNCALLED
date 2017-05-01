@@ -56,16 +56,16 @@ std::vector<double> scale_model(std::vector<double> model, std::vector<Event> ev
     /* method of moments - get mean, stdv of event-level means */
     std::pair<double, double> events_mean_stdv = get_mean_stdv(event_means);
     std::pair<double, double> model_mean_stdv = get_mean_stdv(model_means);
+
     /* get scaling parameters */
-    double shift = 0.0;
-    double scale = 1.0;
     double drift = 0.0;
     double var = 1.0;
     double scale_sd = 1.0;
     double var_sd = 1.0;
     /* TODO: calculate drift? */
-    shift = events_mean_stdv.first -  model_mean_stdv.first;
-    scale = events_mean_stdv.second / model_mean_stdv.second;
+    double shift = events_mean_stdv.first -  model_mean_stdv.first;
+    double scale = events_mean_stdv.second / model_mean_stdv.second;
+
     /* scale model
      * see:
      * https://github.com/mateidavid/nanocall/blob/master/src/nanocall/Pore_Model.hpp#L126

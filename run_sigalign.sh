@@ -1,0 +1,1 @@
+sigalign random_genome.fasta r9_250bps.nucleotide.6mer.template.model 1000 1000 kelvin_20161202_FN_MN17519_sequencing_run_161202_M10_digestss_72888_ch99_read824_strand.fast5
