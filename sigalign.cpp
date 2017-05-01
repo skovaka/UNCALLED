@@ -3,17 +3,24 @@
  * basecalling */
 
 #include <iostream>
+#include <string>
+#include <unordered_map>
 
 #include "fast5.hpp"
 #include "model_tools.hpp"
+#include "nano_bwt.hpp"
 
 int main(int argc, char** argv) 
 {
-  if (argc < 2) { 
+  if (argc < 6) { 
       std::cerr << "need a file. " << 
-          "(usage: sigalign fast5_file_1 [fast5_file_2, ...]" << std::endl;
+          "(usage: sigalign reference model suffix_sp tally_sp fast5_file_1 [fast5_file_2, ...]" << std::endl;
       return 1;
   }
+  std::string ref_fname = argv[1];
+  std::string model_fname = argv[2];
+  int suffix_gap = std::stoi(argv[3]);
+  int tally_gap = std::stoi(argv[4]);
 
   /* load the model into a vector:
    * model has size 4096*4. every group of four represents a 6mer, and is
@@ -22,10 +29,15 @@ int main(int argc, char** argv)
    *  level_mean2, level_stdv2, sd_mean2, sd_stdv2, 
    *  ...]
    */
-  std::vector<double> model = load_model("r9_250bps.nucleotide.6mer.template.model");
+  std::vector<double> model = load_model(model_fname);
+
+  /* initialize the FM-index */
+  std::ifstream ref_fp(ref_fname);
+  std::vector<mer_id> ids = parse_fasta(ref_fp);
+  NanoFMI fmi(model, ids, suffix_gap, tally_gap);
 
   /* navigate through all the read files provided */
-  for (int i = 1; i < argc; i++) {
+  for (int i = 5; i < argc; i++) {
       std::vector<Event> events;
       if (not fast5::File::is_valid_file(argv[i])) {
           std::cerr << "not a valid file. skipping ... " << std::endl;
@@ -40,14 +52,6 @@ int main(int argc, char** argv)
           /* make sure that the fast5 contains an event sequence */
           if (f.have_eventdetection_events()) {
               events = f.get_eventdetection_events();
-              /* to navigate through events:
-              for (auto it = events.begin(); it < events.end(); it++) {
-                  Event e = *it;
-                  to get event mean: e.mean;
-                  to get event stdv: e.stdv;
-                  to get event start:  e.start;
-              }
-              */
           } else {
               std::cerr << "file " << argv[i] << " does not contain events. skipping..." << std::endl;
               continue;

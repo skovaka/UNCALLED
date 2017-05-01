@@ -18,3 +18,4 @@ std::vector<double> scale_model(std::vector<double> model, std::vector<Event> ev
 ScaleParams get_scale_params(std::vector<double> model, std::vector<Event> events);
 
 #endif
+
