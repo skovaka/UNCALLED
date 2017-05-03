@@ -118,3 +118,16 @@ ScaleParams get_scale_params(std::vector<double> model, std::vector<Event> event
     /* TODO: calculate drift? */
     return scale;
 }
+
+std::vector<Event> simulate_read(std::vector<double> &model, 
+                                 std::vector<mer_id> &ref, 
+                                 int start, int end) {
+    std::vector<Event> read(end - start);
+
+    for (int i = start; i < end; i++) {
+        read[i-start].mean = model[4*ref[i]];
+        read[i-start].stdv = model[4*ref[i]+1];
+    }
+
+    return read;
+}

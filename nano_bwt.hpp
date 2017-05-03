@@ -1,37 +1,39 @@
 #ifndef INCL_NANOBWT
 #define INCL_NANOBWT
 
+#include "model_tools.hpp"
 
-typedef unsigned short int mer_id;
 std::vector<mer_id> parse_fasta(std::ifstream &fasta_in);
 
 class NanoFMI 
 {
     public:
 
-    NanoFMI(std::ifstream &model_in, std::vector<mer_id> mer_seq_tmp, int sa_sp, int tally_sp);
+    NanoFMI(std::ifstream &model_in, std::vector<mer_id> &mer_seq, int tally_sp);
 
-    NanoFMI(std::vector<double> model_in, std::vector<mer_id> mer_seq_tmp, int sa_sp, int tally_sp);
+    NanoFMI(std::vector<double> model_in, std::vector<mer_id> &mer_seq, int tally_sp);
     //std::vector<mer_id> get_bwt();
-    
 
     bool operator() (unsigned int rot1, unsigned int rot2);
 
+    void lf_map(std::vector<Event> events, ScaleParams scale);
+
     private:
     int signal_compare(mer_id mer1, mer_id mer2);
+    std::vector<mer_id> match_event(Event e);
+    int tally_cp_dist(int i);
 
     std::vector<double> em_means, em_stdevs, es_means, es_stdevs;
-    std::vector<mer_id> mer_seq;
+    std::vector<mer_id> *mer_seq_tmp;
     
     //Sparseness of suffix and tally arrays
-    int tally_dist, sa_dist;
+    int tally_dist;
 
     std::vector<mer_id> bwt;                        //L array
-    std::vector<int> mer_counts;                    //F array
+    std::vector<int> mer_counts, mer_f_starts;      //F array
+    std::vector<unsigned int> suffix_ar;            //Suffix array
     std::vector< std::vector<int> > mer_tally;      //Rank tally
-    std::unordered_map<unsigned int, unsigned int> sparse_sa; //Sparse suffix array
 
-    private:
 
     void make_bwt();
     

@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
-#include <unordered_map>
+#include <tuple>
 #include <vector>
 #include <math.h>
 #include "timer.h"
@@ -16,7 +16,7 @@ void init_base_ids();
 
 
 /* TODO: read the actual file instead of the dummy version */
-NanoFMI::NanoFMI(std::ifstream &model_in, std::vector<mer_id> mer_seq_tmp, int sa_sp, int tally_sp) {
+NanoFMI::NanoFMI(std::ifstream &model_in, std::vector<mer_id> &mer_seq, int tally_sp) {
 
     double em_mean, em_stdev, es_mean, es_stdev;
     
@@ -30,17 +30,15 @@ NanoFMI::NanoFMI(std::ifstream &model_in, std::vector<mer_id> mer_seq_tmp, int s
         es_stdevs.push_back(es_stdev);
     }
 
-    sa_dist = sa_sp;
     tally_dist = tally_sp;
     
-    // mer_seq_tmp = &mer_seq;
-    mer_seq = mer_seq_tmp;
+    mer_seq_tmp = &mer_seq;
 
     // create bwt
     make_bwt();
 }
 
-NanoFMI::NanoFMI(std::vector<double> model_in, std::vector<mer_id> mer_seq_tmp, int sa_sp, int tally_sp) {
+NanoFMI::NanoFMI(std::vector<double> model_in, std::vector<mer_id> &mer_seq, int tally_sp) {
 
     
     std::cerr << "Reading model\n";
@@ -52,11 +50,10 @@ NanoFMI::NanoFMI(std::vector<double> model_in, std::vector<mer_id> mer_seq_tmp, 
         es_stdevs.push_back(model_in[4*i+3]);
     }
 
-    sa_dist = sa_sp;
     tally_dist = tally_sp;
     
-    //mer_seq_tmp = &mer_seq;
-    mer_seq = mer_seq_tmp;
+    mer_seq_tmp = &mer_seq;
+
     // create bwt
     make_bwt();
 }
@@ -64,7 +61,7 @@ NanoFMI::NanoFMI(std::vector<double> model_in, std::vector<mer_id> mer_seq_tmp, 
 void NanoFMI::make_bwt() 
 {
 
-    std::vector<unsigned int> suffix_ar(mer_seq.size());
+    suffix_ar.resize(mer_seq_tmp->size());
 
     Timer timer;
 
@@ -79,26 +76,24 @@ void NanoFMI::make_bwt()
     std::cerr << "SA sort time: " << timer.lap() << "\n";
 
     //Allocate space
-    bwt.resize(mer_seq.size());
+    bwt.resize(mer_seq_tmp->size());
+    mer_f_starts.resize(alph_size);
     mer_counts.resize(alph_size);
     mer_tally.resize(alph_size);
-    sparse_sa.reserve((mer_seq.size() / sa_dist) + 1);
-    
+
     for (mer_id i = 0; i < alph_size; i++)
-        mer_tally[i].resize((mer_seq.size() / tally_dist) + 1);
+        mer_tally[i].resize((mer_seq_tmp->size() / tally_dist) + 1);
     
     std::cerr << "FM init time: " << timer.lap() << "\n";
 
     int tally_mod = 0;
     
     for (unsigned int i = 0; i < suffix_ar.size(); i++) {
-        if (suffix_ar[i] % sa_dist == 0)
-            sparse_sa[i] = suffix_ar[i];
 
         if (suffix_ar[i] > 0)
-            bwt[i] = mer_seq[suffix_ar[i]-1];
+            bwt[i] = mer_seq_tmp->at(suffix_ar[i]-1);
         else
-            bwt[i] = mer_seq[suffix_ar[suffix_ar.size()-1]];
+            bwt[i] = mer_seq_tmp->at(suffix_ar[suffix_ar.size()-1]);
 
         mer_counts[bwt[i]]++;
 
@@ -112,6 +107,13 @@ void NanoFMI::make_bwt()
 
     std::cerr << "FM build time: " << timer.lap() << "\n";
 
+    for (mer_id i = 0; i < alph_size; i++) {
+        mer_f_starts[i] = 1;
+        for (mer_id j = 0; j < alph_size; j++)
+            if (signal_compare(i, j) < 0)
+                mer_f_starts[i] += mer_counts[j];
+    }
+
     //for (mer_id i = 0; i < alph_size; i++)
     //    std::cout << i << "\t" << mer_counts[i] << "\n";
 }
@@ -119,16 +121,16 @@ void NanoFMI::make_bwt()
 bool NanoFMI::operator() (unsigned int rot1, unsigned int rot2) {
     
     int c;
-    for (unsigned int i = 0; i < mer_seq.size(); i++) {
+    for (unsigned int i = 0; i < mer_seq_tmp->size(); i++) {
         
-        if (rot1+i >= mer_seq.size())
-            return true;
-        
-        if (rot2+i >= mer_seq.size())
-            return false;
+        //if (rot1+i >= mer_seq_tmp->size())
+        //    return true;
+        //
+        //if (rot2+i >= mer_seq_tmp->size())
+        //    return false;
 
-        c = signal_compare(mer_seq.at(rot1+i), 
-                           mer_seq.at(rot2+i));
+        c = signal_compare(mer_seq_tmp->at(rot1+i), 
+                           mer_seq_tmp->at(rot2+i));
         
         if (c == 0)
             continue;
@@ -142,7 +144,61 @@ bool NanoFMI::operator() (unsigned int rot1, unsigned int rot2) {
     return false;
 }
 
+std::vector<mer_id> NanoFMI::match_event(Event e) {
+    std::vector<mer_id> mers;
+    for (mer_id i = 0; i < em_means.size(); i++) {
+        if (e.mean == em_means[i]) //NOT GOOD
+            mers.push_back(i);
+    }
+    return mers;
+}
+
+int NanoFMI::tally_cp_dist(int i) {
+    int cp = (i / tally_dist)*tally_dist; //Closest checkpoint < i
+
+    //Check if checkpoint after i is closer
+    if (i - cp > (cp+tally_dist) - i)
+        cp += tally_dist;
+
+    return cp - i;
+}
+
+void NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
+    std::vector< std::pair<int, int> > f_locs, l_locs;
+
+
+    std::vector<mer_id> mer_ids = match_event(events.back());
+
+    for (unsigned int i = 0; i < mer_ids.size(); i++)
+        f_locs.push_back(std::make_pair(mer_f_starts[i], mer_counts[i]));
+
+    l_locs.reserve(f_locs.size());
+
+    for (unsigned int i = events.size()-2; i >= 0; i--) {
+        mer_ids = match_event(events[i]);
+
+        for(unsigned int j = 0; j < f_locs.size(); j++) {
+            int cp1 = tally_cp_dist(f_locs[j].first),
+                cp2 = tally_cp_dist(f_locs[j].second);
+                //TODO: this is not finished
+        }
+    }
+
+    //std::cout << events[i].mean << "\n";
+}
+
+
 int NanoFMI::signal_compare(mer_id mer1, mer_id mer2) {
+    if (mer1 >= em_means.size()) {
+        if (mer2 >= em_means.size())
+            return 0;
+        else
+            return -1;
+    } else if (mer2 >= em_means.size()) {
+        return 1;
+    }
+
+
     if (em_means[mer1] < em_means[mer2])
         return -1;
     else if (em_means[mer1] > em_means[mer2])
@@ -209,7 +265,7 @@ std::vector<mer_id> parse_fasta(std::ifstream &fasta_in) {
         prev_line = cur_line;
     }
 
-    //ids.push_back((int) pow(4, MER_LEN));
+    ids.push_back((int) pow(4, MER_LEN));
 
     return ids;
 }
