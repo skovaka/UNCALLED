@@ -144,11 +144,11 @@ bool NanoFMI::operator() (unsigned int rot1, unsigned int rot2) {
     return false;
 }
 
-std::vector<mer_id> NanoFMI::match_event(Event e) {
-    std::vector<mer_id> mers;
+std::vector<MerRanges> NanoFMI::match_event(Event e) {
+    std::vector<MerRanges> mers;
     for (mer_id i = 0; i < em_means.size(); i++) {
         if (e.mean == em_means[i]) //NOT GOOD
-            mers.push_back(i);
+            mers.push_back({i, std::vector()});
     }
     return mers;
 }
@@ -163,25 +163,55 @@ int NanoFMI::tally_cp_dist(int i) {
     return cp - i;
 }
 
+int NanoFMI::get_tally(mer_id c, int i) {
+    if (i < 0)
+        return -1;
+
+    int cp_dist = tally_cp_dist(i);
+    int tally = mer_tally[c][(i + cp_dist) / tally_dist];
+
+    if (cp_dist > 0) {
+        for (unsigned int j = i; j < i + cp_dist; j++)
+            if (bwt[j] == c)
+                tally--;
+
+    } else if (cp_dist < 0) {
+        for (unsigned int j = i; j > i + cp_dist; j--)
+            if (bwt[j] == c)
+                tally++;
+    }
+
+    return tally;
+}
+
 void NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
-    std::vector< std::pair<int, int> > f_locs, l_locs;
+    std::vector<MerRanges> f_locs, l_locs;
 
+    f_locs = match_event(events.back());
 
-    std::vector<mer_id> mer_ids = match_event(events.back());
-
-    for (unsigned int i = 0; i < mer_ids.size(); i++)
-        f_locs.push_back(std::make_pair(mer_f_starts[i], mer_counts[i]));
-
-    l_locs.reserve(f_locs.size());
+    for (unsigned int i = 0; i < mer_ids.size(); i++) {
+        f_locs[i].ranges.push_back(mer_f_starts[i]);
+        f_locs[i].ranges.push_back(mer_counts[i])
+    }
 
     for (unsigned int i = events.size()-2; i >= 0; i--) {
-        mer_ids = match_event(events[i]);
+        l_locs = match_event(events[i]);
 
-        for(unsigned int j = 0; j < f_locs.size(); j++) {
-            int cp1 = tally_cp_dist(f_locs[j].first),
-                cp2 = tally_cp_dist(f_locs[j].second);
-                //TODO: this is not finished
+        for (unsigned int l = 0; l < l_locs.size(); l++) { 
+            for(unsigned int f = 0; f < f_locs[f].size(); f += 1) {
+                for (int r = 0; r < f_locs[f].ranges.size(); r += 2) {
+                    int min_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r] - 1),
+                        max_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r+1]);
+
+                    if (min_tally != max_tally) {
+                        l_locs[l].ranges.push_back(min_tally+1)
+                        l_locs[l].ranges.push_back(max_tally-min_tally) 
+                    }
+                }
+            }
         }
+
+        f_locs = l_locs;
     }
 
     //std::cout << events[i].mean << "\n";
