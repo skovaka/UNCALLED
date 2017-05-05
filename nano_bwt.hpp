@@ -5,6 +5,11 @@
 
 std::vector<mer_id> parse_fasta(std::ifstream &fasta_in);
 
+typedef struct MerRanges {
+    mer_id mer;
+    std::vector<int> ranges;
+} MerRanges;
+
 class NanoFMI 
 {
     public:
@@ -20,8 +25,9 @@ class NanoFMI
 
     private:
     int signal_compare(mer_id mer1, mer_id mer2);
-    std::vector<mer_id> match_event(Event e);
+    std::vector<MerRanges> match_event(Event e, double stdv_scale = 1);
     int tally_cp_dist(int i);
+    int get_tally(mer_id c, int i);
 
     std::vector<double> em_means, em_stdevs, es_means, es_stdevs;
     std::vector<mer_id> *mer_seq_tmp;

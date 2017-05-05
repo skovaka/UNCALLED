@@ -30,6 +30,7 @@ NanoFMI::NanoFMI(std::ifstream &model_in, std::vector<mer_id> &mer_seq, int tall
         es_stdevs.push_back(es_stdev);
     }
 
+    
     tally_dist = tally_sp;
     
     mer_seq_tmp = &mer_seq;
@@ -49,6 +50,11 @@ NanoFMI::NanoFMI(std::vector<double> model_in, std::vector<mer_id> &mer_seq, int
         es_means.push_back(model_in[4*i+2]);
         es_stdevs.push_back(model_in[4*i+3]);
     }
+
+    em_means.push_back(-1);
+    em_stdevs.push_back(-1);
+    es_means.push_back(-1);
+    es_stdevs.push_back(-1);
 
     tally_dist = tally_sp;
     
@@ -95,6 +101,8 @@ void NanoFMI::make_bwt()
         else
             bwt[i] = mer_seq_tmp->at(suffix_ar[suffix_ar.size()-1]);
 
+        //std::cout << i << ":" << bwt[i] << "\n";
+
         mer_counts[bwt[i]]++;
 
         if (tally_mod == tally_dist) {
@@ -105,14 +113,17 @@ void NanoFMI::make_bwt()
         tally_mod += 1;
     }
 
+
     std::cerr << "FM build time: " << timer.lap() << "\n";
 
     for (mer_id i = 0; i < alph_size; i++) {
         mer_f_starts[i] = 1;
         for (mer_id j = 0; j < alph_size; j++)
-            if (signal_compare(i, j) < 0)
+            if (signal_compare(i, j) > 0)
                 mer_f_starts[i] += mer_counts[j];
     }
+
+
 
     //for (mer_id i = 0; i < alph_size; i++)
     //    std::cout << i << "\t" << mer_counts[i] << "\n";
@@ -144,11 +155,47 @@ bool NanoFMI::operator() (unsigned int rot1, unsigned int rot2) {
     return false;
 }
 
-std::vector<MerRanges> NanoFMI::match_event(Event e) {
+int NanoFMI::signal_compare(mer_id mer1, mer_id mer2) {
+    //if (mer1 >= em_means.size()) {
+    //    if (mer2 >= em_means.size())
+    //        return 0;
+    //    else
+    //        return -1;
+    //} else if (mer2 >= em_means.size()) {
+    //    return 1;
+    //}
+
+    if (em_means[mer1] < em_means[mer2])
+        return -1;
+    else if (em_means[mer1] > em_means[mer2])
+        return 1;
+
+    if (es_means[mer1] < es_means[mer2])
+        return -1;
+    else if (es_means[mer1] > es_means[mer2])
+        return 1;
+
+    if (em_stdevs[mer1] < em_stdevs[mer2])
+        return 1;
+    else if (em_stdevs[mer1] > em_stdevs[mer2])
+        return -1;
+
+    if (es_stdevs[mer1] < es_stdevs[mer2])
+        return 1;
+    else if (es_stdevs[mer1] > es_stdevs[mer2])
+        return -1;
+
+    return 0;
+}
+
+std::vector<MerRanges> NanoFMI::match_event(Event e, double stdv_scale) {
     std::vector<MerRanges> mers;
     for (mer_id i = 0; i < em_means.size(); i++) {
-        if (e.mean == em_means[i]) //NOT GOOD
-            mers.push_back({i, std::vector()});
+        if ((e.mean <= em_means[i] && e.mean + (e.stdv * stdv_scale) > em_means[i] - (es_means[i] * stdv_scale)) ||
+            (e.mean  > em_means[i] && e.mean - (e.stdv * stdv_scale) < em_means[i] + (es_means[i] * stdv_scale))) {
+            MerRanges m = {i, std::vector<int>()};
+            mers.push_back(m);
+        }
     }
     return mers;
 }
@@ -157,7 +204,7 @@ int NanoFMI::tally_cp_dist(int i) {
     int cp = (i / tally_dist)*tally_dist; //Closest checkpoint < i
 
     //Check if checkpoint after i is closer
-    if (i - cp > (cp+tally_dist) - i)
+    if (i - cp > (cp + tally_dist) - i)
         cp += tally_dist;
 
     return cp - i;
@@ -188,69 +235,51 @@ void NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
     std::vector<MerRanges> f_locs, l_locs;
 
     f_locs = match_event(events.back());
-
-    for (unsigned int i = 0; i < mer_ids.size(); i++) {
-        f_locs[i].ranges.push_back(mer_f_starts[i]);
-        f_locs[i].ranges.push_back(mer_counts[i])
+    for (unsigned int f = 0; f < f_locs.size(); f++) {
+        f_locs[f].ranges.push_back(mer_f_starts[f_locs[f].mer]);
+        f_locs[f].ranges.push_back(mer_f_starts[f_locs[f].mer]+mer_counts[f_locs[f].mer]-1);
     }
 
-    for (unsigned int i = events.size()-2; i >= 0; i--) {
+    bool mer_matched;
+
+    for (int i = events.size()-2; i >= 0; i--) {
+
         l_locs = match_event(events[i]);
+        mer_matched = false;
 
         for (unsigned int l = 0; l < l_locs.size(); l++) { 
-            for(unsigned int f = 0; f < f_locs[f].size(); f += 1) {
-                for (int r = 0; r < f_locs[f].ranges.size(); r += 2) {
+            for(unsigned int f = 0; f < f_locs.size(); f ++) {
+                for (unsigned int r = 0; r < f_locs[f].ranges.size(); r += 2) {
                     int min_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r] - 1),
-                        max_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r+1]);
+                        max_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r + 1]);
 
                     if (min_tally != max_tally) {
-                        l_locs[l].ranges.push_back(min_tally+1)
-                        l_locs[l].ranges.push_back(max_tally-min_tally) 
+                        l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+min_tally);
+                        l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+max_tally);
+                        mer_matched = true;
                     }
                 }
             }
         }
 
-        f_locs = l_locs;
+        f_locs.swap(l_locs);
+        //l_locs.clear();
+
+        if (!mer_matched)
+            break;
     }
 
-    //std::cout << events[i].mean << "\n";
+    if (mer_matched) {
+        for (int l = 0; l < f_locs.size(); l++)
+            for (int r = 0; r < f_locs[l].ranges.size(); r += 2)
+                for (int s = f_locs[l].ranges[r]; s < f_locs[l].ranges[r+1]; s++)
+                    std::cerr << "Match: " << suffix_ar[s] << "\n";
+    }
+
+    std::cerr << mer_matched << "\n";
 }
 
 
-int NanoFMI::signal_compare(mer_id mer1, mer_id mer2) {
-    if (mer1 >= em_means.size()) {
-        if (mer2 >= em_means.size())
-            return 0;
-        else
-            return -1;
-    } else if (mer2 >= em_means.size()) {
-        return 1;
-    }
-
-
-    if (em_means[mer1] < em_means[mer2])
-        return -1;
-    else if (em_means[mer1] > em_means[mer2])
-        return 1;
-
-    if (es_means[mer1] < es_means[mer2])
-        return -1;
-    else if (es_means[mer1] > es_means[mer2])
-        return 1;
-
-    if (em_stdevs[mer1] < em_stdevs[mer2])
-        return 1;
-    else if (em_stdevs[mer1] > em_stdevs[mer2])
-        return -1;
-
-    if (es_stdevs[mer1] < es_stdevs[mer2])
-        return 1;
-    else if (es_stdevs[mer1] > es_stdevs[mer2])
-        return -1;
-
-    return 0;
-}
 
 void init_base_ids() 
 {

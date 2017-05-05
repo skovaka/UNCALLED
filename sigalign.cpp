@@ -35,7 +35,7 @@ int main(int argc, char** argv)
     std::vector<mer_id> ids = parse_fasta(ref_fp);
     NanoFMI fmi(model, ids, tally_gap);
 
-    std::vector<Event> read = simulate_read(model, ids, 0, 10);
+    std::vector<Event> read = simulate_read(model, ids, 0, 14);
 
     fmi.lf_map(read, ScaleParams());
 
