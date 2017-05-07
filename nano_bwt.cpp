@@ -67,17 +67,21 @@ NanoFMI::NanoFMI(std::vector<double> model_in, std::vector<mer_id> &mer_seq, int
 void NanoFMI::make_bwt() 
 {
 
-    suffix_ar.resize(mer_seq_tmp->size());
+    //suffix_ar.resize(mer_seq_tmp->size());
 
     Timer timer;
 
-    for (unsigned int i = 0; i < suffix_ar.size(); i++) {
-        suffix_ar[i] = i;
+    std::vector<unsigned int> suffix_ar_tmp(mer_seq_tmp->size());
+
+    for (unsigned int i = 0; i < suffix_ar_tmp.size(); i++) {
+        suffix_ar_tmp[i] = i;
     }
 
     std::cerr << "SA init time: " << timer.lap() << "\n";
 
-    std::sort(suffix_ar.begin(), suffix_ar.end(), *this);
+    std::sort(suffix_ar_tmp.begin(), suffix_ar_tmp.end(), *this);
+
+    suffix_ar.swap(suffix_ar_tmp);
 
     std::cerr << "SA sort time: " << timer.lap() << "\n";
 

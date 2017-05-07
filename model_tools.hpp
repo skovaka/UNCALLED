@@ -3,6 +3,8 @@
 
 #include "fast5.hpp"
 
+typedef unsigned short int mer_id;
+
 typedef struct ScaleParams {
     double shift = 0.0;
     double scale = 1.0;

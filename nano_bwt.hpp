@@ -5,6 +5,7 @@
 
 std::vector<mer_id> parse_fasta(std::ifstream &fasta_in);
 
+
 typedef struct MerRanges {
     mer_id mer;
     std::vector<int> ranges;
