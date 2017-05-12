@@ -77,6 +77,7 @@ void NanoFMI::make_bwt()
         suffix_ar_tmp[i] = i;
     }
 
+
     std::cerr << "SA init time: " << timer.lap() << "\n";
 
     std::sort(suffix_ar_tmp.begin(), suffix_ar_tmp.end(), *this);
@@ -96,7 +97,7 @@ void NanoFMI::make_bwt()
     
     std::cerr << "FM init time: " << timer.lap() << "\n";
 
-    int tally_mod = 0;
+    int tally_mod = tally_dist;
     
     for (unsigned int i = 0; i < suffix_ar.size(); i++) {
 
@@ -105,18 +106,16 @@ void NanoFMI::make_bwt()
         else
             bwt[i] = mer_seq_tmp->at(suffix_ar[suffix_ar.size()-1]);
 
-        //std::cout << i << ":" << bwt[i] << "\n";
 
         mer_counts[bwt[i]]++;
 
         if (tally_mod == tally_dist) {
             for (mer_id j = 0; j < alph_size; j++)
-                mer_tally[j][i / tally_dist] = mer_counts[bwt[i]];
+                mer_tally[j][i / tally_dist] = mer_counts[j];
             tally_mod = 0;
         }
         tally_mod += 1;
     }
-
 
     std::cerr << "FM build time: " << timer.lap() << "\n";
 
@@ -195,8 +194,9 @@ int NanoFMI::signal_compare(mer_id mer1, mer_id mer2) {
 std::vector<MerRanges> NanoFMI::match_event(Event e, double stdv_scale) {
     std::vector<MerRanges> mers;
     for (mer_id i = 0; i < em_means.size(); i++) {
-        if ((e.mean <= em_means[i] && e.mean + (e.stdv * stdv_scale) > em_means[i] - (es_means[i] * stdv_scale)) ||
+        if ((e.mean <= em_means[i] && e.mean + (e.stdv * stdv_scale) >= em_means[i] - (es_means[i] * stdv_scale)) ||
             (e.mean  > em_means[i] && e.mean - (e.stdv * stdv_scale) < em_means[i] + (es_means[i] * stdv_scale))) {
+        //if (e.mean == em_means[i]) {
             MerRanges m = {i, std::vector<int>()};
             mers.push_back(m);
         }
@@ -208,7 +208,7 @@ int NanoFMI::tally_cp_dist(int i) {
     int cp = (i / tally_dist)*tally_dist; //Closest checkpoint < i
 
     //Check if checkpoint after i is closer
-    if (i - cp > (cp + tally_dist) - i)
+    if (i - cp > (cp + tally_dist) - i && cp + tally_dist < bwt.size())
         cp += tally_dist;
 
     return cp - i;
@@ -221,8 +221,9 @@ int NanoFMI::get_tally(mer_id c, int i) {
     int cp_dist = tally_cp_dist(i);
     int tally = mer_tally[c][(i + cp_dist) / tally_dist];
 
+
     if (cp_dist > 0) {
-        for (unsigned int j = i; j < i + cp_dist; j++)
+        for (unsigned int j = i+1; j <= i + cp_dist; j++)
             if (bwt[j] == c)
                 tally--;
 
@@ -244,22 +245,31 @@ void NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
         f_locs[f].ranges.push_back(mer_f_starts[f_locs[f].mer]+mer_counts[f_locs[f].mer]-1);
     }
 
-    bool mer_matched;
+    bool mer_matched = false;
 
     for (int i = events.size()-2; i >= 0; i--) {
 
-        l_locs = match_event(events[i]);
+        l_locs = match_event(events[i], 1);
         mer_matched = false;
+
+        int size = 0;
+        for(unsigned int f = 0; f < f_locs.size(); f ++) 
+            size += f_locs[f].ranges.size();
+
+        //std::cout << "Aligning " << f_locs.size() << " " << size << " " << l_locs.size() << "\n";
 
         for (unsigned int l = 0; l < l_locs.size(); l++) { 
             for(unsigned int f = 0; f < f_locs.size(); f ++) {
                 for (unsigned int r = 0; r < f_locs[f].ranges.size(); r += 2) {
                     int min_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r] - 1),
                         max_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r + 1]);
+                    
+                    //std::cout << f_locs[f].ranges[r] << " " << f_locs[f].ranges[r + 1] << "\n";
+                    //std::cout << min_tally << " " << max_tally << "\n";
 
                     if (min_tally != max_tally) {
                         l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+min_tally);
-                        l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+max_tally);
+                        l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+max_tally-1);
                         mer_matched = true;
                     }
                 }
@@ -274,10 +284,13 @@ void NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
     }
 
     if (mer_matched) {
-        for (int l = 0; l < f_locs.size(); l++)
-            for (int r = 0; r < f_locs[l].ranges.size(); r += 2)
-                for (int s = f_locs[l].ranges[r]; s < f_locs[l].ranges[r+1]; s++)
+        for (int l = 0; l < f_locs.size(); l++) {
+            for (int r = 0; r < f_locs[l].ranges.size(); r += 2) {
+                for (int s = f_locs[l].ranges[r]; s <= f_locs[l].ranges[r+1]; s++) {
                     std::cerr << "Match: " << suffix_ar[s] << "\n";
+                }
+            }
+        }
     }
 
     std::cerr << mer_matched << "\n";
