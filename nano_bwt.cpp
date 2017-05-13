@@ -191,8 +191,9 @@ int NanoFMI::signal_compare(mer_id mer1, mer_id mer2) {
     return 0;
 }
 
-std::vector<MerRanges> NanoFMI::match_event(Event e, double stdv_scale) {
+std::vector<MerRanges> NanoFMI::match_event(Event e, ScaleParams scale) {
     std::vector<MerRanges> mers;
+    double stdv_scale = scale.var;
     for (mer_id i = 0; i < em_means.size(); i++) {
         if ((e.mean <= em_means[i] && e.mean + (e.stdv * stdv_scale) >= em_means[i] - (es_means[i] * stdv_scale)) ||
             (e.mean  > em_means[i] && e.mean - (e.stdv * stdv_scale) < em_means[i] + (es_means[i] * stdv_scale))) {
@@ -239,7 +240,7 @@ int NanoFMI::get_tally(mer_id c, int i) {
 void NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
     std::vector<MerRanges> f_locs, l_locs;
 
-    f_locs = match_event(events.back());
+    f_locs = match_event(events.back(), scale);
     for (unsigned int f = 0; f < f_locs.size(); f++) {
         f_locs[f].ranges.push_back(mer_f_starts[f_locs[f].mer]);
         f_locs[f].ranges.push_back(mer_f_starts[f_locs[f].mer]+mer_counts[f_locs[f].mer]-1);
@@ -249,7 +250,7 @@ void NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
 
     for (int i = events.size()-2; i >= 0; i--) {
 
-        l_locs = match_event(events[i], 1);
+        l_locs = match_event(events[i], scale);
         mer_matched = false;
 
         int size = 0;
