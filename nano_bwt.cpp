@@ -4,8 +4,11 @@
 #include <tuple>
 #include <vector>
 #include <math.h>
+#include <stddef.h>
 #include "timer.h"
 #include "nano_bwt.hpp"
+#include "boost/math/distributions/students_t.hpp"
+
 
 #define MER_LEN 6
 
@@ -189,6 +192,21 @@ int NanoFMI::signal_compare(mer_id mer1, mer_id mer2) {
         return -1;
 
     return 0;
+}
+
+double NanoFMI::t_test(Event e, int i, ScaleParams scale) 
+{
+    // scale model mean
+    double model_mean = em_means[i] * scale.scale + scale.shift;
+    double model_stdv = em_stdevs[i] * scale.var;
+
+    // calculate t-stat
+    // https://en.wikipedia.org/wiki/Student%27s_t-test#Equal_or_unequal_sample_sizes.2C_equal_variance
+    double t = (e.mean - model_mean) / (sqrt(2/e.length) * sqrt(pow(model_stdv, 2) + pow(e.stdv, 2)/2));
+    int df = (e.length * 2) - 2;
+    boost::math::students_t dist(df);
+    double p = 2 * boost::math::cdf(dist, fabs(t));
+    return p;
 }
 
 std::vector<MerRanges> NanoFMI::match_event(Event e, ScaleParams scale) {
