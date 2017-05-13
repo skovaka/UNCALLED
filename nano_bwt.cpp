@@ -202,20 +202,27 @@ double NanoFMI::t_test(Event e, int i, ScaleParams scale)
 
     // calculate t-stat
     // https://en.wikipedia.org/wiki/Student%27s_t-test#Equal_or_unequal_sample_sizes.2C_equal_variance
-    double t = (e.mean - model_mean) / (sqrt(2/e.length) * sqrt(pow(model_stdv, 2) + pow(e.stdv, 2)/2));
+
+    double s_p = sqrt((pow(model_stdv, 2) + pow(e.stdv, 2))/2.0);
+    double t = (e.mean - model_mean) / (sqrt(2.0/e.length) * s_p);
     int df = (e.length * 2) - 2;
     boost::math::students_t dist(df);
-    double p = 2 * boost::math::cdf(dist, fabs(t));
-    return p;
+    // probability that the difference is due to chance
+    double q = boost::math::cdf(boost::math::complement(dist, fabs(t)));
+    // std::cerr << "q: " << q << std::endl;
+    return q;
 }
 
 std::vector<MerRanges> NanoFMI::match_event(Event e, ScaleParams scale) {
     std::vector<MerRanges> mers;
-    double stdv_scale = scale.var;
     for (mer_id i = 0; i < em_means.size(); i++) {
-        if ((e.mean <= em_means[i] && e.mean + (e.stdv * stdv_scale) >= em_means[i] - (es_means[i] * stdv_scale)) ||
-            (e.mean  > em_means[i] && e.mean - (e.stdv * stdv_scale) < em_means[i] + (es_means[i] * stdv_scale))) {
-        //if (e.mean == em_means[i]) {
+        // double smean = (em_means[i] * scale.scale) + scale.shift;
+        // double sstdv = em_stdevs[i] * scale.var;
+        // if ( ((e.mean <= smean) && (e.mean + e.stdv >= smean - sstdv))   ||
+        //      ((e.mean >  smean) && (e.mean - e.stdv <  smean + sstdv)) ) {
+        // decrease alpha to increase sensitivity
+        double alpha = 0.05;
+        if (t_test(e, i, scale) > alpha/2) {
             MerRanges m = {i, std::vector<int>()};
             mers.push_back(m);
         }
@@ -227,7 +234,7 @@ int NanoFMI::tally_cp_dist(int i) {
     int cp = (i / tally_dist)*tally_dist; //Closest checkpoint < i
 
     //Check if checkpoint after i is closer
-    if (i - cp > (cp + tally_dist) - i && cp + tally_dist < bwt.size())
+    if (i - cp > (cp + tally_dist) - i && cp + (unsigned) tally_dist < bwt.size())
         cp += tally_dist;
 
     return cp - i;
@@ -242,12 +249,12 @@ int NanoFMI::get_tally(mer_id c, int i) {
 
 
     if (cp_dist > 0) {
-        for (unsigned int j = i+1; j <= i + cp_dist; j++)
+        for (int j = i+1; j <= i + cp_dist; j++)
             if (bwt[j] == c)
                 tally--;
 
     } else if (cp_dist < 0) {
-        for (unsigned int j = i; j > i + cp_dist; j--)
+        for (int j = i; j > i + cp_dist; j--)
             if (bwt[j] == c)
                 tally++;
     }
@@ -303,8 +310,8 @@ void NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
     }
 
     if (mer_matched) {
-        for (int l = 0; l < f_locs.size(); l++) {
-            for (int r = 0; r < f_locs[l].ranges.size(); r += 2) {
+        for (unsigned int l = 0; l < f_locs.size(); l++) {
+            for (unsigned int r = 0; r < f_locs[l].ranges.size(); r += 2) {
                 for (int s = f_locs[l].ranges[r]; s <= f_locs[l].ranges[r+1]; s++) {
                     std::cerr << "Match: " << suffix_ar[s] << "\n";
                 }
