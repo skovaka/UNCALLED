@@ -3,7 +3,7 @@ HDF5_LIB=-L./src/hdf5/lib ./src/hdf5/lib/libhdf5.a
 HDF5_INCLUDE=-I./src/hdf5/include
 CC=g++
 CFLAGS=-Wall -std=c++11
-INCLUDE=-I./src/fast5/src -I./src
+INCLUDE=-I./src/fast5/src -I./src -I./src/boost
 
 
 
