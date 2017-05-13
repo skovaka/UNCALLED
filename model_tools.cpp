@@ -58,7 +58,7 @@ std::vector<double> scale_model(std::vector<double> model, std::vector<Event> ev
     std::pair<double, double> model_mean_stdv = get_mean_stdv(model_means);
 
     /* get scaling parameters */
-    double drift = 0.0;
+    // double drift = 0.0;
     double var = 1.0;
     double scale_sd = 1.0;
     double var_sd = 1.0;
@@ -127,6 +127,7 @@ std::vector<Event> simulate_read(std::vector<double> &model,
     for (int i = start; i < end; i++) {
         read[i-start].mean = model[4*ref[i]];
         read[i-start].stdv = model[4*ref[i]+1];
+        read[i-start].length = 4;
     }
 
     return read;
