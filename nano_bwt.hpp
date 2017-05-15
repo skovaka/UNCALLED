@@ -22,7 +22,7 @@ class NanoFMI
 
     bool operator() (unsigned int rot1, unsigned int rot2);
 
-    void lf_map(std::vector<Event> events, ScaleParams scale);
+    int lf_map(std::vector<Event> events, ScaleParams scale);
 
     private:
     int signal_compare(mer_id mer1, mer_id mer2);

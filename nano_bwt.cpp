@@ -216,13 +216,13 @@ double NanoFMI::t_test(Event e, int i, ScaleParams scale)
 std::vector<MerRanges> NanoFMI::match_event(Event e, ScaleParams scale) {
     std::vector<MerRanges> mers;
     for (mer_id i = 0; i < em_means.size(); i++) {
-        // double smean = (em_means[i] * scale.scale) + scale.shift;
-        // double sstdv = em_stdevs[i] * scale.var;
-        // if ( ((e.mean <= smean) && (e.mean + e.stdv >= smean - sstdv))   ||
-        //      ((e.mean >  smean) && (e.mean - e.stdv <  smean + sstdv)) ) {
+        double smean = (em_means[i] * scale.scale) + scale.shift;
+        double sstdv = em_stdevs[i] * scale.var;
+        if ( ((e.mean <= smean) && (e.mean + e.stdv >= smean - sstdv))   ||
+             ((e.mean >  smean) && (e.mean - e.stdv <  smean + sstdv)) ) {
         // decrease alpha to increase sensitivity
-        double alpha = 0.05;
-        if (t_test(e, i, scale) > alpha/2) {
+        // double alpha = 0.05;
+        // if (t_test(e, i, scale) > alpha/2) {
             MerRanges m = {i, std::vector<int>()};
             mers.push_back(m);
         }
@@ -262,7 +262,7 @@ int NanoFMI::get_tally(mer_id c, int i) {
     return tally;
 }
 
-void NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
+int NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
     std::vector<MerRanges> f_locs, l_locs;
 
     f_locs = match_event(events.back(), scale);
@@ -309,17 +309,20 @@ void NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
             break;
     }
 
+    int count = 0;
     if (mer_matched) {
         for (unsigned int l = 0; l < f_locs.size(); l++) {
             for (unsigned int r = 0; r < f_locs[l].ranges.size(); r += 2) {
                 for (int s = f_locs[l].ranges[r]; s <= f_locs[l].ranges[r+1]; s++) {
-                    std::cerr << "Match: " << suffix_ar[s] << "\n";
+                    // std::cerr << "Match: " << suffix_ar[s] << "\n";
+                    count += 1;
                 }
             }
         }
     }
 
-    std::cerr << mer_matched << "\n";
+    // std::cerr << mer_matched << "\n";
+    return count;
 }
 
 

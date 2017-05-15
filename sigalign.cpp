@@ -5,10 +5,12 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
+#include <math.h>
 
 #include "fast5.hpp"
 #include "model_tools.hpp"
 #include "nano_bwt.hpp"
+#include "timer.h"
 
 int main(int argc, char** argv) 
 {
@@ -35,40 +37,53 @@ int main(int argc, char** argv)
     std::vector<mer_id> ids = parse_fasta(ref_fp);
     NanoFMI fmi(model, ids, tally_gap);
 
-    std::vector<Event> read = simulate_read(model, ids, 0, 14);
+    std::cout << "read_name\tk\ttime\tpos_in_read\tmatches" << std::endl;
+    Timer timer;
+    // for (int i = 2; i < 16; i++) {
+    //     std::vector<Event> read = simulate_read(model, ids, 0, pow(2, i));
+    //     int count = 0;
+    //     count = fmi.lf_map(read, ScaleParams());
+    // }
 
-    fmi.lf_map(read, ScaleParams());
-
-    std::cout << "ok\n";
+    // std::cout << "ok\n";
 
     /* navigate through all the read files provided */
-    /*
-       for (int i = 5; i < argc; i++) {
-       std::vector<Event> events;
-       if (not fast5::File::is_valid_file(argv[i])) {
-       std::cerr << "not a valid file. skipping ... " << std::endl;
-       continue;
-       }
-       fast5::File f;
-       try
-       {
-       f.open(argv[i]);
-       assert(f.is_open());
-       std::cout << "processing read " << argv[i] << std::endl;
-    //make sure that the fast5 contains an event sequence 
-    if (f.have_eventdetection_events()) {
-    events = f.get_eventdetection_events();
-    } else {
-    std::cerr << "file " << argv[i] << " does not contain events. skipping..." << std::endl;
-    continue;
+    for (int fix = 4; fix < argc; fix++) {
+        std::vector<Event> events;
+        if (not fast5::File::is_valid_file(argv[fix])) {
+            std::cerr << "<" << argv[fix] << "> is not a valid file. skipping... " << std::endl;
+            continue;
+        }
+        fast5::File f;
+        try
+        {
+            f.open(argv[fix]);
+            assert(f.is_open());
+            std::cerr << "processing read " << argv[fix] << std::endl;
+            //make sure that the fast5 contains an event sequence 
+            if (f.have_eventdetection_events()) {
+                events = f.get_eventdetection_events();
+            } else {
+                std::cerr << "file " << argv[fix] << " does not contain events. skipping..." << std::endl;
+                continue;
+            }
+            ScaleParams scale = get_scale_params(model, events);
+            //TODO: start alignment, pass in scale, model (?), events
+            
+            for (int p = 3; p < 12; p++) {
+                int k = pow(2, p);
+                // for (int i = 0; i < events.size() + k - 1; i++) {
+                for (int i = 0; i < 1000; i++) {
+                    std::vector<Event> kmer(events.begin() + i, events.begin() + i + k);
+                    int count = 0;
+                    count = fmi.lf_map(kmer, scale);
+                    std::cout << argv[fix] << "\t" << k << "\t" << timer.lap() << "\t" << i << "\t" << count << std::endl;
+                }
+            }
+        }
+        catch (hdf5_tools::Exception& e)
+        {
+            std::cerr << "hdf5 error: " << e.what() << std::endl;
+        }
     }
-    ScaleParams scale = get_scale_params(model, events);
-    //TODO: start alignment, pass in scale, model (?), events
-    }
-    catch (hdf5_tools::Exception& e)
-    {
-    std::cout << "hdf5 error: " << e.what() << std::endl;
-    }
-    }
-    */
 }
