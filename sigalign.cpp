@@ -34,18 +34,30 @@ int main(int argc, char** argv)
 
     /* initialize the FM-index */
     std::ifstream ref_fp(ref_fname);
-    std::vector<mer_id> ids = parse_fasta(ref_fp);
-    NanoFMI fmi(model, ids, tally_gap);
+    std::vector<mer_id> fwd_ids, rev_ids;
+
+    Timer timer;
+
+    std::cerr << "Parsing fasta\n";
+    parse_fasta(ref_fp, fwd_ids, rev_ids);
+
+    std::cerr << "Building forward FMI\n";
+    NanoFMI fwd_fmi(model, fwd_ids, tally_gap);
+
+    std::cerr << "Building reverse FMI\n";
+    NanoFMI  rev_fmi(model, rev_ids, tally_gap);
+
+    std::vector<Event> read = simulate_read(model, rev_ids, 0, 14);
+
+    std::cerr << "Mapping to foward index\n";
+    fwd_fmi.lf_map(read, ScaleParams());
+
+    std::cerr << "Mapping to reverse index\n";
+    rev_fmi.lf_map(read, ScaleParams());
+
+    std::cerr << "Done\n";
 
     std::cout << "read_name\tk\ttime\tpos_in_read\tmatches" << std::endl;
-    Timer timer;
-    // for (int i = 2; i < 16; i++) {
-    //     std::vector<Event> read = simulate_read(model, ids, 0, pow(2, i));
-    //     int count = 0;
-    //     count = fmi.lf_map(read, ScaleParams());
-    // }
-
-    // std::cout << "ok\n";
 
     /* navigate through all the read files provided */
     for (int fix = 4; fix < argc; fix++) {
@@ -75,8 +87,11 @@ int main(int argc, char** argv)
                 // for (int i = 0; i < events.size() + k - 1; i++) {
                 for (int i = 0; i < 1000; i++) {
                     std::vector<Event> kmer(events.begin() + i, events.begin() + i + k);
-                    int count = 0;
-                    count = fmi.lf_map(kmer, scale);
+                    int count1  = 0;
+                    int count2 = 0;
+                    count1 = fwd_fmi.lf_map(kmer, scale);
+                    count2 = rev_fmi.lf_map(kmer, scale);
+                    int count = count1 > count2 ? count1 : count2;
                     std::cout << argv[fix] << "\t" << k << "\t" << timer.lap() << "\t" << i << "\t" << count << std::endl;
                 }
             }

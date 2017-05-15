@@ -5,6 +5,7 @@
 #include <vector>
 #include <math.h>
 #include <stddef.h>
+#include <list>
 #include "timer.h"
 #include "nano_bwt.hpp"
 #include "boost/math/distributions/students_t.hpp"
@@ -96,7 +97,7 @@ void NanoFMI::make_bwt()
     mer_tally.resize(alph_size);
 
     for (mer_id i = 0; i < alph_size; i++)
-        mer_tally[i].resize((mer_seq_tmp->size() / tally_dist) + 1);
+        mer_tally[i].resize((mer_seq_tmp->size() / tally_dist) + 1, -1);
     
     std::cerr << "FM init time: " << timer.lap() << "\n";
 
@@ -129,10 +130,10 @@ void NanoFMI::make_bwt()
                 mer_f_starts[i] += mer_counts[j];
     }
 
+    if (mer_seq_tmp->size() % tally_dist == 0)
+        for (mer_id i = 0; i < alph_size; i++)
+            mer_tally[i][mer_tally[i].size()-1] = mer_counts[i];
 
-
-    //for (mer_id i = 0; i < alph_size; i++)
-    //    std::cout << i << "\t" << mer_counts[i] << "\n";
 }
     
 bool NanoFMI::operator() (unsigned int rot1, unsigned int rot2) {
@@ -282,16 +283,12 @@ int NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
         for(unsigned int f = 0; f < f_locs.size(); f ++) 
             size += f_locs[f].ranges.size();
 
-        //std::cout << "Aligning " << f_locs.size() << " " << size << " " << l_locs.size() << "\n";
-
         for (unsigned int l = 0; l < l_locs.size(); l++) { 
             for(unsigned int f = 0; f < f_locs.size(); f ++) {
                 for (unsigned int r = 0; r < f_locs[f].ranges.size(); r += 2) {
                     int min_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r] - 1),
                         max_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r + 1]);
                     
-                    //std::cout << f_locs[f].ranges[r] << " " << f_locs[f].ranges[r + 1] << "\n";
-                    //std::cout << min_tally << " " << max_tally << "\n";
 
                     if (min_tally != max_tally) {
                         l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+min_tally);
@@ -337,44 +334,68 @@ void init_base_ids()
     BASE_IDS[(unsigned int) 'T'] = BASE_IDS[(unsigned int) 't'] = 3;
 }
 
-//std::string id_to_mer(int id);
-//def i_to_mer(i):
-//    ret = [0]*MER_LEN
-//    for n in range(0, MER_LEN):
-//        ret[MER_LEN-n-1] = BASES[(i >> n*2) & 3]
-//    return "".join(ret)
+char rev_base(char c) {
+    switch (c) {
+        case 'A':
+        case 'a':
+            return 'T';
+        case 'C':
+        case 'c':
+            return 'G';
+        case 'G':
+        case 'g':
+            return 'c';
+        case 'T':
+        case 't':
+            return 'A';
+        default:
+            return 'N';
+    }
 
-mer_id mer_to_id(std::string seq, unsigned int i) {
+    return 'N';
+}
+
+mer_id mer_to_id(std::string &seq, unsigned int i) {
     mer_id id = BASE_IDS[(unsigned int) seq[i]];
     for (unsigned int j = 1; j < MER_LEN; j++)
         id = (id << 2) | BASE_IDS[(unsigned int) seq[i+j]];
     return id;
 }
 
-std::vector<mer_id> parse_fasta(std::ifstream &fasta_in) {
+void parse_fasta(std::ifstream &fasta_in, 
+                 std::vector<mer_id> &fwd_ids, 
+                 std::vector<mer_id> &rev_ids) {
     init_base_ids();
-    std::vector<mer_id> ids;
-    std::string cur_line, prev_line, full_seq;
+    std::list<mer_id> rev_list;
+    std::string cur_line, prev_line, fwd_seq, rev_seq;
 
     getline(fasta_in, cur_line); //read past header
 
     while (getline(fasta_in, cur_line)) {
         if (prev_line.size() > 0)
-            full_seq = prev_line.substr(prev_line.size()-MER_LEN+1) + cur_line;
+            fwd_seq = prev_line.substr(prev_line.size()-MER_LEN+1) + cur_line;
         else
-            full_seq = cur_line;
+            fwd_seq = cur_line;
         
-        for (unsigned int i = 0; i < full_seq.size() - MER_LEN + 1; i++)
-            ids.push_back(mer_to_id(full_seq, i));
+        for (unsigned int i = 0; i < fwd_seq.size() - MER_LEN + 1; i++)
+            fwd_ids.push_back(mer_to_id(fwd_seq, i));
+
+        rev_seq = std::string(fwd_seq.size(), ' ');
+        for (unsigned int i = 0; i < fwd_seq.size(); i++)
+            rev_seq[rev_seq.size()-i-1] = rev_base(fwd_seq[i]);
+
+        for (unsigned int i = rev_seq.size() - MER_LEN; i < rev_seq.size(); i--)
+            rev_list.push_front(mer_to_id(rev_seq, i));
 
         prev_line = cur_line;
     }
 
-    ids.push_back((int) pow(4, MER_LEN));
+    rev_ids = std::vector<mer_id>(rev_list.begin(), rev_list.end());
 
-    return ids;
+    fwd_ids.push_back((int) pow(4, MER_LEN));
+    rev_ids.push_back((int) pow(4, MER_LEN));
+
 }
-
 
 
 /*
