@@ -32,14 +32,26 @@ int main(int argc, char** argv)
 
     /* initialize the FM-index */
     std::ifstream ref_fp(ref_fname);
-    std::vector<mer_id> ids = parse_fasta(ref_fp);
-    NanoFMI fmi(model, ids, tally_gap);
+    std::vector<mer_id> fwd_ids, rev_ids;
 
-    std::vector<Event> read = simulate_read(model, ids, 0, 14);
+    std::cerr << "Parsing fasta\n";
+    parse_fasta(ref_fp, fwd_ids, rev_ids);
 
-    fmi.lf_map(read, ScaleParams());
+    std::cerr << "Building forward FMI\n";
+    NanoFMI fwd_fmi(model, fwd_ids, tally_gap);
 
-    std::cout << "ok\n";
+    std::cerr << "Building reverse FMI\n";
+    NanoFMI  rev_fmi(model, rev_ids, tally_gap);
+
+    std::vector<Event> read = simulate_read(model, rev_ids, 0, 14);
+
+    std::cerr << "Mapping to foward index\n";
+    fwd_fmi.lf_map(read, ScaleParams());
+
+    std::cerr << "Mapping to reverse index\n";
+    rev_fmi.lf_map(read, ScaleParams());
+
+    std::cerr << "Done\n";
 
     /* navigate through all the read files provided */
     /*

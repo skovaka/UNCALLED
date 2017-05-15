@@ -3,7 +3,9 @@
 
 #include "model_tools.hpp"
 
-std::vector<mer_id> parse_fasta(std::ifstream &fasta_in);
+void parse_fasta(std::ifstream &fasta_in, 
+                 std::vector<mer_id> &fwd_ids, 
+                 std::vector<mer_id> &rev_ids);
 
 
 typedef struct MerRanges {
