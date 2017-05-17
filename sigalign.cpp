@@ -13,11 +13,11 @@
 #include "timer.h"
 
 
-void align_kmers(NanoFMI& fmi, std::vector<Event>& events, ScaleParams scale)
+void align_kmers(std::string name, std::string strand, NanoFMI& fmi, std::vector<Event>& events, ScaleParams scale)
 {
     Timer timer;
     // for each k-mer length (step:k=2*k)
-    for (int k = pow(2,3); k < pow(2, 3) + 1; k = 2*k) {
+    for (int k = pow(2,4); k < pow(2, 7) + 1; k = 2*k) {
         int aligned_kmers = 0;
         // align each k-mer of length k
         for (int i = 0; i < events.size() - k + 1; i++) {
@@ -27,7 +27,7 @@ void align_kmers(NanoFMI& fmi, std::vector<Event>& events, ScaleParams scale)
             count = fmi.lf_map(kmer, scale);
             if (count) {
                 aligned_kmers += 1;
-                std::cout << k << "\t" << timer.lap() << "\t" << i << "\t" << count << std::endl;
+                std::cout << name << "\t" << strand << "\t" <<  k << "\t" << timer.lap() << "\t" << i << "\t" << count << std::endl;
             }
         }
         // std::cout << "for " << events.size() - k + 1 << " " << k << "-mers: " << aligned_kmers << " aligned." << std::endl;
@@ -69,7 +69,6 @@ int main(int argc, char** argv)
 
     std::cerr << "Building reverse FMI\n";
     NanoFMI  rev_fmi(model, rev_ids, tally_gap);
-    std::cout << "read_name\tk\ttime\tpos_in_read\tmatches" << std::endl;
 
     /* navigate through all the read files provided */
     for (int fix = 4; fix < argc; fix++) {
@@ -93,7 +92,8 @@ int main(int argc, char** argv)
             }
             ScaleParams scale = get_scale_params(model, events);
             //TODO: start alignment, pass in scale, model (?), events
-            align_kmers(rev_fmi, events, scale);
+            align_kmers(argv[fix], "rev", rev_fmi, events, scale);
+            align_kmers(argv[fix], "fwd", fwd_fmi, events, scale);
         }
         catch (hdf5_tools::Exception& e)
         {

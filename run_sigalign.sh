@@ -1,1 +1,3 @@
-sigalign random_genome.fasta r9_250bps.nucleotide.6mer.template.model 1000 1000 kelvin_20161202_FN_MN17519_sequencing_run_161202_M10_digestss_72888_ch99_read824_strand.fast5
+#!/bin/bash
+./sigalign GCF_000005845.2_ASM584v2_genomic.fna r9_250bps.nucleotide.6mer.template.model 5 data/nanopore2_20160728_FNFAB24462_MN17024_sequencing_run_E_coli_K12_1D_R9_SpotOn_2_40525_ch104_read158_strand.fast5
+# ./sigalign random_genome.fasta r9_250bps.nucleotide.6mer.template.model 1 kelvin_20161202_FN_MN17519_sequencing_run_161202_M10_digestss_72888_ch99_read824_strand.fast5
