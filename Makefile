@@ -1,9 +1,10 @@
-LIBS=-lsz -lz -lm -lstdc++ -ldl
-HDF5_LIB=-L./src/hdf5/lib ./src/hdf5/lib/libhdf5.a
-HDF5_INCLUDE=-I./src/hdf5/include
+LIBS=-lz -lm -lstdc++ -ldl
+HDF5_LIB=-L/cm/shared/apps/hdf5/1.8.17/lib /cm/shared/apps/hdf5/1.8.17/lib/libhdf5.a
+BOOST_INCLUDE=-I/cm/local/apps/boost/1.58.0/include
+HDF5_INCLUDE=-I/cm/shared/apps/hdf5/1.8.17/include
 CC=g++
-CFLAGS=-Wall -std=c++11 -O3
-INCLUDE=-I./src/fast5/src -I./src -I./src/boost
+CFLAGS=-Wall -std=c++11
+INCLUDE=-I./src/fast5/src -I./src ${BOOST_INCLUDE}
 
 
 
