@@ -216,14 +216,15 @@ double NanoFMI::t_test(Event e, int i, ScaleParams scale)
 
 std::vector<MerRanges> NanoFMI::match_event(Event e, ScaleParams scale) {
     std::vector<MerRanges> mers;
+    e.length = 4;
     for (mer_id i = 0; i < em_means.size(); i++) {
-        double smean = (em_means[i] * scale.scale) + scale.shift;
-        double sstdv = em_stdevs[i] * scale.var;
-        if ( ((e.mean <= smean) && (e.mean + e.stdv >= smean - sstdv))   ||
-             ((e.mean >  smean) && (e.mean - e.stdv <  smean + sstdv)) ) {
+        // double smean = (em_means[i] * scale.scale) + scale.shift;
+        // double sstdv = em_stdevs[i] * scale.var;
+        // if ( ((e.mean <= smean) && (e.mean + e.stdv >= smean - sstdv))   ||
+        //      ((e.mean >  smean) && (e.mean - e.stdv <  smean + sstdv)) ) {
         // decrease alpha to increase sensitivity
-        // double alpha = 0.05;
-        // if (t_test(e, i, scale) > alpha/2) {
+        double alpha = 0.05;
+        if (t_test(e, i, scale) > alpha/2) {
             MerRanges m = {i, std::vector<int>()};
             mers.push_back(m);
         }

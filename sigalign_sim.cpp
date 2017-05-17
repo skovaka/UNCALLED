@@ -17,7 +17,7 @@ void align_kmers(NanoFMI& fmi, std::vector<Event>& events, ScaleParams scale)
 {
     Timer timer;
     // for each k-mer length (step:k=2*k)
-    for (int k = pow(2,3); k < pow(2, 3) + 1; k = 2*k) {
+    for (int k = 8; k < pow(2, 5) + 1; k = 2*k) {
         int aligned_kmers = 0;
         // align each k-mer of length k
         for (int i = 0; i < events.size() - k + 1; i++) {
@@ -71,33 +71,14 @@ int main(int argc, char** argv)
     NanoFMI  rev_fmi(model, rev_ids, tally_gap);
     std::cout << "read_name\tk\ttime\tpos_in_read\tmatches" << std::endl;
 
-    /* navigate through all the read files provided */
-    for (int fix = 4; fix < argc; fix++) {
-        std::vector<Event> events;
-        if (not fast5::File::is_valid_file(argv[fix])) {
-            std::cerr << "<" << argv[fix] << "> is not a valid file. skipping... " << std::endl;
-            continue;
-        }
-        fast5::File f;
-        try
-        {
-            f.open(argv[fix]);
-            assert(f.is_open());
-            std::cerr << "processing read " << argv[fix] << std::endl;
-            //make sure that the fast5 contains an event sequence 
-            if (f.have_eventdetection_events()) {
-                events = f.get_eventdetection_events();
-            } else {
-                std::cerr << "file " << argv[fix] << " does not contain events. skipping..." << std::endl;
-                continue;
-            }
-            ScaleParams scale = get_scale_params(model, events);
-            //TODO: start alignment, pass in scale, model (?), events
-            align_kmers(rev_fmi, events, scale);
-        }
-        catch (hdf5_tools::Exception& e)
-        {
-            std::cerr << "hdf5 error: " << e.what() << std::endl;
-        }
-    }
+    std::vector<Event> read = simulate_read(model, rev_ids, 0, 500);
+
+
+    std::cerr << "Mapping to reverse index\n";
+    align_kmers(rev_fmi, read, ScaleParams());
+
+    std::cerr << "Mapping to foward index\n";
+    align_kmers(fwd_fmi, read, ScaleParams());
+
+    std::cerr << "Done\n";
 }
