@@ -82,7 +82,7 @@ int main(int argc, char** argv)
         {
             f.open(argv[fix]);
             assert(f.is_open());
-            std::cerr << "processing read " << argv[fix] << std::endl;
+            // std::cerr << "processing read " << argv[fix] << std::endl;
             //make sure that the fast5 contains an event sequence 
             if (f.have_eventdetection_events()) {
                 events = f.get_eventdetection_events();
@@ -92,8 +92,11 @@ int main(int argc, char** argv)
             }
             ScaleParams scale = get_scale_params(model, events);
             //TODO: start alignment, pass in scale, model (?), events
-            align_kmers(argv[fix], "rev", rev_fmi, events, scale);
-            align_kmers(argv[fix], "fwd", fwd_fmi, events, scale);
+            // align_kmers(argv[fix], "rev", rev_fmi, events, scale);
+            // align_kmers(argv[fix], "fwd", fwd_fmi, events, scale);
+            int fwd_count = fwd_fmi.lf_map(events, scale);
+            int rev_count = rev_fmi.lf_map(events, scale);
+            std::cout << argv[fix] << ": " << fwd_count << " matches on fwd strand, " << rev_count << " matches on rev strand" << std::endl;
         }
         catch (hdf5_tools::Exception& e)
         {
