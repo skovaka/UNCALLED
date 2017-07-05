@@ -6,15 +6,19 @@
 #include <math.h>
 #include <stddef.h>
 #include <list>
+#include <unordered_map>
 #include "timer.h"
 #include "nano_bwt.hpp"
 #include "boost/math/distributions/students_t.hpp"
 
 #define MER_LEN 6
+#define PI 3.1415926535897
+
 
 const int alph_size = (int) pow(4, MER_LEN);
 int BASE_IDS[(int) ('t'+1)];
-mer_id mer_to_id(std::string seq, int i);
+std::vector< std::vector<mer_id> > mer_neighbors;
+mer_id mer_to_id(std::string &seq, unsigned int i);
 void init_base_ids();
 
 
@@ -191,6 +195,7 @@ int NanoFMI::signal_compare(mer_id mer1, mer_id mer2) {
     return 0;
 }
 
+/*
 double NanoFMI::t_test(Event e, int i, ScaleParams scale) {
     // scale model mean
     double model_mean = em_means[i] * scale.scale + scale.shift;
@@ -207,21 +212,30 @@ double NanoFMI::t_test(Event e, int i, ScaleParams scale) {
     double q = boost::math::cdf(boost::math::complement(dist, fabs(t)));
     // std::cerr << "q: " << q << std::endl;
     return q;
+}*/
+
+float inv_gauss(float x, float mean, float lambda) {
+    return sqrt(lambda / (2 * PI * pow(x, 3)))  * exp(-lambda * pow(x - mean, 2) / (2 * x * pow(mean, 2)));
+}
+
+float gauss(float x, float mean, float stdv) {
+    return exp( -pow(x - mean, 2) / (2 * pow(stdv, 2)) ) / sqrt(2 * PI * pow(stdv, 2));
+}
+
+bool NanoFMI::t_test(Event e, int i, ScaleParams scale) {
+    float scaled_mean = em_means[i] * scale.scale + scale.shift,
+           lambda = pow((float)es_means[i], 3) / pow((float)es_stdevs[i], 2);
+
+    return gauss(e.mean, scaled_mean, em_stdevs[i])*inv_gauss(e.stdv, es_means[i], lambda) >= 0.0001;
 }
 
 //Returns a vector of MerRanges with empty ranges, each containing a unique
 //k-mer that matches the given event
 std::vector<MerRanges> NanoFMI::match_event(Event e, ScaleParams scale) {
     std::vector<MerRanges> mers;
-    e.length = 4;
     for (mer_id i = 0; i < em_means.size(); i++) {
-        // double smean = (em_means[i] * scale.scale) + scale.shift;
-        // double sstdv = em_stdevs[i] * scale.var;
-        // if ( ((e.mean <= smean) && (e.mean + e.stdv >= smean - sstdv))   ||
-        //      ((e.mean >  smean) && (e.mean - e.stdv <  smean + sstdv)) ) {
-        // decrease alpha to increase sensitivity
         double alpha = 0.05;
-        if (t_test(e, i, scale) > alpha/2) {
+        if (t_test(e, i, scale)) {
             MerRanges m = {i, std::vector<int>()};
             mers.push_back(m);
         }
@@ -245,7 +259,6 @@ int NanoFMI::tally_cp_dist(int i) {
 int NanoFMI::get_tally(mer_id c, int i) {
     if (i < 0)
         return -1;
-
     int cp_dist = tally_cp_dist(i);
     int tally = mer_tally[c][(i + cp_dist) / tally_dist];
 
@@ -268,67 +281,108 @@ int NanoFMI::get_tally(mer_id c, int i) {
 int NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
 
     //Stores ranges corrasponding to the F array and the L array (the BWT)
-    std::vector<MerRanges> f_locs, l_locs;
+    std::unordered_map< mer_id, std::vector<int> > f_locs, l_locs;
 
     //Match the first event
-    f_locs = match_event(events.back(), scale);
 
-    //Find the intial range for each matched k-mer
-    for (unsigned int f = 0; f < f_locs.size(); f++) {
-        f_locs[f].ranges.push_back(mer_f_starts[f_locs[f].mer]);
+    //f_locs = match_event(events.back(), scale);
 
-        f_locs[f].ranges.push_back(mer_f_starts[f_locs[f].mer] 
-                                   + mer_counts[f_locs[f].mer]-1);
+    std::vector<int> range(2);
+    for (mer_id i = 0; i < em_means.size(); i++) {
+        if (t_test(events.back(), i, scale)) {
+            range[0] = mer_f_starts[i];
+            range[1] = mer_f_starts[i] + mer_counts[i]-1;
+            f_locs[i] = range;
+        }
     }
 
+    //Find the intial range for each matched k-mer
+    //for (unsigned int f = 0; f < f_locs.size(); f++) {
+    //    f_locs[f].ranges.push_back(mer_f_starts[f_locs[f].mer]);
+    //    f_locs[f].ranges.push_back(mer_f_starts[f_locs[f].mer] 
+    //                               + mer_counts[f_locs[f].mer]-1);
+    //}
+
     bool mer_matched = false;
+    //std::cout << "matching\n";
     
     //Match all other events backwards
     for (int i = events.size()-2; i >= 0; i--) {
+        mer_matched = false;
 
         //Find all candidate k-mers
-        l_locs = match_event(events[i], scale);
+        for (auto it = f_locs.begin(); it != f_locs.end(); ++it) {
+            std::vector<mer_id> &neighbors = mer_neighbors[it->first];
 
-        mer_matched = false;
-        
-        //Check each candidate k-mer
-        for (unsigned int l = 0; l < l_locs.size(); l++) { 
+            for (int n = 0; n < neighbors.size(); n++) {
+                bool mer_found = l_locs.find(neighbors[n]) != l_locs.end();
 
-            //Check each range from the previous iteration
-            for(unsigned int f = 0; f < f_locs.size(); f ++) {
-                for (unsigned int r = 0; r < f_locs[f].ranges.size(); r += 2) {
+                if(mer_found || t_test(events[i], neighbors[n], scale)) {
 
-                    //Find the min and max tally for the curent k-mer range
-                    //Corrasponds to the min and max rank of the candidate k-mer
-                    int min_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r] - 1),
-                        max_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r + 1]);
-                    
-                    //Candidate k-mer occurs in the range
-                    if (min_tally != max_tally) {
-                        l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+min_tally);
-                        l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+max_tally-1);
-                        mer_matched = true;
+                    if (!mer_found) {
+                        l_locs[neighbors[n]] = std::vector<int>();
+                    }
+
+                    std::vector<int> &ranges = l_locs[neighbors[n]];
+
+                    for (unsigned int r = 0; r < (it->second).size(); r += 2) {
+                        int min_tally = get_tally(neighbors[n], (it->second)[r] - 1),
+                            max_tally = get_tally(neighbors[n], (it->second)[r + 1]);
+                        
+                        //Candidate k-mer occurs in the range
+                        if (min_tally < max_tally) {
+                            ranges.push_back(mer_f_starts[neighbors[n]]+min_tally);
+                            ranges.push_back(mer_f_starts[neighbors[n]]+max_tally-1);
+                            mer_matched = true;
+                            //std::cout << "MATCH " << i << "\n";
+                        }
                     }
                 }
             }
         }
 
+        //
+        ////Check each candidate k-mer
+        //for (unsigned int l = 0; l < l_locs.size(); l++) { 
+
+        //    //Check each range from the previous iteration
+        //    for(unsigned int f = 0; f < f_locs.size(); f ++) {
+        //        for (unsigned int r = 0; r < f_locs[f].ranges.size(); r += 2) {
+
+        //            //Find the min and max tally for the curent k-mer range
+        //            //Corrasponds to the min and max rank of the candidate k-mer
+        //            int min_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r] - 1),
+        //                max_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r + 1]);
+        //            
+        //            //Candidate k-mer occurs in the range
+        //            if (min_tally < max_tally) {
+        //                l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+min_tally);
+        //                l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+max_tally-1);
+        //                mer_matched = true;
+        //            }
+        //        }
+        //    }
+        //}
+
         //Update current ranges
         f_locs.swap(l_locs);
+
+        l_locs.clear();
         
         //Stop search if not matches found
         if (!mer_matched)
             break;
+
     }
     
     //Count up the number of alignments
     //Currently not doing anything with location of alignments
     int count = 0;
     if (mer_matched) {
-        for (unsigned int l = 0; l < f_locs.size(); l++) {
-            for (unsigned int r = 0; r < f_locs[l].ranges.size(); r += 2) {
-                for (int s = f_locs[l].ranges[r]; s <= f_locs[l].ranges[r+1]; s++) {
-                    // std::cerr << "Match: " << suffix_ar[s] << "\n";
+        for (auto it = f_locs.begin(); it != f_locs.end(); ++it) {
+            for (unsigned int r = 0; r < it->second.size(); r += 2) {
+                for (int s = it->second[r]; s <= it->second[r+1]; s++) {
+                    std::cout << "Match: " << suffix_ar[s] << "\n";
                     count += 1;
                 }
             }
@@ -339,6 +393,14 @@ int NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
 }
 
 
+//Converts the 6-mer at the given location to a k-mer ID
+mer_id mer_to_id(std::string &seq, unsigned int i) {
+    mer_id id = BASE_IDS[(unsigned int) seq[i]];
+    for (unsigned int j = 1; j < MER_LEN; j++)
+        id = (id << 2) | BASE_IDS[(unsigned int) seq[i+j]];
+    return id;
+}
+
 
 //Inits BASE_IDS, which is used to generate k-mer IDs
 void init_base_ids() {
@@ -348,6 +410,36 @@ void init_base_ids() {
     BASE_IDS[(unsigned int) 'C'] = BASE_IDS[(unsigned int) 'c'] = 1;
     BASE_IDS[(unsigned int) 'G'] = BASE_IDS[(unsigned int) 'g'] = 2;
     BASE_IDS[(unsigned int) 'T'] = BASE_IDS[(unsigned int) 't'] = 3;
+
+    //TODO: Probably do this when you load the model, idiot
+
+    mer_neighbors.resize(4096);
+    std::list<std::string> to_check;
+    to_check.push_front("AAAAAA");
+    std::string cur_mer;
+    int cur_id;
+
+    while (!to_check.empty()) {
+        cur_mer = to_check.back();
+        to_check.pop_back();
+        cur_id = mer_to_id(cur_mer, (unsigned int) 0);
+
+        if (!mer_neighbors[cur_id].empty())
+            continue;
+
+        std::string s = "A" + cur_mer.substr(0, 5);
+        mer_neighbors[cur_id].push_back(mer_to_id(s, 0));
+        to_check.push_front(s);
+        s = "C" + cur_mer.substr(0, 5);
+        mer_neighbors[cur_id].push_back(mer_to_id(s, 0));
+        to_check.push_front(s);
+        s = "G" + cur_mer.substr(0, 5);
+        mer_neighbors[cur_id].push_back(mer_to_id(s, 0));
+        to_check.push_front(s);
+        s = "T" + cur_mer.substr(0, 5);
+        mer_neighbors[cur_id].push_back(mer_to_id(s, 0));
+        to_check.push_front(s);
+    }
 }
 
 //Returns the complement to the given base
@@ -370,14 +462,6 @@ char rev_base(char c) {
     }
 
     return 'N';
-}
-
-//Converts the 6-mer at the given location to a k-mer ID
-mer_id mer_to_id(std::string &seq, unsigned int i) {
-    mer_id id = BASE_IDS[(unsigned int) seq[i]];
-    for (unsigned int j = 1; j < MER_LEN; j++)
-        id = (id << 2) | BASE_IDS[(unsigned int) seq[i+j]];
-    return id;
 }
 
 //Reads the given fasta file and stores forward and reverse k-mers

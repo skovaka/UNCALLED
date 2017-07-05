@@ -31,7 +31,7 @@ class NanoFMI
     std::vector<MerRanges> match_event(Event e, ScaleParams scale);
     int tally_cp_dist(int i);
     int get_tally(mer_id c, int i);
-    double t_test(Event e, int i, ScaleParams scale);
+    bool t_test(Event e, int i, ScaleParams scale);
     std::vector<double> em_means, em_stdevs, es_means, es_stdevs;
     std::vector<mer_id> *mer_seq_tmp;
     

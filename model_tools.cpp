@@ -63,8 +63,8 @@ std::vector<double> scale_model(std::vector<double> model, std::vector<Event> ev
     double scale_sd = 1.0;
     double var_sd = 1.0;
     /* TODO: calculate drift? */
-    double shift = events_mean_stdv.first -  model_mean_stdv.first;
     double scale = events_mean_stdv.second / model_mean_stdv.second;
+    double shift = events_mean_stdv.first -  model_mean_stdv.first;
 
     /* scale model
      * see:
@@ -108,9 +108,10 @@ ScaleParams get_scale_params(std::vector<double> model, std::vector<Event> event
     /* method of moments - get mean, stdv of event-level means */
     std::pair<double, double> events_mean_stdv = get_mean_stdv(event_means);
     std::pair<double, double> model_mean_stdv = get_mean_stdv(model_means);
+    
     /* get scaling parameters */
-    scale.shift = events_mean_stdv.first -  model_mean_stdv.first;
     scale.scale = events_mean_stdv.second / model_mean_stdv.second;
+    scale.shift = events_mean_stdv.first - (scale.scale * model_mean_stdv.first);
     scale.drift = 0.0;
     scale.var = 1.0;
     scale.scale_sd = 1.0;

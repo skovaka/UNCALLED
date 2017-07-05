@@ -17,7 +17,8 @@ void align_kmers(std::string name, std::string strand, NanoFMI& fmi, std::vector
 {
     Timer timer;
     // for each k-mer length (step:k=2*k)
-    for (int k = pow(2,4); k < pow(2, 7) + 1; k = 2*k) {
+    //for (int k = pow(2,4); k < pow(2, 7) + 1; k = 2*k) {
+    int k = 8;
         int aligned_kmers = 0;
         // align each k-mer of length k
         for (int i = 0; i < events.size() - k + 1; i++) {
@@ -26,12 +27,12 @@ void align_kmers(std::string name, std::string strand, NanoFMI& fmi, std::vector
             int count  = 0;
             count = fmi.lf_map(kmer, scale);
             if (count) {
+                std::cout << strand << "\t" <<  k << "\t" << timer.lap() << "\t" << i << "\t" << count << std::endl;
                 aligned_kmers += 1;
-                std::cout << name << "\t" << strand << "\t" <<  k << "\t" << timer.lap() << "\t" << i << "\t" << count << std::endl;
             }
         }
         // std::cout << "for " << events.size() - k + 1 << " " << k << "-mers: " << aligned_kmers << " aligned." << std::endl;
-    }
+    //}
 
 }
 
@@ -92,11 +93,11 @@ int main(int argc, char** argv)
             }
             ScaleParams scale = get_scale_params(model, events);
             //TODO: start alignment, pass in scale, model (?), events
-            // align_kmers(argv[fix], "rev", rev_fmi, events, scale);
-            // align_kmers(argv[fix], "fwd", fwd_fmi, events, scale);
-            int fwd_count = fwd_fmi.lf_map(events, scale);
-            int rev_count = rev_fmi.lf_map(events, scale);
-            std::cout << argv[fix] << ": " << fwd_count << " matches on fwd strand, " << rev_count << " matches on rev strand" << std::endl;
+            align_kmers(argv[fix], "rev", rev_fmi, events, scale);
+            align_kmers(argv[fix], "fwd", fwd_fmi, events, scale);
+            //int fwd_count = fwd_fmi.lf_map(events, scale);
+            //int rev_count = rev_fmi.lf_map(events, scale);
+            //std::cout << argv[fix] << ": " << fwd_count << " matches on fwd strand, " << rev_count << " matches on rev strand" << std::endl;
         }
         catch (hdf5_tools::Exception& e)
         {
