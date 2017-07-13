@@ -7,11 +7,40 @@ void parse_fasta(std::ifstream &fasta_in,
                  std::vector<mer_id> &fwd_ids, 
                  std::vector<mer_id> &rev_ids);
 
+//TODO: make nested class?
+//class MerRanges {
+//    public:
+//
+//    MerRanges(){};
+//    MerRanges(int start, int range_len, float prob);
+//    MerRanges(MerRanges prev, float prob);
+//
+//    void add_match(int start, int range_len, float prob, int match_len);
+//    void add_stay(MerRanges prev, float prob);
+//
+//    std::vector<int> starts, ends, match_lens;
+//    std::vector<float> prob_sums;
+//};
 
-typedef struct MerRanges {
-    mer_id mer;
-    std::vector<int> ranges;
-} MerRanges;
+class FMQuery {
+    public:
+    int start, end, match_len, skips;
+    float prob_sum;
+
+    FMQuery(){}
+
+    FMQuery(int range_start, int range_len, float prob)
+        : start(range_start), end(range_start+range_len-1), 
+          match_len(1), skips(0), prob_sum(prob) {}
+
+    FMQuery(FMQuery prev, int range_start, int range_len, float prob)
+        : start(range_start), end(range_start+range_len-1), 
+          match_len(prev.match_len+1), skips(prev.skips), prob_sum(prev.prob_sum+prob) {}
+
+    FMQuery(FMQuery prev, float prob)
+        : start(prev.start), end(prev.end), 
+          match_len(prev.match_len), skips(prev.skips+1), prob_sum(prev.prob_sum+prob) {}
+};
 
 class NanoFMI 
 {
@@ -24,14 +53,14 @@ class NanoFMI
 
     bool operator() (unsigned int rot1, unsigned int rot2);
 
-    int lf_map(std::vector<Event> events, ScaleParams scale);
+    int lf_map(std::vector<Event> events, int seed_end, int match_len, ScaleParams scale);
 
     private:
     int signal_compare(mer_id mer1, mer_id mer2);
-    std::vector<MerRanges> match_event(Event e, ScaleParams scale);
     int tally_cp_dist(int i);
     int get_tally(mer_id c, int i);
-    bool t_test(Event e, int i, ScaleParams scale);
+    float get_evt_prob(Event e, int i, ScaleParams scale);
+    float get_stay_prob(Event e1, Event e2);
     std::vector<double> em_means, em_stdevs, es_means, es_stdevs;
     std::vector<mer_id> *mer_seq_tmp;
     

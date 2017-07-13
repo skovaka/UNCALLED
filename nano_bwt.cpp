@@ -222,25 +222,24 @@ float gauss(float x, float mean, float stdv) {
     return exp( -pow(x - mean, 2) / (2 * pow(stdv, 2)) ) / sqrt(2 * PI * pow(stdv, 2));
 }
 
-bool NanoFMI::t_test(Event e, int i, ScaleParams scale) {
+float NanoFMI::get_evt_prob(Event e, int i, ScaleParams scale) {
     float scaled_mean = em_means[i] * scale.scale + scale.shift,
-           lambda = pow((float)es_means[i], 3) / pow((float)es_stdevs[i], 2);
+          lambda = pow((float)es_means[i], 3) / pow((float)es_stdevs[i], 2),
+          ng = gauss(e.mean, scaled_mean, em_stdevs[i]),
+          ig = inv_gauss(e.stdv, es_means[i], lambda);
 
-    return gauss(e.mean, scaled_mean, em_stdevs[i])*inv_gauss(e.stdv, es_means[i], lambda) >= 0.0001;
+    return ng*ig;
 }
 
-//Returns a vector of MerRanges with empty ranges, each containing a unique
-//k-mer that matches the given event
-std::vector<MerRanges> NanoFMI::match_event(Event e, ScaleParams scale) {
-    std::vector<MerRanges> mers;
-    for (mer_id i = 0; i < em_means.size(); i++) {
-        double alpha = 0.05;
-        if (t_test(e, i, scale)) {
-            MerRanges m = {i, std::vector<int>()};
-            mers.push_back(m);
-        }
-    }
-    return mers;
+float NanoFMI::get_stay_prob(Event e1, Event e2) {
+    double var1 = e1.stdv*e1.stdv, var2 = e2.stdv*e2.stdv;
+    double t = (e1.mean - e2.mean) / sqrt(var1/e1.length + var2/e2.length);
+    int df = pow(var1/e1.length + var2/e2.length, 2) / (pow(var1/e1.length, 2) / (e1.length-1) + pow(var2/e2.length, 2) / (e2.length-1));
+
+    boost::math::students_t dist(df);
+    double q = boost::math::cdf(boost::math::complement(dist, fabs(t)));
+
+    return q;
 }
 
 //Returns the distance from a BWT index to the nearest tally array checkpoint
@@ -276,114 +275,152 @@ int NanoFMI::get_tally(mer_id c, int i) {
     return tally;
 }
 
+//MerRanges::MerRanges(int start, int range_len, float prob) {
+//    starts.push_back(start);
+//    ends.push_back(start + range_len - 1);
+//    prob_sums.push_back(prob);
+//    match_lens.push_back(1);
+//}
+//
+//MerRanges::MerRanges(MerRanges prev, float prob) {
+//    add_stay(prev, prob);
+//}
+//
+//void MerRanges::add_stay(MerRanges prev, float prob) {
+//    for (unsigned int r = 0; r < prev.starts.size(); r++) {
+//        starts.push_back(prev.starts[r]);
+//        ends.push_back(prev.ends[r]);
+//        prob_sums.push_back(prev.prob_sums[r] + prob);
+//        match_lens.push_back(prev.match_lens[r]);
+//    }
+//}
+//
+//void MerRanges::add_match(int start, int range_len, float prob, int match_len) {
+//    starts.push_back(start);
+//    ends.push_back(start + range_len - 1);
+//    prob_sums.push_back(prob);
+//    match_lens.push_back(match_len);
+//}
+
 //Aligns the vector of events to the reference using LF mapping
 //Returns the number of exact alignments
-int NanoFMI::lf_map(std::vector<Event> events, ScaleParams scale) {
+int NanoFMI::lf_map(std::vector<Event> events, int seed_end, int seed_len, ScaleParams scale) {
+
+    float EVENT_THRESH = 0.00025,
+          SEED_THRESH  = 0.05,
+          STAY_THRESH  = 0.01;
 
     //Stores ranges corrasponding to the F array and the L array (the BWT)
-    std::unordered_map< mer_id, std::vector<int> > f_locs, l_locs;
+    //std::unordered_map< mer_id, MerRanges > f_locs, l_locs;
+    std::vector< std::list<FMQuery> > f_locs(4096), l_locs(4096);
+    std::list<mer_id> f_mers, l_mers;
+    std::list<FMQuery> results;
 
     //Match the first event
 
     //f_locs = match_event(events.back(), scale);
 
-    std::vector<int> range(2);
+    float prob;
     for (mer_id i = 0; i < em_means.size(); i++) {
-        if (t_test(events.back(), i, scale)) {
-            range[0] = mer_f_starts[i];
-            range[1] = mer_f_starts[i] + mer_counts[i]-1;
-            f_locs[i] = range;
+        prob = get_evt_prob(events[seed_end], i, scale);
+        if (prob >= EVENT_THRESH) {
+            f_locs[i].emplace_back(mer_f_starts[i], mer_counts[i], prob);
+            f_mers.push_back(i);
         }
     }
 
-    //Find the intial range for each matched k-mer
-    //for (unsigned int f = 0; f < f_locs.size(); f++) {
-    //    f_locs[f].ranges.push_back(mer_f_starts[f_locs[f].mer]);
-    //    f_locs[f].ranges.push_back(mer_f_starts[f_locs[f].mer] 
-    //                               + mer_counts[f_locs[f].mer]-1);
-    //}
-
-    bool mer_matched = false;
-    //std::cout << "matching\n";
+    bool mer_matched = true,
+         stay = false;
     
     //Match all other events backwards
-    for (int i = events.size()-2; i >= 0; i--) {
+    int i = seed_end - 1;
+    while (i >= 0 && mer_matched) {
         mer_matched = false;
 
+        stay = get_stay_prob(events[i], events[i+1]) >= STAY_THRESH;
+    
         //Find all candidate k-mers
-        for (auto it = f_locs.begin(); it != f_locs.end(); ++it) {
-            std::vector<mer_id> &neighbors = mer_neighbors[it->first];
+        while (!f_mers.empty()) {
+            mer_id f = f_mers.front();
+            f_mers.pop_front();
 
+            prob = get_evt_prob(events[i], f, scale);
+
+            if (stay && prob >= EVENT_THRESH) {
+                if (l_locs[f].empty()) 
+                    l_mers.push_back(f);
+
+                for (auto fq = f_locs[f].begin(); fq != f_locs[f].end(); ++fq) {
+                    l_locs[f].emplace_back(*fq, prob);
+                }
+            }
+
+            //Check neighboring k-mers
+            std::vector<mer_id> &neighbors = mer_neighbors[f];
+
+            //TODO: switch this and innermost for loop?
+            //compute tally for all neighbors at once, delete f_locs as we go
             for (int n = 0; n < neighbors.size(); n++) {
-                bool mer_found = l_locs.find(neighbors[n]) != l_locs.end();
+                
+                //TODO: Never compute same prob twice ??
+                prob = get_evt_prob(events[i], neighbors[n], scale);
 
-                if(mer_found || t_test(events[i], neighbors[n], scale)) {
+                if(prob >= EVENT_THRESH) {
 
-                    if (!mer_found) {
-                        l_locs[neighbors[n]] = std::vector<int>();
-                    }
+                    for (auto fq = f_locs[f].begin(); fq != f_locs[f].end(); ++fq) {
 
-                    std::vector<int> &ranges = l_locs[neighbors[n]];
-
-                    for (unsigned int r = 0; r < (it->second).size(); r += 2) {
-                        int min_tally = get_tally(neighbors[n], (it->second)[r] - 1),
-                            max_tally = get_tally(neighbors[n], (it->second)[r + 1]);
+                        int min_tally = get_tally(neighbors[n], fq->start - 1),
+                            max_tally = get_tally(neighbors[n], fq->end);
                         
                         //Candidate k-mer occurs in the range
                         if (min_tally < max_tally) {
-                            ranges.push_back(mer_f_starts[neighbors[n]]+min_tally);
-                            ranges.push_back(mer_f_starts[neighbors[n]]+max_tally-1);
-                            mer_matched = true;
-                            //std::cout << "MATCH " << i << "\n";
+                            if (fq->match_len+1 < seed_len) {
+                                if (l_locs[neighbors[n]].empty())
+                                    l_mers.push_back(neighbors[n]);
+
+                                l_locs[neighbors[n]].emplace_back(*fq,
+                                    mer_f_starts[neighbors[n]]+min_tally, 
+                                                 max_tally-min_tally,
+                                                 prob);
+
+                                mer_matched = true;
+                            } else {
+                                results.emplace_back(*fq,
+                                    mer_f_starts[neighbors[n]]+min_tally, 
+                                                 max_tally-min_tally,
+                                                 prob);
+                            }
                         }
                     }
                 }
             }
+
+            f_locs[f].clear();
         }
 
-        //
-        ////Check each candidate k-mer
-        //for (unsigned int l = 0; l < l_locs.size(); l++) { 
-
-        //    //Check each range from the previous iteration
-        //    for(unsigned int f = 0; f < f_locs.size(); f ++) {
-        //        for (unsigned int r = 0; r < f_locs[f].ranges.size(); r += 2) {
-
-        //            //Find the min and max tally for the curent k-mer range
-        //            //Corrasponds to the min and max rank of the candidate k-mer
-        //            int min_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r] - 1),
-        //                max_tally = get_tally(l_locs[l].mer, f_locs[f].ranges[r + 1]);
-        //            
-        //            //Candidate k-mer occurs in the range
-        //            if (min_tally < max_tally) {
-        //                l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+min_tally);
-        //                l_locs[l].ranges.push_back(mer_f_starts[l_locs[l].mer]+max_tally-1);
-        //                mer_matched = true;
-        //            }
-        //        }
-        //    }
-        //}
-
         //Update current ranges
-        f_locs.swap(l_locs);
-
-        l_locs.clear();
+        //f_locs.swap(l_locs);
+        //l_locs.clear();
+        for (auto m = l_mers.begin(); m != l_mers.end(); ++m) 
+            l_locs[*m].swap(f_locs[*m]);
+        l_mers.swap(f_mers);
         
         //Stop search if not matches found
         if (!mer_matched)
             break;
 
+        i--;
     }
     
     //Count up the number of alignments
     //Currently not doing anything with location of alignments
     int count = 0;
-    if (mer_matched) {
-        for (auto it = f_locs.begin(); it != f_locs.end(); ++it) {
-            for (unsigned int r = 0; r < it->second.size(); r += 2) {
-                for (int s = it->second[r]; s <= it->second[r+1]; s++) {
-                    std::cout << "Match: " << suffix_ar[s] << "\n";
-                    count += 1;
+    if (!results.empty()) {
+        for (auto f_loc = results.begin(); f_loc != results.end(); ++f_loc) {
+            if (f_loc->prob_sum / (f_loc->match_len + f_loc->skips) >= SEED_THRESH) {
+                for (int s = f_loc->start; s <= f_loc->end; s++) {
+                    std::cout << "Match: " << suffix_ar[s] << "\t" << f_loc->prob_sum  << "\t" << f_loc->match_len << "\t" << f_loc->skips << "\n";
+                    count += 1; 
                 }
             }
         }

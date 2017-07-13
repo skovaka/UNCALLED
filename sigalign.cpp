@@ -16,23 +16,19 @@
 void align_kmers(std::string name, std::string strand, NanoFMI& fmi, std::vector<Event>& events, ScaleParams scale)
 {
     Timer timer;
-    // for each k-mer length (step:k=2*k)
-    //for (int k = pow(2,4); k < pow(2, 7) + 1; k = 2*k) {
-    int k = 8;
-        int aligned_kmers = 0;
-        // align each k-mer of length k
-        for (int i = 0; i < events.size() - k + 1; i++) {
-        // for (int i = 0; i < 1000; i++) {
-            std::vector<Event> kmer(events.begin() + i, events.begin() + i + k);
-            int count  = 0;
-            count = fmi.lf_map(kmer, scale);
-            if (count) {
-                std::cout << strand << "\t" <<  k << "\t" << timer.lap() << "\t" << i << "\t" << count << std::endl;
-                aligned_kmers += 1;
-            }
+    int k = 16;
+    int aligned_kmers = 0;
+
+    // align each k-mer of length k
+    for (int i = events.size()-1; i >= k; i--) {
+        //std::vector<Event> kmer(events.begin() + i, events.begin() + i + k);
+        int count  = 0;
+        count = fmi.lf_map(events, i, k, scale);
+        if (count) {
+            std::cout << strand << "\t" <<  k << "\t" << timer.lap() << "\t" << i - k + 1 << "\t" << count << std::endl;
+            aligned_kmers += 1;
         }
-        // std::cout << "for " << events.size() - k + 1 << " " << k << "-mers: " << aligned_kmers << " aligned." << std::endl;
-    //}
+    }
 
 }
 
