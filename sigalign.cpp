@@ -25,7 +25,7 @@ void align_kmers(std::string name, std::string strand, NanoFMI& fmi, std::vector
         int count  = 0;
         count = fmi.lf_map(events, i, k, scale);
         if (count) {
-            std::cout << strand << "\t" <<  k << "\t" << timer.lap() << "\t" << i - k + 1 << "\t" << count << std::endl;
+            std::cout << strand << "\t" <<  k << "\t" << timer.lap() << "\t" << i << "\t" << count << std::endl;
             aligned_kmers += 1;
         }
     }

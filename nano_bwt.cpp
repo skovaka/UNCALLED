@@ -417,9 +417,14 @@ int NanoFMI::lf_map(std::vector<Event> events, int seed_end, int seed_len, Scale
     int count = 0;
     if (!results.empty()) {
         for (auto f_loc = results.begin(); f_loc != results.end(); ++f_loc) {
-            if (f_loc->prob_sum / (f_loc->match_len + f_loc->skips) >= SEED_THRESH) {
+            if (f_loc->prob_sum / (f_loc->match_len + f_loc->stays) >= SEED_THRESH) {
                 for (int s = f_loc->start; s <= f_loc->end; s++) {
-                    std::cout << "Match: " << suffix_ar[s] << "\t" << f_loc->prob_sum  << "\t" << f_loc->match_len << "\t" << f_loc->skips << "\n";
+                    //std::cout << "Match: " << suffix_ar[s] << "\t" << f_loc->prob_sum  << "\t" << f_loc->match_len << "\t" << f_loc->stays << "\n";
+                    std::cout << seed_end - f_loc->match_len - f_loc->stays + 1 << " " << suffix_ar[s] << "\t";
+                    for (auto al = f_loc->align.begin(); al != f_loc->align.end(); ++al)
+                        std::cout << *al;
+                        
+                    std::cout << "\n";
                     count += 1; 
                 }
             }

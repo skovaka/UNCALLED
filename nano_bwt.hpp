@@ -2,6 +2,7 @@
 #define INCL_NANOBWT
 
 #include "model_tools.hpp"
+#include <list>
 
 void parse_fasta(std::ifstream &fasta_in, 
                  std::vector<mer_id> &fwd_ids, 
@@ -24,22 +25,30 @@ void parse_fasta(std::ifstream &fasta_in,
 
 class FMQuery {
     public:
-    int start, end, match_len, skips;
+    static const char NEXT = 'n', STAY = 't', SKIP = 'k';
+    int start, end, match_len, stays;
     float prob_sum;
+    std::list<char> align;
 
     FMQuery(){}
 
     FMQuery(int range_start, int range_len, float prob)
         : start(range_start), end(range_start+range_len-1), 
-          match_len(1), skips(0), prob_sum(prob) {}
+          match_len(1), stays(0), prob_sum(prob) {
+        align.push_front(NEXT);          
+    }
 
     FMQuery(FMQuery prev, int range_start, int range_len, float prob)
         : start(range_start), end(range_start+range_len-1), 
-          match_len(prev.match_len+1), skips(prev.skips), prob_sum(prev.prob_sum+prob) {}
+          match_len(prev.match_len+1), stays(prev.stays), prob_sum(prev.prob_sum+prob), align(prev.align) {
+        align.push_front(NEXT);          
+    }
 
     FMQuery(FMQuery prev, float prob)
         : start(prev.start), end(prev.end), 
-          match_len(prev.match_len), skips(prev.skips+1), prob_sum(prev.prob_sum+prob) {}
+          match_len(prev.match_len), stays(prev.stays+1), prob_sum(prev.prob_sum+prob), align(prev.align) {
+        align.push_front(STAY);
+    }
 };
 
 class NanoFMI 
