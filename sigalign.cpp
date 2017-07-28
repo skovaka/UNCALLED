@@ -20,13 +20,16 @@ void align_kmers(std::string name, std::string strand, NanoFMI& fmi, std::vector
     int aligned_kmers = 0;
 
     // align each k-mer of length k
-    for (int i = events.size()-1; i >= k; i--) {
+    //for (int i = events.size()-1; i >= k; i--) {
+    for (int i = 14831; i >= k; i--) {
         //std::vector<Event> kmer(events.begin() + i, events.begin() + i + k);
+        //int i = 14830;
         int count  = 0;
+        //std::cout << "Aligning " << i << "\n";
         count = fmi.lf_map(events, i, k, scale);
         if (count) {
             std::cout << strand << "\t" <<  k << "\t" << timer.lap() << "\t" << i << "\t" << count << std::endl;
-            aligned_kmers += 1;
+            //aligned_kmers += 1;
         }
     }
 

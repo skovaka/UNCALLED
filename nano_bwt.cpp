@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stddef.h>
 #include <list>
+#include <set>
 #include <unordered_map>
 #include "timer.h"
 #include "nano_bwt.hpp"
@@ -301,6 +302,23 @@ int NanoFMI::get_tally(mer_id c, int i) {
 //    prob_sums.push_back(prob);
 //    match_lens.push_back(match_len);
 //}
+//
+bool operator< (const FMQuery &q1, const FMQuery &q2) {
+    //return q1.start < q2.start || q1.end < q2.end || q1.avg_prob() < q2.avg_prob();
+    return q1.start < q2.start ||
+           q1.end < q2.end ||
+           q1.avg_prob() > q2.avg_prob() ||
+           q1.stays > q2.stays||
+           q1.match_len < q2.match_len;
+}
+
+bool FMQuery::same_range(const FMQuery &q) const {
+    return start == q.start && end == q.end && match_len == q.match_len;
+}
+
+float FMQuery::avg_prob() const {
+    return prob_sum / (match_len + stays);
+}
 
 //Aligns the vector of events to the reference using LF mapping
 //Returns the number of exact alignments
@@ -312,9 +330,9 @@ int NanoFMI::lf_map(std::vector<Event> events, int seed_end, int seed_len, Scale
 
     //Stores ranges corrasponding to the F array and the L array (the BWT)
     //std::unordered_map< mer_id, MerRanges > f_locs, l_locs;
-    std::vector< std::list<FMQuery> > f_locs(4096), l_locs(4096);
+    std::vector< std::set<FMQuery> > f_locs(4096), l_locs(4096);
     std::list<mer_id> f_mers, l_mers;
-    std::list<FMQuery> results;
+    std::set<FMQuery> results;
 
     //Match the first event
 
@@ -324,34 +342,36 @@ int NanoFMI::lf_map(std::vector<Event> events, int seed_end, int seed_len, Scale
     for (mer_id i = 0; i < em_means.size(); i++) {
         prob = get_evt_prob(events[seed_end], i, scale);
         if (prob >= EVENT_THRESH) {
-            f_locs[i].emplace_back(mer_f_starts[i], mer_counts[i], prob);
+            f_locs[i].emplace(mer_f_starts[i], mer_counts[i], prob);
             f_mers.push_back(i);
         }
     }
 
     bool mer_matched = true,
          stay = false;
-    
+
     //Match all other events backwards
     int i = seed_end - 1;
     while (i >= 0 && mer_matched) {
         mer_matched = false;
 
-        stay = get_stay_prob(events[i], events[i+1]) >= STAY_THRESH;
-    
+        //stay = get_stay_prob(events[i], events[i+1]) >= STAY_THRESH;
+        stay = true;
+
         //Find all candidate k-mers
         while (!f_mers.empty()) {
             mer_id f = f_mers.front();
             f_mers.pop_front();
+            //std::cout << "Fmer " << f << "\n";
 
             prob = get_evt_prob(events[i], f, scale);
 
             if (stay && prob >= EVENT_THRESH) {
-                if (l_locs[f].empty()) 
+                if (l_locs[f].empty())
                     l_mers.push_back(f);
 
                 for (auto fq = f_locs[f].begin(); fq != f_locs[f].end(); ++fq) {
-                    l_locs[f].emplace_back(*fq, prob);
+                    l_locs[f].emplace(*fq, prob);
                 }
             }
 
@@ -360,49 +380,53 @@ int NanoFMI::lf_map(std::vector<Event> events, int seed_end, int seed_len, Scale
 
             //TODO: switch this and innermost for loop?
             //compute tally for all neighbors at once, delete f_locs as we go
-            for (int n = 0; n < neighbors.size(); n++) {
+            for (unsigned int n = 0; n < neighbors.size(); n++) {
                 
                 //TODO: Never compute same prob twice ??
                 prob = get_evt_prob(events[i], neighbors[n], scale);
 
                 if(prob >= EVENT_THRESH) {
 
-                    for (auto fq = f_locs[f].begin(); fq != f_locs[f].end(); ++fq) {
+                    int loop_count = 0;
 
-                        int min_tally = get_tally(neighbors[n], fq->start - 1),
+                    for (auto fq = f_locs[f].begin(); fq != f_locs[f].end(); ++fq) {
+                        int min_tally = get_tally(neighbors[n], (fq->start) - 1),
                             max_tally = get_tally(neighbors[n], fq->end);
                         
                         //Candidate k-mer occurs in the range
                         if (min_tally < max_tally) {
-                            if (fq->match_len+1 < seed_len) {
+                            FMQuery lq(*fq, mer_f_starts[neighbors[n]]+min_tally, max_tally-min_tally, prob);
+
+                            if ((fq->match_len)+1 < seed_len) {
                                 if (l_locs[neighbors[n]].empty())
                                     l_mers.push_back(neighbors[n]);
 
-                                l_locs[neighbors[n]].emplace_back(*fq,
-                                    mer_f_starts[neighbors[n]]+min_tally, 
-                                                 max_tally-min_tally,
-                                                 prob);
+                                l_locs[neighbors[n]].insert(lq);
 
                                 mer_matched = true;
                             } else {
-                                results.emplace_back(*fq,
-                                    mer_f_starts[neighbors[n]]+min_tally, 
-                                                 max_tally-min_tally,
-                                                 prob);
+                                results.insert(lq);
                             }
                         }
+                        loop_count++;
                     }
                 }
             }
-
             f_locs[f].clear();
         }
 
         //Update current ranges
-        //f_locs.swap(l_locs);
-        //l_locs.clear();
-        for (auto m = l_mers.begin(); m != l_mers.end(); ++m) 
-            l_locs[*m].swap(f_locs[*m]);
+        for (auto m = l_mers.begin(); m != l_mers.end(); ++m) {
+            std::set<FMQuery>::iterator prev = f_locs[*m].end();
+            while (!l_locs[*m].empty()) {
+                std::set<FMQuery>::iterator q = l_locs[*m].begin();
+
+                if (prev == f_locs[*m].end() || !q->same_range(*prev))
+                    prev = f_locs[*m].insert(prev, *q);
+    
+                l_locs[*m].erase(q);
+            }
+        }
         l_mers.swap(f_mers);
         
         //Stop search if not matches found
@@ -415,19 +439,27 @@ int NanoFMI::lf_map(std::vector<Event> events, int seed_end, int seed_len, Scale
     //Count up the number of alignments
     //Currently not doing anything with location of alignments
     int count = 0;
+    
     if (!results.empty()) {
+        std::set<FMQuery>::iterator prev = results.end();
         for (auto f_loc = results.begin(); f_loc != results.end(); ++f_loc) {
-            if (f_loc->prob_sum / (f_loc->match_len + f_loc->stays) >= SEED_THRESH) {
+            if ((prev == results.end() || !f_loc->same_range(*prev))
+                && f_loc->avg_prob() >= SEED_THRESH) {
+
                 for (int s = f_loc->start; s <= f_loc->end; s++) {
-                    //std::cout << "Match: " << suffix_ar[s] << "\t" << f_loc->prob_sum  << "\t" << f_loc->match_len << "\t" << f_loc->stays << "\n";
-                    std::cout << seed_end - f_loc->match_len - f_loc->stays + 1 << " " << suffix_ar[s] << "\t";
-                    for (auto al = f_loc->align.begin(); al != f_loc->align.end(); ++al)
-                        std::cout << *al;
+                    std::cout << seed_end - f_loc->match_len - f_loc->stays + 1 << " " 
+                              << suffix_ar[s] << " " 
+                              << f_loc->avg_prob() << " " 
+                              << f_loc->match_len << " " 
+                              << f_loc->stays << "\n";
+
+                    //std::cout << seed_end - f_loc->match_len - f_loc->stays + 1 << " " << suffix_ar[s] << " " << f_loc->avg_prob() << "\n";
                         
-                    std::cout << "\n";
+                    //std::cout << "\n";
                     count += 1; 
                 }
             }
+            prev = f_loc;
         }
     }
 

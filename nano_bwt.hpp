@@ -25,30 +25,54 @@ void parse_fasta(std::ifstream &fasta_in,
 
 class FMQuery {
     public:
-    static const char NEXT = 'n', STAY = 't', SKIP = 'k';
+    //const char NEXT = 'n', STAY = 't', SKIP = 'k';
     int start, end, match_len, stays;
     float prob_sum;
-    std::list<char> align;
+    //std::list<char> align;
 
-    FMQuery(){}
+    FMQuery(){ std::cout << "NOPE\n";}
+
+    FMQuery(const FMQuery &fq){
+        start = fq.start;
+        end = fq.end;
+        match_len = fq.match_len;
+        stays = fq.stays; 
+        prob_sum = fq.prob_sum; 
+        //align.assign(fq.align.begin(), fq.align.end());
+    }
 
     FMQuery(int range_start, int range_len, float prob)
         : start(range_start), end(range_start+range_len-1), 
           match_len(1), stays(0), prob_sum(prob) {
-        align.push_front(NEXT);          
+        //align.push_front(NEXT);          
     }
 
-    FMQuery(FMQuery prev, int range_start, int range_len, float prob)
-        : start(range_start), end(range_start+range_len-1), 
-          match_len(prev.match_len+1), stays(prev.stays), prob_sum(prev.prob_sum+prob), align(prev.align) {
-        align.push_front(NEXT);          
+    FMQuery(const FMQuery &prev, int range_start, int range_len, float prob)
+        //: start(range_start), end(range_start+range_len-1), 
+        //  match_len(prev.match_len+1), stays(prev.stays), prob_sum(prev.prob_sum+prob), align(prev.align) {
+        {
+        start = range_start;
+        end = range_start+range_len-1;
+        match_len = prev.match_len+1;
+        stays = prev.stays; 
+        prob_sum = prev.prob_sum+prob; 
+        //align = prev.align;
+        
+        //std::cout << "why " << align.size() << "\n";
+        //align.push_front(NEXT);          
     }
 
-    FMQuery(FMQuery prev, float prob)
+    FMQuery(const FMQuery &prev, float prob)
         : start(prev.start), end(prev.end), 
-          match_len(prev.match_len), stays(prev.stays+1), prob_sum(prev.prob_sum+prob), align(prev.align) {
-        align.push_front(STAY);
+          match_len(prev.match_len), stays(prev.stays+1), prob_sum(prev.prob_sum+prob) {
+        
     }
+
+    bool same_range(const FMQuery &q) const;
+
+    float avg_prob() const;
+
+    friend bool operator< (const FMQuery &q1, const FMQuery &q2);
 };
 
 class NanoFMI 
