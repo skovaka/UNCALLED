@@ -13,11 +13,11 @@ all: sigalign signal_extract
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c -o $@ $^ $(INCLUDE) $(HDF5_INCLUDE) 
 
-sigalign: sigalign.o nano_bwt.o model_tools.o
-	$(CC) $(CFLAGS) nano_bwt.o model_tools.o sigalign.o -o sigalign $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
+sigalign: sigalign.o nano_fmi.o kmer_model.o
+	$(CC) $(CFLAGS) nano_fmi.o kmer_model.o sigalign.o -o sigalign $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
 
-signal_extract: signal_extract.o model_tools.o
-	$(CC) $(CFLAGS) model_tools.o signal_extract.o -o signal_extract $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
+#signal_extract: signal_extract.o model_tools.o
+#	$(CC) $(CFLAGS) model_tools.o signal_extract.o -o signal_extract $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
 	
 # nano_bwt: nano_bwt.o
 #
