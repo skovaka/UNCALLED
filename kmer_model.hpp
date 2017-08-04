@@ -2,6 +2,7 @@
 #define _INCL_MODEL_TOOLS
 
 #include <array>
+#include <utility>
 #include "fast5.hpp"
 
 #define NUM_BASES 4
@@ -15,18 +16,15 @@ typedef struct NormParams {
 
 class KmerModel {
     public:
-    //KmerModel(std::ifstream model_in);
+    typedef std::array<mer_id, NUM_BASES>::const_iterator neighbor_itr;
 
     KmerModel(std::string model_fname);
 
     NormParams get_norm_params(std::vector<Event> events);
 
-    std::array<mer_id, NUM_BASES>::const_iterator neighbor_begin(mer_id k_id) {
-        return neighbors_[k_id].begin();
-    }
-
-    std::array<mer_id, NUM_BASES>::const_iterator neighbor_end(mer_id k_id) {
-        return neighbors_[k_id].end();
+    std::pair<neighbor_itr, neighbor_itr> get_neighbors(mer_id k_id) {
+        return std::pair<neighbor_itr, neighbor_itr>
+                    (neighbors_[k_id].begin(), neighbors_[k_id].end());
     }
 
     float event_match_prob(Event evt, mer_id k_id, NormParams norm);

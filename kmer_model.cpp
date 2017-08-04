@@ -26,8 +26,6 @@ KmerModel::KmerModel(std::string model_fname) {
         }
     }
 
-    std::cout << "HEADER: " << header << " " << num_cols << "\n";
-    
     //Variables for reading model
     std::string kmer, neighbor_kmer;
     mer_id k_id;

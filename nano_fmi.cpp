@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <list>
 #include <set>
+#include <utility>
 #include "timer.h"
 #include "nano_fmi.hpp"
 #include "boost/math/distributions/students_t.hpp"
@@ -108,8 +109,12 @@ bool NanoFMI::operator() (unsigned int rot1, unsigned int rot2) {
 
 float NanoFMI::get_stay_prob(Event e1, Event e2) {
     double var1 = e1.stdv*e1.stdv, var2 = e2.stdv*e2.stdv;
+
     double t = (e1.mean - e2.mean) / sqrt(var1/e1.length + var2/e2.length);
-    int df = pow(var1/e1.length + var2/e2.length, 2) / (pow(var1/e1.length, 2) / (e1.length-1) + pow(var2/e2.length, 2) / (e2.length-1));
+
+    int df = pow(var1/e1.length + var2/e2.length, 2) 
+               / (pow(var1/e1.length, 2) / (e1.length-1) 
+                    + pow(var2/e2.length, 2) / (e2.length-1));
 
     boost::math::students_t dist(df);
     double q = boost::math::cdf(boost::math::complement(dist, fabs(t)));
@@ -150,26 +155,10 @@ int NanoFMI::get_tally(mer_id c, int i) {
     return tally;
 }
 
-bool operator< (const FMQuery &q1, const FMQuery &q2) {
-    //return q1.start < q2.start || q1.end < q2.end || q1.avg_prob() < q2.avg_prob();
-    return q1.start < q2.start ||
-           q1.end < q2.end ||
-           q1.avg_prob() > q2.avg_prob() ||
-           q1.stays > q2.stays||
-           q1.match_len < q2.match_len;
-}
-
-bool FMQuery::same_range(const FMQuery &q) const {
-    return start == q.start && end == q.end && match_len == q.match_len;
-}
-
-float FMQuery::avg_prob() const {
-    return prob_sum / (match_len + stays);
-}
-
 //Aligns the vector of events to the reference using LF mapping
 //Returns the number of exact alignments
-int NanoFMI::lf_map(std::vector<Event> &events, int seed_end, 
+std::vector<NanoFMI::Result> NanoFMI::lf_map(
+                    std::vector<Event> &events, int seed_end, 
                     int seed_len, NormParams norm_params) {
 
     float EVENT_THRESH = 0.00025,
@@ -177,10 +166,10 @@ int NanoFMI::lf_map(std::vector<Event> &events, int seed_end,
           STAY_THRESH  = 0.01;
 
     //Stores ranges corrasponding to the F array and the L array (the BWT)
-    std::vector< std::set<FMQuery> > f_locs(model_->kmer_count()), 
-                                     l_locs(model_->kmer_count());
+    std::vector< std::set<Query> > f_locs(model_->kmer_count()), 
+                                   l_locs(model_->kmer_count());
     std::list<mer_id> f_mers, l_mers;
-    std::set<FMQuery> results;
+    std::set<Query> finished;
 
     //Match the first event
 
@@ -190,7 +179,7 @@ int NanoFMI::lf_map(std::vector<Event> &events, int seed_end,
     for (mer_id i = 0; i < f_locs.size(); i++) {
         prob = model_->event_match_prob(events[seed_end], i, norm_params);
         if (prob >= EVENT_THRESH) {
-            f_locs[i].emplace(mer_f_starts_[i], mer_counts_[i], prob);
+            f_locs[i].emplace(*this, i, prob);
             f_mers.push_back(i);
         }
     }
@@ -210,7 +199,6 @@ int NanoFMI::lf_map(std::vector<Event> &events, int seed_end,
         while (!f_mers.empty()) {
             mer_id f = f_mers.front();
             f_mers.pop_front();
-            //std::cout << "Fmer " << f << "\n";
 
             prob = model_->event_match_prob(events[i], f, norm_params);
 
@@ -223,30 +211,20 @@ int NanoFMI::lf_map(std::vector<Event> &events, int seed_end,
                 }
             }
 
-            //Check neighboring k-mers
-            //std::vector<mer_id> &neighbors = mer_neighbors[f];
-
-            //TODO: switch this and innermost for loop?
-            //compute tally for all neighbors at once, delete f_locs as we go
-            for (auto n = model_->neighbor_begin(f); 
-                    n != model_->neighbor_end(f); n++) {
+            auto neighbors = model_->get_neighbors(f);
+            for (auto n = neighbors.first; n != neighbors.second; n++) {
                 
                 //TODO: Never compute same prob twice ??
                 prob = model_->event_match_prob(events[i], *n, norm_params);
 
                 if(prob >= EVENT_THRESH) {
 
-                    int loop_count = 0;
-
                     for (auto fq = f_locs[f].begin(); fq != f_locs[f].end(); ++fq) {
-                        int min_tally = get_tally(*n, (fq->start) - 1),
-                            max_tally = get_tally(*n, fq->end);
-                        
-                        //Candidate k-mer occurs in the range
-                        if (min_tally < max_tally) {
-                            FMQuery lq(*fq, mer_f_starts_[*n]+min_tally, max_tally-min_tally, prob);
 
-                            if ((fq->match_len)+1 < seed_len) {
+                        Query lq(*fq, *n, prob);
+
+                        if (lq.is_valid()) {
+                            if (lq.match_len_ < seed_len) {
                                 if (l_locs[*n].empty())
                                     l_mers.push_back(*n);
 
@@ -254,10 +232,9 @@ int NanoFMI::lf_map(std::vector<Event> &events, int seed_end,
 
                                 mer_matched = true;
                             } else {
-                                results.insert(lq);
+                                finished.insert(lq);
                             }
                         }
-                        loop_count++;
                     }
                 }
             }
@@ -266,9 +243,9 @@ int NanoFMI::lf_map(std::vector<Event> &events, int seed_end,
 
         //Update current ranges
         for (auto m = l_mers.begin(); m != l_mers.end(); ++m) {
-            std::set<FMQuery>::iterator prev = f_locs[*m].end();
+            std::set<Query>::iterator prev = f_locs[*m].end();
             while (!l_locs[*m].empty()) {
-                std::set<FMQuery>::iterator q = l_locs[*m].begin();
+                std::set<Query>::iterator q = l_locs[*m].begin();
 
                 if (prev == f_locs[*m].end() || !q->same_range(*prev))
                     prev = f_locs[*m].insert(prev, *q);
@@ -285,35 +262,101 @@ int NanoFMI::lf_map(std::vector<Event> &events, int seed_end,
         i--;
     }
     
-    //Count up the number of alignments
-    //Currently not doing anything with location of alignments
-    int count = 0;
-    
-    if (!results.empty()) {
-        std::set<FMQuery>::iterator prev = results.end();
-        for (auto f_loc = results.begin(); f_loc != results.end(); ++f_loc) {
-            if ((prev == results.end() || !f_loc->same_range(*prev))
-                && f_loc->avg_prob() >= SEED_THRESH) {
 
-                for (int s = f_loc->start; s <= f_loc->end; s++) {
-                    std::cout << seed_end - f_loc->match_len - f_loc->stays + 1 << " " 
-                              << suffix_ar_[s] << " " 
-                              << f_loc->avg_prob() << " " 
-                              << f_loc->match_len << " " 
-                              << f_loc->stays << "\n";
+    std::vector<Result> results;
 
-                    //std::cout << seed_end - f_loc->match_len - f_loc->stays + 1 << " " << suffix_ar[s] << " " << f_loc->avg_prob() << "\n";
-                        
-                    //std::cout << "\n";
-                    count += 1; 
-                }
-            }
-            prev = f_loc;
-        }
+    auto prev = finished.end();
+    for (auto qry = finished.begin(); qry != finished.end(); qry++) {
+        if ( prev == finished.end() || !qry->same_range(*prev) ) 
+            qry->add_results(results, seed_end, SEED_THRESH);
+        prev = qry;
     }
 
-    return count;
+    return results;
 }
 
+bool operator< (const NanoFMI::Query &q1, const NanoFMI::Query &q2) {
+    //return q1.start < q2.start || q1.end < q2.end || q1.avg_prob() < q2.avg_prob();
+    return q1.start_ < q2.start_ ||
+           q1.end_ < q2.end_ ||
+           q1.avg_prob() > q2.avg_prob() ||
+           q1.stays_ > q2.stays_ ||
+           q1.match_len_ < q2.match_len_;
+}
+
+//Initial match constructor
+NanoFMI::Query::Query(NanoFMI &fmi, mer_id k_id, float prob)
+    : fmi_(fmi), 
+      start_(fmi.mer_f_starts_[k_id]), 
+      end_(fmi.mer_f_starts_[k_id] + fmi.mer_counts_[k_id] - 1), 
+      match_len_(1), 
+      stays_(0), 
+      prob_sum_(prob) {}
+
+//"next" constructor
+NanoFMI::Query::Query(const NanoFMI::Query &prev, mer_id k_id, double prob)
+    : fmi_(prev.fmi_) {
+    int min = fmi_.get_tally(k_id, prev.start_ - 1),
+        max = fmi_.get_tally(k_id, prev.end_);
+    
+    //Candidate k-mer occurs in the range
+    if (min < max) {
+        start_ = fmi_.mer_f_starts_[k_id] + min;
+        end_ = start_ + max - min;
+        match_len_ = prev.match_len_ + 1;
+        stays_ = prev.stays_;
+        prob_sum_ = prev.prob_sum_ + prob;
+    } else {
+        start_ = end_ = match_len_ = stays_ = prob_sum_ = 0;
+    }
+}
+
+//"stay" constructor
+NanoFMI::Query::Query(const NanoFMI::Query &prev, float prob)
+    : fmi_(prev.fmi_), 
+      start_(prev.start_), 
+      end_(prev.end_), 
+      match_len_(prev.match_len_), 
+      stays_(prev.stays_ + 1), 
+      prob_sum_(prev.prob_sum_ + prob) {}
+
+//Copy constructor
+NanoFMI::Query::Query(const NanoFMI::Query &prev)
+    : fmi_(prev.fmi_), 
+      start_(prev.start_), 
+      end_(prev.end_), 
+      match_len_(prev.match_len_), 
+      stays_(prev.stays_), 
+      prob_sum_(prev.prob_sum_) {} 
+
+bool NanoFMI::Query::add_results(std::vector<NanoFMI::Result> &results, 
+                                 int query_end, double min_prob) const {
+    if (avg_prob() >= min_prob) {
+        Result r;
+        for (int s = start_; s <= end_; s++) {
+            r.qry_start = query_end - match_len_ - stays_ + 1;
+            r.qry_end = query_end;
+            r.ref_start = fmi_.suffix_ar_[s];
+            r.ref_end = fmi_.suffix_ar_[s] + match_len_ - 1;
+            r.prob = avg_prob();
+            results.push_back(r);
+        }
+        return true;
+    }
+    return false;
+}
+
+bool NanoFMI::Query::same_range(const NanoFMI::Query &q) const {
+    return start_ == q.start_ && end_ == q.end_ && match_len_ == q.match_len_;
+}
+
+bool NanoFMI::Query::is_valid() {
+    return start_ != 0 || end_ != 0 || match_len_ != 0 || 
+           stays_ != 0 || prob_sum_ != 0;
+}
+
+float NanoFMI::Query::avg_prob() const {
+    return prob_sum_ / (match_len_ + stays_);
+}
 
 
