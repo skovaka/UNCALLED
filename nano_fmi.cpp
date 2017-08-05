@@ -173,8 +173,6 @@ std::vector<NanoFMI::Result> NanoFMI::lf_map(
 
     //Match the first event
 
-    //f_locs = match_event(events.back(), scale);
-
     double prob;
     for (mer_id i = 0; i < f_locs.size(); i++) {
         prob = model_->event_match_prob(events[seed_end], i, norm_params);
@@ -302,7 +300,7 @@ NanoFMI::Query::Query(const NanoFMI::Query &prev, mer_id k_id, double prob)
     //Candidate k-mer occurs in the range
     if (min < max) {
         start_ = fmi_.mer_f_starts_[k_id] + min;
-        end_ = start_ + max - min;
+        end_ = fmi_.mer_f_starts_[k_id] + max - 1;
         match_len_ = prev.match_len_ + 1;
         stays_ = prev.stays_;
         prob_sum_ = prev.prob_sum_ + prob;
