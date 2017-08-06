@@ -161,9 +161,13 @@ std::vector<NanoFMI::Result> NanoFMI::lf_map(
                     std::vector<Event> &events, int seed_end, 
                     int seed_len, NormParams norm_params) {
 
-    float EVENT_THRESH = 0.00025,
-          SEED_THRESH  = 0.05,
-          STAY_THRESH  = 0.01;
+    //float EVENT_THRESH = 0.00025,
+    //      SEED_THRESH  = 0.05,
+    //      STAY_THRESH  = 0.01;
+
+    float EVENT_THRESH = -9.2103,
+          SEED_THRESH = -3.75, //-5.298,
+          STAY_THRESH = -5.298;
 
     //Stores ranges corrasponding to the F array and the L array (the BWT)
     std::vector< std::set<Query> > f_locs(model_->kmer_count()), 

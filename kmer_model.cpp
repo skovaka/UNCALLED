@@ -155,7 +155,7 @@ float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) {
            ig = sqrt(lambda / (2 * PI * pow(e.stdv, 3))) 
                   * exp(-lambda * pow(e.stdv - sd_means_[k_id], 2) 
                          / (2 * e.stdv * pow(sd_means_[k_id], 2)));
-    return ng*ig;
+    return log(ng*ig);
 }
 
 std::string KmerModel::reverse_complement(std::string &seq) {
