@@ -170,19 +170,25 @@ std::vector<NanoFMI::Result> NanoFMI::lf_map(
           STAY_THRESH = -5.298;
 
     //Stores ranges corrasponding to the F array and the L array (the BWT)
-    std::vector< std::set<Query> > f_locs(model_->kmer_count()), 
-                                   l_locs(model_->kmer_count());
-    std::list<mer_id> f_mers, l_mers;
+    //std::vector< std::set<Query> > f_locs(model_->kmer_count()), 
+    //                               l_locs(model_->kmer_count());
+    
+    std::list<EventQueries> queries;
+    queries.emplace_front(EventQueries(model_->kmer_count()));
+
+    //std::list<mer_id> f_mers, l_mers;
+
+    std::list< std::list<mer_id> > matched_mers(1);
     std::set<Query> finished;
 
     //Match the first event
 
     double prob;
-    for (mer_id i = 0; i < f_locs.size(); i++) {
+    for (mer_id i = 0; i < queries.front().size(); i++) {
         prob = model_->event_match_prob(events[seed_end], i, norm_params);
         if (prob >= EVENT_THRESH) {
-            f_locs[i].emplace(*this, i, prob);
-            f_mers.push_back(i);
+            queries.front()[i].emplace(*this, i, prob);
+            matched_mers.front().push_back(i);
         }
     }
 
@@ -192,28 +198,40 @@ std::vector<NanoFMI::Result> NanoFMI::lf_map(
     //Match all other events backwards
     int i = seed_end - 1;
     while (i >= 0 && mer_matched) {
+
+        EventQueries &prev_queries = queries.front();
+        std::list<mer_id> &prev_matches = matched_mers.front();
+
+        matched_mers.emplace_front(std::list<mer_id>());
+
+
+        std::list<mer_id> &next_matches = matched_mers.front();
+        EventQueries next_queries = EventQueries(model_->kmer_count());
+
         mer_matched = false;
 
         //stay = get_stay_prob(events[i], events[i+1]) >= STAY_THRESH;
         stay = true;
 
         //Find all candidate k-mers
-        while (!f_mers.empty()) {
-            mer_id f = f_mers.front();
-            f_mers.pop_front();
+        for (auto k_id = prev_matches.begin();
+             k_id != prev_matches.end(); k_id++) {
 
-            prob = model_->event_match_prob(events[i], f, norm_params);
+            prob = model_->event_match_prob(events[i], *k_id, norm_params);
 
             if (stay && prob >= EVENT_THRESH) {
-                if (l_locs[f].empty())
-                    l_mers.push_back(f);
+                if (next_queries[*k_id].empty())
+                    next_matches.push_back(*k_id);
 
-                for (auto fq = f_locs[f].begin(); fq != f_locs[f].end(); ++fq) {
-                    l_locs[f].emplace(*fq, prob);
+                for (auto pq = prev_queries[*k_id].begin(); 
+                     pq != prev_queries[*k_id].end(); pq++) {
+
+                    next_queries[*k_id].emplace(*pq, prob);
                 }
             }
 
-            auto neighbors = model_->get_neighbors(f);
+            auto neighbors = model_->get_neighbors(*k_id);
+
             for (auto n = neighbors.first; n != neighbors.second; n++) {
                 
                 //TODO: Never compute same prob twice ??
@@ -221,41 +239,42 @@ std::vector<NanoFMI::Result> NanoFMI::lf_map(
 
                 if(prob >= EVENT_THRESH) {
 
-                    for (auto fq = f_locs[f].begin(); fq != f_locs[f].end(); ++fq) {
+                    for (auto pq = prev_queries[*k_id].begin(); 
+                         pq != prev_queries[*k_id].end(); pq++) {
 
-                        Query lq(*fq, *n, prob);
+                        Query nq(*pq, *n, prob);
 
-                        if (lq.is_valid()) {
-                            if (lq.match_len_ < seed_len) {
-                                if (l_locs[*n].empty())
-                                    l_mers.push_back(*n);
+                        if (nq.is_valid()) {
+                            if (nq.match_len() < seed_len) {
+                                if (next_queries[*n].empty())
+                                    next_matches.push_back(*n);
 
-                                l_locs[*n].insert(lq);
+                                next_queries[*n].insert(nq);
 
                                 mer_matched = true;
                             } else {
-                                finished.insert(lq);
+                                finished.insert(nq);
                             }
                         }
                     }
                 }
             }
-            f_locs[f].clear();
         }
+
+        queries.emplace_front(EventQueries(model_->kmer_count()));
 
         //Update current ranges
-        for (auto m = l_mers.begin(); m != l_mers.end(); ++m) {
-            std::set<Query>::iterator prev = f_locs[*m].end();
-            while (!l_locs[*m].empty()) {
-                std::set<Query>::iterator q = l_locs[*m].begin();
+        for (auto m = next_matches.begin(); m != next_matches.end(); m++) {
+            std::set<Query>::iterator prev = queries.front()[*m].end();
+            while (!next_queries[*m].empty()) {
+                std::set<Query>::iterator q = next_queries[*m].begin();
 
-                if (prev == f_locs[*m].end() || !q->same_range(*prev))
-                    prev = f_locs[*m].insert(prev, *q);
+                if (prev == queries.front()[*m].end() || !q->same_range(*prev))
+                    prev = queries.front()[*m].insert(prev, *q);
     
-                l_locs[*m].erase(q);
+                next_queries[*m].erase(q);
             }
         }
-        l_mers.swap(f_mers);
         
         //Stop search if not matches found
         if (!mer_matched)
@@ -352,9 +371,13 @@ bool NanoFMI::Query::same_range(const NanoFMI::Query &q) const {
     return start_ == q.start_ && end_ == q.end_ && match_len_ == q.match_len_;
 }
 
-bool NanoFMI::Query::is_valid() {
+bool NanoFMI::Query::is_valid() const {
     return start_ != 0 || end_ != 0 || match_len_ != 0 || 
            stays_ != 0 || prob_sum_ != 0;
+}
+
+int NanoFMI::Query::match_len() const {
+    return match_len_;
 }
 
 float NanoFMI::Query::avg_prob() const {

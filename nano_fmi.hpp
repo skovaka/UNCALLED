@@ -24,12 +24,13 @@ class NanoFMI
     private:
     int tally_cp_dist(int i);
     int get_tally(mer_id c, int i);
-
     float get_stay_prob(Event e1, Event e2); //hmm
 
     KmerModel *model_;
     std::vector<mer_id> *mer_seq_;
-    
+
+
+
     //Sparseness of suffix and tally arrays
     int tally_dist_;
 
@@ -43,9 +44,6 @@ class NanoFMI
     
     class Query {
         public:
-        NanoFMI &fmi_;
-        int start_, end_, match_len_, stays_;
-        float prob_sum_;
 
         //Copy constructor
         Query(const Query &prev);
@@ -64,13 +62,24 @@ class NanoFMI
 
         bool same_range(const Query &q) const;
 
-        bool is_valid();
+        bool is_valid() const;
+
+        int match_len() const;
 
         float avg_prob() const;
 
         friend bool operator< (const Query &q1, const Query &q2);
+
+        private:
+
+        NanoFMI &fmi_;
+        int start_, end_, match_len_, stays_;
+        float prob_sum_;
+
     };
     friend bool operator< (const NanoFMI::Query &q1, const NanoFMI::Query &q2);
+
+    typedef std::vector< std::set<Query> > EventQueries;
 };
 
 #endif
