@@ -21,6 +21,7 @@ class NanoFMI
 
 
 
+
     private:
     int tally_cp_dist(int i);
     int get_tally(mer_id c, int i);
@@ -43,19 +44,33 @@ class NanoFMI
     void make_bwt();
     
     class Query {
+        //private:
+
+
         public:
 
-        //Copy constructor
-        Query(const Query &prev);
+        NanoFMI &fmi_;
+        mer_id k_id_;
+        int start_, end_, match_len_, stays_;
+        float prob_sum_;
+
+        std::list<const Query *> *parents_, *children_;
+
+        Query(NanoFMI &fmi);
 
         //Initial match constructor
         Query(NanoFMI &fmi, mer_id k_id, float prob);
+
+        //Copy constructor
+        Query(const Query &prev);
 
         //"next" constructor
         Query(const Query &prev, mer_id k_id, double prob);
 
         //"stay" constructor
         Query(const Query &prev, float prob);
+
+        ~Query();
 
         bool add_results(std::vector<Result> &results, 
                          int query_end, double min_prob) const;
@@ -68,16 +83,20 @@ class NanoFMI
 
         float avg_prob() const;
 
+        void print_info() const;
+
+        bool intersects(const Query &q);
+
+        Query split_query(const Query &q);
+
         friend bool operator< (const Query &q1, const Query &q2);
 
-        private:
-
-        NanoFMI &fmi_;
-        int start_, end_, match_len_, stays_;
-        float prob_sum_;
 
     };
     friend bool operator< (const NanoFMI::Query &q1, const NanoFMI::Query &q2);
+    friend bool check_queries(const NanoFMI::Query &q1, const NanoFMI::Query &q2);
+
+    int update_queries(std::set<Query> &queries, Query &q);
 
     typedef std::vector< std::set<Query> > EventQueries;
 };
