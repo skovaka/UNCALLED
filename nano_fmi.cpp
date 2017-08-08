@@ -278,12 +278,16 @@ std::vector<NanoFMI::Result> NanoFMI::lf_map(
 }
 
 bool operator< (const NanoFMI::Query &q1, const NanoFMI::Query &q2) {
-    //return q1.start < q2.start || q1.end < q2.end || q1.avg_prob() < q2.avg_prob();
-    return q1.start_ < q2.start_ ||
-           q1.end_ < q2.end_ ||
-           q1.avg_prob() > q2.avg_prob() ||
-           q1.stays_ > q2.stays_ ||
-           q1.match_len_ < q2.match_len_;
+    if (q1.start_ < q2.start_)
+        return true;
+
+    if (q1.start_ == q2.start_ && q1.end_ < q2.end_)
+        return true;
+
+    if (q1.start_ == q2.start_ && q1.end_ == q2.end_)
+        return q1.avg_prob() > q2.avg_prob();
+
+    return false;
 }
 
 //Initial match constructor
