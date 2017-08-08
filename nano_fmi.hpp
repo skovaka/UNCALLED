@@ -48,29 +48,33 @@ class NanoFMI
 
 
         public:
-
         NanoFMI &fmi_;
         mer_id k_id_;
-        int start_, end_, match_len_, stays_;
-        float prob_sum_;
+        int start_, end_;
+        mutable int match_len_;
+        mutable double prob_;
 
         std::list<const Query *> *parents_, *children_;
 
         Query(NanoFMI &fmi);
 
-        //Initial match constructor
-        Query(NanoFMI &fmi, mer_id k_id, float prob);
-
         //Copy constructor
         Query(const Query &prev);
+
+        //Initial match constructor
+        Query(NanoFMI &fmi, mer_id k_id, double prob);
 
         //"next" constructor
         Query(const Query &prev, mer_id k_id, double prob);
 
         //"stay" constructor
-        Query(const Query &prev, float prob);
+        Query(const Query &prev, double prob);
 
         ~Query();
+
+        Query& operator=(const Query&);
+
+        unsigned int id() const;
 
         bool add_results(std::vector<Result> &results, 
                          int query_end, double min_prob) const;
@@ -79,15 +83,13 @@ class NanoFMI
 
         bool is_valid() const;
 
-        int match_len() const;
-
-        float avg_prob() const;
+        bool is_match() const;
 
         void print_info() const;
 
-        bool intersects(const Query &q);
+        bool intersects(const Query &q) const;
 
-        Query split_query(const Query &q);
+        Query split_query(Query &q);
 
         friend bool operator< (const Query &q1, const Query &q2);
 
