@@ -42,6 +42,14 @@ class NanoFMI
 
 
     void make_bwt();
+
+    //typedef struct QueryMetadata {
+    //     int match_len_;              
+    //     double prob_;
+    //     bool traversed_;
+    //     Query const * parent_, self_;
+    //     std::list<Query const *> children_;
+    //} QueryMetadata;
     
     class Query {
         //private:
@@ -53,8 +61,9 @@ class NanoFMI
         int start_, end_;
         mutable int match_len_;
         mutable double prob_;
-
-        std::list<const Query *> *parents_, *children_;
+        mutable bool traversed_;
+        mutable Query const * parent_;
+        mutable std::list<Query const *> children_;
 
         Query(NanoFMI &fmi);
 
@@ -98,7 +107,7 @@ class NanoFMI
     friend bool operator< (const NanoFMI::Query &q1, const NanoFMI::Query &q2);
     friend bool check_queries(const NanoFMI::Query &q1, const NanoFMI::Query &q2);
 
-    int update_queries(std::set<Query> &queries, Query &q);
+    int update_queries(std::set<Query> &queries, Query &q, bool first);
 
     typedef std::vector< std::set<Query> > EventQueries;
 };

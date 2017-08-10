@@ -20,8 +20,9 @@ void align_kmers(std::string name, std::string strand, NanoFMI& fmi, std::vector
 
     // align each k-mer of length k
     //for (int i = events.size()-1; i >= k; i--) {
-    for (int i = 2266; i >= 2226; i--) { //Should map to 12198-12214 - 55 events -> 36 genome BP
-        auto matches = fmi.lf_map(events, i, k, norm);
+    //for (int i = 2266; i >= 2226; i--) { //Should map to 12198-12214 - 55 events -> 36 genome BP
+        auto matches = fmi.lf_map(events, events.size()-1, k, norm);
+        //auto matches = fmi.lf_map(events, 14197, k, norm);
 
         for (auto match = matches.begin(); match != matches.end(); match++) {
             std::cout << strand << "\t" 
@@ -30,8 +31,7 @@ void align_kmers(std::string name, std::string strand, NanoFMI& fmi, std::vector
                       << match->prob << "\n";
         }
 
-        break;
-    }
+    //}
 
 }
 
