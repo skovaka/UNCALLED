@@ -173,294 +173,321 @@ std::vector<NanoFMI::Result> NanoFMI::lf_map(
 
     //Match the first event
 
-    double event_probs[map_start + 1][model_->kmer_count()];
+    double **event_probs = new double*[map_start + 1];//[model_->kmer_count()];
 
     std::cerr << "Getting probs\n";
 
     for (int e = map_start; e >= 0; e--) {
+        event_probs[e] = new double[model_->kmer_count()];
         for (mer_id i = 0; i < model_->kmer_count(); i++) {
             event_probs[e][i] = model_->event_match_prob(events[e], i, norm_params);
         }
     }
+    std::cerr << "Got probs\n";
 
-    std::list< std::set<Query> > queries(1);
+    std::list< std::set<Range> > traversed_ranges;
+    //traversed_ranges.push_front(std::set<Range>());
+    //std::set<Range> to_traverse;
 
-    std::list< std::list<mer_id> > matched_mers(1);
     std::vector<Result> results;
 
     //double prob;
 
-    for (int seed_end = map_start; seed_end >= seed_len; seed_end--) {
-        std::set<Query> finished;
+    int i = map_start;
+    while (i >= 0) {
 
-        std::cerr << "seed: " << seed_end << "\n";
+        //std::cout << "loop " << i << "\n";
 
-        for (mer_id i = 0; i < model_->kmer_count(); i++) {
-            if (event_probs[seed_end][i] >= EVENT_THRESH) {
-                Query q(*this, i, event_probs[seed_end][i]);
-                update_queries(queries.back(), q, true);
-            }
-        }
-
-        bool mer_matched = true,
-             stay = false;
-
-        int query_loc = 0;
-
-        auto prev_queries = queries.rbegin();
-
-        for (auto pq = prev_queries->begin(); pq != prev_queries->end(); pq++) {
-            pq->parent_ = NULL;
-        }
+        std::set<Range> next_ranges, seed_starts;
         
+        bool stay = false;
 
-        //Match all other events backwards
-        int i = seed_end - 1;
-        while (i >= 0 && mer_matched) {
+        //stay = get_stay_prob(events[i], events[i+1]) >= STAY_THRESH;
+        stay = true;
 
-            if (&(*prev_queries) == &(queries.front())) {
-                queries.push_front(std::set<Query>());
-            }
-            
-            auto next_queries = prev_queries;
-            next_queries++;
+        //auto prev_ranges = traversed_ranges.begin(); //Empty on first iteration
+        if (!traversed_ranges.empty()) {
+            for (auto pr = traversed_ranges.front().begin(); 
+                 pr != traversed_ranges.front().end(); pr++) {
 
-            mer_matched = false;
+                if (stay && event_probs[i][pr->k_id_] >= EVENT_THRESH) {
+                    Range nr(*pr, event_probs[i][pr->k_id_]);
 
-            //stay = get_stay_prob(events[i], events[i+1]) >= STAY_THRESH;
-            stay = true;
-
-            for (auto pq = prev_queries->begin(); pq != prev_queries->end(); pq++) {
-
-                if (!pq->is_valid() || pq->traversed_)
-                    continue;
-
-                if (stay && event_probs[i][pq->k_id_] >= EVENT_THRESH) {
-                    Query nq(*pq, event_probs[i][pq->k_id_]);
-                    update_queries(*next_queries, nq, false);
+                    update_ranges(next_ranges, nr, false);
                 }
                 
-                auto neighbors = model_->get_neighbors(pq->k_id_);
+                auto neighbors = model_->get_neighbors(pr->k_id_);
 
                 for (auto n = neighbors.first; n != neighbors.second; n++) {
 
                     if(event_probs[i][*n] >= EVENT_THRESH) {
 
-                        Query nq(*pq, *n, event_probs[i][*n]);
-
-                        if (nq.is_valid()) {
-                            if ( nq.match_len_ < seed_len ) {
-
-                                update_queries(*next_queries, nq, false);
-
-                                mer_matched = true;
-
-                            } else {
-                                auto dup = finished.find(nq);
-                                if (dup == finished.end()) {
-                                    finished.insert(nq);
-                                } else if (dup->prob_ < nq.prob_) {
-                                    finished.erase(dup);
-                                    finished.insert(nq);
-                                }
-                            }
+                        Range nr(*pr, *n, event_probs[i][*n]);
+                        //std::cout << nr.match_len_ << "\n";
+                        if (update_ranges(next_ranges, nr, false) > 0 
+                                 && nr.match_len_ == seed_len ) {
+                            update_ranges(seed_starts, nr, false);
                         }
                     }
                 }
-                pq->traversed_ = true;
             }
-
-
-            prev_queries++;
-
-            //Stop search if not matches found
-            if (!mer_matched)
-                break;
-
-            i--;
-
-            query_loc++;
         }
 
+        //std::cout << next_ranges.size() << ", ";
 
-        for (auto aln_en = finished.begin(); aln_en != finished.end(); aln_en++) {
-
-            //std::cout << aln_en->parent_ << "\n";
-                
-            int total_length = 1;
-            const Query *aln_st = &(*aln_en), *aln_second;
-
-            while (aln_st->parent_ != NULL) {
-                aln_second = aln_st;
-                aln_st = aln_st->parent_;
-                total_length++;
+        //FIRST MATCH
+        for (mer_id k_id = 0; k_id < model_->kmer_count(); k_id++) {
+            if (event_probs[i][k_id] >= EVENT_THRESH) {
+                Range nr(*this, k_id, i, event_probs[i][k_id]);
+                update_ranges(next_ranges, nr, true);
+                //std::cout << update_ranges(next_ranges, nr, true) << "\n";
             }
-            
+        }
 
-            //aln_second->parent_ = NULL;
+       // std::cout << next_ranges.size() << "\n";
 
-            if (aln_en->prob_ / total_length >= SEED_THRESH) {
-                for (int s = aln_en->start_; s <= aln_en->end_; s++) {
+        for (auto aln_st = seed_starts.begin(); aln_st != seed_starts.end(); aln_st++) {
+
+            auto end_ranges = traversed_ranges.begin();
+            int total_length = 1;
+            bool back_stays = false;
+            const Range *aln_en = &(*aln_st),
+                        *aln_cut_end = NULL; //Marks
+
+            while (aln_en->parent_ != NULL) {
+                if (!back_stays) //Last 
+                    aln_cut_end = aln_en;
+                back_stays = aln_en->stay_;
+                aln_en = aln_en->parent_;
+                total_length++;
+                end_ranges++;
+            }
+                
+            if (aln_st->prob_ / total_length >= SEED_THRESH) {
+                for (int s = aln_st->start_; s <= aln_st->end_; s++) {
                     Result r;
-                    r.qry_start = seed_end - total_length;
-                    r.qry_end = seed_end;
+                    r.qry_start = aln_st->event_;// seed_end - total_length + 1;
+                    r.qry_end = aln_en->event_;
                     r.ref_start = suffix_ar_[s];
-                    r.ref_end = suffix_ar_[s] + aln_en->match_len_ - 1;
-                    r.prob = aln_en->prob_ / total_length;
+                    r.ref_end = suffix_ar_[s] + aln_st->match_len_ - 1;
+                    r.prob = aln_st->prob_ / aln_st->total_len_;
                     results.push_back(r);
+
+                    std::cout << "rev\t" 
+                              << r.qry_start << "-" << r.qry_end << "\t"
+                              << r.ref_start << "-" << r.ref_end << "\t"
+                              << r.prob << "\n";//" " << total_length << " "
+                              //<< aln_st->match_len_ << " " <<  aln_st->event_ << "\n";
                 }
             }
 
-            //std::cout << query_loc << " " << queries.size() << " " << aln_en->parent_ << "\n";
+            //double last_prob = event_probs[aln_en->event_][aln_en->k_id_];
+            //double last_prob = aln_en->prob_;
+            double last_prob = aln_cut_end->prob_;
 
-            aln_en->prob_ -= event_probs[seed_end - total_length][aln_en->parent_->k_id_];
-            aln_en->match_len_--;
+            aln_st->match_len_--;
+            aln_st->prob_ -= last_prob;
+
+            int next_len = aln_st->match_len_ - 1;
+
+            const Range *aln_evt = &(*aln_st);
+            while ((aln_evt = aln_evt->parent_) != NULL) {
+
+                if (aln_evt->match_len_ != next_len) {
+                    aln_evt->prob_ -= last_prob;
+                    aln_evt->match_len_ = next_len;
+                    aln_evt->total_len_--;
+                }
+
+                if (aln_evt->parent_ == aln_cut_end) {
+                    aln_evt->parent_ = NULL;
+                    aln_cut_end->child_count_--;
+                }
+
+                else if (aln_evt->stay_)
+                    next_len = aln_evt->match_len_;
+                else
+                    next_len = aln_evt->match_len_-1;
+            }
+
+            
+            aln_evt = aln_cut_end;
+            while (aln_evt != NULL && aln_evt->child_count_ == 0) {
+                if ((aln_evt = aln_evt->parent_) != NULL) 
+                    aln_evt->child_count_--;
+            }
         }
 
-        queries.pop_back();
+        //std::cout << traversed_ranges.size() << " " << next_ranges.size() << "\n";
+
+        traversed_ranges.push_front(next_ranges);
+
+        i--;
     }
 
+    delete event_probs;
 
     return results;
 }
 
-int NanoFMI::update_queries(std::set<NanoFMI::Query> &queries, NanoFMI::Query &new_qry, bool first) {
+int NanoFMI::update_ranges(std::set<NanoFMI::Range> &next_ranges, 
+                           const NanoFMI::Range &nr, bool split_all) {
 
-    if (!new_qry.is_valid())
+    if (!nr.is_valid()) {
         return 0;
+    }
 
-    auto lb = queries.lower_bound(new_qry);
+    auto lb = next_ranges.lower_bound(nr);
 
-    if (lb == queries.end()) {
-        queries.insert(lb, new_qry);
+
+    if (lb == next_ranges.end()) {
+        next_ranges.insert(nr);
         return 1;
     }
 
-    if (lb->same_range(new_qry)) {
-        if (new_qry.prob_ > lb->prob_) {
-            Query old_q = *lb;
-            queries.erase(lb);
-            const Query *new_q = &(*(queries.insert(new_qry).first));
-            for (auto c = old_q.children_.begin(); c != old_q.children_.end(); c++)
-                (*c)->parent_ = new_q;
+    if (lb->same_range(nr)) {
+
+        //PROBABILY THE PROBLEM
+        //or maybe not
+        if (!split_all && (nr.total_len_ > lb->total_len_ 
+                            || (nr.prob_ > lb->prob_ && nr.total_len_ == lb->total_len_))) {
+            Range old_q = *lb;
+
+            //std::cout << nr.match_len_ << " vs " << lb->match_len_ << "\n";
+            
+            lb->parent_->child_count_--; //TODO: go further? 
+            next_ranges.erase(lb); 
+            next_ranges.insert(nr); //TODO: store lb next iter to speed up
+            return 1;
         }
-        return 0;        
+        if (nr.parent_ != NULL)
+            nr.parent_->child_count_--;
+        return 0; 
     }
 
-    auto end = lb;
-    while (end != queries.end() && end->intersects(new_qry)) {
-        end++;
+    if (!split_all) {
+        next_ranges.insert(nr);
+        return 1;
     }
 
     auto start = lb;
-    while (start != queries.begin() && std::prev(start)->intersects(new_qry)){
+    while (start != next_ranges.begin() && std::prev(start)->intersects(nr)){
         start--;
     }
-    
 
-    if (start == queries.end() || (start == lb && end == lb)) {
-        queries.insert(lb, new_qry);
+    auto end = lb;
+    while (end != next_ranges.end() && end->intersects(nr)) {
+        end++;
+    }
+
+    if (start == next_ranges.end() || (start == lb && end == lb)) {
+        next_ranges.insert(nr);
         return 1;
     }
 
-    //if (!first)
-    //    std::cout << new_qry.start_ << "-" << new_qry.end_ << " / ";
+    std::list<Range> split_ranges;
 
-    bool any_traversed = false;
+    Range rr(nr); //Right range
 
-    Query orig(new_qry);
+    for (auto pr = start; pr != end; pr++) {
+        Range lr = rr.split_range(*pr); //Left range
 
-    std::list<Query> split_queries;
-    for (auto sq = start; sq != end; sq++) {
-        Query sq2(*sq);
-        //if (!first)
-        //    std::cout << sq2.start_ << "-" << sq2.end_ << "|" << sq2.traversed_;
-        any_traversed = any_traversed || sq2.traversed_;
-        split_queries.push_back(sq2.split_query(new_qry)); //q is right query now
-        if (!new_qry.is_valid())
+        if (lr.is_valid()) 
+            split_ranges.push_back(lr);
+
+        if (!lr.is_valid())
             break;
     }
-    split_queries.push_back(new_qry);
 
-    //std::cout << "-> ";
+    if (rr.is_valid())
+        split_ranges.push_back(rr);
 
+    next_ranges.insert(split_ranges.begin(), split_ranges.end());
 
-    int new_count = 0;
-    for (auto sq = split_queries.begin(); sq != split_queries.end(); sq++) {
-        if (sq->is_valid()) {
-            queries.insert(lb, *sq);
-            new_count++;
-        }
-    }
-
-    return new_count;
+    return split_ranges.size();
 }
 
-bool NanoFMI::Query::intersects(const Query &q) const {
+bool NanoFMI::Range::intersects(const Range &q) const {
     return (start_ >= q.start_ && start_ <= q.end_) ||
            (end_ >= q.start_ && end_ <= q.end_);
 }
 
-NanoFMI::Query NanoFMI::Query::split_query(NanoFMI::Query &q) {
+NanoFMI::Range NanoFMI::Range::split_range(const NanoFMI::Range &r) { 
 
     //if (prob_ < q.prob_)
-    //    return Query(fmi_);
+    //    return Range(fmi_);
 
-    Query left(fmi_);
-    if (start_ > q.start_) {
-        left = Query(q);
-        left.end_ = start_ - 1;
+    Range left(fmi_);
+    if (start_ < r.start_) {
+        left = Range(*this);
+        left.end_ = r.start_ - 1;
     }
 
-    if (end_ < q.end_) {
-        q.start_ = end_ + 1;
+    if (end_ > r.end_) {
+        start_ = r.end_ + 1;
     } else {
-        q = Query(fmi_);
+        start_ = end_ = prob_ = 0;
+    }
+
+    if (parent_ != NULL) {
+        if (left.is_valid())
+            left.parent_->child_count_++;
+
+        if (!is_valid())
+            parent_->child_count_--;
     }
 
     return left;
 }
 
 
-NanoFMI::Query& NanoFMI::Query::operator=(const NanoFMI::Query& prev) {
+NanoFMI::Range& NanoFMI::Range::operator=(const NanoFMI::Range& prev) {
     fmi_ = prev.fmi_;
     k_id_ = prev.k_id_;
+    event_ = prev.event_;
     start_ = prev.start_;
     end_ = prev.end_;
     prob_ = prev.prob_;
     match_len_ = prev.match_len_;
-    traversed_ = prev.traversed_;
+    stay_ = prev.stay_;
     parent_ = prev.parent_;
-    children_ = std::list<Query const *>(prev.children_);
+    //children_ = std::list<Range const *>(prev.children_);
+    child_count_ = prev.child_count_;
     return *this;
 }
 
-NanoFMI::Query::Query(NanoFMI &fmi)
+NanoFMI::Range::Range(NanoFMI &fmi)
     : fmi_(fmi), 
       k_id_(0),
+      event_(-1),
       start_(0), 
       end_(0), 
       match_len_(0),
+      total_len_(0),
       prob_(0),
-      traversed_(false),
-      parent_(NULL) {}
+      stay_(false),
+      parent_(NULL),
+      child_count_(0) {}
 
 //Initial match constructor
-NanoFMI::Query::Query(NanoFMI &fmi, mer_id k_id, double prob)
+NanoFMI::Range::Range(NanoFMI &fmi, mer_id k_id, int event, double prob)
     : fmi_(fmi), 
       k_id_(k_id),
+      event_(event),
       start_(fmi.mer_f_starts_[k_id]), 
       end_(fmi.mer_f_starts_[k_id] + fmi.mer_counts_[k_id] - 1), 
       match_len_(1),
+      total_len_(1),
       prob_(prob),
-      traversed_(false),
-      parent_(NULL) {}
+      stay_(false),
+      parent_(NULL),
+      child_count_(0) {}
 
 //"next" constructor
-NanoFMI::Query::Query(const NanoFMI::Query &prev, mer_id k_id, double prob)
+NanoFMI::Range::Range(const NanoFMI::Range &prev, mer_id k_id, double prob)
     : fmi_(prev.fmi_),
       k_id_(k_id),
-      traversed_(false),
+      stay_(false),
       parent_(&prev) {
 
     int min = fmi_.get_tally(k_id, prev.start_ - 1),
@@ -468,11 +495,14 @@ NanoFMI::Query::Query(const NanoFMI::Query &prev, mer_id k_id, double prob)
 
     //Candidate k-mer occurs in the range
     if (min < max) {
+        event_ = prev.event_ - 1,
         start_ = fmi_.mer_f_starts_[k_id] + min;
         end_ = fmi_.mer_f_starts_[k_id] + max - 1;
         match_len_ = prev.match_len_ + 1;
+        total_len_ = prev.total_len_ + 1;
         prob_ = prev.prob_ + prob;
-        prev.children_.push_back(this);
+        prev.child_count_++;
+        //prev.children_.push_back(this);
     } else {
         start_ = end_ = 0;
 
@@ -480,57 +510,69 @@ NanoFMI::Query::Query(const NanoFMI::Query &prev, mer_id k_id, double prob)
 }
 
 //"stay" constructor
-NanoFMI::Query::Query(const NanoFMI::Query &prev, double prob)
+NanoFMI::Range::Range(const NanoFMI::Range &prev, double prob)
     : fmi_(prev.fmi_), 
       k_id_(prev.k_id_),
+      event_(prev.event_ - 1),
       start_(prev.start_), 
       end_(prev.end_), 
       match_len_(prev.match_len_),
+      total_len_(prev.total_len_+1),
       prob_(prev.prob_ + prob),
-      traversed_(false),
+      stay_(true),
       parent_(&prev) {
 
-        prev.children_.push_back(this);
+        //prev.children_.push_back(this);
+        prev.child_count_++;
           
     }
 
 //Copy constructor
-NanoFMI::Query::Query(const NanoFMI::Query &prev)
+NanoFMI::Range::Range(const NanoFMI::Range &prev)
     : fmi_(prev.fmi_), 
       k_id_(prev.k_id_),
+      event_(prev.event_),
       start_(prev.start_), 
       end_(prev.end_), 
       match_len_(prev.match_len_),
+      total_len_(prev.total_len_),
       prob_(prev.prob_),
-      traversed_(prev.traversed_),
+      stay_(prev.stay_),
       parent_(prev.parent_),
-      children_(std::list<Query const *>(prev.children_)) {
+      child_count_(prev.child_count_) {
+      //children_(std::list<Range const *>(prev.children_)) {
 } 
 
-NanoFMI::Query::~Query() {
+NanoFMI::Range::~Range() {
     //delete parents_;
     //delete children_;
 }
 
-bool NanoFMI::Query::same_range(const NanoFMI::Query &q) const {
+bool NanoFMI::Range::same_range(const NanoFMI::Range &q) const {
     return start_ == q.start_ && end_ == q.end_;
 }
 
-bool NanoFMI::Query::is_valid() const {
+bool NanoFMI::Range::is_valid() const {
     return start_ <= end_ && (start_ != 0 || end_ != 0);
 }
 
 
-void NanoFMI::Query::print_info() const {
+void NanoFMI::Range::print_info() const {
 }
 
 
-bool operator< (const NanoFMI::Query &q1, const NanoFMI::Query &q2) {
-    if (q1.start_ < q2.start_)
+bool operator< (const NanoFMI::Range &q1, const NanoFMI::Range &q2) {
+    if (q1.event_ > q2.event_) {
         return true;
+        
+    } else if (q1.event_ == q2.event_) {
 
-    if (q1.start_ == q2.start_ && q1.end_ < q2.end_)
-        return true;
+        if (q1.start_ < q2.start_)
+            return true;
+
+        if (q1.start_ == q2.start_ && q1.end_ < q2.end_)
+            return true;
+    }
     
     return false;
 }

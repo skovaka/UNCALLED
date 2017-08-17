@@ -3,7 +3,7 @@ HDF5_LIB=-L/cm/shared/apps/hdf5/1.8.17/lib /cm/shared/apps/hdf5/1.8.17/lib/libhd
 BOOST_INCLUDE=-I/cm/local/apps/boost/1.58.0/include
 HDF5_INCLUDE=-I/cm/shared/apps/hdf5/1.8.17/include
 CC=g++
-CFLAGS=-Wall -std=c++11 -O3
+CFLAGS=-Wall -std=c++11 -g
 INCLUDE=-I./src/fast5/src -I./src ${BOOST_INCLUDE}
 
 
