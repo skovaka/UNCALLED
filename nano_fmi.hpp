@@ -43,52 +43,52 @@ class NanoFMI
 
     void make_bwt();
 
-    //typedef struct QueryMetadata {
+    //typedef struct RangeMetadata {
     //     int match_len_;              
     //     double prob_;
     //     bool traversed_;
-    //     Query const * parent_, self_;
-    //     std::list<Query const *> children_;
-    //} QueryMetadata;
+    //     Range const * parent_, self_;
+    //     std::list<Range const *> children_;
+    //} RangeMetadata;
     
-    class Query {
+    class Range {
         //private:
 
 
         public:
         NanoFMI &fmi_;
         mer_id k_id_;
-        int start_, end_;
-        mutable int match_len_;
+        int event_, start_, end_;
+        mutable int match_len_, total_len_;
         mutable double prob_;
-        mutable bool traversed_;
-        mutable Query const * parent_;
-        mutable std::list<Query const *> children_;
+        mutable bool stay_;
+        mutable Range const * parent_;
+        mutable int child_count_;
 
-        Query(NanoFMI &fmi);
+        Range(NanoFMI &fmi);
 
         //Copy constructor
-        Query(const Query &prev);
+        Range(const Range &prev);
 
         //Initial match constructor
-        Query(NanoFMI &fmi, mer_id k_id, double prob);
+        Range(NanoFMI &fmi, mer_id k_id, int event, double prob);
 
         //"next" constructor
-        Query(const Query &prev, mer_id k_id, double prob);
+        Range(const Range &prev, mer_id k_id, double prob);
 
         //"stay" constructor
-        Query(const Query &prev, double prob);
+        Range(const Range &prev, double prob);
 
-        ~Query();
+        ~Range();
 
-        Query& operator=(const Query&);
+        Range& operator=(const Range&);
 
         unsigned int id() const;
 
         bool add_results(std::vector<Result> &results, 
-                         int query_end, double min_prob) const;
+                         int range_end, double min_prob) const;
 
-        bool same_range(const Query &q) const;
+        bool same_range(const Range &q) const;
 
         bool is_valid() const;
 
@@ -96,20 +96,21 @@ class NanoFMI
 
         void print_info() const;
 
-        bool intersects(const Query &q) const;
+        bool intersects(const Range &q) const;
 
-        Query split_query(Query &q);
+        Range split_range(const Range &q);
 
-        friend bool operator< (const Query &q1, const Query &q2);
+        friend bool operator< (const Range &q1, const Range &q2);
 
 
     };
-    friend bool operator< (const NanoFMI::Query &q1, const NanoFMI::Query &q2);
-    friend bool check_queries(const NanoFMI::Query &q1, const NanoFMI::Query &q2);
+    friend bool operator< (const NanoFMI::Range &q1, const NanoFMI::Range &q2);
+    friend bool check_ranges(const NanoFMI::Range &q1, const NanoFMI::Range &q2);
 
-    int update_queries(std::set<Query> &queries, Query &q, bool first);
+    int update_ranges(std::set<Range> &next_ranges, 
+                      const Range &nr, bool split_all);
 
-    typedef std::vector< std::set<Query> > EventQueries;
+    typedef std::vector< std::set<Range> > EventQueries;
 };
 
 #endif
