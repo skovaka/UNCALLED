@@ -52,17 +52,16 @@ class NanoFMI
     //} RangeMetadata;
     
     class Range {
-        //private:
-
-
+        
         public:
+        //int id_;
         NanoFMI &fmi_;
         mer_id k_id_;
         int event_, start_, end_;
-        mutable int match_len_, total_len_;
+        mutable int total_len_, stay_count_;
         mutable double prob_;
         mutable bool stay_;
-        mutable Range const * parent_;
+        mutable std::map<short, Range const *> parents_;
         mutable int child_count_;
 
         Range(NanoFMI &fmi);
@@ -104,13 +103,35 @@ class NanoFMI
 
 
     };
+
     friend bool operator< (const NanoFMI::Range &q1, const NanoFMI::Range &q2);
     friend bool check_ranges(const NanoFMI::Range &q1, const NanoFMI::Range &q2);
 
     int update_ranges(std::set<Range> &next_ranges, 
                       const Range &nr, bool split_all);
 
-    typedef std::vector< std::set<Range> > EventQueries;
+    class SeedGraph {
+        public:
+        typedef std::set<Range> range_set;
+        typedef RangeSet::const_iterator range_itr;
+
+        int seed_len_;
+        std::list< range_set > event_ranges_;
+        range_set seed_starts_;
+        
+        SeedGraph(int seed_len);
+
+        int add_range(const Range &r); //copy update_ranges
+
+        std::pair<ange_itr, range_itr> iter_prev();
+
+        vector<Result> pop_seeds(); //Big result gathering loop
+                                    //Probably split into a few methods
+        
+        bool empty();
+
+
+    };
 };
 
 #endif

@@ -246,77 +246,7 @@ std::vector<NanoFMI::Result> NanoFMI::lf_map(
 
        // std::cout << next_ranges.size() << "\n";
 
-        for (auto aln_st = seed_starts.begin(); aln_st != seed_starts.end(); aln_st++) {
-
-            auto end_ranges = traversed_ranges.begin();
-            int total_length = 1;
-            bool back_stays = false;
-            const Range *aln_en = &(*aln_st),
-                        *aln_cut_end = NULL; //Marks
-
-            while (aln_en->parent_ != NULL) {
-                if (!back_stays) //Last 
-                    aln_cut_end = aln_en;
-                back_stays = aln_en->stay_;
-                aln_en = aln_en->parent_;
-                total_length++;
-                end_ranges++;
-            }
-                
-            if (aln_st->prob_ / total_length >= SEED_THRESH) {
-                for (int s = aln_st->start_; s <= aln_st->end_; s++) {
-                    Result r;
-                    r.qry_start = aln_st->event_;// seed_end - total_length + 1;
-                    r.qry_end = aln_en->event_;
-                    r.ref_start = suffix_ar_[s];
-                    r.ref_end = suffix_ar_[s] + aln_st->match_len_ - 1;
-                    r.prob = aln_st->prob_ / aln_st->total_len_;
-                    results.push_back(r);
-
-                    std::cout << "rev\t" 
-                              << r.qry_start << "-" << r.qry_end << "\t"
-                              << r.ref_start << "-" << r.ref_end << "\t"
-                              << r.prob << "\n";//" " << total_length << " "
-                              //<< aln_st->match_len_ << " " <<  aln_st->event_ << "\n";
-                }
-            }
-
-            //double last_prob = event_probs[aln_en->event_][aln_en->k_id_];
-            //double last_prob = aln_en->prob_;
-            double last_prob = aln_cut_end->prob_;
-
-            aln_st->match_len_--;
-            aln_st->prob_ -= last_prob;
-
-            int next_len = aln_st->match_len_ - 1;
-
-            const Range *aln_evt = &(*aln_st);
-            while ((aln_evt = aln_evt->parent_) != NULL) {
-
-                if (aln_evt->match_len_ != next_len) {
-                    aln_evt->prob_ -= last_prob;
-                    aln_evt->match_len_ = next_len;
-                    aln_evt->total_len_--;
-                }
-
-                if (aln_evt->parent_ == aln_cut_end) {
-                    aln_evt->parent_ = NULL;
-                    aln_cut_end->child_count_--;
-                }
-
-                else if (aln_evt->stay_)
-                    next_len = aln_evt->match_len_;
-                else
-                    next_len = aln_evt->match_len_-1;
-            }
-
-            
-            aln_evt = aln_cut_end;
-            while (aln_evt != NULL && aln_evt->child_count_ == 0) {
-                if ((aln_evt = aln_evt->parent_) != NULL) 
-                    aln_evt->child_count_--;
-            }
-        }
+        blah.pop_results();
 
         //std::cout << traversed_ranges.size() << " " << next_ranges.size() << "\n";
 
@@ -333,78 +263,6 @@ std::vector<NanoFMI::Result> NanoFMI::lf_map(
 int NanoFMI::update_ranges(std::set<NanoFMI::Range> &next_ranges, 
                            const NanoFMI::Range &nr, bool split_all) {
 
-    if (!nr.is_valid()) {
-        return 0;
-    }
-
-    auto lb = next_ranges.lower_bound(nr);
-
-
-    if (lb == next_ranges.end()) {
-        next_ranges.insert(nr);
-        return 1;
-    }
-
-    if (lb->same_range(nr)) {
-
-        //PROBABILY THE PROBLEM
-        //or maybe not
-        if (!split_all && (nr.total_len_ > lb->total_len_ 
-                            || (nr.prob_ > lb->prob_ && nr.total_len_ == lb->total_len_))) {
-            Range old_q = *lb;
-
-            //std::cout << nr.match_len_ << " vs " << lb->match_len_ << "\n";
-            
-            lb->parent_->child_count_--; //TODO: go further? 
-            next_ranges.erase(lb); 
-            next_ranges.insert(nr); //TODO: store lb next iter to speed up
-            return 1;
-        }
-        if (nr.parent_ != NULL)
-            nr.parent_->child_count_--;
-        return 0; 
-    }
-
-    if (!split_all) {
-        next_ranges.insert(nr);
-        return 1;
-    }
-
-    auto start = lb;
-    while (start != next_ranges.begin() && std::prev(start)->intersects(nr)){
-        start--;
-    }
-
-    auto end = lb;
-    while (end != next_ranges.end() && end->intersects(nr)) {
-        end++;
-    }
-
-    if (start == next_ranges.end() || (start == lb && end == lb)) {
-        next_ranges.insert(nr);
-        return 1;
-    }
-
-    std::list<Range> split_ranges;
-
-    Range rr(nr); //Right range
-
-    for (auto pr = start; pr != end; pr++) {
-        Range lr = rr.split_range(*pr); //Left range
-
-        if (lr.is_valid()) 
-            split_ranges.push_back(lr);
-
-        if (!lr.is_valid())
-            break;
-    }
-
-    if (rr.is_valid())
-        split_ranges.push_back(rr);
-
-    next_ranges.insert(split_ranges.begin(), split_ranges.end());
-
-    return split_ranges.size();
 }
 
 bool NanoFMI::Range::intersects(const Range &q) const {
@@ -448,9 +306,10 @@ NanoFMI::Range& NanoFMI::Range::operator=(const NanoFMI::Range& prev) {
     start_ = prev.start_;
     end_ = prev.end_;
     prob_ = prev.prob_;
-    match_len_ = prev.match_len_;
+    total_len_ = prev.total_len_;
+    stay_count_ = prev.stay_count_;
     stay_ = prev.stay_;
-    parent_ = prev.parent_;
+    parents_ = std::map<short, Range const *>(prev.parents_);
     //children_ = std::list<Range const *>(prev.children_);
     child_count_ = prev.child_count_;
     return *this;
@@ -462,11 +321,10 @@ NanoFMI::Range::Range(NanoFMI &fmi)
       event_(-1),
       start_(0), 
       end_(0), 
-      match_len_(0),
       total_len_(0),
+      stay_count_(0),
       prob_(0),
       stay_(false),
-      parent_(NULL),
       child_count_(0) {}
 
 //Initial match constructor
@@ -476,19 +334,17 @@ NanoFMI::Range::Range(NanoFMI &fmi, mer_id k_id, int event, double prob)
       event_(event),
       start_(fmi.mer_f_starts_[k_id]), 
       end_(fmi.mer_f_starts_[k_id] + fmi.mer_counts_[k_id] - 1), 
-      match_len_(1),
       total_len_(1),
+      stay_count_(0),
       prob_(prob),
       stay_(false),
-      parent_(NULL),
       child_count_(0) {}
 
 //"next" constructor
 NanoFMI::Range::Range(const NanoFMI::Range &prev, mer_id k_id, double prob)
     : fmi_(prev.fmi_),
       k_id_(k_id),
-      stay_(false),
-      parent_(&prev) {
+      stay_(false) {
 
     int min = fmi_.get_tally(k_id, prev.start_ - 1),
         max = fmi_.get_tally(k_id, prev.end_);
@@ -498,10 +354,12 @@ NanoFMI::Range::Range(const NanoFMI::Range &prev, mer_id k_id, double prob)
         event_ = prev.event_ - 1,
         start_ = fmi_.mer_f_starts_[k_id] + min;
         end_ = fmi_.mer_f_starts_[k_id] + max - 1;
-        match_len_ = prev.match_len_ + 1;
         total_len_ = prev.total_len_ + 1;
+        stay_count_ = prev.stay_count_;
         prob_ = prev.prob_ + prob;
-        prev.child_count_++;
+
+        parents_[total_len_] = &prev;
+        prev.child_count_++; //mAYBE NOT
         //prev.children_.push_back(this);
     } else {
         start_ = end_ = 0;
@@ -516,16 +374,16 @@ NanoFMI::Range::Range(const NanoFMI::Range &prev, double prob)
       event_(prev.event_ - 1),
       start_(prev.start_), 
       end_(prev.end_), 
-      match_len_(prev.match_len_),
       total_len_(prev.total_len_+1),
+      stay_count_(prev.stay_count_+1),
       prob_(prev.prob_ + prob),
-      stay_(true),
-      parent_(&prev) {
+      stay_(true) {
 
         //prev.children_.push_back(this);
+        parents_[total_len_] = &prev;
         prev.child_count_++;
           
-    }
+}
 
 //Copy constructor
 NanoFMI::Range::Range(const NanoFMI::Range &prev)
@@ -534,11 +392,11 @@ NanoFMI::Range::Range(const NanoFMI::Range &prev)
       event_(prev.event_),
       start_(prev.start_), 
       end_(prev.end_), 
-      match_len_(prev.match_len_),
       total_len_(prev.total_len_),
+      stay_count_(prev.stay_count_),
       prob_(prev.prob_),
       stay_(prev.stay_),
-      parent_(prev.parent_),
+      parents_(std::map<short, Range const *>(prev.parents_)),
       child_count_(prev.child_count_) {
       //children_(std::list<Range const *>(prev.children_)) {
 } 
@@ -575,4 +433,203 @@ bool operator< (const NanoFMI::Range &q1, const NanoFMI::Range &q2) {
     }
     
     return false;
+}
+
+
+NanoFMI::SeedGraph::SeedGraph(int seed_len) {
+    seed_len_ = seed_len;
+    event_ranges_.push_front(range_set());
+}
+
+std::list<Range> NanoFMI::SeedGraph::split_root(const Range &root) {
+    range_set &ranges = event_ranges_.front();
+    auto lb = ranges.lower_bound(root);
+    
+    auto start = lb;
+    while (start != next_ranges.begin() && std::prev(start)->intersects(nr)){
+        start--;
+    }
+
+    auto end = lb;
+    while (end != next_ranges.end() && end->intersects(nr)) {
+        end++;
+    }
+
+    std::list<Range> split_ranges;
+
+    if (start == next_ranges.end() || (start == lb && end == lb)) {
+        split_ranges.push_back(root);
+        return split_ranges;
+    }
+
+    Range rr(root); //Right range
+
+    for (auto pr = start; pr != end; pr++) {
+        Range lr = rr.split_range(*pr); //Left range
+
+        if (lr.is_valid()) 
+            split_ranges.push_back(lr);
+
+        if (!lr.is_valid())
+            break;
+    }
+
+    if (rr.is_valid())
+        split_ranges.push_back(rr);
+
+    return split_ranges;
+}
+
+int NanoFMI::SeedGraph::add_range(const Range &nr) { 
+    if (!nr.is_valid()) {
+        return 0;
+    }
+
+    if (nr.parents_.empty()) {
+        std::list<Range> split = split_ranges(nr);
+        event_ranges_.front().insert(split.begin(), split.end());
+        return split.size();
+    }
+
+    if (nr.total_length_ == seed_len_) {
+        auto lb = seed_starts_.lower_bound(nr);
+        if (lb == seed_starts_.end() || !nr.same_range(*lb)) {
+            seed_starts_.insert(lb, nr);
+
+            return 1;
+
+        } else if (lb->prob_ < nr.prob_) {
+            for (auto p = lb->parents_.begin(); p != lb->parents_.end(); p++)
+                (*p)->child_count_--; //Todo - chase your bliss
+
+            auto new_loc = std::next(lb);
+            seed_starts_.erase(lb);
+            seed_starts_.insert(new_loc, nr);
+
+            return 1;
+        }
+
+        return 0;
+    }
+
+    range_set &ranges = event_ranges_.front();
+    auto lb = ranges.lower_bound(nr);
+
+    if (lb == next_ranges.end() || !lb->same_range(nr)) {
+        ranges.insert(lb, nr);
+        return 1;
+    }
+    
+    //Should only have 1 parent?
+    
+    auto other_parent = lb->parents_.find(nr->total_len_);
+    if (other_parent == lb->parents_.end()) {
+        lb->parents_[nr->total_len_] = nr->parents_[nr->total_len_].front();
+
+        if (nr->total_len_ > lb->total_len_) {
+            lb->total_len_ = nr->total_len_;
+            lb->stay_count_ = nr->stay_count_;
+            lb->prob_ = nr->prob_;
+            lb->stay_ = nr->stay_;
+        }
+
+
+        return 1;
+    }
+
+    if (nr.prob_ > lb->prob_) {
+        for (auto p = lb->parents_.begin(); p != lb->parents_.end(); p++)
+            (*p)->child_count_--; //Todo - chase your bliss
+
+        auto new_loc = std::next(lb);
+        ranges.erase(lb);
+        ranges.insert(new_loc, nr);
+        return 1; 
+    }
+
+    nr.parents_.front()->child_count_--;
+
+    return 0;
+}
+
+std::pair<range_itr, range_itr> NanoFMI::SeedGraph::iter_prev() {
+    if (has_prev()) {
+        auto prev = std::next(event_ranges_.begin())
+        return std::pair<range_itr, range_itr>(prev->begin(), prev->end());
+    }
+
+    auto none = event_ranges_.begin()->end();
+    return std::pair<range_itr, range_itr>(none, none);
+}
+
+std::vector<Result> NanoFMI::SeedGraph::pop_seeds() { //Big result gathering loop
+
+    for (auto aln_st = seed_starts_.begin(); aln_st != seed_starts_.end(); aln_st++) {
+
+            
+        if (aln_st->prob_ / aln_st->total_length_ >= SEED_THRESH) {
+            for (int s = aln_st->start_; s <= aln_st->end_; s++) {
+                Result r;
+                r.qry_start = aln_st->event_;// seed_end - total_length + 1;
+                r.qry_end = aln_st->event_ + aln_st->total_length_ - 1;
+                r.ref_start = suffix_ar_[s];
+                r.ref_end = suffix_ar_[s] + aln_st->match_len_ - 1;
+                r.prob = aln_st->prob_ / aln_st->total_length_;
+                results.push_back(r);
+
+                std::cout << "rev\t" 
+                          << r.qry_start << "-" << r.qry_end << "\t"
+                          << r.ref_start << "-" << r.ref_end << "\t"
+                          << r.prob << "\n";//" " << total_length << " "
+                          //<< aln_st->match_len_ << " " <<  aln_st->event_ << "\n";
+            }
+        }
+
+        //TODO: nothing past here is finsihed
+
+        const Range *aln_en = &(*aln_st);
+        while (!aln_en->parents_.empty()) {
+            aln_en = aln_en->parents_[aln_en->total_length_];
+        }
+
+        //double last_prob = event_probs[aln_en->event_][aln_en->k_id_];
+        //double last_prob = aln_en->prob_;
+        double last_prob = aln_cut_end->prob_;
+
+        aln_st->match_len_--;
+        aln_st->prob_ -= last_prob;
+
+        int next_len = aln_st->match_len_ - 1;
+
+        const Range *aln_evt = &(*aln_st);
+        while ((aln_evt = aln_evt->parent_) != NULL) {
+
+            if (aln_evt->match_len_ != next_len) {
+                aln_evt->prob_ -= last_prob;
+                aln_evt->match_len_ = next_len;
+                aln_evt->total_len_--;
+            }
+
+            if (aln_evt->parent_ == aln_cut_end) {
+                aln_evt->parent_ = NULL;
+                aln_cut_end->child_count_--;
+            }
+
+            else if (aln_evt->stay_)
+                next_len = aln_evt->match_len_;
+            else
+                next_len = aln_evt->match_len_-1;
+        }
+
+        
+        aln_evt = aln_cut_end;
+        while (aln_evt != NULL && aln_evt->child_count_ == 0) {
+            if ((aln_evt = aln_evt->parent_) != NULL) 
+                aln_evt->child_count_--;
+        }
+    }
+}
+
+bool NanoFMI::SeedGraph:has_prev() {
+    return event_ranges_.size() > 1;
 }
