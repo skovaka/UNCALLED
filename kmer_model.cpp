@@ -61,7 +61,7 @@ KmerModel::KmerModel(std::string model_fname) {
     model_mean_ = 0;
 
     //Stores which kmers can follow which
-    neighbors_ = new std::array<mer_id, NUM_BASES>[kmer_count_]; 
+    neighbors_ = new std::list<mer_id>[kmer_count_]; 
     rev_comp_ids_ = new mer_id[kmer_count_]; 
 
     //Read and store rest of the model
@@ -82,7 +82,8 @@ KmerModel::KmerModel(std::string model_fname) {
 
             //Store all neighboring kmers
             for (short b = 0; b < 4; b++) { //4 magic number?
-                neighbors_[k_id][b] = kmer_to_id(id_to_base(b) + kmer.substr(0, k_ - 1));
+                neighbors_[k_id].push_back(
+                    kmer_to_id(id_to_base(b) + kmer.substr(0, k_ - 1)));
             }
 
             //Store model information

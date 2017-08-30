@@ -4,9 +4,36 @@
 #include "kmer_model.hpp"
 #include <list>
 
-class NanoFMI 
-{
+class NanoFMI {
     public:
+
+    class Range {
+        
+        public:
+        int start_, end_;
+
+        Range(NanoFMI &fmi);
+
+        //Copy constructor
+        Range(const Range &prev);
+
+        Range(int start, int end);
+
+        Range();
+
+        Range& operator=(const Range &r);
+
+        Range split_range(const Range &r);
+
+        bool same_range(const Range &r) const;
+
+        bool intersects(const Range &r) const;
+
+        bool is_valid() const;
+
+        friend bool operator< (const Range &q1, const Range &q2);
+    };
+
     typedef struct Result {
         int qry_start, qry_end, ref_start, ref_end;
         float prob;
@@ -14,23 +41,20 @@ class NanoFMI
 
     NanoFMI(KmerModel &model, std::vector<mer_id> &mer_seq, int tally_dist);
 
+    std::list<Range> get_neigbhors(Range range, std::list<mer_id> kmers) const;
+    Range get_full_range(mer_id kmer) const;
+
     bool operator() (unsigned int rot1, unsigned int rot2);
 
-    std::vector<Result> lf_map(std::vector<Event> &events, int seed_end, 
-               int match_len, NormParams norm_params);
 
-
-
-
-    private:
-    int tally_cp_dist(int i);
-    int get_tally(mer_id c, int i);
-    float get_stay_prob(Event e1, Event e2); //hmm
+    //private:
+    //int tally_cp_dist(int i);
+    //int get_tally(mer_id c, int i);
+    std::list<int> get_tallies(std::list<mer_id> kmers, int loc) const;
+    float get_stay_prob(Event e1, Event e2) const; //hmm
 
     KmerModel *model_;
     std::vector<mer_id> *mer_seq_;
-
-
 
     //Sparseness of suffix and tally arrays
     int tally_dist_;
@@ -39,99 +63,84 @@ class NanoFMI
     std::vector<int> mer_counts_, mer_f_starts_;      //F array
     std::vector<unsigned int> suffix_ar_;            //Suffix array
     std::vector< std::vector<int> > mer_tally_;      //Rank tally
+    mutable std::vector<int> mer_count_tmp_;
 
 
     void make_bwt();
 
-    //typedef struct RangeMetadata {
-    //     int match_len_;              
-    //     double prob_;
-    //     bool traversed_;
-    //     Range const * parent_, self_;
-    //     std::list<Range const *> children_;
-    //} RangeMetadata;
-    
-    class Range {
-        
-        public:
-        //int id_;
-        NanoFMI &fmi_;
-        mer_id k_id_;
-        int event_, start_, end_;
-        mutable int total_len_, stay_count_;
-        mutable double prob_;
-        mutable bool stay_;
-        mutable std::map<short, Range const *> parents_;
-        mutable int child_count_;
+    friend bool operator< (const NanoFMI::Range &q1, const NanoFMI::Range &q2);
 
-        Range(NanoFMI &fmi);
+    class SeedNode {
+        public:
+        int max_length_, stay_count_;
+        mer_id kmer_;
+        double prob_;
+
+
+        std::list< std::pair<SeedNode *, bool> > parents_;
+        std::list<SeedNode *> children_;
+    
+        //Source constructor
+        SeedNode(mer_id kmer, double prob);
+
+        //Child constructor
+        SeedNode(SeedNode *parent, mer_id kmer, double prob, bool stay);
+
+        //Creates invalid node
+        SeedNode();
 
         //Copy constructor
-        Range(const Range &prev);
+        SeedNode(const SeedNode &s);
 
-        //Initial match constructor
-        Range(NanoFMI &fmi, mer_id k_id, int event, double prob);
+        ~SeedNode();
 
-        //"next" constructor
-        Range(const Range &prev, mer_id k_id, double prob);
+        //SeedNode& operator=(const SeedNode &s);
 
-        //"stay" constructor
-        Range(const Range &prev, double prob);
-
-        ~Range();
-
-        Range& operator=(const Range&);
-
-        unsigned int id() const;
-
-        bool add_results(std::vector<Result> &results, 
-                         int range_end, double min_prob) const;
-
-        bool same_range(const Range &q) const;
-
-        bool is_valid() const;
-
-        bool is_match() const;
-
-        void print_info() const;
-
-        bool intersects(const Range &q) const;
-
-        Range split_range(const Range &q);
-
-        friend bool operator< (const Range &q1, const Range &q2);
+        bool is_valid();
+        
+        void invalidate(bool print=false);
+        bool remove_child(SeedNode *child, bool invalidate, bool print=false);
+        
+        int add_child(SeedNode *child);
 
 
     };
-
-    friend bool operator< (const NanoFMI::Range &q1, const NanoFMI::Range &q2);
-    friend bool check_ranges(const NanoFMI::Range &q1, const NanoFMI::Range &q2);
-
-    int update_ranges(std::set<Range> &next_ranges, 
-                      const Range &nr, bool split_all);
 
     class SeedGraph {
         public:
-        typedef std::set<Range> range_set;
-        typedef RangeSet::const_iterator range_itr;
 
-        int seed_len_;
-        std::list< range_set > event_ranges_;
-        range_set seed_starts_;
+        std::map<Range, SeedNode *> prev_nodes, next_nodes;
+        std::list< std::list< SeedNode * > > sources_;
+        std::list<double *> event_kmer_probs_;
+
+        const NanoFMI &fmi_;
+        const NormParams &norm_params_;
+        unsigned int seed_length_, cur_event_;
+
+        double event_prob_,
+               seed_prob_,
+               stay_prob_;
         
-        SeedGraph(int seed_len);
+        SeedGraph(const NanoFMI &fmi, 
+                  const NormParams &norm_params, 
+                  int seed_len, int read_len,
+                  double event_prob,
+                  double seed_prob,
+                  double stay_prob);
 
-        int add_range(const Range &r); //copy update_ranges
+        std::vector<Result> add_event(Event e);
+        void print_graph();
 
-        std::pair<ange_itr, range_itr> iter_prev();
+        SeedNode *add_child(Range &range, SeedNode &node); //copy update_ranges
+        int add_sources(const Range &range, const SeedNode &node);
 
-        vector<Result> pop_seeds(); //Big result gathering loop
+
+        std::vector<Result> pop_seeds(); //Big result gathering loop
                                     //Probably split into a few methods
         
         bool empty();
-
-
     };
+    typedef std::pair<SeedNode *, bool> parent_ptr;
 };
 
 #endif

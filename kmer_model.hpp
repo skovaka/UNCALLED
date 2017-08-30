@@ -3,6 +3,7 @@
 
 #include <array>
 #include <utility>
+#include <list>
 #include "fast5.hpp"
 
 #define NUM_BASES 4
@@ -16,7 +17,7 @@ typedef struct NormParams {
 
 class KmerModel {
     public:
-    typedef std::array<mer_id, NUM_BASES>::const_iterator neighbor_itr;
+    typedef std::list<mer_id>::const_iterator neighbor_itr;
 
     KmerModel(std::string model_fname);
 
@@ -42,7 +43,7 @@ class KmerModel {
     double *lv_means_, *lv_stdvs_, *sd_means_, *sd_stdvs_;
     double lambda_, model_mean_, model_stdv_;
 
-    std::array<mer_id, NUM_BASES> *neighbors_; 
+    std::list<mer_id> *neighbors_; 
     mer_id *rev_comp_ids_;
 
 
