@@ -115,7 +115,7 @@ class NanoFMI {
 
         const NanoFMI &fmi_;
         const NormParams &norm_params_;
-        unsigned int seed_length_, cur_event_;
+        unsigned int seed_length_, cur_event_, max_stays_;
 
         double event_prob_,
                seed_prob_,
@@ -126,7 +126,8 @@ class NanoFMI {
                   int seed_len, int read_len,
                   double event_prob,
                   double seed_prob,
-                  double stay_prob);
+                  double stay_prob,
+                  double stay_frac);
 
         std::vector<Result> add_event(Event e);
         void print_graph();

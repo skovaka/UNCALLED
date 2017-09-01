@@ -17,7 +17,8 @@ void align_kmers(std::string name, std::string strand, NanoFMI& fmi, std::vector
 {
     Timer timer;
     int k = 32;
-    NanoFMI::SeedGraph sg(fmi, norm, k, events.size() - k + 1, -9.2103, -3.75, -5.298);
+    NanoFMI::SeedGraph sg(fmi, norm, k, events.size() - k + 1, -9.2103, -3.75, -5.298, 0.7);
+    //NanoFMI::SeedGraph sg(fmi, norm, k, 2266 - 2226 + 1, -9.2103, -3.75, -5.298, 0.7); //2226 -> 2200
 
     // align each k-mer of length k
     for (int i = events.size()-1; i >= k; i--) {
@@ -27,8 +28,7 @@ void align_kmers(std::string name, std::string strand, NanoFMI& fmi, std::vector
 
 }
 
-int main(int argc, char** argv) 
-{
+int main(int argc, char** argv) {
     if (argc < 5) { 
         std::cerr << "need a file. " << 
             "(usage: sigalign reference model tally_sp fast5_file_1 [fast5_file_2, ...]" << std::endl;

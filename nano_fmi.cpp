@@ -12,8 +12,8 @@
 #include "nano_fmi.hpp"
 #include "boost/math/distributions/students_t.hpp"
 
-#define DEBUG(s)
-//#define DEBUG(s) do { std::cerr << s; } while (0)
+//#define DEBUG(s)
+#define DEBUG(s) do { std::cerr << s; } while (0)
 
 //Reads a model directly from a file and creates the FM index from the given reference
 NanoFMI::NanoFMI(KmerModel &model, std::vector<mer_id> &mer_seq, int tally_dist) {
@@ -177,6 +177,8 @@ std::list<NanoFMI::Range> NanoFMI::get_neigbhors(Range range, std::list<mer_id> 
         if (*min < *max) {
             int kmer_st = mer_f_starts_[*kmer];
             results.push_back(Range(kmer_st + *min, kmer_st + *max - 1));
+        } else {
+            results.push_back(Range());
         }
 
         kmer++;
@@ -291,9 +293,6 @@ bool NanoFMI::SeedNode::is_valid() {
 }
 
 void NanoFMI::SeedNode::invalidate(bool print) {
-    if (print) {
-        DEBUG("deleting " << max_length_ << " " << parents_.size() << "\n");
-    }
 
     //DEBUG("i\n");
     for (auto p = parents_.begin(); p != parents_.end(); p++) {
@@ -360,14 +359,18 @@ NanoFMI::SeedGraph::SeedGraph(const NanoFMI &fmi,
                               int seed_len, int read_len,
                               double event_prob,
                               double seed_prob,
-                              double stay_prob)
+                              double stay_prob,
+                              double stay_frac)
     : fmi_(fmi),
       norm_params_(norm_params),
       seed_length_(seed_len),
       cur_event_(read_len), 
+      max_stays_( (int) (stay_frac * seed_len) ),
       event_prob_(event_prob),
       seed_prob_(seed_prob),
-      stay_prob_(stay_prob) {}
+      stay_prob_(stay_prob) {
+    DEBUG(max_stays_ << "\n"); 
+}
 
 
 std::vector<NanoFMI::Result> NanoFMI::SeedGraph::add_event(Event e) {
@@ -395,8 +398,7 @@ std::vector<NanoFMI::Result> NanoFMI::SeedGraph::add_event(Event e) {
 
     //DEBUG("ADDING EVENT " << cur_event_ << " (" << sources_.size() << ")\n");
 
-    int source_count = 0,
-        child_count = 0;
+    int source_count = 0;
 
     //auto prev_ranges = traversed_ranges.begin(); //Empty on first iteration
     for (auto p = prev_nodes.begin(); p != prev_nodes.end(); p++) {
@@ -412,7 +414,6 @@ std::vector<NanoFMI::Result> NanoFMI::SeedGraph::add_event(Event e) {
         if (stay && prob >= event_prob_) {
             SeedNode next_node(prev_node, prev_kmer, prob, true);
             SeedNode *nn = add_child(prev_range, next_node);
-            child_count++;
         
             //if (nn->parents_.size() > 1) {
             //    //DEBUG("NEW NODE " << nn->max_length_ << " " << nn << " ");
@@ -438,6 +439,7 @@ std::vector<NanoFMI::Result> NanoFMI::SeedGraph::add_event(Event e) {
         auto next_range = next_ranges.begin();
 
         
+        int child_count = 0;
         //std::cout << "Adding nodes\n";
         while (next_kmer != next_kmers.end()) {
             prob = kmer_probs[*next_kmer];
@@ -449,6 +451,7 @@ std::vector<NanoFMI::Result> NanoFMI::SeedGraph::add_event(Event e) {
             next_kmer++; //Maybe do this in-place up above
             next_range++;
         }
+
     }
 
     for (auto p = prev_nodes.begin(); p != prev_nodes.end(); p++) {
@@ -459,10 +462,6 @@ std::vector<NanoFMI::Result> NanoFMI::SeedGraph::add_event(Event e) {
 
             //DEBUG("x" << cur_event_ << "x " << prev_node->max_length_ << "\n");
 
-            if (prev_node->max_length_ == 31) {
-                DEBUG("oh no " << cur_event_ << "\n");
-            }
-
             prev_node->invalidate(prev_node->max_length_ == 31);
             
             if (!is_source) {
@@ -470,6 +469,7 @@ std::vector<NanoFMI::Result> NanoFMI::SeedGraph::add_event(Event e) {
             } 
         }
     }
+
 
     for (mer_id kmer = 0; kmer < alph_size; kmer++) {
         prob = kmer_probs[kmer];
@@ -620,7 +620,7 @@ NanoFMI::SeedNode *NanoFMI::SeedGraph::add_child(Range &range, SeedNode &node) {
             dup_parent->first->remove_child(dup_node, false);
 
             //Erase old parent 
-            auto old_loc = dup_node->parents_.erase(dup_parent);
+            dup_node->parents_.erase(dup_parent);
 
             //Copy seed info
             dup_node->max_length_ = node.max_length_;
@@ -628,7 +628,7 @@ NanoFMI::SeedNode *NanoFMI::SeedGraph::add_child(Range &range, SeedNode &node) {
             dup_node->prob_ = node.prob_;
 
             //Insert new parent in old parent's place
-            dup_node->parents_.insert(old_loc, new_parent);
+            dup_node->parents_.push_front(new_parent);
             new_parent.first->children_.push_front(dup_node);
         }
 
@@ -655,7 +655,7 @@ NanoFMI::SeedNode *NanoFMI::SeedGraph::add_child(Range &range, SeedNode &node) {
         //dup_parent is same length as new_parent
 
         //and new node has higher probability
-        } else if (node.prob_ > dup_node->prob_) {
+        } else if (new_parent.first->prob_ > dup_parent->first->prob_) {
 
             //DEBUG("CASE 3\n");
             
@@ -761,10 +761,11 @@ std::vector<NanoFMI::Result> NanoFMI::SeedGraph::pop_seeds() { //Big result gath
                         delete to_erase;
                     }
                 }
+
             }
 
             if (n->max_length_ == seed_length_) {
-                if (n->stay_count_ < 12) {
+                if (n->stay_count_ <= max_stays_ && n->prob_ >= seed_prob_*seed_length_) {
                     Range r = node_ranges[n];
                     for (int s = r.start_; s <= r.end_; s++) {
                         Result r;
@@ -778,7 +779,7 @@ std::vector<NanoFMI::Result> NanoFMI::SeedGraph::pop_seeds() { //Big result gath
                         std::cout << "= rev\t" 
                                   << r.qry_start << "-" << r.qry_end << "\t"
                                   << r.ref_start << "-" << r.ref_end << "\t"
-                                  << r.prob << " =\n";
+                                  << r.prob << "\t" << n->stay_count_ << " =\n";
                     }
                 }
             } else {
@@ -794,6 +795,7 @@ std::vector<NanoFMI::Result> NanoFMI::SeedGraph::pop_seeds() { //Big result gath
 
                 n->prob_ = new_parent.first->prob_ + (*kmer_probs)[n->kmer_];
                 n->stay_count_ = new_parent.first->stay_count_ + new_parent.second;
+
             } else {
                 n->prob_ = (*kmer_probs)[n->kmer_];
                 n->stay_count_ = 0;
@@ -804,6 +806,7 @@ std::vector<NanoFMI::Result> NanoFMI::SeedGraph::pop_seeds() { //Big result gath
         delete aln_en;
     }
 
+    event_kmer_probs_.pop_back();
     sources_.pop_back();
 
     return std::vector<NanoFMI::Result>();
