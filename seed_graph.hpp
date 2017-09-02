@@ -5,10 +5,17 @@
 #include "kmer_model.hpp"
 #include <list>
 
-typedef struct Result {
-    int qry_start, qry_end, ref_start, ref_end;
-    float prob;
-} Result;
+class Result {
+    public:
+
+    Result(int read_start, int seed_len, double prob, int ref_start = 0, int ref_end = 0);
+
+    void set_ref_range(int start, int end);
+    void print();
+
+    Range read_range_, ref_range_;
+    double prob_;
+};
 
 
 
@@ -49,7 +56,8 @@ class SeedGraph {
 
     public:
 
-    std::map<Range, Node *> prev_nodes, next_nodes;
+    std::map<Range, Node *> next_nodes_;
+    std::map<Node *, Range> prev_nodes_;
     std::list< std::list< Node * > > sources_;
     std::list<double *> event_kmer_probs_;
     

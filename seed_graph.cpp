@@ -165,11 +165,11 @@ std::vector<Result> SeedGraph::add_event(Event e) {
     int source_count = 0;
 
     //auto prev_ranges = traversed_ranges.begin(); //Empty on first iteration
-    for (auto p = prev_nodes.begin(); p != prev_nodes.end(); p++) {
+    for (auto p = prev_nodes_.begin(); p != prev_nodes_.end(); p++) {
         //Node *next_node = NULL;
 
-        Range prev_range = p->first;
-        Node *prev_node = p->second;
+        Range prev_range = p->second;
+        Node *prev_node = p->first;
 
 
         int prev_kmer = prev_node->kmer_;
@@ -218,23 +218,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
 
     }
 
-    for (auto p = prev_nodes.begin(); p != prev_nodes.end(); p++) {
-        Node *prev_node = p->second;
-
-        if (prev_node->children_.empty()) {
-            bool is_source = prev_node->parents_.empty();
-
-            //DEBUG("x" << cur_event_ << "x " << prev_node->max_length_ << "\n");
-
-            prev_node->invalidate(prev_node->max_length_ == 31);
-            
-            if (!is_source) {
-                delete prev_node;
-            } 
-        }
-    }
-
-
+    //Find sources
     for (mer_id kmer = 0; kmer < model_.kmer_count(); kmer++) {
         prob = kmer_probs[kmer];
         if (prob >= event_prob_) {
@@ -246,12 +230,32 @@ std::vector<Result> SeedGraph::add_event(Event e) {
             }
         }
     }
- 
-    //DEBUG("Added " << source_count << " sources, " << child_count << " children\n");   
 
-    prev_nodes.swap(next_nodes);
-    next_nodes.clear();
-    
+    //Clear prev_nodes, pruning any leaves
+    while (!prev_nodes_.empty()) {
+        auto p = prev_nodes_.begin();
+        Node *prev_node = p->first;
+
+        if (prev_node->children_.empty()) {
+            bool is_source = prev_node->parents_.empty();
+
+            prev_node->invalidate();
+            
+            if (!is_source) {
+                delete prev_node;
+            } 
+        }
+
+        prev_nodes_.erase(p);
+    }
+ 
+    //Move next_nodes_ to prev
+    while (!next_nodes_.empty()) {
+        auto n = next_nodes_.begin();
+        prev_nodes_[n->second] = n->first;
+        next_nodes_.erase(n);
+    }
+
     //print_graph();
 
     auto r = pop_seeds();
@@ -262,23 +266,23 @@ std::vector<Result> SeedGraph::add_event(Event e) {
 
 int SeedGraph::add_sources(const Range &range, const Node &node) {
 
-    auto lb = next_nodes.lower_bound(range);
+    auto lb = next_nodes_.lower_bound(range);
     
     auto start = lb;
-    while (start != next_nodes.begin() 
+    while (start != next_nodes_.begin() 
            && std::prev(start)->first.intersects(range)){
         start--;
     }
 
     auto end = lb;
-    while (end != next_nodes.end() && end->first.intersects(range)) {
+    while (end != next_nodes_.end() && end->first.intersects(range)) {
         end++;
     }
 
-    if (start == next_nodes.end() || (start == lb && end == lb)) {
+    if (start == next_nodes_.end() || (start == lb && end == lb)) {
 
-        next_nodes[range] = new Node(node);
-        sources_.front().push_back(next_nodes[range]); //TODO: store node, no double query
+        next_nodes_[range] = new Node(node);
+        sources_.front().push_back(next_nodes_[range]); //TODO: store node, no double query
         return 1;
     }
 
@@ -305,8 +309,8 @@ int SeedGraph::add_sources(const Range &range, const Node &node) {
         split_ranges.push_back(rr);
 
     for (auto r = split_ranges.begin(); r != split_ranges.end(); r++) {
-        next_nodes[*r] = new Node(node);
-        sources_.front().push_back(next_nodes[*r]);
+        next_nodes_[*r] = new Node(node);
+        sources_.front().push_back(next_nodes_[*r]);
     }
 
     return split_ranges.size();
@@ -323,10 +327,10 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
     parent_ptr new_parent = node.parents_.front();
 
     //Find closest node >= the node being added
-    auto lb = next_nodes.lower_bound(range);
+    auto lb = next_nodes_.lower_bound(range);
 
     //Node range hasn't been added yet
-    if (lb == next_nodes.end() || !lb->first.same_range(range)) {
+    if (lb == next_nodes_.end() || !lb->first.same_range(range)) {
 
         //DEBUG("CASE 0\n");
             
@@ -334,12 +338,12 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
         Node *new_node = new Node(node);
 
 
-        //DEBUG("ADDING " << new_node << " " << next_nodes.size() << "\n");
+        //DEBUG("ADDING " << new_node << " " << next_nodes_.size() << "\n");
 
         //Store it with it's range
-        auto r = next_nodes.insert(lb, std::pair<Range, Node *>(range, new_node));
+        auto r = next_nodes_.insert(lb, std::pair<Range, Node *>(range, new_node));
 
-        //DEBUG("NEW NODE " << new_node << " " << next_nodes.size() << "\n");
+        //DEBUG("NEW NODE " << new_node << " " << next_nodes_.size() << "\n");
 
         //Update the parent
         new_parent.first->children_.push_front(new_node);
@@ -459,10 +463,10 @@ std::vector<Result> SeedGraph::pop_seeds() { //Big result gathering loop
 
     //DEBUG("SEED POP\n");
 
-    //TODO: Store prev_nodes like this?
-    std::unordered_map<Node *, Range> node_ranges;
-    for (auto n = prev_nodes.begin(); n != prev_nodes.end(); n++)
-        node_ranges[n->second] = n->first;
+    //TODO: Store prev_nodes_ like this?
+    //std::unordered_map<Node *, Range> node_ranges;
+    //for (auto n = prev_nodes_.begin(); n != prev_nodes_.end(); n++)
+    //    node_ranges[n->second] = n->first;
 
 
     std::list<Node *> &aln_ends = sources_.back(),
@@ -530,20 +534,18 @@ std::vector<Result> SeedGraph::pop_seeds() { //Big result gathering loop
 
             if (n->max_length_ == seed_length_) {
                 if (n->stay_count_ <= max_stays_ && n->prob_ >= seed_prob_*seed_length_) {
-                    Range r = node_ranges[n];
-                    for (int s = r.start_; s <= r.end_; s++) {
-                        Result r;
-                        r.qry_start = cur_event_;// seed_end - total_length + 1;
-                        r.qry_end = cur_event_ + n->max_length_ - 1;
-                        r.ref_start = fmi_.suffix_ar_[s];
-                        r.ref_end = fmi_.suffix_ar_[s] + n->max_length_ - n->stay_count_ - 1;
-                        r.prob = n->prob_ / n->max_length_;
-                        //results.push_back(r);
+                    
+                    //add_results(n, results);
 
-                        std::cout << "= rev\t" 
-                                  << r.qry_start << "-" << r.qry_end << "\t"
-                                  << r.ref_start << "-" << r.ref_end << "\t"
-                                  << r.prob << "\t" << n->stay_count_ << " =\n";
+                    Range range = prev_nodes_[n];
+
+                    Result r(cur_event_, seed_length_, n->prob_ / n->max_length_);
+
+                    for (int s = range.start_; s <= range.end_; s++) {
+
+                        r.set_ref_range(fmi_.suffix_ar_[s], seed_length_ - n->stay_count_ - 1);
+
+                        r.print();
                     }
                 }
             } else {
@@ -624,4 +626,21 @@ void SeedGraph::print_graph() {
     }
 
     std::cout << "== end ==\n";
+}
+
+Result::Result(int read_start, int seed_len, double prob, int ref_start, int ref_end) 
+    : read_range_( Range(read_start, read_start + seed_len) ),
+      ref_range_(Range(ref_start, ref_end)),
+      prob_(prob) {}
+
+void Result::set_ref_range(int start, int length) {
+    ref_range_.start_ = start;
+    ref_range_.end_ = start+length;
+}
+
+void Result::print() {
+    std::cout << "= rev\t" 
+              << read_range_.start_ << "-" << read_range_.end_ << "\t"
+              << ref_range_.start_ << "-" << ref_range_.end_ << "\t"
+              << prob_ << " =\n";
 }
