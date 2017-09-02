@@ -21,23 +21,21 @@ class KmerModel {
 
     KmerModel(std::string model_fname);
 
-    NormParams get_norm_params(std::vector<Event> events);
+    NormParams get_norm_params(std::vector<Event> events) const;
 
-    std::pair<neighbor_itr, neighbor_itr> get_neighbors(mer_id k_id) {
+    std::pair<neighbor_itr, neighbor_itr> get_neighbors(mer_id k_id) const {
         return std::pair<neighbor_itr, neighbor_itr>
                     (neighbors_[k_id].begin(), neighbors_[k_id].end());
     }
 
-    float event_match_prob(Event evt, mer_id k_id, NormParams norm);
+    float event_match_prob(Event evt, mer_id k_id, NormParams norm) const;
 
-    int compare_kmers(mer_id k_id1, mer_id k_id2);
+    inline int kmer_len() const {return k_;}
+    inline int kmer_count() const {return kmer_count_;}
 
-    inline int kmer_len() {return k_;}
-    inline int kmer_count() {return kmer_count_;}
-
-    void parse_fasta(std::ifstream &fasta_in, 
+    void parse_fasta (std::ifstream &fasta_in, 
                  std::vector<mer_id> &fwd_ids, 
-                 std::vector<mer_id> &rev_ids);
+                 std::vector<mer_id> &rev_ids) const;
     private:
     unsigned short k_, kmer_count_;
     double *lv_means_, *lv_stdvs_, *sd_means_, *sd_stdvs_;
@@ -47,8 +45,8 @@ class KmerModel {
     mer_id *rev_comp_ids_;
 
 
-    mer_id kmer_to_id(std::string kmer, int offset = 0);
-    std::string reverse_complement(std::string &seq);
+    mer_id kmer_to_id(std::string kmer, int offset = 0) const;
+    std::string reverse_complement(std::string &seq) const ;
 
     static char id_to_base(short i);
     static short base_to_id(char b);

@@ -119,31 +119,31 @@ KmerModel::KmerModel(std::string model_fname) {
     model_stdv_ = sqrt(model_stdv_ / kmer_count_);
 }
 
-int KmerModel::compare_kmers(mer_id mer1, mer_id mer2) {
-    if (lv_means_[mer1] < lv_means_[mer2])
-        return -1;
-    else if (lv_means_[mer1] > lv_means_[mer2])
-        return 1;
+//int KmerModel::compare_kmers(mer_id mer1, mer_id mer2) {
+//    if (lv_means_[mer1] < lv_means_[mer2])
+//        return -1;
+//    else if (lv_means_[mer1] > lv_means_[mer2])
+//        return 1;
+//
+//    if (sd_means_[mer1] < sd_means_[mer2])
+//        return -1;
+//    else if (sd_means_[mer1] > sd_means_[mer2])
+//        return 1;
+//
+//    if (lv_stdvs_[mer1] < lv_stdvs_[mer2])
+//        return 1;
+//    else if (lv_stdvs_[mer1] > lv_stdvs_[mer2])
+//        return -1;
+//
+//    if (sd_stdvs_[mer1] < sd_stdvs_[mer2])
+//        return 1;
+//    else if (sd_stdvs_[mer1] > sd_stdvs_[mer2])
+//        return -1;
+//
+//    return 0;
+//}
 
-    if (sd_means_[mer1] < sd_means_[mer2])
-        return -1;
-    else if (sd_means_[mer1] > sd_means_[mer2])
-        return 1;
-
-    if (lv_stdvs_[mer1] < lv_stdvs_[mer2])
-        return 1;
-    else if (lv_stdvs_[mer1] > lv_stdvs_[mer2])
-        return -1;
-
-    if (sd_stdvs_[mer1] < sd_stdvs_[mer2])
-        return 1;
-    else if (sd_stdvs_[mer1] > sd_stdvs_[mer2])
-        return -1;
-
-    return 0;
-}
-
-float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) {
+float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) const {
     double norm_mean = lv_means_[k_id] * norm.scale + norm.shift;
     
     double lambda = lambda_;
@@ -159,7 +159,7 @@ float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) {
     return log(ng*ig);
 }
 
-std::string KmerModel::reverse_complement(std::string &seq) {
+std::string KmerModel::reverse_complement(std::string &seq) const {
     std::string rev(seq.size(), 'N');
     for (unsigned int i = 0; i < seq.size(); i++) {
         char c = 'N';
@@ -187,7 +187,7 @@ std::string KmerModel::reverse_complement(std::string &seq) {
     return rev;
 }
 
-mer_id KmerModel::kmer_to_id(std::string kmer, int offset) {
+mer_id KmerModel::kmer_to_id(std::string kmer, int offset) const {
     mer_id id = base_to_id(kmer[offset]);
     for (unsigned int j = 1; j < k_; j++)
         id = (id << 2) | base_to_id(kmer[offset+j]);
@@ -234,7 +234,7 @@ char KmerModel::id_to_base(short i) {
     return 'N';
 }
 
-NormParams KmerModel::get_norm_params(std::vector<Event> events) {
+NormParams KmerModel::get_norm_params(std::vector<Event> events) const {
 
     //Compute events mean
     double events_mean = 0;
@@ -260,7 +260,7 @@ NormParams KmerModel::get_norm_params(std::vector<Event> events) {
 void KmerModel::parse_fasta(
                  std::ifstream &fasta_in, 
                  std::vector<mer_id> &fwd_ids, 
-                 std::vector<mer_id> &rev_ids) {
+                 std::vector<mer_id> &rev_ids) const {
 
     //For parsing the file
     std::string cur_line, prev_line, fwd_seq;

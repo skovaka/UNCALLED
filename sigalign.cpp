@@ -8,16 +8,17 @@
 #include <math.h>
 
 #include "fast5.hpp"
+#include "seed_graph.hpp"
 #include "kmer_model.hpp"
 #include "nano_fmi.hpp"
 #include "timer.h"
 
 
-void align_kmers(std::string name, std::string strand, NanoFMI& fmi, std::vector<Event>& events, NormParams norm)
+void align_kmers(std::string name, std::string strand, KmerModel &model, NanoFMI& fmi, std::vector<Event>& events, NormParams norm)
 {
     Timer timer;
     int k = 32;
-    NanoFMI::SeedGraph sg(fmi, norm, k, events.size() - k + 1, -9.2103, -3.75, -5.298, 0.7);
+    SeedGraph sg(model, fmi, norm, k, events.size() - k + 1, -9.2103, -3.75, -5.298, 0.7);
     //NanoFMI::SeedGraph sg(fmi, norm, k, 2266 - 2226 + 1, -9.2103, -3.75, -5.298, 0.7); //2226 -> 2200
 
     // align each k-mer of length k
@@ -52,7 +53,7 @@ int main(int argc, char** argv) {
     //NanoFMI fwd_fmi(model, fwd_ids, tally_gap);
 
     std::cerr << "Building reverse FMI\n";
-    NanoFMI rev_fmi(model, rev_ids, tally_gap);
+    NanoFMI rev_fmi(model.kmer_count(), rev_ids, tally_gap);
 
     /* navigate through all the read files provided */
     for (int fix = 4; fix < argc; fix++) {
@@ -76,7 +77,7 @@ int main(int argc, char** argv) {
 
             NormParams scale = model.get_norm_params(events);
 
-            align_kmers(argv[fix], "rev", rev_fmi, events, scale);
+            align_kmers(argv[fix], "rev", model, rev_fmi, events, scale);
             //align_kmers(argv[fix], "fwd", fwd_fmi, events, scale);
 
         }
