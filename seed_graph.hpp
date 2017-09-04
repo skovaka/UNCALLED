@@ -26,7 +26,6 @@ class SeedGraph {
         mer_id kmer_;
         double prob_;
 
-
         std::list< std::pair<Node *, bool> > parents_;
         std::list<Node *> children_;
     
@@ -42,14 +41,10 @@ class SeedGraph {
         //Copy constructor
         Node(const Node &s);
 
-        ~Node();
-
-        //Node& operator=(const Node &s);
-
         bool is_valid();
         
-        void invalidate(bool print=false);
-        bool remove_child(Node *child, bool invalidate, bool print=false);
+        void invalidate();
+        bool remove_child(Node *child, bool invalidate_if_empty);
         
         int add_child(Node *child);
     };
@@ -80,7 +75,7 @@ class SeedGraph {
               double stay_frac);
 
     std::vector<Result> add_event(Event e);
-    void print_graph();
+    void print_graph(bool verbose);
 
     Node *add_child(Range &range, Node &node); //copy update_ranges
     int add_sources(const Range &range, const Node &node);

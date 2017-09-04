@@ -18,13 +18,19 @@ void align_kmers(std::string name, std::string strand, KmerModel &model, NanoFMI
 {
     Timer timer;
     int k = 32;
-    SeedGraph sg(model, fmi, norm, k, events.size() - k + 1, -9.2103, -3.75, -5.298, 0.7);
-    //NanoFMI::SeedGraph sg(fmi, norm, k, 2266 - 2226 + 1, -9.2103, -3.75, -5.298, 0.7); //2226 -> 2200
+
+    //SeedGraph sg(model, fmi, norm, k, events.size() - k + 1, -9.2103, -3.75, -5.298, 0.7);
+    SeedGraph sg(model, fmi, norm, k, 2266 - 2226 + 1, -9.2103, -3.75, -5.298, 0.7);
 
     // align each k-mer of length k
-    for (int i = events.size()-1; i >= k; i--) {
-    //for (int i = 2266; i >= 2226; i--) { //Should map to 12198-12214 - 55 events -> 36 genome BP
-        sg.add_event(events[i]);
+    //for (int i = events.size()-1; i >= k; i--) {
+    for (int i = 2266; i >= 2226; i--) { //Should map to 12198-12214 - 55 events -> 36 genome BP
+        std::vector<Result> results = sg.add_event(events[i]);
+
+        for (auto r = results.begin(); r != results.end(); r++) {
+            std::cout << strand << " ";
+            r->print();
+        }
     }
 
 }
@@ -47,10 +53,9 @@ int main(int argc, char** argv) {
     std::ifstream ref_file(ref_fname);
     model.parse_fasta(ref_file, fwd_ids, rev_ids);
 
-    Timer timer;
 
     std::cerr << "Building forward FMI\n";
-    //NanoFMI fwd_fmi(model, fwd_ids, tally_gap);
+    NanoFMI fwd_fmi(model.kmer_count(), fwd_ids, tally_gap);
 
     std::cerr << "Building reverse FMI\n";
     NanoFMI rev_fmi(model.kmer_count(), rev_ids, tally_gap);
@@ -77,8 +82,15 @@ int main(int argc, char** argv) {
 
             NormParams scale = model.get_norm_params(events);
 
+            Timer timer;
+
             align_kmers(argv[fix], "rev", model, rev_fmi, events, scale);
-            //align_kmers(argv[fix], "fwd", fwd_fmi, events, scale);
+
+            std::cerr << "Reverse time: " << timer.lap() << "\n";
+
+            align_kmers(argv[fix], "fwd", model, fwd_fmi, events, scale);
+
+            std::cerr << "Forward time: " << timer.lap() << "\n";
 
         }
         catch (hdf5_tools::Exception& e)

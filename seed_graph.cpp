@@ -51,71 +51,41 @@ SeedGraph::Node::Node(const Node &s)
       parents_(s.parents_),
       children_(s.children_) {}
     
-SeedGraph::Node::~Node() {
-    //invalidate();
-}
 bool SeedGraph::Node::is_valid() {
     return max_length_ > 0;
 }
 
-void SeedGraph::Node::invalidate(bool print) {
+void SeedGraph::Node::invalidate() {
 
-    //DEBUG("i\n");
     for (auto p = parents_.begin(); p != parents_.end(); p++) {
-        //DEBUG("n\n");
-        if (p->first->remove_child(this, true, print)) {
-            //DEBUG("v\n");
+        if (p->first->remove_child(this, true)) {
             delete p->first;
         }
-        //DEBUG("a\n");
     }
-    //DEBUG("l\n");
 
     parents_.clear();
     children_.clear();
 
     max_length_ = stay_count_ = prob_ = 0;
-    
-    //TODO: remove this node's children?
 }
 
-//Returns true if this node should be pruned/erased/deleted/freed
+//Returns true if this node should be pruned
 //If should_invalidate = false, will always return false
-bool SeedGraph::Node::remove_child(Node *child, bool should_invalidate, bool print) {
+bool SeedGraph::Node::remove_child(Node *child, bool invalidate_if_empty) {
 
-    //DEBUG("rm child " << children_.size() << " " << max_length_ << " " << parents_.size() << "\n");
-
-    if (should_invalidate && children_.size() == 1) {
+    if (invalidate_if_empty && children_.size() == 1) {
         bool is_source = parents_.empty();
-        invalidate(print);
+        invalidate();
 
-        
         return !is_source;
     }
 
-    //for (auto p = parents_.begin(); p != parents_.end(); p++) {
-    //    if (p->first->max_length_ == child->max_length_ + 1) {
-    //        if (p->first->remove_child(this, should_invalidate)) {
-    //            delete p->first;
-    //        }
-    //        parents_.erase(p);
-    //        break;
-    //    }
-    //}
-
-    //DEBUG("o\n");
     for (auto c = children_.begin(); c != children_.end(); c++) {
-        //DEBUG("v" << children_.size() << "\n");
-        //DEBUG(*c << "\n");
         if (*c == child) {
-            //DEBUG("e\n");
             children_.erase(c);
             break;
         }
     }
-    //DEBUG("d\n");
-
-    //DEBUG("\t" << children_.size()  << "\tchild removed\n");
 
     return false;
 }
@@ -142,53 +112,41 @@ SeedGraph::SeedGraph(const KmerModel &model,
 
 std::vector<Result> SeedGraph::add_event(Event e) {
 
+    //Compare this event with previous to see if it should be a stay
     //bool stay = get_stay_prob(events[i], events[i+1]) >= STAY_THRESH;
     //bool stay = false;
     bool stay = true;
-    double prob;
 
-    
+
+    //Calculate and store kmer match probs for this event
     event_kmer_probs_.push_front(new double[model_.kmer_count()]);
     double *kmer_probs = event_kmer_probs_.front();
     for (int kmer = 0; kmer < model_.kmer_count(); kmer++)
         kmer_probs[kmer] = model_.event_match_prob(e, kmer, norm_params_);
     
+    //Where this event's sources will be stored
     sources_.push_front(std::list<Node *>());
-
+    
+    //Update event index
     cur_event_--;
 
-    //std::cout << "Creating children\n";
-    //
+    double prob;
 
-    //DEBUG("ADDING EVENT " << cur_event_ << " (" << sources_.size() << ")\n");
-
-    int source_count = 0;
-
-    //auto prev_ranges = traversed_ranges.begin(); //Empty on first iteration
+    //Find neighbors of previous nodes
     for (auto p = prev_nodes_.begin(); p != prev_nodes_.end(); p++) {
-        //Node *next_node = NULL;
-
         Range prev_range = p->second;
         Node *prev_node = p->first;
 
-
+        //Get probability for stay neighbor
         int prev_kmer = prev_node->kmer_;
         prob = kmer_probs[prev_kmer];
-
+        
         if (stay && prob >= event_prob_) {
             Node next_node(prev_node, prev_kmer, prob, true);
-            Node *nn = add_child(prev_range, next_node);
-        
-            //if (nn->parents_.size() > 1) {
-            //    //DEBUG("NEW NODE " << nn->max_length_ << " " << nn << " ");
-            //    for (auto par = nn->parents_.begin(); par != nn->parents_.end(); par++)
-            //        //DEBUG("\t" << par->first->max_length_);
-            //    //DEBUG("\n");
-            //}
+            add_child(prev_range, next_node);
         }
-
-        //DEBUG(prev_node << "(" << prev_node->children_.size() << ")\n");
         
+        //Find next possible kmers
         auto neighbor_itr = model_.get_neighbors(prev_kmer);
         std::list<mer_id> next_kmers;
 
@@ -196,23 +154,20 @@ std::vector<Result> SeedGraph::add_event(Event e) {
             if(kmer_probs[*n] >= event_prob_) 
                 next_kmers.push_back(*n);
 
-
+        //Find ranges FM index for those next kmers
         std::list<Range> next_ranges = fmi_.get_neigbhors(prev_range, next_kmers);
             
         auto next_kmer = next_kmers.begin(); 
         auto next_range = next_ranges.begin();
-
         
-        int child_count = 0;
-        //std::cout << "Adding nodes\n";
+        //Add all the neighbors that were found
         while (next_kmer != next_kmers.end()) {
             prob = kmer_probs[*next_kmer];
 
             Node next_node(prev_node, *next_kmer, prob, false);
-            Node *nn = add_child(*next_range, next_node);
-            child_count++;
+            add_child(*next_range, next_node);
 
-            next_kmer++; //Maybe do this in-place up above
+            next_kmer++; 
             next_range++;
         }
 
@@ -226,7 +181,9 @@ std::vector<Result> SeedGraph::add_event(Event e) {
 
             if (next_range.is_valid()) {
                 Node next_node(kmer, prob);
-                source_count += add_sources(next_range, next_node);
+
+                //Will split sources if they intersect existing nodes
+                add_sources(next_range, next_node);             
             }
         }
     }
@@ -249,14 +206,14 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         prev_nodes_.erase(p);
     }
  
-    //Move next_nodes_ to prev
+    //Move next_nodes to prev
     while (!next_nodes_.empty()) {
         auto n = next_nodes_.begin();
         prev_nodes_[n->second] = n->first;
         next_nodes_.erase(n);
     }
 
-    //print_graph();
+    //print_graph(false);
 
     auto r = pop_seeds();
 
@@ -266,8 +223,10 @@ std::vector<Result> SeedGraph::add_event(Event e) {
 
 int SeedGraph::add_sources(const Range &range, const Node &node) {
 
+    //Find closest existing node
     auto lb = next_nodes_.lower_bound(range);
     
+    //Find range of existing nodes intersecting the new node
     auto start = lb;
     while (start != next_nodes_.begin() 
            && std::prev(start)->first.intersects(range)){
@@ -279,35 +238,39 @@ int SeedGraph::add_sources(const Range &range, const Node &node) {
         end++;
     }
 
+    //No nodes intersect new node, just add it
     if (start == next_nodes_.end() || (start == lb && end == lb)) {
-
         next_nodes_[range] = new Node(node);
         sources_.front().push_back(next_nodes_[range]); //TODO: store node, no double query
         return 1;
     }
+    
 
+    //Split range to not include intersecting ranges
     std::list<Range> split_ranges;
 
-    Range rr(range); //Right range
-
-    //Node *node_copy;
+    Range rr(range); //Copy full range
 
     for (auto pr = start; pr != end; pr++) {
+
+        //After this, rr stores right segment, lr stores left
         Range lr = rr.split_range(pr->first); //Left range
 
+        //Add left range if it exists
         if (lr.is_valid()) {
-            if (lr.same_range(pr->first))
-                //DEBUG("WHOOPS B " << pr->second << "\n");
             split_ranges.push_back(lr);
         }
-
+        
+        //If right range invalid, no more splitting can be done
         if (!rr.is_valid())
             break;
     }
 
+    //Add last range if there is one
     if (rr.is_valid()) 
         split_ranges.push_back(rr);
 
+    //Add a new node for every split range
     for (auto r = split_ranges.begin(); r != split_ranges.end(); r++) {
         next_nodes_[*r] = new Node(node);
         sources_.front().push_back(next_nodes_[*r]);
@@ -318,7 +281,6 @@ int SeedGraph::add_sources(const Range &range, const Node &node) {
 
 SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
     
-    //Do I need to do this?
     if (!node.is_valid()) {
         return NULL;
     }
@@ -332,18 +294,11 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
     //Node range hasn't been added yet
     if (lb == next_nodes_.end() || !lb->first.same_range(range)) {
 
-        //DEBUG("CASE 0\n");
-            
         //Allocate memory for a new node
         Node *new_node = new Node(node);
 
-
-        //DEBUG("ADDING " << new_node << " " << next_nodes_.size() << "\n");
-
         //Store it with it's range
-        auto r = next_nodes_.insert(lb, std::pair<Range, Node *>(range, new_node));
-
-        //DEBUG("NEW NODE " << new_node << " " << next_nodes_.size() << "\n");
+        next_nodes_.insert(lb, std::pair<Range, Node *>(range, new_node));
 
         //Update the parent
         new_parent.first->children_.push_front(new_node);
@@ -356,16 +311,8 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
     Node *dup_node = lb->second;
     auto dup_parent = dup_node->parents_.begin(); 
 
-    //DEBUG("found dup node of " << dup_node << "\n");
-
     //This node is for a longer seed
     if (dup_node->max_length_ < node.max_length_) {
-        //DEBUG(dup_node << " has new best parent, old still there\n");
-
-        //DEBUG("CASE 1 " << dup_node->max_length_ << " " << node.max_length_ << "\n");
-
-        //if (!dup_node->parents_.empty())
-        //    //DEBUG(dup_node->parents_.front().first->max_length_ << " par?\n");
 
         //Copy seed info
         dup_node->max_length_ = node.max_length_;
@@ -382,7 +329,6 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
     } else if (dup_node->max_length_ == node.max_length_) {
 
         if (dup_node->prob_ < node.prob_) {
-            //DEBUG(dup_node << " has new best parent, old is gone\n");
 
             //If dup_parent has no children in the end, will be invalidated (in add_event)
             dup_parent->first->remove_child(dup_node, false);
@@ -402,7 +348,6 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
 
         return dup_node;
     }
-    //DEBUG(dup_node << " the hunt is on\n");
    
     //Find where to place the new parent pointer 
     while (dup_parent != dup_node->parents_.end()) {
@@ -414,7 +359,6 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
 
         //dup_parent is the longest branch shorter than new_parent
         } else if (new_parent.first->max_length_ > dup_parent->first->max_length_)  {
-            //DEBUG("CASE 2\n");
             
             //Add parent in the correct location
             dup_node->parents_.insert(dup_parent, new_parent);
@@ -425,8 +369,6 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
         //and new node has higher probability
         } else if (new_parent.first->prob_ > dup_parent->first->prob_) {
 
-            //DEBUG("CASE 3\n");
-            
             //If dup_parent has no children in the end, will be invalidated (in add_event)
             dup_parent->first->remove_child(dup_node, false);
 
@@ -445,7 +387,6 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
 
     //Smallest parent, put at the end
     if (dup_parent == dup_node->parents_.end()) {
-        //DEBUG("CASE 4\n");    
         dup_node->parents_.push_back(new_parent);
         new_parent.first->children_.push_front(dup_node);
     }
@@ -455,19 +396,13 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
 
 
 
-std::vector<Result> SeedGraph::pop_seeds() { //Big result gathering loop
+std::vector<Result> SeedGraph::pop_seeds() { 
+
+    std::vector<Result> results;
 
     //Is there a long enough seed?
     if (sources_.size() < seed_length_)
-        return std::vector<Result>();
-
-    //DEBUG("SEED POP\n");
-
-    //TODO: Store prev_nodes_ like this?
-    //std::unordered_map<Node *, Range> node_ranges;
-    //for (auto n = prev_nodes_.begin(); n != prev_nodes_.end(); n++)
-    //    node_ranges[n->second] = n->first;
-
+        return results;
 
     std::list<Node *> &aln_ends = sources_.back(),
                           &next_sources = *std::next(sources_.rbegin());
@@ -496,8 +431,6 @@ std::vector<Result> SeedGraph::pop_seeds() { //Big result gathering loop
 
             Node *n = to_visit.front();
             to_visit.pop_front();
-
-            //DEBUG("updating " << n->max_length_);
 
             if (n->max_length_ != prev_len) {
                 prev_len = n->max_length_;
@@ -544,8 +477,8 @@ std::vector<Result> SeedGraph::pop_seeds() { //Big result gathering loop
                     for (int s = range.start_; s <= range.end_; s++) {
 
                         r.set_ref_range(fmi_.suffix_ar_[s], seed_length_ - n->stay_count_ - 1);
+                        results.push_back(r);
 
-                        r.print();
                     }
                 }
             } else {
@@ -575,16 +508,15 @@ std::vector<Result> SeedGraph::pop_seeds() { //Big result gathering loop
     event_kmer_probs_.pop_back();
     sources_.pop_back();
 
-    return std::vector<Result>();
+    return results;
 
 }
 
-void SeedGraph::print_graph() {
+void SeedGraph::print_graph(bool verbose) {
     std::set< std::pair<int, Node *> > to_visit;
     auto event_sources = sources_.rbegin();
 
-    std::cout << "== nodeptr \"event\" max_len #parents children... (" 
-              << sources_.size() << " events) ==\n";
+    std::cout << "== printing graph at event " << cur_event_ << " ==\n"; 
 
     for (auto s = event_sources->begin(); s != event_sources->end(); s++) 
         to_visit.insert( std::pair<int, Node *> (0, *s) );
@@ -593,6 +525,11 @@ void SeedGraph::print_graph() {
 
     int source_count = 0;
 
+    std::vector<int> source_counts(sources_.size(), 0),
+                     linear_counts(sources_.size(), 0),
+                     branch_counts(sources_.size(), 0),
+                     invalid_counts(sources_.size(), 0);
+
     while (!to_visit.empty()) {
 
         if (iter_sources) {
@@ -600,6 +537,7 @@ void SeedGraph::print_graph() {
             event_sources++;
         }
 
+        //TODO: move this outside
         if (event_sources != sources_.rend()) {
             for (auto s = event_sources->begin(); s != event_sources->end(); s++) 
                 to_visit.insert(std::pair<int, Node *>(source_count, *s));
@@ -611,19 +549,71 @@ void SeedGraph::print_graph() {
         int event = p->first;
         Node *n = p->second;
         to_visit.erase(p);
+
+        if (!n->is_valid()) {
+            invalid_counts[event]++;
+        } else if (n->parents_.empty()) {
+            source_counts[event]++;
+        } else if (n->children_.size() > 1 || n->parents_.size() > 1) {
+            branch_counts[event]++;
+        } else {
+            linear_counts[event]++;
+        }
         
-        std::cout << n << " " << event << " " 
-                  << n->max_length_ << " " 
-                  << n->parents_.size();
+        if (verbose) {
+            std::cout << n << " " << event << " " 
+                      << n->max_length_ << " " 
+                      << n->parents_.size();
+        }
 
         for (auto c = n->children_.begin(); c != n->children_.end(); c++) {
-            std::cout << " " << *c;
+            if (verbose) {
+                std::cout << " " << *c;
+            }
             to_visit.insert(std::pair<int, Node *>(event + 1, *c));
         }
 
-        std::cout << "\n";
-
+        if (verbose) {
+            std::cout << "\n";
+        }
     }
+
+    int source_total = 0;
+    std::cout << "== source counts:";
+    for (unsigned int i = 0; i < source_counts.size(); i++) {
+        std::cout << "\t" << source_counts[i];
+        source_total += source_counts[i];
+    }
+    std::cout << "\t (" << source_total << ")\t==\n";
+
+    int branch_total = 0;
+    std::cout << "== branch counts:";
+    for (unsigned int i = 0; i < branch_counts.size(); i++) {
+        std::cout << "\t" << branch_counts[i];
+        branch_total += branch_counts[i];
+    }
+    std::cout << "\t (" << branch_total << ")\t==\n";
+
+
+    int linear_total = 0;
+    std::cout << "== linear counts:";
+    for (unsigned int i = 0; i < linear_counts.size(); i++) {
+        std::cout << "\t" << linear_counts[i];
+        linear_total += linear_counts[i];
+    }
+    std::cout << "\t (" << linear_total << ")\t==\n";
+
+    int invalid_total = 0;
+    std::cout << "== invalid counts:";
+    for (unsigned int i = 0; i < invalid_counts.size(); i++) {
+        std::cout << "\t" << invalid_counts[i];
+        invalid_total += invalid_counts[i];
+    }
+    std::cout << "\t (" << invalid_total << "\t==\n";
+
+    std::cout << "== full total: " 
+              << (source_total + branch_total + linear_total + invalid_total) 
+              << "\t==\n";
 
     std::cout << "== end ==\n";
 }
@@ -638,9 +628,9 @@ void Result::set_ref_range(int start, int length) {
     ref_range_.end_ = start+length;
 }
 
+
 void Result::print() {
-    std::cout << "= rev\t" 
-              << read_range_.start_ << "-" << read_range_.end_ << "\t"
+    std::cout << read_range_.start_ << "-" << read_range_.end_ << "\t"
               << ref_range_.start_ << "-" << ref_range_.end_ << "\t"
-              << prob_ << " =\n";
+              << prob_ << "\n";
 }
