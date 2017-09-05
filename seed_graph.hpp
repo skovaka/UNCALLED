@@ -44,7 +44,7 @@ class SeedGraph {
         bool is_valid();
         
         void invalidate(std::vector<Node *> *old_nodes);
-        bool remove_child(Node *child, std::vector<Node *> *old_nodes);
+        bool remove_child(Node *child);
         
         int add_child(Node *child);
     };

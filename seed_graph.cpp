@@ -55,36 +55,39 @@ bool SeedGraph::Node::is_valid() {
     return max_length_ > 0;
 }
 
-void SeedGraph::Node::invalidate(std::vector<Node *> *old_nodes = NULL) {
+void SeedGraph::Node::invalidate(std::vector<Node *> *old_nodes) {
 
-    for (auto p = parents_.begin(); p != parents_.end(); p++) {
-        p->first->remove_child(this, old_nodes);
+    std::vector<Node *> to_remove;
+    to_remove.push_back(this);
+
+    while (!to_remove.empty()) {
+        Node *n = to_remove.back();
+        to_remove.pop_back();
+
+        for (auto p = n->parents_.begin(); p != n->parents_.end(); p++) {
+            if (p->first->remove_child(n)) {
+                to_remove.push_back(p->first);
+            }
+        }
+
+        if (!n->parents_.empty()) {
+            old_nodes->push_back(n);
+        }
+
+        n->parents_.clear();
+        n->children_.clear();
+
+        n->max_length_ = n->stay_count_ = n->prob_ = 0;
     }
-
-
-    parents_.clear();
-    children_.clear();
-
-    max_length_ = stay_count_ = prob_ = 0;
-
-    if (old_nodes != NULL)
-        old_nodes->push_back(this);
 }
 
 //Returns true if this node should be pruned
 //If should_invalidate = false, will always return false
-bool SeedGraph::Node::remove_child(Node *child, std::vector<Node *> *old_nodes = NULL) {
+bool SeedGraph::Node::remove_child(Node *child) {
 
-    if (old_nodes != NULL && children_.size() == 1) {
-        bool is_source = parents_.empty();
-
-        if (is_source) {
-            invalidate();
-        } else {
-            invalidate(old_nodes);
-        }
-
-        return !is_source;
+    if (children_.size() == 1) {
+        children_.clear();
+        return true;
     }
 
     for (auto c = children_.begin(); c != children_.end(); c++) {
@@ -225,13 +228,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         Node *prev_node = p->first;
 
         if (prev_node->children_.empty()) {
-            bool is_source = prev_node->parents_.empty();
-            
-            if (is_source) {
-                prev_node->invalidate();
-            } else {
-                prev_node->invalidate(&old_nodes_);
-            }
+            prev_node->invalidate(&old_nodes_);
         }
 
         prev_nodes_.erase(p);
@@ -512,8 +509,10 @@ std::vector<Result> SeedGraph::pop_seeds() {
                         n->parents_.erase(next_parent);
                     }
 
-                    //Delete branch (if it's not a source)
-                    to_erase->remove_child(n, &old_nodes_);
+                    //Remove old parent
+                    if (to_erase->remove_child(n)) {
+                        to_erase->invalidate(&old_nodes_);
+                    }
                 }
 
             }
