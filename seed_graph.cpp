@@ -13,8 +13,8 @@
 #include "nano_fmi.hpp"
 #include "boost/math/distributions/students_t.hpp"
 
-#define DEBUG(s)
-//#define DEBUG(s) do { std::cerr << s; } while (0)
+//#define DEBUG(s)
+#define DEBUG(s) do { std::cerr << s; } while (0)
 
 
 //Source constructor
@@ -58,9 +58,6 @@ bool SeedGraph::Node::is_valid() {
 void SeedGraph::Node::invalidate(std::vector<Node *> *old_nodes = NULL) {
 
     for (auto p = parents_.begin(); p != parents_.end(); p++) {
-        //if (p->first->remove_child(this, old_nodes)) {
-            //delete p->first;
-        //}
         p->first->remove_child(this, old_nodes);
     }
 
@@ -81,10 +78,11 @@ bool SeedGraph::Node::remove_child(Node *child, std::vector<Node *> *old_nodes =
     if (old_nodes != NULL && children_.size() == 1) {
         bool is_source = parents_.empty();
 
-        if (is_source)
+        if (is_source) {
             invalidate();
-        else
+        } else {
             invalidate(old_nodes);
+        }
 
         return !is_source;
     }
@@ -120,7 +118,8 @@ SeedGraph::SeedGraph(const KmerModel &model,
 
 SeedGraph::~SeedGraph() {
     for (auto p = prev_nodes_.begin(); p != prev_nodes_.end(); p++) {
-        p->first->invalidate(&old_nodes_);
+        if (!p->first->parents_.empty())
+            p->first->invalidate(&old_nodes_);
     }
 
     for (auto ss = sources_.begin(); ss != sources_.end(); ss++) {
@@ -144,7 +143,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
     //Update event index
     cur_event_--;
 
-    //Timer t;
+    Timer t;
 
     //Calculate and store kmer match probs for this event
     event_kmer_probs_.push_front(new double[model_.kmer_count()]);
@@ -152,7 +151,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
     for (int kmer = 0; kmer < model_.kmer_count(); kmer++)
         kmer_probs[kmer] = model_.event_match_prob(e, kmer, norm_params_);
 
-    //DEBUG(cur_event_ << "\t" << t.lap() << "\t");
+    DEBUG(cur_event_ << "\t" << t.lap() << "\t");
     
     //Where this event's sources will be stored
     sources_.push_front(std::list<Node *>());
@@ -201,7 +200,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
 
     }
 
-    //DEBUG(t.lap() << "\t");
+    DEBUG(t.lap() << "\t");
 
     //Find sources
     for (mer_id kmer = 0; kmer < model_.kmer_count(); kmer++) {
@@ -218,7 +217,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         }
     }
 
-    //DEBUG(t.lap() << "\t");
+    DEBUG(t.lap() << "\t");
 
     //Clear prev_nodes, pruning any leaves
     while (!prev_nodes_.empty()) {
@@ -227,13 +226,12 @@ std::vector<Result> SeedGraph::add_event(Event e) {
 
         if (prev_node->children_.empty()) {
             bool is_source = prev_node->parents_.empty();
-
             
             if (is_source) {
                 prev_node->invalidate();
             } else {
                 prev_node->invalidate(&old_nodes_);
-            }   
+            }
         }
 
         prev_nodes_.erase(p);
@@ -246,11 +244,11 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         next_nodes_.erase(n);
     }
 
-    //DEBUG(t.lap() << "\t");
+    DEBUG(t.lap() << "\t");
 
     auto r = pop_seeds();
 
-    //DEBUG(t.lap() << "\n");
+    DEBUG(t.lap() << "\n");
 
     return r;
 }
