@@ -43,8 +43,8 @@ class SeedGraph {
 
         bool is_valid();
         
-        void invalidate();
-        bool remove_child(Node *child, bool invalidate_if_empty);
+        void invalidate(std::vector<Node *> *old_nodes);
+        bool remove_child(Node *child, std::vector<Node *> *old_nodes);
         
         int add_child(Node *child);
     };
@@ -55,6 +55,7 @@ class SeedGraph {
     std::map<Node *, Range> prev_nodes_;
     std::list< std::list< Node * > > sources_;
     std::list<double *> event_kmer_probs_;
+    std::vector<Node *> old_nodes_;
     
     const KmerModel &model_;
     const NanoFMI &fmi_;
@@ -74,8 +75,11 @@ class SeedGraph {
               double stay_prob,
               double stay_frac);
 
+    ~SeedGraph();
+
     std::vector<Result> add_event(Event e);
     void print_graph(bool verbose);
+
 
     Node *add_child(Range &range, Node &node); //copy update_ranges
     int add_sources(const Range &range, const Node &node);

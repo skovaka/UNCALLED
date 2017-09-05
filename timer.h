@@ -18,8 +18,9 @@ class Timer {
         }
 
         inline float get() {
-            return float( (long double)(clock() - start) / 
+            return float( 1000.0 * (long double)(clock() - start) / 
                           (long double)CLOCKS_PER_SEC );
+            //return (float) (clock() - start);
         }
 
         inline float lap() {

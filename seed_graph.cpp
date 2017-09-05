@@ -13,8 +13,8 @@
 #include "nano_fmi.hpp"
 #include "boost/math/distributions/students_t.hpp"
 
-//#define DEBUG(s)
-#define DEBUG(s) do { std::cerr << s; } while (0)
+#define DEBUG(s)
+//#define DEBUG(s) do { std::cerr << s; } while (0)
 
 
 //Source constructor
@@ -55,27 +55,36 @@ bool SeedGraph::Node::is_valid() {
     return max_length_ > 0;
 }
 
-void SeedGraph::Node::invalidate() {
+void SeedGraph::Node::invalidate(std::vector<Node *> *old_nodes = NULL) {
 
     for (auto p = parents_.begin(); p != parents_.end(); p++) {
-        if (p->first->remove_child(this, true)) {
-            delete p->first;
-        }
+        //if (p->first->remove_child(this, old_nodes)) {
+            //delete p->first;
+        //}
+        p->first->remove_child(this, old_nodes);
     }
+
 
     parents_.clear();
     children_.clear();
 
     max_length_ = stay_count_ = prob_ = 0;
+
+    if (old_nodes != NULL)
+        old_nodes->push_back(this);
 }
 
 //Returns true if this node should be pruned
 //If should_invalidate = false, will always return false
-bool SeedGraph::Node::remove_child(Node *child, bool invalidate_if_empty) {
+bool SeedGraph::Node::remove_child(Node *child, std::vector<Node *> *old_nodes = NULL) {
 
-    if (invalidate_if_empty && children_.size() == 1) {
+    if (old_nodes != NULL && children_.size() == 1) {
         bool is_source = parents_.empty();
-        invalidate();
+
+        if (is_source)
+            invalidate();
+        else
+            invalidate(old_nodes);
 
         return !is_source;
     }
@@ -109,6 +118,21 @@ SeedGraph::SeedGraph(const KmerModel &model,
       stay_prob_(stay_prob) {
 }
 
+SeedGraph::~SeedGraph() {
+    for (auto p = prev_nodes_.begin(); p != prev_nodes_.end(); p++) {
+        p->first->invalidate(&old_nodes_);
+    }
+
+    for (auto ss = sources_.begin(); ss != sources_.end(); ss++) {
+        for (auto s = ss->begin(); s != ss->end(); s++) {
+            delete *s;
+        }
+    }
+
+    for (int i = 0; i < old_nodes_.size(); i++) {
+        delete old_nodes_[i];
+    }
+}
 
 std::vector<Result> SeedGraph::add_event(Event e) {
 
@@ -117,18 +141,22 @@ std::vector<Result> SeedGraph::add_event(Event e) {
     //bool stay = false;
     bool stay = true;
 
+    //Update event index
+    cur_event_--;
+
+    //Timer t;
 
     //Calculate and store kmer match probs for this event
     event_kmer_probs_.push_front(new double[model_.kmer_count()]);
     double *kmer_probs = event_kmer_probs_.front();
     for (int kmer = 0; kmer < model_.kmer_count(); kmer++)
         kmer_probs[kmer] = model_.event_match_prob(e, kmer, norm_params_);
+
+    //DEBUG(cur_event_ << "\t" << t.lap() << "\t");
     
     //Where this event's sources will be stored
     sources_.push_front(std::list<Node *>());
     
-    //Update event index
-    cur_event_--;
 
     double prob;
 
@@ -173,6 +201,8 @@ std::vector<Result> SeedGraph::add_event(Event e) {
 
     }
 
+    //DEBUG(t.lap() << "\t");
+
     //Find sources
     for (mer_id kmer = 0; kmer < model_.kmer_count(); kmer++) {
         prob = kmer_probs[kmer];
@@ -188,6 +218,8 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         }
     }
 
+    //DEBUG(t.lap() << "\t");
+
     //Clear prev_nodes, pruning any leaves
     while (!prev_nodes_.empty()) {
         auto p = prev_nodes_.begin();
@@ -196,11 +228,12 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         if (prev_node->children_.empty()) {
             bool is_source = prev_node->parents_.empty();
 
-            prev_node->invalidate();
             
-            if (!is_source) {
-                delete prev_node;
-            } 
+            if (is_source) {
+                prev_node->invalidate();
+            } else {
+                prev_node->invalidate(&old_nodes_);
+            }   
         }
 
         prev_nodes_.erase(p);
@@ -213,10 +246,11 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         next_nodes_.erase(n);
     }
 
-    //print_graph(false);
+    //DEBUG(t.lap() << "\t");
 
     auto r = pop_seeds();
 
+    //DEBUG(t.lap() << "\n");
 
     return r;
 }
@@ -240,7 +274,15 @@ int SeedGraph::add_sources(const Range &range, const Node &node) {
 
     //No nodes intersect new node, just add it
     if (start == next_nodes_.end() || (start == lb && end == lb)) {
-        next_nodes_[range] = new Node(node);
+
+        if (old_nodes_.empty()) {
+            next_nodes_[range] = new Node(node);
+        } else {
+            *(old_nodes_.back()) = node;
+            next_nodes_[range] = old_nodes_.back();
+            old_nodes_.pop_back();
+        }
+
         sources_.front().push_back(next_nodes_[range]); //TODO: store node, no double query
         return 1;
     }
@@ -272,7 +314,14 @@ int SeedGraph::add_sources(const Range &range, const Node &node) {
 
     //Add a new node for every split range
     for (auto r = split_ranges.begin(); r != split_ranges.end(); r++) {
-        next_nodes_[*r] = new Node(node);
+        if (old_nodes_.empty()) {
+            next_nodes_[*r] = new Node(node);
+        } else {
+            *(old_nodes_.back()) = node;
+            next_nodes_[*r] = old_nodes_.back();
+            old_nodes_.pop_back();
+        }
+
         sources_.front().push_back(next_nodes_[*r]);
     }
 
@@ -295,7 +344,14 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
     if (lb == next_nodes_.end() || !lb->first.same_range(range)) {
 
         //Allocate memory for a new node
-        Node *new_node = new Node(node);
+        Node *new_node;
+        if (old_nodes_.empty()) {
+            new_node = new Node(node);
+        } else {
+            *(old_nodes_.back()) = node;
+            new_node = old_nodes_.back();
+            old_nodes_.pop_back();
+        }
 
         //Store it with it's range
         next_nodes_.insert(lb, std::pair<Range, Node *>(range, new_node));
@@ -331,7 +387,7 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
         if (dup_node->prob_ < node.prob_) {
 
             //If dup_parent has no children in the end, will be invalidated (in add_event)
-            dup_parent->first->remove_child(dup_node, false);
+            dup_parent->first->remove_child(dup_node);
 
             //Erase old parent 
             dup_node->parents_.erase(dup_parent);
@@ -370,7 +426,7 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
         } else if (new_parent.first->prob_ > dup_parent->first->prob_) {
 
             //If dup_parent has no children in the end, will be invalidated (in add_event)
-            dup_parent->first->remove_child(dup_node, false);
+            dup_parent->first->remove_child(dup_node);
 
             //Erase old parent 
             auto old_loc = dup_node->parents_.erase(dup_parent);
@@ -412,7 +468,8 @@ std::vector<Result> SeedGraph::pop_seeds() {
 
         if (!aln_en->is_valid()) {
             aln_ends.pop_front();
-            delete aln_en;
+            aln_en->invalidate(&old_nodes_);
+            //delete aln_en;
             continue;
         }
 
@@ -458,9 +515,7 @@ std::vector<Result> SeedGraph::pop_seeds() {
                     }
 
                     //Delete branch (if it's not a source)
-                    if (to_erase->remove_child(n, true)) {
-                        delete to_erase;
-                    }
+                    to_erase->remove_child(n, &old_nodes_);
                 }
 
             }
@@ -502,7 +557,8 @@ std::vector<Result> SeedGraph::pop_seeds() {
         }
         
         aln_ends.pop_front();
-        delete aln_en;
+        aln_en->invalidate(&old_nodes_);
+        //delete aln_en;
     }
 
     event_kmer_probs_.pop_back();
