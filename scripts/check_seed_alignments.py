@@ -6,7 +6,7 @@ REF_START = 3912154
 
 truth_in = open(sys.argv[1])
 align_in = open(sys.argv[2])
-
+#align_in = sys.stdin
 nofwd = len(sys.argv) > 3 and sys.argv[3] == "nofwd"
 
 
@@ -30,7 +30,7 @@ unique_ends = set()
 not_in = 0
 
 for line in align_in:
-    _, strand, seed_range, ref_range, prob, _ = line.strip().split()
+    strand, seed_range, ref_range, prob = line.strip().split()
     seed_st, seed_en = map(int, seed_range.split("-"))
     ref_en, ref_st = map(int, ref_range.split("-"))
     prob = float(prob)
