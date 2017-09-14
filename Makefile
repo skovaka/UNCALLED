@@ -8,13 +8,18 @@ INCLUDE=-I./src/fast5/src -I./src ${BOOST_INCLUDE}
 
 
 
-all: sigalign signal_extract
+all: sigalign seeds_to_aln
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c -o $@ $^ $(INCLUDE) $(HDF5_INCLUDE) 
 
 sigalign: sigalign.o nano_fmi.o kmer_model.o seed_graph.o
 	$(CC) $(CFLAGS) nano_fmi.o kmer_model.o seed_graph.o sigalign.o -o sigalign $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
+
+seeds_to_aln: seed_tracker.o nano_fmi.o seed_graph.o
+	$(CC) $(CFLAGS) nano_fmi.o kmer_model.o seed_graph.o seed_tracker.o -o seeds_to_aln $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
+
+
 
 #signal_extract: signal_extract.o model_tools.o
 #	$(CC) $(CFLAGS) model_tools.o signal_extract.o -o signal_extract $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 

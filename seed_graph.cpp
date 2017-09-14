@@ -13,8 +13,8 @@
 #include "nano_fmi.hpp"
 #include "boost/math/distributions/students_t.hpp"
 
-//#define DEBUG(s)
-#define DEBUG(s) do { std::cerr << s; } while (0)
+#define DEBUG(s)
+//#define DEBUG(s) do { std::cerr << s; } while (0)
 
 
 //Source constructor
