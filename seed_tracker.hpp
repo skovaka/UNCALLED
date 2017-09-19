@@ -8,12 +8,13 @@ class SeedTracker {
     
     class RefLoc {
         public:
-        int ref_st_, evt_st_, sup_,
-            ref_en_, evt_en_;
+        int ref_st_, evt_st_,
+            ref_en_, evt_en_,
+            prev_len_, total_len_;
 
-        RefLoc(int ref_en, int evt_en);
+        RefLoc(int ref_en, int evt_en, int len);
         RefLoc(const RefLoc &r);
-
+        int ref_start_base() const;
         void update_next(RefLoc &new_loc) const;
         void print() const;
 

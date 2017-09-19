@@ -13,8 +13,8 @@
 #include "nano_fmi.hpp"
 #include "boost/math/distributions/students_t.hpp"
 
-#define DEBUG(s)
-//#define DEBUG(s) do { std::cerr << s; } while (0)
+//#define DEBUG(s)
+#define DEBUG(s) do { std::cerr << s; } while (0)
 
 
 //Source constructor
@@ -22,7 +22,13 @@ SeedGraph::Node::Node(mer_id kmer, double prob)
     : max_length_(1),
       stay_count_(0),
       kmer_(kmer),
-      prob_(prob) {}
+      prob_(prob)
+
+      #ifdef DEBUG_PROB
+      , min_evt_prob_(prob)
+      #endif
+      
+       {}
 
 //Child constructor
 SeedGraph::Node::Node(Node *parent, mer_id kmer, 
@@ -31,6 +37,14 @@ SeedGraph::Node::Node(Node *parent, mer_id kmer,
       stay_count_(parent->stay_count_ + stay),
       kmer_(kmer),
       prob_(parent->prob_ + prob) {
+
+    #ifdef DEBUG_PROB
+    if (parent->min_evt_prob_ < prob) {
+        min_evt_prob_ = parent->min_evt_prob_;
+    } else {
+        min_evt_prob_ = prob;
+    }
+    #endif
 
     parents_.push_front(parent_ptr(parent, stay));
 }
@@ -48,6 +62,11 @@ SeedGraph::Node::Node(const Node &s)
       stay_count_(s.stay_count_),
       kmer_(s.kmer_),
       prob_(s.prob_),
+
+      #ifdef DEBUG_PROB
+      min_evt_prob_(s.min_evt_prob_),
+      #endif
+
       parents_(s.parents_),
       children_(s.children_) {}
     
@@ -154,7 +173,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
     for (int kmer = 0; kmer < model_.kmer_count(); kmer++)
         kmer_probs[kmer] = model_.event_match_prob(e, kmer, norm_params_);
 
-    DEBUG(cur_event_ << "\t" << t.lap() << "\t");
+    //DEBUG(cur_event_ << "\t" << t.lap() << "\t");
     
     //Where this event's sources will be stored
     sources_.push_front(std::list<Node *>());
@@ -203,7 +222,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
 
     }
 
-    DEBUG(t.lap() << "\t");
+    //DEBUG(t.lap() << "\t");
 
     //Find sources
     for (mer_id kmer = 0; kmer < model_.kmer_count(); kmer++) {
@@ -220,7 +239,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         }
     }
 
-    DEBUG(t.lap() << "\t");
+    //DEBUG(t.lap() << "\t");
 
     //Clear prev_nodes, pruning any leaves
     while (!prev_nodes_.empty()) {
@@ -241,11 +260,10 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         next_nodes_.erase(n);
     }
 
-    DEBUG(t.lap() << "\t");
+    //DEBUG(t.lap() << "\t");
 
     auto r = pop_seeds();
 
-    DEBUG(t.lap() << "\n");
 
     return r;
 }
@@ -370,6 +388,10 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
         dup_node->stay_count_ = node.stay_count_;
         dup_node->prob_ = node.prob_;
 
+        #ifdef DEBUG_PROB
+        dup_node->min_evt_prob_ = node.min_evt_prob_;
+        #endif
+
         //Update parents and children
         dup_node->parents_.push_front(new_parent);
         new_parent.first->children_.push_front(dup_node);
@@ -391,6 +413,10 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
             dup_node->max_length_ = node.max_length_;
             dup_node->stay_count_ = node.stay_count_;
             dup_node->prob_ = node.prob_;
+
+            #ifdef DEBUG_PROB
+            dup_node->min_evt_prob_ = node.min_evt_prob_;
+            #endif
 
             //Insert new parent in old parent's place
             dup_node->parents_.push_front(new_parent);
@@ -525,14 +551,27 @@ std::vector<Result> SeedGraph::pop_seeds() {
                     Range range = prev_nodes_[n];
 
                     Result r(cur_event_, seed_length_, n->prob_ / n->max_length_);
+                    
+                    #ifdef DEBUG_PROB
+                    r.min_evt_prob_ = n->min_evt_prob_ ;
+                    #endif
 
                     for (int s = range.start_; s <= range.end_; s++) {
 
                         r.set_ref_range(fmi_.suffix_ar_[s], seed_length_ - n->stay_count_ - 1);
                         results.push_back(r);
 
+
                     }
                 }
+
+                //#ifdef DEBUG_PROB
+                //else {
+                //    DEBUG("BAD: " << n->min_evt_prob_ << "\n");
+                //}
+                //#endif
+
+
             } else {
                 for (auto c = n->children_.begin(); c != n->children_.end(); c++) {
                     to_visit.push_back(*c);
@@ -547,9 +586,21 @@ std::vector<Result> SeedGraph::pop_seeds() {
                 n->prob_ = new_parent.first->prob_ + (*kmer_probs)[n->kmer_];
                 n->stay_count_ = new_parent.first->stay_count_ + new_parent.second;
 
+                #ifdef DEBUG_PROB
+                if (new_parent.first->min_evt_prob_ < (*kmer_probs)[n->kmer_]) {
+                    n->min_evt_prob_ = new_parent.first->min_evt_prob_;
+                } else {
+                    n->min_evt_prob_ = (*kmer_probs)[n->kmer_];
+                }
+                #endif
+
             } else {
                 n->prob_ = (*kmer_probs)[n->kmer_];
                 n->stay_count_ = 0;
+
+                #ifdef DEBUG_PROB
+                n->min_evt_prob_ = n->prob_;
+                #endif
             }
         }
         
@@ -685,5 +736,12 @@ void Result::set_ref_range(int start, int length) {
 void Result::print() {
     std::cout << read_range_.start_ << "-" << read_range_.end_ << "\t"
               << ref_range_.start_ << "-" << ref_range_.end_ << "\t"
-              << prob_ << "\n";
+              << prob_;
+              
+
+    #ifdef DEBUG_PROB
+    std::cout << " " << min_evt_prob_;
+    #endif
+
+    std::cout << "\n";
 }

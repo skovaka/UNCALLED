@@ -3,29 +3,51 @@
 #include <iostream>
 #include <set>
 
-
-SeedTracker::RefLoc::RefLoc(int ref_en, int evt_en)
+SeedTracker::RefLoc::RefLoc(int ref_en, int evt_en, int len)
     : ref_st_(ref_en),
       evt_st_(evt_en),
-      sup_(1),
       ref_en_(ref_en),
-      evt_en_(evt_en) {}
+      evt_en_(evt_en),
+      prev_len_(len), 
+      total_len_(len) {}
 
 SeedTracker::RefLoc::RefLoc(const RefLoc &r)
     : ref_st_(r.ref_st_),
       evt_st_(r.evt_st_),
-      sup_(r.sup_),
       ref_en_(r.ref_en_),
-      evt_en_(r.evt_en_) {}
+      evt_en_(r.evt_en_),
+      prev_len_(r.prev_len_), 
+      total_len_(r.total_len_) {}
+
+int SeedTracker::RefLoc::ref_start_base() const {
+    return ref_st_ - prev_len_;
+}
 
 void SeedTracker::RefLoc::update_next(RefLoc &new_loc) const {
     new_loc.ref_en_ = ref_en_;
     new_loc.evt_en_ = evt_en_;
-    new_loc.sup_ = sup_ + 1;
+
+    std::cerr << new_loc.prev_len_ << "\n";
+
+    if (new_loc.ref_start_base() < ref_start_base()) {
+        if (new_loc.ref_st_ >= ref_start_base()) {
+
+            new_loc.total_len_ 
+                = total_len_ + 
+                  ref_start_base() - 
+                  new_loc.ref_start_base();
+
+        } else {
+            new_loc.total_len_ += total_len_;
+        }
+    } else {
+        new_loc.total_len_ = total_len_;
+    }
+
 }
 
 void SeedTracker::RefLoc::print() const {
-    std::cout << sup_ << " " 
+    std::cout << total_len_ << " " 
               << ref_st_ << "-" << ref_en_ << " " 
               << evt_st_ << "-" << evt_en_ << "\n";
 }
@@ -42,22 +64,20 @@ SeedTracker::SeedTracker() {
 }
 
 int SeedTracker::add_seed(Result r) {
-    RefLoc new_loc(r.ref_range_.end_, r.read_range_.end_);
+    RefLoc new_loc(r.ref_range_.end_, r.read_range_.end_, r.ref_range_.length());
 
     auto loc = locations.lower_bound(new_loc),
          loc_match = locations.end();
 
-
     while (loc != locations.end()) {
         bool higher_sup = loc_match == locations.end() 
-                          || loc_match->sup_ < loc->sup_,
+                       || loc_match->total_len_ < loc->total_len_,
              
              in_range = loc->ref_st_ >= new_loc.ref_st_
-                        && loc->ref_st_ - loc->evt_st_ 
-                           <= new_loc.ref_st_ - new_loc.evt_st_;
+                        && loc->ref_st_ - loc->evt_st_
+                           <= new_loc.ref_st_ - new_loc.evt_st_ + 2;
 
         if (higher_sup && in_range) {
-            std::cout << (loc->ref_st_ < new_loc.ref_st_) << "\n";
             loc_match = loc;
         }
 
@@ -71,12 +91,16 @@ int SeedTracker::add_seed(Result r) {
         loc_match->update_next(new_loc);
         locations.erase(loc_match);
         locations.insert(new_loc);
+        //new_loc.print();
 
     } else if (loc_match == locations.end()) {
         locations.insert(new_loc);
+        //new_loc.print();
     }
 
-    return new_loc.sup_;
+    //std::cerr << new_loc.ref_en_ << " " << r.ref_range_.length() << "\n";
+
+    return new_loc.ref_en_;
 }
 
 void SeedTracker::print(std::string &strand) {
@@ -93,6 +117,10 @@ int main(int argc, char **argv) {
 
     int i, evt_st, evt_en, ref_st, ref_en;
 
+    #ifdef DEBUG_PROB
+    double min_evt_prob_;
+    #endif
+
     SeedTracker tracker;
 
     prev_strand = "";
@@ -106,6 +134,10 @@ int main(int argc, char **argv) {
         }
 
         std::cin >> evt_str >> ref_str >> prob;
+
+        #ifdef DEBUG_PROB
+        std::cin >> min_evt_prob_;
+        #endif
 
         if (!prev_strand.empty() && prev_strand != strand) {
             tracker.print(prev_strand);     
@@ -122,7 +154,12 @@ int main(int argc, char **argv) {
 
         Result r(evt_st, evt_en-evt_en, prob, ref_st, ref_en);
 
-        tracker.add_seed(r);
+        int ref_en = tracker.add_seed(r);
+
+        #ifdef DEBUG_PROB
+        std::cerr << ref_en << "\t" << min_evt_prob_ << "\n";
+        #endif
+
         prev_strand = strand;
     }
 

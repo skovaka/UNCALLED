@@ -5,6 +5,8 @@
 #include "kmer_model.hpp"
 #include <list>
 
+//#define DEBUG_PROB
+
 class Result {
     public:
 
@@ -15,6 +17,10 @@ class Result {
 
     Range read_range_, ref_range_;
     double prob_;
+
+    #ifdef DEBUG_PROB
+    double min_evt_prob_;
+    #endif
 };
 
 
@@ -25,6 +31,11 @@ class SeedGraph {
         int max_length_, stay_count_;
         mer_id kmer_;
         double prob_;
+
+        #ifdef DEBUG_PROB
+        double min_evt_prob_;
+        double min_stay_prob_;
+        #endif
 
         std::list< std::pair<Node *, bool> > parents_;
         std::list<Node *> children_;

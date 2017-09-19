@@ -26,6 +26,8 @@ class Range {
 
     bool is_valid() const;
 
+    int length() const;
+
     friend bool operator< (const Range &q1, const Range &q2);
 };
 

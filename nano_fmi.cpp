@@ -210,6 +210,11 @@ bool Range::intersects(const Range &q) const {
            (end_ >= q.start_ && end_ <= q.end_);
 }
 
+int Range::length() const {
+    return end_ - start_ + 1;
+}
+
+
 Range Range::split_range(const Range &r) { 
 
     Range left;
