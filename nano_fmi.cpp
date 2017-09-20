@@ -10,7 +10,6 @@
 #include <unordered_map>
 #include "timer.h"
 #include "nano_fmi.hpp"
-#include "boost/math/distributions/students_t.hpp"
 
 //#define DEBUG(s)
 #define DEBUG(s) do { std::cerr << s; } while (0)
@@ -115,21 +114,6 @@ bool NanoFMI::operator() (unsigned int rot1, unsigned int rot2) {
     return false;
 }
 
-//TODO: move to model
-float NanoFMI::get_stay_prob(Event e1, Event e2) const {
-    double var1 = e1.stdv*e1.stdv, var2 = e2.stdv*e2.stdv;
-
-    double t = (e1.mean - e2.mean) / sqrt(var1/e1.length + var2/e2.length);
-
-    int df = pow(var1/e1.length + var2/e2.length, 2) 
-               / (pow(var1/e1.length, 2) / (e1.length-1) 
-                    + pow(var2/e2.length, 2) / (e2.length-1));
-
-    boost::math::students_t dist(df);
-    double q = boost::math::cdf(boost::math::complement(dist, fabs(t)));
-
-    return q;
-}
 
 //Returns the number of occurences of the given k-mer in the BWT up to and
 //including the given index

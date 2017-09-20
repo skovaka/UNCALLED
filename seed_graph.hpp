@@ -73,6 +73,8 @@ class SeedGraph {
     const NormParams &norm_params_;
     unsigned int seed_length_, cur_event_, max_stays_;
 
+    Event prev_event_;
+
     double event_prob_,
            seed_prob_,
            stay_prob_;

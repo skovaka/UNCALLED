@@ -23,7 +23,7 @@ void align_kmers(const std::string &strand,
 
     std::cout << "== " << events.size() << " events ==\n";
 
-    SeedGraph sg(model, fmi, norm, k, events.size() - k + 1, -5.29, -3.35, -5.298, 0.7);
+    SeedGraph sg(model, fmi, norm, k, events.size() - k + 1, -5.29, -3.35, -8.343, 0.7);
     //SeedGraph sg(model, fmi, norm, k, 2266 - 2226 + 1, -9.2103, -3.75, -5.298, 0.7);
 
     // align each k-mer of length k
@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
     model.parse_fasta(ref_file, fwd_ids, rev_ids);
 
     std::cerr << "Building forward FMI\n";
-    //NanoFMI fwd_fmi(model.kmer_count(), fwd_ids, tally_gap);
+    NanoFMI fwd_fmi(model.kmer_count(), fwd_ids, tally_gap);
 
     std::cerr << "Building reverse FMI\n";
     NanoFMI rev_fmi(model.kmer_count(), rev_ids, tally_gap);
@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
 
             std::cerr << "Reverse time: " << timer.lap() << "\n";
 
-            //align_kmers("fwd", model, fwd_fmi, events, scale);
+            align_kmers("fwd", model, fwd_fmi, events, scale);
 
             std::cout << "== done ==\n";
 

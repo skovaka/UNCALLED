@@ -4,6 +4,8 @@
 #include <tuple>
 #include <string>
 #include <cmath>
+#include <stddef.h>
+#include "boost/math/distributions/students_t.hpp"
 #include "kmer_model.hpp"
 
 #define PI 3.1415926535897
@@ -157,6 +159,26 @@ float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) const {
                   * exp(-lambda * pow(e.stdv - sd_means_[k_id], 2) 
                          / (2 * e.stdv * pow(sd_means_[k_id], 2)));
     return log(ng*ig);
+}
+
+//TODO: move to model
+float KmerModel::get_stay_prob(Event e1, Event e2) const {
+
+    if (e1.length == 0 || e2.length == 0)
+        return 0;
+
+    double var1 = e1.stdv*e1.stdv, var2 = e2.stdv*e2.stdv;
+
+    double t = (e1.mean - e2.mean) / sqrt(var1/e1.length + var2/e2.length);
+
+    int df = pow(var1/e1.length + var2/e2.length, 2) 
+               / (pow(var1/e1.length, 2) / (e1.length-1) 
+                    + pow(var2/e2.length, 2) / (e2.length-1));
+
+    boost::math::students_t dist(df);
+    double q = boost::math::cdf(boost::math::complement(dist, fabs(t)));
+
+    return log(q);
 }
 
 std::string KmerModel::reverse_complement(std::string &seq) const {

@@ -27,8 +27,6 @@ void SeedTracker::RefLoc::update_next(RefLoc &new_loc) const {
     new_loc.ref_en_ = ref_en_;
     new_loc.evt_en_ = evt_en_;
 
-    std::cerr << new_loc.prev_len_ << "\n";
-
     if (new_loc.ref_start_base() < ref_start_base()) {
         if (new_loc.ref_st_ >= ref_start_base()) {
 
@@ -126,10 +124,12 @@ int main(int argc, char **argv) {
     prev_strand = "";
 
     while (std::cin) {
+
         std::cin >> strand;
         
         if (strand[0] == '=') {
             getline(std::cin, strand);
+            strand = prev_strand;
             continue;
         }
 
@@ -160,7 +160,10 @@ int main(int argc, char **argv) {
         std::cerr << ref_en << "\t" << min_evt_prob_ << "\n";
         #endif
 
-        prev_strand = strand;
+        if (strand[0] != '=') {
+            prev_strand = strand;
+        }
+
     }
 
     tracker.print(prev_strand);

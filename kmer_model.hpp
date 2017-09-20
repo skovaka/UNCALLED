@@ -30,6 +30,8 @@ class KmerModel {
 
     float event_match_prob(Event evt, mer_id k_id, NormParams norm) const;
 
+    float get_stay_prob(Event e1, Event e2) const; 
+
     inline int kmer_len() const {return k_;}
     inline int kmer_count() const {return kmer_count_;}
 

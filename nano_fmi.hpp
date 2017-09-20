@@ -46,7 +46,6 @@ class NanoFMI {
 
     //private:
     std::list<int> get_tallies(std::list<mer_id> kmers, int loc) const;
-    float get_stay_prob(Event e1, Event e2) const; //hmm
 
     std::vector<mer_id> *mer_seq_;
 

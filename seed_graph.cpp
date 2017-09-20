@@ -133,6 +133,7 @@ SeedGraph::SeedGraph(const KmerModel &model,
       seed_length_(seed_len),
       cur_event_(read_len), 
       max_stays_( (int) (stay_frac * seed_len) ),
+      prev_event_({0, 0, 0}),
       event_prob_(event_prob),
       seed_prob_(seed_prob),
       stay_prob_(stay_prob) {
@@ -158,9 +159,18 @@ SeedGraph::~SeedGraph() {
 std::vector<Result> SeedGraph::add_event(Event e) {
 
     //Compare this event with previous to see if it should be a stay
-    //bool stay = get_stay_prob(events[i], events[i+1]) >= STAY_THRESH;
+
+    //bool stay = model_.get_stay_prob(e, prev_event_) >= stay_prob_;
+    double cur_stay_prob = model_.get_stay_prob(e, prev_event_);
+
+    //DEBUG(prev_event_.mean << " (" << prev_event_.stdv << ")\t" << 
+    //      e.mean << " (" << e.stdv << ")\t"
+    //      << sp << "\n");
+    
+    bool stay = cur_stay_prob >= stay_prob_;
+
     //bool stay = false;
-    bool stay = true;
+    //bool stay = true;
 
     //Update event index
     cur_event_--;
@@ -191,6 +201,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         prob = kmer_probs[prev_kmer];
         
         if (stay && prob >= event_prob_) {
+            //DEBUG(cur_stay_prob 
             Node next_node(prev_node, prev_kmer, prob, true);
             add_child(prev_range, next_node);
         }
@@ -264,6 +275,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
 
     auto r = pop_seeds();
 
+    prev_event_ = e;
 
     return r;
 }
