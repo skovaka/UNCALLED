@@ -20,6 +20,7 @@ class KmerModel {
     typedef std::list<mer_id>::const_iterator neighbor_itr;
 
     KmerModel(std::string model_fname);
+    ~KmerModel();
 
     NormParams get_norm_params(std::vector<Event> events) const;
 

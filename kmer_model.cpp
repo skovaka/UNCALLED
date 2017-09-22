@@ -121,29 +121,15 @@ KmerModel::KmerModel(std::string model_fname) {
     model_stdv_ = sqrt(model_stdv_ / kmer_count_);
 }
 
-//int KmerModel::compare_kmers(mer_id mer1, mer_id mer2) {
-//    if (lv_means_[mer1] < lv_means_[mer2])
-//        return -1;
-//    else if (lv_means_[mer1] > lv_means_[mer2])
-//        return 1;
-//
-//    if (sd_means_[mer1] < sd_means_[mer2])
-//        return -1;
-//    else if (sd_means_[mer1] > sd_means_[mer2])
-//        return 1;
-//
-//    if (lv_stdvs_[mer1] < lv_stdvs_[mer2])
-//        return 1;
-//    else if (lv_stdvs_[mer1] > lv_stdvs_[mer2])
-//        return -1;
-//
-//    if (sd_stdvs_[mer1] < sd_stdvs_[mer2])
-//        return 1;
-//    else if (sd_stdvs_[mer1] > sd_stdvs_[mer2])
-//        return -1;
-//
-//    return 0;
-//}
+
+KmerModel::~KmerModel() {
+    delete [] lv_means_;
+    delete [] lv_stdvs_;
+    delete [] sd_means_;
+    delete [] sd_stdvs_;
+    delete [] neighbors_; 
+    delete [] rev_comp_ids_; 
+}
 
 float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) const {
     double norm_mean = lv_means_[k_id] * norm.scale + norm.shift;

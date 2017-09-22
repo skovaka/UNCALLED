@@ -74,7 +74,8 @@ bool SeedGraph::Node::is_valid() {
     return max_length_ > 0;
 }
 
-void SeedGraph::Node::invalidate(std::vector<Node *> *old_nodes) {
+void SeedGraph::Node::invalidate(std::vector<Node *> *old_nodes, 
+                                 bool delete_source = false) {
 
     std::vector<Node *> to_remove;
     to_remove.push_back(this);
@@ -89,7 +90,7 @@ void SeedGraph::Node::invalidate(std::vector<Node *> *old_nodes) {
             }
         }
 
-        if (!n->parents_.empty()) {
+        if (!n->parents_.empty() || delete_source) {
             old_nodes->push_back(n);
         }
 
@@ -153,6 +154,11 @@ SeedGraph::~SeedGraph() {
 
     for (int i = 0; i < old_nodes_.size(); i++) {
         delete old_nodes_[i];
+    }
+
+    for (auto probs = event_kmer_probs_.begin(); 
+         probs != event_kmer_probs_.end(); probs++) {
+        delete [] *probs;
     }
 }
 
@@ -494,14 +500,14 @@ std::vector<Result> SeedGraph::pop_seeds() {
         return results;
 
     std::list<Node *> &aln_ends = sources_.back(),
-                          &next_sources = *std::next(sources_.rbegin());
+                      &next_sources = *std::next(sources_.rbegin());
 
     while (!aln_ends.empty()) {
         Node *aln_en = aln_ends.front();
 
         if (!aln_en->is_valid()) {
             aln_ends.pop_front();
-            aln_en->invalidate(&old_nodes_);
+            aln_en->invalidate(&old_nodes_, true);
             //delete aln_en;
             continue;
         }
@@ -617,10 +623,11 @@ std::vector<Result> SeedGraph::pop_seeds() {
         }
         
         aln_ends.pop_front();
-        aln_en->invalidate(&old_nodes_);
+        aln_en->invalidate(&old_nodes_, true);
         //delete aln_en;
     }
 
+    delete [] event_kmer_probs_.back();
     event_kmer_probs_.pop_back();
     sources_.pop_back();
 
