@@ -140,11 +140,36 @@ SeedGraph::SeedGraph(const KmerModel &model,
       stay_prob_(stay_prob) {
 }
 
+SeedGraph::SeedGraph(const KmerModel &model,
+                     const NanoFMI &fmi, 
+                     const AlnParams &gp)
+    : model_(model),
+      fmi_(fmi),
+      seed_length_(gp.seed_len),
+      max_stays_( (int) (gp.stay_frac * gp.seed_len) ),
+      event_prob_(gp.event_prob),
+      seed_prob_(gp.seed_prob),
+      stay_prob_(gp.stay_prob) {
+}
+
 SeedGraph::~SeedGraph() {
+    reset();
+}
+
+void SeedGraph::new_read(int read_len, const NormParams &params) {
+    reset();
+    norm_params_ = params;
+    cur_event_ = read_len;
+    prev_event_ = {0, 0, 0};
+}
+
+void SeedGraph::reset() {
     for (auto p = prev_nodes_.begin(); p != prev_nodes_.end(); p++) {
         if (!p->first->parents_.empty())
             p->first->invalidate(&old_nodes_);
     }
+
+    prev_nodes_.clear();
 
     for (auto ss = sources_.begin(); ss != sources_.end(); ss++) {
         for (auto s = ss->begin(); s != ss->end(); s++) {
@@ -152,31 +177,29 @@ SeedGraph::~SeedGraph() {
         }
     }
 
+    sources_.clear();
+
     for (int i = 0; i < old_nodes_.size(); i++) {
         delete old_nodes_[i];
     }
+
+    old_nodes_.clear();
 
     for (auto probs = event_kmer_probs_.begin(); 
          probs != event_kmer_probs_.end(); probs++) {
         delete [] *probs;
     }
+
+    event_kmer_probs_.clear();
 }
 
 std::vector<Result> SeedGraph::add_event(Event e) {
 
     //Compare this event with previous to see if it should be a stay
 
-    //bool stay = model_.get_stay_prob(e, prev_event_) >= stay_prob_;
     double cur_stay_prob = model_.get_stay_prob(e, prev_event_);
 
-    //DEBUG(prev_event_.mean << " (" << prev_event_.stdv << ")\t" << 
-    //      e.mean << " (" << e.stdv << ")\t"
-    //      << sp << "\n");
-    
     bool stay = cur_stay_prob >= stay_prob_;
-
-    //bool stay = false;
-    //bool stay = true;
 
     //Update event index
     cur_event_--;
@@ -207,7 +230,6 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         prob = kmer_probs[prev_kmer];
         
         if (stay && prob >= event_prob_) {
-            //DEBUG(cur_stay_prob 
             Node next_node(prev_node, prev_kmer, prob, true);
             add_child(prev_range, next_node);
         }

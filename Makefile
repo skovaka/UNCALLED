@@ -8,16 +8,19 @@ INCLUDE=-I./src/fast5/src -I./src ${BOOST_INCLUDE}
 
 
 
-all: sigalign seeds_to_aln
+all: uncalled 
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c -o $@ $^ $(INCLUDE) $(HDF5_INCLUDE) 
 
-sigalign: sigalign.o nano_fmi.o kmer_model.o seed_graph.o
-	$(CC) $(CFLAGS) nano_fmi.o kmer_model.o seed_graph.o sigalign.o -o sigalign $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
+#sigalign: sigalign.o nano_fmi.o kmer_model.o seed_graph.o
+#	$(CC) $(CFLAGS) nano_fmi.o kmer_model.o seed_graph.o sigalign.o -o sigalign $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
 
-seeds_to_aln: seed_tracker.o nano_fmi.o seed_graph.o
-	$(CC) $(CFLAGS) nano_fmi.o kmer_model.o seed_graph.o seed_tracker.o -o seeds_to_aln $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
+uncalled: uncalled.o nano_fmi.o kmer_model.o seed_graph.o seed_tracker.o
+	$(CC) $(CFLAGS) nano_fmi.o kmer_model.o seed_graph.o seed_tracker.o uncalled.o -o uncalled $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
+
+#seeds_to_aln: seed_tracker.o nano_fmi.o seed_graph.o
+#	$(CC) $(CFLAGS) nano_fmi.o kmer_model.o seed_graph.o seed_tracker.o -o seeds_to_aln $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
 
 
 

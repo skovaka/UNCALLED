@@ -23,9 +23,17 @@ class Result {
     #endif
 };
 
+struct AlnParams {
+     int seed_len;
+     double event_prob,
+            seed_prob,
+            stay_prob,
+            stay_frac;
+};
 
 
 class SeedGraph {
+
     class Node {
         public:
         int max_length_, stay_count_;
@@ -70,7 +78,7 @@ class SeedGraph {
     
     const KmerModel &model_;
     const NanoFMI &fmi_;
-    const NormParams &norm_params_;
+    NormParams norm_params_;
     unsigned int seed_length_, cur_event_, max_stays_;
 
     Event prev_event_;
@@ -88,7 +96,14 @@ class SeedGraph {
               double stay_prob,
               double stay_frac);
 
+    SeedGraph(const KmerModel &model,
+              const NanoFMI &fmi, 
+              const AlnParams &aln_params);
+
     ~SeedGraph();
+
+    void new_read(int read_len, const NormParams &params);
+    void reset();
 
     std::vector<Result> add_event(Event e);
     void print_graph(bool verbose);
