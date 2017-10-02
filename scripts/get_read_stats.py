@@ -64,13 +64,6 @@ if __name__ == "__main__":
 
                 event_info.append(SKIP)
 
-                print p_kmer
-                e1 = model.get_norm_vals(model.kmer_to_i(p_kmer))
-                e2 = model.get_norm_vals(model.kmer_to_i(s_kmer))
-                e3 = model.get_norm_vals(model.kmer_to_i(kmer))
-
-                print "%s   %.2f %.2f\n %s  %.2f %.2f\n  %s %.2f %.2f" % (p_kmer, e1[0], e1[1], s_kmer, e2[0], e2[1], kmer, e3[0], e3[1])
-
                 if p_length != None:
                     #skip_lens.append( max((length, p_length)) )    
                     skip_lens.append((p_length + length) / 2)    
@@ -90,16 +83,19 @@ if __name__ == "__main__":
 
 
         avg_skip = sum(skip_lens) / len(skip_lens)
+        std_skip = np.std(skip_lens)
         avg_stay = sum(stay_lens) / len(stay_lens)
+        std_stay = np.std(stay_lens)
         avg_match = sum(match_lens) / len(match_lens)
+        std_match = np.std(match_lens)
 
         sk_ratio = avg_skip - avg_match
 
-        out = "%d\t%.2f\t%.2f\t%.2f\t%.2f" % (len(event_info), avg_match, avg_stay, avg_skip, avg_skip-avg_match) 
+        out = "%d\t%.2f (%.2f)\t%.2f (%.2f)\t%.2f (%.2f)\t%.2f" % (len(event_info), avg_match, std_match, avg_stay, std_stay, avg_skip, std_skip, avg_skip-avg_match) 
         for sc in skip_counts:
             out += "\t%.1f%%" % (100.0 * sc / len(event_info))
 
-        #print out
+        print out
 
         sys.stdout.flush()
 
