@@ -7,16 +7,17 @@
 
 class ReadAln {
     public:
-    int ref_st_, evt_st_,
+    Range ref_st_;
+    int evt_st_,
         ref_en_, evt_en_,
-        prev_len_, total_len_;
+        total_len_;
 
-    ReadAln(int ref_en, int evt_en, int len);
+    ReadAln(Range ref_en, int evt_en);
     ReadAln(const ReadAln &r);
     ReadAln();
     int ref_start_base() const;
     void update_next(ReadAln &new_loc) const;
-    void print() const;
+    void print(bool print_all) const;
 
     friend bool operator< (const ReadAln &q1, const ReadAln &q2);
 };

@@ -3,65 +3,66 @@
 #include <iostream>
 #include <set>
 
+//#define DEBUG
+
 ReadAln::ReadAln() {
 }
 
-ReadAln::ReadAln(int ref_en, int evt_en, int len)
+ReadAln::ReadAln(Range ref_en, int evt_en)
     : ref_st_(ref_en),
       evt_st_(evt_en),
-      ref_en_(ref_en),
+      ref_en_(ref_en.end_),
       evt_en_(evt_en),
-      prev_len_(len), 
-      total_len_(len) {}
+      total_len_(ref_en.length()) {}
 
 ReadAln::ReadAln(const ReadAln &r)
     : ref_st_(r.ref_st_),
       evt_st_(r.evt_st_),
       ref_en_(r.ref_en_),
       evt_en_(r.evt_en_),
-      prev_len_(r.prev_len_), 
       total_len_(r.total_len_) {}
 
-int ReadAln::ref_start_base() const {
-    return ref_st_ - prev_len_;
-}
 
 void ReadAln::update_next(ReadAln &new_loc) const {
     new_loc.ref_en_ = ref_en_;
     new_loc.evt_en_ = evt_en_;
 
-    if (new_loc.ref_start_base() < ref_start_base()) {
-        if (new_loc.ref_st_ >= ref_start_base()) {
+    if (ref_st_.intersects(new_loc.ref_st_)) {
 
+        if (new_loc.ref_st_.start_ < ref_st_.start_) {
             new_loc.total_len_ 
                 = total_len_ + 
-                  ref_start_base() - 
-                  new_loc.ref_start_base();
-
+                  ref_st_.start_ - 
+                  new_loc.ref_st_.start_;
         } else {
-            new_loc.total_len_ += total_len_;
+            new_loc.total_len_ = total_len_;
+            new_loc.ref_st_.start_ = ref_st_.start_;
         }
     } else {
-        new_loc.total_len_ = total_len_;
+        new_loc.total_len_ += total_len_;
     }
 
 }
 
-void ReadAln::print() const {
-    std::cout << total_len_ << " " 
-              << ref_st_ << "-" << ref_en_ << " " 
+void ReadAln::print(bool print_all = false) const {
+    std::cout << total_len_ << " ";
+
+    if (print_all ) {
+        std::cout << ref_st_.start_ << ":";
+    }
+
+    std::cout << ref_st_.end_ << "-" << ref_en_ << " " 
               << evt_st_ << "-" << evt_en_ << "\n";
 }
 
 bool operator< (const ReadAln &r1, const ReadAln &r2) {
-    if (r1.ref_st_ != r2.ref_st_)
-        return r1.ref_st_ < r2.ref_st_;
+    if (r1.ref_st_.end_ != r2.ref_st_.end_)
+        return r1.ref_st_.end_ < r2.ref_st_.end_;
 
     return r1.evt_st_ < r2.evt_st_;
 }
 
 SeedTracker::SeedTracker() {
-
 }
 
 int SeedTracker::add_seeds(const std::vector<Result> &seeds) {
@@ -71,7 +72,7 @@ int SeedTracker::add_seeds(const std::vector<Result> &seeds) {
 }
 
 int SeedTracker::add_seed(Result r) {
-    ReadAln new_loc(r.ref_range_.end_, r.read_range_.end_, r.ref_range_.length());
+    ReadAln new_loc(r.ref_range_, r.read_range_.end_);
 
     auto loc = locations.lower_bound(new_loc),
          loc_match = locations.end();
@@ -80,9 +81,15 @@ int SeedTracker::add_seed(Result r) {
         bool higher_sup = loc_match == locations.end() 
                        || loc_match->total_len_ < loc->total_len_,
              
-             in_range = loc->ref_st_ >= new_loc.ref_st_
-                        && loc->ref_st_ - loc->evt_st_
-                           <= new_loc.ref_st_ - new_loc.evt_st_ + 2;
+             in_range = loc->ref_st_.end_ >= new_loc.ref_st_.end_
+                        && loc->ref_st_.end_ - loc->evt_st_
+                           <= new_loc.ref_st_.end_ - new_loc.evt_st_ + 6;
+
+        //std::cout << (loc->ref_st_.end_ >= new_loc.ref_st_.end_) << " " 
+        //          << loc->ref_st_.end_ - loc->evt_st_ << " "
+        //          << new_loc.ref_st_.end_ - new_loc.evt_st_ << " "
+        //          << higher_sup << "\n";
+        //loc->print();
 
         if (higher_sup && in_range) {
             loc_match = loc;
@@ -98,14 +105,22 @@ int SeedTracker::add_seed(Result r) {
         loc_match->update_next(new_loc);
         locations.erase(loc_match);
         locations.insert(new_loc);
-        //new_loc.print();
+
+        #ifdef DEBUG
+        new_loc.print(true);
+        #endif
 
     } else if (loc_match == locations.end()) {
         locations.insert(new_loc);
-        //new_loc.print();
+
+        #ifdef DEBUG
+        new_loc.print(true);
+        #endif
     }
 
     //std::cerr << new_loc.ref_en_ << " " << r.ref_range_.length() << "\n";
+
+    
 
     return new_loc.ref_en_;
 }
@@ -128,9 +143,10 @@ std::vector<ReadAln> SeedTracker::get_alignments(int min_len = 1) {
 }
 
 void SeedTracker::print(std::string &strand) {
-    for (auto l = locations.begin(); l != locations.end(); l++) {
-        std::cout << strand << " ";
-        l->print();
+    std::vector<ReadAln> alns = get_alignments(1);
+    for (int i = 0; i < alns.size(); i++) {
+        std::cout << strand << "\t";
+        alns[i].print();
     }
 }
 

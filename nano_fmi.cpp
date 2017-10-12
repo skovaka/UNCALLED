@@ -190,8 +190,10 @@ Range::Range(int start, int end) : start_(start), end_(end) {}
 Range::Range() : start_(1), end_(0) {}
 
 bool Range::intersects(const Range &q) const {
-    return (start_ >= q.start_ && start_ <= q.end_) ||
-           (end_ >= q.start_ && end_ <= q.end_);
+    return !(start_ > q.end_ || end_ < q.start_) &&
+           !(q.start_ > end_ || q.end_ < start_);
+    //return (start_ >= q.start_ && start_ <= q.end_) ||
+    //       (end_ >= q.start_ && end_ <= q.end_);
 }
 
 int Range::length() const {

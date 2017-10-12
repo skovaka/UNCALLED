@@ -10,13 +10,17 @@
 class Result {
     public:
 
-    Result(int read_start, int seed_len, double prob, int ref_start = 0, int ref_end = 0);
+    Result(int read_start, 
+           int seed_len, 
+           double prob, 
+           int ref_start = 0, 
+           int ref_end = 0);
 
     void set_ref_range(int start, int end);
     void print();
 
     Range read_range_, ref_range_;
-    double prob_;
+    double seed_prob_;
 
     #ifdef DEBUG_PROB
     double min_evt_prob_;
@@ -24,11 +28,11 @@ class Result {
 };
 
 struct AlnParams {
-     int seed_len;
-     double event_prob,
-            seed_prob,
-            stay_prob,
-            stay_frac;
+    int seed_len;
+    double min_event_prob,
+            min_seed_prob,
+            min_stay_prob,
+            max_stay_frac;
 };
 
 
@@ -36,23 +40,29 @@ class SeedGraph {
 
     class Node {
         public:
-        int max_length_, stay_count_;
+
+        enum Type { MATCH, STAY, SKIP, IGNORE };
+
+        int length_, 
+            stay_count_,
+            skip_count_,
+            ignore_count_;
         mer_id kmer_;
-        double prob_;
+        double event_prob_, seed_prob_;
 
         #ifdef DEBUG_PROB
         double min_evt_prob_;
         double min_stay_prob_;
         #endif
 
-        std::list< std::pair<Node *, bool> > parents_;
+        std::list< std::pair<Node *, Type> > parents_;
         std::list<Node *> children_;
     
         //Source constructor
         Node(mer_id kmer, double prob);
 
         //Child constructor
-        Node(Node *parent, mer_id kmer, double prob, bool stay);
+        Node(Node *parent, mer_id kmer, double prob, Type type);
 
         //Creates invalid node
         Node();
@@ -60,13 +70,23 @@ class SeedGraph {
         //Copy constructor
         Node(const Node &s);
 
+        void replace_info(const Node &node);
+        void update_info();
+        bool better_than(const Node *node); //TODO: this is a terrible name
+        bool should_report(double min_prob, int max_stays);
+
+        int seed_len();
+        int match_len();
         bool is_valid();
+
         
         void invalidate(std::vector<Node *> *old_nodes, bool delete_source);
         bool remove_child(Node *child);
         
         int add_child(Node *child);
     };
+    typedef std::pair<Node *, Node::Type> parent_ptr;
+
 
     public:
 
@@ -80,25 +100,28 @@ class SeedGraph {
     const NanoFMI &fmi_;
     NormParams norm_params_;
     unsigned int seed_length_, cur_event_, max_stays_;
+    std::string label_;
 
     Event prev_event_;
 
-    double event_prob_,
-           seed_prob_,
-           stay_prob_;
+    double min_event_prob_,
+           min_seed_prob_,
+           min_stay_prob_;
     
     SeedGraph(const KmerModel &model,
               const NanoFMI &fmi, 
               const NormParams &norm_params, 
               int seed_len, int read_len,
-              double event_prob,
-              double seed_prob,
-              double stay_prob,
-              double stay_frac);
+              double min_event_prob,
+              double min_seed_prob,
+              double min_stay_prob,
+              double max_stay_frac,
+              const std::string &label);
 
     SeedGraph(const KmerModel &model,
               const NanoFMI &fmi, 
-              const AlnParams &aln_params);
+              const AlnParams &aln_params,
+              const std::string &label);
 
     ~SeedGraph();
 
@@ -120,7 +143,6 @@ class SeedGraph {
 
 
 
-    typedef std::pair<Node *, bool> parent_ptr;
 };
 
 

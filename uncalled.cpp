@@ -109,8 +109,8 @@ int main(int argc, char** argv) {
                             stay_prob_thr,
                             stay_frac};
 
-    SeedGraph rev_sg(model, rev_fmi, aln_params),
-              fwd_sg(model, fwd_fmi, aln_params);
+    SeedGraph rev_sg(model, rev_fmi, aln_params, "rev"),
+              fwd_sg(model, fwd_fmi, aln_params, "fwd");
 
     std::ifstream reads_file(reads_filename);
 
@@ -119,41 +119,75 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::string read_filename;
+    std::string read_line, read_filename;
 
-    while (getline(reads_file, read_filename)) {
+
+    while (getline(reads_file, read_line)) {
+
+        int aln_st = 0, aln_en = -1;
+
+        int i = read_line.find("\t");
+
+        if (i == std::string::npos) {
+            read_filename = read_line;
+        } else {
+            read_filename = read_line.substr(0, i);
+
+            int j = read_line.find("\t", i+1);
+
+            if (j == std::string::npos) {
+                aln_st = atoi(read_line.substr(i+1).c_str());
+            } else {
+                aln_st = atoi(read_line.substr(i+1, j).c_str());
+                aln_en = atoi(read_line.substr(j+1).c_str());
+            }
+        }
+            
+
         std::vector<Event> events;
-
         
         if (!get_events(read_filename, events)) {
             continue;
         }
 
+        if (aln_en < aln_st) {
+            aln_en = events.size() - 1;
+        }
+
         NormParams norm = model.get_norm_params(events);
 
-        fwd_sg.new_read(events.size(), norm);
-        rev_sg.new_read(events.size(), norm);
+        std::cerr << "NORM: " << norm.scale << " " << norm.shift << "\n";
+
+        int aln_len = aln_en - aln_st + 1;
+
+        fwd_sg.new_read(aln_len, norm);
+        rev_sg.new_read(aln_len, norm);
 
         SeedTracker fwd_tracker, rev_tracker;
 
         Timer timer;
         
         std::cout << "== " << read_filename << " ==\n";
-        std::cout << "== " << events.size() << " events ==\n";
+        std::cout << "== aligning " 
+                  << aln_st << "-" 
+                  << aln_en << " of " 
+                  << events.size() << " events ==\n";
 
         std::cerr << read_filename << "\n";
 
-        int status_step = events.size() / 10,
+        int status_step = aln_len / 10,
             status = 0;
 
-        for (int i = events.size()-1; i >= seed_len; i--) {
+        for (int i = aln_en; i >= aln_st; i--) {
             std::vector<Result> fwd_seeds = fwd_sg.add_event(events[i]),
                                 rev_seeds = rev_sg.add_event(events[i]);
             fwd_tracker.add_seeds(fwd_seeds);
             rev_tracker.add_seeds(rev_seeds);
 
+            //std::cout << events[i].mean << " " << events[i].stdv << "\n";
+
             if (status == status_step) {
-                int prog = (int) ((100.0 * (events.size() - i)) / events.size());
+                int prog = (int) ((100.0 * (aln_len - i)) / aln_len);
                 std::cerr << prog << "%  (" << timer.get() / 1000 << ")\n";
                 status = 0;
             } else {
@@ -163,18 +197,18 @@ int main(int argc, char** argv) {
         std::cerr << "100% (" << timer.get() / 1000 << ")\n";
 
 
-        std::vector<ReadAln> fwd_alns = fwd_tracker.get_alignments(1),
-                             rev_alns = rev_tracker.get_alignments(1);
+        //std::vector<ReadAln> fwd_alns = fwd_tracker.get_alignments(1),
+        //                     rev_alns = rev_tracker.get_alignments(1);
 
-        for (int i = 0; i < fwd_alns.size(); i++) {
-            std::cout << "fwd ";
-            fwd_alns[i].print();
-        }
+        //for (int i = 0; i < fwd_alns.size(); i++) {
+        //    std::cout << "fwd ";
+        //    fwd_alns[i].print();
+        //}
 
-        for (int i = 0; i < rev_alns.size(); i++) {
-            std::cout << "rev ";
-            rev_alns[i].print();
-        }
+        //for (int i = 0; i < rev_alns.size(); i++) {
+        //    std::cout << "rev ";
+        //    rev_alns[i].print();
+        //}
 
         std::cout << "== " << timer.lap() / 1000 << " sec ==\n";
     }

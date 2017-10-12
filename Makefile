@@ -4,14 +4,13 @@ BOOST_INCLUDE=-I/cm/local/apps/boost/1.58.0/include
 HDF5_INCLUDE=-I/cm/shared/apps/hdf5/1.8.17/include
 CC=g++
 CFLAGS=-Wall -std=c++11 -O3
-INCLUDE=-I./src/fast5/src -I./src ${BOOST_INCLUDE}
+INCLUDE=-I./src/fast5/src -I./src/scrappie -I./src ${BOOST_INCLUDE}
 
-
-
-all: uncalled 
+all: uncalled seed_tracker_test
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c -o $@ $^ $(INCLUDE) $(HDF5_INCLUDE) 
+
 
 #sigalign: sigalign.o nano_fmi.o kmer_model.o seed_graph.o
 #	$(CC) $(CFLAGS) nano_fmi.o kmer_model.o seed_graph.o sigalign.o -o sigalign $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
@@ -19,20 +18,9 @@ all: uncalled
 uncalled: uncalled.o nano_fmi.o kmer_model.o seed_graph.o seed_tracker.o
 	$(CC) $(CFLAGS) nano_fmi.o kmer_model.o seed_graph.o seed_tracker.o uncalled.o -o uncalled $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
 
-#seeds_to_aln: seed_tracker.o nano_fmi.o seed_graph.o
-#	$(CC) $(CFLAGS) nano_fmi.o kmer_model.o seed_graph.o seed_tracker.o -o seeds_to_aln $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
+seed_tracker_test: seed_tracker_test.o kmer_model.o seed_tracker.o seed_graph.o nano_fmi.o 
+	$(CC) $(CFLAGS) seed_tracker_test.o kmer_model.o nano_fmi.o seed_tracker.o seed_graph.o -o seed_tracker_test $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
 
-
-
-#signal_extract: signal_extract.o model_tools.o
-#	$(CC) $(CFLAGS) model_tools.o signal_extract.o -o signal_extract $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
-	
-# nano_bwt: nano_bwt.o
-#
-# 	$(CC) $(CFLAGS) nano_bwt.o -o nano_bwt $(LIBS) $(INCLUDE)
-
-# nano_bwt.o: nano_bwt.cpp
-# 	$(CC) $(CFLAGS) -c nano_bwt.cpp $(compile_opts)
 
 clean:
 	rm *.o

@@ -19,10 +19,13 @@
 
 //Source constructor
 SeedGraph::Node::Node(mer_id kmer, double prob)
-    : max_length_(1),
+    : length_(1),
       stay_count_(0),
+      skip_count_(0),
+      ignore_count_(0),
       kmer_(kmer),
-      prob_(prob)
+      event_prob_(prob),
+      seed_prob_(prob)
 
       #ifdef DEBUG_PROB
       , min_evt_prob_(prob)
@@ -32,36 +35,38 @@ SeedGraph::Node::Node(mer_id kmer, double prob)
 
 //Child constructor
 SeedGraph::Node::Node(Node *parent, mer_id kmer, 
-                            double prob, bool stay) 
-    : max_length_(parent->max_length_ + 1),
-      stay_count_(parent->stay_count_ + stay),
+                      double prob, Type type) 
+    : length_(parent->length_ + 1),
+      stay_count_(parent->stay_count_),
+      skip_count_(parent->skip_count_),
+      ignore_count_(parent->ignore_count_),
       kmer_(kmer),
-      prob_(parent->prob_ + prob) {
+      event_prob_(prob),
+      seed_prob_(parent->seed_prob_ + prob) {
 
-    #ifdef DEBUG_PROB
-    if (parent->min_evt_prob_ < prob) {
-        min_evt_prob_ = parent->min_evt_prob_;
-    } else {
-        min_evt_prob_ = prob;
-    }
-    #endif
-
-    parents_.push_front(parent_ptr(parent, stay));
+    parents_.push_front(parent_ptr(parent, type));
+    update_info();
 }
 
 //Creates invalid node
 SeedGraph::Node::Node()
-    : max_length_(0),
+    : length_(0),
       stay_count_(0),
+      skip_count_(0),
+      ignore_count_(0),
       kmer_(0),
-      prob_(0) {}
+      event_prob_(0),
+      seed_prob_(0) {}
 
 //Copy constructor
 SeedGraph::Node::Node(const Node &s)
-    : max_length_(s.max_length_),
+    : length_(s.length_),
       stay_count_(s.stay_count_),
+      skip_count_(s.stay_count_),
+      ignore_count_(s.ignore_count_),
       kmer_(s.kmer_),
-      prob_(s.prob_),
+      event_prob_(s.event_prob_),
+      seed_prob_(s.seed_prob_),
 
       #ifdef DEBUG_PROB
       min_evt_prob_(s.min_evt_prob_),
@@ -71,7 +76,27 @@ SeedGraph::Node::Node(const Node &s)
       children_(s.children_) {}
     
 bool SeedGraph::Node::is_valid() {
-    return max_length_ > 0;
+    return length_ > 0;
+}
+
+int SeedGraph::Node::seed_len() {
+    return length_;
+}
+
+int SeedGraph::Node::match_len() {
+    return seed_len() - stay_count_ - ignore_count_ + skip_count_;
+}
+
+bool SeedGraph::Node::better_than(const Node *node) {
+    return node->ignore_count_ > ignore_count_ ||
+            (node->ignore_count_ == ignore_count_ && 
+             node->seed_prob_ < seed_prob_);
+}
+
+bool SeedGraph::Node::should_report(double min_prob, int max_stays) {
+    return parents_.front().second == Node::Type::MATCH && 
+           stay_count_ <= max_stays && 
+           seed_prob_ >= min_prob*length_;
 }
 
 void SeedGraph::Node::invalidate(std::vector<Node *> *old_nodes, 
@@ -97,9 +122,72 @@ void SeedGraph::Node::invalidate(std::vector<Node *> *old_nodes,
         n->parents_.clear();
         n->children_.clear();
 
-        n->max_length_ = n->stay_count_ = n->prob_ = 0;
+        n->length_ = n->stay_count_ = n->seed_prob_ = 0;
     }
 }
+
+void SeedGraph::Node::replace_info(const Node &node) {
+    length_ = node.length_;
+
+    event_prob_ = node.event_prob_;
+    seed_prob_ = node.seed_prob_;
+
+    stay_count_ = node.stay_count_;
+    skip_count_ = node.skip_count_;
+    ignore_count_ = node.ignore_count_;
+
+    #ifdef DEBUG_PROB
+    dup_node->min_evt_prob_ = node.min_evt_prob_;
+    #endif
+}
+
+void SeedGraph::Node::update_info() {
+    if (parents_.empty()) {
+        seed_prob_ = event_prob_;
+        stay_count_ = 
+        skip_count_ =
+        ignore_count_ = 0;
+
+        #ifdef DEBUG_PROB
+        min_evt_prob_ = seed_prob_;
+        #endif
+
+        return;
+    }
+
+    const parent_ptr &parent = parents_.front();
+    
+    seed_prob_    = parent.first->seed_prob_ + event_prob_;
+
+    stay_count_   = parent.first->stay_count_;
+    skip_count_   = parent.first->skip_count_;
+    ignore_count_ = parent.first->ignore_count_;
+
+    switch(parent.second) {
+        case Type::STAY:
+        stay_count_++;
+        break;
+
+        case Type::SKIP:
+        skip_count_++;
+        break;
+
+        case Type::IGNORE:
+        ignore_count_++;
+
+        default:
+            break;
+    }
+
+    #ifdef DEBUG_PROB
+    if (parent.first->min_evt_prob_ < event_prob_) {
+        min_evt_prob_ = parent.first->min_evt_prob_;
+    } else {
+        min_evt_prob_ = event_prob_;
+    }
+    #endif
+}
+
 
 //Returns true if this node should be pruned
 //If should_invalidate = false, will always return false
@@ -120,36 +208,41 @@ bool SeedGraph::Node::remove_child(Node *child) {
     return false;
 }
 
+
+
 SeedGraph::SeedGraph(const KmerModel &model,
                      const NanoFMI &fmi, 
                      const NormParams &norm_params, 
                      int seed_len, int read_len,
-                     double event_prob,
-                     double seed_prob,
-                     double stay_prob,
-                     double stay_frac)
+                     double min_event_prob,
+                     double min_seed_prob,
+                     double min_stay_prob,
+                     double max_stay_frac,
+                     const std::string &label)
     : model_(model),
       fmi_(fmi),
       norm_params_(norm_params),
       seed_length_(seed_len),
       cur_event_(read_len), 
-      max_stays_( (int) (stay_frac * seed_len) ),
+      max_stays_( (int) (max_stay_frac * seed_len) ),
       prev_event_({0, 0, 0}),
-      event_prob_(event_prob),
-      seed_prob_(seed_prob),
-      stay_prob_(stay_prob) {
+      min_event_prob_(min_event_prob),
+      min_seed_prob_(min_seed_prob),
+      min_stay_prob_(min_stay_prob) {
 }
 
 SeedGraph::SeedGraph(const KmerModel &model,
                      const NanoFMI &fmi, 
-                     const AlnParams &gp)
+                     const AlnParams &gp,
+                     const std::string &label)
     : model_(model),
       fmi_(fmi),
       seed_length_(gp.seed_len),
-      max_stays_( (int) (gp.stay_frac * gp.seed_len) ),
-      event_prob_(gp.event_prob),
-      seed_prob_(gp.seed_prob),
-      stay_prob_(gp.stay_prob) {
+      max_stays_( (int) (gp.max_stay_frac * gp.seed_len) ),
+      min_event_prob_(gp.min_event_prob),
+      min_seed_prob_(gp.min_seed_prob),
+      min_stay_prob_(gp.min_stay_prob),
+      label_(label) {
 }
 
 SeedGraph::~SeedGraph() {
@@ -199,7 +292,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
 
     double cur_stay_prob = model_.get_stay_prob(e, prev_event_);
 
-    bool stay = cur_stay_prob >= stay_prob_;
+    bool stay = true;//cur_stay_prob >= min_stay_prob_;
 
     //Update event index
     cur_event_--;
@@ -217,6 +310,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
     //Where this event's sources will be stored
     sources_.push_front(std::list<Node *>());
     
+    bool event_skipped = false;
 
     double prob;
 
@@ -229,8 +323,19 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         int prev_kmer = prev_node->kmer_;
         prob = kmer_probs[prev_kmer];
         
-        if (stay && prob >= event_prob_) {
-            Node next_node(prev_node, prev_kmer, prob, true);
+        int neighbor_count = 0;
+
+        double evt_thresh = min_event_prob_;
+
+        if (prev_node->seed_len() >= seed_length_ * 0.75) {
+            evt_thresh = -10;
+        }
+
+        if (stay && prob >= evt_thresh) {
+            neighbor_count += 1;
+
+            Node next_node(prev_node, prev_kmer, prob, Node::Type::STAY);
+
             add_child(prev_range, next_node);
         }
         
@@ -238,27 +343,64 @@ std::vector<Result> SeedGraph::add_event(Event e) {
         auto neighbor_itr = model_.get_neighbors(prev_kmer);
         std::list<mer_id> next_kmers;
 
-        for (auto n = neighbor_itr.first; n != neighbor_itr.second; n++) 
-            if(kmer_probs[*n] >= event_prob_) 
+        for (auto n = neighbor_itr.first; 
+             n != neighbor_itr.second; n++) {
+
+
+            if(kmer_probs[*n] >= evt_thresh) {
                 next_kmers.push_back(*n);
+            } // else {
+            //    std::cout << cur_event_ << " " 
+            //              << *n << " " 
+            //              << kmer_probs[*n] << "\n";
+            //}
+        }
 
         //Find ranges FM index for those next kmers
         std::list<Range> next_ranges = fmi_.get_neigbhors(prev_range, next_kmers);
+
             
         auto next_kmer = next_kmers.begin(); 
         auto next_range = next_ranges.begin();
         
+
         //Add all the neighbors that were found
         while (next_kmer != next_kmers.end()) {
             prob = kmer_probs[*next_kmer];
 
-            Node next_node(prev_node, *next_kmer, prob, false);
+            neighbor_count += next_range->is_valid();
+
+            //std::cout << next_range->start_ << " " << next_range->end_ << "\n";
+            Node next_node(prev_node, *next_kmer, prob, Node::Type::MATCH);
             add_child(*next_range, next_node);
+
+            //if (added != NULL) {
+            //    DEBUG("sr " << next_node.length_ << " " 
+            //          << next_range->length() << "\n");
+            //}
 
             next_kmer++; 
             next_range++;
         }
 
+        if (neighbor_count < 2 && 
+            //prev_node->seed_len() >= seed_length_ * 0.75 &&
+            prev_node->seed_len() == seed_length_ - 1 &&
+            prev_range.length() == 1 &&
+            prev_node->ignore_count_ < 6) {
+            
+
+
+            prob = prev_node->seed_prob_ / prev_node->length_;
+            //prob = (*std::next(event_kmer_probs_.begin()))[prev_kmer];
+            
+            Node next_node(prev_node, prev_kmer, prob, Node::Type::IGNORE);
+            add_child(prev_range, next_node);
+            //std::cout << "IGNORE " 
+            //          << cur_event_ << " " 
+            //          << prob << "\n";
+
+        }
     }
 
     //DEBUG(t.lap() << "\t");
@@ -266,7 +408,7 @@ std::vector<Result> SeedGraph::add_event(Event e) {
     //Find sources
     for (mer_id kmer = 0; kmer < model_.kmer_count(); kmer++) {
         prob = kmer_probs[kmer];
-        if (prob >= event_prob_) {
+        if (prob >= min_event_prob_) {
             Range next_range = fmi_.get_full_range(kmer);
 
             if (next_range.is_valid()) {
@@ -336,7 +478,7 @@ int SeedGraph::add_sources(const Range &range, const Node &node) {
             old_nodes_.pop_back();
         }
 
-        sources_.front().push_back(next_nodes_[range]); //TODO: store node, no double query
+        sources_.front().push_back(next_nodes_[range]);
         return 1;
     }
     
@@ -383,7 +525,7 @@ int SeedGraph::add_sources(const Range &range, const Node &node) {
 
 SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
     
-    if (!node.is_valid()) {
+    if (!node.is_valid() || !range.is_valid()) {
         return NULL;
     }
     
@@ -421,16 +563,10 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
     auto dup_parent = dup_node->parents_.begin(); 
 
     //This node is for a longer seed
-    if (dup_node->max_length_ < node.max_length_) {
+    if (dup_node->seed_len() < node.seed_len()) {
 
         //Copy seed info
-        dup_node->max_length_ = node.max_length_;
-        dup_node->stay_count_ = node.stay_count_;
-        dup_node->prob_ = node.prob_;
-
-        #ifdef DEBUG_PROB
-        dup_node->min_evt_prob_ = node.min_evt_prob_;
-        #endif
+        dup_node->replace_info(node);
 
         //Update parents and children
         dup_node->parents_.push_front(new_parent);
@@ -439,9 +575,12 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
         //No new nodes created
         return dup_node;
 
-    } else if (dup_node->max_length_ == node.max_length_) {
+    } else if (dup_node->seed_len() == node.seed_len()) {
 
-        if (dup_node->prob_ < node.prob_) {
+        if(node.better_than(dup_node)) {
+        //if ( dup_node->ignore_count_ > node.ignore_count_ 
+        //    || (dup_node->ignore_count_ == node.ignore_count_ && 
+        //        dup_node->seed_prob_ < node.seed_prob_)) {
 
             //If dup_parent has no children in the end, will be invalidated (in add_event)
             dup_parent->first->remove_child(dup_node);
@@ -450,13 +589,7 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
             dup_node->parents_.erase(dup_parent);
 
             //Copy seed info
-            dup_node->max_length_ = node.max_length_;
-            dup_node->stay_count_ = node.stay_count_;
-            dup_node->prob_ = node.prob_;
-
-            #ifdef DEBUG_PROB
-            dup_node->min_evt_prob_ = node.min_evt_prob_;
-            #endif
+            dup_node->replace_info(node);
 
             //Insert new parent in old parent's place
             dup_node->parents_.push_front(new_parent);
@@ -470,12 +603,12 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
     while (dup_parent != dup_node->parents_.end()) {
 
         //dup_parent is a longer seed
-        if (new_parent.first->max_length_ < dup_parent->first->max_length_) {
+        if (new_parent.first->seed_len() < dup_parent->first->seed_len()) {
             dup_parent++;
             continue; //not breaking yet
 
         //dup_parent is the longest branch shorter than new_parent
-        } else if (new_parent.first->max_length_ > dup_parent->first->max_length_)  {
+        } else if (new_parent.first->seed_len() > dup_parent->first->seed_len())  {
             
             //Add parent in the correct location
             dup_node->parents_.insert(dup_parent, new_parent);
@@ -484,7 +617,7 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
         //dup_parent is same length as new_parent
 
         //and new node has higher probability
-        } else if (new_parent.first->prob_ > dup_parent->first->prob_) {
+        } else if (new_parent.first->better_than(dup_parent->first)) {
 
             //If dup_parent has no children in the end, will be invalidated (in add_event)
             dup_parent->first->remove_child(dup_node);
@@ -541,7 +674,7 @@ std::vector<Result> SeedGraph::pop_seeds() {
             to_visit.push_back(*c);
         }
         
-        double prev_len = aln_en->max_length_;
+        double prev_len = aln_en->seed_len();
         auto kmer_probs = event_kmer_probs_.rbegin();
 
         while (!to_visit.empty()) {
@@ -550,8 +683,8 @@ std::vector<Result> SeedGraph::pop_seeds() {
             Node *n = to_visit.front();
             to_visit.pop_front();
 
-            if (n->max_length_ != prev_len) {
-                prev_len = n->max_length_;
+            if (n->seed_len() != prev_len) {
+                prev_len = n->seed_len();
                 kmer_probs++;
             }
 
@@ -561,11 +694,12 @@ std::vector<Result> SeedGraph::pop_seeds() {
                      next_parent = std::next(seed_parent); //seed with closest length
 
                 //Parents now have the same length
-                if (seed_parent->first->max_length_ == next_parent->first->max_length_) {
+                if (seed_parent->first->seed_len() == next_parent->first->seed_len()) {
                     Node *to_erase;
 
                     //Erase where we came from
-                    if (seed_parent->first->prob_ < next_parent->first->prob_) {
+                    if (next_parent->first->better_than(seed_parent->first)) {
+                    //if (seed_parent->first->seed_prob_ < next_parent->first->seed_prob_) {
                         to_erase = seed_parent->first; 
                         n->parents_.erase(seed_parent);
 
@@ -583,34 +717,27 @@ std::vector<Result> SeedGraph::pop_seeds() {
 
             }
 
-            if (n->max_length_ == seed_length_) {
-                if (n->stay_count_ <= max_stays_ && n->prob_ >= seed_prob_*seed_length_) {
-                    
-                    //add_results(n, results);
+            if (n->seed_len() == seed_length_) {
+                if (n->should_report(min_seed_prob_, max_stays_)) {
+                //if (n->stay_count_ <= max_stays_ && 
+                //    n->seed_prob_ >= min_seed_prob_*(seed_length_)) {
 
+                    
                     Range range = prev_nodes_[n];
+                    Result r(cur_event_, seed_length_, n->seed_prob_ / n->seed_len());
 
-                    Result r(cur_event_, seed_length_, n->prob_ / n->max_length_);
-                    
                     #ifdef DEBUG_PROB
                     r.min_evt_prob_ = n->min_evt_prob_ ;
                     #endif
 
                     for (int s = range.start_; s <= range.end_; s++) {
-
-                        r.set_ref_range(fmi_.suffix_ar_[s], seed_length_ - n->stay_count_ - 1);
+                        r.set_ref_range(fmi_.suffix_ar_[s], n->match_len());
                         results.push_back(r);
 
-
+                        std::cout << label_ << "\t";
+                        r.print();
                     }
                 }
-
-                //#ifdef DEBUG_PROB
-                //else {
-                //    DEBUG("BAD: " << n->min_evt_prob_ << "\n");
-                //}
-                //#endif
-
 
             } else {
                 for (auto c = n->children_.begin(); c != n->children_.end(); c++) {
@@ -618,30 +745,10 @@ std::vector<Result> SeedGraph::pop_seeds() {
                 }
             }
 
-            n->max_length_--;
+            n->length_--;
             
-            if (!n->parents_.empty()) {
-                parent_ptr new_parent = n->parents_.front();
+            n->update_info();
 
-                n->prob_ = new_parent.first->prob_ + (*kmer_probs)[n->kmer_];
-                n->stay_count_ = new_parent.first->stay_count_ + new_parent.second;
-
-                #ifdef DEBUG_PROB
-                if (new_parent.first->min_evt_prob_ < (*kmer_probs)[n->kmer_]) {
-                    n->min_evt_prob_ = new_parent.first->min_evt_prob_;
-                } else {
-                    n->min_evt_prob_ = (*kmer_probs)[n->kmer_];
-                }
-                #endif
-
-            } else {
-                n->prob_ = (*kmer_probs)[n->kmer_];
-                n->stay_count_ = 0;
-
-                #ifdef DEBUG_PROB
-                n->min_evt_prob_ = n->prob_;
-                #endif
-            }
         }
         
         aln_ends.pop_front();
@@ -707,7 +814,7 @@ void SeedGraph::print_graph(bool verbose) {
         
         if (verbose) {
             std::cout << n << " " << event << " " 
-                      << n->max_length_ << " " 
+                      << n->seed_len() << " " 
                       << n->parents_.size();
         }
 
@@ -764,20 +871,20 @@ void SeedGraph::print_graph(bool verbose) {
 }
 
 Result::Result(int read_start, int seed_len, double prob, int ref_start, int ref_end) 
-    : read_range_( Range(read_start, read_start + seed_len) ),
+    : read_range_( Range(read_start, read_start + seed_len - 1) ),
       ref_range_(Range(ref_start, ref_end)),
-      prob_(prob) {}
+      seed_prob_(prob) {}
 
 void Result::set_ref_range(int start, int length) {
     ref_range_.start_ = start;
-    ref_range_.end_ = start+length;
+    ref_range_.end_ = start + length - 1;
 }
 
 
 void Result::print() {
     std::cout << read_range_.start_ << "-" << read_range_.end_ << "\t"
               << ref_range_.start_ << "-" << ref_range_.end_ << "\t"
-              << prob_;
+              << seed_prob_;
               
 
     #ifdef DEBUG_PROB
