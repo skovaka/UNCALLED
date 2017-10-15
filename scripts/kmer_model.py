@@ -75,7 +75,7 @@ class KmerModel:
 
         return (scale, shift)
 
-    def get_norm_vals(self, i, norm_params):
+    def get_norm_vals(self, i, norm_params=(1, 0)):
         scale, shift = norm_params
         
         norm_mean = self.lv_means[i] * scale + shift;
@@ -117,6 +117,10 @@ class KmerModel:
             i = (i << 2) | self.BASE_IDS[kmer[n]]
 
         return i
+
+    def seq_to_kmers(self, seq):
+        return [self.kmer_to_i(seq[i:i+self.k])
+                    for i in range(0, len(seq) - self.k + 1)]
 
     def reverse_comp(self, seq):
         rev = ['']*len(seq)
