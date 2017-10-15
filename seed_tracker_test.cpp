@@ -60,6 +60,8 @@ int main(int argc, char **argv) {
     }
 
     std::string s1 = "fwd", s2 = "rev";
-    fwd_tracker.print(s1);
-    rev_tracker.print(s2);
+    
+    fwd_tracker.print(s1, 5);
+    std::cout << "\n";
+    rev_tracker.print(s2, 5);
 }

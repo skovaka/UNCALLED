@@ -20,6 +20,12 @@ class Range {
 
     Range split_range(const Range &r);
 
+    Range intersect(const Range &r) const;
+
+    Range merge(const Range &r) const;
+
+    double get_recp_overlap(const Range &r) const;
+
     bool same_range(const Range &r) const;
 
     bool intersects(const Range &r) const;

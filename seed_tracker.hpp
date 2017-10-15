@@ -5,6 +5,9 @@
 #include <set>
 #include <vector>
 
+int max(int a, int b);
+int min(int a, int b);
+
 class ReadAln {
     public:
     Range ref_st_;
@@ -17,7 +20,8 @@ class ReadAln {
     ReadAln();
     int ref_start_base() const;
     void update_next(ReadAln &new_loc) const;
-    void print(bool print_all) const;
+    void print(std::ostream &out, bool newline, bool print_all) const;
+    Range ref_range() const;
 
     friend bool operator< (const ReadAln &q1, const ReadAln &q2);
 };
@@ -37,7 +41,9 @@ class SeedTracker {
 
     std::vector<ReadAln> get_alignments(int min_len);
 
-    void print(std::string &strand);
+    static double top_ratio(const std::vector<ReadAln> &alns);
+
+    void print(std::ostream &out, std::string strand, int max_out);
 };
 
 

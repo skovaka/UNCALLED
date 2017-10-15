@@ -9,113 +9,100 @@
 #include <unistd.h>
 
 #include "fast5.hpp"
+#include "arg_parse.hpp"
 #include "seed_graph.hpp"
 #include "seed_tracker.hpp"
 #include "kmer_model.hpp"
 #include "nano_fmi.hpp"
 #include "timer.h"
 
-const char *OPTIONS = "m:r:t:l:e:d:y:s:f:";
 
-const char MODEL_OPT      = 'm',
-           REFERENCE_OPT  = 'r',
-           TALLY_DIST_OPT = 't',
-           READ_LIST_OPT  = 'l',
-           EVENT_PT_OPT   = 'e',
-           SEED_PT_OPT    = 'd',
-           STAY_PT_OPT    = 'y',
-           SEED_LEN_OPT   = 's',
-           STAY_FRAC_OPT  = 'f';
+std::string FWD_STR = "fwd",
+            REV_STR = "rev";
 
 //TODO: relative paths
 const std::string MODEL_DEF = "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model";
 
-const int TALLY_DIST_DEF = 1,
-          SEED_LEN_DEF   = 32;
+bool get_events(std::ostream &err, std::string filename, std::vector<Event> &events);
 
-const double EVENT_PT_DEF  = -5.29,
-             SEED_PT_DEF   = -3.35,
-             STAY_PT_DEF   = -8.343,
-             STAY_FRAC_DEF = 0.7;
+enum Opt {MODEL       = 'm',
+          REFERENCE   = 'r',
+          READ_LIST   = 'l',
+          OUT_PREFIX     = 'o',
 
-bool get_events(std::string filename, std::vector<Event> &events);
+          TALLY_DIST  = 't',
+
+          SEED_LEN    = 's',
+          ANCHOR_LEN  = 'a',
+          STAY_FRAC   = 'y',
+          IGNORE_FRAC = 'i',
+
+          EXTEND_EVPR = 'E',
+          ANCHOR_EVPR = 'A',
+          SEED_PR     = 'S',
+          STAY_PR     = 'Y'};
 
 int main(int argc, char** argv) {
-    std::string model_filename = MODEL_DEF,
-                ref_filename = "",
-                reads_filename = "";
+    ArgParse args("UNCALLED: Utility for Nanopore Current Alignment to Large Expanses of DNA");
 
-    int tally_dist = TALLY_DIST_DEF,
-        seed_len   = SEED_LEN_DEF;  
+    args.add_string(Opt::MODEL, "model", "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model", "Nanopore kmer model");
+    args.add_string(Opt::REFERENCE,   "reference",   "",     "");
+    args.add_string(Opt::READ_LIST,   "read_list",   "",     "");
+    args.add_string(Opt::OUT_PREFIX,  "out_prefix",     ".",     "");
+    args.add_int(   Opt::TALLY_DIST,  "tally_dist",  16,     "");
+    args.add_int(   Opt::SEED_LEN,    "seed_len",    32,     "");
+    args.add_int(   Opt::ANCHOR_LEN,  "anchor_len",  24,     "");
+    args.add_double(Opt::STAY_FRAC,   "stay_frac",   0.7,    "");
+    args.add_double(Opt::IGNORE_FRAC, "ignore_frac", 0.2,    "");
+    args.add_double(Opt::EXTEND_EVPR, "extend_evpr", -5.29,  "");
+    args.add_double(Opt::ANCHOR_EVPR, "anchor_evpr", -10,    "");
+    args.add_double(Opt::SEED_PR,     "seed_pr",     -3.75,  "");
+    args.add_double(Opt::STAY_PR,     "stay_pr",     -8.343, "");
 
-    double event_prob_thr = EVENT_PT_DEF,
-           seed_prob_thr  = SEED_PT_DEF,
-           stay_prob_thr  = STAY_PT_DEF,
-           stay_frac      = STAY_FRAC_DEF;
+    args.parse_args(argc, argv);
 
-    char o;
-    while ( (o = getopt(argc, argv, OPTIONS)) != -1 ) {
-        switch (o) {
-        case MODEL_OPT:
-            model_filename = std::string(optarg);
-            break;
-        case REFERENCE_OPT:
-            ref_filename = std::string(optarg);
-            break;
-        case TALLY_DIST_OPT:
-            tally_dist = atoi(optarg);
-            break;
-        case READ_LIST_OPT:   
-            reads_filename = std::string(optarg);
-            break;
-        case EVENT_PT_OPT:
-            event_prob_thr = atof(optarg);
-            break;
-        case SEED_PT_OPT: 
-            seed_prob_thr = atof(optarg);
-            break;
-        case STAY_PT_OPT:  
-            stay_prob_thr = atof(optarg);
-            break;
-        case SEED_LEN_OPT:  
-            seed_len = atoi(optarg);
-            break;
-        case STAY_FRAC_OPT: 
-            stay_frac = atof(optarg);
-            break;
-        default:
-            std::cerr << "Error: unrecognized option '" << o << "'\n";
-            return 1;
-        }
-    }
+    std::string prefix = args.get_string(Opt::OUT_PREFIX) + args.get_param_str();
+    std::ofstream seeds_out(prefix + "_seeds.txt");
+    std::ofstream alns_out(prefix + "_aln.txt");
+    std::ofstream err_out(prefix + "_err.txt");
 
-    std::cerr << "Loading model\n";
-    KmerModel model(model_filename);
+    std::cerr << "Writing:" << "\n"
+              << prefix << "_seeds.txt" << "\n"
+              << prefix << "_aln.txt" << "\n"
+              << prefix << "_err.txt" << "\n";
 
-    std::cerr << "Parsing fasta\n";
+    err_out << "Loading model\n";
+    KmerModel model(args.get_string(Opt::MODEL));
+
+    err_out << "Parsing fasta\n";
     std::vector<mer_id> fwd_ids, rev_ids;
-    std::ifstream ref_file(ref_filename);
+    std::ifstream ref_file(args.get_string(Opt::REFERENCE));
     model.parse_fasta(ref_file, fwd_ids, rev_ids);
 
-    std::cerr << "Building forward FMI\n";
-    NanoFMI fwd_fmi(model.kmer_count(), fwd_ids, tally_dist);
+    err_out << "Building forward FMI\n";
+    NanoFMI fwd_fmi(model.kmer_count(), fwd_ids, args.get_int(Opt::TALLY_DIST));
 
-    std::cerr << "Building reverse FMI\n";
-    NanoFMI rev_fmi(model.kmer_count(), rev_ids, tally_dist);
+    err_out << "Building reverse FMI\n";
+    NanoFMI rev_fmi(model.kmer_count(), rev_ids, args.get_int(Opt::TALLY_DIST));
 
-    AlnParams aln_params = {seed_len,
-                            event_prob_thr,
-                            seed_prob_thr,
-                            stay_prob_thr,
-                            stay_frac};
+    AlnParams aln_params = {args.get_int(Opt::SEED_LEN),
+                            args.get_int(Opt::ANCHOR_LEN),
+                            args.get_double(Opt::EXTEND_EVPR),
+                            args.get_double(Opt::ANCHOR_EVPR),
+                            args.get_double(Opt::SEED_PR),
+                            args.get_double(Opt::STAY_PR),
+                            args.get_double(Opt::STAY_FRAC),
+                            args.get_double(Opt::IGNORE_FRAC)};
 
     SeedGraph rev_sg(model, rev_fmi, aln_params, "rev"),
               fwd_sg(model, fwd_fmi, aln_params, "fwd");
 
-    std::ifstream reads_file(reads_filename);
+
+    std::ifstream reads_file(args.get_string(Opt::READ_LIST));
 
     if (!reads_file) {
-        std::cerr << "Error: couldn't open '" << reads_filename << "'\n";
+        err_out << "Error: couldn't open '" 
+                  << args.get_string(Opt::READ_LIST) << "'\n";
         return 1;
     }
 
@@ -146,7 +133,7 @@ int main(int argc, char** argv) {
 
         std::vector<Event> events;
         
-        if (!get_events(read_filename, events)) {
+        if (!get_events(err_out, read_filename, events)) {
             continue;
         }
 
@@ -156,7 +143,7 @@ int main(int argc, char** argv) {
 
         NormParams norm = model.get_norm_params(events);
 
-        std::cerr << "NORM: " << norm.scale << " " << norm.shift << "\n";
+        err_out << "NORM: " << norm.scale << " " << norm.shift << "\n";
 
         int aln_len = aln_en - aln_st + 1;
 
@@ -167,58 +154,56 @@ int main(int argc, char** argv) {
 
         Timer timer;
         
-        std::cout << "== " << read_filename << " ==\n";
-        std::cout << "== aligning " 
-                  << aln_st << "-" 
-                  << aln_en << " of " 
-                  << events.size() << " events ==\n";
+        seeds_out << "== " << read_filename << " ==\n";
+        alns_out << "== " << read_filename << " ==\n";
+        alns_out << "== aligning " 
+                 << aln_st << "-" 
+                 << aln_en << " of " 
+                 << events.size() << " events ==\n";
 
-        std::cerr << read_filename << "\n";
+        err_out << read_filename << "\n";
 
         int status_step = aln_len / 10,
             status = 0;
 
         for (int i = aln_en; i >= aln_st; i--) {
-            std::vector<Result> fwd_seeds = fwd_sg.add_event(events[i]),
-                                rev_seeds = rev_sg.add_event(events[i]);
+            std::vector<Result> fwd_seeds = fwd_sg.add_event(events[i], seeds_out),
+                                rev_seeds = rev_sg.add_event(events[i], seeds_out);
             fwd_tracker.add_seeds(fwd_seeds);
             rev_tracker.add_seeds(rev_seeds);
 
-            //std::cout << events[i].mean << " " << events[i].stdv << "\n";
+            //alns_out << events[i].mean << " " << events[i].stdv << "\n";
 
             if (status == status_step) {
                 int prog = (int) ((100.0 * (aln_len - i)) / aln_len);
-                std::cerr << prog << "%  (" << timer.get() / 1000 << ")\n";
+                err_out << prog << "%  (" << timer.get() / 1000 << ")\n";
                 status = 0;
+                err_out.flush();
+                seeds_out.flush();
+                alns_out.flush();
             } else {
                 status++;
             }
         }
-        std::cerr << "100% (" << timer.get() / 1000 << ")\n";
+        err_out << "100% (" << timer.get() / 1000 << ")\n";
 
+        fwd_tracker.print(alns_out, FWD_STR, 5);
+        rev_tracker.print(alns_out, REV_STR, 5);
 
-        //std::vector<ReadAln> fwd_alns = fwd_tracker.get_alignments(1),
-        //                     rev_alns = rev_tracker.get_alignments(1);
+        err_out.flush();
+        seeds_out.flush();
+        alns_out.flush();
 
-        //for (int i = 0; i < fwd_alns.size(); i++) {
-        //    std::cout << "fwd ";
-        //    fwd_alns[i].print();
-        //}
-
-        //for (int i = 0; i < rev_alns.size(); i++) {
-        //    std::cout << "rev ";
-        //    rev_alns[i].print();
-        //}
-
-        std::cout << "== " << timer.lap() / 1000 << " sec ==\n";
+        alns_out << "== " << timer.lap() / 1000 << " sec ==\n";
+        seeds_out << "== " << timer.lap() / 1000 << " sec ==\n";
     }
 }
 
-bool get_events(std::string filename, std::vector<Event> &events) {
+bool get_events(std::ostream &err, std::string filename, std::vector<Event> &events) {
     events.clear();
 
     if (!fast5::File::is_valid_file(filename)) {
-        std::cerr << "Error: '" << filename << "' is not a valid file \n";
+        err << "Error: '" << filename << "' is not a valid file \n";
     }
 
     try {
@@ -226,11 +211,11 @@ bool get_events(std::string filename, std::vector<Event> &events) {
         file.open(filename);
         
         if (!file.is_open()) {  
-            std::cerr << "Error: unable to open '" 
+            err << "Error: unable to open '" 
                       << filename << "'\n";
 
         } else if (!file.have_eventdetection_events()) {
-            std::cerr << "Error: file '" << filename
+            err << "Error: file '" << filename
                       << "' does not contain events\n";
 
         } else {
@@ -239,7 +224,7 @@ bool get_events(std::string filename, std::vector<Event> &events) {
         }
 
     } catch (hdf5_tools::Exception& e) {
-        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
+        err << "Error: hdf5 exception '" << e.what() << "'\n";
     }
 
     return false;

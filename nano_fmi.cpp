@@ -14,6 +14,14 @@
 //#define DEBUG(s)
 #define DEBUG(s) do { std::cerr << s; } while (0)
 
+int max(int a, int b) {
+    return a > b ? a : b;
+}
+
+int min(int a, int b) {
+    return a < b ? a : b;
+}
+
 //Reads a model directly from a file and creates the FM index from the given reference
 NanoFMI::NanoFMI(int alph_size, std::vector<mer_id> &mer_seq, int tally_dist) {
 
@@ -192,8 +200,6 @@ Range::Range() : start_(1), end_(0) {}
 bool Range::intersects(const Range &q) const {
     return !(start_ > q.end_ || end_ < q.start_) &&
            !(q.start_ > end_ || q.end_ < start_);
-    //return (start_ >= q.start_ && start_ <= q.end_) ||
-    //       (end_ >= q.start_ && end_ <= q.end_);
 }
 
 int Range::length() const {
@@ -217,6 +223,30 @@ Range Range::split_range(const Range &r) {
     }
 
     return left;
+}
+
+Range Range::intersect(const Range &r) const {
+    if (!intersects(r)) {
+        return Range();
+    }
+    
+    return Range(max(start_, r.start_), min(end_, r.end_));
+}
+
+Range Range::merge(const Range &r) const {
+    if (!intersects(r)) {
+        return Range();
+    }
+
+    return Range(min(start_, r.start_), max(end_, r.end_));
+}
+
+double Range::get_recp_overlap(const Range &r) const {
+    if (!intersects(r)) {
+        return 0;
+    }
+
+    return double(intersect(r).length()) / double(merge(r).length());
 }
 
 Range& Range::operator=(const Range& prev) {

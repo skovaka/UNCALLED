@@ -38,21 +38,30 @@ void ReadAln::update_next(ReadAln &new_loc) const {
             new_loc.total_len_ = total_len_;
             new_loc.ref_st_.start_ = ref_st_.start_;
         }
+
     } else {
         new_loc.total_len_ += total_len_;
     }
 
 }
 
-void ReadAln::print(bool print_all = false) const {
-    std::cout << total_len_ << " ";
+Range ReadAln::ref_range() const {
+    return Range(ref_st_.start_, ref_en_);
+}
 
+void ReadAln::print(std::ostream &out, bool newline = false, bool print_all = false) const {
+    out << total_len_ << " ";
+
+    out << ref_st_.start_;
     if (print_all ) {
-        std::cout << ref_st_.start_ << ":";
+        std::cout << ref_st_.end_ << ":";
     }
 
-    std::cout << ref_st_.end_ << "-" << ref_en_ << " " 
-              << evt_st_ << "-" << evt_en_ << "\n";
+    out << "-" << ref_en_ << " " 
+              << evt_st_ << "-" << evt_en_;
+
+    if (newline)
+        out << "\n";
 }
 
 bool operator< (const ReadAln &r1, const ReadAln &r2) {
@@ -85,12 +94,6 @@ int SeedTracker::add_seed(Result r) {
                         && loc->ref_st_.end_ - loc->evt_st_
                            <= new_loc.ref_st_.end_ - new_loc.evt_st_ + 6;
 
-        //std::cout << (loc->ref_st_.end_ >= new_loc.ref_st_.end_) << " " 
-        //          << loc->ref_st_.end_ - loc->evt_st_ << " "
-        //          << new_loc.ref_st_.end_ - new_loc.evt_st_ << " "
-        //          << higher_sup << "\n";
-        //loc->print();
-
         if (higher_sup && in_range) {
             loc_match = loc;
         }
@@ -99,22 +102,21 @@ int SeedTracker::add_seed(Result r) {
     }
 
 
-    if (loc_match != locations.end() && 
-        new_loc.evt_st_ != loc_match->evt_st_) {
+    if (loc_match != locations.end()) {
 
         loc_match->update_next(new_loc);
         locations.erase(loc_match);
         locations.insert(new_loc);
 
         #ifdef DEBUG
-        new_loc.print(true);
+        new_loc.print(true, true);
         #endif
 
     } else if (loc_match == locations.end()) {
         locations.insert(new_loc);
 
         #ifdef DEBUG
-        new_loc.print(true);
+        new_loc.print(true, true);
         #endif
     }
 
@@ -142,72 +144,42 @@ std::vector<ReadAln> SeedTracker::get_alignments(int min_len = 1) {
     return ret;
 }
 
-void SeedTracker::print(std::string &strand) {
+double SeedTracker::top_ratio(const std::vector<ReadAln> &alns) {
+    const ReadAln &top = alns.front();
+
+    Range top_ref = top.ref_range();
+
+    int i = 1;
+    for(; i < alns.size(); i++) {
+        if (top_ref.get_recp_overlap(alns[i].ref_range()) < 0.9) {
+            break;
+        }
+    }
+
+    return double(top.total_len_) / double(alns[i].total_len_);
+
+}
+
+void SeedTracker::print(std::ostream &out, std::string strand, int max_out = 10) {
+
     std::vector<ReadAln> alns = get_alignments(1);
-    for (int i = 0; i < alns.size(); i++) {
-        std::cout << strand << "\t";
-        alns[i].print();
+
+    //std::cout << strand << " " << top_ratio(alns) << "\n";
+
+    if (alns.empty()) {
+        return;
+    }
+
+    Range top_ref = alns[0].ref_range();
+    double top_len = alns[0].total_len_;
+
+    for (int i = 0; i < min(max_out, alns.size()); i++) {
+        double overlap = top_ref.get_recp_overlap(alns[i].ref_range()),
+               len_ratio = top_len / alns[i].total_len_;
+
+        out << strand << " ";
+        alns[i].print(out, false);
+        out << "\t" << len_ratio << "\t" << overlap << "\n";
     }
 }
 
-//int main(int argc, char **argv) {
-//    
-//    std::string prev_strand, strand, evt_str, ref_str;
-//    double prob;
-//
-//    int i, evt_st, evt_en, ref_st, ref_en;
-//
-//    #ifdef DEBUG_PROB
-//    double min_evt_prob_;
-//    #endif
-//
-//    SeedTracker tracker;
-//
-//    prev_strand = "";
-//
-//    while (std::cin) {
-//
-//        std::cin >> strand;
-//        
-//        if (strand[0] == '=') {
-//            getline(std::cin, strand);
-//            strand = prev_strand;
-//            continue;
-//        }
-//
-//        std::cin >> evt_str >> ref_str >> prob;
-//
-//        #ifdef DEBUG_PROB
-//        std::cin >> min_evt_prob_;
-//        #endif
-//
-//        if (!prev_strand.empty() && prev_strand != strand) {
-//            tracker.print(prev_strand);     
-//            tracker = SeedTracker();
-//        }
-//
-//        i = evt_str.find('-');
-//        evt_st = atoi(evt_str.substr(0, i).c_str());
-//        evt_en = atoi(evt_str.substr(i + 1).c_str());
-//
-//        i = ref_str.find('-');
-//        ref_st = atoi(ref_str.substr(0, i).c_str());
-//        ref_en = atoi(ref_str.substr(i + 1).c_str());
-//
-//        Result r(evt_st, evt_en-evt_en, prob, ref_st, ref_en);
-//
-//        int ref_en = tracker.add_seed(r);
-//
-//        #ifdef DEBUG_PROB
-//        std::cerr << ref_en << "\t" << min_evt_prob_ << "\n";
-//        #endif
-//
-//        if (strand[0] != '=') {
-//            prev_strand = strand;
-//        }
-//
-//    }
-//
-//    tracker.print(prev_strand);
-//
-//}
