@@ -32,10 +32,11 @@ enum Opt {MODEL       = 'm',
 
           TALLY_DIST  = 't',
 
-          SEED_LEN    = 's',
+          MIN_SEED_LEN    = 's',
           ANCHOR_LEN  = 'a',
+          MAX_IGNORES = 'i',
+          MAX_SKIPS   = 'k',
           STAY_FRAC   = 'y',
-          IGNORE_FRAC = 'i',
 
           EXTEND_EVPR = 'E',
           ANCHOR_EVPR = 'A',
@@ -46,16 +47,17 @@ int main(int argc, char** argv) {
     ArgParse args("UNCALLED: Utility for Nanopore Current Alignment to Large Expanses of DNA");
 
     args.add_string(Opt::MODEL, "model", "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model", "Nanopore kmer model");
-    args.add_string(Opt::REFERENCE,   "reference",   "",     "");
-    args.add_string(Opt::READ_LIST,   "read_list",   "",     "");
-    args.add_string(Opt::OUT_PREFIX,  "out_prefix",     ".",     "");
-    args.add_int(   Opt::TALLY_DIST,  "tally_dist",  16,     "");
-    args.add_int(   Opt::SEED_LEN,    "seed_len",    32,     "");
-    args.add_int(   Opt::ANCHOR_LEN,  "anchor_len",  24,     "");
-    args.add_double(Opt::STAY_FRAC,   "stay_frac",   0.7,    "");
-    args.add_double(Opt::IGNORE_FRAC, "ignore_frac", 0.2,    "");
-    args.add_double(Opt::EXTEND_EVPR, "extend_evpr", -5.29,  "");
-    args.add_double(Opt::ANCHOR_EVPR, "anchor_evpr", -10,    "");
+    args.add_string(Opt::REFERENCE,   "reference",    "",     "");
+    args.add_string(Opt::READ_LIST,   "read_list",    "",     "");
+    args.add_string(Opt::OUT_PREFIX,  "out_prefix",   ".",     "");
+    args.add_int(   Opt::TALLY_DIST,  "tally_dist",   16,     "");
+    args.add_int(   Opt::MIN_SEED_LEN,"min_seed_len", 15,     "");
+    args.add_int(   Opt::ANCHOR_LEN,  "anchor_len",   12,     "");
+    args.add_int(   Opt::MAX_IGNORES, "max_ignores",  0,    "");
+    args.add_int(   Opt::MAX_SKIPS,   "max_skips",    0,    "");
+    args.add_double(Opt::STAY_FRAC,   "stay_frac",    0.5,    "");
+    args.add_double(Opt::ANCHOR_EVPR, "anchor_evpr", -3.75,    "");
+    args.add_double(Opt::EXTEND_EVPR, "extend_evpr", -10,  "");
     args.add_double(Opt::SEED_PR,     "seed_pr",     -3.75,  "");
     args.add_double(Opt::STAY_PR,     "stay_pr",     -8.343, "");
 
@@ -85,17 +87,19 @@ int main(int argc, char** argv) {
     err_out << "Building reverse FMI\n";
     NanoFMI rev_fmi(model.kmer_count(), rev_ids, args.get_int(Opt::TALLY_DIST));
 
-    AlnParams aln_params = {args.get_int(Opt::SEED_LEN),
-                            args.get_int(Opt::ANCHOR_LEN),
-                            args.get_double(Opt::EXTEND_EVPR),
-                            args.get_double(Opt::ANCHOR_EVPR),
-                            args.get_double(Opt::SEED_PR),
-                            args.get_double(Opt::STAY_PR),
-                            args.get_double(Opt::STAY_FRAC),
-                            args.get_double(Opt::IGNORE_FRAC)};
+    AlnParams aln_params(model,
+                         args.get_int(Opt::MIN_SEED_LEN),
+                         args.get_int(Opt::ANCHOR_LEN),
+                         args.get_int(Opt::MAX_IGNORES),
+                         args.get_int(Opt::MAX_SKIPS),
+                         args.get_double(Opt::STAY_FRAC),
+                         args.get_double(Opt::ANCHOR_EVPR),
+                         args.get_double(Opt::EXTEND_EVPR),
+                         args.get_double(Opt::SEED_PR),
+                         args.get_double(Opt::STAY_PR));
 
-    SeedGraph rev_sg(model, rev_fmi, aln_params, "rev"),
-              fwd_sg(model, fwd_fmi, aln_params, "fwd");
+    SeedGraph rev_sg(rev_fmi, aln_params, "rev"),
+              fwd_sg(fwd_fmi, aln_params, "fwd");
 
 
     std::ifstream reads_file(args.get_string(Opt::READ_LIST));

@@ -28,15 +28,31 @@ class Result {
     #endif
 };
 
-struct AlnParams {
-    int seed_len, anchor_len;
+class AlnParams {
+    public:
+    const KmerModel &model_;
 
-    double min_extend_evpr,
-           min_anchor_evpr,
-           min_seed_pr,
-           min_stay_pr,
-           max_stay_frac,
-           max_ignore_frac;
+    int graph_elen_, anchor_rlen_, max_ignores_, max_skips_;
+
+    double max_stay_frac_,
+           min_anchor_evpr_,
+           min_seed_pr_,
+           min_stay_pr_,
+           min_extend_evpr_;
+
+    AlnParams(const KmerModel &model,
+              int min_seed_nlen, 
+              int anchor_nlen, 
+              int max_ignores, 
+              int max_skips,
+              double max_stay_frac,
+              double min_anchor_evpr,
+              double min_extend_evpr,
+              double min_seed_pr,
+              double min_stay_pr);
+    
+    int nucl_to_events(int n);
+    int get_graph_len(int seed_nlen);
 };
 
 
@@ -94,7 +110,6 @@ class SeedGraph {
 
     public:
 
-    const KmerModel &model_;
     const NanoFMI &fmi_;
 
     AlnParams params_;
@@ -110,24 +125,7 @@ class SeedGraph {
     unsigned int cur_event_;
     Event prev_event_;
 
-    //unsigned int seed_length_, cur_event_, max_stays_;
-
-    //double min_event_prob_,
-    //       min_seed_prob_,
-    //       min_stay_prob_;
-    
-    //SeedGraph(const KmerModel &model,
-    //          const NanoFMI &fmi, 
-    //          const NormParams &norm_params, 
-    //          int seed_len, int read_len,
-    //          double min_event_prob,
-    //          double min_seed_prob,
-    //          double min_stay_prob,
-    //          double max_stay_frac,
-    //          const std::string &label);
-
-    SeedGraph(const KmerModel &model,
-              const NanoFMI &fmi, 
+    SeedGraph(const NanoFMI &fmi, 
               const AlnParams &aln_params,
               const std::string &label);
 

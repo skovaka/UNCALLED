@@ -9,10 +9,6 @@ def get_events(filename):
 
     hdf = h5py.File(os.path.abspath(filename),'r')
 
-    readnum = filename.split('_')[-2]
-    readname='R'+readnum[1:4]+'_'+readnum[4:]
-
-    #events = hdf['Analyses']['EventDetection_000']['Reads'][readname]['Events']
     reads = hdf['Analyses']['EventDetection_000']['Reads']
     
     for r in reads:

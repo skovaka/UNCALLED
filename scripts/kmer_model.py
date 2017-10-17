@@ -82,7 +82,7 @@ class KmerModel:
 
         ig_lambda = self.ig_lambda
         if not self.has_lambda:
-            ig_lambda = pow(self.sd_means[k_id], 3) / pow(self.sd_stdvs[k_id], 2);
+            ig_lambda = pow(self.sd_means[i], 3) / pow(self.sd_stdvs[i], 2);
         
         return (norm_mean, self.lv_stdvs[i], self.sd_means[i], ig_lambda)
 
