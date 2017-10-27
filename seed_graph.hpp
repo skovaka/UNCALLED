@@ -1,8 +1,9 @@
 #ifndef SEED_GRAPH_HPP
 #define SEED_GRAPH_HPP
 
-#include "nano_fmi.hpp"
+#include "kmer_fmi.hpp"
 #include "kmer_model.hpp"
+#include "timer.h"
 #include <list>
 #include <iostream>
 
@@ -110,7 +111,7 @@ class SeedGraph {
 
     public:
 
-    const NanoFMI &fmi_;
+    const KmerFMI &fmi_;
 
     AlnParams params_;
     NormParams norm_params_;
@@ -121,11 +122,13 @@ class SeedGraph {
     std::list< std::list< Node * > > sources_;
     std::list<double *> event_kmer_probs_;
     std::vector<Node *> old_nodes_;
+
+    Timer timer;
     
     unsigned int cur_event_;
     Event prev_event_;
 
-    SeedGraph(const NanoFMI &fmi, 
+    SeedGraph(const KmerFMI &fmi, 
               const AlnParams &aln_params,
               const std::string &label);
 

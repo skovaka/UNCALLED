@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include "timer.h"
 #include "seed_graph.hpp"
-#include "nano_fmi.hpp"
+#include "kmer_fmi.hpp"
 #include "boost/math/distributions/students_t.hpp"
 
 //#define DEBUG(s)
@@ -212,7 +212,7 @@ bool SeedGraph::Node::remove_child(Node *child) {
 
 
 //SeedGraph::SeedGraph(const KmerModel &model,
-//                     const NanoFMI &fmi, 
+//                     const KmerFMI &fmi, 
 //                     const NormParams &norm_params, 
 //                     int seed_len, int read_len,
 //                     double min_event_prob,
@@ -267,12 +267,13 @@ int AlnParams::get_graph_len(int seed_nlen) {
     return (nucl_to_events(seed_nlen) / (1.0 - max_stay_frac_)) + max_ignores_;
 }
 
-SeedGraph::SeedGraph(const NanoFMI &fmi, 
+SeedGraph::SeedGraph(const KmerFMI &fmi, 
                      const AlnParams &ap,
                      const std::string &label)
     : fmi_(fmi),
       params_(ap),
       label_(label) {
+    timer.reset();
 }
 
 SeedGraph::~SeedGraph() {
@@ -312,11 +313,19 @@ void SeedGraph::reset() {
          probs != event_kmer_probs_.end(); probs++) {
         delete [] *probs;
     }
+    timer.reset();
 
     event_kmer_probs_.clear();
 }
 
 std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
+    //Update event index
+    cur_event_--;
+
+    if (!params_.model_.event_valid(e)) {
+        std::cerr << "Error: event " << cur_event_
+                  << " invalid - this might cause some problems\n";
+    }
 
     //Compare this event with previous to see if it should be a stay
 
@@ -324,8 +333,6 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
 
     bool stay = true;//cur_stay_prob >= min_stay_prob_;
 
-    //Update event index
-    cur_event_--;
 
     Timer t;
 
@@ -748,7 +755,7 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
                         r.set_ref_range(fmi_.suffix_ar_[s], n->match_len());
                         results.push_back(r);
 
-                        out << label_ << "\t";
+                        out << label_ << "\t" << timer.get() << "\t";
                         r.print(out);
                     }
                 }

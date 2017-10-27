@@ -29,6 +29,8 @@ class KmerModel {
                     (neighbors_[k_id].begin(), neighbors_[k_id].end());
     }
 
+    bool event_valid(const Event &e) const;
+
     float event_match_prob(Event evt, mer_id k_id, NormParams norm) const;
 
     float get_stay_prob(Event e1, Event e2) const; 

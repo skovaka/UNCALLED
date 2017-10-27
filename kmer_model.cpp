@@ -131,6 +131,10 @@ KmerModel::~KmerModel() {
     delete [] rev_comp_ids_; 
 }
 
+bool KmerModel::event_valid(const Event &e) const {
+    return e.mean > 0 && e.stdv >= 0 && e.length > 0;
+}
+
 float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) const {
     double norm_mean = lv_means_[k_id] * norm.scale + norm.shift;
     
