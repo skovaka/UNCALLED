@@ -15,16 +15,16 @@ if __name__ == "__main__":
         for a in path:
             h = h[a]
 
-        print "-------------"
+        print ("-------------")
         if hasattr(h, "keys"):
             i = 0
             for k in h.keys():
-                print "%02d %s" % (i, k)
+                print ("%02d %s" % (i, k))
                 i += 1
         else:
             for x in h[:20]:
-                print x
-        print "-------------"
+                print (x)
+        print ("-------------")
 
         sys.stdout.write("> ")
         line = sys.stdin.readline()
@@ -40,11 +40,12 @@ if __name__ == "__main__":
             i = int(line.strip())
 
             if i < 0 or i >= len(h.keys()):
-                print "Nope"
+                print ("Nope")
                 continue
             else:
-                path.append(h.keys()[i])
+                print(list(h.keys()), i)
+                path.append(list(h.keys())[i])
         except:
-            print "Not right"
+            print ("Not right")
 
-    print 
+    print ()

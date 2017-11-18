@@ -322,14 +322,15 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
     //Update event index
     cur_event_--;
 
-    if (!params_.model_.event_valid(e)) {
-        std::cerr << "Error: event " << cur_event_
-                  << " invalid - this might cause some problems\n";
-    }
+    //if (!params_.model_.event_valid(e)) {
+    //    std::cerr << "Error: event " << cur_event_
+    //              << " invalid - this might cause some problems\n";
+    //    return std::vector<Result>();
+    //}
 
     //Compare this event with previous to see if it should be a stay
-
-    double cur_stay_prob = params_.model_.get_stay_prob(e, prev_event_);
+    //TODO: if I enable stay prob checking, need to deal with stdv = 0
+    //double cur_stay_prob = params_.model_.get_stay_prob(e, prev_event_);
 
     bool stay = true;//cur_stay_prob >= min_stay_prob_;
 
@@ -466,6 +467,8 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
     }
 
     //DEBUG(t.lap() << "\t");
+    //
+    //print_graph(true);
 
     auto r = pop_seeds(out);
 
@@ -836,7 +839,13 @@ void SeedGraph::print_graph(bool verbose) {
         if (verbose) {
             std::cout << n << " " << event << " " 
                       << n->seed_len() << " " 
-                      << n->parents_.size();
+                      << n->parents_.size() << " ";
+            
+            if (n->parents_.empty()) {
+                std::cout << -1;
+            } else {
+                std::cout << n->parents_.front().second;
+            }
         }
 
         for (auto c = n->children_.begin(); c != n->children_.end(); c++) {
