@@ -20,58 +20,18 @@
 std::string FWD_STR = "fwd",
             REV_STR = "rev";
 
-//TODO: relative paths
-const std::string MODEL_DEF = "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model";
-
-bool get_events(std::ostream &err, std::string filename, std::vector<Event> &events);
-
-enum Opt {MODEL       = 'm',
-          REFERENCE   = 'r',
-          READ_LIST   = 'l',
-          OUT_PREFIX     = 'o',
-
-          TALLY_DIST  = 't',
-
-          MIN_SEED_LEN    = 's',
-          ANCHOR_LEN  = 'a',
-          MAX_IGNORES = 'i',
-          MAX_SKIPS   = 'k',
-          STAY_FRAC   = 'y',
-
-          EXTEND_EVPR = 'E',
-          ANCHOR_EVPR = 'A',
-          SEED_PR     = 'S',
-          STAY_PR     = 'Y'};
-
-int main(int argc, char** argv) {
-    ArgParse args("UNCALLED: Utility for Nanopore Current Alignment to Large Expanses of DNA");
-
-    args.add_string(Opt::MODEL, "model", "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model", "Nanopore kmer model");
-    args.add_string(Opt::REFERENCE,   "reference",    "",     "");
-    args.add_string(Opt::READ_LIST,   "read_list",    "",     "");
-    args.add_string(Opt::OUT_PREFIX,  "out_prefix",   ".",     "");
-    args.add_int(   Opt::TALLY_DIST,  "tally_dist",   16,     "");
-    args.add_int(   Opt::MIN_SEED_LEN,"min_seed_len", 15,     "");
-    args.add_int(   Opt::ANCHOR_LEN,  "anchor_len",   12,     "");
-    args.add_int(   Opt::MAX_IGNORES, "max_ignores",  0,    "");
-    args.add_int(   Opt::MAX_SKIPS,   "max_skips",    0,    "");
-    args.add_double(Opt::STAY_FRAC,   "stay_frac",    0.5,    "");
-    args.add_double(Opt::ANCHOR_EVPR, "anchor_evpr", -3.75,    "");
-    args.add_double(Opt::EXTEND_EVPR, "extend_evpr", -10,  "");
-    args.add_double(Opt::SEED_PR,     "seed_pr",     -3.75,  "");
-    args.add_double(Opt::STAY_PR,     "stay_pr",     -8.343, "");
-
-    args.parse_args(argc, argv);
-
-    std::string prefix = args.get_string(Opt::OUT_PREFIX) + args.get_param_str();
-    std::ofstream seeds_out(prefix + "_seeds.txt");
-    std::ofstream alns_out(prefix + "_aln.txt");
-    std::ofstream err_out(prefix + "_err.txt");
-
-    std::cerr << "Writing:" << "\n"
-              << prefix << "_seeds.txt" << "\n"
-              << prefix << "_aln.txt" << "\n"
-              << prefix << "_err.txt" << "\n";
+EventAligner::EventAligner(std::string model_fname,
+                           std::stirng ref_fname,
+                           int min_seed_len,
+                           int anchor_len,
+                           int max_ignores,
+                           int max_skips,
+                           int stay_frac,
+                           int anchor_evpr,
+                           int extend_evpr,
+                           int seed_pr,
+                           int stay_pr) {
+                           
 
     err_out << "Loading model\n";
     KmerModel model(args.get_string(Opt::MODEL));

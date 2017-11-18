@@ -9,18 +9,19 @@ def get_events(filename):
 
     hdf = h5py.File(os.path.abspath(filename),'r')
 
+    readnum = filename.split('_')[-2]
+    readname='R'+readnum[1:4]+'_'+readnum[4:]
+
+    #events = hdf['Analyses']['EventDetection_000']['Reads'][readname]['Events']
     reads = hdf['Analyses']['EventDetection_000']['Reads']
     
     for r in reads:
         sys.stderr.write("Reading '%s'\n" % r)
         for start, length, mean, stdv in reads[r]['Events']:
-            yield (length, mean, stdv, start)
+            yield (mean, stdv, length)
 
 if __name__ == "__main__":
+    i = 0
     for e in get_events(sys.argv[1]):
-<<<<<<< HEAD
-        print ("%d\t%.4f\t%.4f\t%d" % ((i,)+e))
+        print "%d\t%.4f\t%.4f\t%d" % ((i,)+e)
         i += 1
-=======
-        print "%d\t%.4f\t%.4f\t%d" % e
->>>>>>> 1153dca7a4946f187366b9b3b9dfa7f29ebb5da1

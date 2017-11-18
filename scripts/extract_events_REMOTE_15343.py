@@ -18,9 +18,4 @@ def get_events(filename):
 
 if __name__ == "__main__":
     for e in get_events(sys.argv[1]):
-<<<<<<< HEAD
-        print ("%d\t%.4f\t%.4f\t%d" % ((i,)+e))
-        i += 1
-=======
         print "%d\t%.4f\t%.4f\t%d" % e
->>>>>>> 1153dca7a4946f187366b9b3b9dfa7f29ebb5da1

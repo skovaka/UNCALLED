@@ -23,7 +23,7 @@ def parse_graph(infile, print_graph):
         
         tabs = line.strip().split()
         try:
-            event, length, pcount = map(int, tabs[1:4])
+            event, length, pcount, ntype = map(int, tabs[1:5])
         except e:
             print (line.strip())
             return None
@@ -39,7 +39,7 @@ def parse_graph(infile, print_graph):
 
         graph[pid] = (event, list(), seed_node)
 
-        children = list() if len(tabs) == 4 else tabs[4:]
+        children = list() if len(tabs) == 5 else tabs[5:]
 
         for c in children:
             if not c in node_ids:
@@ -140,7 +140,7 @@ if __name__ == "__main__":
         
         draw_graph(graph, img)
         if out_prefix:
-            cv2.imwrite("%s%03d.png" % (out_prefix, count), img)
+            cv2.imwrite("%s%03d.jpg" % (out_prefix, count), img)
 
         count += 1
 

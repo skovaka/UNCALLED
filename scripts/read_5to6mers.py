@@ -15,6 +15,10 @@ def parse_events(model, events):
     #new_means = [(mean - shift) / scale for mean, _, _ in events_raw]
     new_means = [mean for mean, _, _ in events_raw]
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 1153dca7a4946f187366b9b3b9dfa7f29ebb5da1
     return [(e[0], mean, e[2], e[3]) for mean, e in zip(new_means, events)]
 
 MATCH = 0
@@ -76,7 +80,11 @@ if __name__ == "__main__":
             k3 = k1 + k2[-2]
 
             for l in range(i, j):
+<<<<<<< HEAD
                 print ("%s\t%s\t%.4f\t%.4f\t%d" % ((k3, t) + events[l][1:]))
+=======
+                print ("%s\t%s\t%.4f\t%.4f\t%d" % ((k3, "SKIP") + events[l][1:]))
+>>>>>>> 1153dca7a4946f187366b9b3b9dfa7f29ebb5da1
             skipped = k1[1:] + k2[-2:]
 
             

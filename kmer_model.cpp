@@ -131,6 +131,10 @@ KmerModel::~KmerModel() {
     delete [] rev_comp_ids_; 
 }
 
+bool KmerModel::event_valid(const Event &e) const {
+    return e.mean > 0 && e.stdv >= 0 && e.length > 0;
+}
+
 float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) const {
     double norm_mean = lv_means_[k_id] * norm.scale + norm.shift;
     
@@ -152,6 +156,9 @@ float KmerModel::get_stay_prob(Event e1, Event e2) const {
 
     if (e1.length == 0 || e2.length == 0)
         return 0;
+
+    if (e1 == e2)
+        return log(1);
 
     double var1 = e1.stdv*e1.stdv, var2 = e2.stdv*e2.stdv;
 

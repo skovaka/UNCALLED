@@ -1,5 +1,5 @@
 #include "seed_tracker.hpp"
-#include "nano_fmi.hpp"
+#include "kmer_fmi.hpp"
 #include <iostream>
 #include <set>
 
@@ -72,6 +72,12 @@ bool operator< (const ReadAln &r1, const ReadAln &r2) {
 }
 
 SeedTracker::SeedTracker() {
+    longest_seed = 0;
+}
+
+void SeedTracker::reset() {
+    locations.clear();
+    longest_seed = 0;
 }
 
 int SeedTracker::add_seeds(const std::vector<Result> &seeds) {
@@ -108,6 +114,7 @@ int SeedTracker::add_seed(Result r) {
         locations.erase(loc_match);
         locations.insert(new_loc);
 
+
         #ifdef DEBUG
         new_loc.print(true, true);
         #endif
@@ -118,6 +125,10 @@ int SeedTracker::add_seed(Result r) {
         #ifdef DEBUG
         new_loc.print(true, true);
         #endif
+    }
+
+    if (new_loc.total_len_ > longest_seed) {
+        longest_seed = new_loc.total_len_;
     }
 
     //std::cerr << new_loc.ref_en_ << " " << r.ref_range_.length() << "\n";
@@ -157,7 +168,6 @@ double SeedTracker::top_ratio(const std::vector<ReadAln> &alns) {
     }
 
     return double(top.total_len_) / double(alns[i].total_len_);
-
 }
 
 void SeedTracker::print(std::ostream &out, std::string strand, int max_out = 10) {

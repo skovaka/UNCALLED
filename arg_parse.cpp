@@ -13,6 +13,7 @@ ArgParse::~ArgParse() {
 }
 
 std::string ArgParse::get_param_str() {
+    const std::string DELIM = ".";
     std::stringstream ss;
 
     for (auto a = args_.begin(); a != args_.end(); a++) {
@@ -20,7 +21,7 @@ std::string ArgParse::get_param_str() {
         if (a->second.type != Type::STRING) {
             
             if (a != args_.begin()) {
-                ss << ":";
+                ss << DELIM;
             }
 
             ss << a->first;

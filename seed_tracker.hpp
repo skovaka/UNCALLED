@@ -34,10 +34,13 @@ class SeedTracker {
 
 
     std::set<ReadAln> locations;
+    int longest_seed;
 
     SeedTracker();
     int add_seed(Result seed);
     int add_seeds(const std::vector<Result> &seeds);
+
+    void reset();
 
     std::vector<ReadAln> get_alignments(int min_len);
 

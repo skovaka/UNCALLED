@@ -87,7 +87,12 @@ class KmerModel:
 
         ig_lambda = self.ig_lambda
         if not self.has_lambda:
+<<<<<<< HEAD
             ig_lambda = pow(self.sd_means[i], 3) / pow(self.sd_stdvs[i], 2)        
+=======
+            ig_lambda = pow(self.sd_means[i], 3) / pow(self.sd_stdvs[i], 2);
+        
+>>>>>>> 1153dca7a4946f187366b9b3b9dfa7f29ebb5da1
         return (norm_mean, self.lv_stdvs[i], self.sd_means[i], ig_lambda)
 
     def event_match_probs(self, event, k_id, norm_params):
