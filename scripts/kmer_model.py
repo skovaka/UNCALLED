@@ -21,18 +21,23 @@ class KmerModel:
                   'G': 'C', 'g': 'c',
                   'T': 'A', 't': 'a'}
 
-    def __init__(self, model_fname=MODEL_FILES[0]):
+    def __init__(self, model_fname=None, k=6):
+
+        self.lv_means = list()
+        self.lv_stdvs = list()
+        self.sd_means = list()
+        self.sd_stdvs = list()
+
+        if not model_fname:
+            self.k = k
+            self.kmer_count = 4**k
+            return
 
         model_file = open(model_fname)
         header = model_file.readline().strip().split()
         
         self.has_lambda = len(header) == 7
         self.ig_lambda = -1
-
-        self.lv_means = list()
-        self.lv_stdvs = list()
-        self.sd_means = list()
-        self.sd_stdvs = list()
         
         self.k = -1
         self.kmer_count = -1
@@ -82,8 +87,7 @@ class KmerModel:
 
         ig_lambda = self.ig_lambda
         if not self.has_lambda:
-            ig_lambda = pow(self.sd_means[k_id], 3) / pow(self.sd_stdvs[k_id], 2);
-        
+            ig_lambda = pow(self.sd_means[i], 3) / pow(self.sd_stdvs[i], 2)        
         return (norm_mean, self.lv_stdvs[i], self.sd_means[i], ig_lambda)
 
     def event_match_probs(self, event, k_id, norm_params):
@@ -122,6 +126,9 @@ class KmerModel:
         return [self.kmer_to_i(seq[i:i+self.k])
                     for i in range(0, len(seq) - self.k + 1)]
 
+    def comp(self, seq):
+        return "".join([self.BASE_COMPL[b] for b in seq])
+
     def reverse_comp(self, seq):
         rev = ['']*len(seq)
         for i in range(0, len(seq)):
@@ -131,7 +138,7 @@ class KmerModel:
 
 
 if __name__ == "__main__":
-    model = KmerModel()
+    model = KmerModel(sys.argv[1])
 
 
 

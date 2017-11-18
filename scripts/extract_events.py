@@ -23,5 +23,5 @@ def get_events(filename):
 if __name__ == "__main__":
     i = 0
     for e in get_events(sys.argv[1]):
-        print "%d\t%.4f\t%.4f\t%d" % ((i,)+e)
+        print ("%d\t%.4f\t%.4f\t%d" % ((i,)+e))
         i += 1
