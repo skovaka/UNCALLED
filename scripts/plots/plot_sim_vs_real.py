@@ -3,6 +3,7 @@ import sys, os
 path = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, path+"/..")
 
+import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as stats

@@ -6,6 +6,7 @@
 
 #include "event_detection.h"
 #include "scrappie_stdlib.h"
+#include "fast5_interface.h"
 
 typedef struct {
     int DEF_PEAK_POS;
@@ -109,6 +110,7 @@ float *compute_tstat(const double *sum, const double *sumsq,
         //  differing variance
         const float delta_mean = mean2 - mean1;
         tstat[i] = fabs(delta_mean) / sqrt(combined_var / w_lengthf);
+        //printf("%f\n", tstat[i]);
     }
 
     return tstat;
@@ -135,6 +137,17 @@ size_t *short_long_peak_detector(DetectorPtr short_detector,
     size_t peak_count = 0;
     for (size_t i = 0; i < short_detector->signal_length; i++) {
         for (int k = 0; k < ndetector; k++) {
+            printf("s %ld\t%d\t%f\t%d\n", 
+                   short_detector->masked_to,
+                   short_detector->peak_pos,
+                   short_detector->peak_value,
+                   short_detector->valid_peak);
+            printf("l %ld\t%d\t%f\t%d\n", 
+                   long_detector->masked_to,
+                   long_detector->peak_pos,
+                   long_detector->peak_value,
+                   long_detector->valid_peak);
+
             DetectorPtr detector = detectors[k];
             //Carry on if we've been masked out
             if (detector->masked_to >= i) {
@@ -277,6 +290,10 @@ event_table detect_events(raw_table const rt, detector_param const edparam) {
     float *tstat1 = compute_tstat(sums, sumsqs, rt.n, edparam.window_length1);
     float *tstat2 = compute_tstat(sums, sumsqs, rt.n, edparam.window_length2);
 
+    //for (int i = 0; i < rt.n; i++) {
+    //    printf("%f\t%f\n", tstat1[i], tstat2[i]);
+    //}
+
     Detector short_detector = {
         .DEF_PEAK_POS = -1,
         .DEF_PEAK_VAL = FLT_MAX,
@@ -316,4 +333,18 @@ event_table detect_events(raw_table const rt, detector_param const edparam) {
     free(sums);
 
     return et;
+}
+
+int main(int argc, char** argv) {
+    raw_table rt = {0};
+    rt = read_raw(argv[1], true);
+
+    event_table et = {0};
+    et = detect_events(rt, event_detection_defaults);
+    event_t e; 
+    for (size_t i = 0; i < et.n; i++) {
+        e = et.event[i];
+
+        printf("%d\t%.3f\t%.3f\t%ld\n", (int) e.length, e.mean, e.stdv, e.start);
+    }
 }

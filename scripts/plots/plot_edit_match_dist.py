@@ -11,8 +11,6 @@ model = KmerModel(sys.argv[1])
 seq_len = int(sys.argv[2])
 N = int(sys.argv[3])
 
-
-
 event_thresh = -5.29
 seed_thresh  = -3.35
 
@@ -24,7 +22,7 @@ if len(sys.argv) > 4:
 else:
     dist_max = 3
 
-event_probs = np.arange(-9.1, -3.5, 0.1)
+event_probs = np.arange(-11, -3.5, 0.1)
 
 #for seq_len in range(13, 70, 8):
 seq = "".join([np.random.choice(["A", "C", "G", "T"]) for _ in range(seq_len)])

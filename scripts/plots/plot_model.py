@@ -2,63 +2,33 @@ import sys
 import matplotlib.pyplot as plt
 from scipy.cluster.vq import *
 import numpy as np
+import os
 
-sys.stdin.readline()
+path = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, path+"/..")
+from kmer_model import *
 
-k = int(sys.argv[1])
 
-COLORS = ['blue', 'red', 'green', 'black', 'orange', 'magenta', 'cyan', 'yellow'] 
+model = KmerModel(sys.argv[1])
 
-kmers = list()
 lv_means = list()
-lv_stdvs = list()
 sd_means = list()
-sd_stdvs = list()
-ig_lambdas = list()
-weights = list()
+lv_stdvs = list()
+for i in range(0, model.kmer_count):
+    lv_mean, lv_stdv, sd_mean, sd_stdv = model.get_norm_vals(i)
 
-obs = list()
-
-for line in sys.stdin:
-    tabs = line.strip().split()
-    kmer = tabs[0]
-    lv_mean, lv_stdv, sd_mean, sd_stdv, ig_lambda, weight = map(float, tabs[1:])
-    
-    kmers.append(kmer)
     lv_means.append(lv_mean)
-    lv_stdvs.append(lv_stdv)
     sd_means.append(sd_mean)
-    sd_stdvs.append(sd_stdv)
-    ig_lambdas.append(ig_lambda)
-    weights.append(weight)
+    lv_stdvs.append((lv_stdv+sd_stdv)*20)
 
-    #obs.append([lv_mean, lv_stdv, sd_mean, sd_stdv])
-    obs.append([lv_mean, sd_mean])
-    #obs.append([sd_mean, sd_stdv])
+heatmap, xedges, yedges = np.histogram2d(lv_means, sd_means, weights=lv_stdvs, bins=100, normed=True)
+extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
 
-obs = whiten(np.array(obs))
-
-centroids, distortion = kmeans(obs, k)
-codes, dists = vq(obs, centroids)
-
-base_counts = list()
-for i in range(0, k):
-    base_counts.append([0, 0, 0, 0])
-
-for i in range(0, len(kmers)):
-    base_counts[codes[i]][0] += kmers[i].count('A')
-    base_counts[codes[i]][1] += kmers[i].count('C')
-    base_counts[codes[i]][2] += kmers[i].count('G')
-    base_counts[codes[i]][3] += kmers[i].count('T')
-
-
-print ("\tA\tC\tG\tT")
-for i in range(0, k):
-    percents = tuple(map(lambda c: 100.0*c/sum(base_counts[i]),  base_counts[i]))
-    print ("%s\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%" % ((COLORS[i],)+percents))
-
-#plt.scatter(sd_stdvs, sd_means, c=list(map(lambda c: COLORS[c], codes)))
-plt.scatter(sd_means, lv_means, c=list(map(lambda c: COLORS[c], codes)))
+#plt.imshow(heatmap.T, extent=extent, origin='lower')
+plt.scatter(lv_means, sd_means, s=lv_stdvs, c=(0, 0, 1), alpha=0.2, linewidths=0)
+plt.xlabel("Expected Mean (pA)", fontsize=25)
+plt.ylabel("Expected Stdv (pA)", fontsize=25)
+plt.title('Pore Model Event Values', fontsize=25)
 plt.show()
 
 

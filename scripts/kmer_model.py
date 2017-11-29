@@ -71,12 +71,17 @@ class KmerModel:
         self.model_mean = np.mean(self.lv_means)
         self.model_stdv = np.std(self.lv_means)
 
-    def get_norm_params(self, events):
+    def get_norm_params(self, events, model_mean=None, model_stdv=None):
+        if model_mean == None:
+            model_mean = self.model_mean
+        if model_stdv == None:
+            model_stdv = self.model_stdv
+
         evt_mean = np.mean([mean for mean, stdv, length in events])
         evt_stdv = np.std([mean for mean, stdv, length in events])
 
-        scale = evt_stdv / self.model_stdv
-        shift = evt_mean - (scale * self.model_mean)
+        scale = evt_stdv / model_stdv
+        shift = evt_mean - (scale * model_mean)
 
         return (scale, shift)
 
@@ -87,12 +92,8 @@ class KmerModel:
 
         ig_lambda = self.ig_lambda
         if not self.has_lambda:
-<<<<<<< HEAD
             ig_lambda = pow(self.sd_means[i], 3) / pow(self.sd_stdvs[i], 2)        
-=======
-            ig_lambda = pow(self.sd_means[i], 3) / pow(self.sd_stdvs[i], 2);
-        
->>>>>>> 1153dca7a4946f187366b9b3b9dfa7f29ebb5da1
+
         return (norm_mean, self.lv_stdvs[i], self.sd_means[i], ig_lambda)
 
     def event_match_probs(self, event, k_id, norm_params):
@@ -104,7 +105,6 @@ class KmerModel:
         ig = np.sqrt(ig_lambda / (2 * np.pi * pow(evt_stdv, 3))) * np.exp(-ig_lambda * pow(evt_stdv - sd_mean, 2) / (2 * evt_stdv * pow(sd_mean, 2)));
 
         return ng, ig;
-    
 
     def i_to_kmer(self, i):
         ret = [0] * self.k
