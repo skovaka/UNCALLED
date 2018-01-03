@@ -22,7 +22,7 @@ class KmerModel {
     KmerModel(std::string model_fname);
     ~KmerModel();
 
-    NormParams get_norm_params(std::vector<Event> events) const;
+    NormParams get_norm_params(const std::vector<Event> &events) const;
 
     std::pair<neighbor_itr, neighbor_itr> get_neighbors(mer_id k_id) const {
         return std::pair<neighbor_itr, neighbor_itr>
@@ -41,9 +41,11 @@ class KmerModel {
     void parse_fasta (std::ifstream &fasta_in, 
                  std::vector<mer_id> &fwd_ids, 
                  std::vector<mer_id> &rev_ids) const;
+
+    double *lv_means_, *lv_stdvs_, *sd_means_, *sd_stdvs_;
+
     private:
     unsigned short k_, kmer_count_;
-    double *lv_means_, *lv_stdvs_, *sd_means_, *sd_stdvs_;
     double lambda_, model_mean_, model_stdv_;
 
     std::list<mer_id> *neighbors_; 

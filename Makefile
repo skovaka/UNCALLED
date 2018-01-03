@@ -6,7 +6,7 @@ CC=g++
 CFLAGS=-Wall -std=c++11 -O3
 INCLUDE=-I./src/fast5/src -I./src/scrappie -I./src ${BOOST_INCLUDE}
 
-all: uncalled seed_tracker_test
+all: uncalled seed_tracker_test dtw_test
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c -o $@ $^ $(INCLUDE) $(HDF5_INCLUDE) 
@@ -20,6 +20,9 @@ uncalled: uncalled.o kmer_fmi.o kmer_model.o seed_graph.o seed_tracker.o arg_par
 
 seed_tracker_test: seed_tracker_test.o kmer_model.o seed_tracker.o seed_graph.o kmer_fmi.o 
 	$(CC) $(CFLAGS) seed_tracker_test.o kmer_model.o kmer_fmi.o seed_tracker.o seed_graph.o -o seed_tracker_test $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
+
+dtw_test: dtw.o kmer_model.o
+	$(CC) $(CFLAGS) dtw.o kmer_model.o -o dtw_test $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS)
 
 #arg_parse_test: 
 #	$(CC) $(CFLAGS) arg_parse.o -o arg_parse_test $(INCLUDE) $(LIBS)

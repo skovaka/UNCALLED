@@ -143,12 +143,19 @@ float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) const {
           lambda = pow(sd_means_[k_id], 3) / pow(sd_stdvs_[k_id], 2);
 
     double ng = exp(-pow(e.mean - norm_mean, 2) / (2 * pow(lv_stdvs_[k_id], 2)))
-                 / sqrt(2 * PI * pow(lv_stdvs_[k_id], 2)),
+                 / sqrt(2 * PI * pow(lv_stdvs_[k_id], 2));
 
-           ig = sqrt(lambda / (2 * PI * pow(e.stdv, 3))) 
-                  * exp(-lambda * pow(e.stdv - sd_means_[k_id], 2) 
-                         / (2 * e.stdv * pow(sd_means_[k_id], 2)));
-    return log(ng*ig);
+    //       ig = sqrt(lambda / (2 * PI * pow(e.stdv, 3))) 
+    //              * exp(-lambda * pow(e.stdv - sd_means_[k_id], 2) 
+    //                     / (2 * e.stdv * pow(sd_means_[k_id], 2)));
+
+    //if (ig < ig_min) {
+    //    ig = ig_min;
+    //} else if (ig > ig_max) {
+    //    ig = ig_max;
+    //}
+
+    return log(ng);
 }
 
 //TODO: move to model
@@ -249,7 +256,7 @@ char KmerModel::id_to_base(short i) {
     return 'N';
 }
 
-NormParams KmerModel::get_norm_params(std::vector<Event> events) const {
+NormParams KmerModel::get_norm_params(const std::vector<Event> &events) const {
 
     //Compute events mean
     double events_mean = 0;

@@ -242,7 +242,7 @@ AlnParams::AlnParams(const KmerModel &model,
                      double min_anchor_evpr,
                      double min_extend_evpr,
                      double min_seed_pr,
-                     double min_stay_pr) 
+                     double min_stay_pr)
         : model_(model),
           max_ignores_(max_ignores),
           max_skips_(max_skips),
