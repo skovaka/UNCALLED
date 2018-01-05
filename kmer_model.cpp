@@ -51,12 +51,14 @@ KmerModel::KmerModel(std::string model_fname) {
     k_ = kmer.size();
     kmer_count_ = pow(4, k_); //4 magic number?
     lv_means_ = new double[kmer_count_+1];
-    lv_stdvs_ = new double[kmer_count_+1];
+    lv_vars_x2_ = new double[kmer_count_+1];
+    lognorm_denoms_ = new double[kmer_count_+1];
     sd_means_ = new double[kmer_count_+1];
     sd_stdvs_ = new double[kmer_count_+1];
 
     lv_means_[kmer_count_] = 
-    lv_stdvs_[kmer_count_] = 
+    lv_vars_x2_[kmer_count_] = 
+    lognorm_denoms_[kmer_count_] = 
     sd_means_[kmer_count_] = 
     sd_stdvs_[kmer_count_] = -1;
 
@@ -90,7 +92,9 @@ KmerModel::KmerModel(std::string model_fname) {
 
             //Store model information
             lv_means_[k_id] = lv_mean;
-            lv_stdvs_[k_id] = lv_stdv;
+            lv_vars_x2_[k_id] = 2*lv_stdv*lv_stdv;
+            lognorm_denoms_[k_id] = log(sqrt(PI * lv_vars_x2_[k_id]));
+
             sd_means_[k_id] = sd_mean;
             sd_stdvs_[k_id] = sd_stdv;
 
@@ -124,7 +128,8 @@ KmerModel::KmerModel(std::string model_fname) {
 
 KmerModel::~KmerModel() {
     delete [] lv_means_;
-    delete [] lv_stdvs_;
+    delete [] lv_vars_x2_;
+    delete [] lognorm_denoms_;
     delete [] sd_means_;
     delete [] sd_stdvs_;
     delete [] neighbors_; 
@@ -138,27 +143,13 @@ bool KmerModel::event_valid(const Event &e) const {
 float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) const {
     double norm_mean = lv_means_[k_id] * norm.scale + norm.shift;
     
-    double lambda = lambda_;
-    if (lambda < 0)
-          lambda = pow(sd_means_[k_id], 3) / pow(sd_stdvs_[k_id], 2);
+    //double ng = exp(-pow(e.mean - norm_mean, 2) / lv_vars_x2_[k_id])
+    //             / sqrt(PI * lv_vars_x2_[k_id]);
+    //return log(ng);
 
-    double ng = exp(-pow(e.mean - norm_mean, 2) / (2 * pow(lv_stdvs_[k_id], 2)))
-                 / sqrt(2 * PI * pow(lv_stdvs_[k_id], 2));
-
-    //       ig = sqrt(lambda / (2 * PI * pow(e.stdv, 3))) 
-    //              * exp(-lambda * pow(e.stdv - sd_means_[k_id], 2) 
-    //                     / (2 * e.stdv * pow(sd_means_[k_id], 2)));
-
-    //if (ig < ig_min) {
-    //    ig = ig_min;
-    //} else if (ig > ig_max) {
-    //    ig = ig_max;
-    //}
-
-    return log(ng);
+    return (-pow(e.mean - norm_mean, 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
 }
 
-//TODO: move to model
 float KmerModel::get_stay_prob(Event e1, Event e2) const {
 
     if (e1.length == 0 || e2.length == 0)

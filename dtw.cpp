@@ -22,18 +22,23 @@ double **full_dtw(const KmerModel &model,
         dtw_mat[i] = new double[rd_len];
     }
 
-    NormParams norm = {0, 1};//= model.get_norm_params(read_events);
+    NormParams norm = model.get_norm_params(read_events);
 
     double cost, up, left, diag;
 
     for (int i = 0; i < rf_len; i++) {
         for (int j = 0; j < rd_len; j++) {
 
-            up   = i > 0 ? dtw_mat[i-1][j] : INF;
+            up   = i > 0 ? dtw_mat[i-1][j] 
+                         : INF;
 
-            left = j > 0 ? dtw_mat[i][j-1] : (local ? 0 :  INF);
+            left = j > 0 ? dtw_mat[i][j-1] 
+                         : (local ? 0 
+                                  : INF);
 
-            diag = j > 0 && i > 0 ? dtw_mat[i-1][j-1] : (j == i || (j == 0 && local) ? 0 : INF);
+            diag = j > 0 && i > 0 ? dtw_mat[i-1][j-1] 
+                                  : (j == i || (j == 0 && local) ? 0 
+                                                                 : INF);
 
             if (prob) {
                 cost = -model.event_match_prob(read_events[j], ref_kmers[i], norm);
@@ -95,65 +100,141 @@ std::list< std::pair<size_t, size_t> > get_path(double **dtw_mat,
 
     return path;
 }
-    
-int main(int argc, char** argv) {
-    bool local = true;
 
-    KmerModel model(argv[1]);
+bool get_bcevents(std::string filename, std::vector<BCEvent> &events) {
+    events.clear();
+
+    if (!fast5::File::is_valid_file(filename)) {
+        std::cerr << "Error: '" << filename << "' is not a valid file \n";
+    }
+
+    try {
+        fast5::File file;
+        file.open(filename);
+        
+        if (!file.is_open()) {  
+            std::cerr << "Error: unable to open '" 
+                      << filename << "'\n";
+
+        } else if (!file.have_basecall_events(0)) {
+            std::cerr << "Error: file '" << filename
+                      << "' does not contain events\n";
+
+        } else {
+            events = file.get_basecall_events(0);
+            return true;
+        }
+
+    } catch (hdf5_tools::Exception& e) {
+        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
+    }
+
+    return false;
+
+}
+
+bool get_events(std::string filename, std::vector<Event> &events) {
+    events.clear();
+
+    if (!fast5::File::is_valid_file(filename)) {
+        std::cerr << "Error: '" << filename << "' is not a valid file \n";
+    }
+
+    try {
+        fast5::File file;
+        file.open(filename);
+        
+        if (!file.is_open()) {  
+            std::cerr << "Error: unable to open '" 
+                      << filename << "'\n";
+
+        } else if (!file.have_eventdetection_events()) {
+            std::cerr << "Error: file '" << filename
+                      << "' does not contain events\n";
+
+        } else {
+            events = file.get_eventdetection_events();
+            return true;
+        }
+
+    } catch (hdf5_tools::Exception& e) {
+        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
+    }
+
+    return false;
+}
+    
+enum Opt {MODEL  = 'm',
+          READ   = 'i',
+          REF    = 'x',
+          LOCAL  = 'l',
+          PROB   = 'p',
+          REV    = 'r'};
+
+int main(int argc, char** argv) {
+
+    ArgParse args("DTW tester");
+
+    args.add_string(Opt::MODEL, "model", "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.4_180mv_450bps_6mer/5mers_pre.txt", "Nanopore kmer model");
+    args.add_string(Opt::READ, "read", "", "Event detected read (fast5)");
+    args.add_string(Opt::REF, "reference", "", "Reference to align to (fasta)");
+    args.add_flag(Opt::LOCAL, "local", "Will perform local alignment if provided, otherwise global");
+    args.add_flag(Opt::PROB, "prob", "Will use kmer/event match probability for cost if probability, otherwise absolute mean difference");
+    args.add_flag(Opt::REV, "rev", "Will align to reverse complement of reference if provided");
+
+    args.parse_args(argc, argv);
+
+    KmerModel model(args.get_string(Opt::MODEL));
+
+    std::vector<mer_id> fwd_kmers, rev_kmers, ref_kmers;
+    std::ifstream ref_file(args.get_string(Opt::REF));
+    model.parse_fasta(ref_file, fwd_kmers, rev_kmers);
+
+    if (args.get_flag(Opt::REV)) {
+        ref_kmers = rev_kmers;
+    } else  {
+        ref_kmers = fwd_kmers;
+    }
+
+    ref_kmers.pop_back();
 
     std::vector<Event> read_events;
-    read_events.push_back( {85.083612, 1.517846, 5} );
-    read_events.push_back( {85.083612, 1.517846, 5} );
-    read_events.push_back( {76.635809, 1.705015, 5} );
-    read_events.push_back( {76.635809, 1.705015, 5} );
-    read_events.push_back( {76.635809, 1.705015, 5} );
-    read_events.push_back( {87.429392, 1.962027, 5} );
-    read_events.push_back( {106.44446, 2.191321, 5} );
-    read_events.push_back( {106.44446, 2.191321, 5} );
-    read_events.push_back( {106.44446, 2.191321, 5} );
-    read_events.push_back( {91.063935, 2.709875, 5} );
-    read_events.push_back( {91.063935, 2.709875, 5} );
-    read_events.push_back( {85.299201, 1.517846, 5} );
-    read_events.push_back( {85.083612, 1.517846, 5} );
-    read_events.push_back( {76.635809, 1.705015, 5} );
-    read_events.push_back( {87.429392, 1.962027, 5} );
-    read_events.push_back( {106.44446, 2.191321, 5} );
-    read_events.push_back( {91.063935, 2.709875, 5} );
-    read_events.push_back( {85.299201, 1.517846, 5} );
-
-    std::vector<mer_id> ref_kmers;
-    ref_kmers.push_back(0);
-    ref_kmers.push_back(1);
-    ref_kmers.push_back(4);
-    ref_kmers.push_back(16);
-    ref_kmers.push_back(64);
-    ref_kmers.push_back(256);
-    ref_kmers.push_back(0);
-    ref_kmers.push_back(0);
-    ref_kmers.push_back(0);
-    ref_kmers.push_back(0);
-    ref_kmers.push_back(1);
-    ref_kmers.push_back(4);
-    ref_kmers.push_back(16);
-    ref_kmers.push_back(64);
-    ref_kmers.push_back(256);
-
-    double **dtw_mat = full_dtw(model, read_events, ref_kmers, local, true);
-
-    for (size_t i = 0; i < ref_kmers.size(); i++) {
-        for (size_t j = 0; j < read_events.size(); j++) {
-            std::cout << dtw_mat[i][j] << "\t";
-        }
-        std::cout << "\n";
+    if (!get_events(args.get_string(Opt::READ), read_events)) {
+        return 1;
     }
+
+    //std::vector<BCEvent> read_bcevents;
+    //if (!get_bcevents(args.get_string(Opt::READ), read_bcevents)) {
+    //    return 1;
+    //}
+
+    double **dtw_mat = full_dtw(model, 
+                                read_events, 
+                                ref_kmers, 
+                                args.get_flag(Opt::LOCAL),
+                                args.get_flag(Opt::PROB));
+
+    //for (size_t i = ref_kmers.size()-11; i < ref_kmers.size(); i++) {
+    //    for (size_t j = read_events.size()-11; j < read_events.size(); j++) {
+    //        std::cout << dtw_mat[i][j] << "\t";
+    //    }
+    //    std::cout << "\n";
+    //}
+
+    //for (size_t i = 0; i < ref_kmers.size(); i++) {
+    //    for (size_t j = 0; j < read_events.size(); j++) {
+    //        std::cout << dtw_mat[i][j] << "\t";
+    //    }
+    //    std::cout << "\n";
+    //}
 
     std::list< std::pair<size_t, size_t> > path = get_path(dtw_mat, 
                                                            ref_kmers.size(), 
                                                            read_events.size(),
-                                                           local);
+                                                           args.get_flag(Opt::LOCAL));
     
     for (auto p = path.begin(); p != path.end(); p++) {
-        std::cout << p->first << "\t" << p->second << "\n";
+        std::cout << p->first << "\t" << p->second << "\t" << dtw_mat[p->first][p->second] << "\n";
     }
 
 }

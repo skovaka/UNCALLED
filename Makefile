@@ -21,8 +21,8 @@ uncalled: uncalled.o kmer_fmi.o kmer_model.o seed_graph.o seed_tracker.o arg_par
 seed_tracker_test: seed_tracker_test.o kmer_model.o seed_tracker.o seed_graph.o kmer_fmi.o 
 	$(CC) $(CFLAGS) seed_tracker_test.o kmer_model.o kmer_fmi.o seed_tracker.o seed_graph.o -o seed_tracker_test $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
 
-dtw_test: dtw.o kmer_model.o
-	$(CC) $(CFLAGS) dtw.o kmer_model.o -o dtw_test $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS)
+dtw_test: dtw.o kmer_model.o arg_parse.o
+	$(CC) $(CFLAGS) dtw.o kmer_model.o arg_parse.o -o dtw_test $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS)
 
 #arg_parse_test: 
 #	$(CC) $(CFLAGS) arg_parse.o -o arg_parse_test $(INCLUDE) $(LIBS)

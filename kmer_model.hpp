@@ -10,6 +10,7 @@
 
 typedef unsigned short int mer_id;
 typedef fast5::EventDetection_Event Event;
+typedef fast5::Basecall_Event BCEvent;
 
 typedef struct NormParams {
     double shift, scale;
@@ -42,7 +43,7 @@ class KmerModel {
                  std::vector<mer_id> &fwd_ids, 
                  std::vector<mer_id> &rev_ids) const;
 
-    double *lv_means_, *lv_stdvs_, *sd_means_, *sd_stdvs_;
+    double *lv_means_, *lv_vars_x2_, *lognorm_denoms_, *sd_means_, *sd_stdvs_;
 
     private:
     unsigned short k_, kmer_count_;
