@@ -55,8 +55,6 @@ void ArgParse::parse_args(int argc, char **argv) {
 
     std::string opt_str;
 
-    std::cout << opt_str << "\n";
-
     for (auto a = args_.begin(); a != args_.end(); a++) {
         opt_str.push_back(a->first);
 
