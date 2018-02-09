@@ -13,8 +13,8 @@ typedef struct {
 
 
 static detector_param const event_detection_defaults = {
-    .window_length = 3,
-    .window_length = 6,
+    .window_length1 = 3,
+    .window_length2 = 6,
     .threshold1    = 1.4f,
     .threshold2    = 9.0f,
     .peak_height   = 0.2f

@@ -1,5 +1,5 @@
 LIBS=-lz -lm -lstdc++ -ldl
-HDF5_LIB=-L/cm/shared/apps/hdf5/1.8.17/lib /usr/lib/libhdf5.a
+HDF5_LIB=-L/cm/shared/apps/hdf5/1.8.17/lib /cm/shared/apps/hdf5/1.8.17/lib/libhdf5.a
 HDF5_INCLUDE=-I/cm/shared/apps/hdf5/1.8.17/include
 CC=gcc
 CPP_C=g++

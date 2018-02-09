@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
     args.add_string(Opt::MODEL, "model", "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model", "Nanopore kmer model");
     args.add_string(Opt::REFERENCE,   "reference",    "",     "");
     args.add_string(Opt::READ_LIST,   "read_list",    "",     "");
-    args.add_string(Opt::OUT_PREFIX,  "out_prefix",   ".",     "");
+    args.add_string(Opt::OUT_PREFIX,  "out_prefix",   "./",     "");
     args.add_int(   Opt::TALLY_DIST,  "tally_dist",   16,     "");
     args.add_int(   Opt::MIN_SEED_LEN,"min_seed_len", 15,     "");
     args.add_int(   Opt::ANCHOR_LEN,  "anchor_len",   12,     "");

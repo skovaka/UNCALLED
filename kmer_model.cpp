@@ -141,13 +141,11 @@ bool KmerModel::event_valid(const Event &e) const {
 }
 
 float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) const {
-    double norm_mean = lv_means_[k_id] * norm.scale + norm.shift;
-    
-    //double ng = exp(-pow(e.mean - norm_mean, 2) / lv_vars_x2_[k_id])
-    //             / sqrt(PI * lv_vars_x2_[k_id]);
-    //return log(ng);
+    //double norm_mean = lv_means_[k_id] * norm.scale + norm.shift;
+    //return (-pow(e.mean - norm_mean, 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
 
-    return (-pow(e.mean - norm_mean, 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
+    double norm_mean = (e.mean - norm.shift) / norm.scale;
+    return (-pow(norm_mean - lv_means_[k_id], 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
 }
 
 float KmerModel::get_stay_prob(Event e1, Event e2) const {

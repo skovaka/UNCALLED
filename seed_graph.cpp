@@ -15,6 +15,7 @@
 
 //#define DEBUG(s)
 #define DEBUG(s) do { std::cerr << s; } while (0)
+#define DEBUG_PATHS
 
 
 //Source constructor
@@ -62,7 +63,7 @@ SeedGraph::Node::Node()
 SeedGraph::Node::Node(const Node &s)
     : length_(s.length_),
       stay_count_(s.stay_count_),
-      skip_count_(s.stay_count_),
+      skip_count_(s.skip_count_),
       ignore_count_(s.ignore_count_),
       kmer_(s.kmer_),
       event_prob_(s.event_prob_),
@@ -419,7 +420,7 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
             //Maybe mark if previously a full seed, so only happens when extending
             prev_node->seed_len() == params_.graph_elen_ - 1 && 
             prev_range.length() == 1 && //Yes
-            prev_node->ignore_count_ <= params_.max_ignores_) { //max_ignores (frac?)
+            prev_node->ignore_count_ < params_.max_ignores_) { //max_ignores (frac?)
 
             prob = prev_node->seed_prob_ / prev_node->length_; //could be better
             
@@ -427,6 +428,7 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
             add_child(prev_range, next_node);
         }
     }
+
 
     //DEBUG(t.lap() << "\t");
 
@@ -438,6 +440,7 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
 
             if (next_range.is_valid()) {
                 Node next_node(kmer, prob);
+                //std::cout << kmer << "\t" << prob << "\n";
 
                 //Will split sources if they intersect existing nodes
                 add_sources(next_range, next_node);             
@@ -465,6 +468,10 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
         prev_nodes_[n->second] = n->first;
         next_nodes_.erase(n);
     }
+
+    //if (label_ == "fwd") {
+    //    print_graph(false);
+    //}
 
     //DEBUG(t.lap() << "\t");
     //
@@ -694,21 +701,43 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
             continue;
         }
 
+        #ifdef DEBUG_PATHS
+        std::list< std::vector<Node::Type> > paths;
+        #endif 
+
         std::list<Node *> to_visit;
+
         for (auto c = aln_en->children_.begin(); c != aln_en->children_.end(); c++) {
+
+            #ifdef DEBUG_PATHS
+            std::vector<Node::Type> p(params_.graph_elen_);
+            p[0] = Node::Type::MATCH;
+            p[1] = (*c)->parents_.front().second;
+            paths.push_back(p);
+            #endif 
+
             (*c)->parents_.clear();
             next_sources.push_back(*c);
             to_visit.push_back(*c);
+
         }
         
         double prev_len = aln_en->seed_len();
         auto kmer_probs = event_kmer_probs_.rbegin();
 
         while (!to_visit.empty()) {
-
-
+    
             Node *n = to_visit.front();
             to_visit.pop_front();
+
+            #ifdef DEBUG_PATHS
+            std::vector<Node::Type> p = paths.front();
+            paths.pop_front();
+
+            if (n->seed_len() > 2) {
+                p[n->seed_len()-1] = n->parents_.front().second;
+            }
+            #endif 
 
             if (n->seed_len() != prev_len) {
                 prev_len = n->seed_len();
@@ -726,7 +755,6 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
 
                     //Erase where we came from
                     if (next_parent->first->better_than(seed_parent->first)) {
-                    //if (seed_parent->first->seed_prob_ < next_parent->first->seed_prob_) {
                         to_erase = seed_parent->first; 
                         n->parents_.erase(seed_parent);
 
@@ -740,6 +768,8 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
                     if (to_erase->remove_child(n)) {
                         to_erase->invalidate(&old_nodes_);
                     }
+
+                    n->update_info();
                 }
 
             }
@@ -759,11 +789,45 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
                         results.push_back(r);
 
                         out << label_ << "\t" << timer.get() << "\t";
+
+                        #ifdef DEBUG_PATHS
+                        for (size_t i = p.size()-1; i < p.size(); i--) {
+                            switch (p[i]) {
+                                case Node::Type::MATCH:
+                                out << "M";
+                                break;
+                                case Node::Type::STAY:
+                                out << "S";
+                                break;
+                                case Node::Type::SKIP:
+                                out << "K";
+                                break;
+                                case Node::Type::IGNORE:
+                                out << "I";
+                                break;
+                                default:
+                                out << "?";
+                                break;
+                            }
+                        }
+                        out << "\t";
+                        #endif
                         r.print(out);
                     }
                 }
 
             } else {
+
+                #ifdef DEBUG_PATHS
+                if (n->children_.size() > 0) { //Should always be true?
+                    paths.push_back(p);
+
+                    for (int i = 1; i < n->children_.size(); i++) {
+                        paths.push_back(std::vector<Node::Type>(p));
+                    }   
+                }
+                #endif
+
                 for (auto c = n->children_.begin(); c != n->children_.end(); c++) {
                     to_visit.push_back(*c);
                 }
@@ -772,7 +836,6 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
             n->length_--;
             
             n->update_info();
-
         }
         
         aln_ends.pop_front();
@@ -804,6 +867,7 @@ void SeedGraph::print_graph(bool verbose) {
     std::vector<int> source_counts(sources_.size(), 0),
                      linear_counts(sources_.size(), 0),
                      branch_counts(sources_.size(), 0),
+                     multiparent_counts(sources_.size(), 0),
                      invalid_counts(sources_.size(), 0);
 
     while (!to_visit.empty()) {
@@ -834,6 +898,10 @@ void SeedGraph::print_graph(bool verbose) {
             branch_counts[event]++;
         } else {
             linear_counts[event]++;
+        }
+
+        if (n->parents_.size() > 1) {
+            multiparent_counts[event]++;
         }
         
         if (verbose) {
@@ -891,9 +959,17 @@ void SeedGraph::print_graph(bool verbose) {
         std::cout << "\t" << invalid_counts[i];
         invalid_total += invalid_counts[i];
     }
-    std::cout << "\t (" << invalid_total << "\t==\n";
+    std::cout << "\t (" << invalid_total << ")\t==\n";
 
-    std::cout << "== full total: " 
+    int multiparent_total = 0;
+    std::cout << "== multiparent counts:";
+    for (unsigned int i = 0; i < multiparent_counts.size(); i++) {
+        std::cout << "\t" << multiparent_counts[i];
+        multiparent_total += multiparent_counts[i];
+    }
+    std::cout << "\t (" << multiparent_total << ")\t==\n";
+
+    std::cout << "== total nodes: " 
               << (source_total + branch_total + linear_total + invalid_total) 
               << "\t==\n";
 

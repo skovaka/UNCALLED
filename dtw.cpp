@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
                                     ref_kmers, 
                                     norm,
                                     args.get_flag(Opt::LOCAL),
-                                    args.get_flag(Opt::PROB));
+                                    true);
 
         std::list< std::pair<size_t, size_t> > path 
             = get_path(dtw_mat, 

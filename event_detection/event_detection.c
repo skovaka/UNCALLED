@@ -137,16 +137,6 @@ size_t *short_long_peak_detector(DetectorPtr short_detector,
     size_t peak_count = 0;
     for (size_t i = 0; i < short_detector->signal_length; i++) {
         for (int k = 0; k < ndetector; k++) {
-            printf("s %ld\t%d\t%f\t%d\n", 
-                   short_detector->masked_to,
-                   short_detector->peak_pos,
-                   short_detector->peak_value,
-                   short_detector->valid_peak);
-            printf("l %ld\t%d\t%f\t%d\n", 
-                   long_detector->masked_to,
-                   long_detector->peak_pos,
-                   long_detector->peak_value,
-                   long_detector->valid_peak);
 
             DetectorPtr detector = detectors[k];
             //Carry on if we've been masked out

@@ -58,7 +58,7 @@ void ReadAln::print(std::ostream &out, bool newline = false, bool print_all = fa
     }
 
     out << "-" << ref_en_ << " " 
-              << evt_st_ << "-" << evt_en_;
+               << evt_st_ << "-" << evt_en_;
 
     if (newline)
         out << "\n";
