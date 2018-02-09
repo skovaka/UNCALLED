@@ -107,7 +107,6 @@ int SeedTracker::add_seed(Result r) {
         loc++;
     }
 
-
     if (loc_match != locations.end()) {
 
         loc_match->update_next(new_loc);

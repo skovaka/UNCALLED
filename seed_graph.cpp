@@ -15,7 +15,7 @@
 
 //#define DEBUG(s)
 #define DEBUG(s) do { std::cerr << s; } while (0)
-#define DEBUG_PATHS
+//#define DEBUG_PATHS
 
 
 //Source constructor
@@ -211,29 +211,6 @@ bool SeedGraph::Node::remove_child(Node *child) {
 }
 
 
-
-//SeedGraph::SeedGraph(const KmerModel &model,
-//                     const KmerFMI &fmi, 
-//                     const NormParams &norm_params, 
-//                     int seed_len, int read_len,
-//                     double min_event_prob,
-//                     double min_seed_prob,
-//                     double min_stay_prob,
-//                     double max_stay_frac,
-//                     const std::string &label)
-//    : model_(model),
-//      fmi_(fmi),
-//      norm_params_(norm_params),
-//      seed_length_(seed_len),
-//      cur_event_(read_len), 
-//      max_stays_( (int) (max_stay_frac * seed_len) ),
-//      prev_event_({0, 0, 0}),
-//      min_event_prob_(min_event_prob),
-//      min_seed_prob_(min_seed_prob),
-//      min_stay_prob_(min_stay_prob) {
-//}
-//
-
 AlnParams::AlnParams(const KmerModel &model,
                      int min_seed_nlen, 
                      int anchor_nlen, 
@@ -281,9 +258,8 @@ SeedGraph::~SeedGraph() {
     reset();
 }
 
-void SeedGraph::new_read(int read_len, const NormParams &params) {
+void SeedGraph::new_read(int read_len) {
     reset();
-    norm_params_ = params;
     cur_event_ = read_len;
     prev_event_ = {0, 0, 0};
 }
@@ -342,7 +318,7 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
     event_kmer_probs_.push_front(new double[params_.model_.kmer_count()]);
     double *kmer_probs = event_kmer_probs_.front();
     for (int kmer = 0; kmer < params_.model_.kmer_count(); kmer++)
-        kmer_probs[kmer] = params_.model_.event_match_prob(e, kmer, norm_params_);
+        kmer_probs[kmer] = params_.model_.event_match_prob(e, kmer);
 
     //DEBUG(cur_event_ << "\t" << t.lap() << "\t");
     

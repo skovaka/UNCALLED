@@ -140,12 +140,11 @@ bool KmerModel::event_valid(const Event &e) const {
     return e.mean > 0 && e.stdv >= 0 && e.length > 0;
 }
 
-float KmerModel::event_match_prob(Event e, mer_id k_id, NormParams norm) const {
+float KmerModel::event_match_prob(Event e, mer_id k_id) const {
     //double norm_mean = lv_means_[k_id] * norm.scale + norm.shift;
     //return (-pow(e.mean - norm_mean, 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
 
-    double norm_mean = (e.mean - norm.shift) / norm.scale;
-    return (-pow(norm_mean - lv_means_[k_id], 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
+    return (-pow(e.mean - lv_means_[k_id], 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
 }
 
 float KmerModel::get_stay_prob(Event e1, Event e2) const {
@@ -261,10 +260,21 @@ NormParams KmerModel::get_norm_params(const std::vector<Event> &events) const {
     
     /* get scaling parameters */
     NormParams params;
-    params.scale = events_stdv / model_stdv_;
-    params.shift = events_mean - (params.scale * model_mean_);
+    //params.scale = events_stdv / model_stdv_;
+    //params.shift = events_mean - (params.scale * model_mean_);
+    params.scale = model_stdv_ / events_stdv;
+    params.shift = model_mean_ - (params.scale * events_mean);
 
     return params;
+}
+
+void KmerModel::normalize_events(std::vector<Event> &events, NormParams norm) const {
+    if (norm.scale == 0) {
+        norm = get_norm_params(events);
+    }
+    for (size_t i = 0; i < events.size(); i++) {
+        events[i].mean = norm.scale * events[i].mean + norm.shift;
+    }
 }
 
 //Reads the given fasta file and stores forward and reverse k-mers

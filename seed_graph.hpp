@@ -114,7 +114,6 @@ class SeedGraph {
     const KmerFMI &fmi_;
 
     AlnParams params_;
-    NormParams norm_params_;
     std::string label_;
 
     std::map<Range, Node *> next_nodes_;
@@ -134,7 +133,7 @@ class SeedGraph {
 
     ~SeedGraph();
 
-    void new_read(int read_len, const NormParams &params);
+    void new_read(int read_len);
     void reset();
 
     std::vector<Result> add_event(Event e, std::ostream &out);

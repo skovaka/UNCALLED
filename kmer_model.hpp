@@ -24,6 +24,7 @@ class KmerModel {
     ~KmerModel();
 
     NormParams get_norm_params(const std::vector<Event> &events) const;
+    void normalize_events(std::vector<Event> &events, NormParams norm={0, 0}) const;
 
     std::pair<neighbor_itr, neighbor_itr> get_neighbors(mer_id k_id) const {
         return std::pair<neighbor_itr, neighbor_itr>
@@ -32,7 +33,7 @@ class KmerModel {
 
     bool event_valid(const Event &e) const;
 
-    float event_match_prob(Event evt, mer_id k_id, NormParams norm) const;
+    float event_match_prob(Event evt, mer_id k_id) const;
 
     float get_stay_prob(Event e1, Event e2) const; 
 

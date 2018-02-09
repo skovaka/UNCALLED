@@ -9,7 +9,6 @@
 double **full_dtw(const KmerModel &model,
                   const std::vector<Event> &read_events, 
                   const std::vector<mer_id> &ref_kmers,
-                  const NormParams &norm,
                   bool local = true,
                   bool prob = true) {
 
@@ -40,7 +39,7 @@ double **full_dtw(const KmerModel &model,
                                   : (j == i || (j == 0 && local) ? 0 
                                                                  : INF);
             if (prob) {
-                cost = -model.event_match_prob(read_events[j], ref_kmers[i], norm);
+                cost = -model.event_match_prob(read_events[j], ref_kmers[i]);
             } else {
                 cost = fabs(model.lv_means_[ref_kmers[i]] - read_events[j].mean);
             }
@@ -184,7 +183,7 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        NormParams norm = model.get_norm_params(read_events);
+        model.normalize_events(read_events);
 
         std::vector<mer_id> ref_kmers(ref_seq.size() - model.kmer_len() + 1);
         for (size_t i = 0; i < ref_kmers.size(); i++) {
@@ -194,7 +193,6 @@ int main(int argc, char** argv) {
         double **dtw_mat = full_dtw(model, 
                                     read_events, 
                                     ref_kmers, 
-                                    norm,
                                     args.get_flag(Opt::LOCAL),
                                     true);
 
@@ -204,8 +202,7 @@ int main(int argc, char** argv) {
                        read_events.size(),
                        args.get_flag(Opt::LOCAL));
         
-        std::cout << "#" << read_filename << "\n"
-                  << "#" << norm.scale << " " << norm.shift << "\n";
+        std::cout << "#" << read_filename << "\n";
 
         double prev_prob = 0;
         for (auto p = path.begin(); p != path.end(); p++) {

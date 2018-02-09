@@ -141,18 +141,20 @@ int main(int argc, char** argv) {
             continue;
         }
 
+        NormParams norm = model.get_norm_params(events);
+        model.normalize_events(events, norm);
+
         if (aln_en < aln_st) {
             aln_en = events.size() - 1;
         }
 
-        NormParams norm = model.get_norm_params(events);
+        //NormParams norm = model.get_norm_params(events);
 
-        err_out << "NORM: " << norm.scale << " " << norm.shift << "\n";
 
         int aln_len = aln_en - aln_st + 1;
 
-        fwd_sg.new_read(aln_len, norm);
-        rev_sg.new_read(aln_len, norm);
+        fwd_sg.new_read(aln_len);
+        rev_sg.new_read(aln_len);
 
         SeedTracker fwd_tracker, rev_tracker;
 
@@ -160,6 +162,7 @@ int main(int argc, char** argv) {
         
         seeds_out << "== " << read_filename << " ==\n";
         alns_out << "== " << read_filename << " ==\n";
+        alns_out << "== scale/shift: " << norm.scale << " " << norm.shift << " ==\n";
         alns_out << "== aligning " 
                  << aln_st << "-" 
                  << aln_en << " of " 
