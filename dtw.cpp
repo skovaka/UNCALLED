@@ -44,7 +44,10 @@ double **full_dtw(const KmerModel &model,
                 cost = fabs(model.lv_means_[ref_kmers[i]] - read_events[j].mean);
             }
 
-            dtw_mat[i][j] = fmin(diag, fmin(left, up)) + cost;
+
+            dtw_mat[i][j] = fmin(diag + cost, 
+                            fmin(left + cost, 
+                                 up + 2*cost));
         }
     }
 
