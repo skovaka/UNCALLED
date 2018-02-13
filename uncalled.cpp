@@ -32,7 +32,7 @@ enum Opt {MODEL       = 'm',
 
           TALLY_DIST  = 't',
 
-          MIN_SEED_LEN    = 's',
+          MIN_SEED_LEN = 's',
           ANCHOR_LEN  = 'a',
           MAX_IGNORES = 'i',
           MAX_SKIPS   = 'k',
@@ -41,7 +41,9 @@ enum Opt {MODEL       = 'm',
           EXTEND_EVPR = 'E',
           ANCHOR_EVPR = 'A',
           SEED_PR     = 'S',
-          STAY_PR     = 'Y'};
+          STAY_PR     = 'Y',
+          
+          READ_UNTIL = 'u'};
 
 int main(int argc, char** argv) {
     ArgParse args("UNCALLED: Utility for Nanopore Current Alignment to Large Expanses of DNA");
@@ -55,6 +57,7 @@ int main(int argc, char** argv) {
     args.add_int(   Opt::ANCHOR_LEN,  "anchor_len",   12,     "");
     args.add_int(   Opt::MAX_IGNORES, "max_ignores",  0,    "");
     args.add_int(   Opt::MAX_SKIPS,   "max_skips",    0,    "");
+    args.add_int(   Opt::READ_UNTIL,  "read_until",   0, "");
     args.add_double(Opt::STAY_FRAC,   "stay_frac",    0.5,    "");
     args.add_double(Opt::ANCHOR_EVPR, "anchor_evpr", -3.75,    "");
     args.add_double(Opt::EXTEND_EVPR, "extend_evpr", -10,  "");
@@ -101,7 +104,6 @@ int main(int argc, char** argv) {
     SeedGraph rev_sg(rev_fmi, aln_params, "rev"),
               fwd_sg(fwd_fmi, aln_params, "fwd");
 
-
     std::ifstream reads_file(args.get_string(Opt::READ_LIST));
 
     if (!reads_file) {
@@ -109,6 +111,9 @@ int main(int argc, char** argv) {
                   << args.get_string(Opt::READ_LIST) << "'\n";
         return 1;
     }
+
+    int ru_min_revts = args.get_int(Opt::READ_UNTIL);
+    bool read_until = ru_min_revts > 0;
 
     std::string read_line, read_filename;
 
@@ -173,16 +178,20 @@ int main(int argc, char** argv) {
         int status_step = aln_len / 10,
             status = 0;
 
-        for (int i = aln_en; i >= aln_st; i--) {
-            std::vector<Result> fwd_seeds = fwd_sg.add_event(events[i], seeds_out),
-                                rev_seeds = rev_sg.add_event(events[i], seeds_out);
-            fwd_tracker.add_seeds(fwd_seeds);
-            rev_tracker.add_seeds(rev_seeds);
+        int e = aln_en;
+        for (; e >= aln_st; e--) {
+            std::vector<Result> fwd_seeds = fwd_sg.add_event(events[e], seeds_out),
+                                rev_seeds = rev_sg.add_event(events[e], seeds_out);
 
-            //alns_out << events[i].mean << " " << events[i].stdv << "\n";
+            int fwd_len = fwd_tracker.add_seeds(fwd_seeds);
+            int rev_len = rev_tracker.add_seeds(rev_seeds);
+
+            if (read_until && max(rev_len, fwd_len) > ru_min_revts) {
+                break;
+            }
 
             if (status == status_step) {
-                int prog = (int) ((100.0 * (aln_len - i)) / aln_len);
+                int prog = (int) ((100.0 * (aln_len - e)) / aln_len);
                 err_out << prog << "%  (" << timer.get() / 1000 << ")\n";
                 status = 0;
                 err_out.flush();
@@ -192,6 +201,7 @@ int main(int argc, char** argv) {
                 status++;
             }
         }
+
         err_out << "100% (" << timer.get() / 1000 << ")\n";
 
         fwd_tracker.print(alns_out, FWD_STR, 5);
@@ -201,7 +211,9 @@ int main(int argc, char** argv) {
         seeds_out.flush();
         alns_out.flush();
 
-        alns_out << "== " << timer.lap() / 1000 << " sec ==\n";
+        alns_out  << "== " << timer.lap() << " ms, " 
+                  << (aln_en - e + 1) << " events ==\n";
+
         seeds_out << "== " << timer.lap() / 1000 << " sec ==\n";
     }
 }

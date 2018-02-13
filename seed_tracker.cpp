@@ -5,7 +5,7 @@
 
 //#define DEBUG
 
-ReadAln::ReadAln() {
+ReadAln::ReadAln() : evt_st_(-1) {
 }
 
 ReadAln::ReadAln(Range ref_en, int evt_en)
@@ -64,6 +64,10 @@ void ReadAln::print(std::ostream &out, bool newline = false, bool print_all = fa
         out << "\n";
 }
 
+bool ReadAln::is_valid() {
+    return evt_st_ >= 0;
+}
+
 bool operator< (const ReadAln &r1, const ReadAln &r2) {
     if (r1.ref_st_.end_ != r2.ref_st_.end_)
         return r1.ref_st_.end_ < r2.ref_st_.end_;
@@ -81,9 +85,11 @@ void SeedTracker::reset() {
 }
 
 int SeedTracker::add_seeds(const std::vector<Result> &seeds) {
+    int max_len = 0;
     for (int i = 0; i < seeds.size(); i++) {
-        add_seed(seeds[i]);
+        max_len = max(max_len, add_seed(seeds[i]));
     }
+    return max_len;
 }
 
 int SeedTracker::add_seed(Result r) {
@@ -132,9 +138,7 @@ int SeedTracker::add_seed(Result r) {
 
     //std::cerr << new_loc.ref_en_ << " " << r.ref_range_.length() << "\n";
 
-    
-
-    return new_loc.ref_en_;
+    return new_loc.total_len_;
 }
 
 std::vector<ReadAln> SeedTracker::get_alignments(int min_len = 1) {

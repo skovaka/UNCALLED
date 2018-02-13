@@ -22,6 +22,7 @@ class ReadAln {
     void update_next(ReadAln &new_loc) const;
     void print(std::ostream &out, bool newline, bool print_all) const;
     Range ref_range() const;
+    bool is_valid();
 
     friend bool operator< (const ReadAln &q1, const ReadAln &q2);
 };
@@ -32,11 +33,13 @@ class SeedTracker {
 
     public:
 
-
     std::set<ReadAln> locations;
     int longest_seed;
+    int min_revents_;
 
     SeedTracker();
+    SeedTracker(int min_revents);
+
     int add_seed(Result seed);
     int add_seeds(const std::vector<Result> &seeds);
 
