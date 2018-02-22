@@ -5,7 +5,9 @@
 
 //#define DEBUG
 
-ReadAln::ReadAln() : evt_st_(-1) {
+ReadAln::ReadAln() 
+    : evt_st_(-1),
+      total_len_(0) {
 }
 
 ReadAln::ReadAln(Range ref_en, int evt_en)
@@ -76,23 +78,29 @@ bool operator< (const ReadAln &r1, const ReadAln &r2) {
 }
 
 SeedTracker::SeedTracker() {
-    longest_seed = 0;
+    longest_seed = NULL;
 }
 
 void SeedTracker::reset() {
     locations.clear();
-    longest_seed = 0;
+    longest_seed = NULL;
 }
 
-int SeedTracker::add_seeds(const std::vector<Result> &seeds) {
-    int max_len = 0;
+ReadAln SeedTracker::add_seeds(const std::vector<Result> &seeds) {
+    ReadAln top;
+
     for (int i = 0; i < seeds.size(); i++) {
-        max_len = max(max_len, add_seed(seeds[i]));
+        ReadAln a = add_seed(seeds[i]);
+
+        if (!top.is_valid() || top.total_len_ < a.total_len_) {
+            top = a;
+        }
     }
-    return max_len;
+
+    return top;
 }
 
-int SeedTracker::add_seed(Result r) {
+ReadAln SeedTracker::add_seed(Result r) {
     ReadAln new_loc(r.ref_range_, r.read_range_.end_);
 
     auto loc = locations.lower_bound(new_loc),
@@ -132,13 +140,13 @@ int SeedTracker::add_seed(Result r) {
         #endif
     }
 
-    if (new_loc.total_len_ > longest_seed) {
-        longest_seed = new_loc.total_len_;
+    if (longest_seed == NULL || new_loc.total_len_ > longest_seed->total_len_) {
+        longest_seed = &new_loc;
     }
 
     //std::cerr << new_loc.ref_en_ << " " << r.ref_range_.length() << "\n";
 
-    return new_loc.total_len_;
+    return new_loc;
 }
 
 std::vector<ReadAln> SeedTracker::get_alignments(int min_len = 1) {
@@ -158,19 +166,21 @@ std::vector<ReadAln> SeedTracker::get_alignments(int min_len = 1) {
     return ret;
 }
 
-double SeedTracker::top_ratio(const std::vector<ReadAln> &alns) {
-    const ReadAln &top = alns.front();
+bool SeedTracker::check_ratio(const ReadAln &aln, double ratio) {
 
-    Range top_ref = top.ref_range();
+    Range top_ref = aln.ref_range();
+    int max_len = (aln.total_len_) / ratio;
 
     int i = 1;
-    for(; i < alns.size(); i++) {
-        if (top_ref.get_recp_overlap(alns[i].ref_range()) < 0.9) {
-            break;
+    for (auto a = locations.begin(); a != locations.end(); a++) {
+        if (top_ref.get_recp_overlap(a->ref_range()) == 0 && 
+            a->total_len_ >= max_len) {
+            
+            return false;
         }
     }
 
-    return double(top.total_len_) / double(alns[i].total_len_);
+    return true;
 }
 
 void SeedTracker::print(std::ostream &out, std::string strand, int max_out = 10) {

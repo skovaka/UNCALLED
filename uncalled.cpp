@@ -183,12 +183,21 @@ int main(int argc, char** argv) {
             std::vector<Result> fwd_seeds = fwd_sg.add_event(events[e], seeds_out),
                                 rev_seeds = rev_sg.add_event(events[e], seeds_out);
 
-            int fwd_len = fwd_tracker.add_seeds(fwd_seeds);
-            int rev_len = rev_tracker.add_seeds(rev_seeds);
+            ReadAln fa = fwd_tracker.add_seeds(fwd_seeds);
+            ReadAln ra = rev_tracker.add_seeds(rev_seeds);
 
-            if (read_until && max(rev_len, fwd_len) > ru_min_revts) {
-                break;
+            if (read_until && max(fa.total_len_, ra.total_len_) > ru_min_revts) {
+                //alns_out << fa.total_len_ << "\t" << ra.total_len_ << "\n";
+                ReadAln a = fa;
+                if (fa.total_len_ < ra.total_len_) {
+                    a = ra;
+                }
+                
+                if(fwd_tracker.check_ratio(a, 2) && rev_tracker.check_ratio(a, 2)) {
+                    break;
+                }
             }
+            
 
             if (status == status_step) {
                 int prog = (int) ((100.0 * (aln_len - e)) / aln_len);

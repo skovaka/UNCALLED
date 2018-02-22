@@ -47,10 +47,6 @@ EventDetector::EventDetector(const detector_param &edparams) :
         .valid_peak = false
     };
 
-    
-                               
-
-
     long_detector = {
         .DEF_PEAK_POS = -1,
         .DEF_PEAK_VAL = FLT_MAX,
@@ -168,16 +164,16 @@ bool EventDetector::peak_detect(float current_value, Detector &detector) {
 
     size_t i = sig_center();
 
-    printf("s %d\t%d\t%f\t%d\n", 
-           short_detector.masked_to,
-           short_detector.peak_pos,
-           short_detector.peak_value,
-           short_detector.valid_peak);
-    printf("l %d\t%d\t%f\t%d\n", 
-           long_detector.masked_to,
-           long_detector.peak_pos,
-           long_detector.peak_value,
-           long_detector.valid_peak);
+    //printf("s %d\t%d\t%f\t%d\n", 
+    //       short_detector.masked_to,
+    //       short_detector.peak_pos,
+    //       short_detector.peak_value,
+    //       short_detector.valid_peak);
+    //printf("l %d\t%d\t%f\t%d\n", 
+    //       long_detector.masked_to,
+    //       long_detector.peak_pos,
+    //       long_detector.peak_value,
+    //       long_detector.valid_peak);
 
     //Carry on if we've been masked out
     if (detector.masked_to >= i) {

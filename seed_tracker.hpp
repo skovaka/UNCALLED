@@ -34,20 +34,21 @@ class SeedTracker {
     public:
 
     std::set<ReadAln> locations;
-    int longest_seed;
+    ReadAln *longest_seed;
     int min_revents_;
 
     SeedTracker();
     SeedTracker(int min_revents);
 
-    int add_seed(Result seed);
-    int add_seeds(const std::vector<Result> &seeds);
+    ReadAln add_seed(Result seed);
+    ReadAln add_seeds(const std::vector<Result> &seeds);
 
     void reset();
 
     std::vector<ReadAln> get_alignments(int min_len);
 
-    static double top_ratio(const std::vector<ReadAln> &alns);
+    //static double top_ratio(int min_len);
+    bool check_ratio(const ReadAln &aln, double ratio);
 
     void print(std::ostream &out, std::string strand, int max_out);
 };

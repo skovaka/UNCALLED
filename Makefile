@@ -6,7 +6,9 @@ CC=g++
 CFLAGS=-Wall -std=c++11 -O3
 INCLUDE=-I./src/fast5/src -I./src/scrappie -I./src ${BOOST_INCLUDE}
 
-all: uncalled seed_tracker_test dtw_test
+all: uncalled dtw_test 
+
+#seed_tracker_test 
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c -o $@ $^ $(INCLUDE) $(HDF5_INCLUDE) 
