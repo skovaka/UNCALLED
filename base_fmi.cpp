@@ -9,7 +9,7 @@
 #include <utility>
 #include <unordered_map>
 #include "timer.h"
-#include "kmer_fmi.hpp"
+#include "base_fmi.hpp"
 
 //#define DEBUG(s)
 #define DEBUG(s) do { std::cerr << s; } while (0)
@@ -22,11 +22,25 @@ int min(int a, int b) {
     return a < b ? a : b;
 }
 
-//Reads a model directly from a file and creates the FM index from the given reference
-KmerFMI::KmerFMI(int alph_size, std::vector<mer_id> &mer_seq, int tally_dist) {
+char base_to_idx(char base) {
+    switch (base) {
+        case 'A':
+        return 0;
+        case 'C':
+        return 1;
+        case 'G':
+        return 2;
+        case 'T':
+        return 3;
+        default:
+        return 4;
+    }
+}
 
-    alph_size_ = alph_size;
-    mer_seq_ = &mer_seq;
+//Reads a model directly from a file and creates the FM index from the given reference
+BaseFMI::BaseFMI(std::string seq, int tally_dist) {
+
+    seq_ = &seq;
     tally_dist_ = tally_dist;
 
     //For outputting time
@@ -34,9 +48,10 @@ KmerFMI::KmerFMI(int alph_size, std::vector<mer_id> &mer_seq, int tally_dist) {
 
     //Init suffix array
     //Not using suffix_ar instance var speeds up sorting significantly
-    std::vector<unsigned int> suffix_ar(mer_seq.size());
-    for (unsigned int i = 0; i < suffix_ar.size(); i++) 
+    std::vector<unsigned int> suffix_ar(seq.size());
+    for (unsigned int i = 0; i < suffix_ar.size(); i++) {
         suffix_ar[i] = i;
+    }
 
     std::cerr << "SA init time: " << timer.lap() << "\n";
 
@@ -47,38 +62,39 @@ KmerFMI::KmerFMI(int alph_size, std::vector<mer_id> &mer_seq, int tally_dist) {
     std::cerr << "SA sort time: " << timer.lap() << "\n";
 
     //Allocate space for other data structures
-    bwt_.resize(mer_seq.size());
-    mer_f_starts_.resize(alph_size_);
-    mer_counts_.resize(alph_size_);
-    mer_tally_.resize(alph_size_);
+    bwt_ = std::string(seq.size(), '$');
+    f_starts_.resize(4);
+    counts_.resize(4);
+    tally_.resize(4);
 
-    mer_count_tmp_.resize(alph_size_, 0);
+    count_tmp_.resize(4, 0);
 
-    for (mer_id i = 0; i < alph_size_; i++)
-        mer_tally_[i].resize((mer_seq.size() / tally_dist_) + 1, -1);
+    for (size_t i = 0; i < 4; i++)
+        tally_[i].resize((seq.size() / tally_dist_) + 1, -1);
     
     std::cerr << "FM init time: " << timer.lap() << "\n";
 
     int tally_mod = tally_dist_;
-    
+
     //Single pass to generate BWT and other datastructures
     for (unsigned int i = 0; i < suffix_ar_.size(); i++) {
         
         //Fill in BWT
         if (suffix_ar_[i] > 0) {
-            bwt_[i] = mer_seq[suffix_ar_[i]-1];
+            bwt_[i] = base_to_idx(seq[suffix_ar_[i]-1]);
         } else {
-            bwt_[i] = mer_seq.back();
-            //bwt_[i] = mer_seq[suffix_ar_[suffix_ar_.size()-1]];
+            bwt_[i] = base_to_idx(seq.back());
         }
 
+
         //Update 6-mer counts
-        mer_counts_[bwt_[i]]++;
+        counts_[bwt_[i]]++;
         
         //Update tally array
         if (tally_mod == tally_dist_) {
-            for (mer_id j = 0; j < alph_size_; j++)
-                mer_tally_[j][i / tally_dist_] = mer_counts_[j];
+            for (size_t j = 0; j < 4; j++) {
+                tally_[j][i / tally_dist_] = counts_[j];
+            }
             tally_mod = 0;
         }
         tally_mod += 1;
@@ -87,35 +103,41 @@ KmerFMI::KmerFMI(int alph_size, std::vector<mer_id> &mer_seq, int tally_dist) {
     std::cerr << "FM build time: " << timer.lap() << "\n";
     
     //TODO: store as range?
-    mer_f_starts_[0] = 1;
-    for (mer_id i = 1; i < alph_size_; i++) {
-        mer_f_starts_[i] = mer_f_starts_[i-1] + mer_counts_[i-1];
+    f_starts_[0] = 1;
+    for (size_t i = 1; i < 4; i++) {
+        f_starts_[i] = f_starts_[i-1] + counts_[i-1];
     }
+
     
     //Fill in last entry in tally array if needed
-    if (mer_seq.size() % tally_dist_ == 0)
-        for (mer_id i = 0; i < alph_size_; i++)
-            mer_tally_[i][mer_tally_[i].size()-1] = mer_counts_[i];
+    if (seq.size() % tally_dist_ == 0) {
+        for (size_t i = 0; i < 4; i++) {
+            tally_[i][tally_[i].size()-1] = counts_[i];
+        }
+    }
+
+
+
 
 }
 
 //Returns true if the suffix of *mer_seq_tmp starting at rot1 is less than that
 //starting at rot2. Used to build suffix array.
-bool KmerFMI::operator() (unsigned int rot1, unsigned int rot2) {
+bool BaseFMI::operator() (unsigned int rot1, unsigned int rot2) {
 
     int c1, c2;
-    for (unsigned int i = 0; i < mer_seq_->size(); i++) {
+    for (unsigned int i = 0; i < seq_->size(); i++) {
         
-        c1 = mer_seq_->at(rot1 + i);
-        c2 = mer_seq_->at(rot2 + i);
+        c1 = seq_->at(rot1 + i);
+        c2 = seq_->at(rot2 + i);
 
         if (c1 == c2)
             continue;
 
-        if (c2 == alph_size_)
+        if (c2 == '$')
             return false;
         
-        if (c1 == alph_size_ || c1 < c2)
+        if (c1 == '$' || c1 < c2)
             return true;
 
        return false;
@@ -124,10 +146,52 @@ bool KmerFMI::operator() (unsigned int rot1, unsigned int rot2) {
     return false;
 }
 
+Range BaseFMI::get_neighbor(Range range, char base) const {
+    int min = get_tally(base, range.start_ - 1);
+    int max = get_tally(base, range.end_);
+
+    if (min >= 0 && max >= 0 && min < max) {
+        int base_st = f_starts_[base_to_idx(base)];
+        return Range(base_st + min, base_st + max - 1);
+    }
+
+    return Range();
+}
+
+int BaseFMI::get_tally(char base, int loc) const {
+    if (loc < 0)
+        return -1;
+
+    //Closest checkpoint < i
+    int cp = (loc / tally_dist_) * tally_dist_; 
+
+    //Check if checkpoint after i is closer
+    if (loc - cp > (cp + tally_dist_) - loc 
+            && cp + (unsigned) tally_dist_ < bwt_.size())
+        cp += tally_dist_;
+
+    int cp_dist = cp - loc; //TODO: just use cp
+
+    int k = base_to_idx(base);
+
+    int count = tally_[k][(loc + cp_dist) / tally_dist_];
+
+    if (cp_dist > 0) {
+        for (int i = loc+1; i <= loc + cp_dist; i++) {
+            count -= bwt_[i] == k;
+        }
+    } else if (cp_dist < 0) {
+        for (int i = loc; i > loc + cp_dist; i--) {
+            count += bwt_[i] == k;
+        }
+    }
+    
+    return count;
+}
 
 //Returns the number of occurences of the given k-mer in the BWT up to and
 //including the given index
-std::list<int> KmerFMI::get_tallies(std::list<mer_id> kmers, int loc) const {
+std::list<int> BaseFMI::get_tallies(std::list<char> bases, int loc) const {
     std::list<int> tallies;
     if (loc < 0)
         return tallies;
@@ -142,43 +206,46 @@ std::list<int> KmerFMI::get_tallies(std::list<mer_id> kmers, int loc) const {
 
     int cp_dist = cp - loc; //TODO: just use cp
 
-    for (auto k = kmers.begin(); k != kmers.end(); k++)
-        mer_count_tmp_[*k] = mer_tally_[*k][(loc + cp_dist) / tally_dist_];
+    for (auto k = bases.begin(); k != bases.end(); k++)
+        count_tmp_[base_to_idx(*k)] = tally_[base_to_idx(*k)][(loc + cp_dist) / tally_dist_];
 
-    if (cp_dist > 0) 
-        for (int i = loc+1; i <= loc + cp_dist; i++)
-            mer_count_tmp_[bwt_[i]]--;
-
-    else if (cp_dist < 0)
-        for (int i = loc; i > loc + cp_dist; i--)
-            mer_count_tmp_[bwt_[i]]++;
+    if (cp_dist > 0) {
+        for (int i = loc+1; i <= loc + cp_dist; i++) {
+            count_tmp_[bwt_[i]]--;
+        }
+    } else if (cp_dist < 0) {
+        for (int i = loc; i > loc + cp_dist; i--) {
+            count_tmp_[bwt_[i]]++;
+        }
+    }
     
-    for (auto k = kmers.begin(); k != kmers.end(); k++) {
-        tallies.push_back(mer_count_tmp_[*k]);
+    for (auto k = bases.begin(); k != bases.end(); k++) {
+        tallies.push_back(count_tmp_[base_to_idx(*k)]);
     }
 
     return tallies;
 }
 
-std::list<Range> KmerFMI::get_neigbhors(Range range, std::list<mer_id> kmers) const {
+
+std::list<Range> BaseFMI::get_neigbhors(Range range, std::list<char> bases) const {
     std::list<Range> results;
 
-    std::list<int> mins = get_tallies(kmers, range.start_ - 1);
-    std::list<int> maxs = get_tallies(kmers, range.end_);
+    std::list<int> mins = get_tallies(bases, range.start_ - 1);
+    std::list<int> maxs = get_tallies(bases, range.end_);
 
-    auto kmer = kmers.begin();
+    auto base = bases.begin();
     auto min = mins.begin();
     auto max = maxs.begin();
         
-    while (kmer != kmers.end()) {
+    while (base != bases.end()) {
         if (*min < *max) {
-            int kmer_st = mer_f_starts_[*kmer];
-            results.push_back(Range(kmer_st + *min, kmer_st + *max - 1));
+            int base_st = f_starts_[base_to_idx(*base)];
+            results.push_back(Range(base_st + *min, base_st + *max - 1));
         } else {
             results.push_back(Range());
         }
 
-        kmer++;
+        base++;
         min++;
         max++;
     }
@@ -187,8 +254,22 @@ std::list<Range> KmerFMI::get_neigbhors(Range range, std::list<mer_id> kmers) co
 }
 
 //TODO: Maybe store f as ranges?
-Range KmerFMI::get_full_range(mer_id kmer) const {
-    return Range(mer_f_starts_[kmer], mer_f_starts_[kmer] + mer_counts_[kmer] -1 );
+Range BaseFMI::get_full_range(char base) const {
+    return Range(f_starts_[base_to_idx(base)], f_starts_[base_to_idx(base)] + counts_[base_to_idx(base)] -1 );
+}
+
+Range BaseFMI::get_kmer_range(const std::string &seq) const {
+    Range r = get_full_range(seq.back());
+
+    for (size_t i = seq.size()-2; i < seq.size(); i--) {
+        if (!r.is_valid()) {
+            break;
+        }
+
+        r = get_neighbor(r, seq[i]);
+    }
+
+    return r;
 }
 
 Range::Range(const Range &prev)

@@ -169,7 +169,7 @@ float KmerModel::get_stay_prob(Event e1, Event e2) const {
     return log(q);
 }
 
-std::string KmerModel::reverse_complement(std::string &seq) const {
+std::string KmerModel::reverse_complement(const std::string &seq) const {
     std::string rev(seq.size(), 'N');
     for (unsigned int i = 0; i < seq.size(); i++) {
         char c = 'N';
@@ -202,6 +202,22 @@ mer_id KmerModel::kmer_to_id(std::string kmer, int offset) const {
     for (unsigned int j = 1; j < k_; j++)
         id = (id << 2) | base_to_id(kmer[offset+j]);
     return id;
+}
+
+std::string KmerModel::id_to_kmer(mer_id kmer) const {
+    std::string seq(k_, 'A');
+    for (size_t i = 0; i < k_; i++) {
+        seq[k_ - i - 1] = id_to_base((kmer >> i * 2) & 0x3);
+    }
+    return seq;
+}
+
+char KmerModel::get_lmb(mer_id kmer) const {
+    return id_to_base( (kmer >> (2*k_ - 2)) & 0x3 );
+}
+
+char KmerModel::get_rmb(mer_id kmer) const {
+    return id_to_base(kmer & 0x3);
 }
     
 short KmerModel::base_to_id(char b) {
@@ -275,6 +291,26 @@ void KmerModel::normalize_events(std::vector<Event> &events, NormParams norm) co
     for (size_t i = 0; i < events.size(); i++) {
         events[i].mean = norm.scale * events[i].mean + norm.shift;
     }
+}
+
+void KmerModel::parse_fasta(
+                 std::ifstream &fasta_in, 
+                 std::string &fwd_bases, 
+                 std::string &rev_bases) const {
+
+    //For parsing the file
+    std::string line;
+    
+    getline(fasta_in, line); //read past header
+
+    while (getline(fasta_in, line)) {
+        fwd_bases += line;
+    }
+
+    rev_bases = reverse_complement(fwd_bases);
+
+    fwd_bases += "$";
+    rev_bases += "$";
 }
 
 //Reads the given fasta file and stores forward and reverse k-mers

@@ -13,7 +13,6 @@
 #include "seed_graph.hpp"
 #include "seed_tracker.hpp"
 #include "kmer_model.hpp"
-#include "kmer_fmi.hpp"
 #include "timer.h"
 
 
@@ -80,15 +79,19 @@ int main(int argc, char** argv) {
     KmerModel model(args.get_string(Opt::MODEL));
 
     err_out << "Parsing fasta\n";
-    std::vector<mer_id> fwd_ids, rev_ids;
+    //std::vector<mer_id> fwd_ids, rev_ids;
     std::ifstream ref_file(args.get_string(Opt::REFERENCE));
-    model.parse_fasta(ref_file, fwd_ids, rev_ids);
+    //model.parse_fasta(ref_file, fwd_ids, rev_ids);
+    std::string fwd_bases, rev_bases;
+    model.parse_fasta(ref_file, fwd_bases, rev_bases);
 
     err_out << "Building forward FMI\n";
-    KmerFMI fwd_fmi(model.kmer_count(), fwd_ids, args.get_int(Opt::TALLY_DIST));
+    //KmerFMI fwd_fmi(model.kmer_count(), fwd_ids, args.get_int(Opt::TALLY_DIST));
+    BaseFMI fwd_fmi(fwd_bases, args.get_int(Opt::TALLY_DIST));
 
     err_out << "Building reverse FMI\n";
-    KmerFMI rev_fmi(model.kmer_count(), rev_ids, args.get_int(Opt::TALLY_DIST));
+    //KmerFMI rev_fmi(model.kmer_count(), rev_ids, args.get_int(Opt::TALLY_DIST));
+    BaseFMI rev_fmi(rev_bases, args.get_int(Opt::TALLY_DIST));
 
     AlnParams aln_params(model,
                          args.get_int(Opt::MIN_SEED_LEN),

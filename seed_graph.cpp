@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include "timer.h"
 #include "seed_graph.hpp"
-#include "kmer_fmi.hpp"
+#include "base_fmi.hpp"
 #include "boost/math/distributions/students_t.hpp"
 
 //#define DEBUG(s)
@@ -245,16 +245,22 @@ int AlnParams::get_graph_len(int seed_nlen) {
     return (nucl_to_events(seed_nlen) / (1.0 - max_stay_frac_)) + max_ignores_;
 }
 
-SeedGraph::SeedGraph(const KmerFMI &fmi, 
+SeedGraph::SeedGraph(const BaseFMI &fmi, 
                      const AlnParams &ap,
                      const std::string &label)
     : fmi_(fmi),
       params_(ap),
       label_(label) {
     timer.reset();
+
+    kmer_ranges_ = new Range[params_.model_.kmer_count()];
+    for (mer_id k = 0; k < params_.model_.kmer_count(); k++) {
+        kmer_ranges_[k] = fmi_.get_kmer_range(params_.model_.id_to_kmer(k));
+    }
 }
 
 SeedGraph::~SeedGraph() {
+    delete[] kmer_ranges_;
     reset();
 }
 
@@ -361,34 +367,33 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
         auto neighbor_itr = params_.model_.get_neighbors(prev_kmer);
         std::list<mer_id> next_kmers;
 
-        for (auto n = neighbor_itr.first; 
-             n != neighbor_itr.second; n++) {
-
-
+        for (auto n = neighbor_itr.first; n != neighbor_itr.second; n++) {
             if(kmer_probs[*n] >= evpr_thresh) {
                 next_kmers.push_back(*n);
             } 
         }
 
         //Find ranges FM index for those next kmers
-        std::list<Range> next_ranges = fmi_.get_neigbhors(prev_range, next_kmers);
+        //std::list<Range> next_ranges = fmi_.get_neigbhors(prev_range, next_kmers);
 
         auto next_kmer = next_kmers.begin(); 
-        auto next_range = next_ranges.begin();
+        //auto next_range = next_ranges.begin();
         
 
         //Add all the neighbors that were found
         while (next_kmer != next_kmers.end()) {
             prob = kmer_probs[*next_kmer];
 
-            neighbor_count += next_range->is_valid();
+            char next_base = params_.model_.get_lmb(*next_kmer);
+            Range next_range = fmi_.get_neighbor(prev_range, next_base);
 
-            //std::cout << next_range->start_ << " " << next_range->end_ << "\n";
+            neighbor_count += next_range.is_valid();
+
             Node next_node(prev_node, *next_kmer, prob, Node::Type::MATCH);
-            add_child(*next_range, next_node);
+            add_child(next_range, next_node);
 
             next_kmer++; 
-            next_range++;
+            //next_range++;
         }
 
         if (neighbor_count < 2 && //Probably ok? Maybe add param?
@@ -412,7 +417,8 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
     for (mer_id kmer = 0; kmer < params_.model_.kmer_count(); kmer++) {
         prob = kmer_probs[kmer];
         if (prob >= params_.min_anchor_evpr_) {
-            Range next_range = fmi_.get_full_range(kmer);
+            Range next_range = fmi_.get_kmer_range(params_.model_.id_to_kmer(kmer));
+            //Range next_range = kmer_ranges_[kmer];
 
             if (next_range.is_valid()) {
                 Node next_node(kmer, prob);

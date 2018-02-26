@@ -41,10 +41,18 @@ class KmerModel {
     inline int kmer_count() const {return kmer_count_;}
 
     mer_id kmer_to_id(std::string kmer, int offset = 0) const;
+    std::string id_to_kmer(mer_id kmer) const;
+
+    char get_lmb(mer_id k) const;
+    char get_rmb(mer_id k) const;
 
     void parse_fasta (std::ifstream &fasta_in, 
                  std::vector<mer_id> &fwd_ids, 
                  std::vector<mer_id> &rev_ids) const;
+
+    void parse_fasta (std::ifstream &fasta_in, 
+                 std::string &fwd_bases, 
+                 std::string &rev_bases) const;
 
     double *lv_means_, *lv_vars_x2_, *lognorm_denoms_, *sd_means_, *sd_stdvs_;
 
@@ -56,7 +64,7 @@ class KmerModel {
     mer_id *rev_comp_ids_;
 
 
-    std::string reverse_complement(std::string &seq) const ;
+    std::string reverse_complement(const std::string &seq) const ;
 
     static char id_to_base(short i);
     static short base_to_id(char b);
