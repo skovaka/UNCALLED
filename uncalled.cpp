@@ -26,6 +26,7 @@ bool get_events(std::ostream &err, std::string filename, std::vector<Event> &eve
 
 enum Opt {MODEL       = 'm',
           REFERENCE   = 'r',
+          INDEX_PREFIX   = 'f',
           READ_LIST   = 'l',
           OUT_PREFIX     = 'o',
 
@@ -50,6 +51,7 @@ int main(int argc, char** argv) {
     args.add_string(Opt::MODEL, "model", "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model", "Nanopore kmer model");
     args.add_string(Opt::REFERENCE,   "reference",    "",     "");
     args.add_string(Opt::READ_LIST,   "read_list",    "",     "");
+    args.add_string(Opt::INDEX_PREFIX,  "index_prefix",   "",     "");
     args.add_string(Opt::OUT_PREFIX,  "out_prefix",   "./",     "");
     args.add_int(   Opt::TALLY_DIST,  "tally_dist",   16,     "");
     args.add_int(   Opt::MIN_SEED_LEN,"min_seed_len", 15,     "");
@@ -58,7 +60,7 @@ int main(int argc, char** argv) {
     args.add_int(   Opt::MAX_SKIPS,   "max_skips",    0,    "");
     args.add_int(   Opt::READ_UNTIL,  "read_until",   0, "");
     args.add_double(Opt::STAY_FRAC,   "stay_frac",    0.5,    "");
-    args.add_double(Opt::ANCHOR_EVPR, "anchor_evpr", -3.75,    "");
+    args.add_double(Opt::ANCHOR_EVPR, "anchor_evpr", -2.4,    "");
     args.add_double(Opt::EXTEND_EVPR, "extend_evpr", -10,  "");
     args.add_double(Opt::SEED_PR,     "seed_pr",     -3.75,  "");
     args.add_double(Opt::STAY_PR,     "stay_pr",     -8.343, "");
@@ -78,20 +80,34 @@ int main(int argc, char** argv) {
     err_out << "Loading model\n";
     KmerModel model(args.get_string(Opt::MODEL));
 
-    err_out << "Parsing fasta\n";
-    //std::vector<mer_id> fwd_ids, rev_ids;
-    std::ifstream ref_file(args.get_string(Opt::REFERENCE));
-    //model.parse_fasta(ref_file, fwd_ids, rev_ids);
-    std::string fwd_bases, rev_bases;
-    model.parse_fasta(ref_file, fwd_bases, rev_bases);
 
-    err_out << "Building forward FMI\n";
-    //KmerFMI fwd_fmi(model.kmer_count(), fwd_ids, args.get_int(Opt::TALLY_DIST));
-    BaseFMI fwd_fmi(fwd_bases, args.get_int(Opt::TALLY_DIST));
+    BaseFMI fwd_fmi, rev_fmi;
 
-    err_out << "Building reverse FMI\n";
-    //KmerFMI rev_fmi(model.kmer_count(), rev_ids, args.get_int(Opt::TALLY_DIST));
-    BaseFMI rev_fmi(rev_bases, args.get_int(Opt::TALLY_DIST));
+    if (!args.get_string(Opt::INDEX_PREFIX).empty()) {
+        std::string p = args.get_string(Opt::INDEX_PREFIX);
+        std::ifstream fwd_in(p + "fwdFM.txt"),
+                      rev_in(p + "revFM.txt");
+
+        std::cerr << "Reading forward FMI\n";
+        fwd_fmi = BaseFMI(fwd_in, args.get_int(Opt::TALLY_DIST));
+
+        std::cerr << "Reading reverse FMI\n";
+        rev_fmi = BaseFMI(rev_in, args.get_int(Opt::TALLY_DIST));
+
+    } else {
+        std::cerr << "Parsing fasta\n";
+        std::ifstream ref_file(args.get_string(Opt::REFERENCE));
+        std::string fwd_bases, rev_bases;
+        model.parse_fasta(ref_file, fwd_bases, rev_bases);
+
+        std::cerr << "Building forward FMI\n";
+        fwd_fmi = BaseFMI(fwd_bases, args.get_int(Opt::TALLY_DIST));
+
+        std::cerr << "Building reverse FMI\n";
+        rev_fmi = BaseFMI(rev_bases, args.get_int(Opt::TALLY_DIST));
+    }
+
+    std::cerr << "Done\n";
 
     AlnParams aln_params(model,
                          args.get_int(Opt::MIN_SEED_LEN),

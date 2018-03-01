@@ -37,6 +37,11 @@ char base_to_idx(char base) {
     }
 }
 
+BaseFMI::BaseFMI() {
+    loaded_ = false;
+
+}
+
 //Reads a model directly from a file and creates the FM index from the given reference
 BaseFMI::BaseFMI(std::string seq, int tally_dist) {
 
@@ -115,10 +120,73 @@ BaseFMI::BaseFMI(std::string seq, int tally_dist) {
             tally_[i][tally_[i].size()-1] = counts_[i];
         }
     }
+    loaded_ = true;
+}
 
+BaseFMI::BaseFMI(std::ifstream &infile, int tally_dist) {
+    tally_dist_ = tally_dist;
+    
+    size_t size = 0;
+    
+    infile >> size;
 
+    std::cerr << size << "\n";
+    
+    suffix_ar_.resize(size);
+    bwt_ = std::string(size, '$');
+    f_starts_.resize(4);
+    counts_.resize(4);
+    tally_.resize(4);
+    count_tmp_.resize(4, 0);
 
+    for (size_t i = 0; i < 4; i++)
+        tally_[i].resize((size / tally_dist_) + 1, -1);
+    
+    int tally_mod = tally_dist_;
+    int bwt_i;
 
+    for (size_t i = 0; i < size; i++) {
+        infile >> bwt_i >> suffix_ar_[i];
+
+        bwt_[i] = (char) bwt_i;
+
+        if (bwt_[i] < 4)
+            counts_[bwt_[i]]++;
+        
+        //Update tally array
+        if (tally_mod == tally_dist_) {
+            for (size_t j = 0; j < 4; j++) {
+                tally_[j][i / tally_dist_] = counts_[j];
+            }
+            tally_mod = 0;
+        }
+        tally_mod += 1;
+    }
+
+    //TODO: store as range?
+    f_starts_[0] = 1;
+    for (size_t i = 1; i < 4; i++) {
+        f_starts_[i] = f_starts_[i-1] + counts_[i-1];
+    }
+    
+    //Fill in last entry in tally array if needed
+    if (size % tally_dist_ == 0) {
+        for (size_t i = 0; i < 4; i++) {
+            tally_[i][tally_[i].size()-1] = counts_[i];
+        }
+    }
+    loaded_ = true;
+}
+
+void BaseFMI::save(std::string filename) {
+    std::ofstream out(filename);
+
+    out << bwt_.size() << "\n";
+    for (size_t i = 0; i < bwt_.size(); i++) {
+        out << (int) bwt_[i] << "\t" << suffix_ar_[i] << "\n";
+    }
+
+    out.close();
 }
 
 //Returns true if the suffix of *mer_seq_tmp starting at rot1 is less than that

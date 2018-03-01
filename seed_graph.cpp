@@ -417,8 +417,8 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
     for (mer_id kmer = 0; kmer < params_.model_.kmer_count(); kmer++) {
         prob = kmer_probs[kmer];
         if (prob >= params_.min_anchor_evpr_) {
-            Range next_range = fmi_.get_kmer_range(params_.model_.id_to_kmer(kmer));
-            //Range next_range = kmer_ranges_[kmer];
+            //Range next_range = fmi_.get_kmer_range(params_.model_.id_to_kmer(kmer));
+            Range next_range = kmer_ranges_[kmer];
 
             if (next_range.is_valid()) {
                 Node next_node(kmer, prob);

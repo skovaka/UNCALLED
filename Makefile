@@ -6,7 +6,7 @@ CC=g++
 CFLAGS=-Wall -std=c++11 -O3
 INCLUDE=-I./src/fast5/src -I./src/scrappie -I./src ${BOOST_INCLUDE}
 
-all: uncalled dtw_test test_fmi
+all: uncalled dtw_test save_fmi
 
 #seed_tracker_test 
 
@@ -27,6 +27,9 @@ dtw_test: dtw.o kmer_model.o arg_parse.o
 
 test_fmi: base_fmi.o test_fmi.o
 	$(CC) $(CFLAGS) base_fmi.o test_fmi.o -o test_fmi 
+
+save_fmi: base_fmi.o save_fmi.o
+	$(CC) $(CFLAGS) base_fmi.o save_fmi.o -o save_fmi 
 
 #arg_parse_test: 
 #	$(CC) $(CFLAGS) arg_parse.o -o arg_parse_test $(INCLUDE) $(LIBS)

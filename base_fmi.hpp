@@ -44,6 +44,9 @@ class BaseFMI {
     public:
 
     BaseFMI(std::string seq, int tally_dist);
+    BaseFMI();
+    BaseFMI(std::ifstream &infile, int tally_dist);
+    void save(std::string filename); 
 
     std::list<Range> get_neigbhors(Range range, std::list<char> bases) const;
     Range get_neighbor(Range range, char base) const;
@@ -59,6 +62,8 @@ class BaseFMI {
     int get_tally(char bases, int loc) const;
 
     std::string *seq_;
+
+    bool loaded_;
 
     //Sparseness of suffix and tally arrays
     int tally_dist_;
