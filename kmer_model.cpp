@@ -5,7 +5,7 @@
 #include <string>
 #include <cmath>
 #include <stddef.h>
-#include "boost/math/distributions/students_t.hpp"
+//#include "boost/math/distributions/students_t.hpp"
 #include "kmer_model.hpp"
 
 #define PI 3.1415926535897
@@ -86,9 +86,8 @@ KmerModel::KmerModel(std::string model_fname) {
 
             //Store all neighboring kmers
             for (short b = 0; b < 4; b++) { //4 magic number?
-                neighbors_[k_id].push_back(
-                    kmer_to_id(id_to_base(b) + kmer.substr(0, k_ - 1)));
-            }
+                neighbors_[k_id].push_back(kmer_to_id(base_to_char(b) + kmer.substr(0, k_ - 1)));
+           }
 
             //Store model information
             lv_means_[k_id] = lv_mean;
@@ -131,8 +130,8 @@ KmerModel::~KmerModel() {
     delete [] lv_vars_x2_;
     delete [] lognorm_denoms_;
     delete [] sd_means_;
-    delete [] sd_stdvs_;
     delete [] neighbors_; 
+    delete [] sd_stdvs_;
     delete [] rev_comp_ids_; 
 }
 
@@ -141,124 +140,57 @@ bool KmerModel::event_valid(const Event &e) const {
 }
 
 float KmerModel::event_match_prob(Event e, mer_id k_id) const {
-    //double norm_mean = lv_means_[k_id] * norm.scale + norm.shift;
-    //return (-pow(e.mean - norm_mean, 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
-
     return (-pow(e.mean - lv_means_[k_id], 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
 }
 
-float KmerModel::get_stay_prob(Event e1, Event e2) const {
-
-    if (e1.length == 0 || e2.length == 0)
-        return 0;
-
-    if (e1 == e2)
-        return log(1);
-
-    double var1 = e1.stdv*e1.stdv, var2 = e2.stdv*e2.stdv;
-
-    double t = (e1.mean - e2.mean) / sqrt(var1/e1.length + var2/e2.length);
-
-    int df = pow(var1/e1.length + var2/e2.length, 2) 
-               / (pow(var1/e1.length, 2) / (e1.length-1) 
-                    + pow(var2/e2.length, 2) / (e2.length-1));
-
-    boost::math::students_t dist(df);
-    double q = boost::math::cdf(boost::math::complement(dist, fabs(t)));
-
-    return log(q);
-}
-
-std::string KmerModel::reverse_complement(const std::string &seq) const {
-    std::string rev(seq.size(), 'N');
-    for (unsigned int i = 0; i < seq.size(); i++) {
-        char c = 'N';
-        switch(seq[i]) {
-            case 'A':
-            case 'a':
-            c = 'T';
-            break;
-            case 'T':
-            case 't':
-            c = 'A';
-            break;
-            case 'G':
-            case 'g':
-            c = 'C';
-            break;
-            case 'C':
-            case 'c':
-            c = 'G';
-            break;
-        }
-        rev[rev.size()-i-1] = c;
-    }
-
-    return rev;
-}
+//float KmerModel::get_stay_prob(Event e1, Event e2) const {
+//
+//    if (e1.length == 0 || e2.length == 0)
+//        return 0;
+//
+//    if (e1 == e2)
+//        return log(1);
+//
+//    double var1 = e1.stdv*e1.stdv, var2 = e2.stdv*e2.stdv;
+//
+//    double t = (e1.mean - e2.mean) / sqrt(var1/e1.length + var2/e2.length);
+//
+//    int df = pow(var1/e1.length + var2/e2.length, 2) 
+//               / (pow(var1/e1.length, 2) / (e1.length-1) 
+//                    + pow(var2/e2.length, 2) / (e2.length-1));
+//
+//    boost::math::students_t dist(df);
+//    double q = boost::math::cdf(boost::math::complement(dist, fabs(t)));
+//
+//    return log(q);
+//}
 
 mer_id KmerModel::kmer_to_id(std::string kmer, int offset) const {
-    mer_id id = base_to_id(kmer[offset]);
+    mer_id id = char_to_base(kmer[offset]);
     for (unsigned int j = 1; j < k_; j++)
-        id = (id << 2) | base_to_id(kmer[offset+j]);
+        id = (id << 2) | char_to_base(kmer[offset+j]);
     return id;
 }
 
-std::string KmerModel::id_to_kmer(mer_id kmer) const {
-    std::string seq(k_, 'A');
-    for (size_t i = 0; i < k_; i++) {
-        seq[k_ - i - 1] = id_to_base((kmer >> i * 2) & 0x3);
-    }
-    return seq;
+base_t KmerModel::get_base(mer_id kmer, size_t i) const {
+    return (base_t) ((kmer >> (2 * (k_-i-1))) & 0x3);
 }
 
-char KmerModel::get_lmb(mer_id kmer) const {
-    return id_to_base( (kmer >> (2*k_ - 2)) & 0x3 );
+base_t KmerModel::get_first_base(mer_id kmer) const {
+    return (base_t) ((kmer >> (2*k_ - 2)) & 0x3);
 }
 
-char KmerModel::get_rmb(mer_id kmer) const {
-    return id_to_base(kmer & 0x3);
-}
-    
-short KmerModel::base_to_id(char b) {
-    switch (b) {
-        case 'A':
-        case 'a':
-        return 0;
-
-        case 'C':
-        case 'c':
-        return 1;
-
-        case 'G':
-        case 'g':
-        return 2;
-
-        case 'T':
-        case 't':
-        return 3;
-    }
-
-    return -1;
+base_t KmerModel::get_last_base(mer_id kmer) const {
+    return (base_t) (kmer & 0x3);
 }
 
-char KmerModel::id_to_base(short i) {
-    switch (i) {
-        case 0:
-        return 'A';
-        
-        case 1:
-        return 'C';
-
-        case 2:
-        return 'G';
-
-        case 3:
-        return 'T';
-    }
-
-    return 'N';
-}
+//std::string KmerModel::id_to_kmer(mer_id kmer) const {
+//    std::string seq(k_, 'A');
+//    for (size_t i = 0; i < k_; i++) {
+//        seq[k_ - i - 1] = id_to_base((kmer >> i * 2) & 0x3);
+//    }
+//    return seq;
+//}
 
 NormParams KmerModel::get_norm_params(const std::vector<Event> &events) const {
 
@@ -293,25 +225,6 @@ void KmerModel::normalize_events(std::vector<Event> &events, NormParams norm) co
     }
 }
 
-void KmerModel::parse_fasta(
-                 std::ifstream &fasta_in, 
-                 std::string &fwd_bases, 
-                 std::string &rev_bases) const {
-
-    //For parsing the file
-    std::string line;
-    
-    getline(fasta_in, line); //read past header
-
-    while (getline(fasta_in, line)) {
-        fwd_bases += line;
-    }
-
-    rev_bases = reverse_complement(fwd_bases);
-
-    fwd_bases += "$";
-    rev_bases += "$";
-}
 
 //Reads the given fasta file and stores forward and reverse k-mers
 void KmerModel::parse_fasta(

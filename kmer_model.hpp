@@ -4,10 +4,12 @@
 #include <array>
 #include <utility>
 #include <list>
+#include "basepairs.hpp"
 #include "fast5.hpp"
 
 #define NUM_BASES 4
 
+typedef unsigned char base_t;
 typedef unsigned short int mer_id;
 typedef fast5::EventDetection_Event Event;
 typedef fast5::Basecall_Event BCEvent;
@@ -37,22 +39,19 @@ class KmerModel {
 
     float get_stay_prob(Event e1, Event e2) const; 
 
-    inline int kmer_len() const {return k_;}
-    inline int kmer_count() const {return kmer_count_;}
+    inline size_t kmer_len() const {return k_;}
+    inline size_t kmer_count() const {return kmer_count_;}
 
     mer_id kmer_to_id(std::string kmer, int offset = 0) const;
-    std::string id_to_kmer(mer_id kmer) const;
+    //std::string id_to_kmer(mer_id kmer) const;
 
-    char get_lmb(mer_id k) const;
-    char get_rmb(mer_id k) const;
+    base_t get_first_base(mer_id k) const;
+    base_t get_last_base(mer_id k) const;
+    base_t get_base(mer_id kmer, size_t i) const;
 
     void parse_fasta (std::ifstream &fasta_in, 
                  std::vector<mer_id> &fwd_ids, 
                  std::vector<mer_id> &rev_ids) const;
-
-    void parse_fasta (std::ifstream &fasta_in, 
-                 std::string &fwd_bases, 
-                 std::string &rev_bases) const;
 
     double *lv_means_, *lv_vars_x2_, *lognorm_denoms_, *sd_means_, *sd_stdvs_;
 
@@ -62,12 +61,6 @@ class KmerModel {
 
     std::list<mer_id> *neighbors_; 
     mer_id *rev_comp_ids_;
-
-
-    std::string reverse_complement(const std::string &seq) const ;
-
-    static char id_to_base(short i);
-    static short base_to_id(char b);
 };
 
 #endif

@@ -42,7 +42,7 @@ class AlnParams {
            min_stay_pr_;
            //min_extend_evpr_;
 
-    std::vector<int> expr_lengths_;
+    std::vector<unsigned int> expr_lengths_;
     std::vector<double> expr_probs_;
 
     AlnParams(const KmerModel &model,
@@ -53,7 +53,7 @@ class AlnParams {
               double max_stay_frac,
               double min_anchor_evpr,
               //double min_extend_evpr,
-              std::vector<int> expr_lengths,
+              std::vector<unsigned int> expr_lengths,
               std::vector<double> expr_probs,
               double min_seed_pr,
               double min_stay_pr);

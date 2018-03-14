@@ -11,7 +11,6 @@
 #include "timer.h"
 #include "seed_graph.hpp"
 #include "base_fmi.hpp"
-#include "boost/math/distributions/students_t.hpp"
 
 //#define DEBUG(s)
 #define DEBUG(s) do { std::cerr << s; } while (0)
@@ -258,7 +257,7 @@ AlnParams::AlnParams(const KmerModel &model,
                      double max_stay_frac,
                      double min_anchor_evpr,
                      //double min_extend_evpr,
-                     std::vector<int>    expr_lengths,
+                     std::vector<unsigned int>    expr_lengths,
                      std::vector<double> expr_probs,
                      double min_seed_pr,
                      double min_stay_pr)
@@ -267,11 +266,11 @@ AlnParams::AlnParams(const KmerModel &model,
           max_skips_(max_skips),
           max_stay_frac_(max_stay_frac),
           min_anchor_evpr_(min_anchor_evpr),
+          min_seed_pr_(min_seed_pr),
+          min_stay_pr_(min_stay_pr),
           //min_extend_evpr_(min_extend_evpr),
           expr_lengths_(expr_lengths),
-          expr_probs_(expr_probs),
-          min_seed_pr_(min_seed_pr),
-          min_stay_pr_(min_stay_pr) {
+          expr_probs_(expr_probs) {
 
     anchor_rlen_ = nucl_to_events(anchor_nlen);
     graph_elen_ = get_graph_len(min_seed_nlen);
@@ -298,7 +297,12 @@ SeedGraph::SeedGraph(const BaseFMI &fmi,
 
     kmer_ranges_ = new Range[params_.model_.kmer_count()];
     for (mer_id k = 0; k < params_.model_.kmer_count(); k++) {
-        kmer_ranges_[k] = fmi_.get_kmer_range(params_.model_.id_to_kmer(k));
+        Range r = fmi_.get_full_range(params_.model_.get_last_base(k));
+        for (size_t i = params_.model_.kmer_len()-2; 
+             i < params_.model_.kmer_len(); i--) {
+            r = fmi_.get_neighbor(r, params_.model_.get_base(k, i));
+        }
+        kmer_ranges_[k] = r;
     }
 }
 
@@ -374,8 +378,6 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
     //Where this event's sources will be stored
     sources_.push_front(std::list<Node *>());
     
-    bool event_skipped = false;
-
     double prob;
 
     //Find neighbors of previous nodes
@@ -460,7 +462,7 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
         while (next_kmer != next_kmers.end()) {
             prob = kmer_probs[*next_kmer];
 
-            char next_base = params_.model_.get_lmb(*next_kmer);
+            base_t next_base = params_.model_.get_first_base(*next_kmer);
             Range next_range = fmi_.get_neighbor(prev_range, next_base);
 
             neighbor_count += next_range.is_valid();

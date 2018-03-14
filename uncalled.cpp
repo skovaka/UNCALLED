@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
         std::cerr << "Parsing fasta\n";
         std::ifstream ref_file(args.get_string(Opt::REFERENCE));
         std::string fwd_bases, rev_bases;
-        model.parse_fasta(ref_file, fwd_bases, rev_bases);
+        parse_fasta(ref_file, fwd_bases, rev_bases);
 
         std::cerr << "Building forward FMI\n";
         fwd_fmi = BaseFMI(fwd_bases, args.get_int(Opt::TALLY_DIST));
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
     //100-2.4_5-4.0_1-10.0
     std::string expr_str = args.get_string(Opt::EXTEND_EVPR);
     size_t ex_i = 0, ex_j = expr_str.find('_'), ex_k;
-    std::vector<int> expr_lengths;
+    std::vector<unsigned int> expr_lengths;
     std::vector<double> expr_probs;
     while(ex_i < expr_str.size()) {
         ex_k = expr_str.find('-', ex_i);

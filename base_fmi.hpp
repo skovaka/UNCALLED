@@ -4,8 +4,7 @@
 #include <list>
 #include <vector>
 #include <string>
-
-#define ALPH_SIZE 4
+#include "basepairs.hpp"
 
 class Range {
     
@@ -50,16 +49,16 @@ class BaseFMI {
     BaseFMI(std::ifstream &infile, unsigned int tally_dist);
     void save(std::string filename); 
 
-    Range get_neighbor(Range range, char base) const;
+    Range get_neighbor(Range range, base_t base) const;
 
-    Range get_full_range(char base) const;
+    Range get_full_range(base_t base) const;
 
     Range get_kmer_range(const std::string &seq) const;
 
     bool operator() (unsigned int rot1, unsigned int rot2);
 
     //private:
-    unsigned int get_tally(char bases, unsigned int loc) const;
+    unsigned int get_tally(base_t bases, unsigned int loc) const;
 
     std::string *seq_;
 
@@ -68,7 +67,7 @@ class BaseFMI {
     //Sparseness of suffix and tally arrays
     unsigned int tally_dist_;
 
-    std::string bwt_;                        //L array
+    std::vector<base_t> bwt_;                        //L array
     std::vector<unsigned int> counts_, f_starts_;      //F array
     std::vector<unsigned int> suffix_ar_;            //Suffix array
     std::vector< std::vector<unsigned int> > tally_;      //Rank tally

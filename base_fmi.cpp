@@ -22,21 +22,6 @@ unsigned int min(unsigned int a, unsigned int b) {
     return a < b ? a : b;
 }
 
-char base_to_idx(char base) {
-    switch (base) {
-        case 'A':
-        return 0;
-        case 'C':
-        return 1;
-        case 'G':
-        return 2;
-        case 'T':
-        return 3;
-        default:
-        return ALPH_SIZE;
-    }
-}
-
 BaseFMI::BaseFMI() {
     loaded_ = false;
 
@@ -67,7 +52,7 @@ BaseFMI::BaseFMI(std::string seq, unsigned int tally_dist) {
     std::cerr << "SA sort time: " << timer.lap() << "\n";
 
     //Allocate space for other data structures
-    bwt_ = std::string(seq.size(), '$');
+    bwt_.resize(seq.size());
     f_starts_.resize(ALPH_SIZE);
     counts_.resize(ALPH_SIZE);
     tally_.resize(ALPH_SIZE);
@@ -84,9 +69,9 @@ BaseFMI::BaseFMI(std::string seq, unsigned int tally_dist) {
         
         //Fill in BWT
         if (suffix_ar_[i] > 0) {
-            bwt_[i] = base_to_idx(seq[suffix_ar_[i]-1]);
+            bwt_[i] = char_to_base(seq[suffix_ar_[i]-1]);
         } else {
-            bwt_[i] = base_to_idx(seq.back());
+            bwt_[i] = char_to_base(seq.back());
         }
 
         //Update 6-mer counts
@@ -130,7 +115,7 @@ BaseFMI::BaseFMI(std::ifstream &infile, unsigned int tally_dist) {
     std::cerr << size << "\n";
     
     suffix_ar_.resize(size);
-    bwt_ = std::string(size, '$');
+    bwt_.resize(size);
     f_starts_.resize(ALPH_SIZE);
     counts_.resize(ALPH_SIZE);
     tally_.resize(ALPH_SIZE);
@@ -141,12 +126,10 @@ BaseFMI::BaseFMI(std::ifstream &infile, unsigned int tally_dist) {
     unsigned int tally_mod = tally_dist_;
     unsigned int bwt_i;
 
-    int i_mod = 0, update_interval = size / 100;
-
     for (size_t i = 0; i < size; i++) {
         infile >> bwt_i >> suffix_ar_[i];
 
-        bwt_[i] = (char) bwt_i;
+        bwt_[i] = (base_t) bwt_i;
 
         if (bwt_[i] < ALPH_SIZE)
             counts_[bwt_[i]]++;
@@ -186,7 +169,7 @@ void BaseFMI::save(std::string filename) {
 
     out << bwt_.size() << "\n";
     for (size_t i = 0; i < bwt_.size(); i++) {
-        out << (unsigned int) bwt_[i] << "\t" << suffix_ar_[i] << "\n";
+        out << (base_t) bwt_[i] << "\t" << suffix_ar_[i] << "\n";
     }
 
     out.close();
@@ -196,7 +179,7 @@ void BaseFMI::save(std::string filename) {
 //starting at rot2. Used to build suffix array.
 bool BaseFMI::operator() (unsigned int rot1, unsigned int rot2) {
 
-    char c1, c2;
+    base_t c1, c2;
     for (unsigned int i = 0; i < seq_->size(); i++) {
         
         c1 = seq_->at(rot1 + i);
@@ -217,19 +200,19 @@ bool BaseFMI::operator() (unsigned int rot1, unsigned int rot2) {
     return false;
 }
 
-Range BaseFMI::get_neighbor(Range range, char base) const {
+Range BaseFMI::get_neighbor(Range range, base_t base) const {
     unsigned int min = get_tally(base, range.start_ - 1);
     unsigned int max = get_tally(base, range.end_);
 
     if (min >= 0 && max >= 0 && min < max) {
-        unsigned int base_st = f_starts_[base_to_idx(base)];
+        unsigned int base_st = f_starts_[base];
         return Range(base_st + min, base_st + max - 1);
     }
 
     return Range();
 }
 
-unsigned int BaseFMI::get_tally(char base, unsigned int loc) const {
+unsigned int BaseFMI::get_tally(base_t base, unsigned int loc) const {
     if (loc < 0)
         return -1;
 
@@ -242,7 +225,7 @@ unsigned int BaseFMI::get_tally(char base, unsigned int loc) const {
         cp += tally_dist_;
     }
 
-    char k = base_to_idx(base);
+    base_t k = base;
     unsigned int count = tally_[k][cp / tally_dist_];
 
     //int cp_dist = cp - loc;
@@ -263,23 +246,23 @@ unsigned int BaseFMI::get_tally(char base, unsigned int loc) const {
 
 
 //TODO: Maybe store f as ranges?
-Range BaseFMI::get_full_range(char base) const {
-    return Range(f_starts_[base_to_idx(base)], f_starts_[base_to_idx(base)] + counts_[base_to_idx(base)] - 1 );
+Range BaseFMI::get_full_range(base_t base) const {
+    return Range(f_starts_[base], f_starts_[base] + counts_[base] - 1 );
 }
 
-Range BaseFMI::get_kmer_range(const std::string &seq) const {
-    Range r = get_full_range(seq.back());
-
-    for (size_t i = seq.size()-2; i < seq.size(); i--) {
-        if (!r.is_valid()) {
-            break;
-        }
-
-        r = get_neighbor(r, seq[i]);
-    }
-
-    return r;
-}
+//Range BaseFMI::get_kmer_range(const std::string &seq) const {
+//    Range r = get_full_range(seq.back());
+//
+//    for (size_t i = seq.size()-2; i < seq.size(); i--) {
+//        if (!r.is_valid()) {
+//            break;
+//        }
+//
+//        r = get_neighbor(r, seq[i]);
+//    }
+//
+//    return r;
+//}
 
 Range::Range(const Range &prev)
     : start_(prev.start_), 
