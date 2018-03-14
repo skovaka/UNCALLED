@@ -5,15 +5,17 @@
 #include <vector>
 #include <string>
 
+#define ALPH_SIZE 4
+
 class Range {
     
     public:
-    int start_, end_;
+    unsigned int start_, end_;
 
     //Copy constructor
     Range(const Range &prev);
 
-    Range(int start, int end);
+    Range(unsigned int start, unsigned int end);
 
     Range();
 
@@ -33,7 +35,7 @@ class Range {
 
     bool is_valid() const;
 
-    int length() const;
+    unsigned int length() const;
 
     friend bool operator< (const Range &q1, const Range &q2);
 };
@@ -43,12 +45,11 @@ bool operator< (const Range &q1, const Range &q2);
 class BaseFMI {
     public:
 
-    BaseFMI(std::string seq, int tally_dist);
+    BaseFMI(std::string seq, unsigned int tally_dist);
     BaseFMI();
-    BaseFMI(std::ifstream &infile, int tally_dist);
+    BaseFMI(std::ifstream &infile, unsigned int tally_dist);
     void save(std::string filename); 
 
-    std::list<Range> get_neigbhors(Range range, std::list<char> bases) const;
     Range get_neighbor(Range range, char base) const;
 
     Range get_full_range(char base) const;
@@ -58,22 +59,19 @@ class BaseFMI {
     bool operator() (unsigned int rot1, unsigned int rot2);
 
     //private:
-    std::list<int> get_tallies(std::list<char> bases, int loc) const;
-    int get_tally(char bases, int loc) const;
+    unsigned int get_tally(char bases, unsigned int loc) const;
 
     std::string *seq_;
 
     bool loaded_;
 
     //Sparseness of suffix and tally arrays
-    int tally_dist_;
+    unsigned int tally_dist_;
 
-    int alph_size_;
     std::string bwt_;                        //L array
-    std::vector<int> counts_, f_starts_;      //F array
+    std::vector<unsigned int> counts_, f_starts_;      //F array
     std::vector<unsigned int> suffix_ar_;            //Suffix array
-    std::vector< std::vector<int> > tally_;      //Rank tally
-    mutable std::vector<int> count_tmp_;
+    std::vector< std::vector<unsigned int> > tally_;      //Rank tally
 
     void make_bwt();
 

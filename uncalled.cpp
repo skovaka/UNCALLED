@@ -53,7 +53,8 @@ int main(int argc, char** argv) {
     args.add_string(Opt::READ_LIST,   "read_list",    "",     "");
     args.add_string(Opt::INDEX_PREFIX,  "index_prefix",   "",     "");
     args.add_string(Opt::OUT_PREFIX,  "out_prefix",   "./",     "");
-    args.add_int(   Opt::TALLY_DIST,  "tally_dist",   16,     "");
+    args.add_string(Opt::EXTEND_EVPR, "extend_evprs", "1-10.0_5-4.0_100-2.4",  "");
+    args.add_int(   Opt::TALLY_DIST,  "tally_dist",   128,     "");
     args.add_int(   Opt::MIN_SEED_LEN,"min_seed_len", 15,     "");
     args.add_int(   Opt::ANCHOR_LEN,  "anchor_len",   12,     "");
     args.add_int(   Opt::MAX_IGNORES, "max_ignores",  0,    "");
@@ -61,7 +62,7 @@ int main(int argc, char** argv) {
     args.add_int(   Opt::READ_UNTIL,  "read_until",   0, "");
     args.add_double(Opt::STAY_FRAC,   "stay_frac",    0.5,    "");
     args.add_double(Opt::ANCHOR_EVPR, "anchor_evpr", -2.4,    "");
-    args.add_double(Opt::EXTEND_EVPR, "extend_evpr", -10,  "");
+    //args.add_double(Opt::EXTEND_EVPR, "extend_evpr", -10,  "");
     args.add_double(Opt::SEED_PR,     "seed_pr",     -3.75,  "");
     args.add_double(Opt::STAY_PR,     "stay_pr",     -8.343, "");
 
@@ -106,8 +107,25 @@ int main(int argc, char** argv) {
         std::cerr << "Building reverse FMI\n";
         rev_fmi = BaseFMI(rev_bases, args.get_int(Opt::TALLY_DIST));
     }
-
     std::cerr << "Done\n";
+
+    //100-2.4_5-4.0_1-10.0
+    std::string expr_str = args.get_string(Opt::EXTEND_EVPR);
+    size_t ex_i = 0, ex_j = expr_str.find('_'), ex_k;
+    std::vector<int> expr_lengths;
+    std::vector<double> expr_probs;
+    while(ex_i < expr_str.size()) {
+        ex_k = expr_str.find('-', ex_i);
+        expr_lengths.push_back( atoi(expr_str.substr(ex_i, ex_k).c_str()) );
+        expr_probs.push_back( atof(expr_str.substr(ex_k, ex_j).c_str()) );
+
+        ex_i = ex_j+1;
+        ex_j = expr_str.find('_', ex_i+1);
+        if (ex_j == std::string::npos) {
+            ex_j = expr_str.size();
+        }
+    }
+
 
     AlnParams aln_params(model,
                          args.get_int(Opt::MIN_SEED_LEN),
@@ -116,7 +134,9 @@ int main(int argc, char** argv) {
                          args.get_int(Opt::MAX_SKIPS),
                          args.get_double(Opt::STAY_FRAC),
                          args.get_double(Opt::ANCHOR_EVPR),
-                         args.get_double(Opt::EXTEND_EVPR),
+                         //args.get_double(Opt::EXTEND_EVPR),
+                         expr_lengths,
+                         expr_probs,
                          args.get_double(Opt::SEED_PR),
                          args.get_double(Opt::STAY_PR));
 
@@ -131,7 +151,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    int ru_min_revts = args.get_int(Opt::READ_UNTIL);
+    unsigned int ru_min_revts = args.get_int(Opt::READ_UNTIL);
     bool read_until = ru_min_revts > 0;
 
     std::string read_line, read_filename;
@@ -139,16 +159,16 @@ int main(int argc, char** argv) {
 
     while (getline(reads_file, read_line)) {
 
-        int aln_st = 0, aln_en = -1;
+        unsigned int aln_st = 0, aln_en = 0;
 
-        int i = read_line.find("\t");
+        unsigned int i = read_line.find("\t");
 
         if (i == std::string::npos) {
             read_filename = read_line;
         } else {
             read_filename = read_line.substr(0, i);
 
-            int j = read_line.find("\t", i+1);
+            unsigned int j = read_line.find("\t", i+1);
 
             if (j == std::string::npos) {
                 aln_st = atoi(read_line.substr(i+1).c_str());
@@ -168,14 +188,14 @@ int main(int argc, char** argv) {
         NormParams norm = model.get_norm_params(events);
         model.normalize_events(events, norm);
 
-        if (aln_en < aln_st) {
+        if (aln_en == aln_st) {
             aln_en = events.size() - 1;
         }
 
         //NormParams norm = model.get_norm_params(events);
 
 
-        int aln_len = aln_en - aln_st + 1;
+        unsigned int aln_len = aln_en - aln_st + 1;
 
         fwd_sg.new_read(aln_len);
         rev_sg.new_read(aln_len);
@@ -194,11 +214,11 @@ int main(int argc, char** argv) {
 
         err_out << read_filename << "\n";
 
-        int status_step = aln_len / 10,
+        unsigned int status_step = aln_len / 10,
             status = 0;
 
-        int e = aln_en;
-        for (; e >= aln_st; e--) {
+        unsigned int e = aln_en;
+        for (; e >= aln_st && e <= aln_en; e--) {
             std::vector<Result> fwd_seeds = fwd_sg.add_event(events[e], seeds_out),
                                 rev_seeds = rev_sg.add_event(events[e], seeds_out);
 
@@ -213,13 +233,14 @@ int main(int argc, char** argv) {
                 }
                 
                 if(fwd_tracker.check_ratio(a, 2) && rev_tracker.check_ratio(a, 2)) {
+                    //std::cout << "DONE\n";
                     break;
                 }
             }
             
 
             if (status == status_step) {
-                int prog = (int) ((100.0 * (aln_len - e)) / aln_len);
+                unsigned int prog = (unsigned int) ((100.0 * (aln_len - e)) / aln_len);
                 err_out << prog << "%  (" << timer.get() / 1000 << ")\n";
                 status = 0;
                 err_out.flush();
@@ -232,8 +253,8 @@ int main(int argc, char** argv) {
 
         err_out << "100% (" << timer.get() / 1000 << ")\n";
 
-        fwd_tracker.print(alns_out, FWD_STR, 5);
-        rev_tracker.print(alns_out, REV_STR, 5);
+        fwd_tracker.print(alns_out, FWD_STR, (size_t) 5);
+        rev_tracker.print(alns_out, REV_STR, (size_t) 5);
 
         err_out.flush();
         seeds_out.flush();

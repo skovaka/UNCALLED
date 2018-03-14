@@ -66,13 +66,13 @@ int main(int argc, char** argv) {
     parse_fasta(ref_file, fwd_bases, rev_bases);
 
     std::cerr << "Building forward FMI\n";
-    BaseFMI fwd_fmi(fwd_bases, 200);
+    BaseFMI fwd_fmi(fwd_bases, (unsigned int) 200);
 
     std::cerr << "Saving forward FMI\n";
     fwd_fmi.save(out_prefix + "fwdFM.txt");
 
     std::cerr << "Building reverse FMI\n";
-    BaseFMI rev_fmi(rev_bases, 200);
+    BaseFMI rev_fmi(rev_bases, (unsigned int) 200);
 
     std::cerr << "Saving reverse FMI\n";
     rev_fmi.save(out_prefix + "revFM.txt");

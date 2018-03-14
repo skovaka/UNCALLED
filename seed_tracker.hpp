@@ -5,20 +5,20 @@
 #include <set>
 #include <vector>
 
-int max(int a, int b);
-int min(int a, int b);
+unsigned int max(unsigned int a, unsigned int b);
+unsigned int min(unsigned int a, unsigned int b);
 
 class ReadAln {
     public:
     Range ref_st_;
-    int evt_st_,
+    unsigned int evt_st_,
         ref_en_, evt_en_,
         total_len_;
 
-    ReadAln(Range ref_en, int evt_en);
+    ReadAln(Range ref_en, unsigned int evt_en);
     ReadAln(const ReadAln &r);
     ReadAln();
-    int ref_start_base() const;
+    unsigned int ref_start_base() const;
     void update_next(ReadAln &new_loc) const;
     void print(std::ostream &out, bool newline, bool print_all) const;
     Range ref_range() const;
@@ -35,22 +35,22 @@ class SeedTracker {
 
     std::set<ReadAln> locations;
     ReadAln *longest_seed;
-    int min_revents_;
+    unsigned int min_revents_;
 
     SeedTracker();
-    SeedTracker(int min_revents);
+    SeedTracker(unsigned int min_revents);
 
     ReadAln add_seed(Result seed);
     ReadAln add_seeds(const std::vector<Result> &seeds);
 
     void reset();
 
-    std::vector<ReadAln> get_alignments(int min_len);
+    std::vector<ReadAln> get_alignments(unsigned int min_len);
 
     //static double top_ratio(int min_len);
     bool check_ratio(const ReadAln &aln, double ratio);
 
-    void print(std::ostream &out, std::string strand, int max_out);
+    void print(std::ostream &out, std::string strand, size_t max_out);
 };
 
 

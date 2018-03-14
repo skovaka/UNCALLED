@@ -7,18 +7,19 @@
 #include <list>
 #include <iostream>
 
+//#define DEBUG_NODES
 //#define DEBUG_PROB
 
 class Result {
     public:
 
-    Result(int read_start, 
-           int seed_len, 
+    Result(unsigned int read_start, 
+           unsigned int seed_len, 
            double prob, 
-           int ref_start = 0, 
-           int ref_end = 0);
+           unsigned int ref_start = 0, 
+           unsigned int ref_end = 0);
 
-    void set_ref_range(int start, int end);
+    void set_ref_range(unsigned int start, unsigned int end);
     void print(std::ostream &out);
 
     Range read_range_, ref_range_;
@@ -33,27 +34,32 @@ class AlnParams {
     public:
     const KmerModel &model_;
 
-    int graph_elen_, anchor_rlen_, max_ignores_, max_skips_;
+    size_t graph_elen_, anchor_rlen_, max_ignores_, max_skips_;
 
     double max_stay_frac_,
            min_anchor_evpr_,
            min_seed_pr_,
-           min_stay_pr_,
-           min_extend_evpr_;
+           min_stay_pr_;
+           //min_extend_evpr_;
+
+    std::vector<int> expr_lengths_;
+    std::vector<double> expr_probs_;
 
     AlnParams(const KmerModel &model,
-              int min_seed_nlen, 
-              int anchor_nlen, 
-              int max_ignores, 
-              int max_skips,
+              unsigned int min_seed_nlen, 
+              unsigned int anchor_nlen, 
+              unsigned int max_ignores, 
+              unsigned int max_skips,
               double max_stay_frac,
               double min_anchor_evpr,
-              double min_extend_evpr,
+              //double min_extend_evpr,
+              std::vector<int> expr_lengths,
+              std::vector<double> expr_probs,
               double min_seed_pr,
               double min_stay_pr);
     
-    int nucl_to_events(int n);
-    int get_graph_len(int seed_nlen);
+    unsigned int nucl_to_events(unsigned int n);
+    unsigned int get_graph_len(unsigned int seed_nlen);
 };
 
 
@@ -64,13 +70,17 @@ class SeedGraph {
 
         enum Type { MATCH, STAY, SKIP, IGNORE };
 
-        int length_, 
-            stay_count_,
-            skip_count_,
-            ignore_count_;
+        size_t length_, 
+               stay_count_,
+               skip_count_,
+               ignore_count_;
 
         mer_id kmer_;
         double event_prob_, seed_prob_;
+
+        #ifdef DEBUG_NODES
+        size_t full_length_;
+        #endif
 
         #ifdef DEBUG_PROB
         double min_evt_prob_;
@@ -92,20 +102,22 @@ class SeedGraph {
         //Copy constructor
         Node(const Node &s);
 
+
         void replace_info(const Node &node);
         void update_info();
         bool better_than(const Node *node); //TODO: this is a terrible name
         bool should_report(const AlnParams &params);
 
-        int seed_len();
-        int match_len();
+        size_t seed_len();
+        size_t match_len();
         bool is_valid();
 
         
         void invalidate(std::vector<Node *> *old_nodes, bool delete_source);
         bool remove_child(Node *child);
         
-        int add_child(Node *child);
+        size_t add_child(Node *child);
+        void print() const;
     };
     typedef std::pair<Node *, Node::Type> parent_ptr;
 
@@ -136,14 +148,14 @@ class SeedGraph {
 
     ~SeedGraph();
 
-    void new_read(int read_len);
+    void new_read(size_t read_len);
     void reset();
 
     std::vector<Result> add_event(Event e, std::ostream &out);
     void print_graph(bool verbose);
 
     Node *add_child(Range &range, Node &node); //copy update_ranges
-    int add_sources(const Range &range, const Node &node);
+    size_t add_sources(const Range &range, const Node &node);
 
     std::vector<Result> pop_seeds(std::ostream &out); //Big result gathering loop
                                      //Probably split into a few methods

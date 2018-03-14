@@ -10,7 +10,7 @@ ReadAln::ReadAln()
       total_len_(0) {
 }
 
-ReadAln::ReadAln(Range ref_en, int evt_en)
+ReadAln::ReadAln(Range ref_en, unsigned int evt_en)
     : ref_st_(ref_en),
       evt_st_(evt_en),
       ref_en_(ref_en.end_),
@@ -89,7 +89,7 @@ void SeedTracker::reset() {
 ReadAln SeedTracker::add_seeds(const std::vector<Result> &seeds) {
     ReadAln top;
 
-    for (int i = 0; i < seeds.size(); i++) {
+    for (size_t i = 0; i < seeds.size(); i++) {
         ReadAln a = add_seed(seeds[i]);
 
         if (!top.is_valid() || top.total_len_ < a.total_len_) {
@@ -111,8 +111,8 @@ ReadAln SeedTracker::add_seed(Result r) {
                        || loc_match->total_len_ < loc->total_len_,
              
              in_range = loc->ref_st_.end_ >= new_loc.ref_st_.end_
-                        && loc->ref_st_.end_ - loc->evt_st_
-                           <= new_loc.ref_st_.end_ - new_loc.evt_st_ + 6;
+                        && loc->ref_st_.end_ + new_loc.evt_st_
+                           <= new_loc.ref_st_.end_ + loc->evt_st_ + 6;
 
         if (higher_sup && in_range) {
             loc_match = loc;
@@ -129,14 +129,14 @@ ReadAln SeedTracker::add_seed(Result r) {
 
 
         #ifdef DEBUG
-        new_loc.print(true, true);
+        new_loc.print(std::cout, true, false);
         #endif
 
     } else if (loc_match == locations.end()) {
         locations.insert(new_loc);
 
         #ifdef DEBUG
-        new_loc.print(true, true);
+        new_loc.print(std::cout, true, false);
         #endif
     }
 
@@ -149,8 +149,8 @@ ReadAln SeedTracker::add_seed(Result r) {
     return new_loc;
 }
 
-std::vector<ReadAln> SeedTracker::get_alignments(int min_len = 1) {
-    std::map<int, ReadAln> sorted_alns;
+std::vector<ReadAln> SeedTracker::get_alignments(unsigned int min_len = 1) {
+    std::map<unsigned int, ReadAln> sorted_alns;
 
     for (auto a = locations.begin(); a != locations.end(); a++) {
         if (a->total_len_ >= min_len) {
@@ -169,9 +169,8 @@ std::vector<ReadAln> SeedTracker::get_alignments(int min_len = 1) {
 bool SeedTracker::check_ratio(const ReadAln &aln, double ratio) {
 
     Range top_ref = aln.ref_range();
-    int max_len = (aln.total_len_) / ratio;
+    unsigned int max_len = (aln.total_len_) / ratio;
 
-    int i = 1;
     for (auto a = locations.begin(); a != locations.end(); a++) {
         if (top_ref.get_recp_overlap(a->ref_range()) == 0 && 
             a->total_len_ >= max_len) {
@@ -183,7 +182,7 @@ bool SeedTracker::check_ratio(const ReadAln &aln, double ratio) {
     return true;
 }
 
-void SeedTracker::print(std::ostream &out, std::string strand, int max_out = 10) {
+void SeedTracker::print(std::ostream &out, std::string strand, size_t max_out = 10) {
 
     std::vector<ReadAln> alns = get_alignments(1);
 
@@ -196,7 +195,7 @@ void SeedTracker::print(std::ostream &out, std::string strand, int max_out = 10)
     Range top_ref = alns[0].ref_range();
     double top_len = alns[0].total_len_;
 
-    for (int i = 0; i < min(max_out, alns.size()); i++) {
+    for (unsigned int i = 0; i < min(max_out, alns.size()); i++) {
         double overlap = top_ref.get_recp_overlap(alns[i].ref_range()),
                len_ratio = top_len / alns[i].total_len_;
 
