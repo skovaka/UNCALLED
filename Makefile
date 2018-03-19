@@ -8,7 +8,7 @@ CC=g++
 CFLAGS=-Wall -std=c++11 -O3
 INCLUDE=-I./src/fast5/src -I./src/scrappie -I./src #${BOOST_INCLUDE}
 
-all: uncalled dtw_test save_fmi sdsl_fmi
+all: uncalled dtw_test save_fmi test_fmi
 
 #seed_tracker_test 
 
@@ -18,23 +18,23 @@ all: uncalled dtw_test save_fmi sdsl_fmi
 #sigalign: sigalign.o kmer_fmi.o kmer_model.o seed_graph.o
 #	$(CC) $(CFLAGS) kmer_fmi.o kmer_model.o seed_graph.o sigalign.o -o sigalign $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
 
-uncalled: uncalled.o base_fmi.o kmer_model.o seed_graph.o seed_tracker.o arg_parse.o basepairs.o
-	$(CC) $(CFLAGS) base_fmi.o kmer_model.o seed_graph.o seed_tracker.o arg_parse.o uncalled.o basepairs.o -o uncalled $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
+uncalled: uncalled.o sdsl_fmi.o kmer_model.o seed_graph.o seed_tracker.o arg_parse.o basepairs.o range.o
+	$(CC) $(CFLAGS) sdsl_fmi.o kmer_model.o seed_graph.o seed_tracker.o arg_parse.o uncalled.o basepairs.o range.o -o uncalled $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(SDSL_LIB) $(LIBS)
 
-seed_tracker_test: seed_tracker_test.o kmer_model.o seed_tracker.o seed_graph.o kmer_fmi.o basepairs.o 
-	$(CC) $(CFLAGS) seed_tracker_test.o kmer_model.o kmer_fmi.o seed_tracker.o seed_graph.o basepairs.o -o seed_tracker_test $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) 
+seed_tracker_test: seed_tracker_test.o kmer_model.o seed_tracker.o seed_graph.o kmer_fmi.o basepairs.o  range.o
+	$(CC) $(CFLAGS) seed_tracker_test.o kmer_model.o kmer_fmi.o seed_tracker.o seed_graph.o basepairs.o range.o -o seed_tracker_test $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(SDSL_LIB)
 
 dtw_test: dtw.o kmer_model.o arg_parse.o basepairs.o
 	$(CC) $(CFLAGS) dtw.o kmer_model.o arg_parse.o basepairs.o -o dtw_test $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS)
 
-test_fmi: base_fmi.o test_fmi.o basepairs.o
-	$(CC) $(CFLAGS) base_fmi.o test_fmi.o basepairs.o -o test_fmi 
+test_fmi: base_fmi.o sdsl_fmi.o test_fmi.o basepairs.o range.o
+	$(CC) $(CFLAGS) base_fmi.o sdsl_fmi.o test_fmi.o basepairs.o range.o -o test_fmi  $(SDSL_LIB)
 
-save_fmi: base_fmi.o save_fmi.o basepairs.o
-	$(CC) $(CFLAGS) base_fmi.o save_fmi.o basepairs.o -o save_fmi 
+save_fmi: sdsl_fmi.o base_fmi.o save_fmi.o basepairs.o range.o
+	$(CC) $(CFLAGS) sdsl_fmi.o base_fmi.o save_fmi.o basepairs.o range.o -o save_fmi  $(SDSL_LIB) $(LIBS)
 
-sdsl_fmi: sdsl_fmi.o
-	$(CC) $(CFLAGS) sdsl_fmi.o -o sdsl_fmi $(SDSL_LIB) $(LIBS)
+#sdsl_fmi: sdsl_fmi.o basepairs.o range.o
+#	$(CC) $(CFLAGS) sdsl_fmi.o basepairs.o range.o -o sdsl_fmi $(SDSL_LIB) $(LIBS)
 
 #arg_parse_test: 
 #	$(CC) $(CFLAGS) arg_parse.o -o arg_parse_test $(INCLUDE) $(LIBS)

@@ -4,50 +4,21 @@
 #include <list>
 #include <vector>
 #include <string>
+#include "fmi.hpp"
 #include "basepairs.hpp"
+#include "range.hpp"
 
-class Range {
-    
-    public:
-    unsigned int start_, end_;
 
-    //Copy constructor
-    Range(const Range &prev);
-
-    Range(unsigned int start, unsigned int end);
-
-    Range();
-
-    Range& operator=(const Range &r);
-
-    Range split_range(const Range &r);
-
-    Range intersect(const Range &r) const;
-
-    Range merge(const Range &r) const;
-
-    double get_recp_overlap(const Range &r) const;
-
-    bool same_range(const Range &r) const;
-
-    bool intersects(const Range &r) const;
-
-    bool is_valid() const;
-
-    unsigned int length() const;
-
-    friend bool operator< (const Range &q1, const Range &q2);
-};
-
-bool operator< (const Range &q1, const Range &q2);
-
-class BaseFMI {
+class BaseFMI : public FMI {
     public:
 
     BaseFMI(std::string seq, unsigned int tally_dist);
     BaseFMI();
     BaseFMI(std::ifstream &infile, unsigned int tally_dist);
-    void save(std::string filename); 
+
+    void construct(const std::string &seq);
+
+    void save(const std::string &filename); 
 
     Range get_neighbor(Range range, base_t base) const;
 
@@ -55,14 +26,16 @@ class BaseFMI {
 
     Range get_kmer_range(const std::string &seq) const;
 
+    size_t sa(size_t i) const;
+
+    size_t size() const;
+
     bool operator() (unsigned int rot1, unsigned int rot2);
 
     //private:
     unsigned int get_tally(base_t bases, unsigned int loc) const;
 
     std::string *seq_;
-
-    bool loaded_;
 
     //Sparseness of suffix and tally arrays
     unsigned int tally_dist_;

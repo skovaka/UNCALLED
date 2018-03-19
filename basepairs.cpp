@@ -73,9 +73,18 @@ char base_to_char(base_t i) {
     return 'N';
 }
 
+std::vector<base_t> seq_to_bases(const std::string &seq) {
+    std::vector<base_t> bases(seq.size());
+    for (size_t i = 0; i < seq.size(); i++) {
+        bases[i] = char_to_base(seq[i]);
+    }
+    return bases;
+}
+
 void parse_fasta(std::ifstream &fasta_in, 
                  std::string &fwd_bases, 
-                 std::string &rev_bases) {
+                 std::string &rev_bases,
+                 bool terminate) {
 
     //For parsing the file
     std::string line;
@@ -87,7 +96,9 @@ void parse_fasta(std::ifstream &fasta_in,
     }
 
     rev_bases = reverse_complement(fwd_bases);
-
-    fwd_bases += "$";
-    rev_bases += "$";
+    
+    if (terminate) {
+        fwd_bases += "$";
+        rev_bases += "$";
+    }
 }

@@ -8,9 +8,10 @@
 #include <set>
 #include <utility>
 #include <unordered_map>
+#include <sdsl/suffix_arrays.hpp>
 #include "timer.h"
 #include "seed_graph.hpp"
-#include "base_fmi.hpp"
+#include "sdsl_fmi.hpp"
 
 //#define DEBUG(s)
 #define DEBUG(s) do { std::cerr << s; } while (0)
@@ -287,7 +288,7 @@ unsigned int AlnParams::get_graph_len(unsigned int seed_nlen) {
     return (nucl_to_events(seed_nlen) / (1.0 - max_stay_frac_)) + max_ignores_;
 }
 
-SeedGraph::SeedGraph(const BaseFMI &fmi, 
+SeedGraph::SeedGraph(const SdslFMI &fmi, 
                      const AlnParams &ap,
                      const std::string &label)
     : fmi_(fmi),
@@ -898,7 +899,7 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
                     #endif
 
                     for (unsigned int s = range.start_; s <= range.end_; s++) {
-                        r.set_ref_range(fmi_.suffix_ar_[s], n->match_len());
+                        r.set_ref_range(fmi_.sa(s), n->match_len());
                         results.push_back(r);
 
                         out << label_ << "\t" << timer.get() << "\t";

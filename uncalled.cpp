@@ -7,12 +7,16 @@
 #include <unordered_map>
 #include <math.h>
 #include <unistd.h>
+#include <algorithm>
+#include <sdsl/suffix_arrays.hpp>
 
 #include "fast5.hpp"
 #include "arg_parse.hpp"
 #include "seed_graph.hpp"
 #include "seed_tracker.hpp"
+#include "range.hpp"
 #include "kmer_model.hpp"
+#include "sdsl_fmi.hpp"
 #include "timer.h"
 
 
@@ -82,30 +86,30 @@ int main(int argc, char** argv) {
     KmerModel model(args.get_string(Opt::MODEL));
 
 
-    BaseFMI fwd_fmi, rev_fmi;
+    SdslFMI fwd_fmi, rev_fmi;
 
     if (!args.get_string(Opt::INDEX_PREFIX).empty()) {
         std::string p = args.get_string(Opt::INDEX_PREFIX);
-        std::ifstream fwd_in(p + "fwdFM.txt"),
-                      rev_in(p + "revFM.txt");
+        //std::ifstream fwd_in(p + "fwdFM.txt"),
+        //              rev_in(p + "revFM.txt");
 
         std::cerr << "Reading forward FMI\n";
-        fwd_fmi = BaseFMI(fwd_in, args.get_int(Opt::TALLY_DIST));
+        fwd_fmi = SdslFMI(p + "fwdFM.idx");
 
         std::cerr << "Reading reverse FMI\n";
-        rev_fmi = BaseFMI(rev_in, args.get_int(Opt::TALLY_DIST));
+        rev_fmi = SdslFMI(p + "revFM.idx");
 
     } else {
         std::cerr << "Parsing fasta\n";
         std::ifstream ref_file(args.get_string(Opt::REFERENCE));
         std::string fwd_bases, rev_bases;
-        parse_fasta(ref_file, fwd_bases, rev_bases);
+        parse_fasta(ref_file, fwd_bases, rev_bases, false);
 
         std::cerr << "Building forward FMI\n";
-        fwd_fmi = BaseFMI(fwd_bases, args.get_int(Opt::TALLY_DIST));
+        fwd_fmi.construct(fwd_bases);
 
         std::cerr << "Building reverse FMI\n";
-        rev_fmi = BaseFMI(rev_bases, args.get_int(Opt::TALLY_DIST));
+        rev_fmi.construct(rev_bases);
     }
     std::cerr << "Done\n";
 
@@ -151,7 +155,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    unsigned int ru_min_revts = args.get_int(Opt::READ_UNTIL);
+    size_t ru_min_revts = args.get_int(Opt::READ_UNTIL);
     bool read_until = ru_min_revts > 0;
 
     std::string read_line, read_filename;
@@ -225,7 +229,7 @@ int main(int argc, char** argv) {
             ReadAln fa = fwd_tracker.add_seeds(fwd_seeds);
             ReadAln ra = rev_tracker.add_seeds(rev_seeds);
 
-            if (read_until && max(fa.total_len_, ra.total_len_) > ru_min_revts) {
+            if (read_until && std::max(fa.total_len_, ra.total_len_) > ru_min_revts) {
                 //alns_out << fa.total_len_ << "\t" << ra.total_len_ << "\n";
                 ReadAln a = fa;
                 if (fa.total_len_ < ra.total_len_) {

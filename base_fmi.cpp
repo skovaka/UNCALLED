@@ -14,13 +14,6 @@
 //#define DEBUG(s)
 #define DEBUG(s) do { std::cerr << s; } while (0)
 
-unsigned int max(unsigned int a, unsigned int b) {
-    return a > b ? a : b;
-}
-
-unsigned int min(unsigned int a, unsigned int b) {
-    return a < b ? a : b;
-}
 
 BaseFMI::BaseFMI() {
     loaded_ = false;
@@ -43,13 +36,13 @@ BaseFMI::BaseFMI(std::string seq, unsigned int tally_dist) {
         suffix_ar[i] = i;
     }
 
-    std::cerr << "SA init time: " << timer.lap() << "\n";
+    //std::cerr << "SA init time: " << timer.lap() << "\n";
 
     //Create the suffix array
-    std::sort(suffix_ar.begin(), suffix_ar.end(), *this);
+    std::sort(suffix_ar.begin(), suffix_ar.end(), (BaseFMI) *this);
     suffix_ar_.swap(suffix_ar);
 
-    std::cerr << "SA sort time: " << timer.lap() << "\n";
+    //std::cerr << "SA sort time: " << timer.lap() << "\n";
 
     //Allocate space for other data structures
     bwt_.resize(seq.size());
@@ -60,7 +53,7 @@ BaseFMI::BaseFMI(std::string seq, unsigned int tally_dist) {
     for (size_t i = 0; i < ALPH_SIZE; i++)
         tally_[i].resize((seq.size() / tally_dist_) + 1, -1);
     
-    std::cerr << "FM init time: " << timer.lap() << "\n";
+    //std::cerr << "FM init time: " << timer.lap() << "\n";
 
     unsigned int tally_mod = tally_dist_;
 
@@ -75,7 +68,8 @@ BaseFMI::BaseFMI(std::string seq, unsigned int tally_dist) {
         }
 
         //Update 6-mer counts
-        counts_[bwt_[i]]++;
+        if (bwt_[i] < ALPH_SIZE)
+            counts_[bwt_[i]]++;
         
         //Update tally array
         if (tally_mod == tally_dist_) {
@@ -87,7 +81,7 @@ BaseFMI::BaseFMI(std::string seq, unsigned int tally_dist) {
         tally_mod += 1;
     }
 
-    std::cerr << "FM build time: " << timer.lap() << "\n";
+    //std::cerr << "FM build time: " << timer.lap() << "\n";
     
     //TODO: store as range?
     f_starts_[0] = 1;
@@ -164,12 +158,12 @@ BaseFMI::BaseFMI(std::ifstream &infile, unsigned int tally_dist) {
     loaded_ = true;
 }
 
-void BaseFMI::save(std::string filename) {
+void BaseFMI::save(const std::string &filename) {
     std::ofstream out(filename);
 
     out << bwt_.size() << "\n";
     for (size_t i = 0; i < bwt_.size(); i++) {
-        out << (base_t) bwt_[i] << "\t" << suffix_ar_[i] << "\n";
+        out << (int) bwt_[i] << "\t" << suffix_ar_[i] << "\n";
     }
 
     out.close();
@@ -248,6 +242,14 @@ unsigned int BaseFMI::get_tally(base_t base, unsigned int loc) const {
 //TODO: Maybe store f as ranges?
 Range BaseFMI::get_full_range(base_t base) const {
     return Range(f_starts_[base], f_starts_[base] + counts_[base] - 1 );
+}  
+
+size_t BaseFMI::sa(size_t i) const {
+    return suffix_ar_[i];
+}
+
+size_t BaseFMI::size() const {
+    return bwt_.size();
 }
 
 //Range BaseFMI::get_kmer_range(const std::string &seq) const {
@@ -263,92 +265,5 @@ Range BaseFMI::get_full_range(base_t base) const {
 //
 //    return r;
 //}
-
-Range::Range(const Range &prev)
-    : start_(prev.start_), 
-      end_(prev.end_) {}
-
-Range::Range(unsigned int start, unsigned int end) : start_(start), end_(end) {}
-
-Range::Range() : start_(1), end_(0) {}
-
-bool Range::intersects(const Range &q) const {
-    return !(start_ > q.end_ || end_ < q.start_) &&
-           !(q.start_ > end_ || q.end_ < start_);
-}
-
-unsigned int Range::length() const {
-    return end_ - start_ + 1;
-}
-
-
-Range Range::split_range(const Range &r) { 
-
-    Range left;
-    if (start_ < r.start_) {
-        left = Range(*this);
-        left.end_ = r.start_ - 1;
-    }
-
-    if (end_ > r.end_) {
-        start_ = r.end_ + 1;
-    } else {
-        start_ = 1;
-        end_ = 0;
-    }
-
-    return left;
-}
-
-Range Range::intersect(const Range &r) const {
-    if (!intersects(r)) {
-        return Range();
-    }
-    
-    return Range(max(start_, r.start_), min(end_, r.end_));
-}
-
-Range Range::merge(const Range &r) const {
-    if (!intersects(r)) {
-        return Range();
-    }
-
-    return Range(min(start_, r.start_), max(end_, r.end_));
-}
-
-double Range::get_recp_overlap(const Range &r) const {
-    if (!intersects(r)) {
-        return 0;
-    }
-
-    return double(intersect(r).length()) / double(merge(r).length());
-}
-
-Range& Range::operator=(const Range& prev) {
-    start_ = prev.start_;
-    end_ = prev.end_;
-    return *this;
-}
-
-
-bool Range::same_range(const Range &q) const {
-    return start_ == q.start_ && end_ == q.end_;
-}
-
-bool Range::is_valid() const {
-    return start_ <= end_;
-}
-
-
-bool operator< (const Range &q1, const Range &q2) {
-    if (q1.start_ < q2.start_)
-        return true;
-
-    if (q1.start_ == q2.start_ && q1.end_ < q2.end_)
-        return true;
-    
-    return false;
-}
-
 
 

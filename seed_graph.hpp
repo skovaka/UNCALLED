@@ -1,7 +1,7 @@
 #ifndef SEED_GRAPH_HPP
 #define SEED_GRAPH_HPP
 
-#include "base_fmi.hpp"
+#include "sdsl_fmi.hpp"
 #include "kmer_model.hpp"
 #include "timer.h"
 #include <list>
@@ -124,7 +124,7 @@ class SeedGraph {
 
     public:
 
-    const BaseFMI &fmi_;
+    const SdslFMI &fmi_;
     Range *kmer_ranges_;
 
     AlnParams params_;
@@ -142,7 +142,7 @@ class SeedGraph {
     unsigned int cur_event_;
     Event prev_event_;
 
-    SeedGraph(const BaseFMI &fmi, 
+    SeedGraph(const SdslFMI &fmi, 
               const AlnParams &aln_params,
               const std::string &label);
 
