@@ -381,6 +381,9 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
     
     double prob;
 
+    //print_graph(false);
+
+
     //Find neighbors of previous nodes
     for (auto p = prev_nodes_.begin(); p != prev_nodes_.end(); p++) {
         Range prev_range = p->second;
@@ -388,7 +391,6 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
 
         #ifdef DEBUG_RANGES
         //if (prev_range.length() <= 200) {
-            std::cout << prev_node->full_length_ << "\t" << prev_range.length();
         //}
         #endif
 
@@ -538,6 +540,7 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
 
         prev_nodes_.erase(p);
     }
+
  
     //Move next_nodes to prev
     while (!next_nodes_.empty()) {
@@ -547,7 +550,7 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
     }
 
     //if (label_ == "fwd") {
-    //    print_graph(false);
+    //print_graph(false);
     //}
 
     //DEBUG(t.lap() << "\t");
@@ -890,8 +893,10 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
 
             if (n->seed_len() == params_.graph_elen_) {
 
-                if (n->should_report(params_)) {
-                    Range range = prev_nodes_[n];
+                Range range = prev_nodes_[n];
+
+                //TODO: max repeat parameter
+                if (n->should_report(params_) && range.length() < 100) { 
                     Result r(cur_event_, params_.graph_elen_, n->seed_prob_ / n->seed_len());
 
                     #ifdef DEBUG_PROB

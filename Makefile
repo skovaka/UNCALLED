@@ -8,7 +8,7 @@ CC=g++
 CFLAGS=-Wall -std=c++11 -O3
 INCLUDE=-I./src/fast5/src -I./src/scrappie -I./src #${BOOST_INCLUDE}
 
-all: uncalled dtw_test save_fmi test_fmi
+all: uncalled dtw_test save_fmi test_fmi align_stats
 
 #seed_tracker_test 
 
@@ -29,6 +29,9 @@ dtw_test: dtw.o kmer_model.o arg_parse.o basepairs.o
 
 test_fmi: base_fmi.o sdsl_fmi.o test_fmi.o basepairs.o range.o
 	$(CC) $(CFLAGS) base_fmi.o sdsl_fmi.o test_fmi.o basepairs.o range.o -o test_fmi  $(SDSL_LIB)
+
+align_stats: base_fmi.o sdsl_fmi.o align_stats.o basepairs.o range.o
+	$(CC) $(CFLAGS) base_fmi.o sdsl_fmi.o align_stats.o basepairs.o range.o -o align_stats  $(SDSL_LIB)
 
 save_fmi: sdsl_fmi.o base_fmi.o save_fmi.o basepairs.o range.o
 	$(CC) $(CFLAGS) sdsl_fmi.o base_fmi.o save_fmi.o basepairs.o range.o -o save_fmi  $(SDSL_LIB) $(LIBS)

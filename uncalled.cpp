@@ -227,21 +227,10 @@ int main(int argc, char** argv) {
                                 rev_seeds = rev_sg.add_event(events[e], seeds_out);
 
             ReadAln fa = fwd_tracker.add_seeds(fwd_seeds);
+
             ReadAln ra = rev_tracker.add_seeds(rev_seeds);
 
-            if (read_until && std::max(fa.total_len_, ra.total_len_) > ru_min_revts) {
-                //alns_out << fa.total_len_ << "\t" << ra.total_len_ << "\n";
-                ReadAln a = fa;
-                if (fa.total_len_ < ra.total_len_) {
-                    a = ra;
-                }
-                
-                if(fwd_tracker.check_ratio(a, 2) && rev_tracker.check_ratio(a, 2)) {
-                    //std::cout << "DONE\n";
-                    break;
-                }
-            }
-            
+
 
             if (status == status_step) {
                 unsigned int prog = (unsigned int) ((100.0 * (aln_len - e)) / aln_len);
