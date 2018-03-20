@@ -2,24 +2,81 @@
 #include <string>
 #include <list>
 #include "base_fmi.hpp"
-#include "sdsl_fmi.hpp"
+//#include "sdsl_fmi.hpp"
 #include "fmi.hpp"
 #include "timer.h"
 
-void test(FMI &fmi, const std::vector<base_t> &bases) {
-    Range r = fmi.get_full_range(bases.back());
+void brute_align(FMI &fmi, const std::vector<base_t> &bases) {
+    for (size_t j = bases.size()-1; j < bases.size(); j--) {
+        Range r = fmi.get_full_range(bases[j]);
+        size_t i = j-1;
+        for (; i < bases.size() && r.length() > 1; i--) {
+            //std::cout << r.length() << "\t";
+            r = fmi.get_neighbor(r, bases[i]);
+        }
+        //std::cout << r.length() << "\n";
+        std::cout << (j - i) << "\n";
+    }
+}
+
+void dyn_align(FMI &fmi, const std::vector<base_t> &bases) {
+    std::list<Range> ranges;
+    ranges.push_front(fmi.get_full_range(bases.back()));
+
+    for (size_t i = bases.size()-2; i < bases.size() && ranges.front().length() > 1; i--) {
+        //std::cout << ranges.front().length() << "\t";
+        ranges.push_front( fmi.get_neighbor(ranges.front(), bases[i]) );
+    }
+    //std::cout << ranges.front().length() << "\n";
+    std::cout << ranges.size() << "\n";
 
     for (size_t i = bases.size()-2; i < bases.size(); i--) {
-        //std::cout << (int) bases[i+1] << r.start_ << "-" << r.end_ << " " << r.length() << "\n";
-        r = fmi.get_neighbor(r, bases[i]);
+        ranges.pop_back();
+        
+        Range r = fmi.get_full_range(bases[i]), l;
+        l = r.split_range(ranges.back());
+
+        size_t j = i - 1;
+        auto m = ranges.rbegin();
+        for (; j < bases.size() && (l.is_valid() || r.is_valid()) && m != ranges.rend(); m++) {
+
+            if (l.is_valid()) {
+                m->start_ = l.start_;
+                l = fmi.get_neighbor(l, bases[j]);
+            }
+
+            if (r.is_valid()) {
+                m->end_ = r.end_;
+                r = fmi.get_neighbor(r, bases[j]);
+            }
+
+            //std::cout << m->length() << "\t";
+
+            j--;
+        }
+
+        //for (; m != ranges.rend(); m++) {
+        //    std::cout << m->length() << "\t";
+        //}
+        //ONLY KEEP ONE
+        //if (m != ranges.rend()) {
+        //    std::cout << "x\t";
+        //}
+
+        j = i - ranges.size();
+
+        while (ranges.front().length() > 1 && j < bases.size()) {
+            r = fmi.get_neighbor(ranges.front(), bases[j]);
+            //if (!r.is_valid()) {
+            //    break;
+            //}
+            //std::cout << r.length() << "\t";
+            ranges.push_front(r);
+            j--;
+        }
+        //std::cout << "\n";
+        std::cout << ranges.size() << "\n";
     }
-
-
-    std::cout << "done\n";
-
-    //for (size_t s = r.start_; s <= r.end_; s++) {
-    //    std::cout << s << " " << fmi.sa(s) << "\n";
-    //}
 }
 
 int main(int argc, char** argv) {
@@ -44,13 +101,10 @@ int main(int argc, char** argv) {
     }
     
     Timer t;
-    t.reset();
+    dyn_align(fmi, bases);
+    std::cerr << t.lap() << "\n";
+    //brute_align(fmi, bases);
+    //std::cerr << t.lap() << "\n";
 
-    std::list<Range> ranges;
-    //Range r = fmi.get_full_range(bases.back());
-    ranges.push_front(fmi.get_full_range(bases.back()));
-    for (size_t i = bases.size()-2; i < bases.size() && ranges.front().length() > 1; i--) {
-        std::cout << ranges.front().length() << "\n";
-        ranges.push_front( fmi.get_neighbor(ranges.front(), bases[i]) );
-    }
+
 }
