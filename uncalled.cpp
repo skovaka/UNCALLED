@@ -9,16 +9,20 @@
 #include <unistd.h>
 #include <algorithm>
 #include <sdsl/suffix_arrays.hpp>
+#include <iomanip>
 
 #include "fast5.hpp"
 #include "arg_parse.hpp"
-#include "seed_graph.hpp"
+//#include "seed_graph.hpp"
+#include "seed_forest.hpp"
 #include "seed_tracker.hpp"
 #include "range.hpp"
 #include "kmer_model.hpp"
 #include "sdsl_fmi.hpp"
-#include "timer.h"
+#include "base_fmi.hpp"
+#include "timer.hpp"
 
+#define VERBOSE_TIME
 
 std::string FWD_STR = "fwd",
             REV_STR = "rev";
@@ -41,13 +45,13 @@ enum Opt {MODEL       = 'm',
           MAX_IGNORES = 'i',
           MAX_SKIPS   = 'k',
           STAY_FRAC   = 'y',
+          READ_UNTIL = 'u',
+          MAX_CONSEC_STAY = 'c',
 
           EXTEND_EVPR = 'E',
           ANCHOR_EVPR = 'A',
           SEED_PR     = 'S',
-          STAY_PR     = 'Y',
-          
-          READ_UNTIL = 'u'};
+          STAY_PR     = 'Y'};
 
 int main(int argc, char** argv) {
     ArgParse args("UNCALLED: Utility for Nanopore Current Alignment to Large Expanses of DNA");
@@ -64,6 +68,7 @@ int main(int argc, char** argv) {
     args.add_int(   Opt::MAX_IGNORES, "max_ignores",  0,    "");
     args.add_int(   Opt::MAX_SKIPS,   "max_skips",    0,    "");
     args.add_int(   Opt::READ_UNTIL,  "read_until",   0, "");
+    args.add_int(   Opt::MAX_CONSEC_STAY,  "max_consec_stay", 20, "");
     args.add_double(Opt::STAY_FRAC,   "stay_frac",    0.5,    "");
     args.add_double(Opt::ANCHOR_EVPR, "anchor_evpr", -2.4,    "");
     //args.add_double(Opt::EXTEND_EVPR, "extend_evpr", -10,  "");
@@ -75,29 +80,30 @@ int main(int argc, char** argv) {
     std::string prefix = args.get_string(Opt::OUT_PREFIX) + args.get_param_str();
     std::ofstream seeds_out(prefix + "_seeds.txt");
     std::ofstream alns_out(prefix + "_aln.txt");
-    std::ofstream err_out(prefix + "_err.txt");
+    std::ofstream time_out(prefix + "_time.txt");
 
     std::cerr << "Writing:" << "\n"
               << prefix << "_seeds.txt" << "\n"
               << prefix << "_aln.txt" << "\n"
-              << prefix << "_err.txt" << "\n";
+              << prefix << "_time.txt" << "\n";
 
-    err_out << "Loading model\n";
     KmerModel model(args.get_string(Opt::MODEL));
 
-
     SdslFMI fwd_fmi, rev_fmi;
+    //BaseFMI fwd_fmi, rev_fmi;
 
     if (!args.get_string(Opt::INDEX_PREFIX).empty()) {
         std::string p = args.get_string(Opt::INDEX_PREFIX);
-        //std::ifstream fwd_in(p + "fwdFM.txt"),
-        //              rev_in(p + "revFM.txt");
+        std::ifstream fwd_in(p + "fwdFM.txt"),
+                      rev_in(p + "revFM.txt");
 
         std::cerr << "Reading forward FMI\n";
         fwd_fmi = SdslFMI(p + "fwdFM.idx");
+        //fwd_fmi = BaseFMI(fwd_in, args.get_int(Opt::TALLY_DIST));
 
         std::cerr << "Reading reverse FMI\n";
         rev_fmi = SdslFMI(p + "revFM.idx");
+        //rev_fmi = BaseFMI(rev_in, args.get_int(Opt::TALLY_DIST));
 
     } else {
         std::cerr << "Parsing fasta\n";
@@ -107,9 +113,11 @@ int main(int argc, char** argv) {
 
         std::cerr << "Building forward FMI\n";
         fwd_fmi.construct(fwd_bases);
+        //fwd_fmi = BaseFMI(fwd_bases, args.get_int(Opt::TALLY_DIST));
 
         std::cerr << "Building reverse FMI\n";
         rev_fmi.construct(rev_bases);
+        //rev_fmi = BaseFMI(rev_bases, args.get_int(Opt::TALLY_DIST));
     }
     std::cerr << "Done\n";
 
@@ -121,7 +129,9 @@ int main(int argc, char** argv) {
     while(ex_i < expr_str.size()) {
         ex_k = expr_str.find('-', ex_i);
         expr_lengths.push_back( atoi(expr_str.substr(ex_i, ex_k).c_str()) );
-        expr_probs.push_back( atof(expr_str.substr(ex_k, ex_j).c_str()) );
+        expr_probs.push_back( atof(expr_str.substr(ex_k, ex_j).c_str()) ); //CHANGED FOR RANKS
+
+        std::cout << expr_lengths.back() << "\t" << expr_probs.back() << "\n";
 
         ex_i = ex_j+1;
         ex_j = expr_str.find('_', ex_i+1);
@@ -136,6 +146,7 @@ int main(int argc, char** argv) {
                          args.get_int(Opt::ANCHOR_LEN),
                          args.get_int(Opt::MAX_IGNORES),
                          args.get_int(Opt::MAX_SKIPS),
+                         args.get_int(Opt::MAX_CONSEC_STAY),
                          args.get_double(Opt::STAY_FRAC),
                          args.get_double(Opt::ANCHOR_EVPR),
                          //args.get_double(Opt::EXTEND_EVPR),
@@ -144,13 +155,13 @@ int main(int argc, char** argv) {
                          args.get_double(Opt::SEED_PR),
                          args.get_double(Opt::STAY_PR));
 
-    SeedGraph rev_sg(rev_fmi, aln_params, "rev"),
+    SeedForest rev_sg(rev_fmi, aln_params, "rev"),
               fwd_sg(fwd_fmi, aln_params, "fwd");
 
     std::ifstream reads_file(args.get_string(Opt::READ_LIST));
 
     if (!reads_file) {
-        err_out << "Error: couldn't open '" 
+        std::cerr << "Error: couldn't open '" 
                   << args.get_string(Opt::READ_LIST) << "'\n";
         return 1;
     }
@@ -185,7 +196,7 @@ int main(int argc, char** argv) {
 
         std::vector<Event> events;
         
-        if (!get_events(err_out, read_filename, events)) {
+        if (!get_events(std::cerr, read_filename, events)) {
             continue;
         }
 
@@ -204,9 +215,18 @@ int main(int argc, char** argv) {
         fwd_sg.new_read(aln_len);
         rev_sg.new_read(aln_len);
 
-        SeedTracker fwd_tracker, rev_tracker;
+        SeedTracker fwd_tracker(aln_len), rev_tracker(aln_len);
 
-        Timer timer;
+        Timer read_timer;
+
+        #ifdef VERBOSE_TIME
+        Timer event_timer;
+
+        time_out << std::fixed << std::setprecision(5);
+        #else
+        unsigned int status_step = aln_len / 10,
+                     status = 0;
+        #endif
         
         seeds_out << "== " << read_filename << " ==\n";
         alns_out << "== " << read_filename << " ==\n";
@@ -216,47 +236,92 @@ int main(int argc, char** argv) {
                  << aln_en << " of " 
                  << events.size() << " events ==\n";
 
-        err_out << read_filename << "\n";
+        time_out << "== " << read_filename << " ==\n";
 
-        unsigned int status_step = aln_len / 10,
-            status = 0;
 
         unsigned int e = aln_en;
+
         for (; e >= aln_st && e <= aln_en; e--) {
-            std::vector<Result> fwd_seeds = fwd_sg.add_event(events[e], seeds_out),
-                                rev_seeds = rev_sg.add_event(events[e], seeds_out);
+
+            #ifdef VERBOSE_TIME
+            time_out << e;
+            event_timer.reset();
+            #endif
+
+            std::vector<Result> fwd_seeds = fwd_sg.add_event(events[e], seeds_out);
+
+            #ifdef VERBOSE_TIME
+            time_out << std::setw(13) << event_timer.lap();
+            #endif
+
+            std::vector<Result> rev_seeds = rev_sg.add_event(events[e], seeds_out);
+
+            #ifdef VERBOSE_TIME
+            time_out << std::setw(13) << event_timer.lap();
+            #endif
 
             ReadAln fa = fwd_tracker.add_seeds(fwd_seeds);
 
+            #ifdef VERBOSE_TIME
+            time_out << std::setw(13) << event_timer.lap();
+            #endif
+
             ReadAln ra = rev_tracker.add_seeds(rev_seeds);
 
+            #ifdef VERBOSE_TIME
+            time_out << std::setw(13) << event_timer.lap();
+            #endif
+
+            if (read_until && std::max(fa.total_len_, ra.total_len_) > ru_min_revts) {
+                ReadAln a = fa;
+                if (fa.total_len_ < ra.total_len_) {
+                    a = ra;
+                }
+
+                if(fwd_tracker.check_ratio(a, 2) && rev_tracker.check_ratio(a, 2)) {
+                    #ifdef VERBOSE_TIME
+                    time_out << std::setw(13) << event_timer.lap() << std::endl;
+                    #endif
+                    break;
+                }
+            }
+
+            #ifdef VERBOSE_TIME
+            time_out << std::setw(13) << event_timer.lap() << std::endl;
+            time_out.flush();
 
 
+            #else
             if (status == status_step) {
                 unsigned int prog = (unsigned int) ((100.0 * (aln_len - e)) / aln_len);
-                err_out << prog << "%  (" << timer.get() / 1000 << ")\n";
+                time_out << prog << "%  (" << read_timer.get() / 1000 << ")\n";
                 status = 0;
-                err_out.flush();
+                time_out.flush();
                 seeds_out.flush();
                 alns_out.flush();
             } else {
                 status++;
             }
+            #endif
         }
 
-        err_out << "100% (" << timer.get() / 1000 << ")\n";
+        #ifndef VERBOSE_TIME
+        time_out << "100% (" << read_timer.get() / 1000 << ")\n";
+        #endif
+
+        time_out << "== END ==\n";
 
         fwd_tracker.print(alns_out, FWD_STR, (size_t) 5);
         rev_tracker.print(alns_out, REV_STR, (size_t) 5);
 
-        err_out.flush();
+        time_out.flush();
         seeds_out.flush();
         alns_out.flush();
 
-        alns_out  << "== " << timer.lap() << " ms, " 
+        alns_out  << "== " << read_timer.lap() << " ms, " 
                   << (aln_en - e + 1) << " events ==\n";
 
-        seeds_out << "== " << timer.lap() / 1000 << " sec ==\n";
+        seeds_out << "== " << read_timer.lap() / 1000 << " sec ==\n";
     }
 }
 

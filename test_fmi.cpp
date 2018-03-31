@@ -4,7 +4,7 @@
 #include "base_fmi.hpp"
 #include "sdsl_fmi.hpp"
 #include "fmi.hpp"
-#include "timer.h"
+#include "timer.hpp"
 
 void test(FMI &fmi, const std::vector<base_t> &bases) {
     Range r = fmi.get_full_range(bases.back());

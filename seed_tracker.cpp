@@ -77,7 +77,8 @@ bool operator< (const ReadAln &r1, const ReadAln &r2) {
     return r1.evt_st_ < r2.evt_st_;
 }
 
-SeedTracker::SeedTracker() {
+SeedTracker::SeedTracker(unsigned int read_length) {
+    read_length_ = read_length;
     longest_seed = NULL;
 }
 
@@ -106,16 +107,28 @@ ReadAln SeedTracker::add_seed(Result r) {
     auto loc = locations.lower_bound(new_loc),
          loc_match = locations.end();
 
+    unsigned int aln_length = read_length_ - new_loc.evt_st_;
+    //std::cout << aln_length << std::endl;
+
     while (loc != locations.end()) {
         bool higher_sup = loc_match == locations.end() 
                        || loc_match->total_len_ < loc->total_len_,
              
-             in_range = loc->ref_st_.end_ >= new_loc.ref_st_.end_
-                        && loc->ref_st_.end_ + new_loc.evt_st_
-                           <= new_loc.ref_st_.end_ + loc->evt_st_ + 6;
+             in_range = loc->ref_st_.end_ + new_loc.evt_st_
+                         <= new_loc.ref_st_.end_ + loc->evt_st_ + 6;
+        
+        //ASSERT loc->ref_st_.end_ >= new_loc.ref_st_.end_
+
+        //if (loc->ref_st_.end_ < new_loc.ref_st_.end_) {
+        //    std::cout << "WEIRD" << std::endl;
+        //}
 
         if (higher_sup && in_range) {
             loc_match = loc;
+            //std::cout << (loc->ref_st_.end_ - new_loc.ref_st_.end_) << "\t" 
+            //          << (loc->evt_st_ - new_loc.evt_st_) << std::endl;
+        } else if (loc->ref_st_.end_ - new_loc.ref_st_.end_ >= aln_length) {
+            break;
         }
 
         loc++;

@@ -1,7 +1,8 @@
 #ifndef SEED_TRACKER_HPP
 #define SEED_TRACKER_HPP
 
-#include "seed_graph.hpp"
+//#include "seed_graph.hpp"
+#include "seed_forest.hpp"
 #include <set>
 #include <vector>
 
@@ -35,10 +36,9 @@ class SeedTracker {
 
     std::set<ReadAln> locations;
     ReadAln *longest_seed;
-    unsigned int min_revents_;
+    unsigned int read_length_, min_revents_;
 
-    SeedTracker();
-    SeedTracker(unsigned int min_revents);
+    SeedTracker(unsigned int read_length);
 
     ReadAln add_seed(Result seed);
     ReadAln add_seeds(const std::vector<Result> &seeds);

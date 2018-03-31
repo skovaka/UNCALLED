@@ -18,8 +18,8 @@ all: uncalled dtw_test save_fmi test_fmi align_stats
 #sigalign: sigalign.o kmer_fmi.o kmer_model.o seed_graph.o
 #	$(CC) $(CFLAGS) kmer_fmi.o kmer_model.o seed_graph.o sigalign.o -o sigalign $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(LIBS) 
 
-uncalled: uncalled.o sdsl_fmi.o kmer_model.o seed_graph.o seed_tracker.o arg_parse.o basepairs.o range.o
-	$(CC) $(CFLAGS) sdsl_fmi.o kmer_model.o seed_graph.o seed_tracker.o arg_parse.o uncalled.o basepairs.o range.o -o uncalled $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(SDSL_LIB) $(LIBS)
+uncalled: uncalled.o sdsl_fmi.o base_fmi.o kmer_model.o seed_forest.o seed_tracker.o arg_parse.o basepairs.o range.o
+	$(CC) $(CFLAGS) sdsl_fmi.o kmer_model.o base_fmi.o seed_forest.o seed_tracker.o arg_parse.o uncalled.o basepairs.o range.o -o uncalled $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(SDSL_LIB) $(LIBS)
 
 seed_tracker_test: seed_tracker_test.o kmer_model.o seed_tracker.o seed_graph.o kmer_fmi.o basepairs.o  range.o
 	$(CC) $(CFLAGS) seed_tracker_test.o kmer_model.o kmer_fmi.o seed_tracker.o seed_graph.o basepairs.o range.o -o seed_tracker_test $(INCLUDE) $(HDF5_INCLUDE) $(HDF5_LIB) $(SDSL_LIB)

@@ -8,7 +8,7 @@
 #include <set>
 #include <utility>
 #include <unordered_map>
-#include "timer.h"
+#include "timer.hpp"
 #include "base_fmi.hpp"
 
 //#define DEBUG(s)

@@ -2,9 +2,9 @@
 #include <string>
 #include <list>
 #include "base_fmi.hpp"
-//#include "sdsl_fmi.hpp"
+#include "sdsl_fmi.hpp"
 #include "fmi.hpp"
-#include "timer.h"
+#include "timer.hpp"
 
 void brute_align(FMI &fmi, const std::vector<base_t> &bases) {
     for (size_t j = bases.size()-1; j < bases.size(); j--) {
@@ -19,16 +19,25 @@ void brute_align(FMI &fmi, const std::vector<base_t> &bases) {
     }
 }
 
-void dyn_align(FMI &fmi, const std::vector<base_t> &bases) {
+void dyn_align(FMI &fmi, const std::vector<base_t> &bases, std::ofstream &outfile) {
     std::list<Range> ranges;
     ranges.push_front(fmi.get_full_range(bases.back()));
 
+    unsigned int i_mod = 0, flush_checkpoint = 1000;
+
+    unsigned int rangelen;
     for (size_t i = bases.size()-2; i < bases.size() && ranges.front().length() > 1; i--) {
-        //std::cout << ranges.front().length() << "\t";
+        rangelen = (unsigned int) ranges.front().length();
+        //outfile.write((char *) &rangelen, sizeof(unsigned int));
+        std::cout << rangelen << "\t";
         ranges.push_front( fmi.get_neighbor(ranges.front(), bases[i]) );
     }
-    //std::cout << ranges.front().length() << "\n";
-    std::cout << ranges.size() << "\n";
+    
+    rangelen = (unsigned int) ranges.front().length();
+   // outfile.write((char *) &rangelen, sizeof(unsigned int));
+    std::cout << rangelen << "\n";
+
+    //std::cout << ranges.size() << "\n";
 
     for (size_t i = bases.size()-2; i < bases.size(); i--) {
         ranges.pop_back();
@@ -50,14 +59,14 @@ void dyn_align(FMI &fmi, const std::vector<base_t> &bases) {
                 r = fmi.get_neighbor(r, bases[j]);
             }
 
-            //std::cout << m->length() << "\t";
+            std::cout << m->length() << "\t";
 
             j--;
         }
 
-        //for (; m != ranges.rend(); m++) {
-        //    std::cout << m->length() << "\t";
-        //}
+        for (; m != ranges.rend(); m++) {
+            std::cout << m->length() << "\t";
+        }
         //ONLY KEEP ONE
         //if (m != ranges.rend()) {
         //    std::cout << "x\t";
@@ -65,46 +74,69 @@ void dyn_align(FMI &fmi, const std::vector<base_t> &bases) {
 
         j = i - ranges.size();
 
+        bool added = false;
+
         while (ranges.front().length() > 1 && j < bases.size()) {
             r = fmi.get_neighbor(ranges.front(), bases[j]);
             //if (!r.is_valid()) {
             //    break;
             //}
-            //std::cout << r.length() << "\t";
+            std::cout << r.length() << "\t";
             ranges.push_front(r);
             j--;
+            added = true;
         }
+
+        //if (added) {
+            //for (auto k = ranges.rbegin(); k != ranges.rend(); k++) {
+             //   std::cout << k->length() << "\t";
+                //rangelen = (unsigned int) k->length();
+                //outfile.write((char *) &rangelen, sizeof(unsigned int));
+            //}
+            std::cout << "\n";
+
+        //i_mod += 1;
+        //if (i_mod == flush_checkpoint) {
+        //    i_mod = 0;
+        //    outfile.flush();
+        //    std::cout.flush();
+        //}
+        //}
+
         //std::cout << "\n";
-        std::cout << ranges.size() << "\n";
+        //std::cout << ranges.size() << "\n";
     }
 }
 
 int main(int argc, char** argv) {
-    std::string ref_fname(argv[1]), index_fname, fwd_str, rev_str;
+    std::string ref_fname(argv[1]), 
+                index_fname(argv[2]),
+                out_fname(argv[3]), 
+                fwd_str, rev_str;
 
+    std::cerr << "Reading reference\n";
     std::ifstream ref_file(ref_fname);
     parse_fasta(ref_file, fwd_str, rev_str, false);
-    rev_str.erase();
-
     std::vector<base_t> bases = seq_to_bases(fwd_str);
+    rev_str.erase();
+    fwd_str.erase();
 
-    BaseFMI fmi;
-    
-    if (argc > 2) {
-        index_fname = std::string(argv[2]);
-        std::ifstream index_file(index_fname);
-        fmi = BaseFMI(index_file, 128);
-        //fmi = SdslFMI(index_fname);
-    } else {
-        fmi = BaseFMI(fwd_str + "$", 128);
-        //fmi.construct(fwd_str);
-    }
+    std::cerr << "Reading index\n";
+    SdslFMI fmi(index_fname);
+    //std::ifstream index_file(index_fname);
+    //fmi = BaseFMI(index_file, 128);
+
+    std::ofstream outfile(out_fname, std::ios::out | std::ios::binary);
+
+    std::cerr << "Aligning\n";
     
     Timer t;
-    dyn_align(fmi, bases);
-    std::cerr << t.lap() << "\n";
-    //brute_align(fmi, bases);
+    dyn_align(fmi, bases, outfile);
+    outfile.close();
     //std::cerr << t.lap() << "\n";
+    //brute_align(fmi, bases);
+
+    std::cerr << t.lap() << "\n";
 
 
 }

@@ -7,7 +7,7 @@
 #include "kmer_model.cpp"
 #include "sdsl_fmi.hpp"
 #include "base_fmi.hpp"
-#include "timer.h"
+#include "timer.hpp"
 
 int main(int argc, char** argv) {
 

@@ -4,7 +4,7 @@
 #include "kmer_model.hpp"
 #include "fast5.hpp"
 #include "arg_parse.hpp"
-#include "timer.h"
+#include "timer.hpp"
 
 double **full_dtw(const KmerModel &model,
                   const std::vector<Event> &read_events, 
