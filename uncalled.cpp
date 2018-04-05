@@ -13,9 +13,9 @@
 
 #include "fast5.hpp"
 #include "arg_parse.hpp"
-//#include "seed_graph.hpp"
-#include "alignment_forest.hpp"
-#include "seed_tracker.hpp"
+#include "graph_aligner.hpp"
+#include "forest_aligner.hpp"
+#include "seed_tracker.hpp"  
 #include "range.hpp"
 #include "kmer_model.hpp"
 #include "sdsl_fmi.hpp"
@@ -23,6 +23,14 @@
 #include "timer.hpp"
 
 #define VERBOSE_TIME
+
+#define GRAPH_ALN 0
+#define FOREST_ALN 1
+#define LEAF_ALN 2
+
+#ifndef ALN_TYPE
+#define ALN_TYPE GRAPH_ALN
+#endif
 
 std::string FWD_STR = "fwd",
             REV_STR = "rev";
@@ -155,11 +163,16 @@ int main(int argc, char** argv) {
                          args.get_double(Opt::SEED_PR),
                          args.get_double(Opt::STAY_PR));
 
-    //SeedGraph rev_sg(rev_fmi, aln_params, "rev"),
-    AlignmentForest rev_sg(rev_fmi, aln_params, "rev"),
-                     fwd_sg(fwd_fmi, aln_params, "fwd");
+    #if ALN_TYPE == GRAPH_ALN
+    GraphAligner
+    #elif ALN_TYPE == FOREST_ALN
+    ForestAligner
+    //#elif ALN_TYPE == LEAF_ALN
+    #endif
+        rev_sg(rev_fmi, aln_params, "rev"),
+        fwd_sg(fwd_fmi, aln_params, "fwd");
 
-    
+    std::cout << "Aln Type " << ALN_TYPE << std::endl;
 
     std::ifstream reads_file(args.get_string(Opt::READ_LIST));
 

@@ -19,9 +19,9 @@ class SdslFMI : public FMI {
 
     void save(const std::string &filename); 
 
-    Range get_neighbor(Range range, base_t base) const;
+    Range get_neighbor(Range range, Base base) const;
 
-    Range get_full_range(base_t base) const;
+    Range get_full_range(Base base) const;
 
     size_t sa(size_t i) const;
 

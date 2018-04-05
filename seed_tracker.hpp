@@ -1,8 +1,7 @@
 #ifndef SEED_TRACKER_HPP
 #define SEED_TRACKER_HPP
 
-//#include "seed_graph.hpp"
-#include "alignment_forest.hpp"
+#include "aligner.hpp"
 #include <set>
 #include <vector>
 

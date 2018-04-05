@@ -43,23 +43,23 @@ class KmerFMI {
     public:
 
 
-    KmerFMI(int alph_size, std::vector<mer_id> &mer_seq, int tally_dist);
+    KmerFMI(int alph_size, std::vector<Kmer> &mer_seq, int tally_dist);
 
-    std::list<Range> get_neigbhors(Range range, std::list<mer_id> kmers) const;
-    Range get_full_range(mer_id kmer) const;
+    std::list<Range> get_neigbhors(Range range, std::list<Kmer> kmers) const;
+    Range get_full_range(Kmer kmer) const;
 
     bool operator() (unsigned int rot1, unsigned int rot2);
 
     //private:
-    std::list<int> get_tallies(std::list<mer_id> kmers, int loc) const;
+    std::list<int> get_tallies(std::list<Kmer> kmers, int loc) const;
 
-    std::vector<mer_id> *mer_seq_;
+    std::vector<Kmer> *mer_seq_;
 
     //Sparseness of suffix and tally arrays
     int tally_dist_;
 
     int alph_size_;
-    std::vector<mer_id> bwt_;                        //L array
+    std::vector<Kmer> bwt_;                        //L array
     std::vector<int> mer_counts_, mer_f_starts_;      //F array
     std::vector<unsigned int> suffix_ar_;            //Suffix array
     std::vector< std::vector<int> > mer_tally_;      //Rank tally

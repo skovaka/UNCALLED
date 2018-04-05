@@ -6,7 +6,7 @@
 #include "fmi.hpp"
 #include "timer.hpp"
 
-void test(FMI &fmi, const std::vector<base_t> &bases) {
+void test(FMI &fmi, const std::vector<Base> &bases) {
     Range r = fmi.get_full_range(bases.back());
 
     for (size_t i = bases.size()-2; i < bases.size(); i--) {
@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
     std::ifstream ref_file(ref_fname);
     parse_fasta(ref_file, fwd_str, rev_str, false);
 
-    std::vector<base_t> fwd_bases = seq_to_bases(fwd_str);
+    std::vector<Base> fwd_bases = seq_to_bases(fwd_str);
 
     BaseFMI base_fmi;
     SdslFMI sdsl_fmi;

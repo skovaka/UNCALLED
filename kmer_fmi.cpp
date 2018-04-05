@@ -23,7 +23,7 @@ int min(int a, int b) {
 }
 
 //Reads a model directly from a file and creates the FM index from the given reference
-KmerFMI::KmerFMI(int alph_size, std::vector<mer_id> &mer_seq, int tally_dist) {
+KmerFMI::KmerFMI(int alph_size, std::vector<Kmer> &mer_seq, int tally_dist) {
 
     alph_size_ = alph_size;
     mer_seq_ = &mer_seq;
@@ -54,7 +54,7 @@ KmerFMI::KmerFMI(int alph_size, std::vector<mer_id> &mer_seq, int tally_dist) {
 
     mer_count_tmp_.resize(alph_size_, 0);
 
-    for (mer_id i = 0; i < alph_size_; i++)
+    for (Kmer i = 0; i < alph_size_; i++)
         mer_tally_[i].resize((mer_seq.size() / tally_dist_) + 1, -1);
     
     std::cerr << "FM init time: " << timer.lap() << "\n";
@@ -77,7 +77,7 @@ KmerFMI::KmerFMI(int alph_size, std::vector<mer_id> &mer_seq, int tally_dist) {
         
         //Update tally array
         if (tally_mod == tally_dist_) {
-            for (mer_id j = 0; j < alph_size_; j++)
+            for (Kmer j = 0; j < alph_size_; j++)
                 mer_tally_[j][i / tally_dist_] = mer_counts_[j];
             tally_mod = 0;
         }
@@ -88,13 +88,13 @@ KmerFMI::KmerFMI(int alph_size, std::vector<mer_id> &mer_seq, int tally_dist) {
     
     //TODO: store as range?
     mer_f_starts_[0] = 1;
-    for (mer_id i = 1; i < alph_size_; i++) {
+    for (Kmer i = 1; i < alph_size_; i++) {
         mer_f_starts_[i] = mer_f_starts_[i-1] + mer_counts_[i-1];
     }
     
     //Fill in last entry in tally array if needed
     if (mer_seq.size() % tally_dist_ == 0)
-        for (mer_id i = 0; i < alph_size_; i++)
+        for (Kmer i = 0; i < alph_size_; i++)
             mer_tally_[i][mer_tally_[i].size()-1] = mer_counts_[i];
 
 }
@@ -127,7 +127,7 @@ bool KmerFMI::operator() (unsigned int rot1, unsigned int rot2) {
 
 //Returns the number of occurences of the given k-mer in the BWT up to and
 //including the given index
-std::list<int> KmerFMI::get_tallies(std::list<mer_id> kmers, int loc) const {
+std::list<int> KmerFMI::get_tallies(std::list<Kmer> kmers, int loc) const {
     std::list<int> tallies;
     if (loc < 0)
         return tallies;
@@ -160,7 +160,7 @@ std::list<int> KmerFMI::get_tallies(std::list<mer_id> kmers, int loc) const {
     return tallies;
 }
 
-std::list<Range> KmerFMI::get_neigbhors(Range range, std::list<mer_id> kmers) const {
+std::list<Range> KmerFMI::get_neigbhors(Range range, std::list<Kmer> kmers) const {
     std::list<Range> results;
 
     std::list<int> mins = get_tallies(kmers, range.start_ - 1);
@@ -187,7 +187,7 @@ std::list<Range> KmerFMI::get_neigbhors(Range range, std::list<mer_id> kmers) co
 }
 
 //TODO: Maybe store f as ranges?
-Range KmerFMI::get_full_range(mer_id kmer) const {
+Range KmerFMI::get_full_range(Kmer kmer) const {
     return Range(mer_f_starts_[kmer], mer_f_starts_[kmer] + mer_counts_[kmer] -1 );
 }
 

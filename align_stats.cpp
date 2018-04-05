@@ -6,7 +6,7 @@
 #include "fmi.hpp"
 #include "timer.hpp"
 
-void brute_align(FMI &fmi, const std::vector<base_t> &bases) {
+void brute_align(FMI &fmi, const std::vector<Base> &bases) {
     for (size_t j = bases.size()-1; j < bases.size(); j--) {
         Range r = fmi.get_full_range(bases[j]);
         size_t i = j-1;
@@ -19,7 +19,7 @@ void brute_align(FMI &fmi, const std::vector<base_t> &bases) {
     }
 }
 
-void dyn_align(FMI &fmi, const std::vector<base_t> &bases, std::ofstream &outfile) {
+void dyn_align(FMI &fmi, const std::vector<Base> &bases, std::ofstream &outfile) {
     std::list<Range> ranges;
     ranges.push_front(fmi.get_full_range(bases.back()));
 
@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
     std::cerr << "Reading reference\n";
     std::ifstream ref_file(ref_fname);
     parse_fasta(ref_file, fwd_str, rev_str, false);
-    std::vector<base_t> bases = seq_to_bases(fwd_str);
+    std::vector<Base> bases = seq_to_bases(fwd_str);
     rev_str.erase();
     fwd_str.erase();
 

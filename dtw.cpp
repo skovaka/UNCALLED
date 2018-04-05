@@ -8,7 +8,7 @@
 
 double **full_dtw(const KmerModel &model,
                   const std::vector<Event> &read_events, 
-                  const std::vector<mer_id> &ref_kmers,
+                  const std::vector<Kmer> &ref_kmers,
                   bool local = true,
                   bool prob = true) {
 
@@ -188,7 +188,7 @@ int main(int argc, char** argv) {
 
         model.normalize_events(read_events);
 
-        std::vector<mer_id> ref_kmers(ref_seq.size() - model.kmer_len() + 1);
+        std::vector<Kmer> ref_kmers(ref_seq.size() - model.kmer_len() + 1);
         for (size_t i = 0; i < ref_kmers.size(); i++) {
             ref_kmers[i] = model.kmer_to_id(ref_seq, i);
         }

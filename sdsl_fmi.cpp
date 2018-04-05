@@ -32,7 +32,7 @@ void SdslFMI::save(const std::string &filename) {
     sdsl::store_to_file(index_, filename); // save it
 }
 
-Range SdslFMI::get_neighbor(Range r1, base_t base) const {
+Range SdslFMI::get_neighbor(Range r1, Base base) const {
     Range r2;
     if (r1.start_ <= r1.end_) {
         sdsl::backward_search(index_, r1.start_, r1.end_, base+1, r2.start_, r2.end_);
@@ -40,7 +40,7 @@ Range SdslFMI::get_neighbor(Range r1, base_t base) const {
     return r2;
 }
 
-Range SdslFMI::get_full_range(base_t base) const {
+Range SdslFMI::get_full_range(Base base) const {
     Range r;
     sdsl::backward_search(index_, 0, index_.size()-1, base+1, r.start_, r.end_);
     return r;
@@ -75,8 +75,8 @@ int main(int argc, char** argv) {
         }
 
         sdsl::int_vector<8> enc_bases = str_to_vec(bases);
-        //base_t *enc_bases = new base_t[bases.size()];
-        //std::vector<base_t> enc_bases(bases.size());
+        //Base *enc_bases = new Base[bases.size()];
+        //std::vector<Base> enc_bases(bases.size());
         //for (size_t i = 0; i < bases.size(); i++) {
         //    enc_bases[i] = char_to_base(bases[i])+1;
             //std::cout << (int) enc_bases[i] << std::endl;
