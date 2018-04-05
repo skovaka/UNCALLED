@@ -1,7 +1,7 @@
 #ifndef SEED_GRAPH_HPP
 #define SEED_GRAPH_HPP
 
-#include "sdsl_fmi.hpp"
+#include "fmi.hpp"
 #include "kmer_model.hpp"
 #include "timer.hpp"
 #include <list>
@@ -64,7 +64,7 @@ class AlnParams {
 };
 
 
-class SeedGraph {
+class AlignmentForest {
 
     class Node {
         public:
@@ -77,20 +77,15 @@ class SeedGraph {
                ignore_count_,
                consec_stays_;
 
+        unsigned char child_count_;
+
         mer_id kmer_;
+
         double event_prob_, seed_prob_;
+        Node::Type type_;
 
-        #ifdef DEBUG_NODES
-        size_t full_length_;
-        #endif
-
-        #ifdef DEBUG_PROB
-        double min_evt_prob_;
-        double min_stay_prob_;
-        #endif
-
-        std::list< std::pair<Node *, Type> > parents_;
-        std::list<Node *> children_;
+        Node *parent_;
+        Node **children_;
     
         //Source constructor
         Node(mer_id kmer, double prob);
@@ -103,9 +98,8 @@ class SeedGraph {
 
         //Copy constructor
         Node(const Node &s);
+        ~Node();
 
-
-        void replace_info(const Node &node);
         void update_info();
         bool better_than(const Node *node); //TODO: this is a terrible name
         bool should_report(const AlnParams &params);
@@ -113,21 +107,25 @@ class SeedGraph {
         size_t seed_len();
         size_t match_len();
         bool is_valid();
+        double mean_prob() const;
+        double next_mean_prob(double next_prob) const;
 
-        
         void invalidate(std::vector<Node *> *old_nodes, bool delete_source);
         bool remove_child(Node *child);
-        
         size_t add_child(Node *child);
         void print() const;
     };
-    typedef std::pair<Node *, Node::Type> parent_ptr;
+
+    //class SingleNode : Node {
+    //}
+    //typedef std::pair<Node *, Node::Type> parent_ptr;
 
 
     public:
 
-    const SdslFMI &fmi_;
+    const FMI &fmi_;
     Range *kmer_ranges_;
+    std::map<Range, size_t> range_kmers_;
 
     AlnParams params_;
     std::string label_;
@@ -144,11 +142,11 @@ class SeedGraph {
     unsigned int cur_event_;
     Event prev_event_;
 
-    SeedGraph(const SdslFMI &fmi, 
+    AlignmentForest(const FMI &fmi, 
               const AlnParams &aln_params,
               const std::string &label);
 
-    ~SeedGraph();
+    ~AlignmentForest();
 
     void new_read(size_t read_len);
     void reset();

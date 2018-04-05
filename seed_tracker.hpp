@@ -2,7 +2,7 @@
 #define SEED_TRACKER_HPP
 
 //#include "seed_graph.hpp"
-#include "seed_forest.hpp"
+#include "alignment_forest.hpp"
 #include <set>
 #include <vector>
 

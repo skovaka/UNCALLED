@@ -10,25 +10,30 @@
 #include <unordered_map>
 #include <sdsl/suffix_arrays.hpp>
 #include "timer.hpp"
-#include "seed_graph.hpp"
-#include "sdsl_fmi.hpp"
+#include "alignment_forest.hpp"
+#include "fmi.hpp"
 
 //#define DEBUG(s)
 #define DEBUG(s) do { std::cerr << s; } while (0)
 //#define DEBUG_PATHS
 //#define DEBUG_RANGES
 
+#define MAX_CHILDREN 5
 
 //Source constructor
-SeedGraph::Node::Node(mer_id kmer, double prob)
+AlignmentForest::Node::Node(mer_id kmer, double prob)
     : length_(1),
       stay_count_(0),
       skip_count_(0),
       ignore_count_(0),
       consec_stays_(0),
+      child_count_(0),
       kmer_(kmer),
       event_prob_(prob),
-      seed_prob_(prob)
+      seed_prob_(prob),
+      type_(Type::MATCH),
+      parent_(NULL),
+      children_(NULL)
 
       #ifdef DEBUG_NODES
       , full_length_(1)
@@ -41,132 +46,123 @@ SeedGraph::Node::Node(mer_id kmer, double prob)
        {}
 
 //Child constructor
-SeedGraph::Node::Node(Node *parent, mer_id kmer, 
+AlignmentForest::Node::Node(Node *parent, mer_id kmer, 
                       double prob, Type type) 
-    : 
+    :
+      child_count_(0),
       kmer_(kmer),
       event_prob_(prob),
-      seed_prob_(parent->seed_prob_ + prob) {
+      type_(type),
+      parent_(parent),
+      children_(NULL) {
 
     #ifdef DEBUG_NODES
     full_length_ = parent->full_length_ + 1;
     #endif
     
-    parents_.push_front(parent_ptr(parent, type));
     update_info();
 }
 
 //Creates invalid node
-SeedGraph::Node::Node()
+AlignmentForest::Node::Node()
     : length_(0),
       stay_count_(0),
       skip_count_(0),
       ignore_count_(0),
       consec_stays_(0),
+      child_count_(0),
       kmer_(0),
       event_prob_(0),
-      seed_prob_(0) {}
+      seed_prob_(0),
+      type_(Type::MATCH),
+      parent_(NULL),
+      children_(NULL) {}
 
 //Copy constructor
-SeedGraph::Node::Node(const Node &s)
+AlignmentForest::Node::Node(const Node &s)
     : length_(s.length_),
       stay_count_(s.stay_count_),
       skip_count_(s.skip_count_),
       ignore_count_(s.ignore_count_),
+      consec_stays_(s.consec_stays_),
+      child_count_(s.child_count_),
       kmer_(s.kmer_),
       event_prob_(s.event_prob_),
       seed_prob_(s.seed_prob_),
-
-      #ifdef DEBUG_PROB
-      min_evt_prob_(s.min_evt_prob_),
-      #endif
-
-      #ifdef DEBUG_NODES
-      full_length_(s.full_length_),
-      #endif
-
-
-      parents_(s.parents_),
+      type_(s.type_),
+      parent_(s.parent_),
       children_(s.children_) {}
     
-bool SeedGraph::Node::is_valid() {
-    return length_ > 0;
-}
-
-size_t SeedGraph::Node::seed_len() {
-    return length_;
-}
-
-size_t SeedGraph::Node::match_len() {
-    return seed_len() - stay_count_ - ignore_count_ + skip_count_;
-}
-
-//TODO: Really not a very good name
-bool SeedGraph::Node::better_than(const Node *node) {
-    return node->ignore_count_ > ignore_count_ ||
-            (node->ignore_count_ == ignore_count_ && 
-             node->seed_prob_ < seed_prob_);
-}
-
-bool SeedGraph::Node::should_report(const AlnParams &params) {
-    return parents_.front().second == Node::Type::MATCH && 
-           stay_count_ <= params.max_stay_frac_ * length_ && 
-           seed_prob_ >= params.min_seed_pr_ * length_;
-}
-
-void SeedGraph::Node::invalidate(std::vector<Node *> *old_nodes, 
-                                 bool delete_source = false) {
-
-    std::vector<Node *> to_remove;
-    to_remove.push_back(this);
-
-    while (!to_remove.empty()) {
-        Node *n = to_remove.back();
-        to_remove.pop_back();
-
-        for (auto p = n->parents_.begin(); p != n->parents_.end(); p++) {
-            if (p->first->remove_child(n)) {
-                to_remove.push_back(p->first);
-            }
-        }
-
-        if (!n->parents_.empty() || delete_source) {
-            old_nodes->push_back(n);
-        }
-
-        n->parents_.clear();
-        n->children_.clear();
-
-        n->length_ = n->stay_count_ = n->seed_prob_ = 0;
+AlignmentForest::Node::~Node() {
+    if (children_ != NULL) {
+        delete[] children_;
     }
 }
 
-void SeedGraph::Node::replace_info(const Node &node) {
-    length_ = node.length_;
-
-    event_prob_ = node.event_prob_;
-    seed_prob_ = node.seed_prob_;
-
-    stay_count_ = node.stay_count_;
-    skip_count_ = node.skip_count_;
-    ignore_count_ = node.ignore_count_;
-    consec_stays_ = node.consec_stays_;
-
-    #ifdef DEBUG_PROB
-    dup_node->min_evt_prob_ = node.min_evt_prob_;
-    #endif
-
-    #ifdef DEBUG_NODES
-    full_length_ = node.full_length_;
-    #endif
+bool AlignmentForest::Node::is_valid() {
+    return length_ > 0;
 }
 
-void SeedGraph::Node::update_info() {
-    if (parents_.empty()) {
+size_t AlignmentForest::Node::seed_len() {
+    return length_;
+}
+
+size_t AlignmentForest::Node::match_len() {
+    return seed_len() - stay_count_ - ignore_count_ + skip_count_;
+}
+
+double AlignmentForest::Node::mean_prob() const {
+    return seed_prob_ / length_;
+}
+
+double AlignmentForest::Node::next_mean_prob(double next_prob) const {
+    return (seed_prob_ + next_prob) / (length_ + 1);
+}
+
+//TODO: Really not a very good name
+bool AlignmentForest::Node::better_than(const Node *node) {
+    return node->ignore_count_ > ignore_count_ ||
+            (node->ignore_count_ == ignore_count_ && 
+             node->mean_prob() < mean_prob());
+}
+
+bool AlignmentForest::Node::should_report(const AlnParams &params) {
+    return type_ == Node::Type::MATCH && 
+           stay_count_ <= params.max_stay_frac_ * length_ &&
+           mean_prob() >= params.min_seed_pr_;
+}
+
+void AlignmentForest::Node::invalidate(std::vector<Node *> *old_nodes, 
+                                 bool delete_source = false) {
+
+    Node *n = this, *p;
+
+    while (n != NULL) {
+        
+        p = n->parent_;
+
+        if (p != NULL || delete_source) {
+            old_nodes->push_back(n);
+        }
+
+        n->child_count_ = 0;
+        n->parent_ = NULL;
+        n->length_ = n->stay_count_ = n->seed_prob_ = 0;
+
+        if (p == NULL || p->remove_child(n)) {
+            n = p;
+        } else {
+            break;
+        }
+    }
+}
+
+void AlignmentForest::Node::update_info() {
+    if (parent_ == NULL) {
         seed_prob_ = event_prob_;
         stay_count_ = 
         skip_count_ =
-        ignore_count_ =
+        ignore_count_ = 
         consec_stays_ = 0;
 
         length_ = 1;
@@ -178,20 +174,18 @@ void SeedGraph::Node::update_info() {
         return;
     }
 
-    const parent_ptr &parent = parents_.front();
+    seed_prob_    = parent_->seed_prob_ + event_prob_;
     
-    seed_prob_    = parent.first->seed_prob_ + event_prob_;
-    
-    length_       = parent.first->length_ + 1;
-    stay_count_   = parent.first->stay_count_;
-    skip_count_   = parent.first->skip_count_;
-    ignore_count_ = parent.first->ignore_count_;
+    length_       = parent_->length_ + 1;
+    stay_count_   = parent_->stay_count_;
+    skip_count_   = parent_->skip_count_;
+    ignore_count_ = parent_->ignore_count_;
     consec_stays_ = 0;
 
-    switch(parent.second) {
+    switch(type_) {
         case Type::STAY:
         stay_count_++;
-        consec_stays_ = parent.first->consec_stays_ + 1;
+        consec_stays_ = parent_->consec_stays_ + 1;
         break;
 
         case Type::SKIP:
@@ -206,12 +200,12 @@ void SeedGraph::Node::update_info() {
     }
 
     #ifdef DEBUG_NODES
-    full_length_ = parent.first->full_length_ + 1;
+    full_length_ = parent_->full_length_ + 1;
     #endif
 
     #ifdef DEBUG_PROB
-    if (parent.first->min_evt_prob_ < event_prob_) {
-        min_evt_prob_ = parent.first->min_evt_prob_;
+    if (parent_->min_evt_prob_ < event_prob_) {
+        min_evt_prob_ = parent_->min_evt_prob_;
     } else {
         min_evt_prob_ = event_prob_;
     }
@@ -221,16 +215,16 @@ void SeedGraph::Node::update_info() {
 
 //Returns true if this node should be pruned
 //If should_invalidate = false, will always return false
-bool SeedGraph::Node::remove_child(Node *child) {
+bool AlignmentForest::Node::remove_child(Node *child) {
 
-    if (children_.size() == 1) {
-        children_.clear();
+    if (child_count_ == 1) {
+        child_count_ = 0;
         return true;
     }
 
-    for (auto c = children_.begin(); c != children_.end(); c++) {
-        if (*c == child) {
-            children_.erase(c);
+    for (size_t c = 0; c < child_count_; c++) {
+        if (children_[c] == child) {
+            children_[c] = children_[--child_count_];
             break;
         }
     }
@@ -238,7 +232,15 @@ bool SeedGraph::Node::remove_child(Node *child) {
     return false;
 }
 
-void SeedGraph::Node::print() const {
+size_t AlignmentForest::Node::add_child(Node *child) {
+    if (children_ == NULL) {
+        children_ = new Node *[MAX_CHILDREN];
+    }
+    children_[child_count_++] = child;
+    return child_count_;
+}
+
+void AlignmentForest::Node::print() const {
     //std::cout << length_ << "\n";
               //<< full_length_ << "\n";
               //<< stay_count_ << "\t"
@@ -247,7 +249,6 @@ void SeedGraph::Node::print() const {
               //<< (parents_.empty() ? Type::MATCH : parents_.front().second) << "\t"
               //<< parents_.size() << "\t"
               //<< children_.size() << "\t"
-              //<< kmer_ << "\t"
               //<< event_prob_ << "\t"
               //<< seed_prob_ << "\n";
 }
@@ -258,7 +259,7 @@ AlnParams::AlnParams(const KmerModel &model,
                      unsigned int anchor_nlen, 
                      unsigned int max_ignores, 
                      unsigned int max_skips,
-                      unsigned int max_consec_stay,
+                     unsigned int max_consec_stay,
                      double max_stay_frac,
                      double min_anchor_evpr,
                      //double min_extend_evpr,
@@ -293,7 +294,7 @@ unsigned int AlnParams::get_graph_len(unsigned int seed_nlen) {
     return (nucl_to_events(seed_nlen) / (1.0 - max_stay_frac_)) + max_ignores_;
 }
 
-SeedGraph::SeedGraph(const SdslFMI &fmi, 
+AlignmentForest::AlignmentForest(const FMI &fmi, 
                      const AlnParams &ap,
                      const std::string &label)
     : fmi_(fmi),
@@ -309,23 +310,24 @@ SeedGraph::SeedGraph(const SdslFMI &fmi,
             r = fmi_.get_neighbor(r, params_.model_.get_base(k, i));
         }
         kmer_ranges_[k] = r;
+        range_kmers_[r] = k;
     }
 }
 
-SeedGraph::~SeedGraph() {
+AlignmentForest::~AlignmentForest() {
     delete[] kmer_ranges_;
     reset();
 }
 
-void SeedGraph::new_read(size_t read_len) {
+void AlignmentForest::new_read(size_t read_len) {
     reset();
     cur_event_ = read_len;
     prev_event_ = {0, 0, 0};
 }
 
-void SeedGraph::reset() {
+void AlignmentForest::reset() {
     for (auto p = prev_nodes_.begin(); p != prev_nodes_.end(); p++) {
-        if (!p->first->parents_.empty())
+        if (p->first->parent_ != NULL)
             p->first->invalidate(&old_nodes_);
     }
 
@@ -354,62 +356,55 @@ void SeedGraph::reset() {
     event_kmer_probs_.clear();
 }
 
-std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
+std::vector<Result> AlignmentForest::add_event(Event e, std::ostream &out) {
+
     //Update event index
     cur_event_--;
-
-    //if (!params_.model_.event_valid(e)) {
-    //    std::cerr << "Error: event " << cur_event_
-    //              << " invalid - this might cause some problems\n";
-    //    return std::vector<Result>();
-    //}
-
-    //Compare this event with previous to see if it should be a stay
-    //TODO: if I enable stay prob checking, need to deal with stdv = 0
-    //double cur_stay_prob = params_.model_.get_stay_prob(e, prev_event_);
-
 
     Timer t;
 
     //Calculate and store kmer match probs for this event
     event_kmer_probs_.push_front(new double[params_.model_.kmer_count()]);
     double *kmer_probs = event_kmer_probs_.front();
-    for (unsigned int kmer = 0; kmer < params_.model_.kmer_count(); kmer++)
+    for (unsigned int kmer = 0; kmer < params_.model_.kmer_count(); kmer++) {
         kmer_probs[kmer] = params_.model_.event_match_prob(e, kmer);
+    }
 
-    //DEBUG(cur_event_ << "\t" << t.lap() << "\t");
-    
     //Where this event's sources will be stored
     sources_.push_front(std::list<Node *>());
     
     double prob;
 
-    //print_graph(false);
+    t.reset();
 
+    Range kmer_range;
+    mer_id prev_kmer = 0;
 
     //Find neighbors of previous nodes
     for (auto p = prev_nodes_.begin(); p != prev_nodes_.end(); p++) {
         Range prev_range = p->second;
         Node *prev_node = p->first;
 
-        #ifdef DEBUG_RANGES
-        //if (prev_range.length() <= 200) {
+        //TODO: store the kmer with the range/node - still seprate
+        //if (!prev_range.intersects(kmer_range)) {
+        //    auto rk = range_kmers_.upper_bound(prev_range);
+        //    if (!prev_range.intersects(rk->first)) {
+        //        rk--;
+        //    }
+        //    kmer_range = rk->first;
+        //    prev_kmer = rk->second;
+        //    if (!prev_range.intersects(kmer_range)) {
+        //        std::cout << prev_range.start_ << "-" << prev_range.end_ << " "
+        //                  << kmer_range.start_ << "-" << kmer_range.end_ << "\n";
+        //    }
         //}
-        #endif
+
+        prev_kmer = prev_node->kmer_;
 
         //Get probability for stay neighbor
-        mer_id prev_kmer = prev_node->kmer_;
         prob = kmer_probs[prev_kmer];
         
         size_t neighbor_count = 0;
-
-
-        //if (//prev_node->match_len() < params_.anchor_rlen_ &&
-        //    prev_range.length() > 1) { 
-        //    evpr_thresh = params_.min_anchor_evpr_;
-        //} else {
-        //    evpr_thresh = params_.min_extend_evpr_;
-        //}
 
         double evpr_thresh = 0;
         for (size_t i = 0; i < params_.expr_lengths_.size(); i++) {
@@ -423,17 +418,7 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
             evpr_thresh = params_.min_anchor_evpr_;
         }
 
-        //if (prev_range.length() <= 2) {
-        //    evpr_thresh = params_.min_extend_evpr_;
-        //} else if (prev_range.length() <= 5) {
-        //    evpr_thresh = -4;
-        //} else if (prev_range.length() <= 100) {
-        //    evpr_thresh = -2.4;
-        //} else {
-        //    evpr_thresh = params_.min_anchor_evpr_;
-        //}
-
-        if (prev_node->consec_stays_ < params_.max_consec_stay_ && prob >= evpr_thresh) {
+        if (prev_node->consec_stays_ < params_.max_consec_stay_ && prob >= evpr_thresh) { //&& rank <= evpr_thresh ) { 
             neighbor_count += 1;
 
             Node next_node(prev_node, prev_kmer, prob, Node::Type::STAY);
@@ -452,7 +437,8 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
         std::list<mer_id> next_kmers;
 
         for (auto n = neighbor_itr.first; n != neighbor_itr.second; n++) {
-            if(kmer_probs[*n] >= evpr_thresh) {
+            prob = kmer_probs[*n];
+            if(prob >= evpr_thresh) { //&& prev_node->next_mean_prob(prob) >= params_.min_seed_pr_) {
                 next_kmers.push_back(*n);
             } 
         }
@@ -467,6 +453,7 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
         //Add all the neighbors that were found
         while (next_kmer != next_kmers.end()) {
             prob = kmer_probs[*next_kmer];
+            //rank = kmer_ranks[*next_kmer];
 
             base_t next_base = params_.model_.get_first_base(*next_kmer);
             Range next_range = fmi_.get_neighbor(prev_range, next_base);
@@ -476,9 +463,6 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
             #ifdef DEBUG_RANGES
             //if (prev_range.length() <= 200 && next_range.is_valid()) {
             if (next_range.is_valid()) {
-                if (next_range.length() == 13993369) {
-                    std::cout << "\nWHOPS\n" << next_range.start_ << " " << next_range.end_ << "\n";
-                }
                 std::cout << "\t" << next_range.length();
 
             }
@@ -510,13 +494,18 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
         #endif
     }
 
+    //if (cur_event_ < 5000) {
+    //    std::cout << timer.lap() << std::endl;
+    //}
 
     //DEBUG(t.lap() << "\t");
 
     //Find sources
     for (mer_id kmer = 0; kmer < params_.model_.kmer_count(); kmer++) {
         prob = kmer_probs[kmer];
+        //rank = kmer_ranks[kmer];
         if (prob >= params_.min_anchor_evpr_) {
+        //if (rank <= params_.min_anchor_evpr_) {
             //Range next_range = fmi_.get_kmer_range(params_.model_.id_to_kmer(kmer));
             Range next_range = kmer_ranges_[kmer];
 
@@ -530,14 +519,12 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
         }
     }
 
-    //DEBUG(t.lap() << "\t");
-
     //Clear prev_nodes, pruning any leaves
     while (!prev_nodes_.empty()) {
         auto p = prev_nodes_.begin();
         Node *prev_node = p->first;
 
-        if (prev_node->children_.empty()) {
+        if (prev_node->child_count_ == 0) {
             prev_node->invalidate(&old_nodes_);
         }
 
@@ -552,22 +539,22 @@ std::vector<Result> SeedGraph::add_event(Event e, std::ostream &out) {
         next_nodes_.erase(n);
     }
 
-    //if (label_ == "fwd") {
-    //print_graph(false);
+    //if (cur_event_ < 5000) {
+    //    std::cout << timer.lap() << std::endl;
     //}
 
-    //DEBUG(t.lap() << "\t");
-    //
-    //print_graph(true);
-
     auto r = pop_seeds(out);
+
+    //if (cur_event_ < 5000) {
+    //    std::cout << timer.lap() << std::endl;
+    //}
 
     prev_event_ = e;
 
     return r;
 }
 
-size_t SeedGraph::add_sources(const Range &range, const Node &node) {
+size_t AlignmentForest::add_sources(const Range &range, const Node &node) {
 
     //Find closest existing node
     auto lb = next_nodes_.lower_bound(range);
@@ -650,15 +637,12 @@ size_t SeedGraph::add_sources(const Range &range, const Node &node) {
     return split_ranges.size();
 }
 
-SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
+AlignmentForest::Node *AlignmentForest::add_child(Range &range, Node &node) {
     
     if (!node.is_valid() || !range.is_valid()) {
         return NULL;
     }
     
-    //Parent of the node being added
-    parent_ptr new_parent = node.parents_.front();
-
     //Find closest node >= the node being added
     auto lb = next_nodes_.lower_bound(range);
 
@@ -679,120 +663,19 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
         next_nodes_.insert(lb, std::pair<Range, Node *>(range, new_node));
 
         //Update the parent
-        new_parent.first->children_.push_front(new_node);
+        node.parent_->add_child(new_node);
 
         //Created one node
-        //#ifdef DEBUG_NODES
-        //std::cout << range.start_ << "\t" << range.end_ << "\t";
-        //node.print();
-        //#endif
         return new_node;
     }
     
     //Node associated with same range
     Node *dup_node = lb->second;
-    auto dup_parent = dup_node->parents_.begin(); 
 
-    //This node is for a longer seed
-    if (dup_node->seed_len() < node.seed_len()) {
-
-        //Copy seed info
-        dup_node->replace_info(node);
-
-        //Update parents and children
-        dup_node->parents_.push_front(new_parent);
-        new_parent.first->children_.push_front(dup_node);
-
-        //No new nodes created
-        //#ifdef DEBUG_NODES
-        //std::cout << range.start_ << "\t" << range.end_ << "\t";
-        //node.print();
-        //#endif
-        return dup_node;
-
-    } else if (dup_node->seed_len() == node.seed_len()) {
-
-        if(node.better_than(dup_node)) {
-        //if ( dup_node->ignore_count_ > node.ignore_count_ 
-        //    || (dup_node->ignore_count_ == node.ignore_count_ && 
-        //        dup_node->seed_prob_ < node.seed_prob_)) {
-
-            //If dup_parent has no children in the end, will be invalidated (in add_event)
-            dup_parent->first->remove_child(dup_node);
-
-            //Erase old parent 
-            dup_node->parents_.erase(dup_parent);
-
-            //Copy seed info
-            dup_node->replace_info(node);
-
-            //Insert new parent in old parent's place
-            dup_node->parents_.push_front(new_parent);
-            new_parent.first->children_.push_front(dup_node);
-
-            //#ifdef DEBUG_NODES
-            //std::cout << range.start_ << "\t" << range.end_ << "\t";
-            //node.print();
-            //#endif
-        }
-
-        return dup_node;
-    }
-   
-    //Find where to place the new parent pointer 
-    while (dup_parent != dup_node->parents_.end()) {
-
-        //dup_parent is a longer seed
-        if (new_parent.first->seed_len() < dup_parent->first->seed_len()) {
-            dup_parent++;
-            continue; //not breaking yet
-
-        //dup_parent is the longest branch shorter than new_parent
-        } else if (new_parent.first->seed_len() > dup_parent->first->seed_len())  {
-            
-            //Add parent in the correct location
-            dup_node->parents_.insert(dup_parent, new_parent);
-            new_parent.first->children_.push_front(dup_node);
-
-            //#ifdef DEBUG_NODES
-            //std::cout << range.start_ << "\t" << range.end_ << "\t";
-            //node.print();
-            //#endif
-
-        //dup_parent is same length as new_parent
-
-        //and new node has higher probability
-        } else if (new_parent.first->better_than(dup_parent->first)) {
-
-            //If dup_parent has no children in the end, will be invalidated (in add_event)
-            dup_parent->first->remove_child(dup_node);
-
-            //Erase old parent 
-            auto old_loc = dup_node->parents_.erase(dup_parent);
-
-            //Insert new parent in old parent's place
-            dup_node->parents_.insert(old_loc, new_parent);
-            new_parent.first->children_.push_front(dup_node);
-
-            //#ifdef DEBUG_NODES
-            //std::cout << range.start_ << "\t" << range.end_ << "\t";
-            //node.print();
-            //#endif
-
-        } //If new node has lower prob, new node isn't stored in any way
-
-        //Breaking before dup_parent reaches end, so next if statement won't execute
-        break;
-    }
-
-    //Smallest parent, put at the end
-    if (dup_parent == dup_node->parents_.end()) {
-        dup_node->parents_.push_back(new_parent);
-        new_parent.first->children_.push_front(dup_node);
-        //#ifdef DEBUG_NODES
-        //std::cout << range.start_ << "\t" << range.end_ << "\t";
-        //node.print();
-        //#endif
+    if(node.better_than(dup_node)) {
+        dup_node->parent_->remove_child(dup_node);
+        node.parent_->add_child(dup_node);
+        *dup_node = node;
     }
 
     return dup_node;
@@ -800,7 +683,7 @@ SeedGraph::Node *SeedGraph::add_child(Range &range, Node &node) {
 
 
 
-std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) { 
+std::vector<Result> AlignmentForest::pop_seeds(std::ostream &out) { 
 
     std::vector<Result> results;
 
@@ -827,18 +710,18 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
 
         std::list<Node *> to_visit;
 
-        for (auto c = aln_en->children_.begin(); c != aln_en->children_.end(); c++) {
+        for (size_t c = 0; c < aln_en->child_count_; c++) {
 
             #ifdef DEBUG_PATHS
             std::vector<Node::Type> p(params_.graph_elen_);
             p[0] = Node::Type::MATCH;
-            p[1] = (*c)->parents_.front().second;
+            p[1] = (*c)->type_;
             paths.push_back(p);
             #endif 
 
-            (*c)->parents_.clear();
-            next_sources.push_back(*c);
-            to_visit.push_back(*c);
+            aln_en->children_[c]->parent_ = NULL;
+            next_sources.push_back(aln_en->children_[c]);
+            to_visit.push_back(aln_en->children_[c]);
 
         }
         
@@ -855,43 +738,13 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
             paths.pop_front();
 
             if (n->seed_len() > 2) {
-                p[n->seed_len()-1] = n->parents_.front().second;
+                p[n->seed_len()-1] = n->type_;
             }
             #endif 
 
             if (n->seed_len() != prev_len) {
                 prev_len = n->seed_len();
                 kmer_probs++;
-            }
-
-            //Check if parents are compatible
-            if (n->parents_.size() > 1) {
-                auto seed_parent = n->parents_.begin(), //where we came from
-                     next_parent = std::next(seed_parent); //seed with closest length
-
-                //Parents now have the same length
-                if (seed_parent->first->seed_len() == next_parent->first->seed_len()) {
-                    Node *to_erase;
-
-                    //Erase where we came from
-                    if (next_parent->first->better_than(seed_parent->first)) {
-                        to_erase = seed_parent->first; 
-                        n->parents_.erase(seed_parent);
-
-                    //Erase other seed branch
-                    } else {
-                        to_erase = next_parent->first;
-                        n->parents_.erase(next_parent);
-                    }
-
-                    //Remove old parent
-                    if (to_erase->remove_child(n)) {
-                        to_erase->invalidate(&old_nodes_);
-                    }
-
-                    n->update_info();
-                }
-
             }
 
             if (n->seed_len() == params_.graph_elen_) {
@@ -941,17 +794,17 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
             } else {
 
                 #ifdef DEBUG_PATHS
-                if (n->children_.size() > 0) { //Should always be true?
+                if (n->child_count_ > 0) { //Should always be true?
                     paths.push_back(p);
 
-                    for (unsigned int i = 1; i < n->children_.size(); i++) {
+                    for (unsigned int i = 1; i < n->child_count_); i++) {
                         paths.push_back(std::vector<Node::Type>(p));
                     }   
                 }
                 #endif
 
-                for (auto c = n->children_.begin(); c != n->children_.end(); c++) {
-                    to_visit.push_back(*c);
+                for (size_t c = 0; c < n->child_count_; c++) {
+                    to_visit.push_back(n->children_[c]);
                 }
             }
 
@@ -973,7 +826,7 @@ std::vector<Result> SeedGraph::pop_seeds(std::ostream &out) {
 
 }
 
-void SeedGraph::print_graph(bool verbose) {
+void AlignmentForest::print_graph(bool verbose) {
     std::set< std::pair<unsigned int, Node *> > to_visit;
     auto event_sources = sources_.rbegin();
 
@@ -989,7 +842,6 @@ void SeedGraph::print_graph(bool verbose) {
     std::vector<unsigned int> source_counts(sources_.size(), 0),
                      linear_counts(sources_.size(), 0),
                      branch_counts(sources_.size(), 0),
-                     multiparent_counts(sources_.size(), 0),
                      invalid_counts(sources_.size(), 0);
 
     while (!to_visit.empty()) {
@@ -1014,35 +866,30 @@ void SeedGraph::print_graph(bool verbose) {
 
         if (!n->is_valid()) {
             invalid_counts[event]++;
-        } else if (n->parents_.empty()) {
+        } else if (n->parent_ == NULL) {
             source_counts[event]++;
-        } else if (n->children_.size() > 1 || n->parents_.size() > 1) {
+        } else if (n->child_count_ > 1) {
             branch_counts[event]++;
         } else {
             linear_counts[event]++;
         }
 
-        if (n->parents_.size() > 1) {
-            multiparent_counts[event]++;
-        }
-        
         if (verbose) {
             std::cout << n << " " << event << " " 
-                      << n->seed_len() << " " 
-                      << n->parents_.size() << " ";
+                      << n->seed_len() << " ";
             
-            if (n->parents_.empty()) {
+            if (n->parent_ == NULL) {
                 std::cout << -1;
             } else {
-                std::cout << n->parents_.front().second;
+                std::cout << n->parent_;
             }
         }
 
-        for (auto c = n->children_.begin(); c != n->children_.end(); c++) {
+        for (size_t c = 0; c < n->child_count_; c++) {
             if (verbose) {
-                std::cout << " " << *c;
+                std::cout << " " << n->children_[c];
             }
-            to_visit.insert(std::pair<unsigned int, Node *>(event + 1, *c));
+            to_visit.insert(std::pair<unsigned int, Node *>(event + 1, n->children_[c]));
         }
 
         if (verbose) {
@@ -1082,14 +929,6 @@ void SeedGraph::print_graph(bool verbose) {
         invalid_total += invalid_counts[i];
     }
     std::cout << "\t (" << invalid_total << ")\t==\n";
-
-    unsigned int multiparent_total = 0;
-    std::cout << "== multiparent counts:";
-    for (unsigned int i = 0; i < multiparent_counts.size(); i++) {
-        std::cout << "\t" << multiparent_counts[i];
-        multiparent_total += multiparent_counts[i];
-    }
-    std::cout << "\t (" << multiparent_total << ")\t==\n";
 
     std::cout << "== total nodes: " 
               << (source_total + branch_total + linear_total + invalid_total) 

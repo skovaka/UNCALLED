@@ -17,7 +17,8 @@ Range::Range(size_t start, size_t end) : start_(start), end_(end) {}
 Range::Range() : start_(1), end_(0) {}
 
 bool Range::intersects(const Range &q) const {
-    return !(start_ > q.end_ || end_ < q.start_) &&
+    return is_valid() && q.is_valid() &&
+           !(start_ > q.end_ || end_ < q.start_) &&
            !(q.start_ > end_ || q.end_ < start_);
 }
 

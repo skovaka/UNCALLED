@@ -14,7 +14,7 @@
 #include "fast5.hpp"
 #include "arg_parse.hpp"
 //#include "seed_graph.hpp"
-#include "seed_forest.hpp"
+#include "alignment_forest.hpp"
 #include "seed_tracker.hpp"
 #include "range.hpp"
 #include "kmer_model.hpp"
@@ -155,8 +155,11 @@ int main(int argc, char** argv) {
                          args.get_double(Opt::SEED_PR),
                          args.get_double(Opt::STAY_PR));
 
-    SeedForest rev_sg(rev_fmi, aln_params, "rev"),
-              fwd_sg(fwd_fmi, aln_params, "fwd");
+    //SeedGraph rev_sg(rev_fmi, aln_params, "rev"),
+    AlignmentForest rev_sg(rev_fmi, aln_params, "rev"),
+                     fwd_sg(fwd_fmi, aln_params, "fwd");
+
+    
 
     std::ifstream reads_file(args.get_string(Opt::READ_LIST));
 
