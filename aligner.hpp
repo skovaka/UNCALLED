@@ -67,7 +67,7 @@ class Aligner {
 
     virtual void new_read(size_t read_len) = 0;
     virtual void reset() = 0;
-    virtual std::vector<Result> add_event(Event e, std::ostream &out) = 0;
+    virtual std::vector<Result> add_event(double *kmer_probs, std::ostream &out) = 0;
 };
 
 #endif

@@ -93,7 +93,7 @@ class ForestAligner : public Aligner {
 
     void new_read(size_t read_len);
     void reset();
-    std::vector<Result> add_event(Event e, std::ostream &out);
+    std::vector<Result> add_event(double *kmer_probs, std::ostream &out);
 
     void print_graph(bool verbose);
 

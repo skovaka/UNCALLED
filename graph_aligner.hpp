@@ -73,7 +73,7 @@ class GraphAligner : Aligner {
 
     public:
 
-    const SdslFMI &fmi_;
+    const FMI &fmi_;
     Range *kmer_ranges_;
 
     AlnParams params_;
@@ -91,7 +91,7 @@ class GraphAligner : Aligner {
     unsigned int cur_event_;
     Event prev_event_;
 
-    GraphAligner(const SdslFMI &fmi, 
+    GraphAligner(const FMI &fmi, 
               const AlnParams &aln_params,
               const std::string &label);
 
@@ -100,7 +100,7 @@ class GraphAligner : Aligner {
     void new_read(size_t read_len);
     void reset();
 
-    std::vector<Result> add_event(Event e, std::ostream &out);
+    std::vector<Result> add_event(double *kmer_probs, std::ostream &out);
     void print_graph(bool verbose);
 
     Node *add_child(Range &range, Node &node); //copy update_ranges

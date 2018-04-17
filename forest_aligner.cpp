@@ -127,9 +127,11 @@ bool ForestAligner::Node::better_than(const Node *node) {
 }
 
 bool ForestAligner::Node::should_report(const AlnParams &params) {
-    return type_ == Node::Type::MATCH && 
+    bool r = type_ == Node::Type::MATCH && 
            stay_count_ <= params.max_stay_frac_ * length_ &&
            mean_prob() >= params.min_seed_pr_;
+    //std::cout << stay_count_ << " stays " << length_ << " " << r << "\n";
+    return r;
 }
 
 void ForestAligner::Node::invalidate(std::vector<Node *> *old_nodes, 
@@ -304,28 +306,15 @@ void ForestAligner::reset() {
 
     old_nodes_.clear();
 
-    for (auto probs = event_kmer_probs_.begin(); 
-         probs != event_kmer_probs_.end(); probs++) {
-        delete [] *probs;
-    }
     timer.reset();
-
-    event_kmer_probs_.clear();
 }
 
-std::vector<Result> ForestAligner::add_event(Event e, std::ostream &out) {
+std::vector<Result> ForestAligner::add_event(double *kmer_probs, std::ostream &out) {
 
     //Update event index
     cur_event_--;
 
     Timer t;
-
-    //Calculate and store kmer match probs for this event
-    event_kmer_probs_.push_front(new double[params_.model_.kmer_count()]);
-    double *kmer_probs = event_kmer_probs_.front();
-    for (unsigned int kmer = 0; kmer < params_.model_.kmer_count(); kmer++) {
-        kmer_probs[kmer] = params_.model_.event_match_prob(e, kmer);
-    }
 
     //Where this event's sources will be stored
     sources_.push_front(std::list<Node *>());
@@ -337,15 +326,26 @@ std::vector<Result> ForestAligner::add_event(Event e, std::ostream &out) {
     Range kmer_range;
     Kmer prev_kmer = 0;
 
-    //Find neighbors of previous nodes
+    std::map<Range, Node *> prev_nodes_sort_;
     for (auto p = prev_nodes_.begin(); p != prev_nodes_.end(); p++) {
-        Range prev_range = p->second;
-        Node *prev_node = p->first;
+        prev_nodes_sort_[p->second] = p->first;
+    }
 
-        prev_kmer = prev_node->kmer_;
+    //Find neighbors of previous nodes
+    //for (auto p = prev_nodes_.begin(); p != prev_nodes_.end(); p++) {
+    for (auto p = prev_nodes_sort_.begin(); p != prev_nodes_sort_.end(); p++) {
+        //Range prev_range = p->second;
+        //Node *prev_node = p->first;
+        Range prev_range = p->first;
+        Node *prev_node = p->second;
 
-        //Get probability for stay neighbor
-        prob = kmer_probs[prev_kmer];
+        //std::cout << cur_event_ << "\t"
+        //          << prev_range.start_ << "-" << prev_range.end_ << "\t"
+        //          << prev_node->stay_count_ << "\t"
+        //          << prev_node->length_ << "\t"
+        //          << prev_node->mean_prob() << "\n";
+
+
         
         size_t neighbor_count = 0;
 
@@ -361,16 +361,15 @@ std::vector<Result> ForestAligner::add_event(Event e, std::ostream &out) {
             evpr_thresh = params_.min_anchor_evpr_;
         }
 
+        //Get probability for stay neighbor
+        prev_kmer = prev_node->kmer_;
+        prob = kmer_probs[prev_kmer];
+
         if (prev_node->consec_stays_ < params_.max_consec_stay_ && prob >= evpr_thresh) { //&& rank <= evpr_thresh ) { 
             neighbor_count += 1;
+            //std::cout << prev_range.start_ << "-" << prev_range.end_ << "\t" << prob << "\n";
 
             Node next_node(prev_node, prev_kmer, prob, Node::Type::STAY);
-
-            #ifdef DEBUG_RANGES
-            //if (prev_range.length() <= 200) {
-                std::cout << "\t" << prev_range.length();
-            //}
-            #endif
 
             add_child(prev_range, next_node);
         }
@@ -400,6 +399,7 @@ std::vector<Result> ForestAligner::add_event(Event e, std::ostream &out) {
 
             Base next_base = params_.model_.get_first_base(*next_kmer);
             Range next_range = fmi_.get_neighbor(prev_range, next_base);
+            //std::cout << next_range.start_ << "-" << next_range.end_ << "\t" << prob << "\n";
 
             neighbor_count += next_range.is_valid();
 
@@ -430,11 +430,6 @@ std::vector<Result> ForestAligner::add_event(Event e, std::ostream &out) {
             Node next_node(prev_node, prev_kmer, prob, Node::Type::IGNORE);
             add_child(prev_range, next_node);
         }
-        #ifdef DEBUG_RANGES
-        //if (prev_range.length() <= 200) {
-            std::cout << "\n";
-        //}
-        #endif
     }
 
     //if (cur_event_ < 5000) {
@@ -474,7 +469,6 @@ std::vector<Result> ForestAligner::add_event(Event e, std::ostream &out) {
         prev_nodes_.erase(p);
     }
 
- 
     //Move next_nodes to prev
     while (!next_nodes_.empty()) {
         auto n = next_nodes_.begin();
@@ -586,6 +580,7 @@ ForestAligner::Node *ForestAligner::add_child(Range &range, Node &node) {
     
     //Find closest node >= the node being added
     auto lb = next_nodes_.lower_bound(range);
+    //std::cout << "a\n";
 
     //Node range hasn't been added yet
     if (lb == next_nodes_.end() || !lb->first.same_range(range)) {
@@ -593,8 +588,10 @@ ForestAligner::Node *ForestAligner::add_child(Range &range, Node &node) {
         //Allocate memory for a new node
         Node *new_node;
         if (old_nodes_.empty()) {
+            //std::cout << "b\n";
             new_node = new Node(node);
         } else {
+            //std::cout << "c\n";
             *(old_nodes_.back()) = node;
             new_node = old_nodes_.back();
             old_nodes_.pop_back();
@@ -612,12 +609,20 @@ ForestAligner::Node *ForestAligner::add_child(Range &range, Node &node) {
     
     //Node associated with same range
     Node *dup_node = lb->second;
+    //std::cout << "d\n";
+
+
 
     if(node.better_than(dup_node)) {
+        //std::cout << dup_node->length_ << "\t" << node.length_ << "\t" << dup_node->mean_prob() << "\t" << node.mean_prob() << "\n";
+        //std::cout << "e\n";
         dup_node->parent_->remove_child(dup_node);
         node.parent_->add_child(dup_node);
         *dup_node = node;
+        return dup_node;
     }
+
+    //std::cout << "f\n";
 
     return dup_node;
 }
@@ -667,8 +672,6 @@ std::vector<Result> ForestAligner::pop_seeds(std::ostream &out) {
         }
         
         double prev_len = aln_en->seed_len();
-        auto kmer_probs = event_kmer_probs_.rbegin();
-
         while (!to_visit.empty()) {
     
             Node *n = to_visit.front();
@@ -685,7 +688,6 @@ std::vector<Result> ForestAligner::pop_seeds(std::ostream &out) {
 
             if (n->seed_len() != prev_len) {
                 prev_len = n->seed_len();
-                kmer_probs++;
             }
 
             if (n->seed_len() == params_.graph_elen_) {
@@ -704,7 +706,7 @@ std::vector<Result> ForestAligner::pop_seeds(std::ostream &out) {
                         r.set_ref_range(fmi_.sa(s), n->match_len());
                         results.push_back(r);
 
-                        out << label_ << "\t" << timer.get() << "\t";
+                        out << label_ << "\t";
 
                         #ifdef DEBUG_PATHS
                         for (size_t i = p.size()-1; i < p.size(); i--) {
@@ -759,8 +761,6 @@ std::vector<Result> ForestAligner::pop_seeds(std::ostream &out) {
         //delete aln_en;
     }
 
-    delete [] event_kmer_probs_.back();
-    event_kmer_probs_.pop_back();
     sources_.pop_back();
 
     return results;

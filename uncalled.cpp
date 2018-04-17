@@ -15,6 +15,7 @@
 #include "arg_parse.hpp"
 #include "graph_aligner.hpp"
 #include "forest_aligner.hpp"
+#include "leaf_aligner.hpp"
 #include "seed_tracker.hpp"  
 #include "range.hpp"
 #include "kmer_model.hpp"
@@ -22,14 +23,14 @@
 #include "base_fmi.hpp"
 #include "timer.hpp"
 
-#define VERBOSE_TIME
+//#define VERBOSE_TIME
 
 #define GRAPH_ALN 0
 #define FOREST_ALN 1
 #define LEAF_ALN 2
 
 #ifndef ALN_TYPE
-#define ALN_TYPE GRAPH_ALN
+#define ALN_TYPE FOREST_ALN
 #endif
 
 std::string FWD_STR = "fwd",
@@ -97,8 +98,8 @@ int main(int argc, char** argv) {
 
     KmerModel model(args.get_string(Opt::MODEL));
 
-    SdslFMI fwd_fmi, rev_fmi;
-    //BaseFMI fwd_fmi, rev_fmi;
+    //SdslFMI fwd_fmi, rev_fmi;
+    BaseFMI fwd_fmi, rev_fmi;
 
     if (!args.get_string(Opt::INDEX_PREFIX).empty()) {
         std::string p = args.get_string(Opt::INDEX_PREFIX);
@@ -106,12 +107,12 @@ int main(int argc, char** argv) {
                       rev_in(p + "revFM.txt");
 
         std::cerr << "Reading forward FMI\n";
-        fwd_fmi = SdslFMI(p + "fwdFM.idx");
-        //fwd_fmi = BaseFMI(fwd_in, args.get_int(Opt::TALLY_DIST));
+        //fwd_fmi = SdslFMI(p + "fwdFM.idx");
+        fwd_fmi = BaseFMI(fwd_in, args.get_int(Opt::TALLY_DIST));
 
         std::cerr << "Reading reverse FMI\n";
-        rev_fmi = SdslFMI(p + "revFM.idx");
-        //rev_fmi = BaseFMI(rev_in, args.get_int(Opt::TALLY_DIST));
+        //rev_fmi = SdslFMI(p + "revFM.idx");
+        rev_fmi = BaseFMI(rev_in, args.get_int(Opt::TALLY_DIST));
 
     } else {
         std::cerr << "Parsing fasta\n";
@@ -120,12 +121,12 @@ int main(int argc, char** argv) {
         parse_fasta(ref_file, fwd_bases, rev_bases, false);
 
         std::cerr << "Building forward FMI\n";
-        fwd_fmi.construct(fwd_bases);
-        //fwd_fmi = BaseFMI(fwd_bases, args.get_int(Opt::TALLY_DIST));
+        //fwd_fmi.construct(fwd_bases);
+        fwd_fmi = BaseFMI(fwd_bases, args.get_int(Opt::TALLY_DIST));
 
         std::cerr << "Building reverse FMI\n";
-        rev_fmi.construct(rev_bases);
-        //rev_fmi = BaseFMI(rev_bases, args.get_int(Opt::TALLY_DIST));
+        //rev_fmi.construct(rev_bases);
+        rev_fmi = BaseFMI(rev_bases, args.get_int(Opt::TALLY_DIST));
     }
     std::cerr << "Done\n";
 
@@ -167,7 +168,8 @@ int main(int argc, char** argv) {
     GraphAligner
     #elif ALN_TYPE == FOREST_ALN
     ForestAligner
-    //#elif ALN_TYPE == LEAF_ALN
+    #elif ALN_TYPE == LEAF_ALN
+    LeafAligner
     #endif
         rev_sg(rev_fmi, aln_params, "rev"),
         fwd_sg(fwd_fmi, aln_params, "fwd");
@@ -254,23 +256,29 @@ int main(int argc, char** argv) {
 
         time_out << "== " << read_filename << " ==\n";
 
+        double **all_probs = new double*[aln_len];
 
         unsigned int e = aln_en;
 
         for (; e >= aln_st && e <= aln_en; e--) {
+
+            all_probs[e-aln_st] = new double[model.kmer_count()];
+            for (Kmer kmer = 0; kmer < model.kmer_count(); kmer++) {
+                all_probs[e-aln_st][kmer] = model.event_match_prob(events[e], kmer);
+            }
 
             #ifdef VERBOSE_TIME
             time_out << e;
             event_timer.reset();
             #endif
 
-            std::vector<Result> fwd_seeds = fwd_sg.add_event(events[e], seeds_out);
+            std::vector<Result> fwd_seeds = fwd_sg.add_event(all_probs[e-aln_st], seeds_out);
 
             #ifdef VERBOSE_TIME
             time_out << std::setw(13) << event_timer.lap();
             #endif
 
-            std::vector<Result> rev_seeds = rev_sg.add_event(events[e], seeds_out);
+            std::vector<Result> rev_seeds = rev_sg.add_event(all_probs[e-aln_st], seeds_out);
 
             #ifdef VERBOSE_TIME
             time_out << std::setw(13) << event_timer.lap();
@@ -338,6 +346,11 @@ int main(int argc, char** argv) {
                   << (aln_en - e + 1) << " events ==\n";
 
         seeds_out << "== " << read_timer.lap() / 1000 << " sec ==\n";
+
+        for (e = e-aln_st+1; e < aln_len; e++) {
+            delete[] all_probs[e];
+        }
+        delete[] all_probs;
     }
 }
 

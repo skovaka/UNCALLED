@@ -254,7 +254,7 @@ void GraphAligner::Node::print() const {
 
 
 
-GraphAligner::GraphAligner(const SdslFMI &fmi, 
+GraphAligner::GraphAligner(const FMI &fmi, 
                      const AlnParams &ap,
                      const std::string &label)
     : fmi_(fmi),
@@ -281,7 +281,6 @@ GraphAligner::~GraphAligner() {
 void GraphAligner::new_read(size_t read_len) {
     reset();
     cur_event_ = read_len;
-    prev_event_ = {0, 0, 0};
 }
 
 void GraphAligner::reset() {
@@ -306,40 +305,23 @@ void GraphAligner::reset() {
 
     old_nodes_.clear();
 
-    for (auto probs = event_kmer_probs_.begin(); 
-         probs != event_kmer_probs_.end(); probs++) {
-        delete [] *probs;
-    }
     timer.reset();
 
     event_kmer_probs_.clear();
 }
 
-std::vector<Result> GraphAligner::add_event(Event e, std::ostream &out) {
+std::vector<Result> GraphAligner::add_event(double *kmer_probs, std::ostream &out) {
     //Update event index
     cur_event_--;
-
-    //if (!params_.model_.event_valid(e)) {
-    //    std::cerr << "Error: event " << cur_event_
-    //              << " invalid - this might cause some problems\n";
-    //    return std::vector<Result>();
-    //}
-
-    //Compare this event with previous to see if it should be a stay
-    //TODO: if I enable stay prob checking, need to deal with stdv = 0
-    //double cur_stay_prob = params_.model_.get_stay_prob(e, prev_event_);
-
 
     Timer t;
 
     //Calculate and store kmer match probs for this event
-    event_kmer_probs_.push_front(new double[params_.model_.kmer_count()]);
-    double *kmer_probs = event_kmer_probs_.front();
-    for (unsigned int kmer = 0; kmer < params_.model_.kmer_count(); kmer++)
-        kmer_probs[kmer] = params_.model_.event_match_prob(e, kmer);
 
     //DEBUG(cur_event_ << "\t" << t.lap() << "\t");
     
+    event_kmer_probs_.push_front(kmer_probs);
+
     //Where this event's sources will be stored
     sources_.push_front(std::list<Node *>());
     
@@ -522,8 +504,6 @@ std::vector<Result> GraphAligner::add_event(Event e, std::ostream &out) {
     //print_graph(true);
 
     auto r = pop_seeds(out);
-
-    prev_event_ = e;
 
     return r;
 }
@@ -926,7 +906,6 @@ std::vector<Result> GraphAligner::pop_seeds(std::ostream &out) {
         //delete aln_en;
     }
 
-    delete [] event_kmer_probs_.back();
     event_kmer_probs_.pop_back();
     sources_.pop_back();
 
