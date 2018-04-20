@@ -31,33 +31,35 @@ class AlnParams {
     public:
     const KmerModel &model_;
 
-    size_t graph_elen_, anchor_rlen_, max_ignores_, max_skips_, max_consec_stay_;
+    unsigned int path_win_len_, 
+                 min_rep_len_,
+                 max_rep_copy_;
 
-    double max_stay_frac_,
-           min_anchor_evpr_,
-           min_seed_pr_,
-           min_stay_pr_;
-           //min_extend_evpr_;
+    double max_stay_frac_;
 
-    std::vector<unsigned int> expr_lengths_;
-    std::vector<double> expr_probs_;
+    unsigned int max_consec_stay_, 
+                 max_ignores_,
+                 max_skips_;
+
+    double window_prob_;
+
+    std::vector<unsigned int> evpr_lengths_;
+    std::vector<double> evpr_threshes_;
 
     AlnParams(const KmerModel &model,
-              unsigned int min_seed_nlen, 
-              unsigned int anchor_nlen, 
+              unsigned int path_win_len, 
+              unsigned int min_rep_len, 
+              unsigned int max_rep_copy, 
+              double max_stay_frac,
+              unsigned int max_consec_stay,
               unsigned int max_ignores, 
               unsigned int max_skips,
-              unsigned int max_consec_stay,
-              double max_stay_frac,
-              double min_anchor_evpr,
-              //double min_extend_evpr,
-              std::vector<unsigned int> expr_lengths,
-              std::vector<double> expr_probs,
-              double min_seed_pr,
-              double min_stay_pr);
+              const std::string event_probs,
+              double window_prob);           
     
     unsigned int nucl_to_events(unsigned int n);
-    unsigned int get_graph_len(unsigned int seed_nlen);
+    double get_prob_thresh(unsigned int fm_length);
+    double get_source_prob();
 };
 
 

@@ -10,28 +10,30 @@ INCLUDE=-I./src/fast5/src -I./src/scrappie -I./src #${BOOST_INCLUDE}
 
 UNCALLED_OBJS= kmer_model.o aligner.o seed_tracker.o arg_parse.o basepairs.o range.o
 
-all: uncalled_graph uncalled_forest uncalled_leaves dtw_test save_fmi test_fmi align_stats
+all: uncalled_leaves dtw_test save_fmi test_fmi align_stats 
 
-uncalled_graph.o: uncalled.cpp
-	$(CC) $(CFLAGS) -D ALN_TYPE=GRAPH_ALN -c -o $@ $^ $(SDSL_INC) $(INCLUDE) $(HDF5_INCLUDE) 
+#uncalled_graph uncalled_forest 
 
-uncalled_forest.o: uncalled.cpp
-	$(CC) $(CFLAGS) -D ALN_TYPE=FOREST_ALN -c -o $@ $^ $(SDSL_INC) $(INCLUDE) $(HDF5_INCLUDE) 
-
+#uncalled_graph.o: uncalled.cpp
+#	$(CC) $(CFLAGS) -D ALN_TYPE=GRAPH_ALN -c -o $@ $^ $(SDSL_INC) $(INCLUDE) $(HDF5_INCLUDE) 
+#
+#uncalled_forest.o: uncalled.cpp
+#	$(CC) $(CFLAGS) -D ALN_TYPE=FOREST_ALN -c -o $@ $^ $(SDSL_INC) $(INCLUDE) $(HDF5_INCLUDE) 
+#
 uncalled_leaves.o: uncalled.cpp
 	$(CC) $(CFLAGS) -D ALN_TYPE=LEAF_ALN -c -o $@ $^ $(SDSL_INC) $(INCLUDE) $(HDF5_INCLUDE) 
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c -o $@ $^ $(SDSL_INC) $(INCLUDE) $(HDF5_INCLUDE) 
 
-uncalled_graph: $(UNCALLED_OBJS) uncalled_graph.o base_fmi.o graph_aligner.o
-	$(CC) $(CFLAGS) -D ALN_TYPE=GRAPH_ALN $(UNCALLED_OBJS) uncalled_graph.o base_fmi.o graph_aligner.o -o uncalled_graph $(HDF5_LIB) $(SDSL_LIB) $(LIBS)
+#uncalled_graph: $(UNCALLED_OBJS) uncalled_graph.o sdsl_fmi.o base_fmi.o graph_aligner.o
+#	$(CC) $(CFLAGS) -D ALN_TYPE=GRAPH_ALN $(UNCALLED_OBJS) uncalled_graph.o sdsl_fmi.o base_fmi.o graph_aligner.o -o uncalled_graph $(HDF5_LIB) $(SDSL_LIB) $(LIBS)
+#
+#uncalled_forest: $(UNCALLED_OBJS) uncalled_forest.o sdsl_fmi.o base_fmi.o forest_aligner.o
+#	$(CC) $(CFLAGS) -D ALN_TYPE=FOREST_ALN $(UNCALLED_OBJS) uncalled_forest.o sdsl_fmi.o base_fmi.o forest_aligner.o -o uncalled_forest $(HDF5_LIB) $(SDSL_LIB) $(LIBS)
 
-uncalled_forest: $(UNCALLED_OBJS) uncalled_forest.o base_fmi.o forest_aligner.o
-	$(CC) $(CFLAGS) -D ALN_TYPE=FOREST_ALN $(UNCALLED_OBJS) uncalled_forest.o base_fmi.o forest_aligner.o -o uncalled_forest $(HDF5_LIB) $(SDSL_LIB) $(LIBS)
-
-uncalled_leaves: $(UNCALLED_OBJS) uncalled_leaves.o base_fmi.o leaf_aligner.o
-	$(CC) $(CFLAGS) -D ALN_TYPE=LEAF_ALN $(UNCALLED_OBJS) uncalled_leaves.o base_fmi.o leaf_aligner.o -o uncalled_leaves $(HDF5_LIB) $(SDSL_LIB) $(LIBS)
+uncalled_leaves: $(UNCALLED_OBJS) uncalled_leaves.o sdsl_fmi.o base_fmi.o leaf_aligner.o
+	$(CC) $(CFLAGS) -D ALN_TYPE=LEAF_ALN $(UNCALLED_OBJS) uncalled_leaves.o sdsl_fmi.o base_fmi.o leaf_aligner.o -o uncalled_leaves $(HDF5_LIB) $(SDSL_LIB) $(LIBS)
 
 dtw_test: dtw.o kmer_model.o arg_parse.o basepairs.o
 	$(CC) $(CFLAGS) dtw.o kmer_model.o arg_parse.o basepairs.o -o dtw_test $(INCLUDE) $(HDF5_LIB) $(LIBS)

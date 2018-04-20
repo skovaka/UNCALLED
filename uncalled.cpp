@@ -23,14 +23,21 @@
 #include "base_fmi.hpp"
 #include "timer.hpp"
 
-//#define VERBOSE_TIME
+#define VERBOSE_TIME
 
 #define GRAPH_ALN 0
 #define FOREST_ALN 1
 #define LEAF_ALN 2
 
 #ifndef ALN_TYPE
-#define ALN_TYPE FOREST_ALN
+#define ALN_TYPE LEAF_ALN
+#endif
+
+#define BASE_FMI 0
+#define SDSL_FMI 1
+
+#ifndef FMI_TYPE
+#define FMI_TYPE SDSL_FMI
 #endif
 
 std::string FWD_STR = "fwd",
@@ -41,52 +48,58 @@ const std::string MODEL_DEF = "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/km
 
 bool get_events(std::ostream &err, std::string filename, std::vector<Event> &events);
 
-enum Opt {MODEL       = 'm',
-          REFERENCE   = 'r',
-          INDEX_PREFIX   = 'f',
-          READ_LIST   = 'l',
-          OUT_PREFIX     = 'o',
+enum Opt {
+    MODEL       = 'm',
+    REFERENCE   = 'r',
+    INDEX_PREFIX   = 'f',
+    READ_LIST   = 'i',
+    OUT_PREFIX     = 'o',
 
-          TALLY_DIST  = 't',
+    TALLY_DIST  = 't',
 
-          MIN_SEED_LEN = 's',
-          ANCHOR_LEN  = 'a',
-          MAX_IGNORES = 'i',
-          MAX_SKIPS   = 'k',
-          STAY_FRAC   = 'y',
-          READ_UNTIL = 'u',
-          MAX_CONSEC_STAY = 'c',
+    MIN_ALN_LEN     = 'a',
+    MIN_ALN_CONF    = 'u', //u for until
+    PATH_WIN_LEN    = 'w',
+    MIN_REP_LEN     = 'l',
+    MAX_REP_COPY    = 'c',
 
-          EXTEND_EVPR = 'E',
-          ANCHOR_EVPR = 'A',
-          SEED_PR     = 'S',
-          STAY_PR     = 'Y'};
+    STAY_FRAC       = 's',
+    MAX_CONSEC_STAY = 'y',
+    MAX_IGNORES     = 'g',
+    MAX_SKIPS       = 'k',
+
+    EVENT_PROBS = 'E',
+    WINDOW_PROB = 'W'
+};
 
 int main(int argc, char** argv) {
     ArgParse args("UNCALLED: Utility for Nanopore Current Alignment to Large Expanses of DNA");
 
     args.add_string(Opt::MODEL, "model", "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model", "Nanopore kmer model");
-    args.add_string(Opt::REFERENCE,   "reference",    "",     "");
-    args.add_string(Opt::READ_LIST,   "read_list",    "",     "");
-    args.add_string(Opt::INDEX_PREFIX,  "index_prefix",   "",     "");
-    args.add_string(Opt::OUT_PREFIX,  "out_prefix",   "./",     "");
-    args.add_string(Opt::EXTEND_EVPR, "extend_evprs", "1-10.0_5-4.0_100-2.4",  "");
-    args.add_int(   Opt::TALLY_DIST,  "tally_dist",   128,     "");
-    args.add_int(   Opt::MIN_SEED_LEN,"min_seed_len", 15,     "");
-    args.add_int(   Opt::ANCHOR_LEN,  "anchor_len",   12,     "");
-    args.add_int(   Opt::MAX_IGNORES, "max_ignores",  0,    "");
-    args.add_int(   Opt::MAX_SKIPS,   "max_skips",    0,    "");
-    args.add_int(   Opt::READ_UNTIL,  "read_until",   0, "");
-    args.add_int(   Opt::MAX_CONSEC_STAY,  "max_consec_stay", 20, "");
-    args.add_double(Opt::STAY_FRAC,   "stay_frac",    0.5,    "");
-    args.add_double(Opt::ANCHOR_EVPR, "anchor_evpr", -2.4,    "");
-    //args.add_double(Opt::EXTEND_EVPR, "extend_evpr", -10,  "");
-    args.add_double(Opt::SEED_PR,     "seed_pr",     -3.75,  "");
-    args.add_double(Opt::STAY_PR,     "stay_pr",     -8.343, "");
+    args.add_string(Opt::REFERENCE,    "reference",    "",     "");
+    args.add_string(Opt::READ_LIST,    "read_list",    "",     "");
+    args.add_string(Opt::INDEX_PREFIX, "index_prefix",   "",     "");
+    args.add_string(Opt::OUT_PREFIX,   "out_prefix",   "./",     "");
+
+    args.add_int(   Opt::TALLY_DIST, "tally_dist",   128,     "");
+
+    args.add_int(   Opt::MIN_ALN_LEN,  "min_aln_len", 25, "");
+    args.add_double(Opt::MIN_ALN_CONF, "min_aln_conf", 2, "");
+    args.add_int(   Opt::PATH_WIN_LEN, "path_window_len", 22, "");
+    args.add_int(   Opt::MIN_REP_LEN,  "min_repeat_len", 0, "");
+    args.add_int(   Opt::MAX_REP_COPY, "min_repeat_copy", 20, "");
+
+    args.add_double(Opt::STAY_FRAC,       "stay_frac",    0.5,    "");
+    args.add_int(   Opt::MAX_CONSEC_STAY, "max_consec_stay", 20, "");
+    args.add_int(   Opt::MAX_IGNORES,     "max_ignores",  0,    "");
+    args.add_int(   Opt::MAX_SKIPS,       "max_skips",    0,    "");
+
+    args.add_string(Opt::EVENT_PROBS, "event_probs", "-2.25_100-2.4_5-4.0_1-10.0", "");
+    args.add_double(Opt::WINDOW_PROB, "window_prob", -3.75, "");
 
     args.parse_args(argc, argv);
 
-    std::string prefix = args.get_string(Opt::OUT_PREFIX) + args.get_param_str();
+    std::string prefix = args.get_string(Opt::OUT_PREFIX) + args.get_string(Opt::EVENT_PROBS) + "_" + args.get_param_str();
     std::ofstream seeds_out(prefix + "_seeds.txt");
     std::ofstream alns_out(prefix + "_aln.txt");
     std::ofstream time_out(prefix + "_time.txt");
@@ -98,21 +111,46 @@ int main(int argc, char** argv) {
 
     KmerModel model(args.get_string(Opt::MODEL));
 
-    //SdslFMI fwd_fmi, rev_fmi;
+    AlnParams aln_params(model,
+                         args.get_int(Opt::PATH_WIN_LEN),
+                         args.get_int(Opt::MIN_REP_LEN),
+                         args.get_int(Opt::MAX_REP_COPY),
+                         args.get_double(Opt::STAY_FRAC),
+                         args.get_int(Opt::MAX_CONSEC_STAY),
+                         args.get_int(Opt::MAX_IGNORES),
+                         args.get_int(Opt::MAX_SKIPS),
+                         args.get_string(Opt::EVENT_PROBS),
+                         args.get_double(Opt::WINDOW_PROB));
+    
+    #if FMI_TYPE == BASE_FMI
     BaseFMI fwd_fmi, rev_fmi;
+    #else
+    SdslFMI fwd_fmi, rev_fmi;
+    #endif
 
     if (!args.get_string(Opt::INDEX_PREFIX).empty()) {
         std::string p = args.get_string(Opt::INDEX_PREFIX);
+
+        #if FMI_TYPE == BASE_FMI
+
         std::ifstream fwd_in(p + "fwdFM.txt"),
                       rev_in(p + "revFM.txt");
 
         std::cerr << "Reading forward FMI\n";
-        //fwd_fmi = SdslFMI(p + "fwdFM.idx");
         fwd_fmi = BaseFMI(fwd_in, args.get_int(Opt::TALLY_DIST));
 
         std::cerr << "Reading reverse FMI\n";
-        //rev_fmi = SdslFMI(p + "revFM.idx");
         rev_fmi = BaseFMI(rev_in, args.get_int(Opt::TALLY_DIST));
+
+        #else
+
+        std::cerr << "Reading forward FMI\n";
+        fwd_fmi = SdslFMI(p + "fwdFM.idx");
+
+        std::cerr << "Reading reverse FMI\n";
+        rev_fmi = SdslFMI(p + "revFM.idx");
+
+        #endif
 
     } else {
         std::cerr << "Parsing fasta\n";
@@ -120,49 +158,24 @@ int main(int argc, char** argv) {
         std::string fwd_bases, rev_bases;
         parse_fasta(ref_file, fwd_bases, rev_bases, false);
 
+        #if FMI_TYPE == BASE_FMI
         std::cerr << "Building forward FMI\n";
-        //fwd_fmi.construct(fwd_bases);
         fwd_fmi = BaseFMI(fwd_bases, args.get_int(Opt::TALLY_DIST));
 
         std::cerr << "Building reverse FMI\n";
-        //rev_fmi.construct(rev_bases);
         rev_fmi = BaseFMI(rev_bases, args.get_int(Opt::TALLY_DIST));
-    }
-    std::cerr << "Done\n";
 
-    //100-2.4_5-4.0_1-10.0
-    std::string expr_str = args.get_string(Opt::EXTEND_EVPR);
-    size_t ex_i = 0, ex_j = expr_str.find('_'), ex_k;
-    std::vector<unsigned int> expr_lengths;
-    std::vector<double> expr_probs;
-    while(ex_i < expr_str.size()) {
-        ex_k = expr_str.find('-', ex_i);
-        expr_lengths.push_back( atoi(expr_str.substr(ex_i, ex_k).c_str()) );
-        expr_probs.push_back( atof(expr_str.substr(ex_k, ex_j).c_str()) ); //CHANGED FOR RANKS
+        #else
 
-        std::cout << expr_lengths.back() << "\t" << expr_probs.back() << "\n";
+        std::cerr << "Building forward FMI\n";
+        fwd_fmi.construct(fwd_bases);
 
-        ex_i = ex_j+1;
-        ex_j = expr_str.find('_', ex_i+1);
-        if (ex_j == std::string::npos) {
-            ex_j = expr_str.size();
-        }
+        std::cerr << "Building reverse FMI\n";
+        rev_fmi.construct(rev_bases);
+
+        #endif
     }
 
-
-    AlnParams aln_params(model,
-                         args.get_int(Opt::MIN_SEED_LEN),
-                         args.get_int(Opt::ANCHOR_LEN),
-                         args.get_int(Opt::MAX_IGNORES),
-                         args.get_int(Opt::MAX_SKIPS),
-                         args.get_int(Opt::MAX_CONSEC_STAY),
-                         args.get_double(Opt::STAY_FRAC),
-                         args.get_double(Opt::ANCHOR_EVPR),
-                         //args.get_double(Opt::EXTEND_EVPR),
-                         expr_lengths,
-                         expr_probs,
-                         args.get_double(Opt::SEED_PR),
-                         args.get_double(Opt::STAY_PR));
 
     #if ALN_TYPE == GRAPH_ALN
     GraphAligner
@@ -174,8 +187,6 @@ int main(int argc, char** argv) {
         rev_sg(rev_fmi, aln_params, "rev"),
         fwd_sg(fwd_fmi, aln_params, "fwd");
 
-    std::cout << "Aln Type " << ALN_TYPE << std::endl;
-
     std::ifstream reads_file(args.get_string(Opt::READ_LIST));
 
     if (!reads_file) {
@@ -184,11 +195,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    size_t ru_min_revts = args.get_int(Opt::READ_UNTIL);
-    bool read_until = ru_min_revts > 0;
+    unsigned int min_aln_len = args.get_int(Opt::MIN_ALN_LEN);
+    double min_aln_conf = args.get_double(Opt::MIN_ALN_CONF);
+    bool read_until = min_aln_conf > 0;
 
     std::string read_line, read_filename;
 
+    std::cerr << read_until << " Aligning...\n";
 
     while (getline(reads_file, read_line)) {
 
@@ -296,16 +309,19 @@ int main(int argc, char** argv) {
             time_out << std::setw(13) << event_timer.lap();
             #endif
 
-            if (read_until && std::max(fa.total_len_, ra.total_len_) > ru_min_revts) {
+            if (read_until && std::max(fa.total_len_, ra.total_len_) > min_aln_len) {
                 ReadAln a = fa;
                 if (fa.total_len_ < ra.total_len_) {
                     a = ra;
                 }
 
-                if(fwd_tracker.check_ratio(a, 2) && rev_tracker.check_ratio(a, 2)) {
+                if(fwd_tracker.check_ratio(a, min_aln_conf) && 
+                   rev_tracker.check_ratio(a, min_aln_conf)) {
+
                     #ifdef VERBOSE_TIME
                     time_out << std::setw(13) << event_timer.lap() << std::endl;
                     #endif
+
                     break;
                 }
             }

@@ -14,7 +14,7 @@ class LeafAligner : public Aligner {
 
     //TODO: think of better name
     //it's not an alignment (no FM info) - keeps track of events
-    class Alignment {
+    class PathBuffer {
         public:
 
         static unsigned char PROB_WIN_LEN, TYPE_WIN_LEN;
@@ -35,27 +35,27 @@ class LeafAligner : public Aligner {
         Kmer prev_kmer_;
 
         //Source constructor
-        Alignment(Kmer kmer, double prob);
+        PathBuffer(Kmer kmer, double prob);
 
         //Sibling constructor
-        Alignment(Alignment *a, Kmer kmer, double prob, EventType type);
+        PathBuffer(PathBuffer *a, Kmer kmer, double prob, EventType type);
 
 
         //Copy constructor
-        //Alignment(Alignment *a);
+        //PathBuffer(PathBuffer *a);
 
         //Creates invalid node
-        //Alignment();
+        //PathBuffer();
 
-        ~Alignment();
+        ~PathBuffer();
 
         void init_source(Kmer kmer, double prob);
-        void init_from_sibling(Alignment *a, Kmer kmer, double prob, EventType type);
-        void init_from_parent(Alignment *a, Kmer kmer, double prob, EventType type);
+        void init_from_sibling(PathBuffer *a, Kmer kmer, double prob, EventType type);
+        void init_from_parent(PathBuffer *a, Kmer kmer, double prob, EventType type);
         void make_child(Kmer kmer, double prob, EventType type);
         void update_consec_stays();
-        bool better_than_parent(const Alignment *a, double prob);
-        bool better_than_sibling(const Alignment *a, double prob);
+        bool better_than_parent(const PathBuffer *a, double prob);
+        bool better_than_sibling(const PathBuffer *a, double prob);
         bool should_report(const AlnParams &params);
 
         size_t event_len();
@@ -75,8 +75,8 @@ class LeafAligner : public Aligner {
     AlnParams params_;
     std::string label_;
     
-    std::vector<Alignment *> inactive_alns_;
-    std::map<Range, Alignment *> prev_alns_, next_alns_;
+    std::vector<PathBuffer *> inactive_alns_;
+    std::map<Range, PathBuffer *> prev_alns_, next_alns_;
 
     Timer timer;
     
@@ -96,7 +96,7 @@ class LeafAligner : public Aligner {
     void print_graph(bool verbose);
 
     bool add_child(Range &range, 
-                   Alignment *prev_aln,
+                   PathBuffer *prev_aln,
                    Kmer kmer,
                    double prob,
                    EventType type,
