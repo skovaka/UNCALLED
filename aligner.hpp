@@ -7,6 +7,8 @@
 #include <list>
 #include <iostream>
 
+//#define VERBOSE_TIME
+
 class Result {
     public:
 
@@ -33,7 +35,8 @@ class AlnParams {
 
     unsigned int path_win_len_, 
                  min_rep_len_,
-                 max_rep_copy_;
+                 max_rep_copy_,
+                 max_paths_;
 
     double max_stay_frac_;
 
@@ -50,6 +53,7 @@ class AlnParams {
               unsigned int path_win_len, 
               unsigned int min_rep_len, 
               unsigned int max_rep_copy, 
+              unsigned int max_paths, 
               double max_stay_frac,
               unsigned int max_consec_stay,
               unsigned int max_ignores, 
@@ -69,7 +73,7 @@ class Aligner {
 
     virtual void new_read(size_t read_len) = 0;
     virtual void reset() = 0;
-    virtual std::vector<Result> add_event(double *kmer_probs, std::ostream &out) = 0;
+    virtual std::vector<Result> add_event(double *kmer_probs, std::ostream &seeds_out, std::ostream &time_out) = 0;
 };
 
 #endif

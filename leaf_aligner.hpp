@@ -12,8 +12,6 @@ class LeafAligner : public Aligner {
 
     enum EventType { MATCH, STAY, SKIP, IGNORE, NUM_TYPES };
 
-    //TODO: think of better name
-    //it's not an alignment (no FM info) - keeps track of events
     class PathBuffer {
         public:
 
@@ -33,6 +31,7 @@ class LeafAligner : public Aligner {
         unsigned char win_type_counts_[EventType::NUM_TYPES];
 
         Kmer prev_kmer_;
+        bool sa_checked_;
 
         //Source constructor
         PathBuffer(Kmer kmer, double prob);
@@ -56,7 +55,7 @@ class LeafAligner : public Aligner {
         void update_consec_stays();
         bool better_than_parent(const PathBuffer *a, double prob);
         bool better_than_sibling(const PathBuffer *a, double prob);
-        bool should_report(const AlnParams &params);
+        bool should_report(const Range &r, const AlnParams &params, bool has_children);
 
         size_t event_len();
         size_t match_len();
@@ -75,10 +74,12 @@ class LeafAligner : public Aligner {
     AlnParams params_;
     std::string label_;
     
-    std::vector<PathBuffer *> inactive_alns_;
-    std::map<Range, PathBuffer *> prev_alns_, next_alns_;
+    std::vector<PathBuffer *> inactive_paths_;
+    std::map<Range, PathBuffer *> prev_paths_, next_paths_;
 
-    Timer timer;
+    #ifdef VERBOSE_TIME
+    double child_map_time_, child_add_time_, child_rpl_time_;
+    #endif
     
     unsigned int cur_event_;
     Event prev_event_;
@@ -91,12 +92,12 @@ class LeafAligner : public Aligner {
 
     void new_read(size_t read_len);
     void reset();
-    std::vector<Result> add_event(double *kmer_probs, std::ostream &out);
+    std::vector<Result> add_event(double *kmer_probs, std::ostream &seeds_out, std::ostream &timing_out);
 
     void print_graph(bool verbose);
 
     bool add_child(Range &range, 
-                   PathBuffer *prev_aln,
+                   PathBuffer *prev_path,
                    Kmer kmer,
                    double prob,
                    EventType type,

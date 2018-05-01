@@ -53,6 +53,7 @@ void LeafAligner::PathBuffer::init_source(Kmer kmer, double prob) {
     tyhd_ = 0;
     tylen_ = 1;
     prev_kmer_ = kmer;
+    sa_checked_ = false;
 
     //MATCH should always be index 0
     all_type_counts_[EventType::MATCH] = 1;
@@ -77,6 +78,7 @@ void LeafAligner::PathBuffer::init_from_sibling(PathBuffer *a, Kmer kmer,
     tyhd_ = a->tyhd_;
     tylen_ = a->tylen_;
     prev_kmer_ = kmer;
+    sa_checked_ = a->sa_checked_;
 
     std::memcpy(prob_sums_, a->prob_sums_, PROB_WIN_LEN * sizeof(double));
     std::memcpy(event_types_, a->event_types_, TYPE_WIN_LEN * sizeof(EventType));
@@ -110,6 +112,8 @@ void LeafAligner::PathBuffer::init_from_parent(PathBuffer *a, Kmer kmer,
     tylen_ = a->tylen_;
     consec_stays_ = a->consec_stays_;
     prev_kmer_ = kmer;
+    sa_checked_ = a->sa_checked_;
+
 
     std::memcpy(prob_sums_, a->prob_sums_, PROB_WIN_LEN * sizeof(double));
     std::memcpy(event_types_, a->event_types_, TYPE_WIN_LEN * sizeof(EventType));
@@ -217,12 +221,18 @@ double LeafAligner::PathBuffer::next_mean_prob() {
 
 }
 
-bool LeafAligner::PathBuffer::should_report(const AlnParams &params) {
-    bool r = event_types_[tyhd_] == EventType::MATCH && 
-           win_type_counts_[EventType::STAY] <= params.max_stay_frac_ * tylen_ &&
-           mean_prob() >= params.window_prob_;
-    //std::cout << (int) win_type_counts_[EventType::STAY] << " stays " << (int) tylen_ << " " << r << "\n";
-    return r;
+bool LeafAligner::PathBuffer::should_report(const Range &r, 
+                                            const AlnParams &p,
+                                            bool has_children) {
+    return (r.length() == 1 || 
+                (!has_children &&
+                 r.length() <= p.max_rep_copy_ &&
+                 match_len() >= p.min_rep_len_)) &&
+
+           length_ >= p.path_win_len_ &&
+           event_types_[tyhd_] == EventType::MATCH &&
+           (!has_children || win_type_counts_[EventType::STAY] <= p.max_stay_frac_ * tylen_) &&
+           mean_prob() >= p.window_prob_;
 }
 
 LeafAligner::LeafAligner(const FMI &fmi, 
@@ -231,7 +241,6 @@ LeafAligner::LeafAligner(const FMI &fmi,
     : fmi_(fmi),
       params_(ap),
       label_(label) {
-    timer.reset();
 
     PathBuffer::PROB_WIN_LEN = params_.path_win_len_+1;
     PathBuffer::TYPE_WIN_LEN = params_.path_win_len_;
@@ -258,111 +267,192 @@ void LeafAligner::new_read(size_t read_len) {
 }
 
 void LeafAligner::reset() {
-    for (auto p = prev_alns_.begin(); p != prev_alns_.end(); p++) {
-        inactive_alns_.push_back(p->second);
+    for (auto p = prev_paths_.begin(); p != prev_paths_.end(); p++) {
+        inactive_paths_.push_back(p->second);
     }
-    prev_alns_.clear();
+    prev_paths_.clear();
 }
 
-std::vector<Result> LeafAligner::add_event(double *kmer_probs, std::ostream &out) {
+std::vector<Result> LeafAligner::add_event(double *kmer_probs, 
+                                           std::ostream &seeds_out,
+                                           std::ostream &time_out) {
 
     //Update event index
     cur_event_--;
 
-    Timer t;
-
     double prob;
 
-    t.reset();
-
     Range prev_range;
-    PathBuffer *prev_aln;
+    PathBuffer *prev_path;
     Kmer prev_kmer;
     
     bool child_found;
     double evpr_thresh;
 
+    std::vector<Result> results;
 
-    //std::cout << cur_event_ << "\t" << label_ << " " << prev_alns_.size() << std::endl;
-    
+    //std::cout << cur_event_ << "\t" << label_ << "\t" << prev_paths_.size() << "\n";
+    //std::cout.flush()
+
+    if (prev_paths_.size() > params_.max_paths_) {
+        for (auto p = prev_paths_.begin(); p != prev_paths_.end(); p++) {
+            inactive_paths_.push_back(p->second);
+        }
+        prev_paths_.clear();
+    }
+
+    #ifdef VERBOSE_TIME
+    double stay_time = 0, 
+           fm_time = 0, 
+           neighbor_time = 0, 
+           un_ext_time = 0;
+    child_map_time_ = 0;
+    child_add_time_ = 0;
+    child_rpl_time_ = 0;
+    Timer timer;
+    #endif
+
     //Find neighbors of previous nodes
-    for (auto p = prev_alns_.begin(); p != prev_alns_.end(); p++) {
+    for (auto p = prev_paths_.begin(); p != prev_paths_.end(); p++) {
+
+        #ifdef VERBOSE_TIME
+        //child_map_time_ += timer.get();
+        //stay_time += timer.lap();
+        #endif
+
         Range prev_range = p->first;
-        prev_aln = p->second;
-
-
-        //std::cout << cur_event_ << "\t"
-        //          << prev_range.start_ << "-" << prev_range.end_ << "\t"
-        //          << (int) prev_aln->win_type_counts_[EventType::STAY] << "\t"
-        //          << prev_aln->length_ << "\t"
-        //          << (int) prev_aln->prlen_ << "\t"
-        //          << prev_aln->next_mean_prob() << "\n";
-
+        prev_path = p->second;
 
         child_found = false;
 
         evpr_thresh = params_.get_prob_thresh(prev_range.length());
 
         //Get probability for stay neighbor
-        prev_kmer = prev_aln->prev_kmer_;
+        prev_kmer = prev_path->prev_kmer_;
         prob = kmer_probs[prev_kmer];
 
-        if (prev_aln->consec_stays_ < params_.max_consec_stay_ && prob >= evpr_thresh) {
-            //std::cout << prev_range.start_ << "-" << prev_range.end_ << "\t" << prob << "\n";
+        #ifdef VERBOSE_TIME
+        timer.reset();
+        #endif
+
+        if (prev_path->consec_stays_ < params_.max_consec_stay_ && 
+            //prev_path->win_type_counts_[EventType::STAY] < params_.max_stay_frac_ * prev_path->tylen_ &&
+            prob >= evpr_thresh) {
             child_found = 
                 add_child(prev_range,
-                          prev_aln, 
+                          prev_path, 
                           prev_kmer, 
                           prob, 
                           EventType::STAY, 
                           child_found);
         }
-        
-        //Find next possible kmers
-        auto neighbor_itr = params_.model_.get_neighbors(prev_kmer);
-        std::list<Kmer> next_kmers;
 
-        for (auto n = neighbor_itr.first; n != neighbor_itr.second; n++) {
-            prob = kmer_probs[*n];
-            if(prob >= evpr_thresh) { //&& prev_node->next_mean_prob(prob) >= params_.min_seed_pr_) {
-                next_kmers.push_back(*n);
-            } 
-        }
-
-        //Find ranges FM index for those next kmers
-        //std::list<Range> next_ranges = fmi_.get_neigbhors(prev_range, next_kmers);
-
-        auto next_kmer = next_kmers.begin(); 
-        //auto next_range = next_ranges.begin();
+        #ifdef VERBOSE_TIME
+        stay_time += timer.lap();
+        #endif
         
 
         //Add all the neighbors that were found
-        while (next_kmer != next_kmers.end()) {
+        auto neighbor_itr = params_.model_.get_neighbors(prev_kmer);
+        for (auto next_kmer = neighbor_itr.first; 
+             next_kmer != neighbor_itr.second; 
+             next_kmer++) {
+
             prob = kmer_probs[*next_kmer];
-            //rank = kmer_ranks[*next_kmer];
+
+            if (prob < evpr_thresh) {
+                continue;
+            }
 
             Base next_base = params_.model_.get_first_base(*next_kmer);
+
+            #ifdef VERBOSE_TIME
+            //neighbor_time += timer.lap();
+            timer.reset();
+            #endif
+
             Range next_range = fmi_.get_neighbor(prev_range, next_base);
 
-            //std::cout << next_range.start_ << "-" << next_range.end_ << "\t" << prob << "\n";
+            #ifdef VERBOSE_TIME
+            fm_time += timer.lap();
+            #endif
 
             child_found = 
                 add_child(next_range,
-                          prev_aln, 
+                          prev_path, 
                           *next_kmer, 
                           prob, 
                           EventType::MATCH, 
                           child_found);
 
-            next_kmer++; 
+            #ifdef VERBOSE_TIME
+            neighbor_time += timer.lap();
+            #endif
         }
 
+        #ifdef VERBOSE_TIME
+        //neighbor_time += timer.lap();
+        timer.reset();
+        #endif
+
+
         if (child_found) {
-            prev_aln->update_consec_stays();
+            prev_path->update_consec_stays();
         } else {
-            inactive_alns_.push_back(prev_aln);
+
+            if (!prev_path->sa_checked_ && prev_path->should_report(prev_range, params_, false)) {
+                Result r(cur_event_+1, params_.path_win_len_, prev_path->mean_prob());
+
+                for (unsigned int s = prev_range.start_; s <= prev_range.end_; s++) {
+                    r.set_ref_range(fmi_.sa(s), prev_path->match_len());
+                    results.push_back(r);
+
+                    seeds_out << label_ << "\t";
+                    r.print(seeds_out);
+                }
+            }
+
+            inactive_paths_.push_back(prev_path);
+        }
+        #ifdef VERBOSE_TIME
+        un_ext_time += timer.lap();
+        #endif
+    }
+
+    #ifdef VERBOSE_TIME
+    time_out << std::setw(23) << stay_time 
+             << std::setw(23) << fm_time
+             << std::setw(23) << neighbor_time
+             << std::setw(23) << un_ext_time
+             << std::setw(23) << child_map_time_
+             << std::setw(23) << child_add_time_
+             << std::setw(23) << child_rpl_time_;
+    #endif
+
+    for (auto p = next_paths_.begin(); p != next_paths_.end(); p++) {
+
+        PathBuffer *n = p->second;
+        const Range &range = p->first;
+
+        if (n->should_report(range, params_, true)) {
+            Result r(cur_event_, params_.path_win_len_, n->mean_prob());
+            n->sa_checked_ = true;
+
+            for (unsigned int s = range.start_; s <= range.end_; s++) {
+                r.set_ref_range(fmi_.sa(s), n->match_len());
+                results.push_back(r);
+
+                seeds_out << label_ << "\t";
+
+                r.print(seeds_out);
+            }
         }
     }
+
+    //SA time
+    #ifdef VERBOSE_TIME
+    time_out << std::setw(23) << timer.lap();
+    #endif
 
     //Find sources
     for (Kmer kmer = 0; kmer < params_.model_.kmer_count(); kmer++) {
@@ -376,41 +466,44 @@ std::vector<Result> LeafAligner::add_event(double *kmer_probs, std::ostream &out
             }
         }
     }
+    
+    //Source time
+    #ifdef VERBOSE_TIME
+    time_out << std::setw(23) << timer.lap();
+    #endif
 
-    prev_alns_.clear();
-    prev_alns_.swap(next_alns_);
+    prev_paths_.clear();
+    prev_paths_.swap(next_paths_);
 
-    auto r = pop_seeds(out);
-
-    return r;
+    return results;
 }
 
 size_t LeafAligner::add_sources(const Range &range, Kmer kmer, double prob) {
 
     //Find closest existing node
-    auto lb = next_alns_.lower_bound(range);
+    auto lb = next_paths_.lower_bound(range);
     
     //Find range of existing alns intersecting the new aln
     auto start = lb;
-    while (start != next_alns_.begin() 
+    while (start != next_paths_.begin() 
            && std::prev(start)->first.intersects(range)){
         start--;
     }
 
     auto end = lb;
-    while (end != next_alns_.end() && end->first.intersects(range)) {
+    while (end != next_paths_.end() && end->first.intersects(range)) {
         end++;
     }
 
     //No alns intersect new aln, just add it
-    if (start == next_alns_.end() || (start == lb && end == lb)) {
+    if (start == next_paths_.end() || (start == lb && end == lb)) {
 
-        if (inactive_alns_.empty()) {
-            next_alns_[range] = new PathBuffer(kmer, prob);
+        if (inactive_paths_.empty()) {
+            next_paths_[range] = new PathBuffer(kmer, prob);
         } else {
-            next_alns_[range] = inactive_alns_.back();
-            next_alns_[range]->init_source(kmer, prob);
-            inactive_alns_.pop_back();
+            next_paths_[range] = inactive_paths_.back();
+            next_paths_[range]->init_source(kmer, prob);
+            inactive_paths_.pop_back();
         }
 
         return 1;
@@ -445,12 +538,12 @@ size_t LeafAligner::add_sources(const Range &range, Kmer kmer, double prob) {
 
     //Add a new aln for every split range
     for (auto r = split_ranges.begin(); r != split_ranges.end(); r++) {
-        if (inactive_alns_.empty()) {
-            next_alns_[*r] = new PathBuffer(kmer, prob);
+        if (inactive_paths_.empty()) {
+            next_paths_[*r] = new PathBuffer(kmer, prob);
         } else {
-            next_alns_[*r] = inactive_alns_.back();
-            next_alns_[*r]->init_source(kmer, prob);
-            inactive_alns_.pop_back();
+            next_paths_[*r] = inactive_paths_.back();
+            next_paths_[*r]->init_source(kmer, prob);
+            inactive_paths_.pop_back();
         }
     }
 
@@ -458,43 +551,61 @@ size_t LeafAligner::add_sources(const Range &range, Kmer kmer, double prob) {
 }
 
 bool LeafAligner::add_child(Range &range, 
-                            PathBuffer *prev_aln,
+                            PathBuffer *prev_path,
                             Kmer kmer,
                             double prob,
                             EventType type,
                             bool prev_is_sibling) {
     
+    #ifdef VERBOSE_TIME
+    Timer timer;
+    timer.reset();
+    #endif
+
     if (!range.is_valid()) {
         return prev_is_sibling;
     }
+
     
     //Find closest node >= the node being added
-    auto lb = next_alns_.lower_bound(range);
+    auto lb = next_paths_.lower_bound(range);
+
+    #ifdef VERBOSE_TIME
+    child_map_time_ += timer.lap();
+    #endif
 
     //std::cout << "a\n";
 
     //PathBuffer range hasn't been added yet
-    if (lb == next_alns_.end() || !lb->first.same_range(range)) {
+    if (lb == next_paths_.end() || !lb->first.same_range(range)) {
 
-        PathBuffer *new_aln;
+        PathBuffer *new_path;
         if (prev_is_sibling) {
-            if (inactive_alns_.empty()) {
+            if (inactive_paths_.empty()) {
                 //std::cout << "b\n";
-                new_aln = new PathBuffer(prev_aln, kmer, prob, type);
+                new_path = new PathBuffer(prev_path, kmer, prob, type);
             } else {
                 //std::cout << "c\n";
-                new_aln = inactive_alns_.back();
-                inactive_alns_.pop_back();
-                new_aln->init_from_sibling(prev_aln, kmer, prob, type);
+                new_path = inactive_paths_.back();
+                inactive_paths_.pop_back();
+                new_path->init_from_sibling(prev_path, kmer, prob, type);
             }
         } else {
             //std::cout << "c/b\n";
-            prev_aln->make_child(kmer, prob, type);
-            new_aln = prev_aln;
+            prev_path->make_child(kmer, prob, type);
+            new_path = prev_path;
         }
 
+        #ifdef VERBOSE_TIME
+        child_add_time_ += timer.lap();
+        #endif
+
         //Store it with it's range
-        next_alns_.insert(lb, std::pair<Range, PathBuffer *>(range, new_aln));
+        next_paths_.insert(lb, std::pair<Range, PathBuffer *>(range, new_path));
+
+        #ifdef VERBOSE_TIME
+        child_map_time_ += timer.lap();
+        #endif
 
         //Created one node
         return true;
@@ -503,64 +614,39 @@ bool LeafAligner::add_child(Range &range,
 
     
     //PathBuffer associated with same range
-    PathBuffer *dup_aln = lb->second;
+    PathBuffer *dup_path = lb->second;
 
               
     //std::cout << "d " << prev_is_sibling << "\n";
 
     if (prev_is_sibling) {
-        if (dup_aln->better_than_sibling(prev_aln, prob)) {
-            //std::cout << "e1\n";
-            dup_aln->init_from_sibling(prev_aln, kmer, prob, type);
+        if (dup_path->better_than_sibling(prev_path, prob)) {
+            dup_path->init_from_sibling(prev_path, kmer, prob, type);
+
+            #ifdef VERBOSE_TIME
+            child_rpl_time_ += timer.lap();
+            #endif
+
             return true;
         }
     } else {
-        if (dup_aln->better_than_parent(prev_aln, prob)) {
-            //std::cout << "e2\n";
-            inactive_alns_.push_back(lb->second);
-            lb->second = prev_aln;
+        if (dup_path->better_than_parent(prev_path, prob)) {
+            inactive_paths_.push_back(lb->second);
+            lb->second = prev_path;
             lb->second->make_child(kmer, prob, type);
+
+            #ifdef VERBOSE_TIME
+            child_rpl_time_ += timer.lap();
+            #endif
+
             return true;
         }
     }
-    //std::cout << "f\n";
+
+    #ifdef VERBOSE_TIME
+    child_rpl_time_ += timer.lap();
+    #endif
 
     return prev_is_sibling;
-}
-
-
-
-std::vector<Result> LeafAligner::pop_seeds(std::ostream &out) { 
-
-    std::vector<Result> results;
-
-    for (auto p = prev_alns_.begin(); p != prev_alns_.end(); p++) {
-
-        PathBuffer *n = p->second;
-        //std::cout << n->event_len() << "\t" << params_.graph_elen_ << "\n";
-
-        if (n->event_len() >= params_.path_win_len_) {
-
-            Range range = p->first;
-
-            //TODO: max repeat parameter
-            if (n->should_report(params_) && range.length() < 100) { 
-                Result r(cur_event_, params_.path_win_len_, n->mean_prob());
-
-                for (unsigned int s = range.start_; s <= range.end_; s++) {
-                    r.set_ref_range(fmi_.sa(s), n->match_len());
-                    results.push_back(r);
-
-                    out << label_ << "\t";
-
-                    r.print(out);
-                }
-            }
-        }
-    }
-        
-
-    return results;
-
 }
 

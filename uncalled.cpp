@@ -23,8 +23,6 @@
 #include "base_fmi.hpp"
 #include "timer.hpp"
 
-#define VERBOSE_TIME
-
 #define GRAPH_ALN 0
 #define FOREST_ALN 1
 #define LEAF_ALN 2
@@ -50,8 +48,8 @@ bool get_events(std::ostream &err, std::string filename, std::vector<Event> &eve
 
 enum Opt {
     MODEL       = 'm',
-    REFERENCE   = 'r',
-    INDEX_PREFIX   = 'f',
+    REFERENCE   = 'f',
+    INDEX_PREFIX   = 'x',
     READ_LIST   = 'i',
     OUT_PREFIX     = 'o',
 
@@ -60,8 +58,9 @@ enum Opt {
     MIN_ALN_LEN     = 'a',
     MIN_ALN_CONF    = 'u', //u for until
     PATH_WIN_LEN    = 'w',
-    MIN_REP_LEN     = 'l',
+    MIN_REP_LEN     = 'r',
     MAX_REP_COPY    = 'c',
+    MAX_PATHS       = 'p',
 
     STAY_FRAC       = 's',
     MAX_CONSEC_STAY = 'y',
@@ -87,10 +86,11 @@ int main(int argc, char** argv) {
     args.add_double(Opt::MIN_ALN_CONF, "min_aln_conf", 2, "");
     args.add_int(   Opt::PATH_WIN_LEN, "path_window_len", 22, "");
     args.add_int(   Opt::MIN_REP_LEN,  "min_repeat_len", 0, "");
-    args.add_int(   Opt::MAX_REP_COPY, "min_repeat_copy", 20, "");
+    args.add_int(   Opt::MAX_REP_COPY, "max_repeat_copy", 100, "");
+    args.add_int(   Opt::MAX_PATHS,    "max_paths", 10000, "");
 
     args.add_double(Opt::STAY_FRAC,       "stay_frac",    0.5,    "");
-    args.add_int(   Opt::MAX_CONSEC_STAY, "max_consec_stay", 20, "");
+    args.add_int(   Opt::MAX_CONSEC_STAY, "max_consec_stay", 8, "");
     args.add_int(   Opt::MAX_IGNORES,     "max_ignores",  0,    "");
     args.add_int(   Opt::MAX_SKIPS,       "max_skips",    0,    "");
 
@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
 
     args.parse_args(argc, argv);
 
-    std::string prefix = args.get_string(Opt::OUT_PREFIX) + args.get_string(Opt::EVENT_PROBS) + "_" + args.get_param_str();
+    std::string prefix = args.get_string(Opt::OUT_PREFIX) + args.get_string(Opt::EVENT_PROBS) + args.get_param_str();
     std::ofstream seeds_out(prefix + "_seeds.txt");
     std::ofstream alns_out(prefix + "_aln.txt");
     std::ofstream time_out(prefix + "_time.txt");
@@ -115,6 +115,7 @@ int main(int argc, char** argv) {
                          args.get_int(Opt::PATH_WIN_LEN),
                          args.get_int(Opt::MIN_REP_LEN),
                          args.get_int(Opt::MAX_REP_COPY),
+                         args.get_int(Opt::MAX_PATHS),
                          args.get_double(Opt::STAY_FRAC),
                          args.get_int(Opt::MAX_CONSEC_STAY),
                          args.get_int(Opt::MAX_IGNORES),
@@ -253,7 +254,7 @@ int main(int argc, char** argv) {
         #ifdef VERBOSE_TIME
         Timer event_timer;
 
-        time_out << std::fixed << std::setprecision(5);
+        time_out << std::fixed << std::setprecision(10);
         #else
         unsigned int status_step = aln_len / 10,
                      status = 0;
@@ -282,31 +283,32 @@ int main(int argc, char** argv) {
 
             #ifdef VERBOSE_TIME
             time_out << e;
+            //event_timer.reset();
+            #endif
+
+            std::vector<Result> fwd_seeds = fwd_sg.add_event(all_probs[e-aln_st], 
+                                                             seeds_out,
+                                                             time_out);
+
+
+            std::vector<Result> rev_seeds = rev_sg.add_event(all_probs[e-aln_st], 
+                                                             seeds_out,
+                                                             time_out);
+
+            #ifdef VERBOSE_TIME
             event_timer.reset();
-            #endif
-
-            std::vector<Result> fwd_seeds = fwd_sg.add_event(all_probs[e-aln_st], seeds_out);
-
-            #ifdef VERBOSE_TIME
-            time_out << std::setw(13) << event_timer.lap();
-            #endif
-
-            std::vector<Result> rev_seeds = rev_sg.add_event(all_probs[e-aln_st], seeds_out);
-
-            #ifdef VERBOSE_TIME
-            time_out << std::setw(13) << event_timer.lap();
             #endif
 
             ReadAln fa = fwd_tracker.add_seeds(fwd_seeds);
 
             #ifdef VERBOSE_TIME
-            time_out << std::setw(13) << event_timer.lap();
+            time_out << std::setw(23) << event_timer.lap();
             #endif
 
             ReadAln ra = rev_tracker.add_seeds(rev_seeds);
 
             #ifdef VERBOSE_TIME
-            time_out << std::setw(13) << event_timer.lap();
+            time_out << std::setw(23) << event_timer.lap();
             #endif
 
             if (read_until && std::max(fa.total_len_, ra.total_len_) > min_aln_len) {
@@ -319,7 +321,7 @@ int main(int argc, char** argv) {
                    rev_tracker.check_ratio(a, min_aln_conf)) {
 
                     #ifdef VERBOSE_TIME
-                    time_out << std::setw(13) << event_timer.lap() << std::endl;
+                    time_out << std::setw(23) << event_timer.lap() << std::endl;
                     #endif
 
                     break;
@@ -327,7 +329,7 @@ int main(int argc, char** argv) {
             }
 
             #ifdef VERBOSE_TIME
-            time_out << std::setw(13) << event_timer.lap() << std::endl;
+            time_out << std::setw(23) << event_timer.lap() << std::endl;
             time_out.flush();
 
 
