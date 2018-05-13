@@ -41,5 +41,6 @@ class Range {
 };
 
 bool operator< (const Range &q1, const Range &q2);
+bool operator== (const Range &q1, const Range &q2);
 
 #endif

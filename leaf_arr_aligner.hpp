@@ -1,5 +1,5 @@
-#ifndef LEAF_ALIGNER_HPP
-#define LEAF_ALIGNER_HPP
+#ifndef LEAF_ARR_ALIGNER_HPP
+#define LEAF_ARR_ALIGNER_HPP
 
 #include "fmi.hpp"
 #include "kmer_model.hpp"
@@ -8,7 +8,7 @@
 #include <list>
 #include <iostream>
 
-class LeafAligner : public Aligner {
+class LeafArrAligner : public Aligner {
 
     enum EventType { MATCH, STAY, SKIP, IGNORE, NUM_TYPES };
 
@@ -22,40 +22,46 @@ class LeafAligner : public Aligner {
             consec_stays_;
 
         //Prob window head/tail index, type window head index
-        unsigned char prtl_, prhd_, prlen_, tyhd_, tytl_, tylen_;
+        unsigned char prhd_, prtl_, prlen_, tyhd_, tytl_, tylen_;
+        float win_prob_;
 
         float *prob_sums_;
         EventType *event_types_;
 
+        char space_filler[54];
         unsigned short all_type_counts_[EventType::NUM_TYPES];
         unsigned char win_type_counts_[EventType::NUM_TYPES];
 
-        Kmer prev_kmer_;
+        Range fm_range_;
+        Kmer kmer_;
         bool sa_checked_;
 
+        //Initial constructor
+        PathBuffer();
+
         //Source constructor
-        PathBuffer(Kmer kmer, float prob);
+        //PathBuffer(Range range, Kmer kmer, float prob);
 
-        //Sibling constructor
-        PathBuffer(PathBuffer *a, Kmer kmer, float prob, EventType type);
-
+        //Child constructor
+        //PathBuffer(PathBuffer &p, Range range, Kmer kmer, float prob, EventType type);
 
         //Copy constructor
-        //PathBuffer(PathBuffer *a);
+        PathBuffer(const PathBuffer &p);
 
-        //Creates invalid node
-        //PathBuffer();
+        //~PathBuffer();
 
-        ~PathBuffer();
+        //void init_from_sibling(PathBuffer *a, Kmer kmer, float prob, EventType type);
+        //void init_from_parent(PathBuffer *a, Kmer kmer, float prob, EventType type);
+        void make_source(Range &range, Kmer kmer, float prob);
+        void make_child(PathBuffer &p, Range &range, Kmer kmer, float prob, EventType type);
 
-        void init_source(Kmer kmer, float prob);
-        void init_from_sibling(PathBuffer *a, Kmer kmer, float prob, EventType type);
-        void init_from_parent(PathBuffer *a, Kmer kmer, float prob, EventType type);
-        void make_child(Kmer kmer, float prob, EventType type);
+        void invalidate();
+        bool is_valid();
+
         void update_consec_stays();
-        bool better_than_parent(const PathBuffer *a, float prob);
-        bool better_than_sibling(const PathBuffer *a, float prob);
-        bool should_report(const Range &r, const AlnParams &params, bool has_children);
+        //bool better_than_parent(const PathBuffer *a, float prob);
+        bool better_than(const PathBuffer &a);
+        bool should_report(const AlnParams &params, bool has_children);
 
         size_t event_len();
         size_t match_len();
@@ -63,8 +69,15 @@ class LeafAligner : public Aligner {
         float next_mean_prob();
         float next_mean_prob(float next_prob) const;
 
+        void replace(const PathBuffer &r);
+        //PathBuffer& operator=(const PathBuffer &r) = delete;
+
+        void free_buffers();
+
         void print() const;
     };
+
+    friend bool operator< (const PathBuffer &p1, const PathBuffer &p2);
 
     public:
 
@@ -74,8 +87,10 @@ class LeafAligner : public Aligner {
     AlnParams params_;
     std::string label_;
     
-    std::vector<PathBuffer *> inactive_paths_;
-    std::map<Range, PathBuffer *> prev_paths_, next_paths_;
+    //std::vector<PathBuffer *> inactive_paths_;
+    std::vector<PathBuffer> prev_paths_, next_paths_;
+    std::vector<bool> sources_added_;
+    size_t prev_size_;
 
     #ifdef VERBOSE_TIME
     float child_map_time_, child_add_time_, child_rpl_time_;
@@ -84,11 +99,13 @@ class LeafAligner : public Aligner {
     unsigned int cur_event_;
     Event prev_event_;
 
-    LeafAligner(const FMI &fmi, 
+    LeafArrAligner(const FMI &fmi, 
               const AlnParams &aln_params,
               const std::string &label);
 
-    ~LeafAligner();
+    ~LeafArrAligner();
+
+    void check_alignments(PathBuffer &p, std::vector<Result> &results, bool has_children);
 
     void new_read(size_t read_len);
     void reset();
@@ -97,7 +114,7 @@ class LeafAligner : public Aligner {
     void print_graph(bool verbose);
 
     bool add_child(Range &range, 
-                   PathBuffer *prev_path,
+                   PathBuffer &prev_path,
                    Kmer kmer,
                    float prob,
                    EventType type,

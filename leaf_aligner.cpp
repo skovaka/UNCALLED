@@ -24,16 +24,16 @@ unsigned char LeafAligner::PathBuffer::PROB_WIN_LEN = 0,
               LeafAligner::PathBuffer::TYPE_WIN_LEN = 0;
 
 //Source constructor
-LeafAligner::PathBuffer::PathBuffer(Kmer kmer, double prob)
-    : prob_sums_(new double[PROB_WIN_LEN]),
+LeafAligner::PathBuffer::PathBuffer(Kmer kmer, float prob)
+    : prob_sums_(new float[PROB_WIN_LEN]),
       event_types_(new EventType[TYPE_WIN_LEN]) {
     init_source(kmer, prob);
 }
 
 //Sibling constructor
 LeafAligner::PathBuffer::PathBuffer(PathBuffer *a, Kmer kmer, 
-                                  double prob, EventType type) 
-    : prob_sums_(new double[PROB_WIN_LEN]),
+                                  float prob, EventType type) 
+    : prob_sums_(new float[PROB_WIN_LEN]),
       event_types_(new EventType[TYPE_WIN_LEN]) {
     init_from_sibling(a, kmer, prob, type);
 }
@@ -43,7 +43,7 @@ LeafAligner::PathBuffer::~PathBuffer() {
     delete[] event_types_;
 }
 
-void LeafAligner::PathBuffer::init_source(Kmer kmer, double prob) {
+void LeafAligner::PathBuffer::init_source(Kmer kmer, float prob) {
     length_ = 1;
     consec_stays_ = 0;
     prtl_ = 0;
@@ -69,7 +69,7 @@ void LeafAligner::PathBuffer::init_source(Kmer kmer, double prob) {
 }
 
 void LeafAligner::PathBuffer::init_from_sibling(PathBuffer *a, Kmer kmer, 
-                                               double prob, EventType type) {
+                                               float prob, EventType type) {
     length_ = a->length_;
     prtl_ = a->prtl_;
     prhd_ = a->prhd_;
@@ -80,7 +80,7 @@ void LeafAligner::PathBuffer::init_from_sibling(PathBuffer *a, Kmer kmer,
     prev_kmer_ = kmer;
     sa_checked_ = a->sa_checked_;
 
-    std::memcpy(prob_sums_, a->prob_sums_, PROB_WIN_LEN * sizeof(double));
+    std::memcpy(prob_sums_, a->prob_sums_, PROB_WIN_LEN * sizeof(float));
     std::memcpy(event_types_, a->event_types_, TYPE_WIN_LEN * sizeof(EventType));
     std::memcpy(all_type_counts_, a->all_type_counts_, EventType::NUM_TYPES * sizeof(unsigned short));
     std::memcpy(win_type_counts_, a->win_type_counts_, EventType::NUM_TYPES * sizeof(unsigned char));
@@ -102,7 +102,7 @@ void LeafAligner::PathBuffer::init_from_sibling(PathBuffer *a, Kmer kmer,
 }
 
 void LeafAligner::PathBuffer::init_from_parent(PathBuffer *a, Kmer kmer, 
-                                              double prob, EventType type) {
+                                              float prob, EventType type) {
     length_ = a->length_;
     prtl_ = a->prtl_;
     prhd_ = a->prhd_;
@@ -115,7 +115,7 @@ void LeafAligner::PathBuffer::init_from_parent(PathBuffer *a, Kmer kmer,
     sa_checked_ = a->sa_checked_;
 
 
-    std::memcpy(prob_sums_, a->prob_sums_, PROB_WIN_LEN * sizeof(double));
+    std::memcpy(prob_sums_, a->prob_sums_, PROB_WIN_LEN * sizeof(float));
     std::memcpy(event_types_, a->event_types_, TYPE_WIN_LEN * sizeof(EventType));
     std::memcpy(all_type_counts_, a->all_type_counts_, EventType::NUM_TYPES * sizeof(unsigned short));
     std::memcpy(win_type_counts_, a->win_type_counts_, EventType::NUM_TYPES * sizeof(unsigned char));
@@ -124,7 +124,7 @@ void LeafAligner::PathBuffer::init_from_parent(PathBuffer *a, Kmer kmer,
 }
 
 void LeafAligner::PathBuffer::make_child(Kmer kmer, 
-                                        double prob, 
+                                        float prob, 
                                         EventType type) {
     length_++;
     prev_kmer_ = kmer;
@@ -182,19 +182,20 @@ size_t LeafAligner::PathBuffer::match_len() {
     return win_type_counts_[EventType::MATCH];
 }
 
-double LeafAligner::PathBuffer::mean_prob() const {
+float LeafAligner::PathBuffer::mean_prob() const {
     return (prob_sums_[prhd_] - prob_sums_[prtl_]) / prlen_;
+
 }
 
-//double LeafAligner::PathBuffer::next_mean_prob(double next_prob) const {
+//float LeafAligner::PathBuffer::next_mean_prob(float next_prob) const {
 //    return (seed_prob_ + next_prob) / (length_ + 1);
 //}
 
-bool LeafAligner::PathBuffer::better_than_sibling(const PathBuffer *a, double prob) {
-    double x = a->prob_sums_[a->prhd_ > 0 ? a->prhd_ - 1 : PROB_WIN_LEN-1],
+bool LeafAligner::PathBuffer::better_than_sibling(const PathBuffer *a, float prob) {
+    float x = a->prob_sums_[a->prhd_ > 0 ? a->prhd_ - 1 : PROB_WIN_LEN-1],
            y = a->prob_sums_[a->prtl_];
 
-    double replace_prob = (x - y + prob) / a->prlen_;
+    float replace_prob = (x - y + prob) / a->prlen_;
     //std::cout << (int) a->prtl_ << "\t" << (int) a->prhd_ << "\t"
     //          << a->prob_sums_[a->prtl_] << "\t"
     //          << a->prob_sums_[a->prhd_] << "\t" << x << "\t"
@@ -203,18 +204,18 @@ bool LeafAligner::PathBuffer::better_than_sibling(const PathBuffer *a, double pr
     return replace_prob > mean_prob();
 }
 
-bool LeafAligner::PathBuffer::better_than_parent(const PathBuffer *a, double prob) {
-    double x = a->prob_sums_[a->prhd_], 
+bool LeafAligner::PathBuffer::better_than_parent(const PathBuffer *a, float prob) {
+    float x = a->prob_sums_[a->prhd_], 
            y = a->prob_sums_[(a->prlen_ == PROB_WIN_LEN-1 && a->prtl_ < PROB_WIN_LEN-1) ? a->prtl_ + 1 : 0];
     unsigned int len = a->prlen_ + (a->prlen_ < PROB_WIN_LEN-1);
-    double replace_prob = (x - y + prob) / len;
+    float replace_prob = (x - y + prob) / len;
     //std::cout << (int) a->prtl_ << "\t" << (int) a->prhd_ << "\n";
 
     return replace_prob > mean_prob();
 }
 
-double LeafAligner::PathBuffer::next_mean_prob() {
-    double x = prob_sums_[prhd_], 
+float LeafAligner::PathBuffer::next_mean_prob() {
+    float x = prob_sums_[prhd_], 
            y = prob_sums_[(prlen_ == PROB_WIN_LEN-1 && prtl_ < PROB_WIN_LEN-1) ? prtl_ + 1 : 0];
     unsigned int len = prlen_ - (prlen_ == PROB_WIN_LEN-1);
     return (x - y) / len;
@@ -273,21 +274,21 @@ void LeafAligner::reset() {
     prev_paths_.clear();
 }
 
-std::vector<Result> LeafAligner::add_event(double *kmer_probs, 
+std::vector<Result> LeafAligner::add_event(float *kmer_probs, 
                                            std::ostream &seeds_out,
                                            std::ostream &time_out) {
 
     //Update event index
     cur_event_--;
 
-    double prob;
+    float prob;
 
     Range prev_range;
     PathBuffer *prev_path;
     Kmer prev_kmer;
     
     bool child_found;
-    double evpr_thresh;
+    float evpr_thresh;
 
     std::vector<Result> results;
 
@@ -302,7 +303,7 @@ std::vector<Result> LeafAligner::add_event(double *kmer_probs,
     }
 
     #ifdef VERBOSE_TIME
-    double stay_time = 0, 
+    float stay_time = 0, 
            fm_time = 0, 
            neighbor_time = 0, 
            un_ext_time = 0;
@@ -323,6 +324,7 @@ std::vector<Result> LeafAligner::add_event(double *kmer_probs,
         Range prev_range = p->first;
         prev_path = p->second;
 
+
         child_found = false;
 
         evpr_thresh = params_.get_prob_thresh(prev_range.length());
@@ -330,6 +332,14 @@ std::vector<Result> LeafAligner::add_event(double *kmer_probs,
         //Get probability for stay neighbor
         prev_kmer = prev_path->prev_kmer_;
         prob = kmer_probs[prev_kmer];
+
+        //std::cout << cur_event_ << "\t" 
+        //          << prev_path->length_ << "\t"
+        //          << prev_path->mean_prob() << "\t"
+        //          << prev_kmer << "\t"
+        //          << prev_path->event_types_[prev_path->tyhd_] << "\t"
+        //          << prev_range.start_ << "-"
+        //          << prev_range.end_ << "\n";
 
         #ifdef VERBOSE_TIME
         timer.reset();
@@ -384,6 +394,10 @@ std::vector<Result> LeafAligner::add_event(double *kmer_probs,
                           prob, 
                           EventType::MATCH, 
                           child_found);
+
+            //std::cout << "\t" << next_range.start_ << "-" 
+            //          << next_range.end_ << " "
+            //          << *next_kmer << "\n";
 
             #ifdef VERBOSE_TIME
             neighbor_time += timer.lap();
@@ -457,14 +471,17 @@ std::vector<Result> LeafAligner::add_event(double *kmer_probs,
     //Find sources
     for (Kmer kmer = 0; kmer < params_.model_.kmer_count(); kmer++) {
         prob = kmer_probs[kmer];
+        //std::cout << cur_event_ << " " << kmer << " " << params_.get_source_prob();
         if (prob >= params_.get_source_prob()) {
             Range next_range = kmer_ranges_[kmer];
+            //std::cout << "\t" << next_range.start_ << "-" << next_range.end_ ;
 
             if (next_range.is_valid()) {
                 //Will split sources if they intersect existing nodes
                 add_sources(next_range, kmer, prob);             
             }
         }
+        //std::cout << "\n";
     }
     
     //Source time
@@ -478,7 +495,7 @@ std::vector<Result> LeafAligner::add_event(double *kmer_probs,
     return results;
 }
 
-size_t LeafAligner::add_sources(const Range &range, Kmer kmer, double prob) {
+size_t LeafAligner::add_sources(const Range &range, Kmer kmer, float prob) {
 
     //Find closest existing node
     auto lb = next_paths_.lower_bound(range);
@@ -489,6 +506,10 @@ size_t LeafAligner::add_sources(const Range &range, Kmer kmer, double prob) {
            && std::prev(start)->first.intersects(range)){
         start--;
     }
+    //if (!start->first.intersects(range)) {
+    //    start++;
+    //} 
+    
 
     auto end = lb;
     while (end != next_paths_.end() && end->first.intersects(range)) {
@@ -553,7 +574,7 @@ size_t LeafAligner::add_sources(const Range &range, Kmer kmer, double prob) {
 bool LeafAligner::add_child(Range &range, 
                             PathBuffer *prev_path,
                             Kmer kmer,
-                            double prob,
+                            float prob,
                             EventType type,
                             bool prev_is_sibling) {
     

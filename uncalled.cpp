@@ -16,6 +16,7 @@
 #include "graph_aligner.hpp"
 #include "forest_aligner.hpp"
 #include "leaf_aligner.hpp"
+#include "leaf_arr_aligner.hpp"
 #include "seed_tracker.hpp"  
 #include "range.hpp"
 #include "kmer_model.hpp"
@@ -26,6 +27,7 @@
 #define GRAPH_ALN 0
 #define FOREST_ALN 1
 #define LEAF_ALN 2
+#define LEAF_ARR_ALN 3
 
 #ifndef ALN_TYPE
 #define ALN_TYPE LEAF_ALN
@@ -116,12 +118,12 @@ int main(int argc, char** argv) {
                          args.get_int(Opt::MIN_REP_LEN),
                          args.get_int(Opt::MAX_REP_COPY),
                          args.get_int(Opt::MAX_PATHS),
-                         args.get_double(Opt::STAY_FRAC),
+                         (float) args.get_double(Opt::STAY_FRAC),
                          args.get_int(Opt::MAX_CONSEC_STAY),
                          args.get_int(Opt::MAX_IGNORES),
                          args.get_int(Opt::MAX_SKIPS),
                          args.get_string(Opt::EVENT_PROBS),
-                         args.get_double(Opt::WINDOW_PROB));
+                         (float) args.get_double(Opt::WINDOW_PROB));
     
     #if FMI_TYPE == BASE_FMI
     BaseFMI fwd_fmi, rev_fmi;
@@ -184,6 +186,8 @@ int main(int argc, char** argv) {
     ForestAligner
     #elif ALN_TYPE == LEAF_ALN
     LeafAligner
+    #elif ALN_TYPE == LEAF_ARR_ALN
+    LeafArrAligner
     #endif
         rev_sg(rev_fmi, aln_params, "rev"),
         fwd_sg(fwd_fmi, aln_params, "fwd");
@@ -197,7 +201,7 @@ int main(int argc, char** argv) {
     }
 
     unsigned int min_aln_len = args.get_int(Opt::MIN_ALN_LEN);
-    double min_aln_conf = args.get_double(Opt::MIN_ALN_CONF);
+    float min_aln_conf = (float) args.get_double(Opt::MIN_ALN_CONF);
     bool read_until = min_aln_conf > 0;
 
     std::string read_line, read_filename;
@@ -270,13 +274,13 @@ int main(int argc, char** argv) {
 
         time_out << "== " << read_filename << " ==\n";
 
-        double **all_probs = new double*[aln_len];
+        float **all_probs = new float*[aln_len];
 
         unsigned int e = aln_en;
 
         for (; e >= aln_st && e <= aln_en; e--) {
 
-            all_probs[e-aln_st] = new double[model.kmer_count()];
+            all_probs[e-aln_st] = new float[model.kmer_count()];
             for (Kmer kmer = 0; kmer < model.kmer_count(); kmer++) {
                 all_probs[e-aln_st][kmer] = model.event_match_prob(events[e], kmer);
             }
@@ -292,8 +296,8 @@ int main(int argc, char** argv) {
 
 
             std::vector<Result> rev_seeds = rev_sg.add_event(all_probs[e-aln_st], 
-                                                             seeds_out,
-                                                             time_out);
+                                                            seeds_out,
+                                                            time_out);
 
             #ifdef VERBOSE_TIME
             event_timer.reset();

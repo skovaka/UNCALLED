@@ -5,12 +5,12 @@ AlnParams::AlnParams(const KmerModel &model,
                      unsigned int min_rep_len, 
                      unsigned int max_rep_copy, 
                      unsigned int max_paths, 
-                     double max_stay_frac,
+                     float max_stay_frac,
                      unsigned int max_consec_stay,
                      unsigned int max_ignores, 
                      unsigned int max_skips,
                      const std::string event_probs,
-                     double window_prob) 
+                     float window_prob) 
         : model_(model),
           path_win_len_(path_win_len),
           min_rep_len_(min_rep_len),
@@ -44,7 +44,7 @@ AlnParams::AlnParams(const KmerModel &model,
     }
 }
 
-double AlnParams::get_prob_thresh(unsigned int fm_length) {
+float AlnParams::get_prob_thresh(unsigned int fm_length) {
     auto pr = evpr_threshes_.begin();
     for (auto len = evpr_lengths_.begin(); len != evpr_lengths_.end(); len++) {
         if (fm_length > *len) {
@@ -58,7 +58,7 @@ double AlnParams::get_prob_thresh(unsigned int fm_length) {
     return *pr;
 }
 
-double AlnParams::get_source_prob() {
+float AlnParams::get_source_prob() {
     return evpr_threshes_.front();
 }
 
@@ -72,7 +72,7 @@ unsigned int AlnParams::nucl_to_events(unsigned int n) {
 
 Result::Result(unsigned int read_start, 
               unsigned  int seed_len, 
-              double prob, 
+              float prob, 
               unsigned int ref_start, 
               unsigned int ref_end) 
     : read_range_( Range(read_start, read_start + seed_len - 1) ),

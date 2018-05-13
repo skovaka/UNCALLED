@@ -35,11 +35,13 @@ Range Range::split_range(const Range &r) {
         left.end_ = r.start_ - 1;
     }
 
-    if (end_ > r.end_) {
-        start_ = r.end_ + 1;
-    } else {
-        start_ = 1;
-        end_ = 0;
+    if (start_ <= r.end_) {
+        if (end_ > r.end_) {
+            start_ = r.end_ + 1;
+        } else {
+            start_ = 1;
+            end_ = 0;
+        }
     }
 
     return left;
@@ -96,3 +98,6 @@ bool operator< (const Range &q1, const Range &q2) {
 }
 
 
+bool operator== (const Range &q1, const Range &q2) {
+    return q1.start_ == q2.start_ && q1.end_ == q2.end_;
+}
