@@ -212,27 +212,6 @@ bool LeafArrAligner::PathBuffer::better_than(const PathBuffer &p) {
     return p.mean_prob() > mean_prob();
 }
 
-/*
-bool LeafArrAligner::PathBuffer::better_than_sibling(const PathBuffer *a, float prob) {
-    float x = a->prob_sums_[a->prhd_ > 0 ? a->prhd_ - 1 : PROB_WIN_LEN-1],
-           y = a->prob_sums_[a->prtl_];
-
-    float replace_prob = (x - y + prob) / a->prlen_;
-
-    return replace_prob > mean_prob();
-}
-
-bool LeafArrAligner::PathBuffer::better_than_parent(const PathBuffer *a, float prob) {
-    float x = a->prob_sums_[a->prhd_], 
-           y = a->prob_sums_[(a->prlen_ == PROB_WIN_LEN-1 && a->prtl_ < PROB_WIN_LEN-1) ? a->prtl_ + 1 : 0];
-    unsigned int len = a->prlen_ + (a->prlen_ < PROB_WIN_LEN-1);
-    float replace_prob = (x - y + prob) / len;
-    //std::cout << (int) a->prtl_ << "\t" << (int) a->prhd_ << "\n";
-
-    return replace_prob > mean_prob();
-}
-*/
-
 float LeafArrAligner::PathBuffer::next_mean_prob() {
     float x = prob_sums_[prhd_], 
            y = prob_sums_[(prlen_ == PROB_WIN_LEN-1 && prtl_ < PROB_WIN_LEN-1) ? prtl_ + 1 : 0];
@@ -242,35 +221,15 @@ float LeafArrAligner::PathBuffer::next_mean_prob() {
 
 bool LeafArrAligner::PathBuffer::should_report(const AlnParams &p,
                                                 bool path_ended) {
-    //if (length_ >= 22) {
-    //    std::cout << length_ << " " 
-    //              << fm_range_.length() << " "
-    //              << event_types_[tyhd_] << " "
-    //              << mean_prob() << " "
-    //              << (int) win_type_counts_[EventType::STAY] << "\n";
-    //    std::cout.flush();
-    //}
-
-    //return (fm_range_.length() == 1 || 
-    //            (path_ended &&
-    //             fm_range_.length() <= p.max_rep_copy_ &&
-    //             match_len() >= p.min_rep_len_)) &&
-
-    //       length_ >= p.path_win_len_ &&
-    //       event_types_[tyhd_] == EventType::MATCH &&
-    //       (path_ended || win_type_counts_[EventType::STAY] <= p.max_stay_frac_ * tylen_) &&
-    //       win_prob_ >= p.window_prob_;
-    bool a = (fm_range_.length() == 1 || 
+    return (fm_range_.length() == 1 || 
                 (path_ended &&
                  fm_range_.length() <= p.max_rep_copy_ &&
-                 match_len() >= p.min_rep_len_)),
+                 match_len() >= p.min_rep_len_)) &&
 
-         b =  length_ >= p.path_win_len_,
-         c =  (path_ended || event_types_[tyhd_] == EventType::MATCH),
-         d =  (path_ended || win_type_counts_[EventType::STAY] <= p.max_stay_frac_ * tylen_),
-         e = win_prob_ >= p.window_prob_;
-    //std::cout << a << b << c << d << e << " " << (int) win_type_counts_[EventType::STAY] << " " << (int) tylen_;
-    return a && b && c && d && e;
+           length_ >= p.path_win_len_ &&
+           (path_ended || event_types_[tyhd_] == EventType::MATCH) &&
+           (path_ended || win_type_counts_[EventType::STAY] <= p.max_stay_frac_ * tylen_) &&
+          win_prob_ >= p.window_prob_;
 }
 
 void LeafArrAligner::PathBuffer::replace(const PathBuffer &p) {
@@ -296,7 +255,6 @@ void LeafArrAligner::PathBuffer::replace(const PathBuffer &p) {
 bool operator< (const LeafArrAligner::PathBuffer &p1, 
                 const LeafArrAligner::PathBuffer &p2) {
     return p1.fm_range_ < p2.fm_range_ ||
-
            (p1.fm_range_ == p2.fm_range_ && 
             p1.win_prob_ < p2.win_prob_);
 }
@@ -326,6 +284,11 @@ LeafArrAligner::LeafArrAligner(const FMI &fmi,
     next_paths_ = std::vector<PathBuffer>(params_.max_paths_);
     sources_added_ = std::vector<bool>(params_.model_.kmer_count(), false);
     prev_size_ = 0;
+
+
+    #ifdef VERBOSE_TIME
+    loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
+    #endif
 }
 
 LeafArrAligner::~LeafArrAligner() {
@@ -340,6 +303,9 @@ LeafArrAligner::~LeafArrAligner() {
 void LeafArrAligner::new_read(size_t read_len) {
     reset();
     cur_event_ = read_len;
+    #ifdef VERBOSE_TIME
+    loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
+    #endif
 }
 
 void LeafArrAligner::reset() {
@@ -365,17 +331,10 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
     std::vector<Result> results;
 
     #ifdef VERBOSE_TIME
-    //float stay_time = 0, 
-    //       fm_time = 0, 
-    //       neighbor_time = 0, 
-    //       un_ext_time = 0;
-    float first_loop_time = 0,
-           sort_time = 0,
-           second_loop_time = 0;
     Timer timer;
     #endif
-
     auto next_path = next_paths_.begin();
+
 
     //Find neighbors of previous nodes
     for (size_t pi = 0; pi < prev_size_; pi++) {
@@ -446,16 +405,15 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
 
             Base next_base = params_.model_.get_first_base(*next_kmer);
 
-            //#ifdef VERBOSE_TIME
-            ////neighbor_time += timer.lap();
-            //timer.reset();
-            //#endif
+            #ifdef VERBOSE_TIME
+            loop1_time_ += timer.lap();
+            #endif
 
             Range next_range = fmi_.get_neighbor(prev_range, next_base);
 
-            //#ifdef VERBOSE_TIME
-            //fm_time += timer.lap();
-            //#endif
+            #ifdef VERBOSE_TIME
+            fmrs_time_ += timer.lap();
+            #endif
 
             if (!next_range.is_valid()) {
                 continue;
@@ -474,25 +432,19 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
             if (++next_path == next_paths_.end()) {
                 break;
             }
-
-            //#ifdef VERBOSE_TIME
-            //neighbor_time += timer.lap();
-            //#endif
         }
-
-
-        //#ifdef VERBOSE_TIME
-        //neighbor_time += timer.lap();
-        //#endif
-
 
         if (!child_found && !prev_path.sa_checked_) {
-            check_alignments(prev_path, results, true, seeds_out);
-        }
+            #ifdef VERBOSE_TIME
+            loop1_time_ += timer.lap();
+            #endif
 
-        //#ifdef VERBOSE_TIME
-        //un_ext_time += timer.lap();
-        //#endif
+            check_alignments(prev_path, results, true, seeds_out);
+
+            #ifdef VERBOSE_TIME
+            fmsa_time_ += timer.lap();
+            #endif
+        }
 
         if (next_path == next_paths_.end()) {
             break;
@@ -500,16 +452,17 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
     }
 
     #ifdef VERBOSE_TIME
-    time_out << std::setw(23) << timer.lap() << "\t";
+    loop1_time_ += timer.lap();
     #endif
 
     if (next_path != next_paths_.begin()) {
+
         size_t next_size = next_path - next_paths_.begin();
 
         std::sort(next_paths_.begin(), next_path);
 
         #ifdef VERBOSE_TIME
-        time_out << std::setw(23) << timer.lap() << "\t";
+        sort_time_ += timer.lap();
         #endif
 
         Kmer source_kmer;
@@ -546,7 +499,7 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
 
             prev_kmer = source_kmer;
 
-            Range next_range = next_paths_[i].fm_range_;
+            //Range next_range = next_paths_[i].fm_range_;
 
             //Remove paths with duplicate ranges
             //Best path will be listed last
@@ -570,8 +523,6 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
                     if (unchecked_range.start_ <= next_paths_[i+1].fm_range_.end_) {
                         unchecked_range.start_ = next_paths_[i+1].fm_range_.end_ + 1;
                     }
-
-                //Between this path and end of kmer
                 }
 
                 //Add it if it's a real range
@@ -583,20 +534,22 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
                 }
             }
 
+            #ifdef VERBOSE_TIME
+            loop2_time_ += timer.lap();
+            #endif
+
             check_alignments(next_paths_[i], results, false, seeds_out);
+
+            #ifdef VERBOSE_TIME
+            fmsa_time_ += timer.lap();
+            #endif
         }
     }
+
+    #ifdef VERBOSE_TIME
+    loop2_time_ += timer.lap();
+    #endif
     
-    #ifdef VERBOSE_TIME
-    else {
-    time_out << std::setw(23) << timer.lap() << "\t";
-    }
-    #endif
-
-    #ifdef VERBOSE_TIME
-    time_out << std::setw(23) << timer.lap() << "\t";
-    #endif
-
     for (Kmer kmer = 0; 
          kmer < params_.model_.kmer_count() && 
             next_path != next_paths_.end(); 
@@ -619,18 +572,11 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
         }
     }
 
-    //SA time
     #ifdef VERBOSE_TIME
-    time_out << std::setw(23) << timer.lap();
+    fullsource_time_ += timer.lap();
     #endif
 
-    //std::sort(next_paths_.begin(), next_path);
-
     prev_size_ = next_path - next_paths_.begin();
-    //if (prev_size_ == next_paths_.size()) {
-    //    std::cout << "FULL\n";
-    //}
-    //std::cout << prev_size_ << "\n";
     prev_paths_.swap(next_paths_);
 
     return results;

@@ -256,9 +256,9 @@ int main(int argc, char** argv) {
         Timer read_timer;
 
         #ifdef VERBOSE_TIME
-        Timer event_timer;
+        //Timer event_timer;
 
-        time_out << std::fixed << std::setprecision(10);
+        time_out << std::fixed << std::setprecision(3);
         #else
         unsigned int status_step = aln_len / 10,
                      status = 0;
@@ -272,7 +272,9 @@ int main(int argc, char** argv) {
                  << aln_en << " of " 
                  << events.size() << " events ==\n";
 
+        #ifndef VERBOSE_TIME
         time_out << "== " << read_filename << " ==\n";
+        #endif
 
         float **all_probs = new float*[aln_len];
 
@@ -285,10 +287,10 @@ int main(int argc, char** argv) {
                 all_probs[e-aln_st][kmer] = model.event_match_prob(events[e], kmer);
             }
 
-            #ifdef VERBOSE_TIME
-            time_out << e;
-            //event_timer.reset();
-            #endif
+            //#ifdef VERBOSE_TIME
+            //time_out << e;
+            ////event_timer.reset();
+            //#endif
 
             std::vector<Result> fwd_seeds = fwd_sg.add_event(all_probs[e-aln_st], 
                                                              seeds_out,
@@ -299,21 +301,21 @@ int main(int argc, char** argv) {
                                                             seeds_out,
                                                             time_out);
 
-            #ifdef VERBOSE_TIME
-            event_timer.reset();
-            #endif
+            //#ifdef VERBOSE_TIME
+            //event_timer.reset();
+            //#endif
 
             ReadAln fa = fwd_tracker.add_seeds(fwd_seeds);
 
-            #ifdef VERBOSE_TIME
-            time_out << std::setw(23) << event_timer.lap();
-            #endif
+            //#ifdef VERBOSE_TIME
+            //time_out << std::setw(23) << event_timer.lap();
+            //#endif
 
             ReadAln ra = rev_tracker.add_seeds(rev_seeds);
 
-            #ifdef VERBOSE_TIME
-            time_out << std::setw(23) << event_timer.lap();
-            #endif
+            //#ifdef VERBOSE_TIME
+            //time_out << std::setw(23) << event_timer.lap();
+            //#endif
 
             if (read_until && std::max(fa.total_len_, ra.total_len_) > min_aln_len) {
                 ReadAln a = fa;
@@ -324,20 +326,15 @@ int main(int argc, char** argv) {
                 if(fwd_tracker.check_ratio(a, min_aln_conf) && 
                    rev_tracker.check_ratio(a, min_aln_conf)) {
 
-                    #ifdef VERBOSE_TIME
-                    time_out << std::setw(23) << event_timer.lap() << std::endl;
-                    #endif
+                    //#ifdef VERBOSE_TIME
+                    //time_out << std::setw(23) << event_timer.lap() << std::endl;
+                    //#endif
 
                     break;
                 }
             }
 
-            #ifdef VERBOSE_TIME
-            time_out << std::setw(23) << event_timer.lap() << std::endl;
-            time_out.flush();
-
-
-            #else
+            #ifndef VERBOSE_TIME
             if (status == status_step) {
                 unsigned int prog = (unsigned int) ((100.0 * (aln_len - e)) / aln_len);
                 time_out << prog << "%  (" << read_timer.get() / 1000 << ")\n";
@@ -349,13 +346,26 @@ int main(int argc, char** argv) {
                 status++;
             }
             #endif
+
+            time_out.flush();
         }
 
-        #ifndef VERBOSE_TIME
-        time_out << "100% (" << read_timer.get() / 1000 << ")\n";
+        #ifdef VERBOSE_TIME
+        //time_out << std::setw(23) << event_timer.lap() << std::endl;
+        #if ALN_TYPE == LEAF_ARR_ALN
+        time_out << std::setw(10) << (fwd_sg.loop1_time_ + rev_sg.loop1_time_) 
+                 << std::setw(10) << (fwd_sg.sort_time_ + rev_sg.sort_time_) 
+                 << std::setw(10) << (fwd_sg.loop2_time_ + rev_sg.loop2_time_) 
+                 << std::setw(10) << (fwd_sg.fullsource_time_ + rev_sg.fullsource_time_) 
+                 << std::setw(10) << (fwd_sg.fmrs_time_ + rev_sg.fmrs_time_) 
+                 << std::setw(10) << (fwd_sg.fmsa_time_ + rev_sg.fmsa_time_) << "\n";
         #endif
 
+        #else
+        time_out << "100% (" << read_timer.get() / 1000 << ")\n";
+
         time_out << "== END ==\n";
+        #endif
 
         fwd_tracker.print(alns_out, FWD_STR, (size_t) 5);
         rev_tracker.print(alns_out, REV_STR, (size_t) 5);
@@ -374,6 +384,7 @@ int main(int argc, char** argv) {
         }
         delete[] all_probs;
     }
+
 }
 
 bool get_events(std::ostream &err, std::string filename, std::vector<Event> &events) {
