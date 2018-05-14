@@ -64,7 +64,7 @@ class LeafArrAligner : public Aligner {
         bool should_report(const AlnParams &params, bool has_children);
 
         size_t event_len();
-        size_t match_len();
+        size_t match_len() const;
         float mean_prob() const;
         float next_mean_prob();
         float next_mean_prob(float next_prob) const;
@@ -105,7 +105,7 @@ class LeafArrAligner : public Aligner {
 
     ~LeafArrAligner();
 
-    void check_alignments(PathBuffer &p, std::vector<Result> &results, bool has_children);
+    void check_alignments(PathBuffer &p, std::vector<Result> &results, bool has_children, std::ostream &seeds_out);
 
     void new_read(size_t read_len);
     void reset();

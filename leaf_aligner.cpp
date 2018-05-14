@@ -133,8 +133,6 @@ void LeafAligner::PathBuffer::make_child(Kmer kmer,
         tyhd_++;
         tylen_++;
     } else {
-        //std::cout << "incr type " << (int) tyhd_ << " " << event_types_[tyhd_] << " " << (int) win_type_counts_[type] << " ";
-
         tyhd_ = tytl_;
         tytl_ = (tytl_ + 1) % TYPE_WIN_LEN;
         win_type_counts_[event_types_[tyhd_]]--;
@@ -142,10 +140,7 @@ void LeafAligner::PathBuffer::make_child(Kmer kmer,
         win_type_counts_[event_types_[tytl_]]--;
         event_types_[tytl_] = EventType::MATCH;
         win_type_counts_[EventType::MATCH]++;
-
-        //std::cout << (int) tyhd_ << " " << event_types_[tyhd_]  << " " << (int) win_type_counts_[type] << " ";
     }
-    //std::cout << (int) win_type_counts_[type] << "\n";
 
     event_types_[tyhd_] = type;
     win_type_counts_[type]++;
@@ -178,7 +173,7 @@ size_t LeafAligner::PathBuffer::event_len() {
     return length_;
 }
 
-size_t LeafAligner::PathBuffer::match_len() {
+size_t LeafAligner::PathBuffer::match_len() const {
     return win_type_counts_[EventType::MATCH];
 }
 
@@ -211,6 +206,7 @@ bool LeafAligner::PathBuffer::better_than_parent(const PathBuffer *a, float prob
     float replace_prob = (x - y + prob) / len;
     //std::cout << (int) a->prtl_ << "\t" << (int) a->prhd_ << "\n";
 
+    //return replace_prob > mean_prob();
     return replace_prob > mean_prob();
 }
 
@@ -225,6 +221,7 @@ float LeafAligner::PathBuffer::next_mean_prob() {
 bool LeafAligner::PathBuffer::should_report(const Range &r, 
                                             const AlnParams &p,
                                             bool has_children) {
+
     return (r.length() == 1 || 
                 (!has_children &&
                  r.length() <= p.max_rep_copy_ &&
@@ -337,7 +334,7 @@ std::vector<Result> LeafAligner::add_event(float *kmer_probs,
         //          << prev_path->length_ << "\t"
         //          << prev_path->mean_prob() << "\t"
         //          << prev_kmer << "\t"
-        //          << prev_path->event_types_[prev_path->tyhd_] << "\t"
+        //          << (int) prev_path->win_type_counts_[LeafAligner::EventType::STAY] << "\t"
         //          << prev_range.start_ << "-"
         //          << prev_range.end_ << "\n";
 
@@ -348,6 +345,7 @@ std::vector<Result> LeafAligner::add_event(float *kmer_probs,
         if (prev_path->consec_stays_ < params_.max_consec_stay_ && 
             //prev_path->win_type_counts_[EventType::STAY] < params_.max_stay_frac_ * prev_path->tylen_ &&
             prob >= evpr_thresh) {
+            //std::cout << "\t" << prev_range.start_ << "-" << prev_range.end_ << " s\n";
             child_found = 
                 add_child(prev_range,
                           prev_path, 
@@ -386,6 +384,7 @@ std::vector<Result> LeafAligner::add_event(float *kmer_probs,
             #ifdef VERBOSE_TIME
             fm_time += timer.lap();
             #endif
+            //std::cout << "\t" << next_range.start_ << "-" << next_range.end_ << " n\n";
 
             child_found = 
                 add_child(next_range,
@@ -414,16 +413,20 @@ std::vector<Result> LeafAligner::add_event(float *kmer_probs,
             prev_path->update_consec_stays();
         } else {
 
+            //std::cout << prev_range.start_ << "-" << prev_range.end_ << " ";
             if (!prev_path->sa_checked_ && prev_path->should_report(prev_range, params_, false)) {
                 Result r(cur_event_+1, params_.path_win_len_, prev_path->mean_prob());
+                //std::cout << "pass\n";
 
                 for (unsigned int s = prev_range.start_; s <= prev_range.end_; s++) {
                     r.set_ref_range(fmi_.sa(s), prev_path->match_len());
                     results.push_back(r);
 
-                    seeds_out << label_ << "\t";
-                    r.print(seeds_out);
+                    //seeds_out << label_ << "\t";
+                    //r.print(seeds_out);
                 }
+            } else {
+                //std::cout << "fail\n";
             }
 
             inactive_paths_.push_back(prev_path);
@@ -448,18 +451,23 @@ std::vector<Result> LeafAligner::add_event(float *kmer_probs,
         PathBuffer *n = p->second;
         const Range &range = p->first;
 
+        //std::cout << range.start_ << "-" << range.end_ << " ";
+
         if (n->should_report(range, params_, true)) {
             Result r(cur_event_, params_.path_win_len_, n->mean_prob());
             n->sa_checked_ = true;
+
+            //std::cout << "pass\n";
 
             for (unsigned int s = range.start_; s <= range.end_; s++) {
                 r.set_ref_range(fmi_.sa(s), n->match_len());
                 results.push_back(r);
 
-                seeds_out << label_ << "\t";
-
-                r.print(seeds_out);
+                //seeds_out << label_ << "\t";
+                //r.print(seeds_out);
             }
+        } else {
+            //std::cout << "fail\n";
         }
     }
 

@@ -58,7 +58,7 @@ class LeafAligner : public Aligner {
         bool should_report(const Range &r, const AlnParams &params, bool has_children);
 
         size_t event_len();
-        size_t match_len();
+        size_t match_len() const;
         float mean_prob() const;
         float next_mean_prob();
         float next_mean_prob(float next_prob) const;
