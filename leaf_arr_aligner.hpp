@@ -11,24 +11,25 @@
 class LeafArrAligner : public Aligner {
 
     enum EventType { MATCH, STAY, SKIP, IGNORE, NUM_TYPES };
+    static const unsigned char TYPE_BITS = 2;
 
     class PathBuffer {
         public:
 
-        static unsigned char PROB_WIN_LEN, TYPE_WIN_LEN;
+        static unsigned char MAX_WIN_LEN, TYPE_MASK;
+        static unsigned long TYPE_ADDS[EventType::NUM_TYPES];
 
         unsigned short 
             length_, 
             consec_stays_;
 
         //Prob window head/tail index, type window head index
-        unsigned char prhd_, prtl_, prlen_, tyhd_, tytl_, tylen_;
+        unsigned char prhd_, prtl_, prlen_;
         float win_prob_;
 
         float *prob_sums_;
-        EventType *event_types_;
+        unsigned long event_types2_;
 
-        char space_filler[54];
         unsigned short all_type_counts_[EventType::NUM_TYPES];
         unsigned char win_type_counts_[EventType::NUM_TYPES];
 
@@ -58,9 +59,14 @@ class LeafArrAligner : public Aligner {
         void invalidate();
         bool is_valid();
 
+        unsigned char win_len() const;
+        bool win_full() const;
+
         void update_consec_stays();
         //bool better_than_parent(const PathBuffer *a, float prob);
         bool better_than(const PathBuffer &a);
+        unsigned char type_head() const;
+        unsigned char type_tail() const;
         bool should_report(const AlnParams &params, bool has_children);
 
         size_t event_len();
