@@ -23,12 +23,10 @@ class LeafArrAligner : public Aligner {
             length_, 
             consec_stays_;
 
-        //Prob window head/tail index, type window head index
-        unsigned char prhd_, prtl_, prlen_;
         float win_prob_;
 
         float *prob_sums_;
-        unsigned long event_types2_;
+        unsigned long event_types_;
 
         unsigned short all_type_counts_[EventType::NUM_TYPES];
         unsigned char win_type_counts_[EventType::NUM_TYPES];

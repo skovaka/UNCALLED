@@ -40,7 +40,7 @@ LeafArrAligner::PathBuffer::PathBuffer(const PathBuffer &p) :
     consec_stays_ (p.consec_stays_),
     win_prob_ (p.win_prob_),
     prob_sums_ (p.prob_sums_),
-    event_types2_ (p.event_types2_),
+    event_types_ (p.event_types_),
     fm_range_ (p.fm_range_),
     kmer_ (p.kmer_),
     sa_checked_ (p.sa_checked_) {
@@ -56,7 +56,7 @@ void LeafArrAligner::PathBuffer::free_buffers() {
 void LeafArrAligner::PathBuffer::make_source(Range &range, Kmer kmer, float prob) {
     length_ = 1;
     consec_stays_ = 0;
-    event_types2_ = 0;
+    event_types_ = 0;
     win_prob_ = prob;
     fm_range_ = range;
     kmer_ = kmer;
@@ -104,7 +104,7 @@ void LeafArrAligner::PathBuffer::make_child(PathBuffer &p,
 
     //win_prob_ = mean_prob();
 
-    event_types2_ = TYPE_ADDS[type] | (p.event_types2_ >> TYPE_BITS);
+    event_types_ = TYPE_ADDS[type] | (p.event_types_ >> TYPE_BITS);
 
     win_type_counts_[type]++;
     all_type_counts_[type]++;
@@ -149,11 +149,11 @@ bool LeafArrAligner::PathBuffer::better_than(const PathBuffer &p) {
 }
 
 unsigned char LeafArrAligner::PathBuffer::type_head() const {
-    return (event_types2_ >> (TYPE_BITS*(MAX_WIN_LEN-2))) & TYPE_MASK;
+    return (event_types_ >> (TYPE_BITS*(MAX_WIN_LEN-2))) & TYPE_MASK;
 }
 
 unsigned char LeafArrAligner::PathBuffer::type_tail() const {
-    return event_types2_ & TYPE_MASK;
+    return event_types_ & TYPE_MASK;
 }
 
 bool LeafArrAligner::PathBuffer::should_report(const AlnParams &p,
