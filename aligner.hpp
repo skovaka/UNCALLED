@@ -7,7 +7,7 @@
 #include <list>
 #include <iostream>
 
-#define VERBOSE_TIME
+//#define VERBOSE_TIME
 
 class Result {
     public:

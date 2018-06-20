@@ -1,0 +1,42 @@
+# -*- mode:org; mode:visual-line; coding:utf-8; -*-
+
+** Fast5 Library
+
+[[http://travis-ci.org/mateidavid/fast5][http://travis-ci.org/mateidavid/fast5.svg?branch=master]] [[https://tldrlegal.com/license/mit-license][http://img.shields.io/:license-mit-blue.svg]]
+
+A lightweight C++ library for accessing Oxford Nanopore Technologies sequencing data.
+
+*** Installation
+
+**** Core C++ Library
+
+The core library is written in header-only C++11, and it enables read-write access to fast5 files from C++ code.
+
+The core library requires no installation, other than setting the compiler's include path to find [[file:src/fast5.hpp][fast5.hpp]]. See [[file:src/f5ls-full.cpp][f5ls-full.cpp]] for an example.
+
+The core library is built on top the HDF5 C API, so the compiler must also be able to find the HDF5 headers and libraries. See the project's Travis CI [[file:.travis.Dockerfile.in][Dockerfile]] for an example of how to install prerequisites on Debian Jessie.
+
+**** Python Wrapper
+
+The Python wrapper for the core library enables read-only access to fast5 files from Python code. The wrapper also adds several Python scripts:
+
+- [[file:python/bin/f5ls][f5ls]] :: Summarize contents of fast5 files.
+- [[file:python/bin/f5pack][f5pack]] :: Pack and unpack fast5 files. For a detailed description of this tool, see our [[http://simpsonlab.github.io/2017/02/27/packing_fast5/][blog post]].
+
+The Python wrapper also depends on Cython. To build the Python wrapper:
+
+#+BEGIN_EXAMPLE
+# set paths to HDF5
+export HDF5_INCLUDE_DIR=/path/to/hdf5.h
+export HDF5_LIB_DIR=/path/to/libhdf5.so
+
+# either
+make -C python develop         # to install in a virtualenv
+# or
+make -C python develop-user    # to install in user mode
+#+END_EXAMPLE
+
+*** License
+
+[[file:LICENSE][MIT License]].
+

@@ -1,0 +1,240 @@
+#!/usr/bin/env python
+
+#
+# Part of: https://github.com/mateidavid/fast5
+#
+# (c) 2017: Matei David, Ontario Institute for Cancer Research
+# MIT License
+#
+
+import argparse
+import logging
+import os
+import sys
+
+import fast5
+
+import signal
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+policy_d = {
+    "drop": 0,
+    "pack": 1,
+    "unpack": 2,
+    "copy": 3,
+}
+
+def add_fast5(fn, rel_dn, args):
+    logger.info("adding fast5 fn=" + fn + " rel_dn=" + rel_dn)
+    return [(fn, os.path.normpath(os.path.join(args.output, rel_dn, os.path.basename(fn))))]
+
+def add_dir(dn, args):
+    l = list()
+    logger.info("processing dir dn=" + dn)
+    for t in os.walk(dn):
+        rel_dn = os.path.relpath(t[0], dn)
+        for rel_fn in t[2]:
+            fn = os.path.join(t[0], rel_fn)
+            if fast5.File.is_valid_file(fn):
+                l += add_fast5(fn, rel_dn, args)
+        if not args.recurse:
+            break
+    return l
+
+def add_fofn(fn, args):
+    l = list()
+    logger.info("processing fofn fn=" + fn)
+    if fn != "-":
+        f = open(fn)
+    else:
+        f = sys.stdin
+    for p in f:
+        p = p.strip()
+        if fast5.File.is_valid_file(p):
+            l += add_fast5(p, "", args)
+        else:
+            logger.warning("fofn line not a fast5 file: " + p)
+    if fn != "-":
+        f.close()
+    return l
+
+def add_paths(pl, args):
+    l = list()
+    if len(pl) == 0:
+        pl.append("-")
+    for p in pl:
+        if os.path.isdir(p):
+            l += add_dir(p, args)
+        elif fast5.File.is_valid_file(p):
+            l += add_fast5(p, "", args)
+        else:
+            l += add_fofn(p, args)
+    return l
+
+if __name__ == "__main__":
+    description = """
+    Pack and unpack ONT fast5 files.
+    """
+    parser = argparse.ArgumentParser(description=description, epilog="")
+    parser.add_argument("--log", default="warning",
+                        help="log level")
+    #
+    parser.add_argument("--pack", action="store_true",
+                        help="Pack data (default).")
+    parser.add_argument("--unpack", action="store_true",
+                        help="Unpack data.")
+    parser.add_argument("--archive", action="store_true",
+                        help="Pack raw samples data, drop rest.")
+    parser.add_argument("--fastq", action="store_true",
+                        help="Pack fastq data, drop rest.")
+    #
+    parser.add_argument("--rs", choices=["drop", "pack", "unpack", "copy"],
+                        help="Policy for raw samples.")
+    parser.add_argument("--ed", choices=["drop", "pack", "unpack", "copy"],
+                        help="Policy for eventdetection events.")
+    parser.add_argument("--fq", choices=["drop", "pack", "unpack", "copy"],
+                        help="Policy for fastq.")
+    parser.add_argument("--ev", choices=["drop", "pack", "unpack", "copy"],
+                        help="Policy for basecall events.")
+    parser.add_argument("--al", choices=["drop", "pack", "unpack", "copy"],
+                        help="Policy for basecall alignment.")
+    #
+    parser.add_argument("--force", action="store_true",
+                        help="Overwrite existing destination files.")
+    parser.add_argument("--qv-bits", type=int,
+                        help="QV bits to keep.")
+    parser.add_argument("--p-model-state-bits", type=int,
+                        help="p_model_state bits to keep.")
+    parser.add_argument("-R", "--recurse", action="store_true",
+                        help="Recurse in input directories.")
+    parser.add_argument("-o", "--output", required=True,
+                        help="Output directory.")
+    #
+    parser.add_argument("inputs", nargs="*", default=[], action="append",
+                        help="Input directories, fast5 files, or files of fast5 file names. For input directories, the subdirectory hierarchy (if traversed with --recurse) is recreated in the output directory.")
+    args = parser.parse_args()
+
+    numeric_log_level = getattr(logging, args.log.upper(), None)
+    if not isinstance(numeric_log_level, int):
+        raise ValueError("Invalid log level: '%s'" % args.log)
+    logging.basicConfig(level=numeric_log_level,
+                        format="%(asctime)s %(name)s.%(levelname)s %(message)s",
+                        datefmt="%Y/%m/%d %H:%M:%S")
+    logger = logging.getLogger(os.path.basename(__file__))
+    fast5.Logger.set_levels_from_options([args.log.lower()])
+    logger.debug("args: " + str(args))
+
+    if args.pack + args.unpack + args.archive + args.fastq > 1:
+        sys.exit("At most one of --pack/--unpack/--archive/--fastq may be specified")
+    if (not args.pack and
+        not args.unpack and
+        not args.archive and
+        not args.fastq and
+        args.rs is None and
+        args.ed is None and
+        args.fq is None and
+        args.ev is None and
+        args.al is None):
+        args.pack = True
+    if args.pack:
+        if args.rs is None: args.rs = "pack"
+        if args.ed is None: args.ed = "pack"
+        if args.fq is None: args.fq = "pack"
+        if args.ev is None: args.ev = "pack"
+        if args.al is None: args.al = "pack"
+    if args.unpack:
+        if args.rs is None: args.rs = "unpack"
+        if args.ed is None: args.ed = "unpack"
+        if args.fq is None: args.fq = "unpack"
+        if args.ev is None: args.ev = "unpack"
+        if args.al is None: args.al = "unpack"
+    if args.archive:
+        if args.rs is None: args.rs = "pack"
+        if args.ed is None: args.ed = "drop"
+        if args.fq is None: args.fq = "drop"
+        if args.ev is None: args.ev = "drop"
+        if args.al is None: args.al = "drop"
+    if args.fastq:
+        if args.rs is None: args.rs = "drop"
+        if args.ed is None: args.ed = "drop"
+        if args.fq is None: args.fq = "pack"
+        if args.ev is None: args.ev = "drop"
+        if args.al is None: args.al = "drop"
+    if args.rs is None: args.rs = "drop"
+    if args.ed is None: args.ed = "drop"
+    if args.fq is None: args.fq = "drop"
+    if args.ev is None: args.ev = "drop"
+    if args.al is None: args.al = "drop"
+    logger.info("rs: " + args.rs)
+    logger.info("ed: " + args.ed)
+    logger.info("fq: " + args.fq)
+    logger.info("ev: " + args.ev)
+    logger.info("al: " + args.al)
+    fp = fast5.File_Packer(
+        policy_d[args.rs],
+        policy_d[args.ed],
+        policy_d[args.fq],
+        policy_d[args.ev],
+        policy_d[args.al],
+    )
+    if args.force: fp.set_force(True)
+    if args.qv_bits: fp.set_qv_bits(args.qv_bits)
+    if args.p_model_state_bits: fp.set_p_model_state_bits(args.p_model_state_bits)
+    fl = add_paths(args.inputs[0], args)
+    errored_files_cnt = 0
+    input_bytes = 0
+    output_bytes = 0
+    for t in fl:
+        ifn = t[0]
+        ofn = t[1]
+        odn = os.path.dirname(t[1])
+        if not os.path.isdir(odn):
+            os.makedirs(odn)
+        logger.info("packing ifn=" + ifn + " ofn=" + ofn)
+        try:
+            fp.run(ifn, ofn)
+        except RuntimeError as e:
+            logger.warning("error packing " + ifn + ": " + str(e))
+            os.remove(ofn)
+            errored_files_cnt += 1
+            continue
+        input_bytes += os.stat(ifn).st_size
+        output_bytes += os.stat(ofn).st_size
+
+    cnt = fp.get_counts()
+    cnt_total_bits = dict()
+    output_ds_bytes = 0
+    print("bp_seq_count\t%d" % cnt["bp_seq_count"])
+    if cnt["bp_seq_count"] == 0:
+        cnt["bp_seq_count"] = float('nan')
+    for cl in [["rs_count", "rs_bits"],
+               ["ed_count", "ed_skip_bits", "ed_len_bits"],
+               ["fq_count", "fq_bp_bits", "fq_qv_bits"],
+               ["ev_count", "ev_rel_skip_bits", "ev_skip_bits", "ev_len_bits", "ev_move_bits", "ev_p_model_state_bits"],
+               ["al_count", "al_template_step_bits", "al_complement_step_bits", "al_move_bits"]]:
+        cnt_total_bits[cl[0]] = 0
+        if cnt[cl[0]] == 0:
+            continue
+        print(cl[0] + "\t%d" % cnt[cl[0]])
+        for c in cl[1:]:
+            cnt_total_bits[cl[0]] += cnt[c]
+            if cnt[c] == 0:
+                continue
+            print((c + "\t%d\t%.2f\t%.2f") % (cnt[c], float(cnt[c]) / cnt[cl[0]], float(cnt[c])/cnt["bp_seq_count"]))
+        output_ds_bytes += cnt_total_bits[cl[0]] / 8
+        print(cl[0].split('_')[0] + "_total_bits\t%d\t%.2f\t%.2f" % (cnt_total_bits[cl[0]], float(cnt_total_bits[cl[0]])/cnt[cl[0]], float(cnt_total_bits[cl[0]])/cnt["bp_seq_count"]))
+
+    if cnt["rs_total_duration"] > .001 and cnt["rs_called_duration"] > .001:
+        print("rs_total_duration\t%.2f" % cnt["rs_total_duration"])
+        print("rs_called_duration\t%.2f" % cnt["rs_called_duration"])
+        print("rs_frac_called\t%.2f" % (cnt["rs_called_duration"] / cnt["rs_total_duration"]))
+        print("bp_per_sec\t%.2f" % (float(cnt["bp_seq_count"]) / cnt["rs_called_duration"]))
+    print("input_bytes\t%d" % input_bytes)
+    print("output_bytes\t%d" % output_bytes)
+    print("output_overhead_bytes\t%d" % (output_bytes - output_ds_bytes))
+
+    print("processed_files\t%d" % len(fl))
+    if errored_files_cnt > 0:
+        print("errored_files\t%d" % errored_files_cnt)
+
+    sys.exit(errored_files_cnt > 0)

@@ -24,6 +24,11 @@
 #include "base_fmi.hpp"
 #include "timer.hpp"
 
+extern "C" {
+    #include "event_detection/event_detection.h"
+    #include "event_detection/fast5_interface.h"
+}
+
 #define GRAPH_ALN 0
 #define FOREST_ALN 1
 #define LEAF_ALN 2
@@ -46,7 +51,7 @@ std::string FWD_STR = "fwd",
 //TODO: relative paths
 const std::string MODEL_DEF = "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model";
 
-bool get_events(std::string filename, std::vector<Event> &events, EventDetector &ed);
+bool get_events(std::ostream &err, std::string filename, std::vector<Event> &events);
 
 enum Opt {
     MODEL       = 'm',
@@ -179,6 +184,7 @@ int main(int argc, char** argv) {
         #endif
     }
 
+
     #if ALN_TYPE == GRAPH_ALN
     GraphAligner
     #elif ALN_TYPE == FOREST_ALN
@@ -202,11 +208,6 @@ int main(int argc, char** argv) {
     unsigned int min_aln_len = args.get_int(Opt::MIN_ALN_LEN);
     float min_aln_conf = (float) args.get_double(Opt::MIN_ALN_CONF);
     bool read_until = min_aln_conf > 0;
-
-    detector_param params = event_detection_defaults;
-    params.threshold1 = 1.4;
-    params.threshold2 = 1.1;
-    EventDetector event_detector(params, 30, 150);
 
     std::string read_line, read_filename;
 
@@ -233,10 +234,10 @@ int main(int argc, char** argv) {
             }
         }
             
+
         std::vector<Event> events;
         
-        //TODO: get_raw_sample_dataset
-        if (!get_events(read_filename, events, event_detector)) {
+        if (!get_events(std::cerr, read_filename, events)) {
             continue;
         }
 
@@ -317,7 +318,7 @@ int main(int argc, char** argv) {
 
             ReadAln ra = rev_tracker.add_seeds(rev_seeds);
 
-            if (aln_en - e > 20000) {
+            if (aln_en - e > 50000) {
                 break;
             }
 
@@ -397,9 +398,11 @@ int main(int argc, char** argv) {
 
 }
 
-bool get_events(std::string filename, std::vector<Event> &events, EventDetector &ed) {
+bool get_events(std::ostream &err, std::string filename, std::vector<Event> &events) {
+    events.clear();
+
     if (!fast5::File::is_valid_file(filename)) {
-        std::cerr << "Error: '" << filename << "' is not a valid file \n";
+        err << "Error: '" << filename << "' is not a valid file \n";
     }
 
     try {
@@ -407,26 +410,20 @@ bool get_events(std::string filename, std::vector<Event> &events, EventDetector 
         file.open(filename);
         
         if (!file.is_open()) {  
-            std::cerr << "Error: unable to open '" 
+            err << "Error: unable to open '" 
                       << filename << "'\n";
-            return false;
-        }
 
-        events = ed.get_all_events(file.get_raw_samples());
-        return true;
-        
-        /*else if (!file.have_eventdetection_events()) {
-
-            std::cerr << "Error: no events\n";
+        } else if (!file.have_eventdetection_events()) {
+            err << "Error: file '" << filename
+                      << "' does not contain events\n";
 
         } else {
             events = file.get_eventdetection_events();
             return true;
-        }*/
+        }
 
     } catch (hdf5_tools::Exception& e) {
-        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
-        return false;
+        err << "Error: hdf5 exception '" << e.what() << "'\n";
     }
 
     return false;

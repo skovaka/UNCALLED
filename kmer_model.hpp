@@ -5,13 +5,11 @@
 #include <utility>
 #include <list>
 #include "basepairs.hpp"
-#include "fast5.hpp"
+#include "event_detector.hpp"
 
 #define NUM_BASES 4
 
 typedef unsigned short int Kmer;
-typedef fast5::EventDetection_Event Event;
-typedef fast5::Basecall_Event BCEvent;
 
 typedef struct NormParams {
     double shift, scale;

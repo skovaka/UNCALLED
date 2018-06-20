@@ -270,6 +270,7 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
     auto next_path = next_paths_.begin();
 
 
+
     //Find neighbors of previous nodes
     for (size_t pi = 0; pi < prev_size_; pi++) {
         if (!prev_paths_[pi].is_valid()) {
@@ -510,6 +511,8 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
     fullsource_time_ += timer.lap();
     #endif
 
+
+    //std::cout << ((prev_size_ + (next_path - next_paths_.begin())) / 2) << "\t" << timer.get() << "\n";
     prev_size_ = next_path - next_paths_.begin();
     prev_paths_.swap(next_paths_);
 

@@ -1,0 +1,19 @@
+# travis.yml for github.com/mateidavid/fast5
+
+sudo: required
+
+services:
+    - docker
+
+before_install:
+    - sudo apt-get update -y
+    - sudo apt-get install -y -o Dpkg::Options::="--force-confnew" docker-engine
+    - TZ=$(cat /etc/timezone) USER_ID=$(id -u) USER_NAME=$(id -un) GROUP_ID=$(id -g) GROUP_NAME=$(id -gn) envsubst <.travis.Dockerfile.in | docker build -t fast5 -
+
+install:
+    - docker run --rm -v $PWD:/data fast5 make -C src -e
+    - docker run --rm -v $PWD:/data fast5 bash -c 'virtualenv build-venv --system-site-packages && source build-venv/bin/activate && make -C python -e develop'
+
+script:
+    - docker run --rm -v $PWD:/data fast5 bash -c 'src/hdf5-mod -f file.000.fast5 && src/f5-mod file.000.fast5 && src/f5ls file.000.fast5 && src/f5ls-full file.000.fast5'
+    - docker run --rm -v $PWD:/data fast5 bash -c 'source build-venv/bin/activate && python -c "import fast5; f = fast5.File(\"file.000.fast5\"); print(f.file_version()); print(f.have_eventdetection_events())"'
