@@ -42,9 +42,9 @@ class KmerModel {
     Kmer kmer_to_id(std::string kmer, int offset = 0) const;
     //std::string id_to_kmer(Kmer kmer) const;
 
-    Base get_first_base(Kmer k) const;
-    Base get_last_base(Kmer k) const;
-    Base get_base(Kmer kmer, size_t i) const;
+    u8 get_first_base(Kmer k) const;
+    u8 get_last_base(Kmer k) const;
+    u8 get_base(Kmer kmer, size_t i) const;
 
     void parse_fasta (std::ifstream &fasta_in, 
                  std::vector<Kmer> &fwd_ids, 

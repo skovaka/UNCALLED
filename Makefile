@@ -1,6 +1,7 @@
 LIBS=-lz -lm -lstdc++ -ldl 
 HDF5_LIB=-L/cm/shared/apps/hdf5/1.8.17/lib /cm/shared/apps/hdf5/1.8.17/lib/libhdf5.a
 SDSL_LIB=-L/home-4/skovaka1@jhu.edu/software/sdsl-lite/lib  -lsdsl -ldivsufsort -ldivsufsort64
+BWA_LIB=-L/home-4/skovaka1@jhu.edu/code/nanopore_aligner/bwa /home-4/skovaka1@jhu.edu/code/nanopore_aligner/bwa/libbwa.a
 SDSL_INC=-I/home-4/skovaka1@jhu.edu/software/sdsl-lite/include
 #BOOST_INCLUDE=-I/cm/local/apps/boost/1.58.0/include
 HDF5_INCLUDE=-I/cm/shared/apps/hdf5/1.8.17/include
@@ -47,14 +48,14 @@ uncalled_arr_leaves: $(UNCALLED_OBJS) uncalled_arr_leaves.o sdsl_fmi.o base_fmi.
 dtw_test: dtw.o kmer_model.o arg_parse.o basepairs.o
 	$(CC) $(CFLAGS) dtw.o kmer_model.o arg_parse.o basepairs.o -o dtw_test $(INCLUDE) $(HDF5_LIB) $(LIBS)
 
-test_fmi: base_fmi.o sdsl_fmi.o test_fmi.o basepairs.o range.o
-	$(CC) $(CFLAGS) base_fmi.o sdsl_fmi.o test_fmi.o basepairs.o range.o -o test_fmi  $(SDSL_LIB)
+test_fmi: base_fmi.o sdsl_fmi.o bwa_fmi.o test_fmi.o basepairs.o range.o
+	$(CC) $(CFLAGS) base_fmi.o sdsl_fmi.o bwa_fmi.o test_fmi.o basepairs.o range.o -o test_fmi $(LIBS) $(SDSL_LIB) $(BWA_LIB)
 
-align_stats: base_fmi.o sdsl_fmi.o align_stats.o basepairs.o range.o
-	$(CC) $(CFLAGS) base_fmi.o sdsl_fmi.o align_stats.o basepairs.o range.o -o align_stats  $(SDSL_LIB)
+align_stats: base_fmi.o sdsl_fmi.o bwa_fmi.o align_stats.o basepairs.o range.o
+	$(CC) $(CFLAGS) base_fmi.o sdsl_fmi.o bwa_fmi.o align_stats.o basepairs.o range.o -o align_stats $(LIBS) $(SDSL_LIB) $(BWA_LIB)
 
-save_fmi: sdsl_fmi.o base_fmi.o save_fmi.o basepairs.o range.o
-	$(CC) $(CFLAGS) sdsl_fmi.o base_fmi.o save_fmi.o basepairs.o range.o -o save_fmi  $(SDSL_LIB) $(LIBS)
+save_fmi: sdsl_fmi.o base_fmi.o bwa_fmi.o save_fmi.o basepairs.o range.o
+	$(CC) $(CFLAGS) sdsl_fmi.o base_fmi.o bwa_fmi.o save_fmi.o basepairs.o range.o -o save_fmi  $(SDSL_LIB) $(LIBS) $(BWA_LIB)
 
 clean:
 	rm *.o

@@ -3,10 +3,11 @@
 #include <list>
 #include "base_fmi.hpp"
 #include "sdsl_fmi.hpp"
+#include "bwa_fmi.hpp"
 #include "fmi.hpp"
 #include "timer.hpp"
 
-void brute_align(FMI &fmi, const std::vector<Base> &bases) {
+void brute_align(FMI &fmi, const std::vector<u8> &bases) {
     for (size_t j = bases.size()-1; j < bases.size(); j--) {
         Range r = fmi.get_full_range(bases[j]);
         size_t i = j-1;
@@ -15,11 +16,11 @@ void brute_align(FMI &fmi, const std::vector<Base> &bases) {
             r = fmi.get_neighbor(r, bases[i]);
         }
         //std::cout << r.length() << "\n";
-        std::cout << (j - i) << "\n";
+        //std::cout << (j - i) << "\n";
     }
 }
 
-void dyn_align(FMI &fmi, const std::vector<Base> &bases, std::ofstream &outfile) {
+void dyn_align(FMI &fmi, const std::vector<u8> &bases, std::ofstream &outfile) {
     std::list<Range> ranges;
     ranges.push_front(fmi.get_full_range(bases.back()));
 
@@ -28,14 +29,14 @@ void dyn_align(FMI &fmi, const std::vector<Base> &bases, std::ofstream &outfile)
     unsigned int rangelen;
     for (size_t i = bases.size()-2; i < bases.size() && ranges.front().length() > 1; i--) {
         rangelen = (unsigned int) ranges.front().length();
-        //outfile.write((char *) &rangelen, sizeof(unsigned int));
-        std::cout << rangelen << "\t";
+        outfile.write((char *) &rangelen, sizeof(unsigned int));
+        //std::cout << rangelen << "\t";
         ranges.push_front( fmi.get_neighbor(ranges.front(), bases[i]) );
     }
     
     rangelen = (unsigned int) ranges.front().length();
-   // outfile.write((char *) &rangelen, sizeof(unsigned int));
-    std::cout << rangelen << "\n";
+    outfile.write((char *) &rangelen, sizeof(unsigned int));
+    //std::cout << rangelen << "\n";
 
     //std::cout << ranges.size() << "\n";
 
@@ -59,14 +60,15 @@ void dyn_align(FMI &fmi, const std::vector<Base> &bases, std::ofstream &outfile)
                 r = fmi.get_neighbor(r, bases[j]);
             }
 
-            std::cout << m->length() << "\t";
+            //std::cout << m->length() << "\t";
 
             j--;
         }
 
-        for (; m != ranges.rend(); m++) {
-            std::cout << m->length() << "\t";
-        }
+        //for (; m != ranges.rend(); m++) {
+        //    std::cout << m->length() << "\t";
+        //}
+
         //ONLY KEEP ONE
         //if (m != ranges.rend()) {
         //    std::cout << "x\t";
@@ -81,7 +83,7 @@ void dyn_align(FMI &fmi, const std::vector<Base> &bases, std::ofstream &outfile)
             //if (!r.is_valid()) {
             //    break;
             //}
-            std::cout << r.length() << "\t";
+            //std::cout << r.length() << "\t";
             ranges.push_front(r);
             j--;
             added = true;
@@ -93,7 +95,7 @@ void dyn_align(FMI &fmi, const std::vector<Base> &bases, std::ofstream &outfile)
                 //rangelen = (unsigned int) k->length();
                 //outfile.write((char *) &rangelen, sizeof(unsigned int));
             //}
-            std::cout << "\n";
+            //std::cout << "\n";
 
         //i_mod += 1;
         //if (i_mod == flush_checkpoint) {
@@ -117,14 +119,15 @@ int main(int argc, char** argv) {
     std::cerr << "Reading reference\n";
     std::ifstream ref_file(ref_fname);
     parse_fasta(ref_file, fwd_str, rev_str, false);
-    std::vector<Base> bases = seq_to_bases(fwd_str);
+    std::vector<u8> bases = seq_to_bases(fwd_str);
     rev_str.erase();
     fwd_str.erase();
 
     std::cerr << "Reading index\n";
-    SdslFMI fmi(index_fname);
+    BwaFMI fmi(index_fname);
+    //SdslFMI fmi(index_fname);
     //std::ifstream index_file(index_fname);
-    //fmi = BaseFMI(index_file, 128);
+    //BaseFMI fmi(index_file, 128);
 
     std::ofstream outfile(out_fname, std::ios::out | std::ios::binary);
 
@@ -132,11 +135,9 @@ int main(int argc, char** argv) {
     
     Timer t;
     dyn_align(fmi, bases, outfile);
-    outfile.close();
-    //std::cerr << t.lap() << "\n";
-    //brute_align(fmi, bases);
+    //outfile.close();
+    std::cerr << t.lap() << "\n";
+    brute_align(fmi, bases);
 
     std::cerr << t.lap() << "\n";
-
-
 }

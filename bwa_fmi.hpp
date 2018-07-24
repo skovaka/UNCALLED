@@ -1,5 +1,5 @@
-#ifndef INCL_SDSLFMI
-#define INCL_SDSLFMI
+#ifndef INCL_BWAFMI
+#define INCL_BWAFMI
 
 #include <string>
 #include <climits>

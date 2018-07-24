@@ -5,7 +5,7 @@
 #include <unistd.h>
 
 //#include "kmer_model.cpp"
-//#include "sdsl_fmi.hpp"
+#include "sdsl_fmi.hpp"
 #include "base_fmi.hpp"
 #include "timer.hpp"
 
@@ -27,9 +27,9 @@ int main(int argc, char** argv) {
     combined_bases = combined_bases + "$";
 
     std::cerr << "Building forward FMI\n";
-    //SdslFMI fwd_fmi;
-    //fwd_fmi.construct(fwd_bases);
-    BaseFMI fmi(combined_bases, 128);
+    SdslFMI fmi;
+    fmi.construct(combined_bases);
+    //BaseFMI fmi(combined_bases, 128);
 
     std::cerr << "Saving combined FMI\n";
     fmi.save(out_fname);

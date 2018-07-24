@@ -86,7 +86,7 @@ KmerModel::KmerModel(std::string model_fname) {
 
             //Store all neighboring kmers
             for (short b = 0; b < 4; b++) { //4 magic number?
-                neighbors_[k_id].push_back(kmer_to_id(Baseo_char(b) + kmer.substr(0, k_ - 1)));
+                neighbors_[k_id].push_back(kmer_to_id(BASE_CHARS[b] + kmer.substr(0, k_ - 1)));
            }
 
             //Store model information
@@ -166,22 +166,22 @@ float KmerModel::event_match_prob(Event e, Kmer k_id) const {
 //}
 
 Kmer KmerModel::kmer_to_id(std::string kmer, int offset) const {
-    Kmer id = char_to_base(kmer[offset]);
+    Kmer id = BASE_BYTES[(u8) kmer[offset]];
     for (unsigned int j = 1; j < k_; j++)
-        id = (id << 2) | char_to_base(kmer[offset+j]);
+        id = (id << 2) | BASE_BYTES[(u8) kmer[offset+j]];
     return id;
 }
 
-Base KmerModel::get_base(Kmer kmer, size_t i) const {
-    return (Base) ((kmer >> (2 * (k_-i-1))) & 0x3);
+u8 KmerModel::get_base(Kmer kmer, size_t i) const {
+    return (u8) ((kmer >> (2 * (k_-i-1))) & 0x3);
 }
 
-Base KmerModel::get_first_base(Kmer kmer) const {
-    return (Base) ((kmer >> (2*k_ - 2)) & 0x3);
+u8 KmerModel::get_first_base(Kmer kmer) const {
+    return (u8) ((kmer >> (2*k_ - 2)) & 0x3);
 }
 
-Base KmerModel::get_last_base(Kmer kmer) const {
-    return (Base) (kmer & 0x3);
+u8 KmerModel::get_last_base(Kmer kmer) const {
+    return (u8) (kmer & 0x3);
 }
 
 //std::string KmerModel::id_to_kmer(Kmer kmer) const {
