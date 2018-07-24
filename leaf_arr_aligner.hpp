@@ -89,7 +89,6 @@ class LeafArrAligner : public Aligner {
     Range *kmer_ranges_;
 
     AlnParams params_;
-    std::string label_;
     
     //std::vector<PathBuffer *> inactive_paths_;
     std::vector<PathBuffer> prev_paths_, next_paths_;
@@ -104,8 +103,7 @@ class LeafArrAligner : public Aligner {
     Event prev_event_;
 
     LeafArrAligner(const FMI &fmi, 
-              const AlnParams &aln_params,
-              const std::string &label);
+              const AlnParams &aln_params);
 
     ~LeafArrAligner();
 

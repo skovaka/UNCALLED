@@ -126,58 +126,20 @@ int main(int argc, char** argv) {
                          (float) args.get_double(Opt::WINDOW_PROB));
     
     #if FMI_TYPE == BASE_FMI
-    BaseFMI fwd_fmi, rev_fmi;
+    BaseFMI fmi;
     #else
-    SdslFMI fwd_fmi, rev_fmi;
+    SdslFMI fmi;
     #endif
 
-    if (!args.get_string(Opt::INDEX_PREFIX).empty()) {
-        std::string p = args.get_string(Opt::INDEX_PREFIX);
+    #if FMI_TYPE == BASE_FMI
+    std::cerr << "Reading FMI\n";
+    std::ifstream fmi_in(args.get_string(Opt::INDEX_PREFIX));
+    fmi = BaseFMI(fmi_in, args.get_int(Opt::TALLY_DIST));
 
-        #if FMI_TYPE == BASE_FMI
-
-        std::ifstream fwd_in(p + "fwdFM.txt"),
-                      rev_in(p + "revFM.txt");
-
-        std::cerr << "Reading forward FMI\n";
-        fwd_fmi = BaseFMI(fwd_in, args.get_int(Opt::TALLY_DIST));
-
-        std::cerr << "Reading reverse FMI\n";
-        rev_fmi = BaseFMI(rev_in, args.get_int(Opt::TALLY_DIST));
-
-        #else
-
-        std::cerr << "Reading forward FMI\n";
-        fwd_fmi = SdslFMI(p + "fwdFM.idx");
-
-        std::cerr << "Reading reverse FMI\n";
-        rev_fmi = SdslFMI(p + "revFM.idx");
-
-        #endif
-
-    } else {
-        std::cerr << "Parsing fasta\n";
-        std::ifstream ref_file(args.get_string(Opt::REFERENCE));
-        std::string fwd_bases, rev_bases;
-        parse_fasta(ref_file, fwd_bases, rev_bases, false);
-
-        #if FMI_TYPE == BASE_FMI
-        std::cerr << "Building forward FMI\n";
-        fwd_fmi = BaseFMI(fwd_bases, args.get_int(Opt::TALLY_DIST));
-
-        std::cerr << "Building reverse FMI\n";
-        rev_fmi = BaseFMI(rev_bases, args.get_int(Opt::TALLY_DIST));
-
-        #else
-
-        std::cerr << "Building forward FMI\n";
-        fwd_fmi.construct(fwd_bases);
-
-        std::cerr << "Building reverse FMI\n";
-        rev_fmi.construct(rev_bases);
-
-        #endif
-    }
+    #else
+    std::cerr << "Reading FMI\n";
+    fmi = SdslFMI(args.get_string(Opt::INDEX_PREFIX));
+    #endif
 
     #if ALN_TYPE == GRAPH_ALN
     GraphAligner
@@ -188,8 +150,7 @@ int main(int argc, char** argv) {
     #elif ALN_TYPE == LEAF_ARR_ALN
     LeafArrAligner
     #endif
-        rev_sg(rev_fmi, aln_params, "rev"),
-        fwd_sg(fwd_fmi, aln_params, "fwd");
+        graph(fmi, aln_params);
 
     std::ifstream reads_file(args.get_string(Opt::READ_LIST));
 
@@ -252,10 +213,9 @@ int main(int argc, char** argv) {
 
         unsigned int aln_len = aln_en - aln_st + 1;
 
-        fwd_sg.new_read(aln_len);
-        rev_sg.new_read(aln_len);
+        graph.new_read(aln_len);
 
-        SeedTracker fwd_tracker(aln_len), rev_tracker(aln_len);
+        SeedTracker tracker(aln_len);
 
         Timer read_timer;
 
@@ -291,55 +251,21 @@ int main(int argc, char** argv) {
                 all_probs[e-aln_st][kmer] = model.event_match_prob(events[e], kmer);
             }
 
-            //#ifdef VERBOSE_TIME
-            //time_out << e;
-            ////event_timer.reset();
-            //#endif
-
-            std::vector<Result> fwd_seeds = fwd_sg.add_event(all_probs[e-aln_st], 
-                                                             seeds_out,
-                                                             time_out);
+            std::vector<Result> seeds = graph.add_event(all_probs[e-aln_st], 
+                                                        seeds_out,
+                                                        time_out);
 
 
-            std::vector<Result> rev_seeds = rev_sg.add_event(all_probs[e-aln_st], 
-                                                            seeds_out,
-                                                            time_out);
-
-            //#ifdef VERBOSE_TIME
-            //event_timer.reset();
-            //#endif
-
-            ReadAln fa = fwd_tracker.add_seeds(fwd_seeds);
-
-            //#ifdef VERBOSE_TIME
-            //time_out << std::setw(23) << event_timer.lap();
-            //#endif
-
-            ReadAln ra = rev_tracker.add_seeds(rev_seeds);
+            ReadAln new_aln = tracker.add_seeds(seeds);
 
             if (aln_en - e > 20000) {
                 break;
             }
 
-            //#ifdef VERBOSE_TIME
-            //time_out << std::setw(23) << event_timer.lap();
-            //#endif
-
-            if (read_until && std::max(fa.total_len_, ra.total_len_) > min_aln_len) {
-                ReadAln a = fa;
-                if (fa.total_len_ < ra.total_len_) {
-                    a = ra;
-                }
-
-                if(fwd_tracker.check_ratio(a, min_aln_conf) &&
-                   rev_tracker.check_ratio(a, min_aln_conf)) {
-
-                    //#ifdef VERBOSE_TIME
-                    //time_out << std::setw(23) << event_timer.lap() << std::endl;
-                    //#endif
-
+            if (read_until && 
+                new_aln.total_len_ > min_aln_len && 
+                tracker.check_ratio(new_aln, min_aln_conf)) {
                     break;
-                }
             }
 
             #ifndef VERBOSE_TIME
@@ -361,12 +287,12 @@ int main(int argc, char** argv) {
         #ifdef VERBOSE_TIME
         //time_out << std::setw(23) << event_timer.lap() << std::endl;
         #if ALN_TYPE == LEAF_ARR_ALN
-        time_out << std::setw(10) << (fwd_sg.loop1_time_ + rev_sg.loop1_time_) 
-                 << std::setw(10) << (fwd_sg.sort_time_ + rev_sg.sort_time_) 
-                 << std::setw(10) << (fwd_sg.loop2_time_ + rev_sg.loop2_time_) 
-                 << std::setw(10) << (fwd_sg.fullsource_time_ + rev_sg.fullsource_time_) 
-                 << std::setw(10) << (fwd_sg.fmrs_time_ + rev_sg.fmrs_time_) 
-                 << std::setw(10) << (fwd_sg.fmsa_time_ + rev_sg.fmsa_time_) << "\n";
+        time_out << std::setw(10) << (graph.loop1_time_) 
+                 << std::setw(10) << (graph.sort_time_) 
+                 << std::setw(10) << (graph.loop2_time_)
+                 << std::setw(10) << (graph.fullsource_time_)
+                 << std::setw(10) << (graph.fmrs_time_)
+                 << std::setw(10) << (graph.fmsa_time_) << "\n";
         #endif
 
         #else
@@ -375,8 +301,7 @@ int main(int argc, char** argv) {
         time_out << "== END ==\n";
         #endif
 
-        fwd_tracker.print(alns_out, FWD_STR, (size_t) 5);
-        rev_tracker.print(alns_out, REV_STR, (size_t) 5);
+        tracker.print(alns_out, FWD_STR, (size_t) 10);
 
         std::cout.flush();
         

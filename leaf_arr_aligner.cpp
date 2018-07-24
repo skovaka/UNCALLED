@@ -190,11 +190,9 @@ bool operator< (const LeafArrAligner::PathBuffer &p1,
 }
 
 LeafArrAligner::LeafArrAligner(const FMI &fmi, 
-                     const AlnParams &ap,
-                     const std::string &label)
+                     const AlnParams &ap)
     : fmi_(fmi),
-      params_(ap),
-      label_(label) {
+      params_(ap) {
 
     PathBuffer::MAX_WIN_LEN = params_.path_win_len_;
 
@@ -338,7 +336,7 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
                 continue;
             }
 
-            Base next_base = params_.model_.get_first_base(*next_kmer);
+            u8 next_base = params_.model_.get_first_base(*next_kmer);
 
             #ifdef VERBOSE_TIME
             loop1_time_ += timer.lap();
