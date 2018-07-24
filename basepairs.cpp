@@ -33,50 +33,10 @@ std::string reverse_complement(const std::string &seq) {
 
 
     
-Base char_to_base(char b) {
-    switch (b) {
-        case 'A':
-        case 'a':
-        return 0;
-
-        case 'C':
-        case 'c':
-        return 1;
-
-        case 'G':
-        case 'g':
-        return 2;
-
-        case 'T':
-        case 't':
-        return 3;
-    }
-
-    return -1;
-}
-
-char Baseo_char(Base i) {
-    switch (i) {
-        case 0:
-        return 'A';
-        
-        case 1:
-        return 'C';
-
-        case 2:
-        return 'G';
-
-        case 3:
-        return 'T';
-    }
-
-    return 'N';
-}
-
-std::vector<Base> seq_to_bases(const std::string &seq) {
-    std::vector<Base> bases(seq.size());
+std::vector<u8> seq_to_bases(const std::string &seq) {
+    std::vector<u8> bases(seq.size());
     for (size_t i = 0; i < seq.size(); i++) {
-        bases[i] = char_to_base(seq[i]);
+        bases[i] = BASE_BYTES[(u8) seq[i]];
     }
     return bases;
 }

@@ -17,7 +17,6 @@
 
 BaseFMI::BaseFMI() {
     loaded_ = false;
-
 }
 
 //Reads a model directly from a file and creates the FM index from the given reference
@@ -62,9 +61,9 @@ BaseFMI::BaseFMI(std::string seq, unsigned int tally_dist) {
         
         //Fill in BWT
         if (suffix_ar_[i] > 0) {
-            bwt_[i] = char_to_base(seq[suffix_ar_[i]-1]);
+            bwt_[i] = BASE_BYTES[(u8) seq[suffix_ar_[i]-1]];
         } else {
-            bwt_[i] = char_to_base(seq.back());
+            bwt_[i] = BASE_BYTES[(u8) seq.back()];
         }
 
         //Update 6-mer counts
@@ -106,8 +105,6 @@ BaseFMI::BaseFMI(std::ifstream &infile, unsigned int tally_dist) {
     
     infile >> size;
 
-    std::cerr << size << "\n";
-    
     suffix_ar_.resize(size);
     bwt_.resize(size);
     f_starts_.resize(ALPH_SIZE);
@@ -123,7 +120,7 @@ BaseFMI::BaseFMI(std::ifstream &infile, unsigned int tally_dist) {
     for (size_t i = 0; i < size; i++) {
         infile >> bwt_i >> suffix_ar_[i];
 
-        bwt_[i] = (Base) bwt_i;
+        bwt_[i] = (u8) bwt_i;
 
         if (bwt_[i] < ALPH_SIZE)
             counts_[bwt_[i]]++;
@@ -173,7 +170,7 @@ void BaseFMI::save(const std::string &filename) {
 //starting at rot2. Used to build suffix array.
 bool BaseFMI::operator() (unsigned int rot1, unsigned int rot2) {
 
-    Base c1, c2;
+    u8 c1, c2;
     for (unsigned int i = 0; i < seq_->size(); i++) {
         
         c1 = seq_->at(rot1 + i);
@@ -194,7 +191,7 @@ bool BaseFMI::operator() (unsigned int rot1, unsigned int rot2) {
     return false;
 }
 
-Range BaseFMI::get_neighbor(Range range, Base base) const {
+Range BaseFMI::get_neighbor(Range range, u8 base) const {
     unsigned int min = get_tally(base, range.start_ - 1);
     unsigned int max = get_tally(base, range.end_);
 
@@ -206,7 +203,7 @@ Range BaseFMI::get_neighbor(Range range, Base base) const {
     return Range();
 }
 
-unsigned int BaseFMI::get_tally(Base base, unsigned int loc) const {
+unsigned int BaseFMI::get_tally(u8 base, unsigned int loc) const {
     if (loc < 0)
         return -1;
 
@@ -219,7 +216,7 @@ unsigned int BaseFMI::get_tally(Base base, unsigned int loc) const {
         cp += tally_dist_;
     }
 
-    Base k = base;
+    u8 k = base;
     unsigned int count = tally_[k][cp / tally_dist_];
 
     //int cp_dist = cp - loc;
@@ -240,7 +237,7 @@ unsigned int BaseFMI::get_tally(Base base, unsigned int loc) const {
 
 
 //TODO: Maybe store f as ranges?
-Range BaseFMI::get_full_range(Base base) const {
+Range BaseFMI::get_full_range(u8 base) const {
     return Range(f_starts_[base], f_starts_[base] + counts_[base] - 1 );
 }  
 

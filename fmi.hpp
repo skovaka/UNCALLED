@@ -12,13 +12,13 @@ class FMI {
 
     virtual void save(const std::string &filename) = 0; 
 
-    virtual Range get_neighbor(Range range, Base base) const = 0;
+    virtual Range get_neighbor(Range range, u8 base) const = 0;
 
-    virtual Range get_full_range(Base base) const = 0;
+    virtual Range get_full_range(u8 base) const = 0;
 
-    virtual size_t sa(size_t i) const = 0;
+    virtual u64 sa(u64 i) const = 0;
 
-    virtual size_t size() const = 0;
+    virtual u64 size() const = 0;
 
     bool is_loaded() {return loaded_;}
 

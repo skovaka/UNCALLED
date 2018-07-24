@@ -3,23 +3,23 @@
 #include <list>
 #include <cstdlib>
 #include "base_fmi.hpp"
-#include "sdsl_fmi.hpp"
+#include "bwa_fmi.hpp"
+#include "bwa/bwt.h"
 #include "fmi.hpp"
 #include "timer.hpp"
 
-void test_rank_select(FMI &fmi, const std::vector<Base> &bases) {
+void test_rank_select(FMI &fmi, const std::vector<u8> &bases) {
     Range r = fmi.get_full_range(bases.back());
 
     for (size_t i = bases.size()-2; i < bases.size(); i--) {
-        //std::cout << (int) bases[i+1] << r.start_ << "-" << r.end_ << " " << r.length() << "\n";
         r = fmi.get_neighbor(r, bases[i]);
     }
 
-    std::cout << "done\n";
 
-    //for (size_t s = r.start_; s <= r.end_; s++) {
-    //    std::cout << s << " " << fmi.sa(s) << "\n";
-    //}
+    for (size_t s = r.start_; s <= r.end_; s++) {
+        std::cout << s << " " << fmi.sa(s) << "\n";
+    }
+    std::cout << "done\n";
 }
 
 std::vector<size_t> test_sa(FMI &fmi, size_t num_locs) {
@@ -30,44 +30,60 @@ std::vector<size_t> test_sa(FMI &fmi, size_t num_locs) {
     return locs;
 }
 
+//Probably not really useful
+//Just how the BWT is stored, not queried
+std::vector<u32> str_to_bytes(std::string sseq) {
+    std::vector<u32> bseq(sseq.size() / 16 + (sseq.size() % 16 != 0));
+    u32 i = 0;
+    for (u32 j = 0; j < bseq.size(); j++) {
+        for (u8 k = 30; k < 32 && i < sseq.size(); k -= 2) {
+            bseq[j] |= (BASE_BYTES[(u32) sseq[i++]] << k);
+        }
+    }
+    return bseq;
+}
+
+//Probably not really useful
+//Just how the BWT is stored, not queried
+std::string bytes_to_str(std::vector<u32> bseq, u32 len) {
+    std::string sseq(len, 'A');
+    u32 i = 0;
+    for (u32 j = 0; j < bseq.size(); j++) {
+        for (u8 k = 30; k < 32 && i < sseq.size(); k -= 2) {
+            sseq[i++] = BASE_CHARS[(bseq[j] >> k) & 3];
+        }
+    }
+    return sseq;
+}
+
 int main(int argc, char** argv) {
-    //:std::string ref_fname(argv[1]), index_fname, fwd_str, rev_str;
-
-    //std::ifstream ref_file(ref_fname);
-    //parse_fasta(ref_file, fwd_str, rev_str, false);
-
-    //std::vector<Base> fwd_bases = seq_to_bases(fwd_str);
-    //
-    //if (argc > 2) {
-    //    //std::ifstream index_file(index_fname);
-    //    //base_fmi = BaseFMI(index_file, 128);
-    //    //sdsl_fmi.construct(fwd_str);
-    //    //index_file.close();
-    //} else {
-    //    //base_fmi = BaseFMI(fwd_str + "$", 128);
-    //    sdsl_fmi.construct(fwd_str);
-    //}
-    //std::cout << "Built\n";
-
     //BaseFMI base_fmi;
-    std::string index_fname = std::string(argv[1]);
-    SdslFMI sdsl_fmi(index_fname);
+    std::string index_prefix = std::string(argv[1]);
+    std::string squery = std::string(argv[2]);
 
-    //std::ifstream index_file(index_fname);
-    //BaseFMI base_fmi(index_fname, 128);
 
-    size_t num_locs = atoi(argv[2]);
+    std::string bwt_fname = index_prefix + ".bwt",
+                sa_fname = index_prefix + ".sa",
+                base_fname = index_prefix + ".ufmi";
+
+    std::cout << "Loading BWA...\n";
+    BwaFMI bwa_fmi(index_prefix);
+    std::cout << bwa_fmi.size() << "\n";
+
+    std::cout << "Loading UNCALLED...\n";
+    std::ifstream in(index_prefix + ".ufmi");
+    BaseFMI base_fmi(in, 128);
+    std::cout << base_fmi.size() << "\n";
+    
+    std::cout << "Converting query...\n";
+    std::vector<u8> bquery(squery.size());
+    for (u32 i = 0; i < squery.size(); i++) {
+        bquery[i] = BASE_BYTES[(u8) squery[i]];
+    }
 
     Timer t;
-    t.reset();
-    test_sa(sdsl_fmi, num_locs);
-    std::cout << t.lap() << "\n";
-
-    //test_rank_select(base_fmi, fwd_bases);
-    //test_sa(base_fmi, locs);
-
-    //std::cout << t.lap() << "\n";
-
-    //test_rank_select(sdsl_fmi, fwd_bases);
-    
+    test_rank_select(bwa_fmi, bquery);
+    std::cout << "BWA time: " << t.lap() << std::endl;
+    test_rank_select(base_fmi, bquery);
+    std::cout << "UNCALLED time: " << t.lap() << std::endl;
 }

@@ -20,9 +20,9 @@ class BaseFMI : public FMI {
 
     void save(const std::string &filename); 
 
-    Range get_neighbor(Range range, Base base) const;
+    Range get_neighbor(Range range, u8 base) const;
 
-    Range get_full_range(Base base) const;
+    Range get_full_range(u8 base) const;
 
     Range get_kmer_range(const std::string &seq) const;
 
@@ -33,14 +33,14 @@ class BaseFMI : public FMI {
     bool operator() (unsigned int rot1, unsigned int rot2);
 
     //private:
-    unsigned int get_tally(Base bases, unsigned int loc) const;
+    unsigned int get_tally(u8 bases, unsigned int loc) const;
 
     std::string *seq_;
 
     //Sparseness of suffix and tally arrays
     unsigned int tally_dist_;
 
-    std::vector<Base> bwt_;                        //L array
+    std::vector<u8> bwt_;                        //L array
     std::vector<unsigned int> counts_, f_starts_;      //F array
     std::vector<unsigned int> suffix_ar_;            //Suffix array
     std::vector< std::vector<unsigned int> > tally_;      //Rank tally
