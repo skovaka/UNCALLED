@@ -10,7 +10,7 @@
 
 #define PI 3.1415926535897
 
-KmerModel::KmerModel(std::string model_fname) {
+KmerModel::KmerModel(std::string model_fname, bool complement) {
     std::ifstream model_in(model_fname);
 
     //Read header and count number of columns
@@ -30,7 +30,7 @@ KmerModel::KmerModel(std::string model_fname) {
 
     //Variables for reading model
     std::string kmer, neighbor_kmer;
-    Kmer k_id;
+    u16 k_id;
     double lv_mean, lv_stdv, sd_mean, sd_stdv, lambda, weight;
 
     //Check if table includes "ig_lambda" column
@@ -65,14 +65,21 @@ KmerModel::KmerModel(std::string model_fname) {
     model_mean_ = 0;
 
     //Stores which kmers can follow which
-    neighbors_ = new std::list<Kmer>[kmer_count_]; 
-    rev_comp_ids_ = new Kmer[kmer_count_]; 
+    neighbors_ = new std::list<u16>[kmer_count_]; 
+    rev_comp_ids_ = new u16[kmer_count_]; 
 
     //Read and store rest of the model
     do {
+        //Complement kmer if needed
+        if (complement) {
+            for (u8 i = 0; i < k_; i++) {
+                kmer[i] = BASE_COMP_C[(u8) kmer[i]];
+            }
+        }
 
         //Get unique ID for the kmer
         k_id = kmer_to_id(kmer);
+
 
         //Check if kmer is valid
         if (k_id < 0 || k_id >= kmer_count_) {
@@ -81,12 +88,20 @@ KmerModel::KmerModel(std::string model_fname) {
         //Store kmer information
         } else {
 
+            //Complement kmer if needed
+            //if (complement) {
+            //    std::cout << k_id << " " << kmer_comp(k_id) << " " << kmer_to_id(reverse_complement(kmer)) << "\n";
+            //    k_id = kmer_comp(k_id);
+            //}
+
+
             //Store kmer reverse complement
             rev_comp_ids_[k_id] = kmer_to_id(reverse_complement(kmer));
 
             //Store all neighboring kmers
             for (short b = 0; b < 4; b++) { //4 magic number?
-                neighbors_[k_id].push_back(kmer_to_id(BASE_CHARS[b] + kmer.substr(0, k_ - 1)));
+                //neighbors_[k_id].push_back(kmer_to_id(BASE_CHARS[b] + kmer.substr(0, k_ - 1)));
+                neighbors_[k_id].push_back(kmer_to_id(kmer.substr(1, k_) + BASE_CHARS[b]));
            }
 
             //Store model information
@@ -119,7 +134,7 @@ KmerModel::KmerModel(std::string model_fname) {
     //Compute model level mean and stdv
     model_mean_ /= kmer_count_;
     model_stdv_ = 0;
-    for (Kmer k_id = 0; k_id < kmer_count_; k_id++)
+    for (u16 k_id = 0; k_id < kmer_count_; k_id++)
         model_stdv_ += pow(lv_means_[k_id] - model_mean_, 2);
     model_stdv_ = sqrt(model_stdv_ / kmer_count_);
 }
@@ -139,7 +154,7 @@ bool KmerModel::event_valid(const Event &e) const {
     return e.mean > 0 && e.stdv >= 0 && e.length > 0;
 }
 
-float KmerModel::event_match_prob(Event e, Kmer k_id) const {
+float KmerModel::event_match_prob(Event e, u16 k_id) const {
     return (-pow(e.mean - lv_means_[k_id], 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
 }
 
@@ -165,26 +180,30 @@ float KmerModel::event_match_prob(Event e, Kmer k_id) const {
 //    return log(q);
 //}
 
-Kmer KmerModel::kmer_to_id(std::string kmer, int offset) const {
-    Kmer id = BASE_BYTES[(u8) kmer[offset]];
+u16 KmerModel::kmer_to_id(std::string kmer, int offset) const {
+    u16 id = BASE_BYTES[(u8) kmer[offset]];
     for (unsigned int j = 1; j < k_; j++)
         id = (id << 2) | BASE_BYTES[(u8) kmer[offset+j]];
     return id;
 }
 
-u8 KmerModel::get_base(Kmer kmer, size_t i) const {
+u16 KmerModel::kmer_comp(u16 kmer) {
+    return kmer ^ ((1 << (2*k_)) - 1);
+}
+
+u8 KmerModel::get_base(u16 kmer, size_t i) const {
     return (u8) ((kmer >> (2 * (k_-i-1))) & 0x3);
 }
 
-u8 KmerModel::get_first_base(Kmer kmer) const {
+u8 KmerModel::get_first_base(u16 kmer) const {
     return (u8) ((kmer >> (2*k_ - 2)) & 0x3);
 }
 
-u8 KmerModel::get_last_base(Kmer kmer) const {
+u8 KmerModel::get_last_base(u16 kmer) const {
     return (u8) (kmer & 0x3);
 }
 
-//std::string KmerModel::id_to_kmer(Kmer kmer) const {
+//std::string KmerModel::id_to_kmer(u16 kmer) const {
 //    std::string seq(k_, 'A');
 //    for (size_t i = 0; i < k_; i++) {
 //        seq[k_ - i - 1] = id_to_base((kmer >> i * 2) & 0x3);
@@ -229,8 +248,8 @@ void KmerModel::normalize_events(std::vector<Event> &events, NormParams norm) co
 //Reads the given fasta file and stores forward and reverse k-mers
 void KmerModel::parse_fasta(
                  std::ifstream &fasta_in, 
-                 std::vector<Kmer> &fwd_ids, 
-                 std::vector<Kmer> &rev_ids) const {
+                 std::vector<u16> &fwd_ids, 
+                 std::vector<u16> &rev_ids) const {
 
     //For parsing the file
     std::string cur_line, prev_line, fwd_seq;
@@ -252,7 +271,7 @@ void KmerModel::parse_fasta(
         prev_line = cur_line;
     }
 
-    rev_ids = std::vector<Kmer>(fwd_ids.size());
+    rev_ids = std::vector<u16>(fwd_ids.size());
     for (unsigned int i = 0; i < fwd_ids.size(); i++)
         rev_ids[rev_ids.size()-i-1] = rev_comp_ids_[fwd_ids[i]];
 

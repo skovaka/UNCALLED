@@ -53,7 +53,7 @@ void LeafArrAligner::PathBuffer::free_buffers() {
     delete[] prob_sums_;
 }
 
-void LeafArrAligner::PathBuffer::make_source(Range &range, Kmer kmer, float prob) {
+void LeafArrAligner::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     length_ = 1;
     consec_stays_ = 0;
     event_types_ = 0;
@@ -78,7 +78,7 @@ void LeafArrAligner::PathBuffer::make_source(Range &range, Kmer kmer, float prob
 
 void LeafArrAligner::PathBuffer::make_child(PathBuffer &p, 
                                             Range &range,
-                                            Kmer kmer, 
+                                            u16 kmer, 
                                             float prob, 
                                             EventType type) {
     length_ = p.length_ + 1;
@@ -101,8 +101,6 @@ void LeafArrAligner::PathBuffer::make_child(PathBuffer &p,
         prob_sums_[length_] = prob_sums_[length_-1] + prob;
         win_prob_ = (prob_sums_[length_] - prob_sums_[0]) / length_;
     }
-
-    //win_prob_ = mean_prob();
 
     event_types_ = TYPE_ADDS[type] | (p.event_types_ >> TYPE_BITS);
 
@@ -202,7 +200,7 @@ LeafArrAligner::LeafArrAligner(const FMI &fmi,
     PathBuffer::TYPE_MASK = (unsigned char) ((1 << TYPE_BITS) - 1);
 
     kmer_ranges_ = new Range[params_.model_.kmer_count()];
-    for (Kmer k = 0; k < params_.model_.kmer_count(); k++) {
+    for (u16 k = 0; k < params_.model_.kmer_count(); k++) {
         Range r = fmi_.get_full_range(params_.model_.get_last_base(k));
         for (size_t i = params_.model_.kmer_len()-2; 
              i < params_.model_.kmer_len(); i--) {
@@ -234,7 +232,7 @@ LeafArrAligner::~LeafArrAligner() {
 
 void LeafArrAligner::new_read(size_t read_len) {
     reset();
-    cur_event_ = read_len;
+    cur_event_ = 0;
     #ifdef VERBOSE_TIME
     loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
     #endif
@@ -244,18 +242,16 @@ void LeafArrAligner::reset() {
     prev_size_ = 0;
 }
 
-std::vector<Result> LeafArrAligner::add_event(float *kmer_probs, 
+std::vector<Result> LeafArrAligner::add_event(std::vector<float> kmer_probs, 
                                            std::ostream &seeds_out,
                                            std::ostream &time_out) {
 
-    //Update event index
-    cur_event_--;
 
     float prob;
 
     Range prev_range;
     //PathBuffer *prev_path;
-    Kmer prev_kmer;
+    u16 prev_kmer;
     
     bool child_found;
     float evpr_thresh;
@@ -336,7 +332,8 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
                 continue;
             }
 
-            u8 next_base = params_.model_.get_first_base(*next_kmer);
+            //u8 next_base = params_.model_.get_first_base(*next_kmer);
+            u8 next_base = params_.model_.get_last_base(*next_kmer);
 
             #ifdef VERBOSE_TIME
             loop1_time_ += timer.lap();
@@ -398,7 +395,7 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
         sort_time_ += timer.lap();
         #endif
 
-        Kmer source_kmer;
+        u16 source_kmer;
         prev_kmer = params_.model_.kmer_count(); //TODO: won't work for k=4
 
         Range unchecked_range, source_range;
@@ -483,7 +480,7 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
     loop2_time_ += timer.lap();
     #endif
     
-    for (Kmer kmer = 0; 
+    for (u16 kmer = 0; 
          kmer < params_.model_.kmer_count() && 
             next_path != next_paths_.end(); 
          kmer++) {
@@ -514,6 +511,9 @@ std::vector<Result> LeafArrAligner::add_event(float *kmer_probs,
     prev_size_ = next_path - next_paths_.begin();
     prev_paths_.swap(next_paths_);
 
+    //Update event index
+    cur_event_++;
+
     return results;
 }
 
@@ -525,11 +525,18 @@ void LeafArrAligner::check_alignments(PathBuffer &p,
     if (p.should_report(params_, path_ended)) {
         //std::cout << " pass\n";
 
-        Result r(cur_event_ + path_ended, params_.path_win_len_, p.win_prob_);
+        Result r(cur_event_ - path_ended, params_.path_win_len_, p.win_prob_);
+
         p.sa_checked_ = true;
 
-        for (unsigned int s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
-            r.set_ref_range(fmi_.sa(s), p.match_len());
+        for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
+
+            //Reverse the reference coords so they both go L->R
+            u64 rev_en = fmi_.size() - fmi_.sa(s) + 1;
+            r.set_ref_range(rev_en, p.match_len());
+
+            //r.set_ref_range(fmi_.sa(s), p.match_len());
+            
             results.push_back(r);
 
             //seeds_out << label_ << "\t";

@@ -32,27 +32,27 @@ class LeafArrAligner : public Aligner {
         unsigned char win_type_counts_[EventType::NUM_TYPES];
 
         Range fm_range_;
-        Kmer kmer_;
+        u16 kmer_;
         bool sa_checked_;
 
         //Initial constructor
         PathBuffer();
 
         //Source constructor
-        //PathBuffer(Range range, Kmer kmer, float prob);
+        //PathBuffer(Range range, u16 kmer, float prob);
 
         //Child constructor
-        //PathBuffer(PathBuffer &p, Range range, Kmer kmer, float prob, EventType type);
+        //PathBuffer(PathBuffer &p, Range range, u16 kmer, float prob, EventType type);
 
         //Copy constructor
         PathBuffer(const PathBuffer &p);
 
         //~PathBuffer();
 
-        //void init_from_sibling(PathBuffer *a, Kmer kmer, float prob, EventType type);
-        //void init_from_parent(PathBuffer *a, Kmer kmer, float prob, EventType type);
-        void make_source(Range &range, Kmer kmer, float prob);
-        void make_child(PathBuffer &p, Range &range, Kmer kmer, float prob, EventType type);
+        //void init_from_sibling(PathBuffer *a, u16 kmer, float prob, EventType type);
+        //void init_from_parent(PathBuffer *a, u16 kmer, float prob, EventType type);
+        void make_source(Range &range, u16 kmer, float prob);
+        void make_child(PathBuffer &p, Range &range, u16 kmer, float prob, EventType type);
 
         void invalidate();
         bool is_valid();
@@ -111,18 +111,18 @@ class LeafArrAligner : public Aligner {
 
     void new_read(size_t read_len);
     void reset();
-    std::vector<Result> add_event(float *kmer_probs, std::ostream &seeds_out, std::ostream &timing_out);
+    std::vector<Result> add_event(std::vector<float> kmer_probs, std::ostream &seeds_out, std::ostream &timing_out);
 
     void print_graph(bool verbose);
 
     bool add_child(Range &range, 
                    PathBuffer &prev_path,
-                   Kmer kmer,
+                   u16 kmer,
                    float prob,
                    EventType type,
                    bool prev_is_sibling);
 
-    size_t add_sources(const Range &range, Kmer kmer, float prob);
+    size_t add_sources(const Range &range, u16 kmer, float prob);
 
     std::vector<Result> pop_seeds(std::ostream &out); //Big result gathering loop
                                      //Probably split into a few methods

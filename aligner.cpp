@@ -70,18 +70,21 @@ unsigned int AlnParams::nucl_to_events(unsigned int n) {
 //    return (nucl_to_events(seed_nlen) / (1.0 - max_stay_frac_)) + max_ignores_;
 //}
 
-Result::Result(unsigned int read_start, 
+Result::Result(unsigned int read_end, 
               unsigned  int seed_len, 
               float prob, 
               unsigned int ref_start, 
               unsigned int ref_end) 
-    : read_range_( Range(read_start, read_start + seed_len - 1) ),
+    : read_range_( Range(read_end - seed_len, read_end) ),
       ref_range_(Range(ref_start, ref_end)),
       seed_prob_(prob) {}
 
-void Result::set_ref_range(unsigned int start, unsigned int length) {
-    ref_range_.start_ = start;
-    ref_range_.end_ = start + length - 1;
+void Result::set_ref_range(unsigned int end, unsigned int length) {
+    //ref_range_.start_ = start;
+    //ref_range_.end_ = start + length - 1;
+
+    ref_range_.start_ = end - length + 1;
+    ref_range_.end_ = end;
 }
 
 

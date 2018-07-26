@@ -12,13 +12,13 @@
 class Result {
     public:
 
-    Result(unsigned int read_start, 
+    Result(unsigned int read_end, 
            unsigned int seed_len, 
            float prob, 
            unsigned int ref_start = 0, 
            unsigned int ref_end = 0);
 
-    void set_ref_range(unsigned int start, unsigned int end);
+    void set_ref_range(unsigned int end, unsigned int length);
     void print(std::ostream &out);
 
     Range read_range_, ref_range_;
@@ -73,7 +73,7 @@ class Aligner {
 
     virtual void new_read(size_t read_len) = 0;
     virtual void reset() = 0;
-    virtual std::vector<Result> add_event(float *kmer_probs, std::ostream &seeds_out, std::ostream &time_out) = 0;
+    virtual std::vector<Result> add_event(std::vector<float> kmer_probs, std::ostream &seeds_out, std::ostream &time_out) = 0;
 };
 
 #endif

@@ -10,57 +10,68 @@ ReadAln::ReadAln()
       total_len_(0) {
 }
 
-ReadAln::ReadAln(Range ref_en, unsigned int evt_en)
-    : ref_st_(ref_en),
-      evt_st_(evt_en),
-      ref_en_(ref_en.end_),
-      evt_en_(evt_en),
-      total_len_(ref_en.length()) {}
+ReadAln::ReadAln(Range ref_st, unsigned int evt_st, float prob)
+    : ref_en_(ref_st),
+      evt_st_(evt_st),
+      ref_st_(ref_st.end_),
+      evt_en_(evt_st),
+      total_len_(ref_st.length()),
+      prob_sum_(prob),
+      segments_(1) {}
 
 ReadAln::ReadAln(const ReadAln &r)
-    : ref_st_(r.ref_st_),
+    : ref_en_(r.ref_en_),
       evt_st_(r.evt_st_),
-      ref_en_(r.ref_en_),
+      ref_st_(r.ref_st_),
       evt_en_(r.evt_en_),
-      total_len_(r.total_len_) {}
+      total_len_(r.total_len_),
+      prob_sum_(r.prob_sum_),
+      segments_(r.segments_) {}
 
 
 void ReadAln::update_next(ReadAln &new_loc) const {
-    new_loc.ref_en_ = ref_en_;
-    new_loc.evt_en_ = evt_en_;
+    new_loc.ref_st_ = ref_st_;
+    new_loc.evt_st_ = evt_st_;
+    new_loc.prob_sum_ += prob_sum_;
+    //new_loc.segments_ = segments_ + 1;
 
-    if (ref_st_.intersects(new_loc.ref_st_)) {
+    if (ref_en_.intersects(new_loc.ref_en_)) {
 
-        if (new_loc.ref_st_.start_ < ref_st_.start_) {
+        if (new_loc.ref_en_.end_ > ref_en_.end_) {
             new_loc.total_len_ 
                 = total_len_ + 
-                  ref_st_.start_ - 
-                  new_loc.ref_st_.start_;
+                  new_loc.ref_en_.end_ - 
+                  ref_en_.end_;
         } else {
             new_loc.total_len_ = total_len_;
-            new_loc.ref_st_.start_ = ref_st_.start_;
+            new_loc.ref_en_.end_ = ref_en_.end_;
         }
+
+        new_loc.segments_ = segments_;
 
     } else {
         new_loc.total_len_ += total_len_;
+        new_loc.segments_ = segments_ + 1;
     }
 
 }
 
 Range ReadAln::ref_range() const {
-    return Range(ref_st_.start_, ref_en_);
+    return Range(ref_st_, ref_en_.end_);
 }
 
 void ReadAln::print(std::ostream &out, bool newline = false, bool print_all = false) const {
     out << total_len_ << " ";
 
-    out << ref_st_.start_;
-    if (print_all ) {
-        std::cout << ref_st_.end_ << ":";
-    }
+    out << ref_st_;
+    //if (print_all ) {
+    //    std::cout << ref_st_.end_ << ":";
+    //}
 
-    out << "-" << ref_en_ << " " 
-               << evt_st_ << "-" << evt_en_;
+    out << "-" << ref_en_.end_ << " " 
+               << evt_st_ << "-" 
+               << evt_en_;// << " "
+               //<< (int) segments_;
 
     if (newline)
         out << "\n";
@@ -71,10 +82,10 @@ bool ReadAln::is_valid() {
 }
 
 bool operator< (const ReadAln &r1, const ReadAln &r2) {
-    if (r1.ref_st_.end_ != r2.ref_st_.end_)
-        return r1.ref_st_.end_ < r2.ref_st_.end_;
+    if (r1.ref_en_.start_ != r2.ref_en_.start_)
+        return r1.ref_en_.start_ > r2.ref_en_.start_;
 
-    return r1.evt_st_ < r2.evt_st_;
+    return r1.evt_en_ > r2.evt_en_;
 }
 
 SeedTracker::SeedTracker(unsigned int read_length) {
@@ -102,7 +113,10 @@ ReadAln SeedTracker::add_seeds(const std::vector<Result> &seeds) {
 }
 
 ReadAln SeedTracker::add_seed(Result r) {
-    ReadAln new_loc(r.ref_range_, r.read_range_.end_);
+    ReadAln new_loc(r.ref_range_, r.read_range_.start_, r.seed_prob_);
+    //ReadAln new_loc(r.ref_range_, 
+    //                read_length_ - r.read_range_.start_ - 1, 
+    //                r.seed_prob_);
 
     auto loc = locations.lower_bound(new_loc),
          loc_match = locations.end();
@@ -114,8 +128,8 @@ ReadAln SeedTracker::add_seed(Result r) {
         bool higher_sup = loc_match == locations.end() 
                        || loc_match->total_len_ < loc->total_len_,
              
-             in_range = loc->ref_st_.end_ + new_loc.evt_st_
-                         <= new_loc.ref_st_.end_ + loc->evt_st_ + 6;
+             in_range = loc->ref_en_.start_ + new_loc.evt_en_
+                         >= new_loc.ref_en_.start_ + loc->evt_en_;
         
         //ASSERT loc->ref_st_.end_ >= new_loc.ref_st_.end_
 
@@ -127,8 +141,8 @@ ReadAln SeedTracker::add_seed(Result r) {
             loc_match = loc;
             //std::cout << (loc->ref_st_.end_ - new_loc.ref_st_.end_) << "\t" 
             //          << (loc->evt_st_ - new_loc.evt_st_) << std::endl;
-        } else if (loc->ref_st_.end_ - new_loc.ref_st_.end_ >= aln_length) {
-            break;
+        //} else if (loc->ref_st_.end_ - new_loc.ref_st_.end_ >= aln_length) {
+        //    break;
         }
 
         loc++;

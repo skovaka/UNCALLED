@@ -30,8 +30,6 @@ std::string reverse_complement(const std::string &seq) {
 
     return rev;
 }
-
-
     
 std::vector<u8> seq_to_bases(const std::string &seq) {
     std::vector<u8> bases(seq.size());

@@ -10,12 +10,16 @@ unsigned int min(unsigned int a, unsigned int b);
 
 class ReadAln {
     public:
-    Range ref_st_;
+    Range ref_en_;
     unsigned int evt_st_,
-        ref_en_, evt_en_,
+        ref_st_, evt_en_,
         total_len_;
 
-    ReadAln(Range ref_en, unsigned int evt_en);
+    float prob_sum_;
+
+    u8 segments_;
+
+    ReadAln(Range ref_st, unsigned int evt_st, float prob);
     ReadAln(const ReadAln &r);
     ReadAln();
     unsigned int ref_start_base() const;

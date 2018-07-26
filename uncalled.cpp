@@ -13,13 +13,11 @@
 
 #include "fast5.hpp"
 #include "arg_parse.hpp"
-#include "graph_aligner.hpp"
-#include "forest_aligner.hpp"
-#include "leaf_aligner.hpp"
 #include "leaf_arr_aligner.hpp"
 #include "seed_tracker.hpp"  
 #include "range.hpp"
 #include "kmer_model.hpp"
+#include "bwa_fmi.hpp"
 #include "sdsl_fmi.hpp"
 #include "base_fmi.hpp"
 #include "timer.hpp"
@@ -35,9 +33,10 @@
 
 #define BASE_FMI 0
 #define SDSL_FMI 1
+#define BWA_FMI 2
 
 #ifndef FMI_TYPE
-#define FMI_TYPE SDSL_FMI
+#define FMI_TYPE BWA_FMI
 #endif
 
 std::string FWD_STR = "fwd",
@@ -111,7 +110,7 @@ int main(int argc, char** argv) {
               << prefix << "_aln.txt" << "\n"
               << prefix << "_time.txt" << "\n";
 
-    KmerModel model(args.get_string(Opt::MODEL));
+    KmerModel model(args.get_string(Opt::MODEL), true);
 
     AlnParams aln_params(model,
                          args.get_int(Opt::PATH_WIN_LEN),
@@ -127,18 +126,23 @@ int main(int argc, char** argv) {
     
     #if FMI_TYPE == BASE_FMI
     BaseFMI fmi;
-    #else
+    #elif FMI_TYPE == SDSL_FMI
     SdslFMI fmi;
+    #else
+    BwaFMI fmi;
     #endif
 
-    #if FMI_TYPE == BASE_FMI
     std::cerr << "Reading FMI\n";
+
+    #if FMI_TYPE == BASE_FMI
     std::ifstream fmi_in(args.get_string(Opt::INDEX_PREFIX));
     fmi = BaseFMI(fmi_in, args.get_int(Opt::TALLY_DIST));
 
-    #else
-    std::cerr << "Reading FMI\n";
+    #elif FMI_TYPE == SDSL_FMI
     fmi = SdslFMI(args.get_string(Opt::INDEX_PREFIX));
+
+    #else
+    fmi = BwaFMI(args.get_string(Opt::INDEX_PREFIX));
     #endif
 
     #if ALN_TYPE == GRAPH_ALN
@@ -208,9 +212,6 @@ int main(int argc, char** argv) {
             aln_en = events.size() - 1;
         }
 
-        //NormParams norm = model.get_norm_params(events);
-
-
         unsigned int aln_len = aln_en - aln_st + 1;
 
         graph.new_read(aln_len);
@@ -240,27 +241,26 @@ int main(int argc, char** argv) {
         time_out << "== " << read_filename << " ==\n";
         #endif
 
-        float **all_probs = new float*[aln_len];
 
-        unsigned int e = aln_en;
+        u32 e = aln_st;
+        std::vector<float> kmer_probs(model.kmer_count());
 
-        for (; e >= aln_st && e <= aln_en; e--) {
+        for (; e >= aln_st && e <= aln_en; e++) {
 
-            all_probs[e-aln_st] = new float[model.kmer_count()];
-            for (Kmer kmer = 0; kmer < model.kmer_count(); kmer++) {
-                all_probs[e-aln_st][kmer] = model.event_match_prob(events[e], kmer);
+            for (u16 kmer = 0; kmer < model.kmer_count(); kmer++) {
+                kmer_probs[kmer] = model.event_match_prob(events[e], kmer);
             }
 
-            std::vector<Result> seeds = graph.add_event(all_probs[e-aln_st], 
+            std::vector<Result> seeds = graph.add_event(kmer_probs, 
                                                         seeds_out,
                                                         time_out);
 
 
             ReadAln new_aln = tracker.add_seeds(seeds);
 
-            if (aln_en - e > 20000) {
-                break;
-            }
+            //if (aln_en - e > 20000) {
+            //    break;
+            //}
 
             if (read_until && 
                 new_aln.total_len_ > min_aln_len && 
@@ -310,14 +310,9 @@ int main(int argc, char** argv) {
         alns_out.flush();
 
         alns_out  << "== " << read_timer.lap() << " ms, " 
-                  << (aln_en - e + 1) << " events ==\n";
+                  << (e - aln_st + 1) << " events ==\n";
 
         seeds_out << "== " << read_timer.lap() / 1000 << " sec ==\n";
-
-        for (e = e-aln_st+1; e < aln_len; e++) {
-            delete[] all_probs[e];
-        }
-        delete[] all_probs;
     }
 
 }
