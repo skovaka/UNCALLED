@@ -12,8 +12,9 @@ class ReadAln {
     public:
     Range ref_en_;
     unsigned int evt_st_,
-        ref_st_, evt_en_,
-        total_len_;
+                 ref_st_, 
+                 evt_en_,
+                 total_len_;
 
     float prob_sum_;
 

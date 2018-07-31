@@ -114,35 +114,37 @@ ReadAln SeedTracker::add_seeds(const std::vector<Result> &seeds) {
 
 ReadAln SeedTracker::add_seed(Result r) {
     ReadAln new_loc(r.ref_range_, r.read_range_.start_, r.seed_prob_);
-    //ReadAln new_loc(r.ref_range_, 
-    //                read_length_ - r.read_range_.start_ - 1, 
-    //                r.seed_prob_);
 
+    //Locations sorted by decreasing ref_en_.start
+    //Find the largest loc s.t. loc->ref_en_.start <= new_loc.ref_en_.start
+    //AKA r1 <= r2
     auto loc = locations.lower_bound(new_loc),
          loc_match = locations.end();
 
-    unsigned int aln_length = read_length_ - new_loc.evt_st_;
-    //std::cout << aln_length << std::endl;
+    u64 e2 = new_loc.evt_en_, //new event loc
+        r2 = new_loc.ref_en_.start_; //new ref loc
+
+    //Max evt/ref increase ratio
+    const u8 C = 12; //TODO: make parameter
 
     while (loc != locations.end()) {
+        u64 e1 = loc->evt_en_, //old event loc
+            r1 = loc->ref_en_.start_; //old ref loc
+
+        //We know r1 <= r2 because of location sort order
+
         bool higher_sup = loc_match == locations.end() 
                        || loc_match->total_len_ < loc->total_len_,
              
-             in_range = loc->ref_en_.start_ + new_loc.evt_en_
-                         >= new_loc.ref_en_.start_ + loc->evt_en_;
-        
-        //ASSERT loc->ref_st_.end_ >= new_loc.ref_st_.end_
-
-        //if (loc->ref_st_.end_ < new_loc.ref_st_.end_) {
-        //    std::cout << "WEIRD" << std::endl;
-        //}
-
+             in_range = e1 <= e2 && //event loc must increase
+                        r2 - r1 <= e2 - e1 && //evt increases more than ref (+ skip)
+                        (r2 - r1) >= (e2 - e1) / C; //evt doesn't increase too much
+             
         if (higher_sup && in_range) {
             loc_match = loc;
-            //std::cout << (loc->ref_st_.end_ - new_loc.ref_st_.end_) << "\t" 
-            //          << (loc->evt_st_ - new_loc.evt_st_) << std::endl;
-        //} else if (loc->ref_st_.end_ - new_loc.ref_st_.end_ >= aln_length) {
-        //    break;
+        //} else if (new_loc.ref_en_.start_ - loc->ref_en_.start_ >= new_loc.evt_en_) {
+        } else if (r2 - r1 >= e2) {
+            break;
         }
 
         loc++;
