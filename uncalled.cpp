@@ -309,10 +309,10 @@ int main(int argc, char** argv) {
         seeds_out.flush();
         alns_out.flush();
 
-        alns_out  << "== " << read_timer.lap() << " ms, " 
+        alns_out  << "== " << read_timer.get() << " ms, " 
                   << (e - aln_st + 1) << " events ==\n";
 
-        seeds_out << "== " << read_timer.lap() / 1000 << " sec ==\n";
+        seeds_out << "== " << read_timer.get() << " ms ==\n";
     }
 
 }

@@ -13,7 +13,7 @@ ReadAln::ReadAln()
 ReadAln::ReadAln(Range ref_st, unsigned int evt_st, float prob)
     : ref_en_(ref_st),
       evt_st_(evt_st),
-      ref_st_(ref_st.end_),
+      ref_st_(ref_st.start_),
       evt_en_(evt_st),
       total_len_(ref_st.length()),
       prob_sum_(prob),
@@ -53,7 +53,6 @@ void ReadAln::update_next(ReadAln &new_loc) const {
         new_loc.total_len_ += total_len_;
         new_loc.segments_ = segments_ + 1;
     }
-
 }
 
 Range ReadAln::ref_range() const {
@@ -61,14 +60,14 @@ Range ReadAln::ref_range() const {
 }
 
 void ReadAln::print(std::ostream &out, bool newline = false, bool print_all = false) const {
-    out << total_len_ << " ";
+    out << total_len_ << "\t";
 
     out << ref_st_;
     //if (print_all ) {
     //    std::cout << ref_st_.end_ << ":";
     //}
 
-    out << "-" << ref_en_.end_ << " " 
+    out << "-" << ref_en_.end_ << "\t" 
                << evt_st_ << "-" 
                << evt_en_;// << " "
                //<< (int) segments_;
@@ -179,17 +178,24 @@ ReadAln SeedTracker::add_seed(Result r) {
 }
 
 std::vector<ReadAln> SeedTracker::get_alignments(unsigned int min_len = 1) {
-    std::map<unsigned int, ReadAln> sorted_alns;
+    //std::map<unsigned int, ReadAln> sorted_alns;
+    //for (auto a = locations.begin(); a != locations.end(); a++) {
+    //    if (a->total_len_ >= min_len) {
+    //        sorted_alns[a->total_len_] = *a;
+    //    }
+    //}
 
-    for (auto a = locations.begin(); a != locations.end(); a++) {
-        if (a->total_len_ >= min_len) {
-            sorted_alns[a->total_len_] = *a;
-        }
-    }
+    std::vector<ReadAln> alns_sort(locations.begin(),
+                                   locations.end());
+
+    std::sort(alns_sort.begin(), alns_sort.end(),
+              [](const ReadAln &a, const ReadAln &b) -> bool {
+                  return a.total_len_ > b.total_len_;
+              });
 
     std::vector<ReadAln> ret;
-    for (auto a = sorted_alns.rbegin(); a != sorted_alns.rend(); a++) {
-        ret.push_back(a->second);
+    for (auto a = alns_sort.begin(); a != alns_sort.end(); a++) {
+        ret.push_back(*a);
     }
 
     return ret;
@@ -228,7 +234,7 @@ void SeedTracker::print(std::ostream &out, std::string strand, size_t max_out = 
         double overlap = top_ref.get_recp_overlap(alns[i].ref_range()),
                len_ratio = top_len / alns[i].total_len_;
 
-        out << strand << " ";
+        //out << strand << " ";
         alns[i].print(out, false);
         out << "\t" << len_ratio << "\t" << overlap << "\n";
     }
