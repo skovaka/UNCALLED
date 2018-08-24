@@ -57,11 +57,13 @@ enum Opt {
     TALLY_DIST  = 't',
 
     MIN_ALN_LEN     = 'a',
-    MIN_ALN_CONF    = 'u', //u for until
     PATH_WIN_LEN    = 'w',
     MIN_REP_LEN     = 'r',
     MAX_REP_COPY    = 'c',
     MAX_PATHS       = 'p',
+
+    MIN_MEAN_CONF   = 'M', //u for until
+    MIN_TOP_CONF    = 'T', //u for until
 
     STAY_FRAC       = 's',
     MAX_CONSEC_STAY = 'y',
@@ -84,11 +86,13 @@ int main(int argc, char** argv) {
     args.add_int(   Opt::TALLY_DIST, "tally_dist",   128,     "");
 
     args.add_int(   Opt::MIN_ALN_LEN,  "min_aln_len", 25, "");
-    args.add_double(Opt::MIN_ALN_CONF, "min_aln_conf", 2, "");
     args.add_int(   Opt::PATH_WIN_LEN, "path_window_len", 22, "");
     args.add_int(   Opt::MIN_REP_LEN,  "min_repeat_len", 0, "");
     args.add_int(   Opt::MAX_REP_COPY, "max_repeat_copy", 100, "");
     args.add_int(   Opt::MAX_PATHS,    "max_paths", 10000, "");
+
+    args.add_double(Opt::MIN_MEAN_CONF, "min_mean_conf", 6.67, "");
+    args.add_double(Opt::MIN_TOP_CONF,  "min_top_conf", 2, "");
 
     args.add_double(Opt::STAY_FRAC,       "stay_frac",    0.5,    "");
     args.add_int(   Opt::MAX_CONSEC_STAY, "max_consec_stay", 8, "");
@@ -165,8 +169,12 @@ int main(int argc, char** argv) {
     }
 
     unsigned int min_aln_len = args.get_int(Opt::MIN_ALN_LEN);
-    float min_aln_conf = (float) args.get_double(Opt::MIN_ALN_CONF);
-    bool read_until = min_aln_conf > 0;
+    float min_mean_conf = (float) args.get_double(Opt::MIN_MEAN_CONF),
+          min_top_conf = (float) args.get_double(Opt::MIN_TOP_CONF);
+    bool read_until = min_mean_conf > 0 || min_top_conf > 0;
+    std::cout << min_mean_conf << " "
+              << min_top_conf << " "
+              << read_until << std::endl;
 
     detector_param params = event_detection_defaults;
     params.threshold1 = 1.4;
@@ -216,34 +224,30 @@ int main(int argc, char** argv) {
 
         graph.new_read(aln_len);
 
-        SeedTracker tracker(aln_len);
+        SeedTracker tracker(fmi.size(), 
+                            min_mean_conf, 
+                            min_top_conf, 
+                            min_aln_len, 
+                            args.get_int(Opt::PATH_WIN_LEN));
+
 
         Timer read_timer;
 
         #ifdef VERBOSE_TIME
-        //Timer event_timer;
-
         time_out << std::fixed << std::setprecision(3);
         #else
         unsigned int status_step = aln_len / 10,
                      status = 0;
+        time_out << "== " << read_filename << " ==\n";
         #endif
         
         seeds_out << "== " << read_filename << " ==\n";
-        alns_out << "== " << read_filename << " ==\n";
-        alns_out << "== scale/shift: " << norm.scale << " " << norm.shift << " ==\n";
-        alns_out << "== aligning " 
-                 << aln_st << "-" 
-                 << aln_en << " of " 
-                 << events.size() << " events ==\n";
-
-        #ifndef VERBOSE_TIME
-        time_out << "== " << read_filename << " ==\n";
-        #endif
 
 
         u32 e = aln_st;
         std::vector<float> kmer_probs(model.kmer_count());
+
+        ReadAln final_aln;
 
         for (; e >= aln_st && e <= aln_en; e++) {
 
@@ -255,17 +259,14 @@ int main(int argc, char** argv) {
                                                         seeds_out,
                                                         time_out);
 
-
-            ReadAln new_aln = tracker.add_seeds(seeds);
+            final_aln = tracker.add_seeds(seeds);
 
             //if (aln_en - e > 20000) {
             //    break;
             //}
 
-            if (read_until && 
-                new_aln.total_len_ > min_aln_len && 
-                tracker.check_ratio(new_aln, min_aln_conf)) {
-                    break;
+            if (read_until && final_aln.is_valid()) {
+                break;
             }
 
             #ifndef VERBOSE_TIME
@@ -284,35 +285,43 @@ int main(int argc, char** argv) {
             time_out.flush();
         }
 
-        #ifdef VERBOSE_TIME
-        //time_out << std::setw(23) << event_timer.lap() << std::endl;
-        #if ALN_TYPE == LEAF_ARR_ALN
-        time_out << std::setw(10) << (graph.loop1_time_) 
-                 << std::setw(10) << (graph.sort_time_) 
-                 << std::setw(10) << (graph.loop2_time_)
-                 << std::setw(10) << (graph.fullsource_time_)
-                 << std::setw(10) << (graph.fmrs_time_)
-                 << std::setw(10) << (graph.fmsa_time_) << "\n";
-        #endif
+        double aln_time = read_timer.get();
 
+        #ifdef VERBOSE_TIME
+            //time_out << std::setw(23) << event_timer.lap() << std::endl;
+            #if ALN_TYPE == LEAF_ARR_ALN
+            time_out << std::setw(10) << (graph.loop1_time_) 
+                     << std::setw(10) << (graph.sort_time_) 
+                     << std::setw(10) << (graph.loop2_time_)
+                     << std::setw(10) << (graph.fullsource_time_)
+                     << std::setw(10) << (graph.fmrs_time_)
+                     << std::setw(10) << (graph.fmsa_time_) << "\n";
+            #endif
         #else
-        time_out << "100% (" << read_timer.get() / 1000 << ")\n";
+        time_out << "100% (" << aln_time / 1000 << ")\n";
 
         time_out << "== END ==\n";
         #endif
 
-        tracker.print(alns_out, FWD_STR, (size_t) 10);
+        if (read_until) {
+            if (final_aln.is_valid()) {
+                alns_out << "aligned\t" << final_aln << "\t";
+            } else {
+                alns_out << "unaligned\t0-0\t0-" << aln_len << "\t0\t";
+            }
+            alns_out << aln_time << "\t" 
+                     << aln_len << "\t"
+                     << read_filename << std::endl;
+        } else {
+            tracker.print(alns_out, 10);
+            alns_out << aln_len << " events processed" << std::endl;
+        }
 
-        std::cout.flush();
-        
+        seeds_out << "== " << aln_time << " ms ==\n";
+
         time_out.flush();
         seeds_out.flush();
         alns_out.flush();
-
-        alns_out  << "== " << read_timer.get() << " ms, " 
-                  << (e - aln_st + 1) << " events ==\n";
-
-        seeds_out << "== " << read_timer.get() << " ms ==\n";
     }
 
 }

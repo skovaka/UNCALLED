@@ -5,54 +5,47 @@
 
 //#define DEBUG
 
+static const ReadAln NULL_ALN = ReadAln();
+u8 ReadAln::WIN_LEN;
+
 ReadAln::ReadAln() 
-    : evt_st_(-1),
+    : evt_st_(1),
+      evt_en_(0),
       total_len_(0) {
 }
 
-ReadAln::ReadAln(Range ref_st, unsigned int evt_st, float prob)
-    : ref_en_(ref_st),
+ReadAln::ReadAln(Range ref_st, u32 evt_st)
+    : ref_st_(ref_st.start_),
+      ref_en_(ref_st),
       evt_st_(evt_st),
-      ref_st_(ref_st.start_),
       evt_en_(evt_st),
-      total_len_(ref_st.length()),
-      prob_sum_(prob),
-      segments_(1) {}
+      total_len_(ref_st.length()) {}
 
 ReadAln::ReadAln(const ReadAln &r)
-    : ref_en_(r.ref_en_),
+    : ref_st_(r.ref_st_),
+      ref_en_(r.ref_en_),
       evt_st_(r.evt_st_),
-      ref_st_(r.ref_st_),
       evt_en_(r.evt_en_),
-      total_len_(r.total_len_),
-      prob_sum_(r.prob_sum_),
-      segments_(r.segments_) {}
+      total_len_(r.total_len_) {}
 
 
-void ReadAln::update_next(ReadAln &new_loc) const {
-    new_loc.ref_st_ = ref_st_;
-    new_loc.evt_st_ = evt_st_;
-    new_loc.prob_sum_ += prob_sum_;
-    //new_loc.segments_ = segments_ + 1;
-
-    if (ref_en_.intersects(new_loc.ref_en_)) {
-
-        if (new_loc.ref_en_.end_ > ref_en_.end_) {
-            new_loc.total_len_ 
-                = total_len_ + 
-                  new_loc.ref_en_.end_ - 
-                  ref_en_.end_;
+u8 ReadAln::update(ReadAln &new_aln) {
+    u8 growth = 0;
+    if (new_aln.ref_en_.start_ < ref_en_.end_) {
+        if (new_aln.ref_en_.end_ > ref_en_.end_) {
+            growth = new_aln.ref_en_.end_ - ref_en_.end_;
+            ref_en_ = new_aln.ref_en_;
         } else {
-            new_loc.total_len_ = total_len_;
-            new_loc.ref_en_.end_ = ref_en_.end_;
+            ref_en_.start_ = new_aln.ref_en_.start_;
         }
-
-        new_loc.segments_ = segments_;
-
     } else {
-        new_loc.total_len_ += total_len_;
-        new_loc.segments_ = segments_ + 1;
+        growth = new_aln.total_len_;
+        ref_en_ = new_aln.ref_en_;
     }
+
+    evt_en_ = new_aln.evt_en_;
+    total_len_ += growth;
+    return growth;
 }
 
 Range ReadAln::ref_range() const {
@@ -77,7 +70,7 @@ void ReadAln::print(std::ostream &out, bool newline = false, bool print_all = fa
 }
 
 bool ReadAln::is_valid() {
-    return evt_st_ >= 0;
+    return evt_st_ <= evt_en_;
 }
 
 bool operator< (const ReadAln &r1, const ReadAln &r2) {
@@ -87,14 +80,27 @@ bool operator< (const ReadAln &r1, const ReadAln &r2) {
     return r1.evt_en_ > r2.evt_en_;
 }
 
-SeedTracker::SeedTracker(unsigned int read_length) {
-    read_length_ = read_length;
-    longest_seed = NULL;
+std::ostream &operator<< (std::ostream &out, const ReadAln &a) {
+    out << a.ref_st_ << "-" << a.ref_en_.end_ << "\t"
+        << a.evt_st_ << "-" << (a.evt_en_ + ReadAln::WIN_LEN) << "\t"
+        << a.total_len_;
+    return out;
+}
+
+SeedTracker::SeedTracker(u64 ref_len, float mean_thresh, float top_thresh, u8 min_aln_len, u8 win_len)
+    : ref_len_(ref_len),
+      mean_thresh_(mean_thresh),
+      top_thresh_(top_thresh),
+      min_aln_len_(min_aln_len) {
+    ReadAln::WIN_LEN = win_len;
+    reset();
 }
 
 void SeedTracker::reset() {
-    locations.clear();
-    longest_seed = NULL;
+    alignments_.clear();
+    all_lens_.clear();
+    max_len_ = 0;
+    len_sum_ = 0;
 }
 
 ReadAln SeedTracker::add_seeds(const std::vector<Result> &seeds) {
@@ -103,139 +109,113 @@ ReadAln SeedTracker::add_seeds(const std::vector<Result> &seeds) {
     for (size_t i = 0; i < seeds.size(); i++) {
         ReadAln a = add_seed(seeds[i]);
 
-        if (!top.is_valid() || top.total_len_ < a.total_len_) {
-            top = a;
+        if (a.total_len_ >= min_aln_len_ && a.total_len_ > max_len_) {
+
+
+            max_len_ = a.total_len_;
+            float mean_len = len_sum_ / alignments_.size();
+            float next_len = *std::next(all_lens_.rbegin());
+
+            if ((mean_thresh_ > 0 && max_len_ / mean_len >= mean_thresh_) ||
+                (top_thresh_ > 0  && max_len_ / next_len >= top_thresh_)) {
+                return a;
+            }
         }
     }
 
-    return top;
+    return NULL_ALN;
 }
 
 ReadAln SeedTracker::add_seed(Result r) {
-    ReadAln new_loc(r.ref_range_, r.read_range_.start_, r.seed_prob_);
+    ReadAln new_aln(r.ref_range_, r.read_range_.start_);
 
     //Locations sorted by decreasing ref_en_.start
-    //Find the largest loc s.t. loc->ref_en_.start <= new_loc.ref_en_.start
+    //Find the largest aln s.t. aln->ref_en_.start <= new_aln.ref_en_.start
     //AKA r1 <= r2
-    auto loc = locations.lower_bound(new_loc),
-         loc_match = locations.end();
+    auto aln = alignments_.lower_bound(new_aln),
+         aln_match = alignments_.end();
 
-    u64 e2 = new_loc.evt_en_, //new event loc
-        r2 = new_loc.ref_en_.start_; //new ref loc
+    u64 e2 = new_aln.evt_en_, //new event aln
+        r2 = new_aln.ref_en_.start_; //new ref aln
 
-    //Max evt/ref increase ratio
-    const u8 C = 12; //TODO: make parameter
+    while (aln != alignments_.end()) {
+        u64 e1 = aln->evt_en_, //old event aln
+            r1 = aln->ref_en_.start_; //old ref aln
 
-    while (loc != locations.end()) {
-        u64 e1 = loc->evt_en_, //old event loc
-            r1 = loc->ref_en_.start_; //old ref loc
+        //We know r1 <= r2 because of alnation sort order
 
-        //We know r1 <= r2 because of location sort order
-
-        bool higher_sup = loc_match == locations.end() 
-                       || loc_match->total_len_ < loc->total_len_,
+        bool higher_sup = aln_match == alignments_.end() 
+                       || aln_match->total_len_ < aln->total_len_,
              
-             in_range = e1 <= e2 && //event loc must increase
+             in_range = e1 <= e2 && //event aln must increase
                         r2 - r1 <= e2 - e1 && //evt increases more than ref (+ skip)
-                        (r2 - r1) >= (e2 - e1) / C; //evt doesn't increase too much
+                        (r2 - r1) >= (e2 - e1) / 12; //evt doesn't increase too much
              
         if (higher_sup && in_range) {
-            loc_match = loc;
-        //} else if (new_loc.ref_en_.start_ - loc->ref_en_.start_ >= new_loc.evt_en_) {
+            aln_match = aln;
         } else if (r2 - r1 >= e2) {
             break;
         }
 
-        loc++;
+        aln++;
     }
 
-    if (loc_match != locations.end()) {
+    if (aln_match != alignments_.end()) {
+        ReadAln a = *aln_match;
 
-        loc_match->update_next(new_loc);
-        locations.erase(loc_match);
-        locations.insert(new_loc);
+        u32 prev_len = a.total_len_;
+        a.update(new_aln);
 
+        if (a.total_len_ != prev_len) {
+            len_sum_ += a.total_len_ - prev_len;
+            auto l = all_lens_.find(prev_len);
+            all_lens_.insert(l, a.total_len_);
+            all_lens_.erase(l);
+        }
+
+        auto hint = std::next(aln_match);
+        alignments_.erase(aln_match);
+        alignments_.insert(hint, a);
 
         #ifdef DEBUG
-        new_loc.print(std::cout, true, false);
+        new_aln.print(std::cout, true, false);
         #endif
 
-    } else if (loc_match == locations.end()) {
-        locations.insert(new_loc);
-
-        #ifdef DEBUG
-        new_loc.print(std::cout, true, false);
-        #endif
+        return a;
     }
 
-    if (longest_seed == NULL || new_loc.total_len_ > longest_seed->total_len_) {
-        longest_seed = &new_loc;
-    }
+    alignments_.insert(new_aln);
+    all_lens_.insert(new_aln.total_len_);
+    len_sum_ += new_aln.total_len_;
 
-    //std::cerr << new_loc.ref_en_ << " " << r.ref_range_.length() << "\n";
+    #ifdef DEBUG
+    new_aln.print(std::cout, true, false);
+    #endif
 
-    return new_loc;
+    return new_aln;
 }
 
-std::vector<ReadAln> SeedTracker::get_alignments(unsigned int min_len = 1) {
-    //std::map<unsigned int, ReadAln> sorted_alns;
-    //for (auto a = locations.begin(); a != locations.end(); a++) {
-    //    if (a->total_len_ >= min_len) {
-    //        sorted_alns[a->total_len_] = *a;
-    //    }
-    //}
+void SeedTracker::print(std::ostream &out, u16 max_out = 10) {
+    if (alignments_.empty()) {
+        return;
+    }
 
-    std::vector<ReadAln> alns_sort(locations.begin(),
-                                   locations.end());
+    std::vector<ReadAln> alns_sort(alignments_.begin(),
+                                   alignments_.end());
 
     std::sort(alns_sort.begin(), alns_sort.end(),
               [](const ReadAln &a, const ReadAln &b) -> bool {
                   return a.total_len_ > b.total_len_;
               });
 
-    std::vector<ReadAln> ret;
-    for (auto a = alns_sort.begin(); a != alns_sort.end(); a++) {
-        ret.push_back(*a);
-    }
+    Range top_ref = alns_sort[0].ref_range();
+    double top_len = alns_sort[0].total_len_;
 
-    return ret;
-}
+    for (unsigned int i = 0; i < min(max_out, alns_sort.size()); i++) {
+        double overlap = top_ref.get_recp_overlap(alns_sort[i].ref_range()),
+               len_ratio = top_len / alns_sort[i].total_len_;
 
-bool SeedTracker::check_ratio(const ReadAln &aln, double ratio) {
-
-    Range top_ref = aln.ref_range();
-    unsigned int max_len = (aln.total_len_) / ratio;
-
-    for (auto a = locations.begin(); a != locations.end(); a++) {
-        if (top_ref.get_recp_overlap(a->ref_range()) == 0 && 
-            a->total_len_ >= max_len) {
-            
-            return false;
-        }
-    }
-
-    return true;
-}
-
-void SeedTracker::print(std::ostream &out, std::string strand, size_t max_out = 10) {
-
-    std::vector<ReadAln> alns = get_alignments(1);
-
-    //std::cout << strand << " " << top_ratio(alns) << "\n";
-
-    if (alns.empty()) {
-        return;
-    }
-
-    Range top_ref = alns[0].ref_range();
-    double top_len = alns[0].total_len_;
-
-    for (unsigned int i = 0; i < min(max_out, alns.size()); i++) {
-        double overlap = top_ref.get_recp_overlap(alns[i].ref_range()),
-               len_ratio = top_len / alns[i].total_len_;
-
-        //out << strand << " ";
-        alns[i].print(out, false);
+        alns_sort[i].print(out, false);
         out << "\t" << len_ratio << "\t" << overlap << "\n";
     }
 }

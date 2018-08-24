@@ -540,7 +540,7 @@ void LeafArrAligner::check_alignments(PathBuffer &p,
             results.push_back(r);
 
             //seeds_out << label_ << "\t";
-            r.print(seeds_out);
+            //r.print(seeds_out);
         }
     } else {
         //std::cout << " fail\n";

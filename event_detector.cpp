@@ -106,6 +106,8 @@ std::vector<Event> EventDetector::get_all_events(std::vector<RawSample> raw) {
         }
     }
 
+    reset();
+
     return events;
 }
 

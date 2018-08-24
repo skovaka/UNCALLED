@@ -244,6 +244,29 @@ void KmerModel::normalize_events(std::vector<Event> &events, NormParams norm) co
     }
 }
 
+//TODO: refactor this w/ normalize_events
+//would be easier if I stop storing full on events
+//but that's a bigger project
+void KmerModel::normalize_raw(std::vector<float> &raw) const {
+    double raw_mean = 0;
+    for (auto s = raw.begin(); s != raw.end(); s++) 
+        raw_mean += *s;
+    raw_mean /= raw.size();
+
+    //Compute events stdv
+    double raw_stdv = 0;
+    for (auto s = raw.begin(); s != raw.end(); s++) 
+        raw_stdv += pow(*s - raw_mean, 2);
+    raw_stdv = sqrt(raw_stdv / raw.size());
+    
+    float scale = model_stdv_ / raw_stdv,
+          shift = model_mean_ - (scale * raw_mean);
+
+    for (u32 i = 0; i < raw.size(); i++) {
+        raw[i] = scale * raw[i] + shift;
+    }
+}
+
 
 //Reads the given fasta file and stores forward and reverse k-mers
 void KmerModel::parse_fasta(
@@ -276,7 +299,7 @@ void KmerModel::parse_fasta(
         rev_ids[rev_ids.size()-i-1] = rev_comp_ids_[fwd_ids[i]];
 
     //Add EOF character
-    fwd_ids.push_back((int) kmer_count_);
-    rev_ids.push_back((int) kmer_count_);
+    //fwd_ids.push_back((int) kmer_count_);
+    //rev_ids.push_back((int) kmer_count_);
 
 }
