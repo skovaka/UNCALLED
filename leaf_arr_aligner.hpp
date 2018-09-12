@@ -28,7 +28,7 @@ class LeafArrAligner : public Aligner {
         float *prob_sums_;
         unsigned long event_types_;
 
-        unsigned short all_type_counts_[EventType::NUM_TYPES];
+        //unsigned short all_type_counts_[EventType::NUM_TYPES];
         unsigned char win_type_counts_[EventType::NUM_TYPES];
 
         Range fm_range_;

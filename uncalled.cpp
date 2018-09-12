@@ -234,6 +234,8 @@ int main(int argc, char** argv) {
         Timer read_timer;
 
         #ifdef VERBOSE_TIME
+        Timer tracker_timer;
+        double tracker_time = 0;
         time_out << std::fixed << std::setprecision(3);
         #else
         unsigned int status_step = aln_len / 10,
@@ -259,7 +261,15 @@ int main(int argc, char** argv) {
                                                         seeds_out,
                                                         time_out);
 
+            #ifdef VERBOSE_TIME
+            tracker_timer.reset();
+            #endif
+
             final_aln = tracker.add_seeds(seeds);
+
+            #ifdef VERBOSE_TIME
+            tracker_time += tracker_timer.get();
+            #endif
 
             //if (aln_en - e > 20000) {
             //    break;
@@ -295,7 +305,8 @@ int main(int argc, char** argv) {
                      << std::setw(10) << (graph.loop2_time_)
                      << std::setw(10) << (graph.fullsource_time_)
                      << std::setw(10) << (graph.fmrs_time_)
-                     << std::setw(10) << (graph.fmsa_time_) << "\n";
+                     << std::setw(10) << (graph.fmsa_time_)
+                     << std::setw(10) << tracker_time << "\n";
             #endif
         #else
         time_out << "100% (" << aln_time / 1000 << ")\n";

@@ -63,10 +63,10 @@ void LeafArrAligner::PathBuffer::make_source(Range &range, u16 kmer, float prob)
     sa_checked_ = false;
 
     //MATCH should always be index 0
-    all_type_counts_[EventType::MATCH] = 1;
+    //all_type_counts_[EventType::MATCH] = 1;
     win_type_counts_[EventType::MATCH] = 1;
     for (unsigned char t = 1; t < EventType::NUM_TYPES; t++) {
-        all_type_counts_[t] = 0;
+        //all_type_counts_[t] = 0;
         win_type_counts_[t] = 0;
     }
 
@@ -88,7 +88,7 @@ void LeafArrAligner::PathBuffer::make_child(PathBuffer &p,
     kmer_ = kmer;
     sa_checked_ = p.sa_checked_;
 
-    std::memcpy(all_type_counts_, p.all_type_counts_, EventType::NUM_TYPES * sizeof(unsigned short));
+    //std::memcpy(all_type_counts_, p.all_type_counts_, EventType::NUM_TYPES * sizeof(unsigned short));
     std::memcpy(win_type_counts_, p.win_type_counts_, EventType::NUM_TYPES * sizeof(unsigned char));
 
     if (win_full()) {
@@ -105,7 +105,7 @@ void LeafArrAligner::PathBuffer::make_child(PathBuffer &p,
     event_types_ = TYPE_ADDS[type] | (p.event_types_ >> TYPE_BITS);
 
     win_type_counts_[type]++;
-    all_type_counts_[type]++;
+    //all_type_counts_[type]++;
 
     if (type == EventType::STAY) {
         consec_stays_++;
@@ -139,7 +139,8 @@ size_t LeafArrAligner::PathBuffer::match_len() const {
 }
 
 float LeafArrAligner::PathBuffer::mean_prob() const {
-    return (prob_sums_[win_len()] - prob_sums_[0]) / win_len();
+    //return (prob_sums_[win_len()] - prob_sums_[0]) / win_len();
+    return win_prob_;
 }
 
 bool LeafArrAligner::PathBuffer::better_than(const PathBuffer &p) {
@@ -163,7 +164,7 @@ bool LeafArrAligner::PathBuffer::should_report(const AlnParams &p,
 
            length_ >= p.path_win_len_ &&
            (path_ended || type_head() == EventType::MATCH) &&
-           (path_ended || win_type_counts_[EventType::STAY] <= p.max_stay_frac_ * win_len()) &&
+           (path_ended || win_type_counts_[EventType::STAY] <= p.max_stay_frac_ * p.path_win_len_) &&
           win_prob_ >= p.window_prob_;
 }
 
@@ -176,7 +177,7 @@ void LeafArrAligner::PathBuffer::replace(const PathBuffer &p) {
     sa_checked_ = p.sa_checked_;
 
     std::memcpy(prob_sums_, p.prob_sums_, (MAX_WIN_LEN+1) * sizeof(float));
-    std::memcpy(all_type_counts_, p.all_type_counts_, EventType::NUM_TYPES * sizeof(unsigned short));
+    //std::memcpy(all_type_counts_, p.all_type_counts_, EventType::NUM_TYPES * sizeof(unsigned short));
     std::memcpy(win_type_counts_, p.win_type_counts_, EventType::NUM_TYPES * sizeof(unsigned char));
 }
 
@@ -321,19 +322,21 @@ std::vector<Result> LeafArrAligner::add_event(std::vector<float> kmer_probs,
         //#endif
         
         //Add all the neighbors
-        auto neighbor_itr = params_.model_.get_neighbors(prev_kmer);
-        for (auto next_kmer = neighbor_itr.first; 
-             next_kmer != neighbor_itr.second; 
-             next_kmer++) {
+        for (u8 i = 0; i < 4; i++) {
+            u16 next_kmer = params_.model_.get_neighbor(prev_kmer, i);
+        //for (auto next_kmer = neighbor_itr.first; 
+        //     next_kmer != neighbor_itr.second; 
+        //     next_kmer++) {
+            //std::cout << "OooOOHhh " << (*next_kmer) << std::endl;
 
-            prob = kmer_probs[*next_kmer];
+            prob = kmer_probs[next_kmer];
 
             if (prob < evpr_thresh) {
                 continue;
             }
 
             //u8 next_base = params_.model_.get_first_base(*next_kmer);
-            u8 next_base = params_.model_.get_last_base(*next_kmer);
+            u8 next_base = params_.model_.get_last_base(next_kmer);
 
             #ifdef VERBOSE_TIME
             loop1_time_ += timer.lap();
@@ -353,7 +356,7 @@ std::vector<Result> LeafArrAligner::add_event(std::vector<float> kmer_probs,
 
             next_path->make_child(prev_path, 
                                   next_range,
-                                  *next_kmer, 
+                                  next_kmer, 
                                   prob, 
                                   EventType::MATCH);
 
@@ -400,7 +403,7 @@ std::vector<Result> LeafArrAligner::add_event(std::vector<float> kmer_probs,
 
         Range unchecked_range, source_range;
 
-        for (size_t i = 0; i < next_size; i++) {
+        for (u32 i = 0; i < next_size; i++) {
             source_kmer = next_paths_[i].kmer_;
             prob = kmer_probs[source_kmer];
 
