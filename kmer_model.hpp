@@ -17,7 +17,7 @@ typedef struct NormParams {
 
 class KmerModel {
     public:
-    typedef std::list<u16>::const_iterator neighbor_itr;
+    typedef std::vector<u16>::const_iterator neighbor_itr;
 
     KmerModel(std::string model_fname, bool complement);
     ~KmerModel();
@@ -26,6 +26,7 @@ class KmerModel {
     void normalize_events(std::vector<Event> &events, NormParams norm={0, 0}) const;
     void normalize_raw(std::vector<float> &raw) const;
 
+    u16 get_neighbor(u16 k, u8 i) const;
     std::pair<neighbor_itr, neighbor_itr> get_neighbors(u16 k_id) const {
         return std::pair<neighbor_itr, neighbor_itr>
                     (neighbors_[k_id].begin(), neighbors_[k_id].end());
@@ -59,7 +60,7 @@ class KmerModel {
     double lambda_, model_mean_, model_stdv_;
     bool complement_;
 
-    std::list<u16> *neighbors_; //TODO: NO MORE LISTS
+    std::vector< std::vector<u16> > neighbors_; //TODO: NO MORE LISTS
     u16 *rev_comp_ids_;
 };
 

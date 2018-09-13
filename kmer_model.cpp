@@ -65,7 +65,7 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
     model_mean_ = 0;
 
     //Stores which kmers can follow which
-    neighbors_ = new std::list<u16>[kmer_count_]; 
+    neighbors_.resize(kmer_count_);
     rev_comp_ids_ = new u16[kmer_count_]; 
 
     //Read and store rest of the model
@@ -145,7 +145,6 @@ KmerModel::~KmerModel() {
     delete [] lv_vars_x2_;
     delete [] lognorm_denoms_;
     delete [] sd_means_;
-    delete [] neighbors_; 
     delete [] sd_stdvs_;
     delete [] rev_comp_ids_; 
 }
@@ -267,6 +266,9 @@ void KmerModel::normalize_raw(std::vector<float> &raw) const {
     }
 }
 
+u16 KmerModel::get_neighbor(u16 k, u8 i) const {
+    return neighbors_[k][i];
+}
 
 //Reads the given fasta file and stores forward and reverse k-mers
 void KmerModel::parse_fasta(

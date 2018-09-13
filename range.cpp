@@ -26,7 +26,6 @@ size_t Range::length() const {
     return end_ - start_ + 1;
 }
 
-
 Range Range::split_range(const Range &r) { 
 
     Range left;
@@ -88,13 +87,8 @@ bool Range::is_valid() const {
 
 
 bool operator< (const Range &q1, const Range &q2) {
-    if (q1.start_ < q2.start_)
-        return true;
-
-    if (q1.start_ == q2.start_ && q1.end_ < q2.end_)
-        return true;
-    
-    return false;
+    return q1.start_ < q2.start_ ||
+           (q1.start_ == q2.start_ && q1.end_ < q2.end_);
 }
 
 
