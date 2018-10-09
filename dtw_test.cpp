@@ -7,118 +7,19 @@
 #include "timer.hpp"
 #include "dtw.hpp"
 
-double **full_dtw(const KmerModel &model,
-                  const std::vector<Event> &read_events, 
-                  const std::vector<u16> &ref_kmers,
-                  bool local = true,
-                  bool prob = true) {
-
-    const double INF = 100000000;
-
-    const int rd_len = read_events.size(),
-              rf_len = ref_kmers.size();
-
-    double **dtw_mat = new double * [rf_len];
-    for (int i = 0; i < rf_len; i++) {
-        dtw_mat[i] = new double[rd_len];
-    }
-
-
-    double cost, up, left, diag;
-
-    for (int i = 0; i < rf_len; i++) {
-        for (int j = 0; j < rd_len; j++) {
-
-            up   = i > 0 ? dtw_mat[i-1][j]
-                         : INF;
-
-            left = j > 0 ? dtw_mat[i][j-1]
-                         : (local ? 0
-                                  : INF);
-
-            diag = j > 0 && i > 0 ? dtw_mat[i-1][j-1] 
-                                  : (j == i || (j == 0 && local) ? 0 
-                                                                 : INF);
-            if (prob) {
-                cost = -model.event_match_prob(read_events[j], ref_kmers[i]);
-            } else {
-                cost = fabs(model.lv_means_[ref_kmers[i]] - read_events[j].mean);
-            }
-
-
-            dtw_mat[i][j] = fmin(diag + cost, 
-                            fmin(left + cost, 
-                                 up + 2*cost));
-        }
-    }
-
-    return dtw_mat;
-}
-
-std::list< std::pair<size_t, size_t> > get_path(double **dtw_mat, 
-                                                int rf_len, 
-                                                int rd_len,
-                                                bool local = true) {
-
-    std::pair<size_t, size_t> p = {rf_len-1, rd_len-1};
-
-    if (local) {
-        for (int i = 0; i < rf_len; i++) {
-            if (dtw_mat[i][rd_len-1] < dtw_mat[p.first][rd_len-1]) {
-                p.first = i;
-            } 
-        }
-    }
-
-    std::list< std::pair<size_t, size_t> > path;
-    path.push_front(p);
-
-    double up, left, diag;
-
-    bool done = false;
-    while(!done) {
-        if (p.first == 0) {
-            p = {p.first, p.second-1};
-        } else if (p.second == 0) {
-            p = {p.first-1, p.second};
-        } else {
-            up = dtw_mat[p.first-1][p.second];
-            left = dtw_mat[p.first][p.second-1];
-            diag = dtw_mat[p.first-1][p.second-1];
-
-            if (diag <= left && diag <= up) {
-                p = {p.first-1, p.second-1};
-            } else if (left <= up) {
-                p = {p.first, p.second-1};
-            } else {
-                p = {p.first-1, p.second};
-            }
-        }
-
-        path.push_front(p);
-        
-        done = p.second == 0 && (local || p.first == 0); 
-    }
-
-    return path;
-}
-
-bool get_raw(std::string filename, std::vector<float> &raw) {
+bool open_fast5(const std::string &filename, fast5::File &file) {
     if (!fast5::File::is_valid_file(filename)) {
         std::cerr << "Error: '" << filename << "' is not a valid file \n";
     }
 
     try {
-        fast5::File file;
         file.open(filename);
         
         if (!file.is_open()) {  
-            std::cerr << "Error: unable to open '" 
-                      << filename << "'\n";
+            std::cerr << "Error: unable to open '" << filename << "'\n";
             return false;
         }
 
-        raw = file.get_raw_samples();
         return true;
         
     } catch (hdf5_tools::Exception& e) {
@@ -126,30 +27,38 @@ bool get_raw(std::string filename, std::vector<float> &raw) {
         return false;
     }
 
+
     return false;
-
 }
 
-bool get_events(std::string filename, std::vector<Event> &events, EventDetector &ed) {
-    std::vector<float> raw;
-    if (!get_raw(filename, raw)) {
-        return false;
-    }
-
-    events = ed.get_all_events(raw);
-    return true;
-}
-    
 enum Opt {MODEL     = 'm',
           REF_FASTA = 'x',
-          READ_LIST = 'r'};
+          FAST5_NAME = 'i',
+          DIAG_COEF = 'd',
+          VERT_COEF = 'v',
+          HORZ_COEF = 'h',
+          NORM_SCALE = 'a',
+          NORM_SHIFT = 'b',
+          ROW_SUBSTR = 'R',
+          COL_SUBSTR = 'C',
+          EVENTS = 'E',
+          ALN_REV = 'V'};
 
 int main(int argc, char** argv) {
 
     ArgParse args("DTW tester");
     args.add_string(Opt::MODEL, "model", "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.4_180mv_450bps_6mer/5mers_pre.txt", "Nanopore kmer model");
     args.add_string(Opt::REF_FASTA, "ref_fasta", "", "");
-    args.add_string(Opt::READ_LIST, "read_pattern", "", "");
+    args.add_string(Opt::FAST5_NAME, "fast5_name", "", "");
+    args.add_double(Opt::DIAG_COEF, "diag_coef", 1, "");
+    args.add_double(Opt::VERT_COEF, "vert_coef", 1, "");
+    args.add_double(Opt::HORZ_COEF, "horz_coef", 1, "");
+    args.add_double(Opt::NORM_SCALE, "norm_scale", 0, "");
+    args.add_double(Opt::NORM_SHIFT, "norm_shift", 0, "");
+    args.add_flag(Opt::ROW_SUBSTR, "row_substr", "");
+    args.add_flag(Opt::COL_SUBSTR, "col_substr", "");
+    args.add_flag(Opt::EVENTS, "create_events", "");
+    args.add_flag(Opt::ALN_REV, "aln_rev", "");
     args.parse_args(argc, argv);
 
     const KmerModel model(args.get_string(Opt::MODEL), false);
@@ -159,90 +68,81 @@ int main(int argc, char** argv) {
     params.threshold2 = 1.1;
     EventDetector event_detector(params, 30, 150);
 
+    SubSeqDTW substr = SubSeqDTW::NONE;
+    if (args.get_flag(Opt::ROW_SUBSTR) && args.get_flag(Opt::COL_SUBSTR)) {
+        std::cerr << "Error: only use one substr\n";
+        return 1;
+    }
+
+    if (args.get_flag(Opt::ROW_SUBSTR)) {
+        substr = SubSeqDTW::ROW;
+    } else if (args.get_flag(Opt::COL_SUBSTR)) {
+        substr = SubSeqDTW::COL;
+    }
+
+    auto costfn = [&model](float e, u16 k) {return -model.event_match_prob(e,k);};
+
     std::ifstream ref_in(args.get_string(Opt::REF_FASTA));
     std::vector<u16> fwd_kmers, rev_kmers;
     model.parse_fasta(ref_in, fwd_kmers, rev_kmers);
 
-    std::ifstream reads_in(args.get_string(Opt::READ_LIST));
+    //std::cerr << "Opening fast5\n";
 
-    std::string read_fname;
-
-    while (getline(reads_in, read_fname)) {
-
-        //std::vector<Event> events;
-        std::vector<float> events;
-        //if (!get_events(read_fname, events, event_detector)) {
-        if (!get_raw(read_fname, events)) {
-            std::cout << "#" << read_fname << "\n"
-                      << "-1\t-1\n#END#\n";
-            continue;
-        }
-
-        model.normalize_raw(events);
-
-        //bool full_read = false;
-
-        auto cost = [&model](float e, u16 k) {return -model.event_match_prob({e,1,4},k);};
-        DTW<float, u16, decltype(cost)> 
-            fwd_dtw(events, fwd_kmers, cost, SubSeqDTW::ROW, 20, 1000000, 1),
-            rev_dtw(events, rev_kmers, cost, SubSeqDTW::ROW, 20, 1000000, 1);
-
-        std::cout << "== fwd: " << fwd_dtw.mean_score()
-                  << " rev: " << rev_dtw.mean_score() << " ==\n";
-
-        auto &ref_dtw = fwd_dtw.mean_score() < rev_dtw.mean_score()
-                                   ? fwd_dtw : rev_dtw;
-
-        ref_dtw.print_path();
+    fast5::File fast5_file;
+    if (!open_fast5(args.get_string(Opt::FAST5_NAME), fast5_file)) {
+        return 1;
     }
 
-        /*
-        double **fwd_mat = raw_dtw(model, 
-                                   fwd_kmers, raw, 
-                                   true, full_read),
-
-               **rev_mat = raw_dtw(model, 
-                                   rev_kmers, raw,
-                                   true, full_read);
-        
-        double **best_mat = fwd_mat;
-        bool fwd_strand = fwd_mat[fwd_kmers.size()-1][raw.size()-1]
-                          < rev_mat[rev_kmers.size()-1][raw.size()-1];
-        if (!fwd_strand) {
-            best_mat = rev_mat;
+    //std::cerr << "Reading raw\n";
+    std::vector<float> signal = fast5_file.get_raw_samples();
+    if (args.get_flag(Opt::EVENTS)) {
+        std::cerr << "Detecting events\n";
+        auto events = event_detector.get_all_events(signal);
+        signal.clear();
+        for (auto e : events) {
+            signal.push_back(e.mean);
         }
+    }
 
-        std::vector<u16> &ref_kmers = fwd_strand ? fwd_kmers : rev_kmers;
+    NormParams norm = {args.get_double(Opt::NORM_SHIFT),
+                       args.get_double(Opt::NORM_SCALE)};
+    if (norm.scale <= 0) {
+        norm = model.get_norm_params(signal);
+    }
+    //std::vector<float> signal_unnorm(signal);
+    model.normalize(signal, norm);
 
-        std::list< std::pair<size_t, size_t> > path 
-            = get_path(best_mat, 
-                       ref_kmers.size(), 
-                       raw.size(),
-                       true,
-                       full_read);
+    //Takes up too much space :(
+    if (signal.size() > 500000) {
+        return 1;
+    }
 
-        std::cout << "== " << read_fname << " ==\n";
-        std::cout << "== " << (fwd_strand ? "fwd" : "rev") << " ==\n";
+    //std::cerr << "Aligning fwd\n";
 
-        double prev_prob = 0;
-        for (auto p = path.begin(); p != path.end(); p++) {
-            std::cout << p->second << "\t" //read coord
-                      << p->first << "\t"  //ref coord
-                      << raw[p->second] << "\t"
-                      << ref_kmers[p->first] << "\t"
-                      << best_mat[p->first][p->second] << "\n";
-                      
-            //std::cout << p->second << "\t" //read coord
-            //          << p->first << "\t"  //ref coord
-            //          << read_events[p->second].mean << "\t"
-            //          << read_events[p->second].stdv << "\t"
-            //          << read_events[p->second].length << "\t"
-            //          << ref_kmers[p->first] << "\t"
-            //          << prev_prob - best_mat[p->first][p->second] << "\n";
-            
-            prev_prob = best_mat[p->first][p->second];
+    DTW<float, u16, decltype(costfn)> fwd_dtw(signal, fwd_kmers, 
+                                            costfn, substr, 
+                                            args.get_double(Opt::DIAG_COEF),
+                                            args.get_double(Opt::VERT_COEF),
+                                            args.get_double(Opt::HORZ_COEF));
+    if (args.get_flag(Opt::ALN_REV)) {
+        //std::cerr << "Aligning rev\n";
+        DTW<float, u16, decltype(costfn)> rev_dtw(signal, rev_kmers, 
+                                                costfn, substr, 
+                                                args.get_double(Opt::DIAG_COEF),
+                                                args.get_double(Opt::VERT_COEF),
+                                                args.get_double(Opt::HORZ_COEF));
+        std::cout << fwd_dtw.mean_score() << "\t" << rev_dtw.mean_score() << "\n";
+        if (fwd_dtw.mean_score() > rev_dtw.mean_score()) {
+            //rev_dtw.print_path();
         }
+            return 0;
+    }
 
-        std::cout << "== END ==\n";
-    */
+    std::cout << fwd_dtw.mean_score() << "\t"
+              << signal.size() << "\t" 
+              << fwd_kmers.size() << "\t"
+              << norm.scale << "\t"
+              << norm.shift << "\n";
+    fwd_dtw.print_path();
+    return 0;
 }

@@ -24,7 +24,7 @@ class DTW {
 
     std::vector<float> mat_;
     std::vector<Move> bcrumbs_;
-    std::vector< std::pair<u32, u32> > path_;
+    std::vector< std::pair<u64, u64> > path_;
     float score_sum_;
 
     public:
@@ -48,7 +48,7 @@ class DTW {
     }
 
 
-    inline float dscore(u32 i, u32 j) {
+    inline float dscore(u64 i, u64 j) {
         if (j > 0 && i > 0) return mat_[cvals_.size()*(i-1) + j-1];
         else if ((j == i) || 
                  (i == 0 && subseq_ == SubSeqDTW::COL) || 
@@ -56,23 +56,23 @@ class DTW {
         return MAX_COST;
     }
 
-    inline float hscore(u32 i, u32 j) {
+    inline float hscore(u64 i, u64 j) {
         if (j > 0) return mat_[cvals_.size()*i + j-1];
         else if (subseq_ == SubSeqDTW::ROW) return 0;
         return MAX_COST;
     }
 
-    inline float vscore(u32 i, u32 j) {
+    inline float vscore(u64 i, u64 j) {
         if (i > 0) return mat_[cvals_.size()*(i-1) + j];
         else if (subseq_ == SubSeqDTW::COL) return 0;
         else return MAX_COST;
     }
 
     void compute_matrix() {
-        u32 k = 0;
+        u64 k = 0;
         float cost, ds, hs, vs;
-        for (u32 i = 0; i < rvals_.size(); i++) {
-            for (u32 j = 0; j < cvals_.size(); j++) {
+        for (u64 i = 0; i < rvals_.size(); i++) {
+            for (u64 j = 0; j < cvals_.size(); j++) {
 
                 cost = C(rvals_[i], cvals_[j]);
                 ds = dscore(i,j) + cost * weights_[Move::D];
@@ -98,11 +98,11 @@ class DTW {
 
     void traceback() {
 
-        u32 i = rvals_.size()-1, j = cvals_.size()-1;
+        u64 i = rvals_.size()-1, j = cvals_.size()-1;
 
         switch (subseq_) {
             case SubSeqDTW::ROW:
-                for (u32 k = 0; k < rvals_.size(); k++) {
+                for (u64 k = 0; k < rvals_.size(); k++) {
                     //std::cout << k << " " << mat_[k*cvals_.size() + j] << "\n";
                     if (mat_[k*cvals_.size() + j] < mat_[i*cvals_.size() + j]) { 
                         i = k;
@@ -110,7 +110,7 @@ class DTW {
                 }
                 break;
             case SubSeqDTW::COL:
-                for (u32 k = 0; k < cvals_.size(); k++) {
+                for (u64 k = 0; k < cvals_.size(); k++) {
                     //std::cout << k << " " << mat_[i*cvals_.size() + k] << "\n";
                     if (mat_[i*cvals_.size() + k] < mat_[i*cvals_.size() + j]) {
                         j = k;
@@ -122,12 +122,10 @@ class DTW {
         }
 
         score_sum_ = mat_[i*cvals_.size() + j];
-        std::cout << rvals_.size() << " " << cvals_.size() << " ";
-        std::cout << i << " " << j << " " << mat_[i*cvals_.size() + j] << " ";
 
-        //path_.push_back(std::pair<u32, u32>(i, j));
+        path_.push_back(std::pair<u64, u64>(i, j));
 
-        u32 k = i*cvals_.size() + j;
+        u64 k = i*cvals_.size() + j;
         while(!(i == 0 || subseq_ == SubSeqDTW::ROW) ||
               !(j == 0 || subseq_ == SubSeqDTW::COL)) {
 
@@ -143,11 +141,9 @@ class DTW {
                 j--;
             }
 
-            path_.push_back(std::pair<u32, u32>(i, j));
+            path_.push_back(std::pair<u64, u64>(i, j));
         }
 
-        std::cout << path_.size() << std::endl;
-        std::cout.flush();
     }
 
     float score() {
@@ -164,7 +160,7 @@ class DTW {
             std::cout << p->first << "\t"
                       << p->second << "\t"
                       << rvals_[p->first] << "\t"
-                      << cvals_[p->second] << "\t"
+                      << cvals_[p->second]
                       << std::endl;
         }
     } 

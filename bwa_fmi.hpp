@@ -7,13 +7,14 @@
 #include "basepairs.hpp"
 #include "range.hpp"
 #include "bwa/bwt.h"
+#include "bwa/bntseq.h"
 
 class BwaFMI : public FMI {
     public:
 
     BwaFMI();
 
-    BwaFMI(const std::string &filename);
+    BwaFMI(const std::string &prefix);
 
     void construct(const std::string &seq);
 
@@ -26,6 +27,7 @@ class BwaFMI : public FMI {
     u64 sa(u64 i) const;
 
     u64 size() const;
+    bntseq_t *bns_;
 
     private:
     bwt_t *index_;

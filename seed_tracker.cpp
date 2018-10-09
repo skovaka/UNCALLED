@@ -73,6 +73,7 @@ bool ReadAln::is_valid() {
     return evt_st_ <= evt_en_;
 }
 
+
 bool operator< (const ReadAln &r1, const ReadAln &r2) {
     if (r1.ref_en_.start_ != r2.ref_en_.start_)
         return r1.ref_en_.start_ > r2.ref_en_.start_;

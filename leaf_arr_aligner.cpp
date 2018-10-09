@@ -8,7 +8,6 @@
 #include <set>
 #include <utility>
 #include <unordered_map>
-#include <sdsl/suffix_arrays.hpp>
 #include "timer.hpp"
 #include "leaf_arr_aligner.hpp"
 #include "fmi.hpp"

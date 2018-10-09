@@ -153,31 +153,13 @@ bool KmerModel::event_valid(const Event &e) const {
     return e.mean > 0 && e.stdv >= 0 && e.length > 0;
 }
 
-float KmerModel::event_match_prob(Event e, u16 k_id) const {
-    return (-pow(e.mean - lv_means_[k_id], 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
+float KmerModel::event_match_prob(float e, u16 k_id) const {
+    return (-pow(e - lv_means_[k_id], 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
 }
 
-//float KmerModel::get_stay_prob(Event e1, Event e2) const {
-//
-//    if (e1.length == 0 || e2.length == 0)
-//        return 0;
-//
-//    if (e1 == e2)
-//        return log(1);
-//
-//    double var1 = e1.stdv*e1.stdv, var2 = e2.stdv*e2.stdv;
-//
-//    double t = (e1.mean - e2.mean) / sqrt(var1/e1.length + var2/e2.length);
-//
-//    int df = pow(var1/e1.length + var2/e2.length, 2) 
-//               / (pow(var1/e1.length, 2) / (e1.length-1) 
-//                    + pow(var2/e2.length, 2) / (e2.length-1));
-//
-//    boost::math::students_t dist(df);
-//    double q = boost::math::cdf(boost::math::complement(dist, fabs(t)));
-//
-//    return log(q);
-//}
+float KmerModel::event_match_prob(Event e, u16 k_id) const {
+    return event_match_prob(e.mean, k_id);
+}
 
 u16 KmerModel::kmer_to_id(std::string kmer, int offset) const {
     u16 id = BASE_BYTES[(u8) kmer[offset]];
@@ -202,39 +184,49 @@ u8 KmerModel::get_last_base(u16 kmer) const {
     return (u8) (kmer & 0x3);
 }
 
-//std::string KmerModel::id_to_kmer(u16 kmer) const {
-//    std::string seq(k_, 'A');
-//    for (size_t i = 0; i < k_; i++) {
-//        seq[k_ - i - 1] = id_to_base((kmer >> i * 2) & 0x3);
-//    }
-//    return seq;
-//}
-
 NormParams KmerModel::get_norm_params(const std::vector<Event> &events) const {
-
     //Compute events mean
     double events_mean = 0;
-    for (auto e = events.begin(); e != events.end(); e++) 
-        events_mean += e->mean;
+    for (auto e : events) 
+        events_mean += e.mean;
     events_mean /= events.size();
 
     //Compute events stdv
     double events_stdv = 0;
-    for (auto e = events.begin(); e != events.end(); e++) 
-        events_stdv += pow(e->mean - events_mean, 2);
+    for (auto e : events) 
+        events_stdv += pow(e.mean - events_mean, 2);
     events_stdv = sqrt(events_stdv / events.size());
     
     /* get scaling parameters */
     NormParams params;
-    //params.scale = events_stdv / model_stdv_;
-    //params.shift = events_mean - (params.scale * model_mean_);
     params.scale = model_stdv_ / events_stdv;
     params.shift = model_mean_ - (params.scale * events_mean);
 
     return params;
 }
 
-void KmerModel::normalize_events(std::vector<Event> &events, NormParams norm) const {
+NormParams KmerModel::get_norm_params(const std::vector<float> &events) const {
+    //Compute events mean
+    double events_mean = 0;
+    for (auto e : events) 
+        events_mean += e;
+    events_mean /= events.size();
+
+    //Compute events stdv
+    double events_stdv = 0;
+    for (auto e : events) 
+        events_stdv += pow(e - events_mean, 2);
+    events_stdv = sqrt(events_stdv / events.size());
+    
+    /* get scaling parameters */
+    NormParams params;
+    params.scale = model_stdv_ / events_stdv;
+    params.shift = model_mean_ - (params.scale * events_mean);
+
+    return params;
+}
+
+void KmerModel::normalize(std::vector<Event> &events, NormParams norm) const {
     if (norm.scale == 0) {
         norm = get_norm_params(events);
     }
@@ -243,26 +235,12 @@ void KmerModel::normalize_events(std::vector<Event> &events, NormParams norm) co
     }
 }
 
-//TODO: refactor this w/ normalize_events
-//would be easier if I stop storing full on events
-//but that's a bigger project
-void KmerModel::normalize_raw(std::vector<float> &raw) const {
-    double raw_mean = 0;
-    for (auto s = raw.begin(); s != raw.end(); s++) 
-        raw_mean += *s;
-    raw_mean /= raw.size();
-
-    //Compute events stdv
-    double raw_stdv = 0;
-    for (auto s = raw.begin(); s != raw.end(); s++) 
-        raw_stdv += pow(*s - raw_mean, 2);
-    raw_stdv = sqrt(raw_stdv / raw.size());
-    
-    float scale = model_stdv_ / raw_stdv,
-          shift = model_mean_ - (scale * raw_mean);
-
-    for (u32 i = 0; i < raw.size(); i++) {
-        raw[i] = scale * raw[i] + shift;
+void KmerModel::normalize(std::vector<float> &events, NormParams norm) const {
+    if (norm.scale == 0) {
+        norm = get_norm_params(events);
+    }
+    for (size_t i = 0; i < events.size(); i++) {
+        events[i] = norm.scale * events[i] + norm.shift;
     }
 }
 

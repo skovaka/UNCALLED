@@ -12,7 +12,7 @@ INCLUDE=-I./fast5/src #${BOOST_INCLUDE}
 
 UNCALLED_OBJS= kmer_model.o aligner.o seed_tracker.o arg_parse.o basepairs.o range.o
 
-all: uncalled_arr_leaves uncalled_leaves dtw_test save_fmi test_fmi align_stats detect_events
+all: uncalled dtw_test save_fmi test_fmi align_stats detect_events
 
 #uncalled_graph uncalled_forest 
 
@@ -22,14 +22,6 @@ all: uncalled_arr_leaves uncalled_leaves dtw_test save_fmi test_fmi align_stats 
 #uncalled_forest.o: uncalled.cpp
 #	$(CC) $(CFLAGS) -D ALN_TYPE=FOREST_ALN -c -o $@ $^ $(SDSL_INC) $(INCLUDE) $(HDF5_INCLUDE) 
 #
-uncalled_leaves.o: uncalled.cpp
-	$(CC) $(CFLAGS) -D ALN_TYPE=LEAF_ALN -c -o $@ $^ $(SDSL_INC) $(INCLUDE) $(HDF5_INCLUDE) 
-
-uncalled_arr_leaves.o: uncalled.cpp
-	$(CC) $(CFLAGS) -D ALN_TYPE=LEAF_ARR_ALN -c -o $@ $^ $(SDSL_INC) $(INCLUDE) $(HDF5_INCLUDE) 
-
-#dtw.o: dtw.hpp
-#	$(CC) $(CFLAGS) -c -o dtw.hpp dtw.o $(INCLUDE) 
 
 dtw_test.o: dtw_test.cpp dtw.hpp
 	$(CC) $(CFLAGS) -c -o dtw_test.o dtw_test.cpp $(SDSL_INC) $(INCLUDE) $(HDF5_INCLUDE) 
@@ -46,11 +38,8 @@ dtw_test.o: dtw_test.cpp dtw.hpp
 detect_events: detect_events.o event_detector.o
 	$(CC) $(CFLAGS) detect_events.o event_detector.o -o detect_events $(HDF5_LIB) $(LIBS)
 
-uncalled_leaves: $(UNCALLED_OBJS) uncalled_leaves.o sdsl_fmi.o base_fmi.o leaf_aligner.o event_detector.o
-	$(CC) $(CFLAGS) -D ALN_TYPE=LEAF_ALN $(UNCALLED_OBJS) uncalled_leaves.o sdsl_fmi.o base_fmi.o leaf_aligner.o event_detector.o -o uncalled_leaves $(HDF5_LIB) $(SDSL_LIB) $(LIBS)
-
-uncalled_arr_leaves: $(UNCALLED_OBJS) uncalled_arr_leaves.o bwa_fmi.o sdsl_fmi.o base_fmi.o leaf_arr_aligner.o event_detector.o
-	$(CC) $(CFLAGS) -D ALN_TYPE=LEAF_ARR_ALN $(UNCALLED_OBJS) uncalled_arr_leaves.o bwa_fmi.o sdsl_fmi.o base_fmi.o leaf_arr_aligner.o event_detector.o -o uncalled_arr_leaves $(BWA_LIB) $(HDF5_LIB) $(SDSL_LIB) $(LIBS) $(HDF5_INCLUDE)
+uncalled: $(UNCALLED_OBJS) uncalled.o bwa_fmi.o leaf_arr_aligner.o event_detector.o
+	$(CC) $(CFLAGS) $(UNCALLED_OBJS) uncalled.o bwa_fmi.o leaf_arr_aligner.o event_detector.o -o uncalled $(HDF5_LIB) $(BWA_LIB) $(LIBS)
 
 dtw_test: dtw_test.o kmer_model.o arg_parse.o basepairs.o dtw.hpp event_detector.o
 	$(CC) $(CFLAGS) dtw_test.o kmer_model.o arg_parse.o basepairs.o event_detector.o -o dtw_test $(INCLUDE) $(HDF5_LIB) $(LIBS)

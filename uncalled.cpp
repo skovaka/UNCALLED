@@ -8,7 +8,6 @@
 #include <math.h>
 #include <unistd.h>
 #include <algorithm>
-#include <sdsl/suffix_arrays.hpp>
 #include <iomanip>
 
 #include "fast5.hpp"
@@ -18,26 +17,8 @@
 #include "range.hpp"
 #include "kmer_model.hpp"
 #include "bwa_fmi.hpp"
-#include "sdsl_fmi.hpp"
 #include "base_fmi.hpp"
 #include "timer.hpp"
-
-#define GRAPH_ALN 0
-#define FOREST_ALN 1
-#define LEAF_ALN 2
-#define LEAF_ARR_ALN 3
-
-#ifndef ALN_TYPE
-#define ALN_TYPE LEAF_ALN
-#endif
-
-#define BASE_FMI 0
-#define SDSL_FMI 1
-#define BWA_FMI 2
-
-#ifndef FMI_TYPE
-#define FMI_TYPE BWA_FMI
-#endif
 
 std::string FWD_STR = "fwd",
             REV_STR = "rev";
@@ -45,7 +26,7 @@ std::string FWD_STR = "fwd",
 //TODO: relative paths
 const std::string MODEL_DEF = "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model";
 
-bool get_events(std::string filename, std::vector<Event> &events, EventDetector &ed);
+bool open_fast5(const std::string &filename, fast5::File &file);
 
 enum Opt {
     MODEL       = 'm',
@@ -128,37 +109,11 @@ int main(int argc, char** argv) {
                          args.get_string(Opt::EVENT_PROBS),
                          (float) args.get_double(Opt::WINDOW_PROB));
     
-    #if FMI_TYPE == BASE_FMI
-    BaseFMI fmi;
-    #elif FMI_TYPE == SDSL_FMI
-    SdslFMI fmi;
-    #else
-    BwaFMI fmi;
-    #endif
 
     std::cerr << "Reading FMI\n";
+    BwaFMI fmi(args.get_string(Opt::INDEX_PREFIX));
 
-    #if FMI_TYPE == BASE_FMI
-    std::ifstream fmi_in(args.get_string(Opt::INDEX_PREFIX));
-    fmi = BaseFMI(fmi_in, args.get_int(Opt::TALLY_DIST));
-
-    #elif FMI_TYPE == SDSL_FMI
-    fmi = SdslFMI(args.get_string(Opt::INDEX_PREFIX));
-
-    #else
-    fmi = BwaFMI(args.get_string(Opt::INDEX_PREFIX));
-    #endif
-
-    #if ALN_TYPE == GRAPH_ALN
-    GraphAligner
-    #elif ALN_TYPE == FOREST_ALN
-    ForestAligner
-    #elif ALN_TYPE == LEAF_ALN
-    LeafAligner
-    #elif ALN_TYPE == LEAF_ARR_ALN
-    LeafArrAligner
-    #endif
-        graph(fmi, aln_params);
+    LeafArrAligner graph(fmi, aln_params);
 
     std::ifstream reads_file(args.get_string(Opt::READ_LIST));
 
@@ -185,6 +140,8 @@ int main(int argc, char** argv) {
 
     std::cerr << read_until << " Aligning...\n";
 
+    std::cout << fmi.bns_->l_pac << " len\n";
+
     while (getline(reads_file, read_line)) {
 
         unsigned int aln_st = 0, aln_en = 0;
@@ -206,15 +163,18 @@ int main(int argc, char** argv) {
             }
         }
             
-        std::vector<Event> events;
-        
-        //TODO: get_raw_sample_dataset
-        if (!get_events(read_filename, events, event_detector)) {
+        fast5::File fast5_file;
+        if (!open_fast5(read_filename, fast5_file)) {
             continue;
         }
 
+        //TODO: get_raw_sample_dataset
+        auto fast5_info = fast5_file.get_raw_samples_params();
+        auto raw_samples = fast5_file.get_raw_samples();
+        auto events = event_detector.get_all_events(raw_samples);
+
         NormParams norm = model.get_norm_params(events);
-        model.normalize_events(events, norm);
+        model.normalize(events, norm);
 
         if (aln_en == aln_st) {
             aln_en = events.size() - 1;
@@ -223,6 +183,7 @@ int main(int argc, char** argv) {
         unsigned int aln_len = aln_en - aln_st + 1;
 
         graph.new_read(aln_len);
+        
 
         SeedTracker tracker(fmi.size(), 
                             min_mean_conf, 
@@ -316,12 +277,36 @@ int main(int argc, char** argv) {
 
         if (read_until) {
             if (final_aln.is_valid()) {
-                alns_out << "aligned\t" << final_aln << "\t";
+
+                u64 st, en;
+                std::string strand;
+                if (final_aln.ref_st_ < fmi.size() / 2) {
+                    st = final_aln.ref_st_;
+                    en = final_aln.ref_en_.end_;
+                    strand = "rev";
+                } else {
+                    st = fmi.size() - final_aln.ref_en_.end_ - 1;
+                    en = fmi.size() - final_aln.ref_st_ - 1;
+                    strand = "fwd";
+                }
+
+                i32 rid = bns_pos2rid(fmi.bns_, st);
+                std::string ref_name(fmi.bns_->anns[rid].name);
+                st -= fmi.bns_->anns[rid].offset;
+                en -= fmi.bns_->anns[rid].offset;
+
+                alns_out << "aligned\t" 
+                         << final_aln.evt_st_ << "-" << final_aln.evt_en_  << "\t"
+                         << ref_name << "\t" << strand << "\t" 
+                         << st << "-" << en << "\t"
+                         << final_aln.total_len_ << "\t";
             } else {
-                alns_out << "unaligned\t0-0\t0-" << aln_len << "\t0\t";
+                alns_out << "unaligned\t0-" << aln_len << "\tNULL\tNULL\t0-0\t0\t";
             }
-            alns_out << aln_time << "\t" 
+            alns_out 
+                     << aln_time << "\t" 
                      << aln_len << "\t"
+                     << fast5_info.read_id << "\t"
                      << read_filename << std::endl;
         } else {
             tracker.print(alns_out, 10);
@@ -336,6 +321,30 @@ int main(int argc, char** argv) {
     }
 
 }
+
+bool open_fast5(const std::string &filename, fast5::File &file) {
+    if (!fast5::File::is_valid_file(filename)) {
+        std::cerr << "Error: '" << filename << "' is not a valid file \n";
+    }
+
+    try {
+        file.open(filename);
+        
+        if (!file.is_open()) {  
+            std::cerr << "Error: unable to open '" << filename << "'\n";
+            return false;
+        }
+
+        return true;
+        
+    } catch (hdf5_tools::Exception& e) {
+        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
+        return false;
+    }
+
+    return false;
+}
+
 
 bool get_events(std::string filename, std::vector<Event> &events, EventDetector &ed) {
     if (!fast5::File::is_valid_file(filename)) {
