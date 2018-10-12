@@ -8,17 +8,6 @@
 
 #include "event_detector.hpp"
 
-/*
-typedef struct {
-    uint64_t start;
-    float length;
-    float mean;
-    float stdv;
-    int pos;
-    int state;
-} event_t;
-*/
-
 int main(int argc, char** argv) {
 
     std::string filename = std::string(argv[1]);

@@ -1,13 +1,10 @@
 #include <iostream>
 #include <string>
 #include <list>
-#include "base_fmi.hpp"
-#include "sdsl_fmi.hpp"
 #include "bwa_fmi.hpp"
-#include "fmi.hpp"
 #include "timer.hpp"
 
-void brute_align(FMI &fmi, const std::vector<u8> &bases) {
+void brute_align(BwaFMI &fmi, const std::vector<u8> &bases) {
     for (size_t j = bases.size()-1; j < bases.size(); j--) {
         Range r = fmi.get_full_range(bases[j]);
         size_t i = j-1;
@@ -20,7 +17,7 @@ void brute_align(FMI &fmi, const std::vector<u8> &bases) {
     }
 }
 
-void dyn_align(FMI &fmi, const std::vector<u8> &bases) {//, std::ofstream &outfile) {
+void dyn_align(BwaFMI &fmi, const std::vector<u8> &bases) {//, std::ofstream &outfile) {
     std::list<Range> ranges;
 
     u64 rangelen;
@@ -131,17 +128,16 @@ int main(int argc, char** argv) {
     std::string ref_fname(argv[1]), 
                 index_fname(argv[2]),
                 //out_fname(argv[3]), 
-                fwd_str, rev_str;
+                bases_str;
 
     std::cerr << "Reading reference\n";
     std::ifstream ref_file(ref_fname);
-    parse_fasta(ref_file, fwd_str, rev_str, false);
-    std::vector<u8> bases = seq_to_bases(fwd_str);
+    parse_fasta(ref_file, bases_str);
+    std::vector<u8> bases = seq_to_bases(bases_str);
     for (u64 i = 0; i < bases.size(); i++) {
         bases[i] = BASE_COMP_B[bases[i]];
     }
-    rev_str.erase();
-    fwd_str.erase();
+    bases_str.erase();
 
     std::cerr << "Reading index\n";
     BwaFMI fmi(index_fname);

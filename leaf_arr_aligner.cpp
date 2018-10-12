@@ -1,23 +1,16 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
-#include <vector>
 #include <math.h>
 #include <stddef.h>
-#include <list>
-#include <set>
 #include <utility>
-#include <unordered_map>
 #include "timer.hpp"
-#include "leaf_arr_aligner.hpp"
 #include "fmi.hpp"
 
 //#define DEBUG(s)
 #define DEBUG(s) do { std::cerr << s; } while (0)
 //#define DEBUG_PATHS
 //#define DEBUG_RANGES
-
-#define MAX_CHILDREN 5
 
 unsigned char LeafArrAligner::PathBuffer::MAX_WIN_LEN = 0, 
               LeafArrAligner::PathBuffer::TYPE_MASK = 0;
@@ -32,21 +25,6 @@ LeafArrAligner::PathBuffer::PathBuffer()
 LeafArrAligner::PathBuffer::PathBuffer(const PathBuffer &p) {
     std::memcpy(this, &p, sizeof(PathBuffer));
 }
-
-/*
-LeafArrAligner::PathBuffer::PathBuffer(const PathBuffer &p) :
-    length_ (p.length_),
-    consec_stays_ (p.consec_stays_),
-    win_prob_ (p.win_prob_),
-    prob_sums_ (p.prob_sums_),
-    event_types_ (p.event_types_),
-    fm_range_ (p.fm_range_),
-    kmer_ (p.kmer_),
-    sa_checked_ (p.sa_checked_) {
-
-    std::memcpy(all_type_counts_, p.all_type_counts_, EventType::NUM_TYPES * sizeof(unsigned short));
-    std::memcpy(win_type_counts_, p.win_type_counts_, EventType::NUM_TYPES * sizeof(unsigned char));
-}*/
 
 void LeafArrAligner::PathBuffer::free_buffers() {
     delete[] prob_sums_;
@@ -280,34 +258,18 @@ std::vector<Result> LeafArrAligner::add_event(std::vector<float> kmer_probs,
 
         evpr_thresh = params_.get_prob_thresh(prev_range.length());
 
-        //std::cout << cur_event_ << "\t" 
-        //          << prev_path.length_ << "\t"
-        //          << prev_path.mean_prob() << "\t"
-        //          << prev_kmer << "\t"
-        //          << (int) prev_path.win_type_counts_[LeafArrAligner::EventType::STAY] << "\t"
-        //          << prev_path.fm_range_.start_ << "-"
-        //          << prev_path.fm_range_.end_ << "\n";
-
-
-        //#ifdef VERBOSE_TIME
-        //timer.reset();
-        //#endif
-
         //Get probability for stay neighbor
         prob = kmer_probs[prev_kmer];
 
         if (prev_path.consec_stays_ < params_.max_consec_stay_ && 
             prob >= evpr_thresh) {
 
-            //std::cout << (next_paths_.end() - next_path) << "\n";
             next_path->make_child(prev_path, 
                            prev_range,
                            prev_kmer, 
                            prob, 
                            EventType::STAY);
 
-
-            //std::cout << "\t" << prev_range.start_ << "-" << prev_range.end_ << " s\n";
 
             child_found = true;
 
@@ -323,10 +285,6 @@ std::vector<Result> LeafArrAligner::add_event(std::vector<float> kmer_probs,
         //Add all the neighbors
         for (u8 i = 0; i < 4; i++) {
             u16 next_kmer = params_.model_.get_neighbor(prev_kmer, i);
-        //for (auto next_kmer = neighbor_itr.first; 
-        //     next_kmer != neighbor_itr.second; 
-        //     next_kmer++) {
-            //std::cout << "OooOOHhh " << (*next_kmer) << std::endl;
 
             prob = kmer_probs[next_kmer];
 
@@ -350,8 +308,6 @@ std::vector<Result> LeafArrAligner::add_event(std::vector<float> kmer_probs,
             if (!next_range.is_valid()) {
                 continue;
             }
-
-            //std::cout << "\t" << next_range.start_ << "-" << next_range.end_ << " n\n";
 
             next_path->make_child(prev_path, 
                                   next_range,

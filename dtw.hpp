@@ -4,7 +4,7 @@
 #include <vector>
 #include <iostream>
 #include <cfloat>
-#include "basepairs.hpp"
+#include "util.hpp"
 
 enum SubSeqDTW {NONE, ROW, COL};
 

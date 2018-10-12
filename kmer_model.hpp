@@ -3,13 +3,8 @@
 
 #include <array>
 #include <utility>
-#include <list>
-#include "basepairs.hpp"
+#include "util.hpp"
 #include "event_detector.hpp"
-
-#define NUM_BASES 4
-
-typedef unsigned short int u16;
 
 typedef struct NormParams {
     double shift, scale;

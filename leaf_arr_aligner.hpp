@@ -96,14 +96,15 @@ class LeafArrAligner : public Aligner {
     size_t prev_size_;
 
     #ifdef VERBOSE_TIME
-    double loop1_time_, fmrs_time_, fmsa_time_, sort_time_, loop2_time_, fullsource_time_;
+    double loop1_time_, fmrs_time_, fmsa_time_, 
+           sort_time_, loop2_time_, fullsource_time_;
     #endif
     
     unsigned int cur_event_;
     Event prev_event_;
 
     LeafArrAligner(const FMI &fmi, 
-              const AlnParams &aln_params);
+                   const AlnParams &aln_params);
 
     ~LeafArrAligner();
 

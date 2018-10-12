@@ -12,12 +12,11 @@
 
 #include "fast5.hpp"
 #include "arg_parse.hpp"
-#include "leaf_arr_aligner.hpp"
+#include "aligner.hpp"
 #include "seed_tracker.hpp"  
 #include "range.hpp"
 #include "kmer_model.hpp"
 #include "bwa_fmi.hpp"
-#include "base_fmi.hpp"
 #include "timer.hpp"
 
 std::string FWD_STR = "fwd",
@@ -113,7 +112,7 @@ int main(int argc, char** argv) {
     std::cerr << "Reading FMI\n";
     BwaFMI fmi(args.get_string(Opt::INDEX_PREFIX));
 
-    LeafArrAligner graph(fmi, aln_params);
+    Aligner graph(fmi, aln_params);
 
     std::ifstream reads_file(args.get_string(Opt::READ_LIST));
 

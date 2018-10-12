@@ -3,22 +3,17 @@
 
 #include <string>
 #include <climits>
-#include "fmi.hpp"
-#include "basepairs.hpp"
+#include "util.hpp"
 #include "range.hpp"
 #include "bwa/bwt.h"
 #include "bwa/bntseq.h"
 
-class BwaFMI : public FMI {
+class BwaFMI {
     public:
 
     BwaFMI();
 
     BwaFMI(const std::string &prefix);
-
-    void construct(const std::string &seq);
-
-    void save(const std::string &filename); 
 
     Range get_neighbor(Range range, u8 base) const;
 
@@ -31,6 +26,7 @@ class BwaFMI : public FMI {
 
     private:
     bwt_t *index_;
+    bool loaded_;
 };
 
 #endif

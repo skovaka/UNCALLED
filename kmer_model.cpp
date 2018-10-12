@@ -41,6 +41,9 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
         model_in >> kmer >> lv_mean >> lv_stdv >> sd_mean 
                  >> sd_stdv >> lambda >> weight;
         lambda_ = lambda;
+    } else if (num_cols == 4) {
+        model_in >> kmer >> lv_mean >> lv_stdv >> sd_mean; 
+        lambda_ = -1;
     } else {
         model_in >> kmer >> lv_mean >> lv_stdv >> sd_mean 
                  >> sd_stdv >> weight;
@@ -53,14 +56,10 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
     lv_means_ = new double[kmer_count_+1];
     lv_vars_x2_ = new double[kmer_count_+1];
     lognorm_denoms_ = new double[kmer_count_+1];
-    sd_means_ = new double[kmer_count_+1];
-    sd_stdvs_ = new double[kmer_count_+1];
 
     lv_means_[kmer_count_] = 
     lv_vars_x2_[kmer_count_] = 
-    lognorm_denoms_[kmer_count_] = 
-    sd_means_[kmer_count_] = 
-    sd_stdvs_[kmer_count_] = -1;
+    lognorm_denoms_[kmer_count_] = -1;
 
     model_mean_ = 0;
 
@@ -109,23 +108,21 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
             lv_vars_x2_[k_id] = 2*lv_stdv*lv_stdv;
             lognorm_denoms_[k_id] = log(sqrt(PI * lv_vars_x2_[k_id]));
 
-            sd_means_[k_id] = sd_mean;
-            sd_stdvs_[k_id] = sd_stdv;
-
             model_mean_ += lv_mean;
         }
 
-        //Read next line
+        //Read first line
         if (has_lambda) {
             model_in >> kmer >> lv_mean >> lv_stdv >> sd_mean 
                      >> sd_stdv >> lambda >> weight;
-            
-            //Lambda changes - might as well use sd_stdv
-            if (lambda_ != lambda)
-                lambda_ = -1;
+            lambda_ = lambda;
+        } else if (num_cols == 4) {
+            model_in >> kmer >> lv_mean >> lv_stdv >> sd_mean; 
+            lambda_ = -1;
         } else {
-            model_in >> kmer >> lv_mean >> lv_stdv 
-                     >> sd_mean >> sd_stdv >> weight;
+            model_in >> kmer >> lv_mean >> lv_stdv >> sd_mean 
+                     >> sd_stdv >> weight;
+            lambda_ = -1;
         }
 
     //Read until eof or correct number of kmers read
@@ -144,8 +141,6 @@ KmerModel::~KmerModel() {
     delete [] lv_means_;
     delete [] lv_vars_x2_;
     delete [] lognorm_denoms_;
-    delete [] sd_means_;
-    delete [] sd_stdvs_;
     delete [] rev_comp_ids_; 
 }
 
