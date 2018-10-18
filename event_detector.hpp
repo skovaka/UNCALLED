@@ -2,19 +2,15 @@
 #define EVENT_DETECTOR_HPP
 
 #include "fast5.hpp"
+#include "util.hpp"
 
 typedef fast5::EventDetection_Event Event;
 typedef fast5::Basecall_Event BCEvent;
 typedef fast5::Raw_Sample RawSample;
 
-//extern "C" {
-//    #include "scrappie_structures.h"
-//}
-//
-
 typedef struct {
-    size_t window_length1;
-    size_t window_length2;
+    u32 window_length1;
+    u32 window_length2;
     float  threshold1;
     float  threshold2;
     float  peak_height;
@@ -29,12 +25,12 @@ static detector_param const event_detection_defaults = {
 };
 
 struct Detector {
-    int DEF_PEAK_POS;
+    i32 DEF_PEAK_POS;
     float DEF_PEAK_VAL;
     float threshold;
-    size_t window_length;
-    size_t masked_to;
-    int peak_pos;
+    u32 window_length;
+    u32 masked_to;
+    i32 peak_pos;
     float peak_value;
     bool valid_peak;
 };
@@ -49,17 +45,17 @@ class EventDetector {
     std::vector<Event> get_all_events(std::vector<RawSample> raw);
 
     private:
-    size_t get_buf_mid();
-    float compute_tstat(size_t w_length); 
+    u32 get_buf_mid();
+    float compute_tstat(u32 w_length); 
     bool peak_detect(float current_value, Detector &detector);
-    Event create_event(int evt_en); 
+    Event create_event(u32 evt_en); 
 
     const detector_param params;
-    const size_t BUF_LEN;
+    const u32 BUF_LEN;
     const double MIN_MEAN, MAX_MEAN;
     double *sum, *sumsq;
 
-    size_t t, buf_mid, evt_st;
+    u32 t, buf_mid, evt_st;
     double evt_st_sum, evt_st_sumsq;
 
     Detector short_detector, long_detector;

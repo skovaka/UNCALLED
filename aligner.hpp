@@ -5,186 +5,145 @@
 #include <vector>
 #include "bwa_fmi.hpp"
 #include "kmer_model.hpp"
+#include "seed_tracker.hpp"
 #include "timer.hpp"
 
-//#define VERBOSE_TIME
-
-//TODO: should be named seed
-class Result {
-    public:
-
-    Result(unsigned int read_end, 
-           unsigned int seed_len, 
-           float prob, 
-           unsigned int ref_start = 0, 
-           unsigned int ref_end = 0);
-
-    void set_ref_range(unsigned int end, unsigned int length);
-    void print(std::ostream &out);
-
-    Range read_range_, ref_range_;
-    float seed_prob_;
-
-    #ifdef DEBUG_PROB
-    float min_evt_prob_;
-    #endif
-};
+//#define DEBUG_TIME
+//#define DEBUG_SEEDS
 
 class AlnParams {
     public:
-    const KmerModel &model_;
-
-    unsigned int path_win_len_, 
-                 min_rep_len_,
-                 max_rep_copy_,
-                 max_paths_;
-
-    float max_stay_frac_;
-
-    unsigned int max_consec_stay_, 
-                 max_ignores_,
-                 max_skips_;
-
-    float window_prob_;
-
-    std::vector<unsigned int> evpr_lengths_;
-    std::vector<float> evpr_threshes_;
-
     AlnParams(const KmerModel &model,
-              unsigned int path_win_len, 
-              unsigned int min_rep_len, 
-              unsigned int max_rep_copy, 
-              unsigned int max_paths, 
+              const BwaFMI &fmi,
+              u32 seed_len, 
+              u32 min_rep_len, 
+              u32 max_rep_copy, 
+              u32 max_paths, 
+              u32 max_consec_stay,
+              u32 min_aln_len_,
               float max_stay_frac,
-              unsigned int max_consec_stay,
-              unsigned int max_ignores, 
-              unsigned int max_skips,
-              const std::string event_probs,
-              float window_prob);           
+              float min_seed_prob, 
+              float min_mean_conf,
+              float min_top_conf,
+              const std::string event_probs);
     
-    unsigned int nucl_to_events(unsigned int n);
-    float get_prob_thresh(unsigned int fm_length);
+    float get_prob_thresh(u64 fm_length);
     float get_source_prob();
+
+    const KmerModel &model_;
+    const BwaFMI &fmi_;
+
+    u32 seed_len_, 
+        min_rep_len_,
+        max_rep_copy_,
+        max_paths_,
+        max_consec_stay_,
+        min_aln_len_;
+
+    float max_stay_frac_,
+          min_seed_prob_,
+          min_mean_conf_,
+          min_top_conf_;
+
+    std::vector<u64> evpr_lengths_;
+    std::vector<float> evpr_threshes_;
+    std::vector<Range> kmer_fmranges_;
 };
 
 
 class Aligner {
-    enum EventType { MATCH, STAY, SKIP, IGNORE, NUM_TYPES };
-    static const unsigned char TYPE_BITS = 2;
+    public:
+
+    Aligner(const AlnParams &aln_params);
+
+    ~Aligner();
+
+    ReadAln add_event(const Event &event
+                      #ifdef DEBUG_TIME
+                      ,std::ostream &time_out
+                      #endif
+                      #ifdef DEBUG_SEEDS
+                      ,std::ostream &seeds_out
+                      #endif
+                      );
+
+    void reset();
+
+    private:
+
+    enum EventType { MATCH, STAY, NUM_TYPES };
+    static const u8 TYPE_BITS = 1;
 
     class PathBuffer {
         public:
-
-        static unsigned char MAX_WIN_LEN, TYPE_MASK;
-        static unsigned long TYPE_ADDS[EventType::NUM_TYPES];
-
-        unsigned short 
-            length_, 
-            consec_stays_;
-
-        float win_prob_;
-
-        float *prob_sums_;
-        unsigned long event_types_;
-
-        //unsigned short all_type_counts_[EventType::NUM_TYPES];
-        unsigned char win_type_counts_[EventType::NUM_TYPES];
-
-        Range fm_range_;
-        u16 kmer_;
-        bool sa_checked_;
-
-        //Initial constructor
         PathBuffer();
-
-        //Source constructor
-        //PathBuffer(Range range, u16 kmer, float prob);
-
-        //Child constructor
-        //PathBuffer(PathBuffer &p, Range range, u16 kmer, float prob, EventType type);
-
-        //Copy constructor
         PathBuffer(const PathBuffer &p);
 
-        //~PathBuffer();
+        void make_source(Range &range, 
+                         u16 kmer, 
+                         float prob);
 
-        //void init_from_sibling(PathBuffer *a, u16 kmer, float prob, EventType type);
-        //void init_from_parent(PathBuffer *a, u16 kmer, float prob, EventType type);
-        void make_source(Range &range, u16 kmer, float prob);
-        void make_child(PathBuffer &p, Range &range, u16 kmer, float prob, EventType type);
+        void make_child(PathBuffer &p, 
+                        Range &range, 
+                        u16 kmer, 
+                        float prob, 
+                        EventType type);
 
         void invalidate();
-        bool is_valid();
+        bool is_valid() const;
+        bool is_seed_valid(const AlnParams &params, 
+                           bool has_children) const;
 
-        unsigned char win_len() const;
-        bool win_full() const;
-
-        void update_consec_stays();
-        //bool better_than_parent(const PathBuffer *a, float prob);
-        bool better_than(const PathBuffer &a);
-        unsigned char type_head() const;
-        unsigned char type_tail() const;
-        bool should_report(const AlnParams &params, bool has_children);
-
-        size_t event_len();
-        size_t match_len() const;
-        float mean_prob() const;
-        float next_mean_prob();
-        float next_mean_prob(float next_prob) const;
-
-        void replace(const PathBuffer &r);
-        //PathBuffer& operator=(const PathBuffer &r) = delete;
+        u8 type_head() const;
+        u8 type_tail() const;
+        u8 match_len() const;
 
         void free_buffers();
-
         void print() const;
+
+        static u8 MAX_PATH_LEN, TYPE_MASK;
+        static u64 TYPE_ADDS[EventType::NUM_TYPES];
+
+        Range fm_range_;
+        u16 length_,
+            kmer_,
+            consec_stays_;
+
+        float seed_prob_;
+        float *prob_sums_;
+
+        u64 event_types_;
+        u8 path_type_counts_[EventType::NUM_TYPES];
+
+        bool sa_checked_;
     };
 
     friend bool operator< (const PathBuffer &p1, const PathBuffer &p2);
 
-    public:
+    private:
 
-    const BwaFMI &fmi_;
-    Range *kmer_ranges_;
+    void update_seeds(PathBuffer &p, 
+                      std::vector<Seed> &seeds, 
+                      bool has_children);
 
     AlnParams params_;
+    SeedTracker seed_tracker_;
+    Range *kmer_ranges_;
     
-    //std::vector<PathBuffer *> inactive_paths_;
+    std::vector<float> kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;
     std::vector<bool> sources_added_;
-    size_t prev_size_;
+    u32 prev_size_,
+        event_i_;
 
-    #ifdef VERBOSE_TIME
+    #ifdef DEBUG_TIME
+    std::ostream &time_out_;
     double loop1_time_, fmrs_time_, fmsa_time_, 
            sort_time_, loop2_time_, fullsource_time_;
     #endif
-    
-    unsigned int cur_event_;
-    Event prev_event_;
-
-    Aligner(const BwaFMI &fmi, 
-                   const AlnParams &aln_params);
-
-    ~Aligner();
-
-    void check_alignments(PathBuffer &p, std::vector<Result> &results, bool has_children, std::ostream &seeds_out);
-
-    void new_read(size_t read_len);
-    void reset();
-
-    //TODO: do probs inside
-    std::vector<Result> add_event(std::vector<float> kmer_probs, std::ostream &seeds_out, std::ostream &timing_out);
-
-    void print_graph(bool verbose);
-
-    bool add_child(Range &range, 
-                   PathBuffer &prev_path,
-                   u16 kmer,
-                   float prob,
-                   EventType type,
-                   bool prev_is_sibling);
-
-    size_t add_sources(const Range &range, u16 kmer, float prob);
+    #ifdef DEBUG_SEEDS
+    std::ostream &seeds_out_;
+    #endif
 };
 
 

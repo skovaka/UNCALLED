@@ -16,7 +16,6 @@ BwaFMI::BwaFMI(const std::string &prefix) {
 	index_ = bwt_restore_bwt(bwt_fname.c_str());
 	bwt_restore_sa(sa_fname.c_str(), index_);
     bns_ = bns_restore(prefix.c_str());
-    std::cout << bns_->n_seqs << " WHOOP\n";
 
     loaded_ = true;
 }

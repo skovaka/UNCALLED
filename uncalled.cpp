@@ -23,13 +23,12 @@ std::string FWD_STR = "fwd",
             REV_STR = "rev";
 
 //TODO: relative paths
-const std::string MODEL_DEF = "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model";
+const std::string MODEL_DEF = "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.4_180mv_450bps_6mer/5mers_pre.txt";
 
 bool open_fast5(const std::string &filename, fast5::File &file);
 
 enum Opt {
     MODEL       = 'm',
-    REFERENCE   = 'f',
     INDEX_PREFIX   = 'x',
     READ_LIST   = 'i',
     OUT_PREFIX     = 'o',
@@ -37,7 +36,7 @@ enum Opt {
     TALLY_DIST  = 't',
 
     MIN_ALN_LEN     = 'a',
-    PATH_WIN_LEN    = 'w',
+    SEED_LEN    = 'w',
     MIN_REP_LEN     = 'r',
     MAX_REP_COPY    = 'c',
     MAX_PATHS       = 'p',
@@ -47,18 +46,15 @@ enum Opt {
 
     STAY_FRAC       = 's',
     MAX_CONSEC_STAY = 'y',
-    MAX_IGNORES     = 'g',
-    MAX_SKIPS       = 'k',
 
     EVENT_PROBS = 'E',
-    WINDOW_PROB = 'W'
+    MIN_SEED_PROB = 'S'
 };
 
 int main(int argc, char** argv) {
     ArgParse args("UNCALLED: Utility for Nanopore Current Alignment to Large Expanses of DNA");
 
-    args.add_string(Opt::MODEL, "model", "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.2_180mv_250bps_6mer/template_median68pA.model", "Nanopore kmer model");
-    args.add_string(Opt::REFERENCE,    "reference",    "",     "");
+    args.add_string(Opt::MODEL, "model", MODEL_DEF, "Nanopore kmer model");
     args.add_string(Opt::READ_LIST,    "read_list",    "",     "");
     args.add_string(Opt::INDEX_PREFIX, "index_prefix",   "",     "");
     args.add_string(Opt::OUT_PREFIX,   "out_prefix",   "./",     "");
@@ -66,7 +62,7 @@ int main(int argc, char** argv) {
     args.add_int(   Opt::TALLY_DIST, "tally_dist",   128,     "");
 
     args.add_int(   Opt::MIN_ALN_LEN,  "min_aln_len", 25, "");
-    args.add_int(   Opt::PATH_WIN_LEN, "path_window_len", 22, "");
+    args.add_int(   Opt::SEED_LEN, "path_window_len", 22, "");
     args.add_int(   Opt::MIN_REP_LEN,  "min_repeat_len", 0, "");
     args.add_int(   Opt::MAX_REP_COPY, "max_repeat_copy", 100, "");
     args.add_int(   Opt::MAX_PATHS,    "max_paths", 10000, "");
@@ -76,11 +72,9 @@ int main(int argc, char** argv) {
 
     args.add_double(Opt::STAY_FRAC,       "stay_frac",    0.5,    "");
     args.add_int(   Opt::MAX_CONSEC_STAY, "max_consec_stay", 8, "");
-    args.add_int(   Opt::MAX_IGNORES,     "max_ignores",  0,    "");
-    args.add_int(   Opt::MAX_SKIPS,       "max_skips",    0,    "");
 
     args.add_string(Opt::EVENT_PROBS, "event_probs", "-2.25_100-2.4_5-4.0_1-10.0", "");
-    args.add_double(Opt::WINDOW_PROB, "window_prob", -3.75, "");
+    args.add_double(Opt::MIN_SEED_PROB, "min_seed_prob", -3.75, "");
 
     args.parse_args(argc, argv);
 
@@ -95,24 +89,27 @@ int main(int argc, char** argv) {
               << prefix << "_time.txt" << "\n";
 
     KmerModel model(args.get_string(Opt::MODEL), true);
+    std::cerr << "1\n";
+    BwaFMI fmi(args.get_string(Opt::INDEX_PREFIX));
+    std::cerr << "2\n";
 
     AlnParams aln_params(model,
-                         args.get_int(Opt::PATH_WIN_LEN),
+                         fmi,
+                         args.get_int(Opt::SEED_LEN),
                          args.get_int(Opt::MIN_REP_LEN),
                          args.get_int(Opt::MAX_REP_COPY),
                          args.get_int(Opt::MAX_PATHS),
-                         (float) args.get_double(Opt::STAY_FRAC),
                          args.get_int(Opt::MAX_CONSEC_STAY),
-                         args.get_int(Opt::MAX_IGNORES),
-                         args.get_int(Opt::MAX_SKIPS),
-                         args.get_string(Opt::EVENT_PROBS),
-                         (float) args.get_double(Opt::WINDOW_PROB));
+                         args.get_int(Opt::MIN_ALN_LEN),
+                         (float) args.get_double(Opt::STAY_FRAC),
+                         (float) args.get_double(Opt::MIN_SEED_PROB),
+                         (float) args.get_double(Opt::MIN_MEAN_CONF), 
+                         (float) args.get_double(Opt::MIN_TOP_CONF), 
+                         args.get_string(Opt::EVENT_PROBS));
     
+    std::cerr << "Init graph\n";
 
-    std::cerr << "Reading FMI\n";
-    BwaFMI fmi(args.get_string(Opt::INDEX_PREFIX));
-
-    Aligner graph(fmi, aln_params);
+    Aligner graph(aln_params);
 
     std::ifstream reads_file(args.get_string(Opt::READ_LIST));
 
@@ -122,13 +119,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    unsigned int min_aln_len = args.get_int(Opt::MIN_ALN_LEN);
-    float min_mean_conf = (float) args.get_double(Opt::MIN_MEAN_CONF),
-          min_top_conf = (float) args.get_double(Opt::MIN_TOP_CONF);
-    bool read_until = min_mean_conf > 0 || min_top_conf > 0;
-    std::cout << min_mean_conf << " "
-              << min_top_conf << " "
-              << read_until << std::endl;
+    bool read_until = aln_params.min_mean_conf_ > 0 || aln_params.min_top_conf_ > 0;
 
     detector_param params = event_detection_defaults;
     params.threshold1 = 1.4;
@@ -181,15 +172,7 @@ int main(int argc, char** argv) {
 
         unsigned int aln_len = aln_en - aln_st + 1;
 
-        graph.new_read(aln_len);
-        
-
-        SeedTracker tracker(fmi.size(), 
-                            min_mean_conf, 
-                            min_top_conf, 
-                            min_aln_len, 
-                            args.get_int(Opt::PATH_WIN_LEN));
-
+        graph.reset();
 
         Timer read_timer;
 
@@ -207,33 +190,13 @@ int main(int argc, char** argv) {
 
 
         u32 e = aln_st;
-        std::vector<float> kmer_probs(model.kmer_count());
 
         ReadAln final_aln;
 
         for (; e >= aln_st && e <= aln_en; e++) {
 
-            for (u16 kmer = 0; kmer < model.kmer_count(); kmer++) {
-                kmer_probs[kmer] = model.event_match_prob(events[e], kmer);
-            }
 
-            std::vector<Result> seeds = graph.add_event(kmer_probs, 
-                                                        seeds_out,
-                                                        time_out);
-
-            #ifdef VERBOSE_TIME
-            tracker_timer.reset();
-            #endif
-
-            final_aln = tracker.add_seeds(seeds);
-
-            #ifdef VERBOSE_TIME
-            tracker_time += tracker_timer.get();
-            #endif
-
-            //if (aln_en - e > 20000) {
-            //    break;
-            //}
+            final_aln = graph.add_event(events[e]);
 
             if (read_until && final_aln.is_valid()) {
                 break;
@@ -307,11 +270,7 @@ int main(int argc, char** argv) {
                      << aln_len << "\t"
                      << fast5_info.read_id << "\t"
                      << read_filename << std::endl;
-        } else {
-            tracker.print(alns_out, 10);
-            alns_out << aln_len << " events processed" << std::endl;
-        }
-
+        } 
         seeds_out << "== " << aln_time << " ms ==\n";
 
         time_out.flush();

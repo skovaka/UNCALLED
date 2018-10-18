@@ -1,26 +1,31 @@
 #include "aligner.hpp"
 
+
 AlnParams::AlnParams(const KmerModel &model,
-                     unsigned int path_win_len, 
-                     unsigned int min_rep_len, 
-                     unsigned int max_rep_copy, 
-                     unsigned int max_paths, 
+                     const BwaFMI &fmi,
+                     u32 seed_len, 
+                     u32 min_rep_len, 
+                     u32 max_rep_copy, 
+                     u32 max_paths, 
+                     u32 max_consec_stay,
+                     u32 min_aln_len,
                      float max_stay_frac,
-                     unsigned int max_consec_stay,
-                     unsigned int max_ignores, 
-                     unsigned int max_skips,
-                     const std::string event_probs,
-                     float window_prob) 
+                     float min_seed_prob, 
+                     float min_mean_conf,
+                     float min_top_conf,
+                     const std::string event_probs)
         : model_(model),
-          path_win_len_(path_win_len),
+          fmi_(fmi),
+          seed_len_(seed_len),
           min_rep_len_(min_rep_len),
           max_rep_copy_(max_rep_copy),
           max_paths_(max_paths),
-          max_stay_frac_(max_stay_frac),
           max_consec_stay_(max_consec_stay),
-          max_ignores_(max_ignores),
-          max_skips_(max_skips),
-          window_prob_(window_prob) {
+          min_aln_len_(min_aln_len),
+          max_stay_frac_(max_stay_frac),
+          min_seed_prob_(min_seed_prob),
+          min_mean_conf_(min_mean_conf),
+          min_top_conf_(min_top_conf) {
     
     size_t i = event_probs.find('_'), j, k;
 
@@ -40,9 +45,18 @@ AlnParams::AlnParams(const KmerModel &model,
             j = event_probs.size();
         }
     }
+
+    kmer_fmranges_ = std::vector<Range>(model_.kmer_count());
+    for (u16 k = 0; k < model_.kmer_count(); k++) {
+        Range r = fmi_.get_full_range(model_.get_last_base(k));
+        for (i = model_.kmer_len()-2; i < model_.kmer_len(); i--) {
+            r = fmi_.get_neighbor(r, model_.get_base(k, i));
+        }
+        kmer_fmranges_[k] = r;
+    }
 }
 
-float AlnParams::get_prob_thresh(unsigned int fm_length) {
+float AlnParams::get_prob_thresh(u64 fm_length) {
     auto pr = evpr_threshes_.begin();
     for (auto len = evpr_lengths_.begin(); len != evpr_lengths_.end(); len++) {
         if (fm_length > *len) {
@@ -58,26 +72,20 @@ float AlnParams::get_source_prob() {
     return evpr_threshes_.front();
 }
 
-unsigned int AlnParams::nucl_to_events(unsigned int n) {
-    return n - model_.kmer_len() + 1;
-}
+u8 Aligner::PathBuffer::MAX_PATH_LEN = 0, 
+   Aligner::PathBuffer::TYPE_MASK = 0;
 
-
-unsigned char Aligner::PathBuffer::MAX_WIN_LEN = 0, 
-              Aligner::PathBuffer::TYPE_MASK = 0;
-
-unsigned long Aligner::PathBuffer::TYPE_ADDS[EventType::NUM_TYPES];
+u64 Aligner::PathBuffer::TYPE_ADDS[EventType::NUM_TYPES];
 
 Aligner::PathBuffer::PathBuffer()
     : length_(0),
-      prob_sums_(new float[MAX_WIN_LEN+1]) {
+      prob_sums_(new float[MAX_PATH_LEN+1]) {
 }
 
 Aligner::PathBuffer::PathBuffer(const PathBuffer &p) {
     std::memcpy(this, &p, sizeof(PathBuffer));
 }
 
-//MARKER
 void Aligner::PathBuffer::free_buffers() {
     delete[] prob_sums_;
 }
@@ -86,17 +94,14 @@ void Aligner::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     length_ = 1;
     consec_stays_ = 0;
     event_types_ = 0;
-    win_prob_ = prob;
+    seed_prob_ = prob;
     fm_range_ = range;
     kmer_ = kmer;
     sa_checked_ = false;
 
-    //MATCH should always be index 0
-    //all_type_counts_[EventType::MATCH] = 1;
-    win_type_counts_[EventType::MATCH] = 1;
-    for (unsigned char t = 1; t < EventType::NUM_TYPES; t++) {
-        //all_type_counts_[t] = 0;
-        win_type_counts_[t] = 0;
+    path_type_counts_[EventType::MATCH] = 1;
+    for (u8 t = 1; t < EventType::NUM_TYPES; t++) {
+        path_type_counts_[t] = 0;
     }
 
     //TODO: don't write this here to speed up source loop
@@ -106,10 +111,10 @@ void Aligner::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
 
 
 void Aligner::PathBuffer::make_child(PathBuffer &p, 
-                                            Range &range,
-                                            u16 kmer, 
-                                            float prob, 
-                                            EventType type) {
+                                     Range &range,
+                                     u16 kmer, 
+                                     float prob, 
+                                     EventType type) {
     length_ = p.length_ + 1;
 
     consec_stays_ = p.consec_stays_;
@@ -117,24 +122,22 @@ void Aligner::PathBuffer::make_child(PathBuffer &p,
     kmer_ = kmer;
     sa_checked_ = p.sa_checked_;
 
-    //std::memcpy(all_type_counts_, p.all_type_counts_, EventType::NUM_TYPES * sizeof(unsigned short));
-    std::memcpy(win_type_counts_, p.win_type_counts_, EventType::NUM_TYPES * sizeof(unsigned char));
+    std::memcpy(path_type_counts_, p.path_type_counts_, EventType::NUM_TYPES * sizeof(u8));
 
-    if (win_full()) {
-        std::memcpy(prob_sums_, &(p.prob_sums_[1]), MAX_WIN_LEN * sizeof(float));
-        prob_sums_[MAX_WIN_LEN] = prob_sums_[MAX_WIN_LEN-1] + prob;
-        win_prob_ = (prob_sums_[MAX_WIN_LEN] - prob_sums_[0]) / MAX_WIN_LEN;
-        win_type_counts_[p.type_tail()]--;
+    if (length_ > MAX_PATH_LEN) {
+        std::memcpy(prob_sums_, &(p.prob_sums_[1]), MAX_PATH_LEN * sizeof(float));
+        prob_sums_[MAX_PATH_LEN] = prob_sums_[MAX_PATH_LEN-1] + prob;
+        seed_prob_ = (prob_sums_[MAX_PATH_LEN] - prob_sums_[0]) / MAX_PATH_LEN;
+        path_type_counts_[p.type_tail()]--;
     } else {
         std::memcpy(prob_sums_, p.prob_sums_, (length_ + 1) * sizeof(float));
         prob_sums_[length_] = prob_sums_[length_-1] + prob;
-        win_prob_ = (prob_sums_[length_] - prob_sums_[0]) / length_;
+        seed_prob_ = (prob_sums_[length_] - prob_sums_[0]) / length_;
     }
 
     event_types_ = TYPE_ADDS[type] | (p.event_types_ >> TYPE_BITS);
 
-    win_type_counts_[type]++;
-    //all_type_counts_[type]++;
+    path_type_counts_[type]++;
 
     if (type == EventType::STAY) {
         consec_stays_++;
@@ -147,160 +150,120 @@ void Aligner::PathBuffer::invalidate() {
     length_ = 0;
 }
 
-bool Aligner::PathBuffer::is_valid() {
+bool Aligner::PathBuffer::is_valid() const {
     return length_ > 0;
 }
 
-bool Aligner::PathBuffer::win_full() const {
-    return length_ > MAX_WIN_LEN;
+u8 Aligner::PathBuffer::match_len() const {
+    return path_type_counts_[EventType::MATCH];
 }
 
-unsigned char Aligner::PathBuffer::win_len() const {
-    return win_full() ? MAX_WIN_LEN : length_;
+u8 Aligner::PathBuffer::type_head() const {
+    return (event_types_ >> (TYPE_BITS*(MAX_PATH_LEN-2))) & TYPE_MASK;
 }
 
-size_t Aligner::PathBuffer::event_len() {
-    return length_;
-}
-
-size_t Aligner::PathBuffer::match_len() const {
-    return win_type_counts_[EventType::MATCH];
-}
-
-float Aligner::PathBuffer::mean_prob() const {
-    //return (prob_sums_[win_len()] - prob_sums_[0]) / win_len();
-    return win_prob_;
-}
-
-bool Aligner::PathBuffer::better_than(const PathBuffer &p) {
-    return p.mean_prob() > mean_prob();
-}
-
-unsigned char Aligner::PathBuffer::type_head() const {
-    return (event_types_ >> (TYPE_BITS*(MAX_WIN_LEN-2))) & TYPE_MASK;
-}
-
-unsigned char Aligner::PathBuffer::type_tail() const {
+u8 Aligner::PathBuffer::type_tail() const {
     return event_types_ & TYPE_MASK;
 }
 
-bool Aligner::PathBuffer::should_report(const AlnParams &p,
-                                                bool path_ended) {
+bool Aligner::PathBuffer::is_seed_valid(const AlnParams &p,
+                                        bool path_ended) const{
     return (fm_range_.length() == 1 || 
                 (path_ended &&
                  fm_range_.length() <= p.max_rep_copy_ &&
                  match_len() >= p.min_rep_len_)) &&
 
-           length_ >= p.path_win_len_ &&
+           length_ >= p.seed_len_ &&
            (path_ended || type_head() == EventType::MATCH) &&
-           (path_ended || win_type_counts_[EventType::STAY] <= p.max_stay_frac_ * p.path_win_len_) &&
-          win_prob_ >= p.window_prob_;
-}
-
-void Aligner::PathBuffer::replace(const PathBuffer &p) {
-    length_ = p.length_;
-    win_prob_ = p.win_prob_;
-    consec_stays_ = p.consec_stays_;
-    fm_range_ = p.fm_range_;
-    kmer_ = p.kmer_;
-    sa_checked_ = p.sa_checked_;
-
-    std::memcpy(prob_sums_, p.prob_sums_, (MAX_WIN_LEN+1) * sizeof(float));
-    //std::memcpy(all_type_counts_, p.all_type_counts_, EventType::NUM_TYPES * sizeof(unsigned short));
-    std::memcpy(win_type_counts_, p.win_type_counts_, EventType::NUM_TYPES * sizeof(unsigned char));
+           (path_ended || path_type_counts_[EventType::STAY] <= p.max_stay_frac_ * p.seed_len_) &&
+          seed_prob_ >= p.min_seed_prob_;
 }
 
 bool operator< (const Aligner::PathBuffer &p1, 
                 const Aligner::PathBuffer &p2) {
     return p1.fm_range_ < p2.fm_range_ ||
            (p1.fm_range_ == p2.fm_range_ && 
-            p1.win_prob_ < p2.win_prob_);
+            p1.seed_prob_ < p2.seed_prob_);
 }
 
-Aligner::Aligner(const BwaFMI &fmi, 
-                     const AlnParams &ap)
-    : fmi_(fmi),
-      params_(ap) {
+Aligner::Aligner(const AlnParams &ap)
+    : params_(ap),
+      seed_tracker_(ap.fmi_.size(),
+                    ap.min_mean_conf_,
+                    ap.min_top_conf_,
+                    ap.min_aln_len_,
+                    ap.seed_len_)
+     {
 
-    PathBuffer::MAX_WIN_LEN = params_.path_win_len_;
 
-    for (unsigned long t = 0; t < EventType::NUM_TYPES; t++) {
-        PathBuffer::TYPE_ADDS[t] = t << ((PathBuffer::MAX_WIN_LEN-2)*TYPE_BITS);
+    PathBuffer::MAX_PATH_LEN = params_.seed_len_;
+
+    for (u64 t = 0; t < EventType::NUM_TYPES; t++) {
+        PathBuffer::TYPE_ADDS[t] = t << ((PathBuffer::MAX_PATH_LEN-2)*TYPE_BITS);
     }
-    PathBuffer::TYPE_MASK = (unsigned char) ((1 << TYPE_BITS) - 1);
+    PathBuffer::TYPE_MASK = (u8) ((1 << TYPE_BITS) - 1);
 
-    kmer_ranges_ = new Range[params_.model_.kmer_count()];
-    for (u16 k = 0; k < params_.model_.kmer_count(); k++) {
-        Range r = fmi_.get_full_range(params_.model_.get_last_base(k));
-        for (size_t i = params_.model_.kmer_len()-2; 
-             i < params_.model_.kmer_len(); i--) {
-            r = fmi_.get_neighbor(r, params_.model_.get_base(k, i));
-        }
-        //std::cout << k << " " << r.start_ << "-" << r.end_ << "\n";
-        kmer_ranges_[k] = r;
-    }
 
+    kmer_probs_ = std::vector<float>(params_.model_.kmer_count());
     prev_paths_ = std::vector<PathBuffer>(params_.max_paths_);
     next_paths_ = std::vector<PathBuffer>(params_.max_paths_);
     sources_added_ = std::vector<bool>(params_.model_.kmer_count(), false);
     prev_size_ = 0;
 
 
-    #ifdef VERBOSE_TIME
+    #ifdef DEBUG_TIME
     loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
     #endif
 }
 
 Aligner::~Aligner() {
-    delete[] kmer_ranges_;
-    for (size_t i = 0; i < next_paths_.size(); i++) {
+    for (u32 i = 0; i < next_paths_.size(); i++) {
         next_paths_[i].free_buffers();
         prev_paths_[i].free_buffers();
     }
     reset();
 }
 
-void Aligner::new_read(size_t read_len) {
-    reset();
-    cur_event_ = 0;
-    #ifdef VERBOSE_TIME
+void Aligner::reset() {
+    prev_size_ = 0;
+    event_i_ = 0;
+    seed_tracker_.reset();
+    #ifdef DEBUG_TIME
     loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
     #endif
 }
 
-void Aligner::reset() {
-    prev_size_ = 0;
-}
+ReadAln Aligner::add_event(const Event &event
+                           #ifdef DEBUG_TIME
+                           ,std::ostream &time_out
+                           #endif
+                           #ifdef DEBUG_SEEDS
+                           ,std::ostream &seeds_out
+                           #endif
+                           ) {
 
-std::vector<Result> Aligner::add_event(std::vector<float> kmer_probs, 
-                                           std::ostream &seeds_out,
-                                           std::ostream &time_out) {
-
-
-    float prob;
 
     Range prev_range;
-    //PathBuffer *prev_path;
     u16 prev_kmer;
-    
-    bool child_found;
     float evpr_thresh;
+    bool child_found;
+    std::vector<Seed> seeds;
 
-    std::vector<Result> results;
-
-    #ifdef VERBOSE_TIME
+    #ifdef DEBUG_TIME
     Timer timer;
     #endif
+
     auto next_path = next_paths_.begin();
 
-
+    for (u16 kmer = 0; kmer < params_.model_.kmer_count(); kmer++) {
+        kmer_probs_[kmer] = params_.model_.event_match_prob(event, kmer);
+    }
 
     //Find neighbors of previous nodes
-    for (size_t pi = 0; pi < prev_size_; pi++) {
+    for (u32 pi = 0; pi < prev_size_; pi++) {
         if (!prev_paths_[pi].is_valid()) {
             continue;
         }
-
 
         child_found = false;
 
@@ -310,18 +273,14 @@ std::vector<Result> Aligner::add_event(std::vector<float> kmer_probs,
 
         evpr_thresh = params_.get_prob_thresh(prev_range.length());
 
-        //Get probability for stay neighbor
-        prob = kmer_probs[prev_kmer];
-
         if (prev_path.consec_stays_ < params_.max_consec_stay_ && 
-            prob >= evpr_thresh) {
+            kmer_probs_[prev_kmer] >= evpr_thresh) {
 
             next_path->make_child(prev_path, 
                            prev_range,
                            prev_kmer, 
-                           prob, 
+                           kmer_probs_[prev_kmer], 
                            EventType::STAY);
-
 
             child_found = true;
 
@@ -330,30 +289,23 @@ std::vector<Result> Aligner::add_event(std::vector<float> kmer_probs,
             }
         }
 
-        //#ifdef VERBOSE_TIME
-        //stay_time += timer.lap();
-        //#endif
-        
         //Add all the neighbors
-        for (u8 i = 0; i < 4; i++) {
+        for (u8 i = 0; i < ALPH_SIZE; i++) {
             u16 next_kmer = params_.model_.get_neighbor(prev_kmer, i);
 
-            prob = kmer_probs[next_kmer];
-
-            if (prob < evpr_thresh) {
+            if (kmer_probs_[next_kmer] < evpr_thresh) {
                 continue;
             }
 
-            //u8 next_base = params_.model_.get_first_base(*next_kmer);
             u8 next_base = params_.model_.get_last_base(next_kmer);
 
-            #ifdef VERBOSE_TIME
+            #ifdef DEBUG_TIME
             loop1_time_ += timer.lap();
             #endif
 
-            Range next_range = fmi_.get_neighbor(prev_range, next_base);
+            Range next_range = params_.fmi_.get_neighbor(prev_range, next_base);
 
-            #ifdef VERBOSE_TIME
+            #ifdef DEBUG_TIME
             fmrs_time_ += timer.lap();
             #endif
 
@@ -364,7 +316,7 @@ std::vector<Result> Aligner::add_event(std::vector<float> kmer_probs,
             next_path->make_child(prev_path, 
                                   next_range,
                                   next_kmer, 
-                                  prob, 
+                                  kmer_probs_[next_kmer], 
                                   EventType::MATCH);
 
             child_found = true;
@@ -375,13 +327,13 @@ std::vector<Result> Aligner::add_event(std::vector<float> kmer_probs,
         }
 
         if (!child_found && !prev_path.sa_checked_) {
-            #ifdef VERBOSE_TIME
+            #ifdef DEBUG_TIME
             loop1_time_ += timer.lap();
             #endif
 
-            check_alignments(prev_path, results, true, seeds_out);
+            update_seeds(prev_path, seeds, true);
 
-            #ifdef VERBOSE_TIME
+            #ifdef DEBUG_TIME
             fmsa_time_ += timer.lap();
             #endif
         }
@@ -391,50 +343,47 @@ std::vector<Result> Aligner::add_event(std::vector<float> kmer_probs,
         }
     }
 
-    #ifdef VERBOSE_TIME
+    #ifdef DEBUG_TIME
     loop1_time_ += timer.lap();
     #endif
 
     if (next_path != next_paths_.begin()) {
 
-        size_t next_size = next_path - next_paths_.begin();
+        u32 next_size = next_path - next_paths_.begin();
 
         std::sort(next_paths_.begin(), next_path);
 
-        #ifdef VERBOSE_TIME
+        #ifdef DEBUG_TIME
         sort_time_ += timer.lap();
         #endif
 
         u16 source_kmer;
-        prev_kmer = params_.model_.kmer_count(); //TODO: won't work for k=4
+        prev_kmer = params_.model_.kmer_count(); 
 
         Range unchecked_range, source_range;
 
         for (u32 i = 0; i < next_size; i++) {
             source_kmer = next_paths_[i].kmer_;
-            prob = kmer_probs[source_kmer];
 
             //Add source for beginning of kmer range
             if (source_kmer != prev_kmer &&
                 next_path != next_paths_.end() &&
-                prob >= params_.get_source_prob()) {
+                kmer_probs_[source_kmer] >= params_.get_source_prob()) {
 
                 sources_added_[source_kmer] = true;
 
-                //unchecked_range = kmer_ranges_[source_kmer];
-
-                source_range = Range(kmer_ranges_[source_kmer].start_,
+                source_range = Range(params_.kmer_fmranges_[source_kmer].start_,
                                      next_paths_[i].fm_range_.start_ - 1);
 
                 if (source_range.is_valid()) {
                     next_path->make_source(source_range,
                                            source_kmer,
-                                           prob);
+                                           kmer_probs_[source_kmer]);
                     next_path++;
                 }                                    
 
                 unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
-                                        kmer_ranges_[source_kmer].end_);
+                                        params_.kmer_fmranges_[source_kmer].end_);
             }
 
             prev_kmer = source_kmer;
@@ -451,7 +400,7 @@ std::vector<Result> Aligner::add_event(std::vector<float> kmer_probs,
             //Start source after current path
             //TODO: check if theres space for a source here, instead of after extra work?
             if (next_path != next_paths_.end() &&
-                prob >= params_.get_source_prob()) {
+                kmer_probs_[source_kmer] >= params_.get_source_prob()) {
                 
                 source_range = unchecked_range;
                 
@@ -469,24 +418,24 @@ std::vector<Result> Aligner::add_event(std::vector<float> kmer_probs,
                 if (source_range.is_valid()) {
                     next_path->make_source(source_range,
                                            source_kmer,
-                                           prob);
+                                           kmer_probs_[source_kmer]);
                     next_path++;
                 }
             }
 
-            #ifdef VERBOSE_TIME
+            #ifdef DEBUG_TIME
             loop2_time_ += timer.lap();
             #endif
 
-            check_alignments(next_paths_[i], results, false, seeds_out);
+            update_seeds(next_paths_[i], seeds, false);
 
-            #ifdef VERBOSE_TIME
+            #ifdef DEBUG_TIME
             fmsa_time_ += timer.lap();
             #endif
         }
     }
 
-    #ifdef VERBOSE_TIME
+    #ifdef DEBUG_TIME
     loop2_time_ += timer.lap();
     #endif
     
@@ -495,16 +444,15 @@ std::vector<Result> Aligner::add_event(std::vector<float> kmer_probs,
             next_path != next_paths_.end(); 
          kmer++) {
 
-        prob = kmer_probs[kmer];
-        Range next_range = kmer_ranges_[kmer];
+        Range next_range = params_.kmer_fmranges_[kmer];
 
         if (!sources_added_[kmer] && 
-            prob >= params_.get_source_prob() &&
+            kmer_probs_[kmer] >= params_.get_source_prob() &&
             next_path != next_paths_.end() &&
             next_range.is_valid()) {
 
             //TODO: don't write to prob buffer here to speed up source loop
-            next_path->make_source(next_range, kmer, prob);             
+            next_path->make_source(next_range, kmer, kmer_probs_[kmer]);
             next_path++;
 
         } else {
@@ -512,69 +460,39 @@ std::vector<Result> Aligner::add_event(std::vector<float> kmer_probs,
         }
     }
 
-    #ifdef VERBOSE_TIME
+    #ifdef DEBUG_TIME
     fullsource_time_ += timer.lap();
     #endif
 
-
-    //std::cout << ((prev_size_ + (next_path - next_paths_.begin())) / 2) << "\t" << timer.get() << "\n";
     prev_size_ = next_path - next_paths_.begin();
     prev_paths_.swap(next_paths_);
 
     //Update event index
-    cur_event_++;
+    event_i_++;
 
-    return results;
+    return seed_tracker_.add_seeds(seeds);
 }
 
-void Aligner::check_alignments(PathBuffer &p, 
-                                      std::vector<Result> &results, 
-                                      bool path_ended,
-                                      std::ostream &seeds_out) {
+void Aligner::update_seeds(PathBuffer &p, 
+                           std::vector<Seed> &seeds, 
+                           bool path_ended) {
 
-    if (p.should_report(params_, path_ended)) {
-        //std::cout << " pass\n";
-
-        Result r(cur_event_ - path_ended, params_.path_win_len_, p.win_prob_);
-
+    if (p.is_seed_valid(params_, path_ended)) {
         p.sa_checked_ = true;
 
+        Seed seed(event_i_ - path_ended, params_.seed_len_, p.seed_prob_);
         for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
 
             //Reverse the reference coords so they both go L->R
-            u64 rev_en = fmi_.size() - fmi_.sa(s) + 1;
-            r.set_ref_range(rev_en, p.match_len());
+            u64 rev_en = params_.fmi_.size() - params_.fmi_.sa(s) + 1;
+            seed.set_ref_range(rev_en, p.match_len());
+            seeds.push_back(seed);
 
-            //r.set_ref_range(fmi_.sa(s), p.match_len());
-            
-            results.push_back(r);
-
-            //seeds_out << label_ << "\t";
-            //r.print(seeds_out);
+            #ifdef DEBUG_SEEDS
+            seed.print(seeds_out);
+            #endif
         }
-    } else {
-        //std::cout << " fail\n";
     }
 }
 
 
-Result::Result(unsigned int read_end, 
-              unsigned  int seed_len, 
-              float prob, 
-              unsigned int ref_start, 
-              unsigned int ref_end) 
-    : read_range_( Range(read_end - seed_len, read_end) ),
-      ref_range_(Range(ref_start, ref_end)),
-      seed_prob_(prob) {}
-
-void Result::set_ref_range(unsigned int end, unsigned int length) {
-    ref_range_.start_ = end - length + 1;
-    ref_range_.end_ = end;
-}
-
-
-void Result::print(std::ostream &out) {
-    out << read_range_.start_ << "-" << read_range_.end_ << "\t"
-              << ref_range_.start_ << "-" << ref_range_.end_ << "\t"
-              << seed_prob_ << "\n";
-}

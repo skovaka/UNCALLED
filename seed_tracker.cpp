@@ -5,6 +5,27 @@
 
 //#define DEBUG
 
+Seed::Seed(u32 read_end, 
+           u8 seed_len, 
+           float prob, 
+           u64 ref_start, 
+           u64 ref_end) 
+    : read_range_( Range(read_end - seed_len, read_end) ),
+      ref_range_(Range(ref_start, ref_end)),
+      seed_prob_(prob) {}
+
+void Seed::set_ref_range(u64 end, u8 length) {
+    ref_range_.start_ = end - length + 1;
+    ref_range_.end_ = end;
+}
+
+
+void Seed::print(std::ostream &out) {
+    out << read_range_.start_ << "-" << read_range_.end_ << "\t"
+              << ref_range_.start_ << "-" << ref_range_.end_ << "\t"
+              << seed_prob_ << "\n";
+}
+
 static const ReadAln NULL_ALN = ReadAln();
 u8 ReadAln::WIN_LEN;
 
@@ -104,7 +125,7 @@ void SeedTracker::reset() {
     len_sum_ = 0;
 }
 
-ReadAln SeedTracker::add_seeds(const std::vector<Result> &seeds) {
+ReadAln SeedTracker::add_seeds(const std::vector<Seed> &seeds) {
     ReadAln top;
 
     for (size_t i = 0; i < seeds.size(); i++) {
@@ -127,7 +148,7 @@ ReadAln SeedTracker::add_seeds(const std::vector<Result> &seeds) {
     return NULL_ALN;
 }
 
-ReadAln SeedTracker::add_seed(Result r) {
+ReadAln SeedTracker::add_seed(Seed r) {
     ReadAln new_aln(r.ref_range_, r.read_range_.start_);
 
     //Locations sorted by decreasing ref_en_.start

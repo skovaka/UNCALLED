@@ -31,21 +31,21 @@ class KmerModel {
 
     bool event_valid(const Event &e) const;
 
-    float event_match_prob(Event evt, u16 k_id) const;
+    float event_match_prob(const Event &evt, u16 k_id) const;
     float event_match_prob(float evt, u16 k_id) const;
 
     float get_stay_prob(Event e1, Event e2) const; 
 
-    inline size_t kmer_len() const {return k_;}
-    inline size_t kmer_count() const {return kmer_count_;}
+    inline u8 kmer_len() const {return k_;}
+    inline u16 kmer_count() const {return kmer_count_;}
 
-    u16 kmer_to_id(std::string kmer, int offset = 0) const;
+    u16 kmer_to_id(std::string kmer, u64 offset = 0) const;
     u16 kmer_comp(u16 kmer);
     //std::string id_to_kmer(u16 kmer) const;
 
     u8 get_first_base(u16 k) const;
     u8 get_last_base(u16 k) const;
-    u8 get_base(u16 kmer, size_t i) const;
+    u8 get_base(u16 kmer, u8 i) const;
 
     void parse_fasta (std::ifstream &fasta_in, 
                  std::vector<u16> &fwd_ids, 
@@ -54,11 +54,12 @@ class KmerModel {
     double *lv_means_, *lv_vars_x2_, *lognorm_denoms_, *sd_means_, *sd_stdvs_;
 
     private:
-    unsigned short k_, kmer_count_;
+    u8 k_;
+    u16 kmer_count_;
     double lambda_, model_mean_, model_stdv_;
     bool complement_;
 
-    std::vector< std::vector<u16> > neighbors_; //TODO: NO MORE LISTS
+    std::vector< std::vector<u16> > neighbors_;
     u16 *rev_comp_ids_;
 };
 

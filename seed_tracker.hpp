@@ -1,10 +1,32 @@
 #ifndef SEED_TRACKER_HPP
 #define SEED_TRACKER_HPP
 
-#include "aligner.hpp"
 #include <set>
 #include <vector>
 #include <iostream>
+#include <algorithm>
+#include "util.hpp"
+#include "range.hpp"
+
+class Seed {
+    public:
+
+    Seed(u32 read_end, 
+         u8 seed_len, 
+         float prob, 
+         u64 ref_start = 0, 
+         u64 ref_end = 0);
+
+    void set_ref_range(u64 end, u8 length);
+    void print(std::ostream &out);
+
+    Range read_range_, ref_range_;
+    float seed_prob_;
+
+    #ifdef DEBUG_PROB
+    float min_evt_prob_;
+    #endif
+};
 
 class ReadAln {
     public:
@@ -49,8 +71,8 @@ class SeedTracker {
 
     SeedTracker(u64 ref_len, float mean_thresh, float top_thresh, u8 min_aln_len, u8 win_len);
 
-    ReadAln add_seed(Result seed);
-    ReadAln add_seeds(const std::vector<Result> &seeds);
+    ReadAln add_seed(Seed seed);
+    ReadAln add_seeds(const std::vector<Seed> &seeds);
 
     void reset();
 

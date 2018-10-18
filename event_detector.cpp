@@ -57,13 +57,13 @@ void EventDetector::reset() {
     };
 }
 
-size_t EventDetector::get_buf_mid() {
+u32 EventDetector::get_buf_mid() {
     return t - (BUF_LEN / 2) - 1;
 }
 
 Event EventDetector::add_sample(RawSample s) {
 
-    size_t t_mod = t % BUF_LEN;
+    u32 t_mod = t % BUF_LEN;
     
     if (t_mod > 0) {
         sum[t_mod] = sum[t_mod-1] + s;
@@ -99,7 +99,7 @@ std::vector<Event> EventDetector::get_all_events(std::vector<RawSample> raw) {
     std::vector<Event> events;
     Event e;
 
-    for (size_t i = 0; i < raw.size(); i++) {
+    for (u32 i = 0; i < raw.size(); i++) {
         e = add_sample(raw[i]);
         if (e.length > 0) {
             events.push_back(e);
@@ -121,7 +121,7 @@ std::vector<Event> EventDetector::get_all_events(std::vector<RawSample> raw) {
  *
  *   @returns float array containing tstats.  Returns NULL on error
  **/
-float EventDetector::compute_tstat(size_t w_length) {
+float EventDetector::compute_tstat(u32 w_length) {
     assert(w_length > 0);
 
     //float *tstat = (float *) calloc(d_length, sizeof(float));
@@ -137,12 +137,12 @@ float EventDetector::compute_tstat(size_t w_length) {
     }
 
     // fudge boundaries
-    //for (size_t i = 0; i < w_length; ++i) {
+    //for (u32 i = 0; i < w_length; ++i) {
     //    tstat[i] = 0;
     //    tstat[d_length - i - 1] = 0;
     //}
 
-    size_t i = buf_mid % BUF_LEN,
+    u32 i = buf_mid % BUF_LEN,
            st = (buf_mid - w_length) % BUF_LEN,
            en = (buf_mid + w_length) % BUF_LEN;
 
@@ -170,7 +170,7 @@ float EventDetector::compute_tstat(size_t w_length) {
 
 bool EventDetector::peak_detect(float current_value, Detector &detector) {
 
-    size_t i = buf_mid; //TODO: just use buf_mid
+    u32 i = buf_mid; //TODO: just use buf_mid
 
     //Carry on if we've been masked out
     if (detector.masked_to >= i) {
@@ -245,13 +245,13 @@ bool EventDetector::peak_detect(float current_value, Detector &detector) {
  *
  *  @returns An initialised event.  A 'null' event is returned on error.
  **/
-Event EventDetector::create_event(int evt_en) {
+Event EventDetector::create_event(u32 evt_en) {
     Event event = { 0 };
 
-    int evt_en_buf = evt_en % BUF_LEN;
+    u32 evt_en_buf = evt_en % BUF_LEN;
 
-    event.start = (uint64_t) evt_st;
-    event.length = (float)(evt_en - evt_st); //TODO: OFF BY ONE?
+    event.start = evt_st;
+    event.length = (float)(evt_en - evt_st);
     event.mean = (float)(sum[evt_en_buf] - evt_st_sum) / event.length;
     const float deltasqr = (sumsq[evt_en_buf] - evt_st_sumsq);
     const float var = deltasqr / event.length - event.mean * event.mean;

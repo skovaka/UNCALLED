@@ -10,15 +10,31 @@
 
 #define PI 3.1415926535897
 
+std::string get_reverse_complement(const std::string &seq) {
+    std::string rev(seq.size(), 'N');
+    for (u64 i = 0; i < seq.size(); i++) {
+        rev[rev.size()-i-1] = BASE_COMP_C[(u8) seq[i]];
+    }
+    return rev;
+}
+
+std::string get_complement(const std::string &seq) {
+    std::string comp(seq.size(), 'N');
+    for (u64 i = 0; i < seq.size(); i++) {
+        comp[i] = BASE_COMP_C[(u8) seq[i]];
+    }
+    return comp;
+}
+
 KmerModel::KmerModel(std::string model_fname, bool complement) {
     std::ifstream model_in(model_fname);
 
     //Read header and count number of columns
     std::string header;
     std::getline(model_in, header);
-    int num_cols = 0;
+    u8 num_cols = 0;
     bool prev_ws = true;
-    for (unsigned int i = 0; i < header.size(); i++) {
+    for (u8 i = 0; i < header.size(); i++) {
         if (header[i] == ' ' || header[i] == '\t') {
             prev_ws = true;
         } else {
@@ -71,9 +87,7 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
     do {
         //Complement kmer if needed
         if (complement) {
-            for (u8 i = 0; i < k_; i++) {
-                kmer[i] = BASE_COMP_C[(u8) kmer[i]];
-            }
+            kmer = get_complement(kmer);
         }
 
         //Get unique ID for the kmer
@@ -87,15 +101,8 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
         //Store kmer information
         } else {
 
-            //Complement kmer if needed
-            //if (complement) {
-            //    std::cout << k_id << " " << kmer_comp(k_id) << " " << kmer_to_id(reverse_complement(kmer)) << "\n";
-            //    k_id = kmer_comp(k_id);
-            //}
-
-
             //Store kmer reverse complement
-            rev_comp_ids_[k_id] = kmer_to_id(reverse_complement(kmer));
+            rev_comp_ids_[k_id] = kmer_to_id(get_reverse_complement(kmer));
 
             //Store all neighboring kmers
             for (short b = 0; b < 4; b++) { //4 magic number?
@@ -152,14 +159,15 @@ float KmerModel::event_match_prob(float e, u16 k_id) const {
     return (-pow(e - lv_means_[k_id], 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
 }
 
-float KmerModel::event_match_prob(Event e, u16 k_id) const {
+float KmerModel::event_match_prob(const Event &e, u16 k_id) const {
     return event_match_prob(e.mean, k_id);
 }
 
-u16 KmerModel::kmer_to_id(std::string kmer, int offset) const {
+u16 KmerModel::kmer_to_id(std::string kmer, u64 offset) const {
     u16 id = BASE_BYTES[(u8) kmer[offset]];
-    for (unsigned int j = 1; j < k_; j++)
+    for (u8 j = 1; j < k_; j++) {
         id = (id << 2) | BASE_BYTES[(u8) kmer[offset+j]];
+    }
     return id;
 }
 
@@ -167,7 +175,7 @@ u16 KmerModel::kmer_comp(u16 kmer) {
     return kmer ^ ((1 << (2*k_)) - 1);
 }
 
-u8 KmerModel::get_base(u16 kmer, size_t i) const {
+u8 KmerModel::get_base(u16 kmer, u8 i) const {
     return (u8) ((kmer >> (2 * (k_-i-1))) & 0x3);
 }
 
@@ -263,18 +271,13 @@ void KmerModel::parse_fasta(
             fwd_seq = cur_line;
         
         //Store forward IDs
-        for (unsigned int i = 0; i < fwd_seq.size() - k_ + 1; i++)
+        for (u64 i = 0; i < fwd_seq.size() - k_ + 1; i++)
             fwd_ids.push_back(kmer_to_id(fwd_seq, i));
     
         prev_line = cur_line;
     }
 
     rev_ids = std::vector<u16>(fwd_ids.size());
-    for (unsigned int i = 0; i < fwd_ids.size(); i++)
+    for (u64 i = 0; i < fwd_ids.size(); i++)
         rev_ids[rev_ids.size()-i-1] = rev_comp_ids_[fwd_ids[i]];
-
-    //Add EOF character
-    //fwd_ids.push_back((int) kmer_count_);
-    //rev_ids.push_back((int) kmer_count_);
-
 }
