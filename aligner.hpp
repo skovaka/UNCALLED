@@ -15,6 +15,7 @@ class AlnParams {
     public:
     AlnParams(const KmerModel &model,
               const BwaFMI &fmi,
+              const std::string &probfn_fname,
               u32 seed_len, 
               u32 min_rep_len, 
               u32 max_rep_copy, 
@@ -24,8 +25,7 @@ class AlnParams {
               float max_stay_frac,
               float min_seed_prob, 
               float min_mean_conf,
-              float min_top_conf,
-              const std::string event_probs);
+              float min_top_conf);
     
     float get_prob_thresh(u64 fm_length);
     float get_source_prob();

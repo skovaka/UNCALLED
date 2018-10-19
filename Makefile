@@ -17,14 +17,14 @@ dtw_test.o: dtw_test.cpp dtw.hpp
 detect_events: detect_events.o event_detector.o
 	$(CC) $(CFLAGS) detect_events.o event_detector.o -o detect_events $(HDF5_LIB) $(LIBS)
 
-uncalled: uncalled.o kmer_model.o aligner.o seed_tracker.o arg_parse.o util.o range.o bwa_fmi.o event_detector.o
-	$(CC) $(CFLAGS) uncalled.o kmer_model.o aligner.o seed_tracker.o arg_parse.o util.o range.o bwa_fmi.o event_detector.o -o uncalled $(HDF5_LIB) $(BWA_LIB) $(LIBS)
+uncalled: uncalled.o kmer_model.o aligner.o seed_tracker.o arg_parse.o range.o bwa_fmi.o event_detector.o
+	$(CC) $(CFLAGS) uncalled.o kmer_model.o aligner.o seed_tracker.o arg_parse.o range.o bwa_fmi.o event_detector.o -o uncalled $(HDF5_LIB) $(BWA_LIB) $(LIBS)
 
-dtw_test: dtw_test.o kmer_model.o arg_parse.o util.o dtw.hpp event_detector.o
-	$(CC) $(CFLAGS) dtw_test.o kmer_model.o arg_parse.o util.o event_detector.o -o dtw_test $(INCLUDE) $(HDF5_LIB) $(LIBS)
+dtw_test: dtw_test.o kmer_model.o arg_parse.o dtw.hpp event_detector.o
+	$(CC) $(CFLAGS) dtw_test.o kmer_model.o arg_parse.o event_detector.o -o dtw_test $(INCLUDE) $(HDF5_LIB) $(LIBS)
 
-self_align_ref: bwa_fmi.o self_align_ref.o util.o range.o arg_parse.o
-	$(CC) $(CFLAGS) bwa_fmi.o self_align_ref.o util.o range.o arg_parse.o -o self_align_ref $(LIBS) $(BWA_LIB)
+self_align_ref: bwa_fmi.o self_align_ref.o range.o arg_parse.o
+	$(CC) $(CFLAGS) bwa_fmi.o self_align_ref.o range.o arg_parse.o -o self_align_ref $(LIBS) $(BWA_LIB)
 
 fast5_dump: fast5_dump.o 
 	$(CC) $(CFLAGS) fast5_dump.o -o fast5_dump $(LIBS) $(INCLUDE) $(HDF5_LIB) $(HDF5_INCLUDE)

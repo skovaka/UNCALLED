@@ -3,6 +3,7 @@
 
 AlnParams::AlnParams(const KmerModel &model,
                      const BwaFMI &fmi,
+                     const std::string &probfn_fname,
                      u32 seed_len, 
                      u32 min_rep_len, 
                      u32 max_rep_copy, 
@@ -12,8 +13,7 @@ AlnParams::AlnParams(const KmerModel &model,
                      float max_stay_frac,
                      float min_seed_prob, 
                      float min_mean_conf,
-                     float min_top_conf,
-                     const std::string event_probs)
+                     float min_top_conf)
         : model_(model),
           fmi_(fmi),
           seed_len_(seed_len),
@@ -27,29 +27,21 @@ AlnParams::AlnParams(const KmerModel &model,
           min_mean_conf_(min_mean_conf),
           min_top_conf_(min_top_conf) {
     
-    size_t i = event_probs.find('_'), j, k;
-
-    evpr_threshes_.push_back(atof(event_probs.substr(0, i).c_str()));
-
-    i += 1;
-    j = event_probs.find('_');
-
-    while(i < event_probs.size()) {
-        k = event_probs.find('-', i);
-        evpr_lengths_.push_back( atoi(event_probs.substr(i, k).c_str()) );
-        evpr_threshes_.push_back( atof(event_probs.substr(k, j).c_str()) ); 
-
-        i = j+1;
-        j = event_probs.find('_', i+1);
-        if (j == std::string::npos) {
-            j = event_probs.size();
-        }
+    std::ifstream infile(probfn_fname);
+    float prob, frac;
+    u64 fmlen = 0;
+    infile >> prob >> frac;
+    evpr_threshes_.push_back(prob);
+    while (fmlen != 1) {
+        infile >> fmlen >> prob >> frac;
+        evpr_lengths_.push_back(fmlen);
+        evpr_threshes_.push_back(prob);
     }
 
     kmer_fmranges_ = std::vector<Range>(model_.kmer_count());
     for (u16 k = 0; k < model_.kmer_count(); k++) {
         Range r = fmi_.get_full_range(model_.get_last_base(k));
-        for (i = model_.kmer_len()-2; i < model_.kmer_len(); i--) {
+        for (u8 i = model_.kmer_len()-2; i < model_.kmer_len(); i--) {
             r = fmi_.get_neighbor(r, model_.get_base(k, i));
         }
         kmer_fmranges_[k] = r;

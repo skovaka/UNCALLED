@@ -30,6 +30,7 @@ bool open_fast5(const std::string &filename, fast5::File &file);
 enum Opt {
     MODEL       = 'm',
     INDEX_PREFIX   = 'x',
+    PROBFN_FNAME = 'f',
     READ_LIST   = 'i',
     OUT_PREFIX     = 'o',
 
@@ -47,7 +48,6 @@ enum Opt {
     STAY_FRAC       = 's',
     MAX_CONSEC_STAY = 'y',
 
-    EVENT_PROBS = 'E',
     MIN_SEED_PROB = 'S'
 };
 
@@ -56,6 +56,7 @@ int main(int argc, char** argv) {
 
     args.add_string(Opt::MODEL, "model", MODEL_DEF, "Nanopore kmer model");
     args.add_string(Opt::READ_LIST,    "read_list",    "",     "");
+    args.add_string(Opt::PROBFN_FNAME, "probfn_fname", "", "");
     args.add_string(Opt::INDEX_PREFIX, "index_prefix",   "",     "");
     args.add_string(Opt::OUT_PREFIX,   "out_prefix",   "./",     "");
 
@@ -73,12 +74,11 @@ int main(int argc, char** argv) {
     args.add_double(Opt::STAY_FRAC,       "stay_frac",    0.5,    "");
     args.add_int(   Opt::MAX_CONSEC_STAY, "max_consec_stay", 8, "");
 
-    args.add_string(Opt::EVENT_PROBS, "event_probs", "-2.25_100-2.4_5-4.0_1-10.0", "");
     args.add_double(Opt::MIN_SEED_PROB, "min_seed_prob", -3.75, "");
 
     args.parse_args(argc, argv);
 
-    std::string prefix = args.get_string(Opt::OUT_PREFIX) + args.get_string(Opt::EVENT_PROBS) + args.get_param_str();
+    std::string prefix = args.get_string(Opt::OUT_PREFIX) + args.get_param_str();
     std::ofstream seeds_out(prefix + "_seeds.txt");
     std::ofstream alns_out(prefix + "_aln.txt");
     std::ofstream time_out(prefix + "_time.txt");
@@ -89,12 +89,11 @@ int main(int argc, char** argv) {
               << prefix << "_time.txt" << "\n";
 
     KmerModel model(args.get_string(Opt::MODEL), true);
-    std::cerr << "1\n";
     BwaFMI fmi(args.get_string(Opt::INDEX_PREFIX));
-    std::cerr << "2\n";
 
     AlnParams aln_params(model,
                          fmi,
+                         args.get_string(Opt::PROBFN_FNAME),
                          args.get_int(Opt::SEED_LEN),
                          args.get_int(Opt::MIN_REP_LEN),
                          args.get_int(Opt::MAX_REP_COPY),
@@ -104,8 +103,7 @@ int main(int argc, char** argv) {
                          (float) args.get_double(Opt::STAY_FRAC),
                          (float) args.get_double(Opt::MIN_SEED_PROB),
                          (float) args.get_double(Opt::MIN_MEAN_CONF), 
-                         (float) args.get_double(Opt::MIN_TOP_CONF), 
-                         args.get_string(Opt::EVENT_PROBS));
+                         (float) args.get_double(Opt::MIN_TOP_CONF));
     
     std::cerr << "Init graph\n";
 
