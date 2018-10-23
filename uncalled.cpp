@@ -67,12 +67,12 @@ int main(int argc, char** argv) {
     args.add_int(   Opt::MIN_REP_LEN,  "min_repeat_len", 0, "");
     args.add_int(   Opt::MAX_REP_COPY, "max_repeat_copy", 100, "");
     args.add_int(   Opt::MAX_PATHS,    "max_paths", 10000, "");
+    args.add_int(   Opt::MAX_CONSEC_STAY, "max_consec_stay", 8, "");
 
     args.add_double(Opt::MIN_MEAN_CONF, "min_mean_conf", 6.67, "");
     args.add_double(Opt::MIN_TOP_CONF,  "min_top_conf", 2, "");
 
     args.add_double(Opt::STAY_FRAC,       "stay_frac",    0.5,    "");
-    args.add_int(   Opt::MAX_CONSEC_STAY, "max_consec_stay", 8, "");
 
     args.add_double(Opt::MIN_SEED_PROB, "min_seed_prob", -3.75, "");
 
@@ -91,15 +91,15 @@ int main(int argc, char** argv) {
     KmerModel model(args.get_string(Opt::MODEL), true);
     BwaFMI fmi(args.get_string(Opt::INDEX_PREFIX));
 
-    AlnParams aln_params(model,
-                         fmi,
+    AlnParams aln_params(fmi,
+                         model,
                          args.get_string(Opt::PROBFN_FNAME),
                          args.get_int(Opt::SEED_LEN),
+                         args.get_int(Opt::MIN_ALN_LEN),
                          args.get_int(Opt::MIN_REP_LEN),
                          args.get_int(Opt::MAX_REP_COPY),
-                         args.get_int(Opt::MAX_PATHS),
                          args.get_int(Opt::MAX_CONSEC_STAY),
-                         args.get_int(Opt::MIN_ALN_LEN),
+                         args.get_int(Opt::MAX_PATHS),
                          (float) args.get_double(Opt::STAY_FRAC),
                          (float) args.get_double(Opt::MIN_SEED_PROB),
                          (float) args.get_double(Opt::MIN_MEAN_CONF), 

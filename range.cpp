@@ -14,6 +14,7 @@ Range::Range(const Range &prev)
 
 Range::Range(size_t start, size_t end) : start_(start), end_(end) {}
 
+
 Range::Range() : start_(1), end_(0) {}
 
 bool Range::intersects(const Range &q) const {

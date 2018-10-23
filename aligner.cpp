@@ -1,15 +1,14 @@
 #include "aligner.hpp"
 
-
-AlnParams::AlnParams(const KmerModel &model,
-                     const BwaFMI &fmi,
+AlnParams::AlnParams(const BwaFMI &fmi,
+                     const KmerModel &model,
                      const std::string &probfn_fname,
                      u32 seed_len, 
+                     u32 min_aln_len,
                      u32 min_rep_len, 
                      u32 max_rep_copy, 
-                     u32 max_paths, 
                      u32 max_consec_stay,
-                     u32 min_aln_len,
+                     u32 max_paths, 
                      float max_stay_frac,
                      float min_seed_prob, 
                      float min_mean_conf,
@@ -200,12 +199,9 @@ Aligner::Aligner(const AlnParams &ap)
     prev_paths_ = std::vector<PathBuffer>(params_.max_paths_);
     next_paths_ = std::vector<PathBuffer>(params_.max_paths_);
     sources_added_ = std::vector<bool>(params_.model_.kmer_count(), false);
-    prev_size_ = 0;
 
+    reset();
 
-    #ifdef DEBUG_TIME
-    loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
-    #endif
 }
 
 Aligner::~Aligner() {
