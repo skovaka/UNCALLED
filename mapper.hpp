@@ -11,9 +11,9 @@
 //#define DEBUG_TIME
 //#define DEBUG_SEEDS
 
-class AlnParams {
+class MapperParams {
     public:
-    AlnParams(const BwaFMI &fmi,
+    MapperParams(const BwaFMI &fmi,
               const KmerModel &model,
               const std::string &probfn_fname,
               u32 seed_len, 
@@ -51,12 +51,12 @@ class AlnParams {
 };
 
 
-class Aligner {
+class Mapper {
     public:
 
-    Aligner(const AlnParams &aln_params);
+    Mapper(const MapperParams &map_params);
 
-    ~Aligner();
+    ~Mapper();
 
     ReadAln add_event(const Event &event
                       #ifdef DEBUG_TIME
@@ -91,7 +91,7 @@ class Aligner {
 
         void invalidate();
         bool is_valid() const;
-        bool is_seed_valid(const AlnParams &params, 
+        bool is_seed_valid(const MapperParams &params, 
                            bool has_children) const;
 
         u8 type_head() const;
@@ -126,7 +126,7 @@ class Aligner {
                       std::vector<Seed> &seeds, 
                       bool has_children);
 
-    AlnParams params_;
+    MapperParams params_;
     SeedTracker seed_tracker_;
     Range *kmer_ranges_;
     

@@ -41,7 +41,7 @@ bool load_fast5(const std::string &filename, fast5::File &file) {
     return false;
 }
 
-int align_fast5s(const std::vector<std::string> &fast5_names,
+void align_fast5s(const std::vector<std::string> &fast5_names,
                  const std::string &bwa_prefix,
                  const std::string &model_fname,
                  const std::string &probfn_fname,
@@ -57,16 +57,15 @@ int align_fast5s(const std::vector<std::string> &fast5_names,
                  float min_top_conf  = D_MIN_TOP_CONF) {
 
     BwaFMI fmi(bwa_prefix);
-    std::cout << fmi.size() << std::endl;
     KmerModel model(model_fname, true);
 
 
-    AlnParams aln_params(fmi, model, probfn_fname, seed_len, min_aln_len,
+    MapperParams aln_params(fmi, model, probfn_fname, seed_len, min_aln_len,
                          min_rep_len, max_rep_copy, max_consec_stay, 
                          max_paths, max_stay_frac, min_seed_prob,
                          min_mean_conf, min_top_conf);
 
-    Aligner aligner(aln_params);
+    Mapper aligner(aln_params);
 
     detector_param edp = event_detection_defaults;
     edp.threshold1 = 1.4;
@@ -124,12 +123,10 @@ int align_fast5s(const std::vector<std::string> &fast5_names,
         std::cout << fast5_info.read_id << "\t"
                  << fast5_name << std::endl;
 
-
         aligner.reset();
 
     }
 
-    return max_paths;
 }
 
 PYBIND11_MODULE(uncalled, m) {
@@ -143,7 +140,6 @@ PYBIND11_MODULE(uncalled, m) {
           "max_consec_stay"_a=D_MAX_CONSEC_STAY, "max_paths"_a=D_MAX_PATHS,
           "max_stay_frac"_a=D_MAX_STAY_FRAC, "min_seed_prob"_a=D_MIN_SEED_PROB,
           "min_mean_conf"_a=D_MIN_MEAN_CONF, "min_top_conf"_a=D_MIN_TOP_CONF);
-          
 }
 
 /*

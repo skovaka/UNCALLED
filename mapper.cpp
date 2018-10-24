@@ -1,6 +1,6 @@
-#include "aligner.hpp"
+#include "mapper.hpp"
 
-AlnParams::AlnParams(const BwaFMI &fmi,
+MapperParams::MapperParams(const BwaFMI &fmi,
                      const KmerModel &model,
                      const std::string &probfn_fname,
                      u32 seed_len, 
@@ -47,7 +47,7 @@ AlnParams::AlnParams(const BwaFMI &fmi,
     }
 }
 
-float AlnParams::get_prob_thresh(u64 fm_length) {
+float MapperParams::get_prob_thresh(u64 fm_length) {
     auto pr = evpr_threshes_.begin();
     for (auto len = evpr_lengths_.begin(); len != evpr_lengths_.end(); len++) {
         if (fm_length > *len) {
@@ -59,29 +59,29 @@ float AlnParams::get_prob_thresh(u64 fm_length) {
     return *pr;
 }
 
-float AlnParams::get_source_prob() {
+float MapperParams::get_source_prob() {
     return evpr_threshes_.front();
 }
 
-u8 Aligner::PathBuffer::MAX_PATH_LEN = 0, 
-   Aligner::PathBuffer::TYPE_MASK = 0;
+u8 Mapper::PathBuffer::MAX_PATH_LEN = 0, 
+   Mapper::PathBuffer::TYPE_MASK = 0;
 
-u64 Aligner::PathBuffer::TYPE_ADDS[EventType::NUM_TYPES];
+u64 Mapper::PathBuffer::TYPE_ADDS[EventType::NUM_TYPES];
 
-Aligner::PathBuffer::PathBuffer()
+Mapper::PathBuffer::PathBuffer()
     : length_(0),
       prob_sums_(new float[MAX_PATH_LEN+1]) {
 }
 
-Aligner::PathBuffer::PathBuffer(const PathBuffer &p) {
+Mapper::PathBuffer::PathBuffer(const PathBuffer &p) {
     std::memcpy(this, &p, sizeof(PathBuffer));
 }
 
-void Aligner::PathBuffer::free_buffers() {
+void Mapper::PathBuffer::free_buffers() {
     delete[] prob_sums_;
 }
 
-void Aligner::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
+void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     length_ = 1;
     consec_stays_ = 0;
     event_types_ = 0;
@@ -101,7 +101,7 @@ void Aligner::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
 }
 
 
-void Aligner::PathBuffer::make_child(PathBuffer &p, 
+void Mapper::PathBuffer::make_child(PathBuffer &p, 
                                      Range &range,
                                      u16 kmer, 
                                      float prob, 
@@ -137,27 +137,27 @@ void Aligner::PathBuffer::make_child(PathBuffer &p,
     }
 }
 
-void Aligner::PathBuffer::invalidate() {
+void Mapper::PathBuffer::invalidate() {
     length_ = 0;
 }
 
-bool Aligner::PathBuffer::is_valid() const {
+bool Mapper::PathBuffer::is_valid() const {
     return length_ > 0;
 }
 
-u8 Aligner::PathBuffer::match_len() const {
+u8 Mapper::PathBuffer::match_len() const {
     return path_type_counts_[EventType::MATCH];
 }
 
-u8 Aligner::PathBuffer::type_head() const {
+u8 Mapper::PathBuffer::type_head() const {
     return (event_types_ >> (TYPE_BITS*(MAX_PATH_LEN-2))) & TYPE_MASK;
 }
 
-u8 Aligner::PathBuffer::type_tail() const {
+u8 Mapper::PathBuffer::type_tail() const {
     return event_types_ & TYPE_MASK;
 }
 
-bool Aligner::PathBuffer::is_seed_valid(const AlnParams &p,
+bool Mapper::PathBuffer::is_seed_valid(const MapperParams &p,
                                         bool path_ended) const{
     return (fm_range_.length() == 1 || 
                 (path_ended &&
@@ -170,14 +170,14 @@ bool Aligner::PathBuffer::is_seed_valid(const AlnParams &p,
           seed_prob_ >= p.min_seed_prob_;
 }
 
-bool operator< (const Aligner::PathBuffer &p1, 
-                const Aligner::PathBuffer &p2) {
+bool operator< (const Mapper::PathBuffer &p1, 
+                const Mapper::PathBuffer &p2) {
     return p1.fm_range_ < p2.fm_range_ ||
            (p1.fm_range_ == p2.fm_range_ && 
             p1.seed_prob_ < p2.seed_prob_);
 }
 
-Aligner::Aligner(const AlnParams &ap)
+Mapper::Mapper(const MapperParams &ap)
     : params_(ap),
       seed_tracker_(ap.fmi_.size(),
                     ap.min_mean_conf_,
@@ -204,7 +204,7 @@ Aligner::Aligner(const AlnParams &ap)
 
 }
 
-Aligner::~Aligner() {
+Mapper::~Mapper() {
     for (u32 i = 0; i < next_paths_.size(); i++) {
         next_paths_[i].free_buffers();
         prev_paths_[i].free_buffers();
@@ -212,7 +212,7 @@ Aligner::~Aligner() {
     reset();
 }
 
-void Aligner::reset() {
+void Mapper::reset() {
     prev_size_ = 0;
     event_i_ = 0;
     seed_tracker_.reset();
@@ -221,7 +221,7 @@ void Aligner::reset() {
     #endif
 }
 
-ReadAln Aligner::add_event(const Event &event
+ReadAln Mapper::add_event(const Event &event
                            #ifdef DEBUG_TIME
                            ,std::ostream &time_out
                            #endif
@@ -461,7 +461,7 @@ ReadAln Aligner::add_event(const Event &event
     return seed_tracker_.add_seeds(seeds);
 }
 
-void Aligner::update_seeds(PathBuffer &p, 
+void Mapper::update_seeds(PathBuffer &p, 
                            std::vector<Seed> &seeds, 
                            bool path_ended) {
 

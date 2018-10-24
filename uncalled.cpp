@@ -12,7 +12,7 @@
 
 #include "fast5.hpp"
 #include "arg_parse.hpp"
-#include "aligner.hpp"
+#include "mapper.hpp"
 #include "seed_tracker.hpp"  
 #include "range.hpp"
 #include "kmer_model.hpp"
@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
     KmerModel model(args.get_string(Opt::MODEL), true);
     BwaFMI fmi(args.get_string(Opt::INDEX_PREFIX));
 
-    AlnParams aln_params(fmi,
+    MapperParams aln_params(fmi,
                          model,
                          args.get_string(Opt::PROBFN_FNAME),
                          args.get_int(Opt::SEED_LEN),
@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
     
     std::cerr << "Init graph\n";
 
-    Aligner graph(aln_params);
+    Mapper graph(aln_params);
 
     std::ifstream reads_file(args.get_string(Opt::READ_LIST));
 

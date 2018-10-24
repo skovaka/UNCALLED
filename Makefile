@@ -18,8 +18,8 @@ dtw_test.o: dtw_test.cpp dtw.hpp
 detect_events: detect_events.o event_detector.o
 	$(CC) $(CFLAGS) detect_events.o event_detector.o -o detect_events $(HDF5_LIB) $(LIBS)
 
-uncalled: uncalled.o kmer_model.o aligner.o seed_tracker.o arg_parse.o range.o bwa_fmi.o event_detector.o
-	$(CC) $(CFLAGS) uncalled.o kmer_model.o aligner.o seed_tracker.o arg_parse.o range.o bwa_fmi.o event_detector.o -o uncalled $(HDF5_LIB) $(BWA_LIB) $(LIBS)
+uncalled: uncalled.o kmer_model.o mapper.o seed_tracker.o arg_parse.o range.o bwa_fmi.o event_detector.o
+	$(CC) $(CFLAGS) uncalled.o kmer_model.o mapper.o seed_tracker.o arg_parse.o range.o bwa_fmi.o event_detector.o -o uncalled $(HDF5_LIB) $(BWA_LIB) $(LIBS)
 
 dtw_test: dtw_test.o kmer_model.o arg_parse.o dtw.hpp event_detector.o
 	$(CC) $(CFLAGS) dtw_test.o kmer_model.o arg_parse.o event_detector.o -o dtw_test $(INCLUDE) $(HDF5_LIB) $(LIBS)
