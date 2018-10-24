@@ -52,6 +52,8 @@ class ReadAln {
     friend std::ostream &operator<< (std::ostream &out, const ReadAln &a);
 };
 
+const ReadAln NULL_ALN = ReadAln();
+
 //static const ReadAln NULL_ALN;
 
 bool operator< (const ReadAln &q1, const ReadAln &q2);

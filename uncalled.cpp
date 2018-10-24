@@ -91,9 +91,14 @@ int main(int argc, char** argv) {
     KmerModel model(args.get_string(Opt::MODEL), true);
     BwaFMI fmi(args.get_string(Opt::INDEX_PREFIX));
 
+    EventParams event_params = event_detection_defaults;
+    event_params.threshold1 = 1.4;
+    event_params.threshold2 = 1.1;
+
     MapperParams aln_params(fmi,
                          model,
                          args.get_string(Opt::PROBFN_FNAME),
+                         event_params,
                          args.get_int(Opt::SEED_LEN),
                          args.get_int(Opt::MIN_ALN_LEN),
                          args.get_int(Opt::MIN_REP_LEN),
@@ -119,161 +124,24 @@ int main(int argc, char** argv) {
 
     bool read_until = aln_params.min_mean_conf_ > 0 || aln_params.min_top_conf_ > 0;
 
-    detector_param params = event_detection_defaults;
-    params.threshold1 = 1.4;
-    params.threshold2 = 1.1;
-    EventDetector event_detector(params, 30, 150);
 
-    std::string read_line, read_filename;
+    std::string read_fname;
 
     std::cerr << read_until << " Aligning...\n";
 
-    std::cout << fmi.bns_->l_pac << " len\n";
+    while (getline(reads_file, read_fname)) {
 
-    while (getline(reads_file, read_line)) {
-
-        unsigned int aln_st = 0, aln_en = 0;
-
-        unsigned int i = read_line.find("\t");
-
-        if (i == std::string::npos) {
-            read_filename = read_line;
-        } else {
-            read_filename = read_line.substr(0, i);
-
-            unsigned int j = read_line.find("\t", i+1);
-
-            if (j == std::string::npos) {
-                aln_st = atoi(read_line.substr(i+1).c_str());
-            } else {
-                aln_st = atoi(read_line.substr(i+1, j).c_str());
-                aln_en = atoi(read_line.substr(j+1).c_str());
-            }
-        }
-            
         fast5::File fast5_file;
-        if (!open_fast5(read_filename, fast5_file)) {
+        if (!open_fast5(read_fname, fast5_file)) {
             continue;
         }
 
         //TODO: get_raw_sample_dataset
         auto fast5_info = fast5_file.get_raw_samples_params();
         auto raw_samples = fast5_file.get_raw_samples();
-        auto events = event_detector.get_all_events(raw_samples);
 
-        NormParams norm = model.get_norm_params(events);
-        model.normalize(events, norm);
-
-        if (aln_en == aln_st) {
-            aln_en = events.size() - 1;
-        }
-
-        unsigned int aln_len = aln_en - aln_st + 1;
-
+        graph.add_samples(raw_samples, fast5_info.read_id);
         graph.reset();
-
-        Timer read_timer;
-
-        #ifdef VERBOSE_TIME
-        Timer tracker_timer;
-        double tracker_time = 0;
-        time_out << std::fixed << std::setprecision(3);
-        #else
-        unsigned int status_step = aln_len / 10,
-                     status = 0;
-        time_out << "== " << read_filename << " ==\n";
-        #endif
-        
-        seeds_out << "== " << read_filename << " ==\n";
-
-
-        u32 e = aln_st;
-
-        ReadAln final_aln;
-
-        for (; e >= aln_st && e <= aln_en; e++) {
-
-
-            final_aln = graph.add_event(events[e]);
-
-            if (read_until && final_aln.is_valid()) {
-                break;
-            }
-
-            #ifndef VERBOSE_TIME
-            if (status == status_step) {
-                unsigned int prog = (unsigned int) ((100.0 * (aln_len - e)) / aln_len);
-                time_out << prog << "%  (" << read_timer.get() / 1000 << ")\n";
-                status = 0;
-                time_out.flush();
-                seeds_out.flush();
-                alns_out.flush();
-            } else {
-                status++;
-            }
-            #endif
-
-            time_out.flush();
-        }
-
-        double aln_time = read_timer.get();
-
-        #ifdef VERBOSE_TIME
-            //time_out << std::setw(23) << event_timer.lap() << std::endl;
-            #if ALN_TYPE == LEAF_ARR_ALN
-            time_out << std::setw(10) << (graph.loop1_time_) 
-                     << std::setw(10) << (graph.sort_time_) 
-                     << std::setw(10) << (graph.loop2_time_)
-                     << std::setw(10) << (graph.fullsource_time_)
-                     << std::setw(10) << (graph.fmrs_time_)
-                     << std::setw(10) << (graph.fmsa_time_)
-                     << std::setw(10) << tracker_time << "\n";
-            #endif
-        #else
-        time_out << "100% (" << aln_time / 1000 << ")\n";
-
-        time_out << "== END ==\n";
-        #endif
-
-        if (read_until) {
-            if (final_aln.is_valid()) {
-
-                u64 st, en;
-                std::string strand;
-                if (final_aln.ref_st_ < fmi.size() / 2) {
-                    st = final_aln.ref_st_;
-                    en = final_aln.ref_en_.end_;
-                    strand = "rev";
-                } else {
-                    st = fmi.size() - final_aln.ref_en_.end_ - 1;
-                    en = fmi.size() - final_aln.ref_st_ - 1;
-                    strand = "fwd";
-                }
-
-                i32 rid = bns_pos2rid(fmi.bns_, st);
-                std::string ref_name(fmi.bns_->anns[rid].name);
-                st -= fmi.bns_->anns[rid].offset;
-                en -= fmi.bns_->anns[rid].offset;
-
-                alns_out << "aligned\t" 
-                         << final_aln.evt_st_ << "-" << final_aln.evt_en_  << "\t"
-                         << ref_name << "\t" << strand << "\t" 
-                         << st << "-" << en << "\t"
-                         << final_aln.total_len_ << "\t";
-            } else {
-                alns_out << "unaligned\t0-" << aln_len << "\tNULL\tNULL\t0-0\t0\t";
-            }
-            alns_out 
-                     << aln_time << "\t" 
-                     << aln_len << "\t"
-                     << fast5_info.read_id << "\t"
-                     << read_filename << std::endl;
-        } 
-        seeds_out << "== " << aln_time << " ms ==\n";
-
-        time_out.flush();
-        seeds_out.flush();
-        alns_out.flush();
     }
 
 }

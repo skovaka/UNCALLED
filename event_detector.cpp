@@ -11,11 +11,9 @@
 
 typedef Detector *DetectorPtr;
 
-EventDetector::EventDetector(const detector_param &edparams, double min_mean, double max_mean) :
-    params (edparams),
-    BUF_LEN (1 + edparams.window_length2 * 2),
-    MIN_MEAN(min_mean),
-    MAX_MEAN(max_mean) {
+EventDetector::EventDetector(const EventParams &event_params) :
+    params (event_params),
+    BUF_LEN (1 + event_params.window_length2 * 2) {
 
     sum = new double[BUF_LEN];
     sumsq = new double[BUF_LEN];
@@ -87,7 +85,7 @@ Event EventDetector::add_sample(RawSample s) {
     if (p1 || p2) {
         ret = create_event(buf_mid-params.window_length1+1);
 
-        if (ret.mean < MIN_MEAN || ret.mean > MAX_MEAN) {
+        if (ret.mean < params.min_mean || ret.mean > params.max_mean) {
             ret = {0};
         }
     }

@@ -63,10 +63,10 @@ int main(int argc, char** argv) {
 
     const KmerModel model(args.get_string(Opt::MODEL), false);
 
-    detector_param params = event_detection_defaults;
+    EventParams params = event_detection_defaults;
     params.threshold1 = 1.4;
     params.threshold2 = 1.1;
-    EventDetector event_detector(params, 30, 150);
+    EventDetector event_detector(params);
 
     SubSeqDTW substr = SubSeqDTW::NONE;
     if (args.get_flag(Opt::ROW_SUBSTR) && args.get_flag(Opt::COL_SUBSTR)) {

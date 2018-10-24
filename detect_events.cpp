@@ -12,10 +12,10 @@ int main(int argc, char** argv) {
 
     std::string filename = std::string(argv[1]);
 
-    detector_param params = event_detection_defaults;
+    EventParams params = event_detection_defaults;
     params.threshold1 = 1.4;
     params.threshold2 = 1.1;
-    EventDetector ed(params, 30, 150);
+    EventDetector ed(params);
 
     if (!fast5::File::is_valid_file(filename)) {
         std::cerr << "Error: '" << filename << "' is not a valid file \n";

@@ -5,6 +5,7 @@
 #include <vector>
 #include "bwa_fmi.hpp"
 #include "kmer_model.hpp"
+#include "event_detector.hpp"
 #include "seed_tracker.hpp"
 #include "timer.hpp"
 
@@ -14,24 +15,26 @@
 class MapperParams {
     public:
     MapperParams(const BwaFMI &fmi,
-              const KmerModel &model,
-              const std::string &probfn_fname,
-              u32 seed_len, 
-              u32 min_aln_len,
-              u32 min_rep_len, 
-              u32 max_rep_copy, 
-              u32 max_consec_stay,
-              u32 max_paths, 
-              float max_stay_frac,
-              float min_seed_prob, 
-              float min_mean_conf,
-              float min_top_conf);
+                 const KmerModel &model,
+                 const std::string &probfn_fname,
+                 const EventParams &event_params,
+                 u32 seed_len, 
+                 u32 min_aln_len,
+                 u32 min_rep_len, 
+                 u32 max_rep_copy, 
+                 u32 max_consec_stay,
+                 u32 max_paths, 
+                 float max_stay_frac,
+                 float min_seed_prob, 
+                 float min_mean_conf,
+                 float min_top_conf);
     
     float get_prob_thresh(u64 fm_length);
     float get_source_prob();
 
     const KmerModel &model_;
     const BwaFMI &fmi_;
+    const EventParams &event_params_;
 
     u32 seed_len_, 
         min_rep_len_,
@@ -58,14 +61,8 @@ class Mapper {
 
     ~Mapper();
 
-    ReadAln add_event(const Event &event
-                      #ifdef DEBUG_TIME
-                      ,std::ostream &time_out
-                      #endif
-                      #ifdef DEBUG_SEEDS
-                      ,std::ostream &seeds_out
-                      #endif
-                      );
+    ReadAln add_samples(const std::vector<float> &samples, const std::string &fast5_name);
+    //ReadAln add_sample(float s);
 
     void reset();
 
@@ -122,11 +119,23 @@ class Mapper {
 
     private:
 
+    ReadAln add_event(const Event &event
+                      #ifdef DEBUG_TIME
+                      ,std::ostream &time_out
+                      #endif
+                      #ifdef DEBUG_SEEDS
+                      ,std::ostream &seeds_out
+                      #endif
+                      );
+
     void update_seeds(PathBuffer &p, 
                       std::vector<Seed> &seeds, 
                       bool has_children);
 
     MapperParams params_;
+    const KmerModel &model_;
+    const BwaFMI &fmi_;
+    EventDetector event_detector_;
     SeedTracker seed_tracker_;
     Range *kmer_ranges_;
     

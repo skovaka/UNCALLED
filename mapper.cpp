@@ -3,6 +3,7 @@
 MapperParams::MapperParams(const BwaFMI &fmi,
                      const KmerModel &model,
                      const std::string &probfn_fname,
+                     const EventParams &event_params,
                      u32 seed_len, 
                      u32 min_aln_len,
                      u32 min_rep_len, 
@@ -15,6 +16,7 @@ MapperParams::MapperParams(const BwaFMI &fmi,
                      float min_top_conf)
         : model_(model),
           fmi_(fmi),
+          event_params_(event_params),
           seed_len_(seed_len),
           min_rep_len_(min_rep_len),
           max_rep_copy_(max_rep_copy),
@@ -179,6 +181,9 @@ bool operator< (const Mapper::PathBuffer &p1,
 
 Mapper::Mapper(const MapperParams &ap)
     : params_(ap),
+      model_(ap.model_),
+      fmi_(ap.fmi_),
+      event_detector_(EventDetector(ap.event_params_)),
       seed_tracker_(ap.fmi_.size(),
                     ap.min_mean_conf_,
                     ap.min_top_conf_,
@@ -195,10 +200,10 @@ Mapper::Mapper(const MapperParams &ap)
     PathBuffer::TYPE_MASK = (u8) ((1 << TYPE_BITS) - 1);
 
 
-    kmer_probs_ = std::vector<float>(params_.model_.kmer_count());
+    kmer_probs_ = std::vector<float>(model_.kmer_count());
     prev_paths_ = std::vector<PathBuffer>(params_.max_paths_);
     next_paths_ = std::vector<PathBuffer>(params_.max_paths_);
-    sources_added_ = std::vector<bool>(params_.model_.kmer_count(), false);
+    sources_added_ = std::vector<bool>(model_.kmer_count(), false);
 
     reset();
 
@@ -216,10 +221,57 @@ void Mapper::reset() {
     prev_size_ = 0;
     event_i_ = 0;
     seed_tracker_.reset();
+    event_detector_.reset();
     #ifdef DEBUG_TIME
     loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
     #endif
 }
+
+ReadAln Mapper::add_samples(const std::vector<float> &samples, const std::string &fast5_name) {
+    std::vector<Event> events = event_detector_.get_all_events(samples);
+    NormParams norm = model_.get_norm_params(events);
+    model_.normalize(events, norm);
+
+    ReadAln aln;
+
+    for (u32 e = 0; e < events.size(); e++) {
+        aln = add_event(events[e]);
+        if (aln.is_valid()) break;
+    }
+
+    if (aln.is_valid()) {
+
+        u64 st, en;
+        std::string strand;
+        if (aln.ref_st_ < fmi_.size() / 2) {
+            st = aln.ref_st_;
+            en = aln.ref_en_.end_;
+            strand = "rev";
+        } else {
+            st = fmi_.size() - aln.ref_en_.end_ - 1;
+            en = fmi_.size() - aln.ref_st_ - 1;
+            strand = "fwd";
+        }
+
+        i32 rid = bns_pos2rid(fmi_.bns_, st);
+        std::string ref_name(fmi_.bns_->anns[rid].name);
+        st -= fmi_.bns_->anns[rid].offset;
+        en -= fmi_.bns_->anns[rid].offset;
+
+        std::cout << "aligned\t" 
+                 << aln.evt_st_ << "-" << aln.evt_en_  << "\t"
+                 << ref_name << "\t" << strand << "\t" 
+                 << st << "-" << en << "\t"
+                 << aln.total_len_ << "\t";
+    } else {
+        std::cout << "unaligned\t0-" << events.size() << "\tNULL\tNULL\t0-0\t0\t";
+    }
+   
+    std::cout << fast5_name << std::endl;
+
+    return aln;
+}
+
 
 ReadAln Mapper::add_event(const Event &event
                            #ifdef DEBUG_TIME
@@ -243,8 +295,8 @@ ReadAln Mapper::add_event(const Event &event
 
     auto next_path = next_paths_.begin();
 
-    for (u16 kmer = 0; kmer < params_.model_.kmer_count(); kmer++) {
-        kmer_probs_[kmer] = params_.model_.event_match_prob(event, kmer);
+    for (u16 kmer = 0; kmer < model_.kmer_count(); kmer++) {
+        kmer_probs_[kmer] = model_.event_match_prob(event, kmer);
     }
 
     //Find neighbors of previous nodes
@@ -279,19 +331,19 @@ ReadAln Mapper::add_event(const Event &event
 
         //Add all the neighbors
         for (u8 i = 0; i < ALPH_SIZE; i++) {
-            u16 next_kmer = params_.model_.get_neighbor(prev_kmer, i);
+            u16 next_kmer = model_.get_neighbor(prev_kmer, i);
 
             if (kmer_probs_[next_kmer] < evpr_thresh) {
                 continue;
             }
 
-            u8 next_base = params_.model_.get_last_base(next_kmer);
+            u8 next_base = model_.get_last_base(next_kmer);
 
             #ifdef DEBUG_TIME
             loop1_time_ += timer.lap();
             #endif
 
-            Range next_range = params_.fmi_.get_neighbor(prev_range, next_base);
+            Range next_range = fmi_.get_neighbor(prev_range, next_base);
 
             #ifdef DEBUG_TIME
             fmrs_time_ += timer.lap();
@@ -346,7 +398,7 @@ ReadAln Mapper::add_event(const Event &event
         #endif
 
         u16 source_kmer;
-        prev_kmer = params_.model_.kmer_count(); 
+        prev_kmer = model_.kmer_count(); 
 
         Range unchecked_range, source_range;
 
@@ -428,7 +480,7 @@ ReadAln Mapper::add_event(const Event &event
     #endif
     
     for (u16 kmer = 0; 
-         kmer < params_.model_.kmer_count() && 
+         kmer < model_.kmer_count() && 
             next_path != next_paths_.end(); 
          kmer++) {
 
@@ -472,7 +524,7 @@ void Mapper::update_seeds(PathBuffer &p,
         for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
 
             //Reverse the reference coords so they both go L->R
-            u64 rev_en = params_.fmi_.size() - params_.fmi_.sa(s) + 1;
+            u64 rev_en = fmi_.size() - fmi_.sa(s) + 1;
             seed.set_ref_range(rev_en, p.match_len());
             seeds.push_back(seed);
 

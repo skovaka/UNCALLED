@@ -11,17 +11,21 @@ typedef fast5::Raw_Sample RawSample;
 typedef struct {
     u32 window_length1;
     u32 window_length2;
-    float  threshold1;
-    float  threshold2;
-    float  peak_height;
-} detector_param;
+    float threshold1;
+    float threshold2;
+    float peak_height;
+    float min_mean;
+    float max_mean;
+} EventParams;
 
-static detector_param const event_detection_defaults = {
+static EventParams const event_detection_defaults = {
     .window_length1 = 3,
     .window_length2 = 6,
     .threshold1     = 1.4f,
     .threshold2     = 9.0f,
-    .peak_height    = 0.2f
+    .peak_height    = 0.2f,
+    .min_mean       = 30,
+    .max_mean       = 150
 };
 
 struct Detector {
@@ -37,7 +41,8 @@ struct Detector {
 
 class EventDetector {
     public:
-    EventDetector(const detector_param &edparam, double min_mean, double max_mean);
+    EventDetector(const EventParams &edparam);
+
     ~EventDetector();
     
     void reset();
@@ -50,9 +55,8 @@ class EventDetector {
     bool peak_detect(float current_value, Detector &detector);
     Event create_event(u32 evt_en); 
 
-    const detector_param params;
+    const EventParams params;
     const u32 BUF_LEN;
-    const double MIN_MEAN, MAX_MEAN;
     double *sum, *sumsq;
 
     u32 t, buf_mid, evt_st;

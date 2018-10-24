@@ -26,7 +26,6 @@ void Seed::print(std::ostream &out) {
               << seed_prob_ << "\n";
 }
 
-static const ReadAln NULL_ALN = ReadAln();
 u8 ReadAln::WIN_LEN;
 
 ReadAln::ReadAln() 
