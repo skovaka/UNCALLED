@@ -97,8 +97,8 @@ int main(int argc, char** argv) {
 
     MapperParams aln_params(fmi,
                          model,
-                         args.get_string(Opt::PROBFN_FNAME),
                          event_params,
+                         args.get_string(Opt::PROBFN_FNAME),
                          args.get_int(Opt::SEED_LEN),
                          args.get_int(Opt::MIN_ALN_LEN),
                          args.get_int(Opt::MIN_REP_LEN),
@@ -140,8 +140,8 @@ int main(int argc, char** argv) {
         auto fast5_info = fast5_file.get_raw_samples_params();
         auto raw_samples = fast5_file.get_raw_samples();
 
-        graph.add_samples(raw_samples, fast5_info.read_id);
-        graph.reset();
+        graph.new_read(fast5_info.read_id);
+        graph.add_samples(raw_samples);
     }
 
 }

@@ -22,10 +22,12 @@ class BwaFMI {
     u64 sa(u64 i) const;
 
     u64 size() const;
-    bntseq_t *bns_;
+
+    u64 translate_loc(u64 sa_loc, std::string &ref_name, u64 &ref_loc) const;
 
     private:
     bwt_t *index_;
+    bntseq_t *bns_;
     bool loaded_;
 };
 

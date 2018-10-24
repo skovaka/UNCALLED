@@ -2,8 +2,8 @@
 
 MapperParams::MapperParams(const BwaFMI &fmi,
                      const KmerModel &model,
-                     const std::string &probfn_fname,
                      const EventParams &event_params,
+                     const std::string &probfn_fname,
                      u32 seed_len, 
                      u32 min_aln_len,
                      u32 min_rep_len, 
@@ -63,6 +63,72 @@ float MapperParams::get_prob_thresh(u64 fm_length) {
 
 float MapperParams::get_source_prob() {
     return evpr_threshes_.front();
+}
+
+ReadLoc::ReadLoc(const std::string &rd_name) 
+    : rd_name_(rd_name),
+      rd_st_(0),
+      rd_en_(0),
+      rd_len_(0),
+      match_count_(0) {
+    
+}
+
+ReadLoc::ReadLoc() {
+    match_count_ = 0;
+}
+
+bool ReadLoc::set_ref_loc(const MapperParams &params, const SeedGroup &seeds) {
+    rd_st_ = seeds.evt_st_;
+    rd_en_ = seeds.evt_en_ + params.seed_len_;
+    match_count_ = seeds.total_len_;
+    fwd_ = seeds.ref_st_ > params.fmi_.size() / 2;
+
+    u64 sa_st;
+    if (fwd_) sa_st = params.fmi_.size() - seeds.ref_en_.end_ - 1;
+    else sa_st = seeds.ref_st_;
+
+    rf_len_ = params.fmi_.translate_loc(sa_st, rf_name_, rf_st_);
+    rf_en_ = rf_st_ + (seeds.ref_en_.end_ - seeds.ref_st_);
+
+    return rf_len_ > 0;
+}
+
+void ReadLoc::set_read_len(u32 len) {
+    rd_len_ = len;
+    rd_en_ = len-1;
+}
+
+bool ReadLoc::is_valid() const {
+    return match_count_ > 0;
+}
+
+std::ostream &operator<< (std::ostream &out, const ReadLoc &l) {
+    out << l.rd_name_ << "\t"
+        << l.rd_len_ << "\t"
+        << l.rd_st_ << "\t"
+        << l.rd_en_ << "\t";
+    if (l.is_valid()) {
+        out 
+            << (l.fwd_ ? '+' : '-') << "\t"
+            << l.rf_name_ << "\t"
+            << l.rf_len_ << "\t"
+            << l.rf_st_ << "\t"
+            << l.rf_en_ << "\t"
+            << l.match_count_ << "\t"
+            << (l.rd_en_ - l.rd_st_ + 1) << "\t"
+            << 255;
+    } else {
+        out << "*" << "\t"
+            << "*" << "\t"
+            << "*" << "\t"
+            << "*" << "\t"
+            << "*" << "\t"
+            << "*" << "\t"
+            << "*" << "\t"
+            << "255";
+    }
+    return out;
 }
 
 u8 Mapper::PathBuffer::MAX_PATH_LEN = 0, 
@@ -205,8 +271,13 @@ Mapper::Mapper(const MapperParams &ap)
     next_paths_ = std::vector<PathBuffer>(params_.max_paths_);
     sources_added_ = std::vector<bool>(model_.kmer_count(), false);
 
-    reset();
-
+    prev_size_ = 0;
+    event_i_ = 0;
+    seed_tracker_.reset();
+    event_detector_.reset();
+    #ifdef debug_time
+    loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
+    #endif
 }
 
 Mapper::~Mapper() {
@@ -214,80 +285,52 @@ Mapper::~Mapper() {
         next_paths_[i].free_buffers();
         prev_paths_[i].free_buffers();
     }
-    reset();
 }
 
-void Mapper::reset() {
+void Mapper::new_read(const std::string &name) {
+
+    read_loc_ = ReadLoc(name);
     prev_size_ = 0;
     event_i_ = 0;
     seed_tracker_.reset();
     event_detector_.reset();
-    #ifdef DEBUG_TIME
+    #ifdef debug_time
     loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
     #endif
 }
 
-ReadAln Mapper::add_samples(const std::vector<float> &samples, const std::string &fast5_name) {
+ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
     std::vector<Event> events = event_detector_.get_all_events(samples);
     NormParams norm = model_.get_norm_params(events);
     model_.normalize(events, norm);
 
-    ReadAln aln;
+    read_loc_.set_read_len(events.size());
 
     for (u32 e = 0; e < events.size(); e++) {
-        aln = add_event(events[e]);
-        if (aln.is_valid()) break;
+        if (add_event(events[e])) break;
     }
 
-    if (aln.is_valid()) {
+    std::cout << read_loc_ << std::endl;
 
-        u64 st, en;
-        std::string strand;
-        if (aln.ref_st_ < fmi_.size() / 2) {
-            st = aln.ref_st_;
-            en = aln.ref_en_.end_;
-            strand = "rev";
-        } else {
-            st = fmi_.size() - aln.ref_en_.end_ - 1;
-            en = fmi_.size() - aln.ref_st_ - 1;
-            strand = "fwd";
-        }
-
-        i32 rid = bns_pos2rid(fmi_.bns_, st);
-        std::string ref_name(fmi_.bns_->anns[rid].name);
-        st -= fmi_.bns_->anns[rid].offset;
-        en -= fmi_.bns_->anns[rid].offset;
-
-        std::cout << "aligned\t" 
-                 << aln.evt_st_ << "-" << aln.evt_en_  << "\t"
-                 << ref_name << "\t" << strand << "\t" 
-                 << st << "-" << en << "\t"
-                 << aln.total_len_ << "\t";
-    } else {
-        std::cout << "unaligned\t0-" << events.size() << "\tNULL\tNULL\t0-0\t0\t";
-    }
-   
-    std::cout << fast5_name << std::endl;
-
-    return aln;
+    return read_loc_;
 }
 
 
-ReadAln Mapper::add_event(const Event &event
-                           #ifdef DEBUG_TIME
-                           ,std::ostream &time_out
-                           #endif
-                           #ifdef DEBUG_SEEDS
-                           ,std::ostream &seeds_out
-                           #endif
-                           ) {
+bool Mapper::add_event(const Event &event
+                       #ifdef DEBUG_TIME
+                       ,std::ostream &time_out
+                       #endif
+                       #ifdef DEBUG_SEEDS
+                       ,std::ostream &seeds_out
+                       #endif
+                       ) {
 
 
     Range prev_range;
     u16 prev_kmer;
     float evpr_thresh;
     bool child_found;
-    std::vector<Seed> seeds;
+    std::vector<SeedGroup> seeds;
 
     #ifdef DEBUG_TIME
     Timer timer;
@@ -510,23 +553,30 @@ ReadAln Mapper::add_event(const Event &event
     //Update event index
     event_i_++;
 
-    return seed_tracker_.add_seeds(seeds);
+    SeedGroup sg = seed_tracker_.add_seeds(seeds);
+    if (sg.is_valid()) {
+        read_loc_.set_ref_loc(params_, sg);
+        return true;
+    }
+
+    return false;
 }
 
 void Mapper::update_seeds(PathBuffer &p, 
-                           std::vector<Seed> &seeds, 
+                           std::vector<SeedGroup> &seeds, 
                            bool path_ended) {
 
     if (p.is_seed_valid(params_, path_ended)) {
         p.sa_checked_ = true;
 
-        Seed seed(event_i_ - path_ended, params_.seed_len_, p.seed_prob_);
+        //SeedGroup seed(event_i_ - path_ended, params_.seed_len_, p.seed_prob_);
         for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
 
             //Reverse the reference coords so they both go L->R
-            u64 rev_en = fmi_.size() - fmi_.sa(s) + 1;
-            seed.set_ref_range(rev_en, p.match_len());
-            seeds.push_back(seed);
+            u64 ref_en = fmi_.size() - fmi_.sa(s) + 1;
+            seeds.push_back(
+                SeedGroup(Range(ref_en-p.match_len()+1, ref_en),
+                          event_i_ - path_ended));
 
             #ifdef DEBUG_SEEDS
             seed.print(seeds_out);

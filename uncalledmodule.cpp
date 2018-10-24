@@ -2,7 +2,7 @@
 #include "pybind11/include/pybind11/pybind11.h"
 #include "pybind11/include/pybind11/stl.h"
 //#include "fast5.hpp"
-#include "aligner.hpp"
+#include "mapper.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -59,18 +59,17 @@ void align_fast5s(const std::vector<std::string> &fast5_names,
     BwaFMI fmi(bwa_prefix);
     KmerModel model(model_fname, true);
 
+    EventParams event_params = event_detection_defaults;
+    event_params.threshold1 = 1.4;
+    event_params.threshold2 = 1.1;
 
-    MapperParams aln_params(fmi, model, probfn_fname, seed_len, min_aln_len,
-                         min_rep_len, max_rep_copy, max_consec_stay, 
-                         max_paths, max_stay_frac, min_seed_prob,
-                         min_mean_conf, min_top_conf);
+    MapperParams aln_params(fmi, model, event_params,
+                            probfn_fname, seed_len, min_aln_len,
+                            min_rep_len, max_rep_copy, max_consec_stay, 
+                            max_paths, max_stay_frac, min_seed_prob,
+                            min_mean_conf, min_top_conf);
 
-    Mapper aligner(aln_params);
-
-    detector_param edp = event_detection_defaults;
-    edp.threshold1 = 1.4;
-    edp.threshold2 = 1.1;
-    EventDetector event_detector(edp, 30, 150);
+    Mapper mapper(aln_params);
 
     for (std::string fast5_name : fast5_names) {
         fast5::File fast5_file;
@@ -80,51 +79,8 @@ void align_fast5s(const std::vector<std::string> &fast5_names,
 
         auto fast5_info = fast5_file.get_raw_samples_params();
         auto raw_samples = fast5_file.get_raw_samples();
-        auto events = event_detector.get_all_events(raw_samples);
-
-        NormParams norm = model.get_norm_params(events);
-        model.normalize(events, norm);
-
-        ReadAln aln;
-
-        for (u32 e = 0; e < events.size(); e++) {
-            aln = aligner.add_event(events[e]);
-            if (aln.is_valid()) break;
-        }
-
-        if (aln.is_valid()) {
-
-            u64 st, en;
-            std::string strand;
-            if (aln.ref_st_ < fmi.size() / 2) {
-                st = aln.ref_st_;
-                en = aln.ref_en_.end_;
-                strand = "rev";
-            } else {
-                st = fmi.size() - aln.ref_en_.end_ - 1;
-                en = fmi.size() - aln.ref_st_ - 1;
-                strand = "fwd";
-            }
-
-            i32 rid = bns_pos2rid(fmi.bns_, st);
-            std::string ref_name(fmi.bns_->anns[rid].name);
-            st -= fmi.bns_->anns[rid].offset;
-            en -= fmi.bns_->anns[rid].offset;
-
-            std::cout << "aligned\t" 
-                     << aln.evt_st_ << "-" << aln.evt_en_  << "\t"
-                     << ref_name << "\t" << strand << "\t" 
-                     << st << "-" << en << "\t"
-                     << aln.total_len_ << "\t";
-        } else {
-            std::cout << "unaligned\t0-" << events.size() << "\tNULL\tNULL\t0-0\t0\t";
-        }
-       
-        std::cout << fast5_info.read_id << "\t"
-                 << fast5_name << std::endl;
-
-        aligner.reset();
-
+        mapper.new_read(fast5_info.read_id);
+        mapper.add_samples(raw_samples);
     }
 
 }

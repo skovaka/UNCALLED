@@ -16,8 +16,8 @@ class MapperParams {
     public:
     MapperParams(const BwaFMI &fmi,
                  const KmerModel &model,
-                 const std::string &probfn_fname,
                  const EventParams &event_params,
+                 const std::string &probfn_fname,
                  u32 seed_len, 
                  u32 min_aln_len,
                  u32 min_rep_len, 
@@ -53,6 +53,25 @@ class MapperParams {
     std::vector<Range> kmer_fmranges_;
 };
 
+class ReadLoc {
+    public:
+    ReadLoc();
+    ReadLoc(const std::string &rd_name);
+
+    bool set_ref_loc(const MapperParams &params, const SeedGroup &seeds);
+    void set_read_len(u32 len);
+    bool is_valid() const; 
+    friend std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
+
+    private:
+    std::string rd_name_, rf_name_;
+    u64 rd_st_, rd_en_, rd_len_,
+        rf_st_, rf_en_, rf_len_;
+    u16 match_count_;
+    bool fwd_;
+};
+
+std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
 
 class Mapper {
     public:
@@ -61,10 +80,10 @@ class Mapper {
 
     ~Mapper();
 
-    ReadAln add_samples(const std::vector<float> &samples, const std::string &fast5_name);
-    //ReadAln add_sample(float s);
+    void new_read(const std::string &name);
 
-    void reset();
+    ReadLoc add_samples(const std::vector<float> &samples);
+    //SeedGroup add_sample(float s);
 
     private:
 
@@ -119,7 +138,7 @@ class Mapper {
 
     private:
 
-    ReadAln add_event(const Event &event
+    bool add_event(const Event &event
                       #ifdef DEBUG_TIME
                       ,std::ostream &time_out
                       #endif
@@ -129,7 +148,7 @@ class Mapper {
                       );
 
     void update_seeds(PathBuffer &p, 
-                      std::vector<Seed> &seeds, 
+                      std::vector<SeedGroup> &seeds, 
                       bool has_children);
 
     MapperParams params_;
@@ -137,8 +156,8 @@ class Mapper {
     const BwaFMI &fmi_;
     EventDetector event_detector_;
     SeedTracker seed_tracker_;
-    Range *kmer_ranges_;
-    
+
+    ReadLoc read_loc_;
     std::vector<float> kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;
     std::vector<bool> sources_added_;

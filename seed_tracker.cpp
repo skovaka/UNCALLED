@@ -5,43 +5,20 @@
 
 //#define DEBUG
 
-Seed::Seed(u32 read_end, 
-           u8 seed_len, 
-           float prob, 
-           u64 ref_start, 
-           u64 ref_end) 
-    : read_range_( Range(read_end - seed_len, read_end) ),
-      ref_range_(Range(ref_start, ref_end)),
-      seed_prob_(prob) {}
-
-void Seed::set_ref_range(u64 end, u8 length) {
-    ref_range_.start_ = end - length + 1;
-    ref_range_.end_ = end;
-}
-
-
-void Seed::print(std::ostream &out) {
-    out << read_range_.start_ << "-" << read_range_.end_ << "\t"
-              << ref_range_.start_ << "-" << ref_range_.end_ << "\t"
-              << seed_prob_ << "\n";
-}
-
-u8 ReadAln::WIN_LEN;
-
-ReadAln::ReadAln() 
+SeedGroup::SeedGroup() 
     : evt_st_(1),
       evt_en_(0),
       total_len_(0) {
 }
 
-ReadAln::ReadAln(Range ref_st, u32 evt_st)
+SeedGroup::SeedGroup(Range ref_st, u32 evt_st)
     : ref_st_(ref_st.start_),
       ref_en_(ref_st),
       evt_st_(evt_st),
       evt_en_(evt_st),
       total_len_(ref_st.length()) {}
 
-ReadAln::ReadAln(const ReadAln &r)
+SeedGroup::SeedGroup(const SeedGroup &r)
     : ref_st_(r.ref_st_),
       ref_en_(r.ref_en_),
       evt_st_(r.evt_st_),
@@ -49,7 +26,7 @@ ReadAln::ReadAln(const ReadAln &r)
       total_len_(r.total_len_) {}
 
 
-u8 ReadAln::update(ReadAln &new_aln) {
+u8 SeedGroup::update(SeedGroup &new_aln) {
     u8 growth = 0;
     if (new_aln.ref_en_.start_ < ref_en_.end_) {
         if (new_aln.ref_en_.end_ > ref_en_.end_) {
@@ -68,11 +45,11 @@ u8 ReadAln::update(ReadAln &new_aln) {
     return growth;
 }
 
-Range ReadAln::ref_range() const {
+Range SeedGroup::ref_range() const {
     return Range(ref_st_, ref_en_.end_);
 }
 
-void ReadAln::print(std::ostream &out, bool newline = false, bool print_all = false) const {
+void SeedGroup::print(std::ostream &out, bool newline = false, bool print_all = false) const {
     out << total_len_ << "\t";
 
     out << ref_st_;
@@ -89,21 +66,21 @@ void ReadAln::print(std::ostream &out, bool newline = false, bool print_all = fa
         out << "\n";
 }
 
-bool ReadAln::is_valid() {
+bool SeedGroup::is_valid() {
     return evt_st_ <= evt_en_;
 }
 
 
-bool operator< (const ReadAln &r1, const ReadAln &r2) {
+bool operator< (const SeedGroup &r1, const SeedGroup &r2) {
     if (r1.ref_en_.start_ != r2.ref_en_.start_)
         return r1.ref_en_.start_ > r2.ref_en_.start_;
 
     return r1.evt_en_ > r2.evt_en_;
 }
 
-std::ostream &operator<< (std::ostream &out, const ReadAln &a) {
+std::ostream &operator<< (std::ostream &out, const SeedGroup &a) {
     out << a.ref_st_ << "-" << a.ref_en_.end_ << "\t"
-        << a.evt_st_ << "-" << (a.evt_en_ + ReadAln::WIN_LEN) << "\t"
+        << a.evt_st_ << "-" << (a.evt_en_) << "\t"
         << a.total_len_;
     return out;
 }
@@ -113,7 +90,6 @@ SeedTracker::SeedTracker(u64 ref_len, float mean_thresh, float top_thresh, u8 mi
       mean_thresh_(mean_thresh),
       top_thresh_(top_thresh),
       min_aln_len_(min_aln_len) {
-    ReadAln::WIN_LEN = win_len;
     reset();
 }
 
@@ -124,11 +100,11 @@ void SeedTracker::reset() {
     len_sum_ = 0;
 }
 
-ReadAln SeedTracker::add_seeds(const std::vector<Seed> &seeds) {
-    ReadAln top;
+SeedGroup SeedTracker::add_seeds(const std::vector<SeedGroup> &seeds) {
+    SeedGroup top;
 
     for (size_t i = 0; i < seeds.size(); i++) {
-        ReadAln a = add_seed(seeds[i]);
+        SeedGroup a = add_seed(seeds[i]);
 
         if (a.total_len_ >= min_aln_len_ && a.total_len_ > max_len_) {
 
@@ -147,8 +123,8 @@ ReadAln SeedTracker::add_seeds(const std::vector<Seed> &seeds) {
     return NULL_ALN;
 }
 
-ReadAln SeedTracker::add_seed(Seed r) {
-    ReadAln new_aln(r.ref_range_, r.read_range_.start_);
+SeedGroup SeedTracker::add_seed(SeedGroup new_aln) {
+    //SeedGroup new_aln(r.ref_range_, r.read_range_.start_);
 
     //Locations sorted by decreasing ref_en_.start
     //Find the largest aln s.t. aln->ref_en_.start <= new_aln.ref_en_.start
@@ -182,7 +158,7 @@ ReadAln SeedTracker::add_seed(Seed r) {
     }
 
     if (aln_match != alignments_.end()) {
-        ReadAln a = *aln_match;
+        SeedGroup a = *aln_match;
 
         u32 prev_len = a.total_len_;
         a.update(new_aln);
@@ -221,11 +197,11 @@ void SeedTracker::print(std::ostream &out, u16 max_out = 10) {
         return;
     }
 
-    std::vector<ReadAln> alns_sort(alignments_.begin(),
+    std::vector<SeedGroup> alns_sort(alignments_.begin(),
                                    alignments_.end());
 
     std::sort(alns_sort.begin(), alns_sort.end(),
-              [](const ReadAln &a, const ReadAln &b) -> bool {
+              [](const SeedGroup &a, const SeedGroup &b) -> bool {
                   return a.total_len_ > b.total_len_;
               });
 

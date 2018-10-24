@@ -8,23 +8,24 @@ class make_bwa(build):
     def run(self):
         sys.stderr.write("building BWA\n")
         os.chdir("bwa")
-        subprocess.call(["make"])
+        subprocess.call(["make", "libbwa.a"])
         os.chdir("..")
         build.run(self)
 
 uncalled = Extension(
     "uncalled",
      sources = ["uncalledmodule.cpp", 
-                "aligner.cpp", 
+                "mapper.cpp", 
                 "seed_tracker.cpp", 
                 "kmer_model.cpp", 
                 "bwa_fmi.cpp", 
                 "event_detector.cpp", 
                 "range.cpp"],
-     include_dirs = ["/home-4/skovaka1@jhu.edu/software/include",
-                     "./pybind11/include", "./fast5/src"],
-     library_dirs = ["/home-4/skovaka1@jhu.edu/code/nanopore_aligner/bwa"],
-     extra_link_args = ["-lbwa", "-lz", "-ldl", "-lhdf5"],
+     include_dirs = ["/pybind11/include", 
+                     "./fast5/src", 
+                     "/home-net/home-4/skovaka1@jhu.edu/anaconda3/include"],
+     library_dirs = ["./bwa"],
+     extra_link_args = ["-lbwa", "-lhdf5", "-lz", "-ldl"],
      extra_compile_args = ["-std=c++11"]
 )
 

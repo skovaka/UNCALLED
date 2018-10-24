@@ -38,3 +38,11 @@ u64 BwaFMI::size() const {
     return index_->seq_len;
 }
 
+u64 BwaFMI::translate_loc(u64 sa_loc, std::string &ref_name, u64 &ref_loc) const {
+    i32 rid = bns_pos2rid(bns_, sa_loc);
+    if (rid < 0) return 0;
+
+    ref_name = std::string(bns_->anns[rid].name);
+    ref_loc = sa_loc - bns_->anns[rid].offset;
+    return bns_->anns[rid].len;
+}
