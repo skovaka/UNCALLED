@@ -1,7 +1,7 @@
 #include <iostream>
-#include "pybind11/include/pybind11/pybind11.h"
-#include "pybind11/include/pybind11/stl.h"
-//#include "fast5.hpp"
+#include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
+#include "fast5.hpp"
 #include "mapper.hpp"
 
 namespace py = pybind11;

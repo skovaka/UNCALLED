@@ -23,7 +23,7 @@ uncalled = Extension(
                 "src/range.cpp"],
      include_dirs = ["./",
                      "./pybind11/include", 
-                     "./fast5/src"],
+                     "./fast5/include"],
      library_dirs = ["./bwa"],
      libraries = ["hdf5", "bwa", "z", "dl"],
      extra_compile_args = ["-std=c++11"]
