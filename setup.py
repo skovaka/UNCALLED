@@ -7,9 +7,10 @@ import sys
 class make_bwa(build):
     def run(self):
         sys.stderr.write("building libbwa\n")
-        os.chdir("bwa")
-        subprocess.call(["make", "libbwa.a"])
-        os.chdir("..")
+        subprocess.call(["make", 
+                         "-C", "./bwa", 
+                         "-f", "../src/Makefile_bwa", 
+                         "libbwa.a"])
         build.run(self)
 
 uncalled = Extension(
