@@ -6,7 +6,7 @@ import sys
 
 class make_bwa(build):
     def run(self):
-        sys.stderr.write("building BWA\n")
+        sys.stderr.write("building libbwa\n")
         os.chdir("bwa")
         subprocess.call(["make", "libbwa.a"])
         os.chdir("..")
@@ -14,23 +14,23 @@ class make_bwa(build):
 
 uncalled = Extension(
     "uncalled",
-     sources = ["uncalledmodule.cpp", 
-                "mapper.cpp", 
-                "seed_tracker.cpp", 
-                "kmer_model.cpp", 
-                "bwa_fmi.cpp", 
-                "event_detector.cpp", 
-                "range.cpp"],
-     include_dirs = ["/pybind11/include", 
-                     "./fast5/src", 
-                     "/home-net/home-4/skovaka1@jhu.edu/anaconda3/include"],
+     sources = ["src/uncalled.cpp", 
+                "src/mapper.cpp", 
+                "src/seed_tracker.cpp", 
+                "src/kmer_model.cpp", 
+                "src/bwa_fmi.cpp", 
+                "src/event_detector.cpp", 
+                "src/range.cpp"],
+     include_dirs = ["./",
+                     "./pybind11/include", 
+                     "./fast5/src"],
      library_dirs = ["./bwa"],
-     extra_link_args = ["-lbwa", "-lhdf5", "-lz", "-ldl"],
+     libraries = ["hdf5", "bwa", "z", "dl"],
      extra_compile_args = ["-std=c++11"]
 )
 
 setup(name = "uncalled",
       version = "1.0",
-      description = "It\"s the best around, no one\"s ever gonna get it down",
+      description = "Rapidly maps raw nanopore signal to DNA references",
       ext_modules = [uncalled],
       cmdclass={'build': make_bwa})
