@@ -1,152 +1,24 @@
-/* sigalign.cpp 
- * align oxford nanopore event-level signals directly to the reference without
- * basecalling */
-
 #include <iostream>
-#include <string>
-#include <unordered_map>
-#include <math.h>
-#include <unistd.h>
-#include <algorithm>
-#include <iomanip>
-
-#include "fast5.hpp"
-#include "arg_parse.hpp"
+#include "pybind11/include/pybind11/pybind11.h"
+#include "pybind11/include/pybind11/stl.h"
+//#include "fast5.hpp"
 #include "mapper.hpp"
-#include "seed_tracker.hpp"  
-#include "range.hpp"
-#include "kmer_model.hpp"
-#include "bwa_fmi.hpp"
-#include "timer.hpp"
 
-std::string FWD_STR = "fwd",
-            REV_STR = "rev";
+namespace py = pybind11;
+using namespace pybind11::literals;
 
-//TODO: relative paths
-const std::string MODEL_DEF = "/home-4/skovaka1@jhu.edu/code/nanopore_aligner/kmer_models/r9.4_180mv_450bps_6mer/5mers_pre.txt";
+#define D_SEED_LEN 22
+#define D_MIN_ALN_LEN 25
+#define D_MIN_REP_LEN 0
+#define D_MAX_REP_COPY 100
+#define D_MAX_CONSEC_STAY 8
+#define D_MAX_PATHS 10000
+#define D_MAX_STAY_FRAC 0.5
+#define D_MIN_SEED_PROB -3.75
+#define D_MIN_MEAN_CONF 6.67
+#define D_MIN_TOP_CONF 2
 
-bool open_fast5(const std::string &filename, fast5::File &file);
-
-enum Opt {
-    MODEL       = 'm',
-    INDEX_PREFIX   = 'x',
-    PROBFN_FNAME = 'f',
-    READ_LIST   = 'i',
-    OUT_PREFIX     = 'o',
-
-    TALLY_DIST  = 't',
-
-    MIN_ALN_LEN     = 'a',
-    SEED_LEN    = 'w',
-    MIN_REP_LEN     = 'r',
-    MAX_REP_COPY    = 'c',
-    MAX_PATHS       = 'p',
-
-    MIN_MEAN_CONF   = 'M', //u for until
-    MIN_TOP_CONF    = 'T', //u for until
-
-    STAY_FRAC       = 's',
-    MAX_CONSEC_STAY = 'y',
-
-    MIN_SEED_PROB = 'S'
-};
-
-int main(int argc, char** argv) {
-    ArgParse args("UNCALLED: Utility for Nanopore Current Alignment to Large Expanses of DNA");
-
-    args.add_string(Opt::MODEL, "model", MODEL_DEF, "Nanopore kmer model");
-    args.add_string(Opt::READ_LIST,    "read_list",    "",     "");
-    args.add_string(Opt::PROBFN_FNAME, "probfn_fname", "", "");
-    args.add_string(Opt::INDEX_PREFIX, "index_prefix",   "",     "");
-    args.add_string(Opt::OUT_PREFIX,   "out_prefix",   "./",     "");
-
-    args.add_int(   Opt::TALLY_DIST, "tally_dist",   128,     "");
-
-    args.add_int(   Opt::MIN_ALN_LEN,  "min_aln_len", 25, "");
-    args.add_int(   Opt::SEED_LEN, "path_window_len", 22, "");
-    args.add_int(   Opt::MIN_REP_LEN,  "min_repeat_len", 0, "");
-    args.add_int(   Opt::MAX_REP_COPY, "max_repeat_copy", 100, "");
-    args.add_int(   Opt::MAX_PATHS,    "max_paths", 10000, "");
-    args.add_int(   Opt::MAX_CONSEC_STAY, "max_consec_stay", 8, "");
-
-    args.add_double(Opt::MIN_MEAN_CONF, "min_mean_conf", 6.67, "");
-    args.add_double(Opt::MIN_TOP_CONF,  "min_top_conf", 2, "");
-
-    args.add_double(Opt::STAY_FRAC,       "stay_frac",    0.5,    "");
-
-    args.add_double(Opt::MIN_SEED_PROB, "min_seed_prob", -3.75, "");
-
-    args.parse_args(argc, argv);
-
-    std::string prefix = args.get_string(Opt::OUT_PREFIX) + args.get_param_str();
-    std::ofstream seeds_out(prefix + "_seeds.txt");
-    std::ofstream alns_out(prefix + "_aln.txt");
-    std::ofstream time_out(prefix + "_time.txt");
-
-    std::cerr << "Writing:" << "\n"
-              << prefix << "_seeds.txt" << "\n"
-              << prefix << "_aln.txt" << "\n"
-              << prefix << "_time.txt" << "\n";
-
-    KmerModel model(args.get_string(Opt::MODEL), true);
-    BwaFMI fmi(args.get_string(Opt::INDEX_PREFIX));
-
-    EventParams event_params = event_detection_defaults;
-    event_params.threshold1 = 1.4;
-    event_params.threshold2 = 1.1;
-
-    MapperParams aln_params(fmi,
-                         model,
-                         event_params,
-                         args.get_string(Opt::PROBFN_FNAME),
-                         args.get_int(Opt::SEED_LEN),
-                         args.get_int(Opt::MIN_ALN_LEN),
-                         args.get_int(Opt::MIN_REP_LEN),
-                         args.get_int(Opt::MAX_REP_COPY),
-                         args.get_int(Opt::MAX_CONSEC_STAY),
-                         args.get_int(Opt::MAX_PATHS),
-                         (float) args.get_double(Opt::STAY_FRAC),
-                         (float) args.get_double(Opt::MIN_SEED_PROB),
-                         (float) args.get_double(Opt::MIN_MEAN_CONF), 
-                         (float) args.get_double(Opt::MIN_TOP_CONF));
-    
-    std::cerr << "Init graph\n";
-
-    Mapper graph(aln_params);
-
-    std::ifstream reads_file(args.get_string(Opt::READ_LIST));
-
-    if (!reads_file) {
-        std::cerr << "Error: couldn't open '" 
-                  << args.get_string(Opt::READ_LIST) << "'\n";
-        return 1;
-    }
-
-    bool read_until = aln_params.min_mean_conf_ > 0 || aln_params.min_top_conf_ > 0;
-
-
-    std::string read_fname;
-
-    std::cerr << read_until << " Aligning...\n";
-
-    while (getline(reads_file, read_fname)) {
-
-        fast5::File fast5_file;
-        if (!open_fast5(read_fname, fast5_file)) {
-            continue;
-        }
-
-        //TODO: get_raw_sample_dataset
-        auto fast5_info = fast5_file.get_raw_samples_params();
-        auto raw_samples = fast5_file.get_raw_samples();
-
-        graph.new_read(fast5_info.read_id);
-        graph.add_samples(raw_samples);
-    }
-
-}
-
-bool open_fast5(const std::string &filename, fast5::File &file) {
+bool load_fast5(const std::string &filename, fast5::File &file) {
     if (!fast5::File::is_valid_file(filename)) {
         std::cerr << "Error: '" << filename << "' is not a valid file \n";
     }
@@ -169,38 +41,127 @@ bool open_fast5(const std::string &filename, fast5::File &file) {
     return false;
 }
 
+void align_fast5s(const std::vector<std::string> &fast5_names,
+                 const std::string &bwa_prefix,
+                 const std::string &model_fname,
+                 const std::string &probfn_fname,
+                 u32 seed_len        = D_SEED_LEN,      
+                 u32 min_aln_len     = D_MIN_ALN_LEN,
+                 u32 min_rep_len     = D_MIN_REP_LEN,
+                 u32 max_rep_copy    = D_MAX_REP_COPY,
+                 u32 max_consec_stay = D_MAX_CONSEC_STAY,
+                 u32 max_paths       = D_MAX_PATHS,
+                 float max_stay_frac = D_MAX_STAY_FRAC,
+                 float min_seed_prob = D_MIN_SEED_PROB,
+                 float min_mean_conf = D_MIN_MEAN_CONF, 
+                 float min_top_conf  = D_MIN_TOP_CONF) {
 
-bool get_events(std::string filename, std::vector<Event> &events, EventDetector &ed) {
-    if (!fast5::File::is_valid_file(filename)) {
-        std::cerr << "Error: '" << filename << "' is not a valid file \n";
-    }
+    BwaFMI fmi(bwa_prefix);
+    KmerModel model(model_fname, true);
 
-    try {
-        fast5::File file;
-        file.open(filename);
-        
-        if (!file.is_open()) {  
-            std::cerr << "Error: unable to open '" 
-                      << filename << "'\n";
-            return false;
+    EventParams event_params = event_detection_defaults;
+    event_params.threshold1 = 1.4;
+    event_params.threshold2 = 1.1;
+
+    MapperParams aln_params(fmi, model, event_params,
+                            probfn_fname, seed_len, min_aln_len,
+                            min_rep_len, max_rep_copy, max_consec_stay, 
+                            max_paths, max_stay_frac, min_seed_prob,
+                            min_mean_conf, min_top_conf);
+
+    Mapper mapper(aln_params);
+
+    for (std::string fast5_name : fast5_names) {
+        fast5::File fast5_file;
+        if (!load_fast5(fast5_name, fast5_file)) {
+            continue;
         }
 
-        events = ed.get_all_events(file.get_raw_samples());
-        return true;
-        
-        /*else if (!file.have_eventdetection_events()) {
-
-            std::cerr << "Error: no events\n";
-
-        } else {
-            events = file.get_eventdetection_events();
-            return true;
-        }*/
-
-    } catch (hdf5_tools::Exception& e) {
-        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
-        return false;
+        auto fast5_info = fast5_file.get_raw_samples_params();
+        auto raw_samples = fast5_file.get_raw_samples();
+        mapper.new_read(fast5_info.read_id);
+        mapper.add_samples(raw_samples);
     }
 
-    return false;
 }
+
+PYBIND11_MODULE(uncalled, m) {
+    m.doc() = "UNCALLED";
+
+    m.def("align_fast5s", &align_fast5s, 
+          "fast5_names"_a, "bwa_prefix"_a,
+          "model_fname"_a, "probfn_fname"_a,
+          "seed_len"_a=D_SEED_LEN, "min_aln_len"_a=D_MIN_ALN_LEN,
+          "min_rep_len"_a=D_MIN_REP_LEN, "max_rep_copy"_a=D_MAX_REP_COPY,
+          "max_consec_stay"_a=D_MAX_CONSEC_STAY, "max_paths"_a=D_MAX_PATHS,
+          "max_stay_frac"_a=D_MAX_STAY_FRAC, "min_seed_prob"_a=D_MIN_SEED_PROB,
+          "min_mean_conf"_a=D_MIN_MEAN_CONF, "min_top_conf"_a=D_MIN_TOP_CONF);
+}
+
+/*
+#include <Python.h>
+#include <iostream>
+#include "util.hpp"
+
+//sssIIIIIIffff
+//
+extern "C" {
+    static const char *param_names[] = {
+        "fast5_list",
+        "bwa_prefix",      //s
+        "model_fname",     //s
+        "probfn_fname",    //s
+        "seed_len",        //I
+        "min_aln_len",     //I
+        "min_repeat_len",  //I
+        "max_repeat_copy", //I
+        "max_consec_stay", //I
+        "max_paths",       //I
+        "max_stay_frac",   //f
+        "min_seed_prob",   //f
+        "min_mean_conf",   //f
+        "min_top_conf"     //f
+    };
+}
+
+static PyObject *uncalled_align_fast5s(PyObject *self,
+                                       PyObject *args,
+                                       PyObject *keywds) {
+    char *fast5_list, *bwa_prefix, *model_fname, *probfn_fname;
+    u32 seed_len, min_aln_len, min_rep_len, 
+        max_rep_copy, max_consec_stay, max_paths;
+    float max_stay_frac, min_seed_prob, min_mean_conf, min_top_conf;
+    
+    if (!PyArg_ParseTupleAndKeywords(args, keywds, "s|sssIIIIIIffff", param_names,
+            &fast5_list, &bwa_prefix, &model_fname, &probfn_fname,
+            &seed_len, &min_aln_len, &min_rep_len, &max_rep_copy, 
+            &max_consec_stay, &max_paths, &max_stay_frac, &min_seed_prob, 
+            &min_mean_conf, &min_top_conf)) return NULL;
+
+    std::cout << fast5_list << "\n"
+              << bwa_prefix << "\n"
+              << model_fname << "\n"
+              << seed_len << "\n";
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+static PyMethodDef uncalled_methods[] = {
+    {"align_fast5s", (PyCFunction) uncalled_align_fast5s, 
+     METH_VARARGS|METH_KEYWORDS, "Align fast5s"},
+    {NULL, NULL, 0, NULL}
+};
+
+static struct PyModuleDef uncalledmodule = {
+    PyModuleDef_HEAD_INIT,
+    "uncalled",
+    NULL,
+    -1,
+    uncalled_methods
+};
+
+PyMODINIT_FUNC PyInit_uncalled(void) {
+    return PyModule_Create(&uncalledmodule);
+}
+*/
