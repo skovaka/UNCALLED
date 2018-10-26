@@ -1,0 +1,117 @@
+#!/usr/bin/env python
+import uncalled
+import sys                         
+import numpy as np
+import argparse
+from bisect import bisect_left, bisect_right
+
+def align_fast5s(argv):
+    #parser.add_argument("-p", "" #TODO: based on BWA prefix?
+    parser.add_argument("-i", "fast5_files", required=True, type=str)
+    parser.add_argument("-x", "bwa_prefix", required=True, type=str)
+    parser.add_argument("s", "--seed-len", type=int
+    parser.add_argument("a", "--min-aln-len", type=int
+    parser.add_argument("r", "--min-rep-len", type=int
+    parser.add_argument("c", "--max-rep-copy", type=int
+    parser.add_argument("y", "--max-consec-stay", type=int
+    parser.add_argument("p", "--max-paths", type=int
+    parser.add_argument("f", "--max-stay-frac", type=float
+    parser.add_argument("S", "--min-seed-prob", type=float
+    parser.add_argument("M", "--min-mean-conf", type=float
+    parser.add_argument("T", "--min-top-conf", type=float
+
+def index_params(argv):
+    parser.add_argument("-t", "--prob-thresh-file", required=True, type=str)
+    parser.add_argument("-a", "--self-aln-file", required=True, type=str)
+    parser.add_argument("-k", "--kmer-len", default=5, type=int)
+    parser.add_argument("-f", "--fm-percentile", default=95, type=int)
+    parser.add_argument("-1", "--matchpr1", default=0.98, type=float)
+    parser.add_argument("-2", "--matchpr2", default=0.65, type=float)
+    parser.add_argument("-p", "--match-prod", default=0.05, type=float)
+    args = parser.parse_args()
+
+    sys.stderr.write("Reading self alignments\n")
+    fmlens = get_fmlen_percentiles(open(args.self_aln_file),
+                                   args.fm_percentile, 25)[(args.kmer_len-1):]
+    path_len = len(fmlens)
+
+    sys.stderr.write("Reading probability thresholds\n")
+    prob_thresh_in = open(args.prob_thresh_file)
+    prob_freqs = dict()
+    freq_probs = list()
+    for line in prob_thresh_in:
+        prob, match_freq, kmer_count = line.split()
+        prob_freqs[float(prob)] = float(match_freq)
+        freq_probs.append((float(match_freq), float(prob)))
+
+    freq_probs = list(sorted(freq_probs))
+
+    exp = match_prfn_em(power_fn, 
+                        path_len, 
+                        args.matchpr1, 
+                        args.matchpr2, 
+                        args.match_prod)
+
+    fn_freqs = power_fn(path_len, args.matchpr1, args.matchpr2, exp)
+
+    for i in range(path_len):
+        if fmlens[i] > 1 and fmlens[i] == fmlens[i+1]:
+            continue
+        j = bisect_left(freq_probs, (fn_freqs[i], 0))
+        if i > 0:
+            sys.stdout.write("%d\t" % (fmlens[i]))
+        sys.stdout.write("%.2f\t%.4f\n" % (freq_probs[j][1], fn_freqs[i]))
+
+def get_fmlen_percentiles(self_aln_in, perc, max_path_len):
+    path_fmlens = [list() for i in range(max_path_len)]
+    path_percs = list()
+
+    for line in self_aln_in:
+        fmlens = list(map(int, line.split()))
+
+        for i in range(min(max_path_len, len(fmlens))):
+            path_fmlens[i].append(fmlens[i])
+
+        for i in range(len(fmlens), max_path_len):
+            path_fmlens[i].append(1)
+
+    for p in range(len(path_fmlens)):
+        path_fmlens[p] = list(sorted(path_fmlens[p]))
+        i = int(len(path_fmlens[p])*(perc/100))
+        path_percs.append(path_fmlens[p][i])
+
+        if path_percs[-1] == 1:
+            break
+
+    return path_percs
+
+def power_fn(N, st, en, ex):
+    return ((np.arange(N)/(N-1))**ex) * (en-st) + st
+
+def match_prfn_em(fn, N, st, en, tgt_prod, eps=0.00001, param_st=2, init_fac=2):
+    param = param_st
+    param_min, param_max = (None, None)
+
+    delta = np.prod(fn(N, st, en, param)) - tgt_prod
+
+    while abs(delta) > eps:
+        if delta < 0:
+            param_max = param
+        else:
+            param_min = param
+
+        if param_max == None:
+            param *= init_fac
+        elif param_min == None:
+            param /= init_fac
+        else:
+            param = param_min + ((param_max - param_min) / 2.0)
+
+        delta = np.prod(fn(N, st, en, param)) - tgt_prod
+
+    return param
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
+    #TODO: mode argument
+    index_params(argv[1:])
