@@ -299,6 +299,11 @@ void Mapper::new_read(const std::string &name) {
     #endif
 }
 
+std::string Mapper::align_fast5(const std::string &fast5_name) {
+    
+
+}
+
 ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
     std::vector<Event> events = event_detector_.get_all_events(samples);
     NormParams norm = model_.get_norm_params(events);

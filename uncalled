@@ -9,12 +9,13 @@ from bisect import bisect_left, bisect_right
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers.txt")
 MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers_threshs.txt")
+PARAM_SUFF = ".uncl"
 
 def align_fast5s(argv):
     #parser.add_argument("-p", "" #TODO: based on BWA prefix?
     parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
     parser.add_argument("-i", "--fast5s", required=True, type=str)
-    parser.add_argument("-x", "--bwa_prefix", required=True, type=str)
+    parser.add_argument("-x", "--bwa-prefix", required=True, type=str)
     parser.add_argument("-s", "--seed-len", default=22, type=int)
     parser.add_argument("-a", "--min-aln-len", default=25, type=int)
     parser.add_argument("-r", "--min-rep-len", default=0, type=int)
@@ -27,6 +28,7 @@ def align_fast5s(argv):
     parser.add_argument("-T", "--min-top-conf", default=2.2, type=float)
     args = parser.parse_args(argv)
 
+    sys.stdout.write("Reading fast5 paths\n")
     fast5s = list()
     if os.path.isdir(args.fast5s):
         for root, dirs, files in os.walk(args.fast5s):
@@ -40,11 +42,12 @@ def align_fast5s(argv):
 
     else:
         fast5s = [os.path.abspath(l.strip()) for l in open(args.fast5s)]
+    sys.stdout.write("Aligning\n")
 
     uncalled.align_fast5s(fast5s,
                           args.bwa_prefix,
                           MODEL_FNAME,
-                          MODEL_THRESHS_FNAME,
+                          args.bwa_prefix + PARAM_SUFF,
                           args.seed_len,
                           args.min_aln_len,
                           args.min_rep_len,
@@ -108,6 +111,7 @@ def match_prfn_em(fn, N, st, en, tgt_prod, eps=0.00001, param_st=2, init_fac=2):
 def index_params(argv):
     parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
     #parser.add_argument("-t", "--prob-thresh-file", required=True, type=str)
+    parser.add_argument("-x", "--bwa-prefix", required=True, type=str)
     parser.add_argument("-a", "--self-aln-file", required=True, type=str)
     parser.add_argument("-k", "--kmer-len", default=5, type=int)
     parser.add_argument("-f", "--fm-percentile", default=95, type=int)
@@ -115,7 +119,8 @@ def index_params(argv):
     parser.add_argument("-2", "--matchpr2", default=0.65, type=float)
     parser.add_argument("-p", "--match-prod", default=0.05, type=float)
     args = parser.parse_args(argv)
-    print(args)
+
+    params_out = args.bwa_prefix + PARAM_SUFF
 
     sys.stderr.write("Reading self alignments\n")
     fmlens = get_fmlen_percentiles(open(args.self_aln_file),

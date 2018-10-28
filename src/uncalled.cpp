@@ -88,6 +88,18 @@ void align_fast5s(const std::vector<std::string> &fast5_names,
 PYBIND11_MODULE(uncalled, m) {
     m.doc() = "UNCALLED";
 
+    py::class_<MapperParams>(m, "MapperParams")
+        .def(py::init<const BwaFMI &,
+                      const KmerModel &,
+                      const EventParams &,
+                      const std::string &,
+                      u32, u32, u32, u32, u32, u32, 
+                      float, float, float, float>());
+
+    py::class_<Mapper>(m, "Mapper")
+        .def(py::init<const MapperParams &>())
+        .def("align_fast5", &Mapper::align_fast5);
+
     m.def("align_fast5s", &align_fast5s, 
           "fast5_names"_a, "bwa_prefix"_a,
           "model_fname"_a, "probfn_fname"_a,
