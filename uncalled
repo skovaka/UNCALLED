@@ -1,66 +1,60 @@
 #!/usr/bin/env python
 import uncalled
 import sys                         
+import os
 import numpy as np
 import argparse
 from bisect import bisect_left, bisect_right
 
+ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+MODEL_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers.txt")
+MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers_threshs.txt")
+
 def align_fast5s(argv):
     #parser.add_argument("-p", "" #TODO: based on BWA prefix?
-    parser.add_argument("-i", "fast5_files", required=True, type=str)
-    parser.add_argument("-x", "bwa_prefix", required=True, type=str)
-    parser.add_argument("s", "--seed-len", type=int
-    parser.add_argument("a", "--min-aln-len", type=int
-    parser.add_argument("r", "--min-rep-len", type=int
-    parser.add_argument("c", "--max-rep-copy", type=int
-    parser.add_argument("y", "--max-consec-stay", type=int
-    parser.add_argument("p", "--max-paths", type=int
-    parser.add_argument("f", "--max-stay-frac", type=float
-    parser.add_argument("S", "--min-seed-prob", type=float
-    parser.add_argument("M", "--min-mean-conf", type=float
-    parser.add_argument("T", "--min-top-conf", type=float
+    parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
+    parser.add_argument("-i", "--fast5s", required=True, type=str)
+    parser.add_argument("-x", "--bwa_prefix", required=True, type=str)
+    parser.add_argument("-s", "--seed-len", default=22, type=int)
+    parser.add_argument("-a", "--min-aln-len", default=25, type=int)
+    parser.add_argument("-r", "--min-rep-len", default=0, type=int)
+    parser.add_argument("-c", "--max-rep-copy", default=100, type=int)
+    parser.add_argument("-y", "--max-consec-stay", default=8, type=int)
+    parser.add_argument("-p", "--max-paths", default=10000, type=int)
+    parser.add_argument("-F", "--max-stay-frac", default=0.5, type=float)
+    parser.add_argument("-S", "--min-seed-prob", default=-3.75, type=float)
+    parser.add_argument("-M", "--min-mean-conf", default=7.00, type=float)
+    parser.add_argument("-T", "--min-top-conf", default=2.2, type=float)
+    args = parser.parse_args(argv)
 
-def index_params(argv):
-    parser.add_argument("-t", "--prob-thresh-file", required=True, type=str)
-    parser.add_argument("-a", "--self-aln-file", required=True, type=str)
-    parser.add_argument("-k", "--kmer-len", default=5, type=int)
-    parser.add_argument("-f", "--fm-percentile", default=95, type=int)
-    parser.add_argument("-1", "--matchpr1", default=0.98, type=float)
-    parser.add_argument("-2", "--matchpr2", default=0.65, type=float)
-    parser.add_argument("-p", "--match-prod", default=0.05, type=float)
-    args = parser.parse_args()
+    fast5s = list()
+    if os.path.isdir(args.fast5s):
+        for root, dirs, files in os.walk(args.fast5s):
+            for fname in files:
+                if fname.endswith("fast5"):
+                    fast5s.append(os.path.abspath(os.path.join(root, fname)))
 
-    sys.stderr.write("Reading self alignments\n")
-    fmlens = get_fmlen_percentiles(open(args.self_aln_file),
-                                   args.fm_percentile, 25)[(args.kmer_len-1):]
-    path_len = len(fmlens)
+    elif args.fast5s.endswith("fast5"):
+        for fname in args.fast5s.split(","):
+            fast5s.append(os.path.abspath(fname))
 
-    sys.stderr.write("Reading probability thresholds\n")
-    prob_thresh_in = open(args.prob_thresh_file)
-    prob_freqs = dict()
-    freq_probs = list()
-    for line in prob_thresh_in:
-        prob, match_freq, kmer_count = line.split()
-        prob_freqs[float(prob)] = float(match_freq)
-        freq_probs.append((float(match_freq), float(prob)))
+    else:
+        fast5s = [os.path.abspath(l.strip()) for l in open(args.fast5s)]
 
-    freq_probs = list(sorted(freq_probs))
-
-    exp = match_prfn_em(power_fn, 
-                        path_len, 
-                        args.matchpr1, 
-                        args.matchpr2, 
-                        args.match_prod)
-
-    fn_freqs = power_fn(path_len, args.matchpr1, args.matchpr2, exp)
-
-    for i in range(path_len):
-        if fmlens[i] > 1 and fmlens[i] == fmlens[i+1]:
-            continue
-        j = bisect_left(freq_probs, (fn_freqs[i], 0))
-        if i > 0:
-            sys.stdout.write("%d\t" % (fmlens[i]))
-        sys.stdout.write("%.2f\t%.4f\n" % (freq_probs[j][1], fn_freqs[i]))
+    uncalled.align_fast5s(fast5s,
+                          args.bwa_prefix,
+                          MODEL_FNAME,
+                          MODEL_THRESHS_FNAME,
+                          args.seed_len,
+                          args.min_aln_len,
+                          args.min_rep_len,
+                          args.max_rep_copy,
+                          args.max_consec_stay,
+                          args.max_paths,
+                          args.max_stay_frac,
+                          args.min_seed_prob,
+                          args.min_mean_conf,
+                          args.min_top_conf)
 
 def get_fmlen_percentiles(self_aln_in, perc, max_path_len):
     path_fmlens = [list() for i in range(max_path_len)]
@@ -111,7 +105,58 @@ def match_prfn_em(fn, N, st, en, tgt_prod, eps=0.00001, param_st=2, init_fac=2):
 
     return param
 
-if __name__ == "__main__":
+def index_params(argv):
     parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
-    #TODO: mode argument
-    index_params(argv[1:])
+    #parser.add_argument("-t", "--prob-thresh-file", required=True, type=str)
+    parser.add_argument("-a", "--self-aln-file", required=True, type=str)
+    parser.add_argument("-k", "--kmer-len", default=5, type=int)
+    parser.add_argument("-f", "--fm-percentile", default=95, type=int)
+    parser.add_argument("-1", "--matchpr1", default=0.98, type=float)
+    parser.add_argument("-2", "--matchpr2", default=0.65, type=float)
+    parser.add_argument("-p", "--match-prod", default=0.05, type=float)
+    args = parser.parse_args(argv)
+    print(args)
+
+    sys.stderr.write("Reading self alignments\n")
+    fmlens = get_fmlen_percentiles(open(args.self_aln_file),
+                                   args.fm_percentile, 25)[(args.kmer_len-1):]
+    path_len = len(fmlens)
+
+    sys.stderr.write("Reading probability thresholds\n")
+    prob_thresh_in = open(MODEL_THRESHS_FNAME)
+    prob_freqs = dict()
+    freq_probs = list()
+    for line in prob_thresh_in:
+        prob, match_freq, kmer_count = line.split()
+        prob_freqs[float(prob)] = float(match_freq)
+        freq_probs.append((float(match_freq), float(prob)))
+
+    freq_probs = list(sorted(freq_probs))
+
+    exp = match_prfn_em(power_fn, 
+                        path_len, 
+                        args.matchpr1, 
+                        args.matchpr2, 
+                        args.match_prod)
+
+    fn_freqs = power_fn(path_len, args.matchpr1, args.matchpr2, exp)
+
+    for i in range(path_len):
+        if fmlens[i] > 1 and fmlens[i] == fmlens[i+1]:
+            continue
+        j = bisect_left(freq_probs, (fn_freqs[i], 0))
+        if i > 0:
+            sys.stdout.write("%d\t" % (fmlens[i]))
+        sys.stdout.write("%.2f\t%.4f\n" % (freq_probs[j][1], fn_freqs[i]))
+
+if __name__ == "__main__":
+    cmd = None if len(sys.argv) == 1 else sys.argv[1]
+
+    if cmd == "index-params":
+        sys.exit(index_params(sys.argv[2:]))
+
+    elif cmd == "align-fast5s":
+        sys.exit(align_fast5s(sys.argv[2:]))
+
+    sys.stderr.write("Unknown command: %s\n" % cmd)
+

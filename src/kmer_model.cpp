@@ -57,6 +57,9 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
         model_in >> kmer >> lv_mean >> lv_stdv >> sd_mean 
                  >> sd_stdv >> lambda >> weight;
         lambda_ = lambda;
+    } else if (num_cols == 3) {
+        model_in >> kmer >> lv_mean >> lv_stdv; 
+        lambda_ = -1;
     } else if (num_cols == 4) {
         model_in >> kmer >> lv_mean >> lv_stdv >> sd_mean; 
         lambda_ = -1;
@@ -123,6 +126,9 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
             model_in >> kmer >> lv_mean >> lv_stdv >> sd_mean 
                      >> sd_stdv >> lambda >> weight;
             lambda_ = lambda;
+        } else if (num_cols == 3) {
+            model_in >> kmer >> lv_mean >> lv_stdv; 
+            lambda_ = -1;
         } else if (num_cols == 4) {
             model_in >> kmer >> lv_mean >> lv_stdv >> sd_mean; 
             lambda_ = -1;
