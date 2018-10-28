@@ -13,6 +13,13 @@ using namespace pybind11::literals;
 #define D_MAX_REP_COPY 100
 #define D_MAX_CONSEC_STAY 8
 #define D_MAX_PATHS 10000
+#define EVT_WINLEN1 3
+#define EVT_WINLEN2 6
+#define EVT_THRESH1 1.4
+#define EVT_THRESH2 9.0
+#define EVT_PEAK_HEIGHT 0.2
+#define EVT_MIN_MEAN 30
+#define EVT_MAX_MEAN 150
 #define D_MAX_STAY_FRAC 0.5
 #define D_MIN_SEED_PROB -3.75
 #define D_MIN_MEAN_CONF 6.67
@@ -51,20 +58,22 @@ void align_fast5s(const std::vector<std::string> &fast5_names,
                  u32 max_rep_copy    = D_MAX_REP_COPY,
                  u32 max_consec_stay = D_MAX_CONSEC_STAY,
                  u32 max_paths       = D_MAX_PATHS,
+                 u32 evt_winlen1       = EVT_WINLEN1,
+                 u32 evt_winlen2       = EVT_WINLEN2,
+                 float evt_thresh1     = EVT_THRESH1,
+                 float evt_thresh2     = EVT_THRESH2,
+                 float evt_peak_height = EVT_PEAK_HEIGHT,
+                 float evt_min_mean    = EVT_MIN_MEAN,
+                 float evt_max_mean    = EVT_MAX_MEAN,
                  float max_stay_frac = D_MAX_STAY_FRAC,
                  float min_seed_prob = D_MIN_SEED_PROB,
                  float min_mean_conf = D_MIN_MEAN_CONF, 
                  float min_top_conf  = D_MIN_TOP_CONF) {
 
-    BwaFMI fmi(bwa_prefix);
-    KmerModel model(model_fname, true);
-
-    EventParams event_params = event_detection_defaults;
-    event_params.threshold1 = 1.4;
-    event_params.threshold2 = 1.1;
-
-    MapperParams aln_params(fmi, model, event_params,
-                            probfn_fname, seed_len, min_aln_len,
+    MapperParams aln_params(bwa_prefix, model_fname, probfn_fname, 
+                            evt_winlen1, evt_winlen2, evt_thresh1,
+                            evt_thresh2, evt_peak_height, evt_min_mean,
+                            evt_max_mean, seed_len, min_aln_len,
                             min_rep_len, max_rep_copy, max_consec_stay, 
                             max_paths, max_stay_frac, min_seed_prob,
                             min_mean_conf, min_top_conf);
@@ -89,11 +98,11 @@ PYBIND11_MODULE(uncalled, m) {
     m.doc() = "UNCALLED";
 
     py::class_<MapperParams>(m, "MapperParams")
-        .def(py::init<const BwaFMI &,
-                      const KmerModel &,
-                      const EventParams &,
+        .def(py::init<const std::string &,
                       const std::string &,
-                      u32, u32, u32, u32, u32, u32, 
+                      const std::string &,
+                      u32, u32, u32, u32, u32, u32,  u32, u32,
+                      float, float, float, float, float, 
                       float, float, float, float>());
 
     py::class_<Mapper>(m, "Mapper")
@@ -106,6 +115,10 @@ PYBIND11_MODULE(uncalled, m) {
           "seed_len"_a=D_SEED_LEN, "min_aln_len"_a=D_MIN_ALN_LEN,
           "min_rep_len"_a=D_MIN_REP_LEN, "max_rep_copy"_a=D_MAX_REP_COPY,
           "max_consec_stay"_a=D_MAX_CONSEC_STAY, "max_paths"_a=D_MAX_PATHS,
+          "evt_winlen1"_a=EVT_WINLEN1, "evt_winlen2"_a=EVT_WINLEN2,
+          "evt_thresh1"_a=EVT_THRESH1, "evt_thresh2"_a=EVT_THRESH2,
+          "evt_peak_height"_a=EVT_PEAK_HEIGHT, 
+          "evt_min_mean"_a=EVT_MIN_MEAN, "evt_max_mean"_a=EVT_MAX_MEAN,
           "max_stay_frac"_a=D_MAX_STAY_FRAC, "min_seed_prob"_a=D_MIN_SEED_PROB,
           "min_mean_conf"_a=D_MIN_MEAN_CONF, "min_top_conf"_a=D_MIN_TOP_CONF);
 }

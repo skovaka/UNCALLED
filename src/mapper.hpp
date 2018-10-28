@@ -14,9 +14,8 @@
 
 class MapperParams {
     public:
-    MapperParams(const BwaFMI &fmi,
-                 const KmerModel &model,
-                 const EventParams &event_params,
+    MapperParams(const std::string &bwa_prefix,
+                 const std::string &model_fname,
                  const std::string &probfn_fname,
                  u32 seed_len, 
                  u32 min_aln_len,
@@ -24,6 +23,13 @@ class MapperParams {
                  u32 max_rep_copy, 
                  u32 max_consec_stay,
                  u32 max_paths, 
+                 u32 evt_winlen1,
+                 u32 evt_winlen2,
+                 float evt_thresh1,
+                 float evt_thresh2,
+                 float evt_peak_height,
+                 float evt_min_mean,
+                 float evt_max_mean,
                  float max_stay_frac,
                  float min_seed_prob, 
                  float min_mean_conf,
@@ -32,9 +38,9 @@ class MapperParams {
     float get_prob_thresh(u64 fm_length);
     float get_source_prob();
 
-    const KmerModel &model_;
-    const BwaFMI &fmi_;
-    const EventParams &event_params_;
+    BwaFMI fmi_;
+    KmerModel model_;
+    EventParams event_params_;
 
     u32 seed_len_, 
         min_rep_len_,
