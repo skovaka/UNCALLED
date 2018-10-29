@@ -15,9 +15,9 @@ Most dependecies included via submodules, so be sure to clone with `git --recurs
 
 [HDF5](https://www.hdfgroup.org/downloads/hdf5/) must be installed
 
-##Running
+## Usage
 
-###Indexing
+### Indexing
 
 ```
 bwa index <fasta-reference> -p <bwa-prefix>
@@ -28,17 +28,17 @@ UNCALLED requires a [BWA](https://github.com/lh3/bwa) index. You can ust a previ
 
 Before aligning, certain reference specific parameters must be computed using `uncalled index`. The `<fasta-reference>` should be the same FASTA file which was used to build the BWA index. This will create an additional file in the same directory as the BWA index named `<bwa-prefix>.uncl`.
 
-###Aligning
+### Mapping
 
 ```
-uncalled align -x <bwa-prefix> -i <fast5-files>  >  <out.paf>
+uncalled map -x <bwa-prefix> -i <fast5-files>  >  <out.paf>
 ```
 
 `<fast5-files>` can be a directory which will be recursively searched for all files with the ".fast5" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.
 
-Outputs in a format similar to [PAF](https://github.com/lh3/miniasm/blob/master/PAF.md). Query coordinates, residue matches, and block lengths are estimated by average k-mer samplingn rate.
+Outputs in a format similar to [PAF](https://github.com/lh3/miniasm/blob/master/PAF.md). Query coordinates, residue matches, and block lengths are estimated by average k-mer sampling rate. (**TODO: currently actually reports event lengths**)
 
-##Limitations
+## Limitations
 
 UNCALLED has not been tested on large (> ~100Mb) or highly repetetive references. `uncalled index` may take up large amounts of memory or crash on such references.
 
