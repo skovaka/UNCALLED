@@ -1,7 +1,7 @@
 #include <iostream>
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
-#include "fast5.hpp"
+#include "self_align_ref.hpp"
 #include "mapper.hpp"
 
 namespace py = pybind11;
@@ -25,8 +25,7 @@ using namespace pybind11::literals;
 #define D_MIN_MEAN_CONF 6.67
 #define D_MIN_TOP_CONF 2
 
-
-PYBIND11_MODULE(uncalled, m) {
+PYBIND11_MODULE(align, m) {
     m.doc() = "UNCALLED";
 
     py::class_<MapperParams>(m, "MapperParams")
@@ -42,6 +41,7 @@ PYBIND11_MODULE(uncalled, m) {
         .def("align_fast5", 
              &Mapper::align_fast5);
     
+    m.def("self_align", &self_align);
 }
 
 /*

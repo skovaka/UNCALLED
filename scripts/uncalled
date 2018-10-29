@@ -1,0 +1,114 @@
+#!/usr/bin/env python
+from uncalled import align, index
+import sys                         
+import os
+import numpy as np
+import argparse
+from bisect import bisect_left, bisect_right
+
+def align_fast5s(argv):
+    #parser.add_argument("-p", "" #TODO: based on BWA prefix?
+    parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
+    parser.add_argument("-i", "--fast5s", required=True, type=str)
+    parser.add_argument("-x", "--bwa-prefix", required=True, type=str)
+    parser.add_argument("-s", "--seed-len", default=22, type=int)
+    parser.add_argument("-a", "--min-aln-len", default=25, type=int)
+    parser.add_argument("-r", "--min-rep-len", default=0, type=int)
+    parser.add_argument("-c", "--max-rep-copy", default=100, type=int)
+    parser.add_argument("-y", "--max-consec-stay", default=8, type=int)
+    parser.add_argument("-p", "--max-paths", default=10000, type=int)
+    parser.add_argument("-e", "--max-events-proc", default=30000, type=int)
+    parser.add_argument("-F", "--max-stay-frac", default=0.5, type=float)
+    parser.add_argument("-S", "--min-seed-prob", default=-3.75, type=float)
+    parser.add_argument("-M", "--min-mean-conf", default=7.00, type=float)
+    parser.add_argument("-T", "--min-top-conf", default=2.25, type=float)
+    args = parser.parse_args(argv)
+
+    params = align.MapperParams(args.bwa_prefix,
+                              index.MODEL_FNAME,
+                              args.bwa_prefix + index.PARAM_SUFF,
+                              args.seed_len,
+                              args.min_aln_len,
+                              args.min_rep_len,
+                              args.max_rep_copy,
+                              args.max_consec_stay,
+                              args.max_paths,
+                              args.max_events_proc,
+                              3, 6, 1.4, 9.0, 0.2, 30, 150,
+                              args.max_stay_frac,
+                              args.min_seed_prob,
+                              args.min_mean_conf,
+                              args.min_top_conf)
+    mapper = align.Mapper(params)
+
+    sys.stderr.write("Reading fast5 paths\n")
+    fast5s = list()
+    if os.path.isdir(args.fast5s):
+        for root, dirs, files in os.walk(args.fast5s):
+            for fname in files:
+                if fname.endswith("fast5"):
+                    fast5s.append(os.path.abspath(os.path.join(root, fname)))
+
+    elif args.fast5s.endswith("fast5"):
+        for fname in args.fast5s.split(","):
+            fast5s.append(os.path.abspath(fname))
+
+    else:
+        fast5s = [os.path.abspath(l.strip()) for l in open(args.fast5s)]
+
+    sys.stderr.write("Aligning\n")
+    try:
+        for fast5 in fast5s:
+            print(mapper.align_fast5(fast5))
+    except KeyboardInterrupt:
+        pass
+
+def index_params(argv):
+    parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
+    #parser.add_argument("-t", "--prob-thresh-file", required=True, type=str)
+    parser.add_argument("-x", "--bwa-prefix", required=True, type=str)
+    parser.add_argument("-i", "--ref-fasta", required=True, type=str)
+    parser.add_argument("-s", "--sample-dist", default=1000, type=int)
+    parser.add_argument("-k", "--kmer-len", default=5, type=int)
+    parser.add_argument("-f", "--fm-percentile", default=95, type=int)
+    parser.add_argument("-1", "--matchpr1", default=0.65, type=float)
+    parser.add_argument("-2", "--matchpr2", default=0.9837, type=float)
+    parser.add_argument("-p", "--match-prod", default=0.05, type=float)
+    args = parser.parse_args(argv)
+
+    fmlens = align.self_align(args.bwa_prefix, args.ref_fasta, args.sample_dist)
+
+    index.get_params(args.bwa_prefix, 
+                     fmlens, 
+                     args.kmer_len, 
+                     args.fm_percentile, 
+                     args.matchpr1, 
+                     args.matchpr2, 
+                     args.match_prod)
+
+modes = {"index": (index_params, "Computes UNCALLED parameters for a BWA index"),
+         "align": (align_fast5s, "Aligns fast5 reads to UNCALLED index")}
+
+def print_usage(out):
+    out.write("Usage:\t uncalled <command> [opts]\n\nCommands:\n")
+    for mode in modes:
+        out.write("%s\t%s\n" % (mode, modes[mode][1]))
+    out.write("\n")
+
+if __name__ == "__main__":
+    
+
+    if len(sys.argv) == 1:
+        sys.stderr.write("Error: no command specified.\n\n")
+        print_usage(sys.stderr)
+        sys.exit(1)
+    cmd = None if len(sys.argv) == 1 else sys.argv[1]
+
+    if cmd == "index":
+        sys.exit(index_params(sys.argv[2:]))
+
+    elif cmd == "align":
+        sys.exit(align_fast5s(sys.argv[2:]))
+
+    sys.stderr.write("Unknown command: %s\n" % cmd)
+

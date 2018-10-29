@@ -1,0 +1,6 @@
+include README.md
+recursive-include src *
+recursive-include bwa *
+recursive-include fast5 *
+recursive-include pybind11 *
+recursive-include scripts *
