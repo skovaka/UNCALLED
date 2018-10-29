@@ -1,5 +1,5 @@
 # UNCALLED
-A *U*tility for *N*anopore *C*urrent *Al*ignment to *L*arge *E*xpanses of *D*NA
+A **U**tility for **N**anopore **C**urrent **Al**ignment to **L**arge **E**xpanses of **D**NA
 
 Maps raw nanopore signals from fast5 files to large DNA references
 
