@@ -1,53 +1,47 @@
-# ont_sig_align
-Nanopore signal aligner
+# UNCALLED
+A *U*tility for *N*anopore *C*urrent *Al*ignment to *L*arge *E*xpanses of *D*NA
 
+Maps raw nanopore signals from fast5 files to large DNA references
 
-
-# Installation
-
-## Prerequisites:
-
--Fast5:
-```
-cd src
-git clone https://github.com/mateidavid/fast5
-make
-```
-
-- HDF5:
-Should be included on the MARCC server at location specified in Makefile. Otherwise:
-```
-cd src
-wget https://support.hdfgroup.org/ftp/HDF5/current18/bin/linux-centos7-x86_64-gcc485/hdf5-1.8.18-linux-centos7-x86_64-gcc485-shared.tar.gz
-tar -xzvf hdf5-1.8.18-linux-centos7-x86_64-gcc485-shared.tar.gz
-```
-
-- Boost:
-Should be included on the MARCC server at location specified in Makefile. Otherwise:
-```
-# make sure boost is installed
-sudo apt-get install libboost1.58-all-dev
-# find where the boost libraries are located on your computer, set to $BOOSTDIR
-cd src
-bcp --boost=$BOOSTDIR math/distributions boost/
-```
-
-## Compilation
-make sure `BOOST_INCLUDE`, `HDF5_INCLUDE` and `HDF5_LIB` are set accordingly in Makefile
+## Installation
 
 ```
-make
+git clone --recusrive https://github.com/skovaka/UNCALLED.git
+cd UNCALLED
+python setup.py install
 ```
 
+Most dependecies included via submodules, so be sure to clone with `git --recursive`
 
-# running
+[HDF5](https://www.hdfgroup.org/downloads/hdf5/) must be installed
+
+##Running
+
+###Indexing
 
 ```
-./sigalign REFERENCE.FASTA MODEL TALLY_DISTANCE READ1.FAST5 READ2.FAST5 ...
+bwa index <fasta-reference> -p <bwa-prefix>
+uncalled index -i <fasta-reference> -x <bwa-prefix>
 ```
 
-expected output:
+UNCALLED requires a [BWA](https://github.com/lh3/bwa) index. You can ust a previously built BWA index, or build a new one with the BWA instance provided in the `bwa/` submodule.
+
+Before aligning, certain reference specific parameters must be computed using `uncalled index`. The `<fasta-reference>` should be the same FASTA file which was used to build the BWA index. This will create an additional file in the same directory as the BWA index named `<bwa-prefix>.uncl`.
+
+###Aligning
+
 ```
-READ1.FAST5: <x> matches on fwd strand, <y> matches on rev strand
-READ2.FAST5: <x> matches on fwd strand, <y> matches on rev strand
+uncalled align -x <bwa-prefix> -i <fast5-files>  >  <out.paf>
 ```
+
+`<fast5-files>` can be a directory which will be recursively searched for all files with the ".fast5" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.
+
+Outputs in a format similar to [PAF](https://github.com/lh3/miniasm/blob/master/PAF.md). Query coordinates, residue matches, and block lengths are estimated by average k-mer samplingn rate.
+
+##Limitations
+
+UNCALLED has not been tested on large (> ~100Mb) or highly repetetive references. `uncalled index` may take up large amounts of memory or crash on such references.
+
+Currently only reads sequenced with r9.4 chemistry are supported.
+
+This is very much a work in progress! Feel free to report any bugs.

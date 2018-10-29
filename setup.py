@@ -9,8 +9,7 @@ class make_bwa(build):
         sys.stderr.write("building libbwa\n")
         subprocess.call(["make", 
                          "-C", "./bwa", 
-                         "-f", "../src/Makefile_bwa", 
-                         "libbwa.a"])
+                         "-f", "../src/Makefile_bwa"])
         build.run(self)
 
 uncalled = Extension(

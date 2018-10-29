@@ -71,7 +71,7 @@ def index_params(argv):
     parser.add_argument("-s", "--sample-dist", default=1000, type=int)
     parser.add_argument("-k", "--kmer-len", default=5, type=int)
     parser.add_argument("-f", "--fm-percentile", default=95, type=int)
-    parser.add_argument("-1", "--matchpr1", default=0.65, type=float)
+    parser.add_argument("-1", "--matchpr1", default=0.6294, type=float)
     parser.add_argument("-2", "--matchpr2", default=0.9837, type=float)
     parser.add_argument("-p", "--match-prod", default=0.05, type=float)
     args = parser.parse_args(argv)
