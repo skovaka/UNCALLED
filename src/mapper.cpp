@@ -115,31 +115,36 @@ bool ReadLoc::is_valid() const {
     return match_count_ > 0;
 }
 
-std::ostream &operator<< (std::ostream &out, const ReadLoc &l) {
-    out << l.rd_name_ << "\t"
-        << l.rd_len_ << "\t"
-        << l.rd_st_ << "\t"
-        << l.rd_en_ << "\t";
-    if (l.is_valid()) {
-        out 
-            << (l.fwd_ ? '+' : '-') << "\t"
-            << l.rf_name_ << "\t"
-            << l.rf_len_ << "\t"
-            << l.rf_st_ << "\t"
-            << l.rf_en_ << "\t"
-            << l.match_count_ << "\t"
-            << (l.rd_en_ - l.rd_st_ + 1) << "\t"
-            << 255;
+std::string ReadLoc::str() const {
+    std::stringstream ss;
+    ss << rd_name_ << "\t"
+       << rd_len_ << "\t"
+       << rd_st_ << "\t"
+       << rd_en_ << "\t";
+    if (is_valid()) {
+        ss << (fwd_ ? '+' : '-') << "\t"
+           << rf_name_ << "\t"
+           << rf_len_ << "\t"
+           << rf_st_ << "\t"
+           << rf_en_ << "\t"
+           << match_count_ << "\t"
+           << (rd_en_ - rd_st_ + 1) << "\t"
+           << 255;
     } else {
-        out << "*" << "\t"
-            << "*" << "\t"
-            << "*" << "\t"
-            << "*" << "\t"
-            << "*" << "\t"
-            << "*" << "\t"
-            << "*" << "\t"
-            << "255";
+        ss << "*" << "\t"
+           << "*" << "\t"
+           << "*" << "\t"
+           << "*" << "\t"
+           << "*" << "\t"
+           << "*" << "\t"
+           << "*" << "\t"
+           << "255";
     }
+    return ss.str();
+}
+
+std::ostream &operator<< (std::ostream &out, const ReadLoc &l) {
+    out << l.str();
     return out;
 }
 
@@ -312,8 +317,32 @@ void Mapper::new_read(const std::string &name) {
 }
 
 std::string Mapper::align_fast5(const std::string &fast5_name) {
-    
+    if (!fast5::File::is_valid_file(fast5_name)) {
+        std::cerr << "Error: '" << fast5_name << "' is not a valid file \n";
+    }
 
+    ReadLoc aln;
+
+    try {
+        fast5::File file;
+        file.open(fast5_name);
+        
+        if (file.is_open()) {  
+            auto fast5_info = file.get_raw_samples_params();
+            auto raw_samples = file.get_raw_samples();
+            new_read(fast5_info.read_id);
+            aln = add_samples(raw_samples);
+
+        } else {
+            std::cerr << "Error: unable to open '" << fast5_name << "'\n";
+        }
+
+        
+    } catch (hdf5_tools::Exception& e) {
+        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
+    }
+
+    return aln.str();
 }
 
 ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
