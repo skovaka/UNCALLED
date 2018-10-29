@@ -6,7 +6,7 @@ import numpy as np
 import argparse
 from bisect import bisect_left, bisect_right
 
-def align_fast5s(argv):
+def map_fast5s(argv):
     #parser.add_argument("-p", "" #TODO: based on BWA prefix?
     parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
     parser.add_argument("-i", "--fast5s", required=True, type=str)
@@ -59,7 +59,7 @@ def align_fast5s(argv):
     sys.stderr.write("Aligning\n")
     try:
         for fast5 in fast5s:
-            print(mapper.align_fast5(fast5))
+            print(mapper.map_fast5(fast5))
     except KeyboardInterrupt:
         pass
 
@@ -87,7 +87,7 @@ def index_params(argv):
                      args.match_prod)
 
 modes = {"index": (index_params, "Computes UNCALLED parameters for a BWA index"),
-         "align": (align_fast5s, "Aligns fast5 reads to UNCALLED index")}
+         "map": (map_fast5s, "Aligns fast5 reads to UNCALLED index")}
 
 def print_usage(out):
     out.write("Usage:\t uncalled <command> [opts]\n\nCommands:\n")
@@ -107,8 +107,8 @@ if __name__ == "__main__":
     if cmd == "index":
         sys.exit(index_params(sys.argv[2:]))
 
-    elif cmd == "align":
-        sys.exit(align_fast5s(sys.argv[2:]))
+    elif cmd == "map":
+        sys.exit(map_fast5s(sys.argv[2:]))
 
     sys.stderr.write("Unknown command: %s\n" % cmd)
 

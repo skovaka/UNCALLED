@@ -91,7 +91,7 @@ class Mapper {
 
     void new_read(const std::string &name);
 
-    std::string align_fast5(const std::string &fast5_name);
+    std::string map_fast5(const std::string &fast5_name);
     ReadLoc add_samples(const std::vector<float> &samples);
     //SeedGroup add_sample(float s);
 

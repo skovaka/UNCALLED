@@ -318,7 +318,7 @@ void Mapper::new_read(const std::string &name) {
     #endif
 }
 
-std::string Mapper::align_fast5(const std::string &fast5_name) {
+std::string Mapper::map_fast5(const std::string &fast5_name) {
     if (!fast5::File::is_valid_file(fast5_name)) {
         std::cerr << "Error: '" << fast5_name << "' is not a valid file \n";
     }
