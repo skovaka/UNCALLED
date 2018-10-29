@@ -23,6 +23,7 @@ class MapperParams {
                  u32 max_rep_copy, 
                  u32 max_consec_stay,
                  u32 max_paths, 
+                 u32 max_events_proc,
                  u32 evt_winlen1,
                  u32 evt_winlen2,
                  float evt_thresh1,
@@ -35,8 +36,8 @@ class MapperParams {
                  float min_mean_conf,
                  float min_top_conf);
     
-    float get_prob_thresh(u64 fm_length);
-    float get_source_prob();
+    float get_prob_thresh(u64 fm_length) const;
+    float get_source_prob() const;
 
     BwaFMI fmi_;
     KmerModel model_;
@@ -47,7 +48,8 @@ class MapperParams {
         max_rep_copy_,
         max_paths_,
         max_consec_stay_,
-        min_aln_len_;
+        min_aln_len_,
+        max_events_proc_;
 
     float max_stay_frac_,
           min_seed_prob_,
@@ -83,7 +85,7 @@ std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
 class Mapper {
     public:
 
-    Mapper(const MapperParams &map_params);
+    Mapper(MapperParams &map_params);
 
     ~Mapper();
 
@@ -159,7 +161,7 @@ class Mapper {
                       std::vector<SeedGroup> &seeds, 
                       bool has_children);
 
-    MapperParams params_;
+    const MapperParams &params_;
     const KmerModel &model_;
     const BwaFMI &fmi_;
     EventDetector event_detector_;

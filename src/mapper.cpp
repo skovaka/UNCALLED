@@ -9,6 +9,7 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
                            u32 max_rep_copy, 
                            u32 max_consec_stay,
                            u32 max_paths, 
+                           u32 max_events_proc,
                            u32 evt_winlen1,
                            u32 evt_winlen2,
                            float evt_thresh1,
@@ -35,6 +36,7 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
           max_paths_(max_paths),
           max_consec_stay_(max_consec_stay),
           min_aln_len_(min_aln_len),
+          max_events_proc_(max_events_proc),
           max_stay_frac_(max_stay_frac),
           min_seed_prob_(min_seed_prob),
           min_mean_conf_(min_mean_conf),
@@ -61,7 +63,7 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
     }
 }
 
-float MapperParams::get_prob_thresh(u64 fm_length) {
+float MapperParams::get_prob_thresh(u64 fm_length) const {
     auto pr = evpr_threshes_.begin();
     for (auto len = evpr_lengths_.begin(); len != evpr_lengths_.end(); len++) {
         if (fm_length > *len) {
@@ -73,7 +75,7 @@ float MapperParams::get_prob_thresh(u64 fm_length) {
     return *pr;
 }
 
-float MapperParams::get_source_prob() {
+float MapperParams::get_source_prob() const {
     return evpr_threshes_.front();
 }
 
@@ -262,7 +264,7 @@ bool operator< (const Mapper::PathBuffer &p1,
             p1.seed_prob_ < p2.seed_prob_);
 }
 
-Mapper::Mapper(const MapperParams &ap)
+Mapper::Mapper(MapperParams &ap)
     : params_(ap),
       model_(ap.model_),
       fmi_(ap.fmi_),
@@ -353,10 +355,8 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
     read_loc_.set_read_len(events.size());
 
     for (u32 e = 0; e < events.size(); e++) {
-        if (add_event(events[e])) break;
+        if (e >= params_.max_events_proc_ || add_event(events[e])) break;
     }
-
-    std::cout << read_loc_ << std::endl;
 
     return read_loc_;
 }
