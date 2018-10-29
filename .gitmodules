@@ -4,6 +4,3 @@
 [submodule "fast5"]
 	path = fast5
 	url = https://github.com/mateidavid/fast5.git
-[submodule "bwa"]
-	path = bwa
-	url = https://github.com/lh3/bwa
