@@ -14,14 +14,15 @@ class make_bwa(build):
         build.run(self)
 
 uncalled = Extension(
-    "uncalled",
+    "uncalled.align",
      sources = ["src/uncalled.cpp", 
                 "src/mapper.cpp", 
                 "src/seed_tracker.cpp", 
                 "src/kmer_model.cpp", 
                 "src/bwa_fmi.cpp", 
                 "src/event_detector.cpp", 
-                "src/range.cpp"],
+                "src/range.cpp",
+                "src/self_align_ref.cpp"],
      include_dirs = ["./",
                      "./pybind11/include", 
                      "./fast5/include"],
@@ -33,5 +34,10 @@ uncalled = Extension(
 setup(name = "uncalled",
       version = "1.0",
       description = "Rapidly maps raw nanopore signal to DNA references",
+      packages=['uncalled'],
+      package_dir = {'': 'src', 'uncalled': 'src/uncalled'},
+      py_modules = ['uncalled.index'],
       ext_modules = [uncalled],
+      package_data = {'uncalled': ['models/*']},
+      scripts = ['scripts/uncalled'],
       cmdclass={'build': make_bwa})
