@@ -24,7 +24,7 @@ bwa index <fasta-reference> -p <bwa-prefix>
 uncalled index -i <fasta-reference> -x <bwa-prefix>
 ```
 
-UNCALLED requires a [BWA](https://github.com/lh3/bwa) index. You can ust a previously built BWA index, or build a new one with the BWA instance provided in the `bwa/` submodule.
+UNCALLED requires a [BWA](https://github.com/lh3/bwa) index. You can use a previously built BWA index, or build a new one with the BWA instance provided in the `bwa/` submodule.
 
 Before aligning, certain reference specific parameters must be computed using `uncalled index`. The `<fasta-reference>` should be the same FASTA file which was used to build the BWA index. This will create an additional file in the same directory as the BWA index named `<bwa-prefix>.uncl`.
 
@@ -40,7 +40,7 @@ Outputs in a format similar to [PAF](https://github.com/lh3/miniasm/blob/master/
 
 ## Limitations
 
-UNCALLED has not been tested on large (> ~100Mb) or highly repetetive references. `uncalled index` may take up large amounts of memory or crash on such references.
+UNCALLED has not been tested on large (> ~100Mb) or highly repetitive references. `uncalled index` may take up large amounts of memory or crash on such references.
 
 Currently only reads sequenced with r9.4 chemistry are supported.
 
