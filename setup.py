@@ -1,5 +1,6 @@
 from distutils.core import setup, Extension
 from distutils.command.build import build
+from distutils.sysconfig import get_python_inc
 import os
 import subprocess
 import sys
@@ -22,7 +23,8 @@ uncalled = Extension(
                 "src/event_detector.cpp", 
                 "src/range.cpp",
                 "src/self_align_ref.cpp"],
-     include_dirs = ["./",
+     include_dirs = [get_python_inc(),
+                     "./",
                      "./pybind11/include", 
                      "./fast5/include"],
      library_dirs = ["./bwa"],
@@ -31,7 +33,7 @@ uncalled = Extension(
 )
 
 setup(name = "uncalled",
-      version = "1.0",
+      version = "0.1",
       description = "Rapidly maps raw nanopore signal to DNA references",
       author = "Sam Kovaka",
       author_email = "skovaka@gmail.com",
