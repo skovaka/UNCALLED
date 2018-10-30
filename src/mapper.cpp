@@ -93,9 +93,12 @@ ReadLoc::ReadLoc() {
 }
 
 bool ReadLoc::set_ref_loc(const MapperParams &params, const SeedGroup &seeds) {
-    rd_st_ = seeds.evt_st_;
-    rd_en_ = seeds.evt_en_ + params.seed_len_;
-    match_count_ = seeds.total_len_;
+    u8 k_shift = (params.model_.kmer_len() - 1);
+
+    rd_st_ = (u32) (params.max_stay_frac_ * seeds.evt_st_);
+    rd_en_ = (u32) (params.max_stay_frac_ * (seeds.evt_en_ + params.seed_len_)) + k_shift;
+
+    match_count_ = seeds.total_len_ + k_shift;
     fwd_ = seeds.ref_st_ > params.fmi_.size() / 2;
 
     u64 sa_st;
@@ -103,14 +106,14 @@ bool ReadLoc::set_ref_loc(const MapperParams &params, const SeedGroup &seeds) {
     else sa_st = seeds.ref_st_;
 
     rf_len_ = params.fmi_.translate_loc(sa_st, rf_name_, rf_st_);
-    rf_en_ = rf_st_ + (seeds.ref_en_.end_ - seeds.ref_st_);
+    rf_en_ = rf_st_ + (seeds.ref_en_.end_ - seeds.ref_st_) + k_shift;
 
     return rf_len_ > 0;
 }
 
-void ReadLoc::set_read_len(u32 len) {
-    rd_len_ = len;
-    rd_en_ = len-1;
+void ReadLoc::set_read_len(const MapperParams &params, u32 len) {
+    rd_len_ = (u32) (params.max_stay_frac_ * len);
+    rd_en_ = rd_len_ - 1;
 }
 
 bool ReadLoc::is_valid() const {
@@ -352,7 +355,7 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
     NormParams norm = model_.get_norm_params(events);
     model_.normalize(events, norm);
 
-    read_loc_.set_read_len(events.size());
+    read_loc_.set_read_len(params_, events.size());
 
     for (u32 e = 0; e < events.size(); e++) {
         if (e >= params_.max_events_proc_ || add_event(events[e])) break;

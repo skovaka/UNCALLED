@@ -67,7 +67,7 @@ class ReadLoc {
     ReadLoc(const std::string &rd_name);
 
     bool set_ref_loc(const MapperParams &params, const SeedGroup &seeds);
-    void set_read_len(u32 len);
+    void set_read_len(const MapperParams &params, u32 len);
     std::string str() const;
     bool is_valid() const; 
     friend std::ostream &operator<< (std::ostream &out, const ReadLoc &l);

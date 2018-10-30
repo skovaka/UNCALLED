@@ -38,7 +38,7 @@ uncalled map -x <bwa-prefix> -i <fast5-files>  >  <out.paf>
 
 `<fast5-files>` can be a directory which will be recursively searched for all files with the ".fast5" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.
 
-Outputs in a format similar to [PAF](https://github.com/lh3/miniasm/blob/master/PAF.md). Query coordinates, residue matches, and block lengths are estimated by average k-mer sampling rate. (**TODO: currently actually reports event lengths**)
+Outputs in a format similar to [PAF](https://github.com/lh3/miniasm/blob/master/PAF.md). Query coordinates, residue matches, and block lengths are estimated by average k-mer sampling rate.
 
 ## Limitations
 
