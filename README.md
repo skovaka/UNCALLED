@@ -6,7 +6,7 @@ Maps raw nanopore signals from fast5 files to large DNA references
 ## Installation
 
 ```
-git clone --recusrive https://github.com/skovaka/UNCALLED.git
+git clone --recursive https://github.com/skovaka/UNCALLED.git
 cd UNCALLED
 python setup.py install
 ```
