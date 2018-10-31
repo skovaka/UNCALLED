@@ -85,7 +85,8 @@ std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
 class Mapper {
     public:
 
-    Mapper(MapperParams &map_params);
+    Mapper(const MapperParams &map_params);
+    Mapper(Mapper &m);
 
     ~Mapper();
 

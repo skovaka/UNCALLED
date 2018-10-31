@@ -17,6 +17,7 @@ def map_fast5s(argv):
     parser.add_argument("-p", "--max-paths", default=10000, type=int)
     parser.add_argument("-e", "--max-events-proc", default=30000, type=int)
     parser.add_argument("-t", "--threads", default=1, type=int)
+    parser.add_argument("-b", "--batch-size", default=100, type=int)
     parser.add_argument("-F", "--max-stay-frac", default=0.5, type=float)
     parser.add_argument("-S", "--min-seed-prob", default=-3.75, type=float)
     parser.add_argument("-M", "--min-mean-conf", default=7.00, type=float)
@@ -55,31 +56,31 @@ def map_fast5s(argv):
         fast5s = [os.path.abspath(l.strip()) for l in open(args.fast5s)]
 
     sys.stderr.write("Aligning\n")
-    if args.threads == 1:
-        mapper = align.Mapper(params)
+    #if args.threads == 1:
+    #    mapper = align.Mapper(params)
 
-        try:
-            for fast5 in fast5s:
-                print(mapper.map_fast5(fast5))
-        except KeyboardInterrupt:
-            pass
-    else:
-        mapper = align.Fast5Pool(params, args.threads, 1000)
+    #    try:
+    #        for fast5 in fast5s:
+    #            print(mapper.map_fast5(fast5))
+    #    except KeyboardInterrupt:
+    #        pass
+    #else:
+    mapper = align.Fast5Pool(params, args.threads, args.batch_size)
 
-        try:
-            sys.stderr.write("4\n")
-            mapper.add_fast5s(fast5s)
+    try:
+        mapper.add_fast5s(fast5s)
 
-            while not mapper.all_finished():
-                sys.stderr.write("5\n")
-                alns = mapper.update()
-                print("\n".join(alns))
-                time.sleep(0.5)
+        while not mapper.all_finished():
+            alns = mapper.update()
+            for a in alns:
+                sys.stdout.write("%s\n" % a)
+            sys.stdout.flush()
+            time.sleep(0.5)
 
-        except KeyboardInterrupt:
-            pass
+    except KeyboardInterrupt:
+        pass
 
-        mapper.stop_all()
+    mapper.stop_all()
 
 def index_params(argv):
     parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")

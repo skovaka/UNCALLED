@@ -71,7 +71,6 @@ float MapperParams::get_prob_thresh(u64 fm_length) const {
         }
         pr++;
     }
-
     return *pr;
 }
 
@@ -168,7 +167,7 @@ Mapper::PathBuffer::PathBuffer(const PathBuffer &p) {
 }
 
 void Mapper::PathBuffer::free_buffers() {
-    delete[] prob_sums_;
+    //delete[] prob_sums_;
 }
 
 void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
@@ -267,7 +266,7 @@ bool operator< (const Mapper::PathBuffer &p1,
             p1.seed_prob_ < p2.seed_prob_);
 }
 
-Mapper::Mapper(MapperParams &ap)
+Mapper::Mapper(const MapperParams &ap)
     : params_(ap),
       model_(ap.model_),
       fmi_(ap.fmi_),
@@ -301,6 +300,8 @@ Mapper::Mapper(MapperParams &ap)
     loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
     #endif
 }
+
+Mapper::Mapper(Mapper &m) : Mapper(m.params_) {}
 
 Mapper::~Mapper() {
     for (u32 i = 0; i < next_paths_.size(); i++) {
