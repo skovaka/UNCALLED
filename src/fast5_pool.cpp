@@ -48,20 +48,18 @@ void Fast5Pool::add_fast5s(const std::list<std::string> &new_fast5s) {
 std::vector<std::string> Fast5Pool::update() {
     std::vector<std::string> ret;
 
-
     for (MapperThread &t : threads_) {
-        //t.out_mtx_.lock(); //maybe only nescissary for last element?
+        t.out_mtx_.lock();
         while (!t.locs_out_.empty()) {
             ret.push_back(t.locs_out_.front().str());
             t.locs_out_.pop_front();
         }
-        //t.out_mtx_.unlock();
+        t.out_mtx_.unlock();
 
         if (t.signals_in_.size() < batch_size_ / 2) {
             while (!fast5s_.empty() && t.signals_in_.size() < batch_size_) {
 
                 std::string fname = fast5s_.front();
-                //std::cout << fname << "\n";
                 fast5s_.pop_front();
 
                 fast5::File fast5;
@@ -70,11 +68,12 @@ std::vector<std::string> Fast5Pool::update() {
                 std::vector<float> samples = fast5.get_raw_samples();
                 std::string ids = fast5.get_raw_samples_params().read_id;
 
-                //t.in_mtx_.lock(); //maybe only nescissary for last element?
+                //TODO: buffer signal
+                t.in_mtx_.lock();
                 t.signals_in_.push_back(samples);
                 t.ids_in_.push_back(ids);
                 fast5.close();
-                //t.in_mtx_.unlock();
+                t.in_mtx_.unlock();
             }
         }
     }
@@ -103,25 +102,13 @@ void Fast5Pool::stop_all() {
 Fast5Pool::MapperThread::MapperThread(MapperParams &params)
     : running_(true),
       aligning_(false),
-      mapper_(params)
-      //in_lck_(std::unique_lock<std::mutex>(in_mtx_)),
-      //out_lck_(std::unique_lock<std::mutex>(out_mtx_)) {
-{
-
-    //std::cout << "Init\n";      
-}
+      mapper_(params) {}
 
 Fast5Pool::MapperThread::MapperThread(MapperThread &&mt) 
     : running_(mt.running_),                                             
       aligning_(mt.aligning_),                                           
       mapper_(mt.mapper_),
-      thread_(std::move(mt.thread_))
-      //in_lck_(std::unique_lock<std::mutex>(mt.in_mtx_)),
-      //out_lck_(std::unique_lock<std::mutex>(mt.out_mtx_))
-{
-    //std::cout << "Move\n";      
-
-}
+      thread_(std::move(mt.thread_)) {}
 
 void Fast5Pool::MapperThread::start() {
     thread_ = std::thread(&Fast5Pool::MapperThread::run, this);
@@ -131,32 +118,27 @@ void Fast5Pool::MapperThread::run() {
     std::string fast5_id;
     std::vector<float> fast5_signal;
     ReadLoc loc;
-    //std::cout << "Rung\n";      
     while (running_) {
         if (signals_in_.empty()) {
             aligning_ = false;
-            //std::cout << "wait\n";
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
 
         aligning_ = true;
         
-        //in_mtx_.lock(); //check if last elem?
+        in_mtx_.lock(); 
         signals_in_.front().swap(fast5_signal);
         ids_in_.front().swap(fast5_id);
-
         ids_in_.pop_front();
         signals_in_.pop_front();
-        //in_mtx_.unlock();
+        in_mtx_.unlock();
 
-        //std::cout << "MAP1\n";
         mapper_.new_read(fast5_id);
         loc = mapper_.add_samples(fast5_signal);
-        //std::cout << "MAP2\n";
 
-        //out_mtx_.lock(); //you get it
+        out_mtx_.lock(); 
         locs_out_.push_back(loc);
-        //out_mtx_.unlock();
+        out_mtx_.unlock();
     }
 }

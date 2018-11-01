@@ -56,31 +56,31 @@ def map_fast5s(argv):
         fast5s = [os.path.abspath(l.strip()) for l in open(args.fast5s)]
 
     sys.stderr.write("Aligning\n")
-    #if args.threads == 1:
-    #    mapper = align.Mapper(params)
+    if args.threads == 1:
+        mapper = align.Mapper(params)
 
-    #    try:
-    #        for fast5 in fast5s:
-    #            print(mapper.map_fast5(fast5))
-    #    except KeyboardInterrupt:
-    #        pass
-    #else:
-    mapper = align.Fast5Pool(params, args.threads, args.batch_size)
+        try:
+            for fast5 in fast5s:
+                print(mapper.map_fast5(fast5))
+        except KeyboardInterrupt:
+            pass
+    else:
+        mapper = align.Fast5Pool(params, args.threads, args.batch_size)
 
-    try:
-        mapper.add_fast5s(fast5s)
+        try:
+            mapper.add_fast5s(fast5s)
 
-        while not mapper.all_finished():
-            alns = mapper.update()
-            for a in alns:
-                sys.stdout.write("%s\n" % a)
-            sys.stdout.flush()
-            time.sleep(0.5)
+            while not mapper.all_finished():
+                alns = mapper.update()
+                for a in alns:
+                    sys.stdout.write("%s\n" % a)
+                sys.stdout.flush()
+                time.sleep(0.1)
 
-    except KeyboardInterrupt:
-        pass
+        except KeyboardInterrupt:
+            pass
 
-    mapper.stop_all()
+        mapper.stop_all()
 
 def index_params(argv):
     parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")

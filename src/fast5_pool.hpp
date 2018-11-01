@@ -31,7 +31,7 @@ class Fast5Pool {
         std::list<std::string> ids_in_;
         std::list< std::vector<float> > signals_in_;
         std::list<ReadLoc> locs_out_;
-        //std::mutex in_mtx_, out_mtx_;
+        std::mutex in_mtx_, out_mtx_;
         //std::unique_lock<std::mutex> in_lck_, out_lck_;
     };
 
