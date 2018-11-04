@@ -13,7 +13,7 @@ python setup.py install
 
 Most dependecies included via submodules, so be sure to clone with `git --recursive`
 
-UNCALLED must be installed into a python environment. To install without root privileges use the `--user` or `--prefix=<local-dir>` flag when installing, or use a tool such as [virtualenv](virtualenv.pypa.io) or [anaconda](anaconda.com).
+UNCALLED must be installed into a python environment. To install without root privileges use the `--user` or `--prefix=<local-dir>` flag when installing, or use a tool such as [virtualenv](www.virtualenv.pypa.io) or [anaconda](www.anaconda.com).
 
 Requires python-dev and GCC >= 4.8.1
 
