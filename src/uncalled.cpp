@@ -31,6 +31,4 @@ PYBIND11_MODULE(align, m) {
         .def("stop_all", &Fast5Pool::stop_all); 
     
     m.def("self_align", &self_align);
-
 }
-

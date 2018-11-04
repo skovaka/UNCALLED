@@ -51,6 +51,7 @@ std::vector<std::string> Fast5Pool::update() {
     for (MapperThread &t : threads_) {
         t.out_mtx_.lock();
         while (!t.locs_out_.empty()) {
+            //TODO: parse outside
             ret.push_back(t.locs_out_.front().str());
             t.locs_out_.pop_front();
         }

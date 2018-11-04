@@ -5,6 +5,7 @@ import os
 import argparse
 import time
 
+
 def map_fast5s(argv):
     parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
     parser.add_argument("-i", "--fast5s", required=True, type=str)
@@ -16,6 +17,13 @@ def map_fast5s(argv):
     parser.add_argument("-y", "--max-consec-stay", default=8, type=int)
     parser.add_argument("-p", "--max-paths", default=10000, type=int)
     parser.add_argument("-e", "--max-events-proc", default=30000, type=int)
+    parser.add_argument("--evt-window-length1", default=3, type=int)
+    parser.add_argument("--evt-window-length2", default=6, type=int)
+    parser.add_argument("--evt-threshold1", default=1.4, type=float)
+    parser.add_argument("--evt-threshold2", default=9.0, type=float)
+    parser.add_argument("--evt-peak-height", default=0.2, type=float)
+    parser.add_argument("--evt-min-mean", default=30, type=float)
+    parser.add_argument("--evt-max-mean", default=150, type=float)
     parser.add_argument("-t", "--threads", default=1, type=int)
     parser.add_argument("-b", "--batch-size", default=100, type=int)
     parser.add_argument("-F", "--max-stay-frac", default=0.5, type=float)
@@ -25,20 +33,26 @@ def map_fast5s(argv):
     args = parser.parse_args(argv)
 
     params = align.MapperParams(args.bwa_prefix,
-                              index.MODEL_FNAME,
-                              args.bwa_prefix + index.PARAM_SUFF,
-                              args.seed_len,
-                              args.min_aln_len,
-                              args.min_rep_len,
-                              args.max_rep_copy,
-                              args.max_consec_stay,
-                              args.max_paths,
-                              args.max_events_proc,
-                              3, 6, 1.4, 9.0, 0.2, 30, 150,
-                              args.max_stay_frac,
-                              args.min_seed_prob,
-                              args.min_mean_conf,
-                              args.min_top_conf)
+                                index.MODEL_FNAME,
+                                args.bwa_prefix + index.PARAM_SUFF,
+                                args.seed_len,
+                                args.min_aln_len,
+                                args.min_rep_len,
+                                args.max_rep_copy,
+                                args.max_consec_stay,
+                                args.max_paths,
+                                args.max_events_proc,
+                                args.evt_window_length1,
+                                args.evt_window_length2,
+                                args.evt_threshold1,
+                                args.evt_threshold2,
+                                args.evt_peak_height,
+                                args.evt_min_mean,
+                                args.evt_max_mean,
+                                args.max_stay_frac,
+                                args.min_seed_prob,
+                                args.min_mean_conf,
+                                args.min_top_conf)
 
     sys.stderr.write("Reading fast5 paths\n")
     fast5s = list()
@@ -62,6 +76,7 @@ def map_fast5s(argv):
         try:
             for fast5 in fast5s:
                 print(mapper.map_fast5(fast5))
+
         except KeyboardInterrupt:
             pass
     else:

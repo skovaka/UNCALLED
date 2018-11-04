@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import division
 import sys                         
 import os
 import numpy as np
@@ -9,7 +10,6 @@ ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers.txt")
 MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers_threshs.txt")
 PARAM_SUFF = ".uncl"
-
 
 def get_fmlen_percentiles(fmlens, perc, max_path_len):
     path_fmlens = [list() for i in range(max_path_len)]
