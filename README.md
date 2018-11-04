@@ -13,7 +13,9 @@ python setup.py install
 
 Most dependecies included via submodules, so be sure to clone with `git --recursive`
 
-Requires python3-dev and GCC >= 4.8.1
+UNCALLED must be installed into a python environment. To install without root privileges use the `--user` or `--prefix=<local-dir>` flag when installing, or use a tool such as [virtualenv](virtualenv.pypa.io) or [anaconda](anaconda.com).
+
+Requires python-dev and GCC >= 4.8.1
 
 [HDF5](https://www.hdfgroup.org/downloads/hdf5/) must be installed. Libraries and headers should be in system paths (ie `$LD_LIBRARY_PATH` and `$CPATH` respectively), or specified by running `python setup.py build_ext --library-dirs <hdf5-location>/lib --include-dirs <hdf5-location>/include` prior to installation.
 
