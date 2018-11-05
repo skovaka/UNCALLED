@@ -38,7 +38,7 @@ Before aligning, certain reference specific parameters must be computed using `u
 uncalled map -x <bwa-prefix> -i <fast5-files>  >  <out.paf>
 ```
 
-See `example/` for a simple read and reference example.
+See [example/](example/`) for a simple read and reference example.
 
 `<fast5-files>` can be a directory which will be recursively searched for all files with the ".fast5" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.
 
