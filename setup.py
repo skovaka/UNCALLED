@@ -1,17 +1,17 @@
 from distutils.core import setup, Extension
-from distutils.command.build import build
+from distutils.command.build_ext import build_ext
 from distutils.sysconfig import get_python_inc
 import os
 import subprocess
 import sys
 
-class make_bwa(build):
+class make_bwa(build_ext):
     def run(self):
         sys.stderr.write("building libbwa\n")
         subprocess.call(["make", 
                          "-C", "./bwa", 
                          "-f", "../src/Makefile_bwa"])
-        build.run(self)
+        build_ext.run(self)
 
 uncalled = Extension(
     "uncalled.align",
@@ -44,4 +44,4 @@ setup(name = "uncalled",
       ext_modules = [uncalled],
       package_data = {'uncalled': ['models/*']},
       scripts = ['scripts/uncalled'],
-      cmdclass={'build': make_bwa})
+      cmdclass={'build_ext': make_bwa})

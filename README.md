@@ -24,7 +24,7 @@ Requires python-dev and GCC >= 4.8.1
 ### Indexing
 
 ```
-bwa index <fasta-reference> -p <bwa-prefix>
+bwa index -p <bwa-prefix> <fasta-reference>
 uncalled index -i <fasta-reference> -x <bwa-prefix>
 ```
 
