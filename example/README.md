@@ -19,6 +19,8 @@ f41a60f7-de4a-4b17-9f54-387e52d60b65    3086    186     251     +       Escheric
 
 # Data Source
 
-Example data obtained from [https://github.com/LomanLab/mockcommunity]
-fast5 from [https://nanopore.s3.climb.ac.uk/Zymo-GridION-EVEN-BB-SN_signal.tar]
-Reference extracted from [https://s3.amazonaws.com/zymo-files/BioPool/ZymoBIOMICS.STD.refseq.v2.zip]
+Example data obtained from https://github.com/LomanLab/mockcommunity
+
+Read extracted from https://nanopore.s3.climb.ac.uk/Zymo-GridION-EVEN-BB-SN_signal.tar
+
+Reference extracted from https://s3.amazonaws.com/zymo-files/BioPool/ZymoBIOMICS.STD.refseq.v2.zip
