@@ -32,6 +32,8 @@ UNCALLED requires a [BWA](https://github.com/lh3/bwa) index. You can use a previ
 
 Before aligning, certain reference specific parameters must be computed using `uncalled index`. The `<fasta-reference>` should be the same FASTA file which was used to build the BWA index. This will create an additional file in the same directory as the BWA index named `<bwa-prefix>.uncl`.
 
+See `example/` for a simple read and reference example.
+
 ### Mapping
 
 ```
