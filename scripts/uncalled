@@ -5,33 +5,49 @@ import os
 import argparse
 import time
 
+class ArgFormat(argparse.ArgumentDefaultsHelpFormatter, 
+                argparse.MetavarTypeHelpFormatter):
+    pass
 
-def map_fast5s(argv):
+def get_parser():
     parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
-    parser.add_argument("-i", "--fast5s", required=True, type=str)
-    parser.add_argument("-x", "--bwa-prefix", required=True, type=str)
-    parser.add_argument("-s", "--seed-len", default=22, type=int)
-    parser.add_argument("-a", "--min-aln-len", default=25, type=int)
-    parser.add_argument("-r", "--min-rep-len", default=0, type=int)
-    parser.add_argument("-c", "--max-rep-copy", default=100, type=int)
-    parser.add_argument("-y", "--max-consec-stay", default=8, type=int)
-    parser.add_argument("-p", "--max-paths", default=10000, type=int)
-    parser.add_argument("-e", "--max-events-proc", default=30000, type=int)
-    parser.add_argument("--evt-window-length1", default=3, type=int)
-    parser.add_argument("--evt-window-length2", default=6, type=int)
-    parser.add_argument("--evt-threshold1", default=1.4, type=float)
-    parser.add_argument("--evt-threshold2", default=9.0, type=float)
-    parser.add_argument("--evt-peak-height", default=0.2, type=float)
-    parser.add_argument("--evt-min-mean", default=30, type=float)
-    parser.add_argument("--evt-max-mean", default=150, type=float)
-    parser.add_argument("-t", "--threads", default=1, type=int)
-    parser.add_argument("-b", "--batch-size", default=100, type=int)
-    parser.add_argument("-F", "--max-stay-frac", default=0.5, type=float)
-    parser.add_argument("-S", "--min-seed-prob", default=-3.75, type=float)
-    parser.add_argument("-M", "--min-mean-conf", default=7.00, type=float)
-    parser.add_argument("-T", "--min-top-conf", default=2.25, type=float)
-    args = parser.parse_args(argv)
+    sp = parser.add_subparsers(dest="subcmd")
 
+    map_parser = sp.add_parser("map", help="Map fast5 files to a BWA index that has beeen processed by \"uncalled index\"",formatter_class=ArgFormat)
+    map_parser.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to align. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
+    map_parser.add_argument("-x", "--bwa-prefix", required=True, type=str, help="BWA prefix to align to. Must be processed by \"uncalled index\".")
+    map_parser.add_argument("-t", "--threads", default=1, type=int, help="Number of threads to use for mapping")
+    map_parser.add_argument("-b", "--batch-size", default=100, type=int, help="Maximum number of reads buffered per thread")
+    map_parser.add_argument("-e", "--max-events-proc", default=30000, type=int, help="Will give up on a read after this many events have been processed")
+    map_parser.add_argument("-a", "--min-aln-len", default=25, type=int, help="Minimum number of basepairs a mapping must cover.")
+    map_parser.add_argument("-s", "--seed-len", default=22, type=int, help="Seed length in events.")
+    map_parser.add_argument("-y", "--max-consec-stay", default=8, type=int, help="Maximum consecutive stay events.")
+    map_parser.add_argument("-p", "--max-paths", default=10000, type=int, help="Maximum number of paths to consider per event.")
+    map_parser.add_argument("-F", "--max-stay-frac", default=0.5, type=float, help="Expected fraction of events which are stays")
+    map_parser.add_argument("-S", "--min-seed-prob", default=-3.75, type=float, help="Average event probability threshold per seed")
+    map_parser.add_argument("-M", "--min-mean-conf", default=7.00, type=float, help="Minimum ratio between longest alignment and mean alignment length to report confident alignment")
+    map_parser.add_argument("-T", "--min-top-conf", default=2.25, type=float, help="Minimum ratio between longest alignment and second-longet alignment to report confident alignment")
+    map_parser.add_argument("--evt-min-mean", default=30, type=float, help="Minimum un-normalized event mean")
+    map_parser.add_argument("--evt-max-mean", default=150, type=float, help="Maximum un-normalized event mean")
+    map_parser.add_argument("--evt-window-length1", default=3, type=int, help=" ")
+    map_parser.add_argument("--evt-window-length2", default=6, type=int, help=" ")
+    map_parser.add_argument("--evt-threshold1", default=1.4, type=float, help=" ")
+    map_parser.add_argument("--evt-threshold2", default=9.0, type=float, help=" ")
+    map_parser.add_argument("--evt-peak-height", default=0.2, type=float, help=" ")
+
+    index_parser = sp.add_parser("index", help="Calculates reference-specific parameters needed to map to a given a BWA-index.", formatter_class=ArgFormat)
+    index_parser.add_argument("-x", "--bwa-prefix", required=True, type=str, help="Prefix of previously built BWA index")
+    index_parser.add_argument("-i", "--ref-fasta", required=True, type=str, help="FASTA file used to build BWA index")
+    index_parser.add_argument("-s", "--sample-dist", default=1000, type=int, help="Sampling distance between reference self-alignments. Reduce number for larger genomes.")
+    index_parser.add_argument("-k", "--kmer-len", default=5, type=int, help="Model k-mer length")
+    index_parser.add_argument("-1", "--matchpr1", default=0.6677, type=float, help="Minimum event match probability")
+    index_parser.add_argument("-2", "--matchpr2", default=0.9837, type=float, help="Maximum event match probability")
+    index_parser.add_argument("-p", "--match-prod", default=0.05, type=float, help="Target frequency of seeds.")
+    index_parser.add_argument("-f", "--fm-percentile", default=95, type=int, help=" ")
+
+    return parser
+
+def map_fast5s(args):
     params = align.MapperParams(args.bwa_prefix,
                                 index.MODEL_FNAME,
                                 args.bwa_prefix + index.PARAM_SUFF,
@@ -97,16 +113,7 @@ def map_fast5s(argv):
 
         mapper.stop_all()
 
-def index_params(argv):
-    parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
-    parser.add_argument("-x", "--bwa-prefix", required=True, type=str)
-    parser.add_argument("-i", "--ref-fasta", required=True, type=str)
-    parser.add_argument("-s", "--sample-dist", default=1000, type=int)
-    parser.add_argument("-k", "--kmer-len", default=5, type=int)
-    parser.add_argument("-f", "--fm-percentile", default=95, type=int)
-    parser.add_argument("-1", "--matchpr1", default=0.6294, type=float)
-    parser.add_argument("-2", "--matchpr2", default=0.9837, type=float)
-    parser.add_argument("-p", "--match-prod", default=0.05, type=float)
+def index(args):
     args = parser.parse_args(argv)
 
     fmlens = align.self_align(args.bwa_prefix, args.ref_fasta, args.sample_dist)
@@ -119,29 +126,15 @@ def index_params(argv):
                      args.matchpr2, 
                      args.match_prod)
 
-modes = {"index": (index_params, "Computes UNCALLED parameters for a BWA index"),
-         "map": (map_fast5s, "Aligns fast5 reads to UNCALLED index")}
-
-def print_usage(out):
-    out.write("Usage:\t uncalled <command> [opts]\n\nCommands:\n")
-    for mode in modes:
-        out.write("%s\t%s\n" % (mode, modes[mode][1]))
-    out.write("\n")
-
 if __name__ == "__main__":
     
+    parser = get_parser()
+    args = parser.parse_args()
 
-    if len(sys.argv) == 1:
-        sys.stderr.write("Error: no command specified.\n\n")
-        print_usage(sys.stderr)
-        sys.exit(1)
-    cmd = None if len(sys.argv) == 1 else sys.argv[1]
-
-    if cmd == "index":
-        sys.exit(index_params(sys.argv[2:]))
-
-    elif cmd == "map":
-        sys.exit(map_fast5s(sys.argv[2:]))
-
-    sys.stderr.write("Unknown command: %s\n" % cmd)
-
+    if args.subcmd == "index":
+        index(args)
+    elif args.subcmd == "map":
+        map_fast5s(args)
+    else:
+        parser.print_help()
+        
