@@ -21,6 +21,8 @@ def get_parser():
     map_parser.add_argument("-e", "--max-events-proc", default=30000, type=int, help="Will give up on a read after this many events have been processed")
     map_parser.add_argument("-a", "--min-aln-len", default=25, type=int, help="Minimum number of basepairs a mapping must cover.")
     map_parser.add_argument("-s", "--seed-len", default=22, type=int, help="Seed length in events.")
+    map_parser.add_argument("-r", "--min-rep-len", default=0, type=int, help="Minimum number of basepairs a multi-mapping seed must cover")
+    map_parser.add_argument("-c", "--max-rep-copy", default=100, type=int, help="Maximum number of locations for a multi-mapping seed")
     map_parser.add_argument("-y", "--max-consec-stay", default=8, type=int, help="Maximum consecutive stay events.")
     map_parser.add_argument("-p", "--max-paths", default=10000, type=int, help="Maximum number of paths to consider per event.")
     map_parser.add_argument("-F", "--max-stay-frac", default=0.5, type=float, help="Expected fraction of events which are stays")
@@ -47,7 +49,7 @@ def get_parser():
 
     return parser
 
-def map_fast5s(args):
+def map_cmd(args):
     params = align.MapperParams(args.bwa_prefix,
                                 index.MODEL_FNAME,
                                 args.bwa_prefix + index.PARAM_SUFF,
@@ -113,9 +115,7 @@ def map_fast5s(args):
 
         mapper.stop_all()
 
-def index(args):
-    args = parser.parse_args(argv)
-
+def index_cmd(args):
     fmlens = align.self_align(args.bwa_prefix, args.ref_fasta, args.sample_dist)
 
     index.get_params(args.bwa_prefix, 
@@ -132,9 +132,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.subcmd == "index":
-        index(args)
+        index_cmd(args)
     elif args.subcmd == "map":
-        map_fast5s(args)
+        map_cmd(args)
     else:
         parser.print_help()
         
