@@ -101,8 +101,8 @@ bool ReadLoc::set_ref_loc(const MapperParams &params, const SeedGroup &seeds) {
     fwd_ = seeds.ref_st_ > params.fmi_.size() / 2;
 
     u64 sa_st;
-    if (fwd_) sa_st = params.fmi_.size() - seeds.ref_en_.end_ - 1;
-    else sa_st = seeds.ref_st_;
+    if (fwd_) sa_st = params.fmi_.size() - (seeds.ref_en_.end_ + k_shift);
+    else      sa_st = seeds.ref_st_;
 
     rf_len_ = params.fmi_.translate_loc(sa_st, rf_name_, rf_st_);
     rf_en_ = rf_st_ + (seeds.ref_en_.end_ - seeds.ref_st_) + k_shift;
@@ -132,7 +132,7 @@ std::string ReadLoc::str() const {
            << rf_st_ << "\t"
            << rf_en_ << "\t"
            << match_count_ << "\t"
-           << (rd_en_ - rd_st_ + 1) << "\t"
+           << (rf_en_ - rf_st_ + 1) << "\t"
            << 255;
     } else {
         ss << "*" << "\t"
