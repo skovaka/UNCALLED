@@ -17,7 +17,7 @@ def get_parser():
     map_parser.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to align. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
     map_parser.add_argument("-x", "--bwa-prefix", required=True, type=str, help="BWA prefix to align to. Must be processed by \"uncalled index\".")
     map_parser.add_argument("-t", "--threads", default=1, type=int, help="Number of threads to use for mapping")
-    map_parser.add_argument("-b", "--batch-size", default=100, type=int, help="Maximum number of reads buffered per thread")
+    map_parser.add_argument("-b", "--batch-size", default=5, type=int, help="Maximum number of reads buffered per thread")
     map_parser.add_argument("-e", "--max-events-proc", default=30000, type=int, help="Will give up on a read after this many events have been processed")
     map_parser.add_argument("-a", "--min-aln-len", default=25, type=int, help="Minimum number of basepairs a mapping must cover.")
     map_parser.add_argument("-s", "--seed-len", default=22, type=int, help="Seed length in events.")
@@ -113,6 +113,7 @@ def map_cmd(args):
         except KeyboardInterrupt:
             pass
 
+        sys.stderr.write("Waiting for threads to finish...\n")
         mapper.stop_all()
 
 def index_cmd(args):
