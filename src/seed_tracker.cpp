@@ -1,7 +1,29 @@
-#include "seed_tracker.hpp"
-//#include "base_fmi.hpp"
+/* MIT License
+ *
+ * Copyright (c) 2018 Sam Kovaka <skovaka@gmail.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <iostream>
 #include <set>
+#include "seed_tracker.hpp"
 
 //#define DEBUG
 
@@ -53,14 +75,10 @@ void SeedGroup::print(std::ostream &out, bool newline = false, bool print_all = 
     out << total_len_ << "\t";
 
     out << ref_st_;
-    //if (print_all ) {
-    //    std::cout << ref_st_.end_ << ":";
-    //}
 
     out << "-" << ref_en_.end_ << "\t" 
                << evt_st_ << "-" 
-               << evt_en_;// << " "
-               //<< (int) segments_;
+               << evt_en_;
 
     if (newline)
         out << "\n";
@@ -123,8 +141,8 @@ SeedGroup SeedTracker::add_seeds(const std::vector<SeedGroup> &seeds) {
     return NULL_ALN;
 }
 
+//TODO: rename new_aln, make const ref
 SeedGroup SeedTracker::add_seed(SeedGroup new_aln) {
-    //SeedGroup new_aln(r.ref_range_, r.read_range_.start_);
 
     //Locations sorted by decreasing ref_en_.start
     //Find the largest aln s.t. aln->ref_en_.start <= new_aln.ref_en_.start

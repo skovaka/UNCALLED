@@ -1,3 +1,9 @@
+/* 
+ * This file was adptaed from https://github.com/nanoporetech/scrappie
+ * Original resrion released under Mozzila Public Licence
+ * Adapted for UNCALLED by Sam Kovaka <skovaka@gmail.com>
+ */
+
 #ifndef EVENT_DETECTOR_HPP
 #define EVENT_DETECTOR_HPP
 
