@@ -191,7 +191,7 @@ Mapper::PathBuffer::PathBuffer(const PathBuffer &p) {
 
 void Mapper::PathBuffer::free_buffers() {
     //TODO: make this work with copying. Currently technically a memory leak.
-    //delete[] prob_sums_;
+    delete[] prob_sums_;
 }
 
 void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
