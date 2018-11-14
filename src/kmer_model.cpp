@@ -169,6 +169,8 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
     for (u16 k_id = 0; k_id < kmer_count_; k_id++)
         model_stdv_ += pow(lv_means_[k_id] - model_mean_, 2);
     model_stdv_ = sqrt(model_stdv_ / kmer_count_);
+
+    //std::cout << model_mean_ << " " << model_stdv_ << "\n";
 }
 
 

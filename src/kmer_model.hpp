@@ -75,10 +75,10 @@ class KmerModel {
 
     double *lv_means_, *lv_vars_x2_, *lognorm_denoms_, *sd_means_, *sd_stdvs_;
 
+    double lambda_, model_mean_, model_stdv_;
     private:
     u8 k_;
     u16 kmer_count_;
-    double lambda_, model_mean_, model_stdv_;
     bool complement_;
 
     std::vector< std::vector<u16> > neighbors_;
