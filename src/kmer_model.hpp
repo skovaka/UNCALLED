@@ -29,6 +29,7 @@
 #include "util.hpp"
 #include "event_detector.hpp"
 
+//TODO: move to normalizer
 typedef struct NormParams {
     double shift, scale;
 } NormParams;

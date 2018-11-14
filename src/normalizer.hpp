@@ -14,11 +14,13 @@ class Normalizer {
 
     bool add_sample(float s);
     float pop_event();
+    NormParams get_params() const;
+    void reset();
 
-    private:
+    //private:
     const KmerModel &model_;
     EventDetector detector_;
-    std::vector<float> sum_, sumsq_;
+    std::vector<double> sum_, sumsq_;
     u32 n_, rd_, wr_;
 };
 

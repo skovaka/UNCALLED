@@ -12,8 +12,8 @@ Normalizer::Normalizer(const KmerModel &model,
       rd_(0),
       wr_(0) {
 
-    std::cout << model.model_mean_ << "m " << model.model_stdv_ << "s\n";
 }
+
 
 bool Normalizer::add_sample(float s) {
     Event e = detector_.add_sample(s);
@@ -24,7 +24,6 @@ bool Normalizer::add_sample(float s) {
     if (wr_ > 0) {
         sum_[wr_] = sum_[wr_-1] + e.mean;
         sumsq_[wr_] = sumsq_[wr_-1] + e.mean*e.mean;
-        std::cout << e.mean << " e ";
     } else {
         sum_[wr_] = sum_.back() + e.mean;
         sumsq_[wr_] = sumsq_.back() + e.mean*e.mean;
@@ -35,10 +34,15 @@ bool Normalizer::add_sample(float s) {
     return true;
 }
 
-float Normalizer::pop_event() {
+void Normalizer::reset() {
+    n_ = 0;
+    rd_ = 0;
+    wr_ = 0;
+    sum_[0] = sumsq_[0] = 0;
+    detector_.reset();
+}
 
-    //TODO: return negative if past write
-
+NormParams Normalizer::get_params() const {
     float mean, var;
     if (n_ < sum_.size()) {
         mean = sum_[wr_] / n_;
@@ -49,13 +53,19 @@ float Normalizer::pop_event() {
         var = (sumsq_[wr_] - sumsq_[st] - mean*mean*(sum_.size()-1)) / (sum_.size()-1);
     }
 
-    float scale = model_.model_stdv_ / sqrt(var),
-          shift = model_.model_mean_ - scale*mean;
+    NormParams p = {0, model_.model_stdv_ / sqrt(var)};
+    p.shift = model_.model_mean_ - p.scale*mean;
+    return p;
+}
 
-    u32 e = (rd_+1) % sum_.size();
+float Normalizer::pop_event() {
 
-    float ret = (float) (scale * (sum_[e] - sum_[rd_]) + shift);
-    rd_ = e;
+    //TODO: return negative if past write
+    u32 nrd = (rd_+1) % sum_.size();
+    
+    NormParams np = get_params();
+    float ret = (float) (np.scale * (sum_[nrd] - sum_[rd_]) + np.shift);
+    rd_ = nrd;
 
     return ret;
 }
