@@ -6,8 +6,9 @@ Normalizer::Normalizer(const KmerModel &model,
                        u32 buffer_size) 
     : model_(model),
       detector_(event_params),
-      sum_(buffer_size),
-      sumsq_(buffer_size),
+      events_(buffer_size),
+      mean_(0),
+      varsum_(0),
       n_(0),
       rd_(0),
       wr_(0) {
@@ -18,18 +19,27 @@ Normalizer::Normalizer(const KmerModel &model,
 bool Normalizer::add_sample(float s) {
     Event e = detector_.add_sample(s);
     if (e.length == 0) return false;
-    
-    wr_ = (wr_ + 1) % sum_.size();
 
-    if (wr_ > 0) {
-        sum_[wr_] = sum_[wr_-1] + e.mean;
-        sumsq_[wr_] = sumsq_[wr_-1] + e.mean*e.mean;
+    double oldevt = events_[wr_];
+    events_[wr_] = e.mean;
+    n_ += 1;
+
+    //Based on https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_Online_algorithm
+    if (n_ <= events_.size()) {
+        double dt1 = e.mean - mean_;
+        mean_ += dt1 / n_;
+        double dt2 = e.mean - mean_;
+        varsum_ += dt1*dt2;
+
+    //Based on https://stackoverflow.com/questions/5147378/rolling-variance-algorithm
     } else {
-        sum_[wr_] = sum_.back() + e.mean;
-        sumsq_[wr_] = sumsq_.back() + e.mean*e.mean;
+        double oldmean = mean_;
+        mean_ += (e.mean - oldevt) / events_.size();
+        //varsum_ += (e.mean - oldmean) * (e.mean - mean_) - (oldevt - oldmean) * (oldevt - mean_);
+        varsum_ += (e.mean + oldevt - oldmean - mean_) * (e.mean - oldevt);
     }
 
-    n_ += 1;
+    wr_ = (wr_ + 1) % events_.size();
 
     return true;
 }
@@ -38,34 +48,32 @@ void Normalizer::reset() {
     n_ = 0;
     rd_ = 0;
     wr_ = 0;
-    sum_[0] = sumsq_[0] = 0;
+    mean_ = varsum_ = 0;
+    events_[0] = 0;
     detector_.reset();
 }
 
 NormParams Normalizer::get_params() const {
-    float mean, var;
-    if (n_ < sum_.size()) {
-        mean = sum_[wr_] / n_;
-        var = (sumsq_[wr_] - (mean*mean*n_)) / n_;
+    NormParams p;
+    if (n_ <= events_.size()) {
+        p.scale = model_.model_stdv_ / sqrt(varsum_ / n_);
     } else {
-        u32 st = (wr_ + 1) % sum_.size();
-        mean = (sum_[wr_] - sum_[st]) / (sum_.size() - 1);
-        var = (sumsq_[wr_] - sumsq_[st] - mean*mean*(sum_.size()-1)) / (sum_.size()-1);
+        p.scale = model_.model_stdv_ / sqrt(varsum_ / events_.size());
     }
 
-    NormParams p = {0, model_.model_stdv_ / sqrt(var)};
-    p.shift = model_.model_mean_ - p.scale*mean;
+    p.shift = model_.model_mean_ - p.scale * mean_;
+
     return p;
 }
 
 float Normalizer::pop_event() {
 
     //TODO: return negative if past write
-    u32 nrd = (rd_+1) % sum_.size();
     
     NormParams np = get_params();
-    float ret = (float) (np.scale * (sum_[nrd] - sum_[rd_]) + np.shift);
-    rd_ = nrd;
+    float ret = (float) (np.scale * events_[rd_] + np.shift);
+
+    rd_ = (rd_+1) % events_.size();
 
     return ret;
 }

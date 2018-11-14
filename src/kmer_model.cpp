@@ -229,7 +229,7 @@ NormParams KmerModel::get_norm_params(const std::vector<Event> &events) const {
     for (auto e : events) 
         events_stdv += pow(e.mean - events_mean, 2);
     events_stdv = sqrt(events_stdv / events.size());
-    
+
     /* get scaling parameters */
     NormParams params;
     params.scale = model_stdv_ / events_stdv;
