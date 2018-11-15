@@ -33,6 +33,7 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
                            u32 max_consec_stay,
                            u32 max_paths, 
                            u32 max_events_proc,
+                           u32 evt_buffer_len,
                            u32 evt_winlen1,
                            u32 evt_winlen2,
                            float evt_thresh1,
@@ -60,6 +61,7 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
           max_consec_stay_(max_consec_stay),
           min_aln_len_(min_aln_len),
           max_events_proc_(max_events_proc),
+          evt_buffer_len_(evt_buffer_len),
           max_stay_frac_(max_stay_frac),
           min_seed_prob_(min_seed_prob),
           min_mean_conf_(min_mean_conf),
@@ -204,6 +206,7 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     sa_checked_ = false;
 
     path_type_counts_[EventType::MATCH] = 1;
+    //TODO: no loops!
     for (u8 t = 1; t < EventType::NUM_TYPES; t++) {
         path_type_counts_[t] = 0;
     }
@@ -219,6 +222,8 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
                                      u16 kmer, 
                                      float prob, 
                                      EventType type) {
+
+    //TODO: only add if length_ <= MAX_PATH_LEN
     length_ = p.length_ + 1;
 
     consec_stays_ = p.consec_stays_;
@@ -228,6 +233,7 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
 
     std::memcpy(path_type_counts_, p.path_type_counts_, EventType::NUM_TYPES * sizeof(u8));
 
+    //TODO: get rid of the if statements!
     if (length_ > MAX_PATH_LEN) {
         std::memcpy(prob_sums_, &(p.prob_sums_[1]), MAX_PATH_LEN * sizeof(float));
         prob_sums_[MAX_PATH_LEN] = prob_sums_[MAX_PATH_LEN-1] + prob;
@@ -243,6 +249,7 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
 
     path_type_counts_[type]++;
 
+    //TODO: add/multiply by bool instead of if
     if (type == EventType::STAY) {
         consec_stays_++;
     } else {
@@ -294,7 +301,7 @@ Mapper::Mapper(const MapperParams &ap)
     : params_(ap),
       model_(ap.model_),
       fmi_(ap.fmi_),
-      event_detector_(EventDetector(ap.event_params_)),
+      norm_(ap.model_, ap.event_params_, ap.evt_buffer_len_),
       seed_tracker_(ap.fmi_.size(),
                     ap.min_mean_conf_,
                     ap.min_top_conf_,
@@ -319,7 +326,6 @@ Mapper::Mapper(const MapperParams &ap)
     prev_size_ = 0;
     event_i_ = 0;
     seed_tracker_.reset();
-    event_detector_.reset();
     #ifdef debug_time
     loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
     #endif
@@ -340,7 +346,6 @@ void Mapper::new_read(const std::string &name) {
     prev_size_ = 0;
     event_i_ = 0;
     seed_tracker_.reset();
-    event_detector_.reset();
     #ifdef debug_time
     loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
     #endif
@@ -376,21 +381,24 @@ std::string Mapper::map_fast5(const std::string &fast5_name) {
 }
 
 ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
-    std::vector<Event> events = event_detector_.get_all_events(samples);
-    NormParams norm = model_.get_norm_params(events);
-    model_.normalize(events, norm);
-
-    read_loc_.set_read_len(params_, events.size());
-
-    for (u32 e = 0; e < events.size(); e++) {
-        if (e >= params_.max_events_proc_ || add_event(events[e])) break;
+    //std::vector<Event> events = event_detector_.get_all_events(samples);
+    //NormParams norm = model_.get_norm_params(events);
+    //model_.normalize(events, norm);
+    
+    read_loc_.set_read_len(params_, samples.size() / 5); //TODO: this better
+    
+    u32 i = 0;
+    for (auto s : samples) {
+        if (!norm_.add_sample(s)) continue;
+        if (i >= params_.max_events_proc_ || add_event(norm_.pop_event())) break;
+        else i++;
     }
 
     return read_loc_;
 }
 
 
-bool Mapper::add_event(const Event &event
+bool Mapper::add_event(float event
                        #ifdef DEBUG_TIME
                        ,std::ostream &time_out
                        #endif
@@ -434,10 +442,10 @@ bool Mapper::add_event(const Event &event
             kmer_probs_[prev_kmer] >= evpr_thresh) {
 
             next_path->make_child(prev_path, 
-                           prev_range,
-                           prev_kmer, 
-                           kmer_probs_[prev_kmer], 
-                           EventType::STAY);
+                                  prev_range,
+                                  prev_kmer, 
+                                  kmer_probs_[prev_kmer], 
+                                  EventType::STAY);
 
             child_found = true;
 

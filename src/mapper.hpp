@@ -28,7 +28,7 @@
 #include <vector>
 #include "bwa_fmi.hpp"
 #include "kmer_model.hpp"
-#include "event_detector.hpp"
+#include "normalizer.hpp"
 #include "seed_tracker.hpp"
 #include "timer.hpp"
 
@@ -47,6 +47,7 @@ class MapperParams {
                  u32 max_consec_stay,
                  u32 max_paths, 
                  u32 max_events_proc,
+                 u32 evt_buffer_len,
                  u32 evt_winlen1,
                  u32 evt_winlen2,
                  float evt_thresh1,
@@ -66,13 +67,14 @@ class MapperParams {
     KmerModel model_;
     EventParams event_params_;
 
-    u32 seed_len_, 
+    u32 seed_len_,
         min_rep_len_,
         max_rep_copy_,
         max_paths_,
         max_consec_stay_,
         min_aln_len_,
-        max_events_proc_;
+        max_events_proc_,
+        evt_buffer_len_;
 
     float max_stay_frac_,
           min_seed_prob_,
@@ -172,7 +174,7 @@ class Mapper {
 
     private:
 
-    bool add_event(const Event &event
+    bool add_event(float event
                       #ifdef DEBUG_TIME
                       ,std::ostream &time_out
                       #endif
@@ -188,7 +190,8 @@ class Mapper {
     const MapperParams &params_;
     const KmerModel &model_;
     const BwaFMI &fmi_;
-    EventDetector event_detector_;
+    //EventDetector event_detector_;
+    Normalizer norm_;
     SeedTracker seed_tracker_;
 
     ReadLoc read_loc_;

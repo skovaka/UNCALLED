@@ -15,7 +15,6 @@ class Normalizer {
     bool add_sample(float s);
     float pop_event();
     NormParams get_params() const;
-    NormParams get_params_wlf() const;
     void reset();
 
     //private:

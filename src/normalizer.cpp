@@ -35,7 +35,6 @@ bool Normalizer::add_sample(float s) {
     } else {
         double oldmean = mean_;
         mean_ += (e.mean - oldevt) / events_.size();
-        //varsum_ += (e.mean - oldmean) * (e.mean - mean_) - (oldevt - oldmean) * (oldevt - mean_);
         varsum_ += (e.mean + oldevt - oldmean - mean_) * (e.mean - oldevt);
     }
 

@@ -15,7 +15,7 @@ PYBIND11_MODULE(align, m) {
         .def(py::init<const std::string &,
                       const std::string &,
                       const std::string &,
-                      u32, u32, u32, u32, u32, u32,  u32, u32, u32,
+                      u32, u32, u32, u32, u32, u32,  u32, u32, u32, u32,
                       float, float, float, float, float, 
                       float, float, float, float>());
 

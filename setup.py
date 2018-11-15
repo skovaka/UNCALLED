@@ -15,9 +15,11 @@ class make_bwa(build_ext):
 
 uncalled = Extension(
     "uncalled.align",
-     sources = ["src/fast5_pool.cpp",
-                "src/uncalled.cpp", 
+     sources = [
                 "src/mapper.cpp", 
+                "src/fast5_pool.cpp",
+                "src/normalizer.cpp",
+                "src/uncalled.cpp", 
                 "src/seed_tracker.cpp", 
                 "src/kmer_model.cpp", 
                 "src/bwa_fmi.cpp", 
