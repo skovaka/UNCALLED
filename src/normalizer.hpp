@@ -15,7 +15,7 @@ class Normalizer {
     bool add_sample(float s);
     float pop_event();
     NormParams get_params() const;
-    void reset();
+    void reset(u32 buffer_size);
 
     //private:
     const KmerModel &model_;

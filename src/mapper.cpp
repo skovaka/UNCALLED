@@ -385,14 +385,29 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
     //NormParams norm = model_.get_norm_params(events);
     //model_.normalize(events, norm);
     
-    read_loc_.set_read_len(params_, samples.size() / 5); //TODO: this better
-    
-    u32 i = 0;
-    for (auto s : samples) {
-        if (!norm_.add_sample(s)) continue;
-        if (i >= params_.max_events_proc_ || add_event(norm_.pop_event())) break;
-        else i++;
+
+    if (params_.evt_buffer_len_ == 0) {
+        EventDetector ed(params_.event_params_);
+        std::vector<Event> events = ed.get_all_events(samples);
+        model_.normalize(events);
+
+        read_loc_.set_read_len(params_, events.size());
+
+        for (u32 e = 0; e < events.size(); e++) {
+            if (e >= params_.max_events_proc_ || add_event(events[e].mean)) break;
+        }
+    } else {
+
+        read_loc_.set_read_len(params_, samples.size() / 5); //TODO: this better
+        
+        u32 i = 0;
+        for (auto s : samples) {
+            if (!norm_.add_sample(s)) continue;
+            if (i >= params_.max_events_proc_ || add_event(norm_.pop_event())) break;
+            else i++;
+        }
     }
+
 
     return read_loc_;
 }

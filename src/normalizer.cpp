@@ -43,13 +43,18 @@ bool Normalizer::add_sample(float s) {
     return true;
 }
 
-void Normalizer::reset() {
+void Normalizer::reset(u32 buffer_size = 0) {
     n_ = 0;
     rd_ = 0;
     wr_ = 0;
     mean_ = varsum_ = 0;
-    events_[0] = 0;
     detector_.reset();
+
+    if (buffer_size != 0 && buffer_size != events_.size()) {
+        events_.resize(buffer_size);
+    }
+
+    events_[0] = 0;
 }
 
 NormParams Normalizer::get_params() const {

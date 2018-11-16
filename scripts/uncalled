@@ -48,6 +48,7 @@ def get_parser():
     map_parser.add_argument("-c", "--max-rep-copy", default=100, type=int, help="Maximum number of locations for a multi-mapping seed")
     map_parser.add_argument("-y", "--max-consec-stay", default=8, type=int, help="Maximum consecutive stay events.")
     map_parser.add_argument("-p", "--max-paths", default=10000, type=int, help="Maximum number of paths to consider per event.")
+    map_parser.add_argument("-n", "--event-buffer-len", default=0, type=int, help="Size of buffer used to normalize and read events")
     map_parser.add_argument("-F", "--max-stay-frac", default=0.5, type=float, help="Expected fraction of events which are stays")
     map_parser.add_argument("-S", "--min-seed-prob", default=-3.75, type=float, help="Average event probability threshold per seed")
     map_parser.add_argument("-M", "--min-mean-conf", default=7.00, type=float, help="Minimum ratio between longest alignment and mean alignment length to report confident alignment")
@@ -83,6 +84,7 @@ def map_cmd(args):
                                 args.max_consec_stay,
                                 args.max_paths,
                                 args.max_events_proc,
+                                args.event_buffer_len,
                                 args.evt_window_length1,
                                 args.evt_window_length2,
                                 args.evt_threshold1,
@@ -117,6 +119,7 @@ def map_cmd(args):
         try:
             for fast5 in fast5s:
                 print(mapper.map_fast5(fast5))
+                sys.stdout.flush()
 
         except KeyboardInterrupt:
             pass
