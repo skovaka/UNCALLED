@@ -301,7 +301,8 @@ Mapper::Mapper(const MapperParams &ap)
     : params_(ap),
       model_(ap.model_),
       fmi_(ap.fmi_),
-      norm_(ap.model_, ap.event_params_, ap.evt_buffer_len_),
+      event_detector_(ap.event_params_),
+      norm_(ap.model_, ap.evt_buffer_len_),
       seed_tracker_(ap.fmi_.size(),
                     ap.min_mean_conf_,
                     ap.min_top_conf_,
@@ -346,6 +347,7 @@ void Mapper::new_read(const std::string &name) {
     prev_size_ = 0;
     event_i_ = 0;
     seed_tracker_.reset();
+    event_detector_.reset();
     #ifdef debug_time
     loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
     #endif
@@ -384,11 +386,9 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
     //std::vector<Event> events = event_detector_.get_all_events(samples);
     //NormParams norm = model_.get_norm_params(events);
     //model_.normalize(events, norm);
-    
 
     if (params_.evt_buffer_len_ == 0) {
-        EventDetector ed(params_.event_params_);
-        std::vector<Event> events = ed.get_all_events(samples);
+        std::vector<Event> events = event_detector_.get_all_events(samples);
         model_.normalize(events);
 
         read_loc_.set_read_len(params_, events.size());
@@ -401,9 +401,14 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
         read_loc_.set_read_len(params_, samples.size() / 5); //TODO: this better
         
         u32 i = 0;
+        Event e;
+        float m;
         for (auto s : samples) {
-            if (!norm_.add_sample(s)) continue;
-            if (i >= params_.max_events_proc_ || add_event(norm_.pop_event())) break;
+            e = event_detector_.add_sample(s);
+            if (e.length == 0) continue;
+            norm_.add_event(e.mean);
+            m = norm_.pop_event();
+            if (i >= params_.max_events_proc_ || add_event(m)) break;
             else i++;
         }
     }

@@ -190,7 +190,7 @@ class Mapper {
     const MapperParams &params_;
     const KmerModel &model_;
     const BwaFMI &fmi_;
-    //EventDetector event_detector_;
+    EventDetector event_detector_;
     Normalizer norm_;
     SeedTracker seed_tracker_;
 
