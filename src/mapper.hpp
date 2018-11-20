@@ -32,10 +32,21 @@
 #include "seed_tracker.hpp"
 #include "timer.hpp"
 
-#define PAF_TIME_TAG "XT:f:"
+#define PAF_TIME_TAG "YT:f:"
 
 //#define DEBUG_TIME
 //#define DEBUG_SEEDS
+
+#ifdef DEBUG_TIME
+#define PAF_SIGPROC_TAG "YA:f:"
+#define PAF_LOOP1_TAG   "YB:f:"
+#define PAF_FMRS_TAG    "YC:f:"
+#define PAF_FMSA_TAG    "YD:f:"
+#define PAF_SORT_TAG    "YE:f:"
+#define PAF_LOOP2_TAG   "YF:f:"
+#define PAF_SOURCE_TAG  "YG:f:"
+#define PAF_TRACKER_TAG "YH:f:"
+#endif
 
 class MapperParams {
     public:
@@ -95,10 +106,17 @@ class ReadLoc {
 
     bool set_ref_loc(const MapperParams &params, const SeedGroup &seeds);
     void set_read_len(const MapperParams &params, u32 len);
+
     void set_time(float time);
+
     std::string str() const;
     bool is_valid() const; 
     friend std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
+
+    #ifdef DEBUG_TIME
+    double sigproc_time_, loop1_time_, fmrs_time_, fmsa_time_, 
+           sort_time_, loop2_time_, source_time_, tracker_time_;
+    #endif
 
     private:
     std::string rd_name_, rf_name_;
@@ -107,6 +125,7 @@ class ReadLoc {
     u16 match_count_;
     float time_;
     bool fwd_;
+
 };
 
 std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
@@ -178,18 +197,9 @@ class Mapper {
 
     private:
 
-    bool add_event(float event
-                      #ifdef DEBUG_TIME
-                      ,std::ostream &time_out
-                      #endif
-                      #ifdef DEBUG_SEEDS
-                      ,std::ostream &seeds_out
-                      #endif
-                      );
+    bool add_event(float event);
 
-    void update_seeds(PathBuffer &p, 
-                      std::vector<SeedGroup> &seeds, 
-                      bool has_children);
+    void update_seeds(PathBuffer &p, bool has_children);
 
     const MapperParams &params_;
     const KmerModel &model_;
@@ -206,11 +216,6 @@ class Mapper {
         event_i_;
     Timer timer_;
 
-    #ifdef DEBUG_TIME
-    std::ostream &time_out_;
-    double loop1_time_, fmrs_time_, fmsa_time_, 
-           sort_time_, loop2_time_, fullsource_time_;
-    #endif
     #ifdef DEBUG_SEEDS
     std::ostream &seeds_out_;
     #endif

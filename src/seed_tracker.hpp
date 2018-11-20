@@ -68,13 +68,15 @@ class SeedTracker {
     const u64 ref_len_;
     const float mean_thresh_, top_thresh_;
     const u8 min_aln_len_;
+    SeedGroup max_map_;
 
-    float max_len_, len_sum_;
+    float len_sum_;
 
     SeedTracker(u64 ref_len, float mean_thresh, float top_thresh, u8 min_aln_len, u8 win_len);
 
-    SeedGroup add_seed(SeedGroup sg);
-    SeedGroup add_seeds(const std::vector<SeedGroup> &seeds);
+    //SeedGroup add_seed(SeedGroup sg);
+    void add_seed(u64 ref_en, u32 ref_len, u32 evt_st);
+    SeedGroup get_final();
 
     void reset();
 

@@ -114,35 +114,27 @@ SeedTracker::SeedTracker(u64 ref_len, float mean_thresh, float top_thresh, u8 mi
 void SeedTracker::reset() {
     alignments_.clear();
     all_lens_.clear();
-    max_len_ = 0;
+    max_map_ = NULL_ALN;
     len_sum_ = 0;
 }
 
-SeedGroup SeedTracker::add_seeds(const std::vector<SeedGroup> &seeds) {
-    SeedGroup top;
+SeedGroup SeedTracker::get_final() {
+    if (max_map_.total_len_ < min_aln_len_) return NULL_ALN;
 
-    for (size_t i = 0; i < seeds.size(); i++) {
-        SeedGroup a = add_seed(seeds[i]);
+    float mean_len = len_sum_ / alignments_.size();
+    float next_len = *std::next(all_lens_.rbegin());
 
-        if (a.total_len_ >= min_aln_len_ && a.total_len_ > max_len_) {
-
-
-            max_len_ = a.total_len_;
-            float mean_len = len_sum_ / alignments_.size();
-            float next_len = *std::next(all_lens_.rbegin());
-
-            if ((mean_thresh_ > 0 && max_len_ / mean_len >= mean_thresh_) ||
-                (top_thresh_ > 0  && max_len_ / next_len >= top_thresh_)) {
-                return a;
-            }
-        }
+    if ((mean_thresh_ > 0 && max_map_.total_len_ / mean_len >= mean_thresh_) ||
+        (top_thresh_ > 0  && max_map_.total_len_ / next_len >= top_thresh_)) {
+        return max_map_;
     }
-
+    
     return NULL_ALN;
 }
 
-//TODO: rename new_aln, make const ref
-SeedGroup SeedTracker::add_seed(SeedGroup new_aln) {
+void SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
+
+    SeedGroup new_aln(Range(ref_en-ref_len+1, ref_en), evt_st);
 
     //Locations sorted by decreasing ref_en_.start
     //Find the largest aln s.t. aln->ref_en_.start <= new_aln.ref_en_.start
@@ -186,6 +178,10 @@ SeedGroup SeedTracker::add_seed(SeedGroup new_aln) {
             auto l = all_lens_.find(prev_len);
             all_lens_.insert(l, a.total_len_);
             all_lens_.erase(l);
+
+            if (a.total_len_ >= min_aln_len_ && a.total_len_ > max_map_.total_len_) {
+                max_map_ = a;
+            }
         }
 
         auto hint = std::next(aln_match);
@@ -195,19 +191,20 @@ SeedGroup SeedTracker::add_seed(SeedGroup new_aln) {
         #ifdef DEBUG
         new_aln.print(std::cout, true, false);
         #endif
-
-        return a;
     }
 
     alignments_.insert(new_aln);
     all_lens_.insert(new_aln.total_len_);
     len_sum_ += new_aln.total_len_;
 
+    if (new_aln.total_len_ >= min_aln_len_ && new_aln.total_len_ > max_map_.total_len_) {
+        max_map_ = new_aln;
+    }
+
     #ifdef DEBUG
     new_aln.print(std::cout, true, false);
     #endif
 
-    return new_aln;
 }
 
 void SeedTracker::print(std::ostream &out, u16 max_out = 10) {

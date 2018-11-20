@@ -45,7 +45,7 @@ def get_parser():
     map_parser.add_argument("-a", "--min-aln-len", default=25, type=int, help="Minimum number of basepairs a mapping must cover.")
     map_parser.add_argument("-s", "--seed-len", default=22, type=int, help="Seed length in events.")
     map_parser.add_argument("-r", "--min-rep-len", default=0, type=int, help="Minimum number of basepairs a multi-mapping seed must cover")
-    map_parser.add_argument("-c", "--max-rep-copy", default=100, type=int, help="Maximum number of locations for a multi-mapping seed")
+    map_parser.add_argument("-c", "--max-rep-copy", default=50, type=int, help="Maximum number of locations for a multi-mapping seed")
     map_parser.add_argument("-y", "--max-consec-stay", default=8, type=int, help="Maximum consecutive stay events.")
     map_parser.add_argument("-p", "--max-paths", default=10000, type=int, help="Maximum number of paths to consider per event.")
     map_parser.add_argument("-n", "--event-buffer-len", default=0, type=int, help="Size of buffer used to normalize and read events")
