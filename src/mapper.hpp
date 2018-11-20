@@ -32,6 +32,8 @@
 #include "seed_tracker.hpp"
 #include "timer.hpp"
 
+#define PAF_TIME_TAG "XT:f:"
+
 //#define DEBUG_TIME
 //#define DEBUG_SEEDS
 
@@ -93,6 +95,7 @@ class ReadLoc {
 
     bool set_ref_loc(const MapperParams &params, const SeedGroup &seeds);
     void set_read_len(const MapperParams &params, u32 len);
+    void set_time(float time);
     std::string str() const;
     bool is_valid() const; 
     friend std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
@@ -102,6 +105,7 @@ class ReadLoc {
     u64 rd_st_, rd_en_, rd_len_,
         rf_st_, rf_en_, rf_len_;
     u16 match_count_;
+    float time_;
     bool fwd_;
 };
 
@@ -200,6 +204,7 @@ class Mapper {
     std::vector<bool> sources_added_;
     u32 prev_size_,
         event_i_;
+    Timer timer_;
 
     #ifdef DEBUG_TIME
     std::ostream &time_out_;

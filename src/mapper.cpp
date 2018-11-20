@@ -108,7 +108,8 @@ ReadLoc::ReadLoc(const std::string &rd_name)
       rd_st_(0),
       rd_en_(0),
       rd_len_(0),
-      match_count_(0) {
+      match_count_(0),
+      time_(-1) {
     
 }
 
@@ -133,6 +134,10 @@ bool ReadLoc::set_ref_loc(const MapperParams &params, const SeedGroup &seeds) {
     rf_en_ = rf_st_ + (seeds.ref_en_.end_ - seeds.ref_st_) + k_shift;
 
     return rf_len_ > 0;
+}
+
+void ReadLoc::set_time(float time) {
+    time_ = time;
 }
 
 void ReadLoc::set_read_len(const MapperParams &params, u32 len) {
@@ -169,6 +174,11 @@ std::string ReadLoc::str() const {
            << "*" << "\t"
            << "255";
     }
+
+    if (time_ > 0) {
+        ss << "\t" << PAF_TIME_TAG << time_;
+    }
+
     return ss.str();
 }
 
@@ -195,7 +205,6 @@ void Mapper::PathBuffer::free_buffers() {
     delete[] prob_sums_;
 }
 
-
 void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     length_ = 1;
     consec_stays_ = 0;
@@ -206,6 +215,7 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     sa_checked_ = false;
 
     path_type_counts_[EventType::MATCH] = 1;
+
     //TODO: no loops!
     for (u8 t = 1; t < EventType::NUM_TYPES; t++) {
         path_type_counts_[t] = 0;
@@ -348,6 +358,7 @@ void Mapper::new_read(const std::string &name) {
     event_i_ = 0;
     seed_tracker_.reset();
     event_detector_.reset();
+    timer_.reset();
     #ifdef debug_time
     loop1_time_ = fmrs_time_ = fmsa_time_ = sort_time_ = loop2_time_ = fullsource_time_ = 0;
     #endif
@@ -383,9 +394,7 @@ std::string Mapper::map_fast5(const std::string &fast5_name) {
 }
 
 ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
-    //std::vector<Event> events = event_detector_.get_all_events(samples);
-    //NormParams norm = model_.get_norm_params(events);
-    //model_.normalize(events, norm);
+
 
     if (params_.evt_buffer_len_ == 0) {
         std::vector<Event> events = event_detector_.get_all_events(samples);
@@ -413,6 +422,8 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
         }
     }
 
+    read_loc_.set_time(timer_.get());
+
 
     return read_loc_;
 }
@@ -426,7 +437,6 @@ bool Mapper::add_event(float event
                        ,std::ostream &seeds_out
                        #endif
                        ) {
-
 
     Range prev_range;
     u16 prev_kmer;

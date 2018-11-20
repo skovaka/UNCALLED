@@ -66,7 +66,7 @@ def get_parser():
     index_parser.add_argument("-i", "--ref-fasta", required=True, type=str, help="FASTA file used to build BWA index")
     index_parser.add_argument("-s", "--sample-dist", default=1000, type=int, help="Sampling distance between reference self-alignments. Reduce number for larger genomes.")
     index_parser.add_argument("-k", "--kmer-len", default=5, type=int, help="Model k-mer length")
-    index_parser.add_argument("-1", "--matchpr1", default=0.6677, type=float, help="Minimum event match probability")
+    index_parser.add_argument("-1", "--matchpr1", default=0.6225, type=float, help="Minimum event match probability")
     index_parser.add_argument("-2", "--matchpr2", default=0.9837, type=float, help="Maximum event match probability")
     index_parser.add_argument("-p", "--match-prod", default=0.05, type=float, help="Target frequency of seeds.")
     index_parser.add_argument("-f", "--fm-percentile", default=95, type=int, help=" ")
