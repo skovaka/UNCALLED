@@ -7,3 +7,6 @@
 [submodule "bwa"]
 	path = bwa
 	url = https://github.com/lh3/bwa
+[submodule "pdqsort"]
+	path = pdqsort
+	url = https://github.com/orlp/pdqsort

@@ -17,10 +17,10 @@ uncalled = Extension(
     "uncalled.align",
      sources = [
                 "src/mapper.cpp", 
+                "src/seed_tracker.cpp", 
                 "src/fast5_pool.cpp",
                 "src/normalizer.cpp",
                 "src/uncalled.cpp", 
-                "src/seed_tracker.cpp", 
                 "src/kmer_model.cpp", 
                 "src/bwa_fmi.cpp", 
                 "src/event_detector.cpp", 
@@ -28,10 +28,11 @@ uncalled = Extension(
                 "src/self_align_ref.cpp"],
      include_dirs = ["./",
                      "./pybind11/include", 
-                     "./fast5/include"],
+                     "./fast5/include",
+                     "./pdqsort"],
      library_dirs = ["./bwa"],
      libraries = ["hdf5", "bwa", "z", "dl"],
-     extra_compile_args = ["-std=c++11"]
+     extra_compile_args = ["-std=c++11", "-g0"]
 )
 
 setup(name = "uncalled",

@@ -21,6 +21,7 @@
  * SOFTWARE.
  */
 
+#include "pdqsort.h"
 #include "mapper.hpp"
 
 MapperParams::MapperParams(const std::string &bwa_prefix,
@@ -565,7 +566,8 @@ bool Mapper::add_event(float event) {
 
         u32 next_size = next_path - next_paths_.begin();
 
-        std::sort(next_paths_.begin(), next_path);
+        pdqsort(next_paths_.begin(), next_path);
+        //std::sort(next_paths_.begin(), next_path);
 
         #ifdef DEBUG_TIME
         read_loc_.sort_time_ += timer_.lap();
