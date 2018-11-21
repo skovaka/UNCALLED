@@ -113,7 +113,8 @@ ReadLoc::ReadLoc(const std::string &rd_name)
       time_(-1) {
     
     #ifdef DEBUG_TIME
-    sigproc_time_ = loop1_time_ = fmrs_time_ = fmsa_time_ = 
+    sigproc_time_ = prob_time_ = thresh_time_ = stay_time_ = 
+    neighbor_time_ = fmrs_time_ = fmsa_time_ = 
     sort_time_ = loop2_time_ = source_time_ = tracker_time_ = 0;
     #endif
 }
@@ -122,7 +123,8 @@ ReadLoc::ReadLoc() {
     match_count_ = 0;
 
     #ifdef DEBUG_TIME
-    sigproc_time_ = loop1_time_ = fmrs_time_ = fmsa_time_ = 
+    sigproc_time_ = prob_time_ = thresh_time_ = stay_time_ = 
+    neighbor_time_ = fmrs_time_ = fmsa_time_ = 
     sort_time_ = loop2_time_ = source_time_ = tracker_time_ = 0;
     #endif
 }
@@ -191,7 +193,10 @@ std::string ReadLoc::str() const {
     }
     #else
         ss << "\t" PAF_SIGPROC_TAG << sigproc_time_  
-           << "\t" PAF_LOOP1_TAG   << loop1_time_
+           << "\t" PAF_PROB_TAG    << prob_time_
+           << "\t" PAF_THRESH_TAG    << thresh_time_
+           << "\t" PAF_STAY_TAG    << stay_time_
+           << "\t" PAF_NEIGHBOR_TAG    << neighbor_time_
            << "\t" PAF_FMRS_TAG    << fmrs_time_
            << "\t" PAF_FMSA_TAG    << fmsa_time_
            << "\t" PAF_SORT_TAG    << sort_time_
@@ -254,38 +259,28 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
                                      float prob, 
                                      EventType type) {
 
-    //TODO: only add if length_ <= MAX_PATH_LEN
-    length_ = p.length_ + 1;
-
-    consec_stays_ = p.consec_stays_;
+    length_ = p.length_ + (p.length_ <= MAX_PATH_LEN);
     fm_range_ = range;
     kmer_ = kmer;
     sa_checked_ = p.sa_checked_;
+    event_types_ = TYPE_ADDS[type] | (p.event_types_ >> TYPE_BITS);
+    consec_stays_ = (p.consec_stays_ + (type == EventType::STAY)) * (type == EventType::STAY);
 
     std::memcpy(path_type_counts_, p.path_type_counts_, EventType::NUM_TYPES * sizeof(u8));
+    path_type_counts_[type]++;
 
-    //TODO: get rid of the if statements!
     if (length_ > MAX_PATH_LEN) {
         std::memcpy(prob_sums_, &(p.prob_sums_[1]), MAX_PATH_LEN * sizeof(float));
         prob_sums_[MAX_PATH_LEN] = prob_sums_[MAX_PATH_LEN-1] + prob;
         seed_prob_ = (prob_sums_[MAX_PATH_LEN] - prob_sums_[0]) / MAX_PATH_LEN;
         path_type_counts_[p.type_tail()]--;
     } else {
-        std::memcpy(prob_sums_, p.prob_sums_, (length_ + 1) * sizeof(float));
+        std::memcpy(prob_sums_, p.prob_sums_, length_ * sizeof(float));
         prob_sums_[length_] = prob_sums_[length_-1] + prob;
-        seed_prob_ = (prob_sums_[length_] - prob_sums_[0]) / length_;
+        seed_prob_ = prob_sums_[length_] / length_;
     }
 
-    event_types_ = TYPE_ADDS[type] | (p.event_types_ >> TYPE_BITS);
 
-    path_type_counts_[type]++;
-
-    //TODO: add/multiply by bool instead of if
-    if (type == EventType::STAY) {
-        consec_stays_++;
-    } else {
-        consec_stays_ = 0;
-    }
 }
 
 void Mapper::PathBuffer::invalidate() {
@@ -476,6 +471,9 @@ bool Mapper::add_event(float event) {
     for (u16 kmer = 0; kmer < model_.kmer_count(); kmer++) {
         kmer_probs_[kmer] = model_.event_match_prob(event, kmer);
     }
+    #ifdef DEBUG_TIME
+    read_loc_.prob_time_ += timer_.lap();
+    #endif
 
     //Find neighbors of previous nodes
     for (u32 pi = 0; pi < prev_size_; pi++) {
@@ -490,6 +488,9 @@ bool Mapper::add_event(float event) {
         prev_kmer = prev_path.kmer_;
 
         evpr_thresh = params_.get_prob_thresh(prev_range.length());
+        #ifdef DEBUG_TIME
+        read_loc_.thresh_time_ += timer_.lap();
+        #endif
 
         if (prev_path.consec_stays_ < params_.max_consec_stay_ && 
             kmer_probs_[prev_kmer] >= evpr_thresh) {
@@ -507,6 +508,10 @@ bool Mapper::add_event(float event) {
             }
         }
 
+        #ifdef DEBUG_TIME
+        read_loc_.stay_time_ += timer_.lap();
+        #endif
+
         //Add all the neighbors
         for (u8 i = 0; i < ALPH_SIZE; i++) {
             u16 next_kmer = model_.get_neighbor(prev_kmer, i);
@@ -518,7 +523,7 @@ bool Mapper::add_event(float event) {
             u8 next_base = model_.get_last_base(next_kmer);
 
             #ifdef DEBUG_TIME
-            read_loc_.loop1_time_ += timer_.lap();
+            read_loc_.neighbor_time_ += timer_.lap();
             #endif
 
             Range next_range = fmi_.get_neighbor(prev_range, next_base);
@@ -544,10 +549,11 @@ bool Mapper::add_event(float event) {
             }
         }
 
+        #ifdef DEBUG_TIME
+        read_loc_.neighbor_time_ += timer_.lap();
+        #endif
+
         if (!child_found && !prev_path.sa_checked_) {
-            #ifdef DEBUG_TIME
-            read_loc_.loop1_time_ += timer_.lap();
-            #endif
 
             update_seeds(prev_path, true);
 
@@ -557,10 +563,6 @@ bool Mapper::add_event(float event) {
             break;
         }
     }
-
-    #ifdef DEBUG_TIME
-    read_loc_.loop1_time_ += timer_.lap();
-    #endif
 
     if (next_path != next_paths_.begin()) {
 

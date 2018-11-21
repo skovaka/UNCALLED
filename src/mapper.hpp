@@ -39,13 +39,16 @@
 
 #ifdef DEBUG_TIME
 #define PAF_SIGPROC_TAG "YA:f:"
-#define PAF_LOOP1_TAG   "YB:f:"
-#define PAF_FMRS_TAG    "YC:f:"
-#define PAF_FMSA_TAG    "YD:f:"
-#define PAF_SORT_TAG    "YE:f:"
-#define PAF_LOOP2_TAG   "YF:f:"
-#define PAF_SOURCE_TAG  "YG:f:"
-#define PAF_TRACKER_TAG "YH:f:"
+#define PAF_PROB_TAG   "YB:f:"
+#define PAF_THRESH_TAG "YC:f:"
+#define PAF_STAY_TAG   "YD:f:"
+#define PAF_NEIGHBOR_TAG "YE:f:"
+#define PAF_FMRS_TAG    "YF:f:"
+#define PAF_FMSA_TAG    "YG:f:"
+#define PAF_SORT_TAG    "YH:f:"
+#define PAF_LOOP2_TAG   "YI:f:"
+#define PAF_SOURCE_TAG  "YJ:f:"
+#define PAF_TRACKER_TAG "YK:f:"
 #endif
 
 class MapperParams {
@@ -114,7 +117,8 @@ class ReadLoc {
     friend std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
 
     #ifdef DEBUG_TIME
-    double sigproc_time_, loop1_time_, fmrs_time_, fmsa_time_, 
+    double sigproc_time_, prob_time_, thresh_time_, stay_time_,
+           neighbor_time_, fmrs_time_, fmsa_time_, 
            sort_time_, loop2_time_, source_time_, tracker_time_;
     #endif
 
@@ -180,9 +184,9 @@ class Mapper {
         static u64 TYPE_ADDS[EventType::NUM_TYPES];
 
         Range fm_range_;
-        u16 length_,
-            kmer_,
+        u8 length_,
             consec_stays_;
+        u16 kmer_;
 
         float seed_prob_;
         float *prob_sums_;
