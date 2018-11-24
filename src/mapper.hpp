@@ -34,7 +34,7 @@
 
 #define PAF_TIME_TAG "YT:f:"
 
-//#define DEBUG_TIME
+#define DEBUG_TIME
 //#define DEBUG_SEEDS
 
 #ifdef DEBUG_TIME
@@ -181,7 +181,7 @@ class Mapper {
         void print() const;
 
         static u8 MAX_PATH_LEN, TYPE_MASK;
-        static u64 TYPE_ADDS[EventType::NUM_TYPES];
+        static u32 TYPE_ADDS[EventType::NUM_TYPES];
 
         Range fm_range_;
         u8 length_,
@@ -191,7 +191,7 @@ class Mapper {
         float seed_prob_;
         float *prob_sums_;
 
-        u64 event_types_;
+        u32 event_types_;
         u8 path_type_counts_[EventType::NUM_TYPES];
 
         bool sa_checked_;

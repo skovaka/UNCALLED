@@ -216,7 +216,7 @@ std::ostream &operator<< (std::ostream &out, const ReadLoc &l) {
 u8 Mapper::PathBuffer::MAX_PATH_LEN = 0, 
    Mapper::PathBuffer::TYPE_MASK = 0;
 
-u64 Mapper::PathBuffer::TYPE_ADDS[EventType::NUM_TYPES];
+u32 Mapper::PathBuffer::TYPE_ADDS[EventType::NUM_TYPES];
 
 Mapper::PathBuffer::PathBuffer()
     : length_(0),
@@ -268,6 +268,7 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
 
     std::memcpy(path_type_counts_, p.path_type_counts_, EventType::NUM_TYPES * sizeof(u8));
     path_type_counts_[type]++;
+
 
     if (length_ > MAX_PATH_LEN) {
         std::memcpy(prob_sums_, &(p.prob_sums_[1]), MAX_PATH_LEN * sizeof(float));
@@ -507,6 +508,7 @@ bool Mapper::add_event(float event) {
                 break;
             }
         }
+
 
         #ifdef DEBUG_TIME
         read_loc_.stay_time_ += timer_.lap();
