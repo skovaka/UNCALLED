@@ -34,7 +34,7 @@
 
 #define PAF_TIME_TAG "YT:f:"
 
-#define DEBUG_TIME
+//#define DEBUG_TIME
 //#define DEBUG_SEEDS
 
 #ifdef DEBUG_TIME
