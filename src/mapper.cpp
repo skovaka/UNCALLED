@@ -254,10 +254,10 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
 
 
 void Mapper::PathBuffer::make_child(PathBuffer &p, 
-                                     Range &range,
-                                     u16 kmer, 
-                                     float prob, 
-                                     EventType type) {
+                                    Range &range,
+                                    u16 kmer, 
+                                    float prob, 
+                                    EventType type) {
 
     length_ = p.length_ + (p.length_ <= MAX_PATH_LEN);
     fm_range_ = range;
@@ -513,20 +513,18 @@ bool Mapper::add_event(float event) {
         #endif
 
         //Add all the neighbors
-        for (u8 i = 0; i < ALPH_SIZE; i++) {
-            u16 next_kmer = model_.get_neighbor(prev_kmer, i);
+        for (u8 b = 0; b < ALPH_SIZE; b++) {
+            u16 next_kmer = model_.get_neighbor(prev_kmer, b);
 
             if (kmer_probs_[next_kmer] < evpr_thresh) {
                 continue;
             }
 
-            u8 next_base = model_.get_last_base(next_kmer);
-
             #ifdef DEBUG_TIME
             read_loc_.neighbor_time_ += timer_.lap();
             #endif
 
-            Range next_range = fmi_.get_neighbor(prev_range, next_base);
+            Range next_range = fmi_.get_neighbor(prev_range, b);
 
             #ifdef DEBUG_TIME
             read_loc_.fmrs_time_ += timer_.lap();

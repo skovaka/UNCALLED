@@ -93,6 +93,7 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
 
     //Compute number of kmers (4^k) and reserve space for model
     k_ = kmer.size();
+    K_MASK_ =  ((1 << (2*k_)) - 1);
     kmer_count_ = pow(4, k_); //4 magic number?
     lv_means_ = new double[kmer_count_+1];
     lv_vars_x2_ = new double[kmer_count_+1];
@@ -105,7 +106,6 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
     model_mean_ = 0;
 
     //Stores which kmers can follow which
-    neighbors_.resize(kmer_count_);
     rev_comp_ids_ = new u16[kmer_count_]; 
 
     //Read and store rest of the model
@@ -128,12 +128,6 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
 
             //Store kmer reverse complement
             rev_comp_ids_[k_id] = kmer_to_id(get_reverse_complement(kmer));
-
-            //Store all neighboring kmers
-            for (short b = 0; b < 4; b++) { //4 magic number?
-                //neighbors_[k_id].push_back(kmer_to_id(BASE_CHARS[b] + kmer.substr(0, k_ - 1)));
-                neighbors_[k_id].push_back(kmer_to_id(kmer.substr(1, k_) + BASE_CHARS[b]));
-           }
 
             //Store model information
             lv_means_[k_id] = lv_mean;
@@ -202,7 +196,7 @@ u16 KmerModel::kmer_to_id(std::string kmer, u64 offset) const {
 }
 
 u16 KmerModel::kmer_comp(u16 kmer) {
-    return kmer ^ ((1 << (2*k_)) - 1);
+    return kmer ^ K_MASK_;
 }
 
 u8 KmerModel::get_base(u16 kmer, u8 i) const {
@@ -278,7 +272,7 @@ void KmerModel::normalize(std::vector<float> &events, NormParams norm) const {
 }
 
 u16 KmerModel::get_neighbor(u16 k, u8 i) const {
-    return neighbors_[k][i];
+    return ((k << 2) & K_MASK_) | i; 
 }
 
 //Reads the given fasta file and stores forward and reverse k-mers

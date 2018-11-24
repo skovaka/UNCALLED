@@ -48,10 +48,6 @@ class KmerModel {
     void normalize(std::vector<float> &raw, NormParams norm={0, 0}) const;
 
     u16 get_neighbor(u16 k, u8 i) const;
-    std::pair<neighbor_itr, neighbor_itr> get_neighbors(u16 k_id) const {
-        return std::pair<neighbor_itr, neighbor_itr>
-                    (neighbors_[k_id].begin(), neighbors_[k_id].end());
-    }
 
     bool event_valid(const Event &e) const;
 
@@ -79,10 +75,9 @@ class KmerModel {
     double lambda_, model_mean_, model_stdv_;
     private:
     u8 k_;
-    u16 kmer_count_;
+    u16 kmer_count_, K_MASK_;
     bool complement_;
 
-    std::vector< std::vector<u16> > neighbors_;
     u16 *rev_comp_ids_;
 };
 
