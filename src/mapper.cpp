@@ -104,8 +104,9 @@ float MapperParams::get_source_prob() const {
     return evpr_threshes_.front();
 }
 
-ReadLoc::ReadLoc(const std::string &rd_name) 
+ReadLoc::ReadLoc(const std::string &rd_name, u16 channel_id = 0) 
     : rd_name_(rd_name),
+      channel_id_(channel_id),
       rd_st_(0),
       rd_en_(0),
       rd_len_(0),
@@ -159,6 +160,10 @@ void ReadLoc::set_read_len(const MapperParams &params, u32 len) {
 
 bool ReadLoc::is_valid() const {
     return match_count_ > 0;
+}
+
+u16 ReadLoc::get_channel() const {
+    return channel_id_;
 }
 
 std::string ReadLoc::str() const {
@@ -325,8 +330,9 @@ bool operator< (const Mapper::PathBuffer &p1,
             p1.seed_prob_ < p2.seed_prob_);
 }
 
-Mapper::Mapper(const MapperParams &ap)
-    : params_(ap),
+Mapper::Mapper(const MapperParams &ap, u16 channel)
+    : channel_(channel),
+      params_(ap),
       model_(ap.model_),
       fmi_(ap.fmi_),
       event_detector_(ap.event_params_),
@@ -368,7 +374,7 @@ Mapper::~Mapper() {
 
 void Mapper::new_read(const std::string &name) {
 
-    read_loc_ = ReadLoc(name);
+    read_loc_ = ReadLoc(name, channel_);
     prev_size_ = 0;
     event_i_ = 0;
     seed_tracker_.reset();
@@ -403,6 +409,22 @@ std::string Mapper::map_fast5(const std::string &fast5_name) {
     }
 
     return aln.str();
+}
+bool Mapper::add_sample(float s) {
+    Event e = event_detector_.add_sample(s);
+    if (e.length == 0) false;
+    norm_.add_event(e.mean);
+    e = norm_.pop_event();
+
+    #ifdef DEBUG_TIME
+    read_loc_.sigproc_time_ += timer_.lap();
+    #endif
+
+    if (event_i_ >= params_.max_events_proc_ || add_event(e)) return true;
+}
+
+ReadLoc Mapper::get_mapping() const {
+    return read_loc_;
 }
 
 ReadLoc Mapper::add_samples(const std::vector<float> &samples) {

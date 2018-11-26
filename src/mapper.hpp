@@ -105,7 +105,7 @@ class MapperParams {
 class ReadLoc {
     public:
     ReadLoc();
-    ReadLoc(const std::string &rd_name);
+    ReadLoc(const std::string &rd_name, u16 channel_id);
 
     bool set_ref_loc(const MapperParams &params, const SeedGroup &seeds);
     void set_read_len(const MapperParams &params, u32 len);
@@ -114,6 +114,8 @@ class ReadLoc {
 
     std::string str() const;
     bool is_valid() const; 
+    u16 get_channel();
+
     friend std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
 
     #ifdef DEBUG_TIME
@@ -124,6 +126,7 @@ class ReadLoc {
 
     private:
     std::string rd_name_, rf_name_;
+    u16 channel_id_;
     u64 rd_st_, rd_en_, rd_len_,
         rf_st_, rf_en_, rf_len_;
     u16 match_count_;
@@ -137,7 +140,7 @@ std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
 class Mapper {
     public:
 
-    Mapper(const MapperParams &map_params);
+    Mapper(const MapperParams &map_params, u16 channel);
     Mapper(Mapper &m);
 
     ~Mapper();
@@ -146,7 +149,8 @@ class Mapper {
 
     std::string map_fast5(const std::string &fast5_name);
     ReadLoc add_samples(const std::vector<float> &samples);
-    //SeedGroup add_sample(float s);
+    bool add_sample(float s);
+    ReadLoc get_mapping() const;
 
     private:
 
@@ -199,6 +203,7 @@ class Mapper {
 
     friend bool operator< (const PathBuffer &p1, const PathBuffer &p2);
 
+
     private:
 
     bool add_event(float event);
@@ -212,13 +217,14 @@ class Mapper {
     Normalizer norm_;
     SeedTracker seed_tracker_;
 
-    ReadLoc read_loc_;
+    u16 channel_;
     std::vector<float> kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;
     std::vector<bool> sources_added_;
     u32 prev_size_,
         event_i_;
     Timer timer_;
+    ReadLoc read_loc_;
 
     #ifdef DEBUG_SEEDS
     std::ostream &seeds_out_;
