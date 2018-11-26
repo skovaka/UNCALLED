@@ -26,14 +26,14 @@
 
 #include <thread>
 #include <vector>
-#include <list>
+#include <deque>
 #include "mapper.hpp"
 
 class Fast5Pool {
     public:
     Fast5Pool(MapperParams &params, u16 nthreads, u32 batch_size);
     
-    void add_fast5s(const std::list<std::string> &new_fast5s);
+    void add_fast5s(const std::vector<std::string> &new_fast5s);
     std::vector<std::string> update();
     bool all_finished();
     void stop_all();
@@ -51,15 +51,15 @@ class Fast5Pool {
         bool running_, aligning_;
         Mapper mapper_;
         std::thread thread_;
-        std::list<std::string> ids_in_;
-        std::list< std::vector<float> > signals_in_;
-        std::list<ReadLoc> locs_out_;
+        std::deque<std::string> ids_in_;
+        std::deque< std::vector<float> > signals_in_;
+        std::deque<ReadLoc> locs_out_;
         std::mutex in_mtx_, out_mtx_;
     };
 
     u16 nthreads_;
     std::vector<MapperThread> threads_;
-    std::list<std::string> fast5s_;
+    std::deque<std::string> fast5s_;
     u32 batch_size_;
 };
 

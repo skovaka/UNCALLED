@@ -26,7 +26,6 @@
 #include "fast5_pool.hpp"
 #include "mapper.hpp"
 
-
 bool open_fast5(const std::string &filename, fast5::File &file) {
     if (!fast5::File::is_valid_file(filename)) {
         std::cerr << "Error: '" << filename << "' is not a valid file \n";
@@ -47,6 +46,7 @@ bool open_fast5(const std::string &filename, fast5::File &file) {
         return false;
     }
 
+
     return false;
 }
 
@@ -64,7 +64,7 @@ Fast5Pool::Fast5Pool(MapperParams &params, u16 nthreads, u32 batch_size) {
     }
 }
 
-void Fast5Pool::add_fast5s(const std::list<std::string> &new_fast5s) {
+void Fast5Pool::add_fast5s(const std::vector<std::string> &new_fast5s) {
     fast5s_.insert(fast5s_.end(), new_fast5s.begin(), new_fast5s.end());
 }
 
