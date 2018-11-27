@@ -34,7 +34,7 @@ Fast5Read::Fast5Read() :
 
 Fast5Read::Fast5Read(const std::string &filename) {
     if (!fast5::File::is_valid_file(filename)) {
-        std::cerr << "Error: '" << filename << "' is not a valid file \n";
+        //std::cerr << "Error: '" << filename << "' is not a valid file \n";
     }
 
     fast5::File file;
@@ -43,7 +43,7 @@ Fast5Read::Fast5Read(const std::string &filename) {
         file.open(filename);
         
         if (!file.is_open()) {  
-            std::cerr << "Error: unable to open '" << filename << "'\n";
+            //std::cerr << "Error: unable to open '" << filename << "'\n";
         } else {
             
             signal = file.get_raw_samples();
@@ -53,7 +53,7 @@ Fast5Read::Fast5Read(const std::string &filename) {
         }
 
     } catch (hdf5_tools::Exception& e) {
-        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
+        //std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
     }
 }
 
@@ -75,19 +75,21 @@ bool Fast5Read::empty() const {
 
 ChannelPool::ChannelPool(MapperParams &params, u16 nthreads, u16 nchannels) {
     
-    threads_ = std::vector<MapperThread>(nthreads);
-    thread_ids_ = std::vector<u16>(nthreads);
     for (u16 t = 0; t < nthreads; t++) {
-        threads_[t].start();
-        thread_ids_[t] = t;
+        threads_.emplace_back(mappers_);
+        thread_ids_.push_back(t);
     }
     
-    mappers_.reserve(nchannels);
+    //mappers_.reserve(nchannels);
     channel_busy_.reserve(nchannels);
     read_buffer_.resize(nchannels);
     for (u16 i = 0; i < nchannels; i++) {
-        mappers_.emplace_back(params, i);
+        mappers_.push_back(Mapper(params, i));
         channel_busy_.push_back(false);
+    }
+
+    for (u16 t = 0; t < nthreads; t++) {
+        threads_[t].start();
     }
 }
 
@@ -112,8 +114,10 @@ std::vector<std::string> ChannelPool::update() {
         read_buffer_[next_read_.channel].swap(next_read_);
         next_read_ = Fast5Read(filenames_.front());
         filenames_.pop_front();
+        //std::cerr << "Adding read to " << next_read_.channel << "\n";
 
         if (!channel_busy_[next_read_.channel]) {
+            //std::cerr << "Channel" << next_read_.channel << " open\n";
             open_channels_.push_back(next_read_.channel);
         }
     }
@@ -147,12 +151,14 @@ std::vector<std::string> ChannelPool::update() {
     for (u16 i = 0; i < thread_ids_.size(); i++) {
         MapperThread &t = threads_[thread_ids_[i]];
         u16 next_count = in_counts[thread_ids_[(i+1)%threads_.size()]];
+        //std::cerr << "Adding to thread " << i << "\n";
 
         t.in_mtx_.lock();
-        while(t.inputs_.size() < next_count && !open_channels_.empty()) {
+        while(t.inputs_.size() <= next_count && !open_channels_.empty()) {
             u16 ch = open_channels_.front();
             t.inputs_.push_back(Fast5Read());
             t.inputs_.back().swap(read_buffer_[ch]);
+            //std::cerr << "Adding channel " << ch << "\n";
             channel_busy_[ch] = true;
             open_channels_.pop_front();
         }
@@ -199,11 +205,19 @@ void ChannelPool::MapperThread::run() {
 
     std::vector<u16> finished;
 
+    //std::cerr << "Thread started\n";
+    //std::cerr.flush();
+
     while (running_) {
+        //std::cerr << "Looping\n";
+        //std::cerr.flush();
         if (inputs_.empty()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
+
+        //std::cerr << "Doing something\n";
+        //std::cerr.flush();
 
         in_mtx_.lock();
         u16 num_reads = inputs_.size();

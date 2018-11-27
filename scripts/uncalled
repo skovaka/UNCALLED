@@ -49,6 +49,7 @@ def get_parser():
     map_parser.add_argument("-y", "--max-consec-stay", default=8, type=int, help="Maximum consecutive stay events.")
     map_parser.add_argument("-p", "--max-paths", default=10000, type=int, help="Maximum number of paths to consider per event.")
     map_parser.add_argument("-n", "--event-buffer-len", default=0, type=int, help="Size of buffer used to normalize and read events")
+    map_parser.add_argument("-C", "--num-channels", default=None, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
     map_parser.add_argument("-F", "--max-stay-frac", default=0.5, type=float, help="Expected fraction of events which are stays")
     map_parser.add_argument("-S", "--min-seed-prob", default=-3.75, type=float, help="Average event probability threshold per seed")
     map_parser.add_argument("-M", "--min-mean-conf", default=7.00, type=float, help="Minimum ratio between longest alignment and mean alignment length to report confident alignment")
@@ -113,7 +114,7 @@ def map_cmd(args):
         fast5s = [os.path.abspath(l.strip()) for l in open(args.fast5s)]
 
     sys.stderr.write("Aligning\n")
-    if args.threads == 1:
+    if args.threads == 1 and args.num_channels == None:
         mapper = align.Mapper(params)
 
         try:
@@ -124,7 +125,11 @@ def map_cmd(args):
         except KeyboardInterrupt:
             pass
     else:
-        mapper = align.Fast5Pool(params, args.threads, args.batch_size)
+
+        if args.num_channels == None:
+            mapper = align.Fast5Pool(params, args.threads, args.batch_size)
+        else:
+            mapper = align.ChannelPool(params, args.threads, args.num_channels)
 
         try:
             mapper.add_fast5s(fast5s)

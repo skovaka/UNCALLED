@@ -126,7 +126,7 @@ void Fast5Pool::stop_all() {
 Fast5Pool::MapperThread::MapperThread(MapperParams &params)
     : running_(true),
       aligning_(false),
-      mapper_(params) {}
+      mapper_(params, 0) {}
 
 Fast5Pool::MapperThread::MapperThread(MapperThread &&mt) 
     : running_(mt.running_),                                             

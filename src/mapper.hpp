@@ -114,7 +114,7 @@ class ReadLoc {
 
     std::string str() const;
     bool is_valid() const; 
-    u16 get_channel();
+    u16 get_channel() const;
 
     friend std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
 
@@ -141,7 +141,7 @@ class Mapper {
     public:
 
     Mapper(const MapperParams &map_params, u16 channel);
-    Mapper(Mapper &m);
+    Mapper(const Mapper &m);
 
     ~Mapper();
 

@@ -331,7 +331,7 @@ bool operator< (const Mapper::PathBuffer &p1,
 }
 
 Mapper::Mapper(const MapperParams &ap, u16 channel)
-    : channel_(channel),
+    : 
       params_(ap),
       model_(ap.model_),
       fmi_(ap.fmi_),
@@ -341,7 +341,8 @@ Mapper::Mapper(const MapperParams &ap, u16 channel)
                     ap.min_mean_conf_,
                     ap.min_top_conf_,
                     ap.min_aln_len_,
-                    ap.seed_len_)
+                    ap.seed_len_),
+      channel_(channel)
      {
 
 
@@ -363,7 +364,7 @@ Mapper::Mapper(const MapperParams &ap, u16 channel)
     seed_tracker_.reset();
 }
 
-Mapper::Mapper(Mapper &m) : Mapper(m.params_) {}
+Mapper::Mapper(const Mapper &m) : Mapper(m.params_, m.channel_) {}
 
 Mapper::~Mapper() {
     for (u32 i = 0; i < next_paths_.size(); i++) {
@@ -412,15 +413,21 @@ std::string Mapper::map_fast5(const std::string &fast5_name) {
 }
 bool Mapper::add_sample(float s) {
     Event e = event_detector_.add_sample(s);
-    if (e.length == 0) false;
+    if (e.length == 0) return false;
     norm_.add_event(e.mean);
-    e = norm_.pop_event();
+    float m = norm_.pop_event();
 
     #ifdef DEBUG_TIME
     read_loc_.sigproc_time_ += timer_.lap();
     #endif
 
-    if (event_i_ >= params_.max_events_proc_ || add_event(e)) return true;
+    if (event_i_ >= params_.max_events_proc_ || add_event(m)) {
+        read_loc_.set_time(timer_.get());
+        //read_loc_.set_read_len(params_, samples.size() / 5); //TODO: this better
+        return true;
+    }
+
+    return false;
 }
 
 ReadLoc Mapper::get_mapping() const {
@@ -428,7 +435,6 @@ ReadLoc Mapper::get_mapping() const {
 }
 
 ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
-
 
     if (params_.evt_buffer_len_ == 0) {
         #ifdef DEBUG_TIME
@@ -475,7 +481,6 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
     }
 
     read_loc_.set_time(timer_.get());
-
 
     return read_loc_;
 }

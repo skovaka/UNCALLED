@@ -4,6 +4,7 @@
 #include "self_align_ref.hpp"
 #include "mapper.hpp"
 #include "fast5_pool.hpp"
+#include "channel_pool.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -20,7 +21,7 @@ PYBIND11_MODULE(align, m) {
                       float, float, float, float>());
 
     py::class_<Mapper>(m, "Mapper")
-        .def(py::init<MapperParams &>())
+        .def(py::init<MapperParams &, u16>())
         .def("map_fast5", &Mapper::map_fast5);
 
     py::class_<Fast5Pool>(m, "Fast5Pool")
@@ -29,6 +30,13 @@ PYBIND11_MODULE(align, m) {
         .def("update", &Fast5Pool::update)
         .def("all_finished", &Fast5Pool::all_finished)
         .def("stop_all", &Fast5Pool::stop_all); 
+
+    py::class_<ChannelPool>(m, "ChannelPool")
+        .def(py::init<MapperParams &, u16, u16>()) 
+        .def("add_fast5s", &ChannelPool::add_fast5s)
+        .def("update", &ChannelPool::update)
+        .def("all_finished", &ChannelPool::all_finished)
+        .def("stop_all", &ChannelPool::stop_all); 
     
     m.def("self_align", &self_align);
 }
