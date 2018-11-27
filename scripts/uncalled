@@ -115,7 +115,7 @@ def map_cmd(args):
 
     sys.stderr.write("Aligning\n")
     if args.threads == 1 and args.num_channels == None:
-        mapper = align.Mapper(params)
+        mapper = align.Mapper(params, 0)
 
         try:
             for fast5 in fast5s:

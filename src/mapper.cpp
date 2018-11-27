@@ -423,7 +423,7 @@ bool Mapper::add_sample(float s) {
 
     if (event_i_ >= params_.max_events_proc_ || add_event(m)) {
         read_loc_.set_time(timer_.get());
-        //read_loc_.set_read_len(params_, samples.size() / 5); //TODO: this better
+        read_loc_.set_read_len(params_, event_i_);
         return true;
     }
 

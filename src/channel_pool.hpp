@@ -78,9 +78,7 @@ class ChannelPool {
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;
 
-    //Which thread each mapper is currently assigned to
-    //AKA the Mapper mappings
-    std::deque<u16> open_channels_;
+    std::deque<u16> channel_queue_;
     std::vector<bool> channel_busy_;
 
     //Store threads in order of # active mappers

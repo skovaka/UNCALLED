@@ -26,15 +26,26 @@
 #include "channel_pool.hpp"
 #include "mapper.hpp"
 
+
 Fast5Read::Fast5Read() :
     signal(),
     name(""),
     channel(0),
     i(0) {}
 
-Fast5Read::Fast5Read(const std::string &filename) {
+Fast5Read::Fast5Read(const std::string &filename) 
+    : i(0) {
+
+    if (filename.empty()) {
+        signal = std::vector<float>();
+        name = "";
+        channel = 0;
+        return;
+    }
+
     if (!fast5::File::is_valid_file(filename)) {
-        //std::cerr << "Error: '" << filename << "' is not a valid file \n";
+        std::cerr << "Error: '" << filename << "' is not a valid file \n";
+        return;
     }
 
     fast5::File file;
@@ -43,7 +54,7 @@ Fast5Read::Fast5Read(const std::string &filename) {
         file.open(filename);
         
         if (!file.is_open()) {  
-            //std::cerr << "Error: unable to open '" << filename << "'\n";
+            std::cerr << "Error: unable to open '" << filename << "'\n";
         } else {
             
             signal = file.get_raw_samples();
@@ -53,7 +64,7 @@ Fast5Read::Fast5Read(const std::string &filename) {
         }
 
     } catch (hdf5_tools::Exception& e) {
-        //std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
+        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
     }
 }
 
@@ -99,6 +110,7 @@ void ChannelPool::add_fast5s(const std::vector<std::string> &new_fast5s) {
     if (next_read_.empty()) {
         next_read_ = Fast5Read(filenames_.front());
         filenames_.pop_front();
+        //std::cout << next_read_.channel << " init\n";
     }
 }
 
@@ -107,19 +119,22 @@ std::vector<std::string> ChannelPool::update() {
     std::vector<std::string> ret;
 
     //Fill channel buffers
-    while (!filenames_.empty() && 
-           !next_read_.empty() && 
-           read_buffer_[next_read_.channel].empty()) {
+    while (!next_read_.empty() && read_buffer_[next_read_.channel].empty()) {
 
+        //If no other read from that channel is being aligned, queue up that channel
+        //Only necissary for fast5 alignment - will not happen iin real-time
+        if (!channel_busy_[next_read_.channel]) {
+            channel_queue_.push_back(next_read_.channel);
+        }
+
+        //Add next read to buffer
         read_buffer_[next_read_.channel].swap(next_read_);
+
+        //Load next read from filename list
+        if (filenames_.empty()) break;
+
         next_read_ = Fast5Read(filenames_.front());
         filenames_.pop_front();
-        //std::cerr << "Adding read to " << next_read_.channel << "\n";
-
-        if (!channel_busy_[next_read_.channel]) {
-            //std::cerr << "Channel" << next_read_.channel << " open\n";
-            open_channels_.push_back(next_read_.channel);
-        }
     }
 
     std::vector< u16 > in_counts(threads_.size());
@@ -134,7 +149,7 @@ std::vector<std::string> ChannelPool::update() {
             u16 ch = locs.front().get_channel();
             channel_busy_[ch] = false;
             if (!read_buffer_[ch].empty()) {
-                open_channels_.push_back(ch);
+                channel_queue_.push_back(ch);
             }
             ret.push_back(locs.front().str());
             locs.pop_front();
@@ -151,16 +166,14 @@ std::vector<std::string> ChannelPool::update() {
     for (u16 i = 0; i < thread_ids_.size(); i++) {
         MapperThread &t = threads_[thread_ids_[i]];
         u16 next_count = in_counts[thread_ids_[(i+1)%threads_.size()]];
-        //std::cerr << "Adding to thread " << i << "\n";
 
         t.in_mtx_.lock();
-        while(t.inputs_.size() <= next_count && !open_channels_.empty()) {
-            u16 ch = open_channels_.front();
+        while(t.inputs_.size() <= next_count && !channel_queue_.empty()) {
+            u16 ch = channel_queue_.front();
             t.inputs_.push_back(Fast5Read());
             t.inputs_.back().swap(read_buffer_[ch]);
-            //std::cerr << "Adding channel " << ch << "\n";
             channel_busy_[ch] = true;
-            open_channels_.pop_front();
+            channel_queue_.pop_front();
         }
         t.in_mtx_.unlock();
     }
@@ -205,19 +218,11 @@ void ChannelPool::MapperThread::run() {
 
     std::vector<u16> finished;
 
-    //std::cerr << "Thread started\n";
-    //std::cerr.flush();
-
     while (running_) {
-        //std::cerr << "Looping\n";
-        //std::cerr.flush();
         if (inputs_.empty()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
-
-        //std::cerr << "Doing something\n";
-        //std::cerr.flush();
 
         in_mtx_.lock();
         u16 num_reads = inputs_.size();
@@ -232,7 +237,7 @@ void ChannelPool::MapperThread::run() {
             }
 
             //TODO: add signal in chunks?
-            if (mappers_[r.channel].add_sample(r.next_sig())) {
+            if (r.empty() || mappers_[r.channel].add_sample(r.next_sig())) {
                 finished.push_back(i);
             }
         }
