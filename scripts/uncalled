@@ -27,6 +27,7 @@ import sys
 import os
 import argparse
 import time
+import re
 
 class ArgFormat(argparse.ArgumentDefaultsHelpFormatter, 
                 argparse.MetavarTypeHelpFormatter):
@@ -74,7 +75,10 @@ def get_parser():
 
     return parser
 
+
 def map_cmd(args):
+    CHANNEL_RE = re.compile("_ch_?([\d]+)_")
+
     params = align.MapperParams(args.bwa_prefix,
                                 index.MODEL_FNAME,
                                 args.bwa_prefix + index.PARAM_SUFF,
@@ -113,8 +117,8 @@ def map_cmd(args):
     else:
         fast5s = [os.path.abspath(l.strip()) for l in open(args.fast5s)]
 
-    sys.stderr.write("Aligning\n")
     if args.threads == 1 and args.num_channels == None:
+        sys.stderr.write("Aligning\n")
         mapper = align.Mapper(params, 0)
 
         try:
@@ -128,11 +132,18 @@ def map_cmd(args):
 
         if args.num_channels == None:
             mapper = align.Fast5Pool(params, args.threads, args.batch_size)
+            mapper.add_fast5s(fast5s)
         else:
             mapper = align.ChannelPool(params, args.threads, args.num_channels)
 
+            sys.stderr.write("Parsing channel IDs\n")
+            channels = [int(CHANNEL_RE.search(f).group(1)) for f in fast5s]
+
+            mapper.add_fast5s(fast5s, channels)
+
+        sys.stderr.write("Aligning\n")
+
         try:
-            mapper.add_fast5s(fast5s)
 
             while not mapper.all_finished():
                 alns = mapper.update()

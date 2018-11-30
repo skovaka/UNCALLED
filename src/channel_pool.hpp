@@ -48,7 +48,8 @@ class ChannelPool {
     public:
     ChannelPool(MapperParams &params, u16 nchannels, u16 nthreads);
     
-    void add_fast5s(const std::vector<std::string> &new_fast5s);
+    void add_fast5s(const std::vector<std::string> &fast5s, 
+                    const std::vector<u16> &channels);
     std::vector<std::string> update();
     bool all_finished();
     void stop_all();
@@ -63,12 +64,14 @@ class ChannelPool {
         void start();
         void run();
 
+        u16 read_count() const;
+
         std::vector<Mapper> &mappers_;
 
         bool running_;
 
         //Corrasponding inputs/output
-        std::vector< Fast5Read > inputs_;
+        std::vector< Fast5Read > new_reads_, active_reads_;
         std::deque< ReadLoc > outputs_;
 
         std::thread thread_;
@@ -86,9 +89,9 @@ class ChannelPool {
     
     std::vector<MapperThread> threads_;
 
-    std::deque<std::string> filenames_;
+    u64 fast5_count_;
+    std::vector< std::deque<std::string> > channel_fast5s_;
     std::vector<Fast5Read> read_buffer_;
-    Fast5Read next_read_;
     
 
 };
