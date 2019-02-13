@@ -44,6 +44,16 @@ class Fast5Read {
     u32 i;
 };
 
+class ReadStream {
+    public:
+    ReadStream();
+    ReadStream(u16 channel, const std::string &name);
+
+    std::deque< std::vector<float> > chunks_;
+    std::string name_;
+    u16 channel_;
+};
+
 class ChannelPool {
     public:
     ChannelPool(MapperParams &params, u16 nchannels, u16 nthreads);
@@ -65,6 +75,9 @@ class ChannelPool {
         void run();
 
         u16 read_count() const;
+
+        static u16 num_threads;
+        u16 tid_;
 
         std::vector<Mapper> &mappers_;
 

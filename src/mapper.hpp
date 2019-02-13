@@ -150,6 +150,12 @@ class Mapper {
     std::string map_fast5(const std::string &fast5_name);
     ReadLoc add_samples(const std::vector<float> &samples);
     bool add_sample(float s);
+
+    bool swap_chunk(std::vector<float> &chunk);
+    u16 process_chunk();
+    bool map_chunk(u16 nevents);
+    bool chunk_empty() const;
+
     ReadLoc get_mapping() const;
 
     private:
@@ -218,11 +224,12 @@ class Mapper {
     SeedTracker seed_tracker_;
 
     u16 channel_;
-    std::vector<float> kmer_probs_;
+    std::vector<float> chunk_buffer_, kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;
     std::vector<bool> sources_added_;
     u32 prev_size_,
-        event_i_;
+        event_i_,
+        chunk_i_;
     Timer timer_;
     ReadLoc read_loc_;
 

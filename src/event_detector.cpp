@@ -65,7 +65,7 @@ u32 EventDetector::get_buf_mid() {
     return t - (BUF_LEN / 2) - 1;
 }
 
-Event EventDetector::add_sample(RawSample s) {
+bool EventDetector::add_sample(RawSample s) {
 
     u32 t_mod = t % BUF_LEN;
     
@@ -86,33 +86,37 @@ Event EventDetector::add_sample(RawSample s) {
     bool p1 = peak_detect(tstat1, short_detector),
          p2 = peak_detect(tstat2, long_detector);
 
-    Event ret = {0};
-
     if (p1 || p2) {
-        ret = create_event(buf_mid-params.window_length1+1);
+        create_event(buf_mid-params.window_length1+1);
 
-        if (ret.mean < params.min_mean || ret.mean > params.max_mean) {
-            ret = {0};
-        }
+        return event_.mean >= params.min_mean &&
+               event_.mean <= params.max_mean;
     }
     
-    return ret;
+    return false;
 }
 
-std::vector<Event> EventDetector::get_all_events(std::vector<RawSample> raw) {
+std::vector<Event> EventDetector::add_samples(const std::vector<RawSample> &raw) {
     std::vector<Event> events;
-    Event e;
+    events.reserve(raw.size() / params.window_length2);
 
     for (u32 i = 0; i < raw.size(); i++) {
-        e = add_sample(raw[i]);
-        if (e.length > 0) {
-            events.push_back(e);
+        if (add_sample(raw[i])) {
+            events.push_back(event_);
         }
     }
 
     reset();
 
     return events;
+}
+
+Event EventDetector::get() const {
+    return event_;
+}
+
+float EventDetector::get_mean() const {
+    return event_.mean;
 }
 
 /**
@@ -250,23 +254,24 @@ bool EventDetector::peak_detect(float current_value, Detector &detector) {
  *  @returns An initialised event.  A 'null' event is returned on error.
  **/
 Event EventDetector::create_event(u32 evt_en) {
-    Event event = { 0 };
+    //Event event = { 0 };
 
     u32 evt_en_buf = evt_en % BUF_LEN;
 
-    event.start = evt_st;
-    event.length = (float)(evt_en - evt_st);
-    event.mean = (float)(sum[evt_en_buf] - evt_st_sum) / event.length;
+    event_.start = evt_st;
+    event_.length = (float)(evt_en - evt_st);
+    event_.mean = (float)(sum[evt_en_buf] - evt_st_sum) / event_.length;
     const float deltasqr = (sumsq[evt_en_buf] - evt_st_sumsq);
-    const float var = deltasqr / event.length - event.mean * event.mean;
-    event.stdv = sqrtf(fmaxf(var, 0.0f));
+    const float var = deltasqr / event_.length - event_.mean * event_.mean;
+    event_.stdv = sqrtf(fmaxf(var, 0.0f));
 
     evt_st = evt_en;
     evt_st_sum = sum[evt_en_buf];
     evt_st_sumsq = sumsq[evt_en_buf];
 
-    return event;
+    return event_;
 }
+
 
 //=====================stop===================
 

@@ -361,6 +361,7 @@ Mapper::Mapper(const MapperParams &ap, u16 channel)
 
     prev_size_ = 0;
     event_i_ = 0;
+    chunk_i_ = 0;
     seed_tracker_.reset();
 }
 
@@ -378,6 +379,7 @@ void Mapper::new_read(const std::string &name) {
     read_loc_ = ReadLoc(name, channel_);
     prev_size_ = 0;
     event_i_ = 0;
+    chunk_i_ = 0;
     seed_tracker_.reset();
     event_detector_.reset();
     timer_.reset();
@@ -411,10 +413,11 @@ std::string Mapper::map_fast5(const std::string &fast5_name) {
 
     return aln.str();
 }
+
 bool Mapper::add_sample(float s) {
-    Event e = event_detector_.add_sample(s);
-    if (e.length == 0) return false;
-    norm_.add_event(e.mean);
+    ;
+    if (!event_detector_.add_sample(s)) return false;
+    norm_.add_event(event_detector_.get_mean());
     float m = norm_.pop_event();
 
     #ifdef DEBUG_TIME
@@ -441,7 +444,7 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
         timer_.reset();
         #endif
 
-        std::vector<Event> events = event_detector_.get_all_events(samples);
+        std::vector<Event> events = event_detector_.add_samples(samples);
         model_.normalize(events);
 
         #ifdef DEBUG_TIME
@@ -458,17 +461,15 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
         read_loc_.set_read_len(params_, samples.size() / 5); //TODO: this better
         
         u32 i = 0;
-        Event e;
-        float m;
 
         #ifdef DEBUG_TIME
         timer_.reset();
         #endif
 
+        float m;
         for (auto s : samples) {
-            e = event_detector_.add_sample(s);
-            if (e.length == 0) continue;
-            norm_.add_event(e.mean);
+            if (!event_detector_.add_sample(s)) continue;
+            norm_.add_event(event_detector_.get_mean());
             m = norm_.pop_event();
 
             #ifdef DEBUG_TIME
@@ -485,6 +486,59 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
     return read_loc_;
 }
 
+bool Mapper::chunk_empty() const {
+    return chunk_buffer_.empty();
+}
+
+bool Mapper::swap_chunk(std::vector<float> &chunk) {
+    if (!chunk_empty()) return false;
+    chunk_buffer_.swap(chunk);
+    return true;
+}
+
+u16 Mapper::process_chunk() {
+    
+    #ifdef DEBUG_TIME
+    read_loc_.sigproc_time_ += timer_.lap();
+    #endif
+
+    float mean;
+
+    if (chunk_i_ > 0) {
+        mean = event_detector_.get_mean();
+        if (!norm_.add_event(mean)) return 0;
+    }
+
+    u16 nevents = 0;
+    for (u32 i = chunk_i_; i < chunk_buffer_.size(); i++) {
+        if (event_detector_.add_sample(chunk_buffer_[i])) {
+            mean = event_detector_.get_mean();
+            if (norm_.add_event(mean)) {
+                nevents++;
+            } else {
+                chunk_i_ = i+1;
+                return nevents;
+            }
+        }
+    }
+
+    chunk_buffer_.clear();
+    chunk_i_ = 0;
+    return nevents;
+}
+
+bool Mapper::map_chunk(u16 nevents) {
+
+    if (event_i_ + nevents > params_.max_events_proc_) {
+        nevents = params_.max_events_proc_ - event_i_;
+    }
+
+    for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
+        if (add_event(norm_.pop_event())) return true;
+    }
+    
+    return false;
+}
 
 bool Mapper::add_event(float event) {
 

@@ -9,12 +9,18 @@ Normalizer::Normalizer(const KmerModel &model,
       varsum_(0),
       n_(0),
       rd_(0),
-      wr_(0) {
+      wr_(0),
+      is_full_(false),
+      is_empty_(true) {
 
 }
 
 
 bool Normalizer::add_event(float newevt) {
+    if (is_full_) {
+        return false;
+    }
+
     double oldevt = events_[wr_];
     events_[wr_] = newevt;
 
@@ -31,11 +37,12 @@ bool Normalizer::add_event(float newevt) {
         mean_ += dt1 / n_;
         double dt2 = newevt - mean_;
         varsum_ += dt1*dt2;
+        is_empty_ = false;
     }
 
     wr_ = (wr_ + 1) % events_.size();
 
-    //TODO: check if wr_ has hit rd_
+    is_full_ = wr_ == rd_;
 
     return true;
 }
@@ -45,6 +52,8 @@ void Normalizer::reset(u32 buffer_size = 0) {
     rd_ = 0;
     wr_ = 0;
     mean_ = varsum_ = 0;
+    is_full_ = false;
+    is_empty_ = true;
 
     if (buffer_size != 0 && buffer_size != events_.size()) {
         events_.resize(buffer_size);
@@ -55,28 +64,26 @@ void Normalizer::reset(u32 buffer_size = 0) {
 
 NormParams Normalizer::get_params() const {
     NormParams p;
-    //if (n_ <= events_.size()) {
-        p.scale = model_.model_stdv_ / sqrt(varsum_ / n_);
-    //} else {
-    //    p.scale = model_.model_stdv_ / sqrt(varsum_ / events_.size());
-    //}
 
+    p.scale = model_.model_stdv_ / sqrt(varsum_ / n_);
     p.shift = model_.model_mean_ - p.scale * mean_;
 
     return p;
 }
 
 float Normalizer::pop_event() {
-
-    
     NormParams np = get_params();
-    float ret = (float) (np.scale * events_[rd_] + np.shift);
-
+    float e = (float) (np.scale * events_[rd_] + np.shift);
     rd_ = (rd_+1) % events_.size();
+    is_empty_ = rd_ == wr_;
+    is_full_ = false;
+    return e;
+}
 
-    if (rd_ != wr_) {
-        std::cout << rd_ << " " << wr_ << "\n";
-    }
+bool Normalizer::empty() const {
+    return is_empty_;
+}
 
-    return ret;
+bool Normalizer::full() const {
+    return is_full_;
 }

@@ -15,13 +15,15 @@ class Normalizer {
     float pop_event();
     NormParams get_params() const;
     void reset(u32 buffer_size);
+    bool empty() const;
+    bool full() const;
 
     //private:
     const KmerModel &model_;
     std::vector<double> events_;
     double mean_, varsum_;
     u32 n_, rd_, wr_;
-    bool buffer_full_;
+    bool is_full_, is_empty_;
 };
 
 #endif
