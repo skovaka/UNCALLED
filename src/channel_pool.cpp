@@ -142,54 +142,61 @@ std::vector<std::string> ChannelPool::update() {
     std::vector< u16 > read_counts(threads_.size());
     u16 active_count = 0;
 
-    //Get outputs
+    //Get alignment outputs
     std::deque<ReadLoc> locs;
     for (u16 t = 0; t < threads_.size(); t++) {
         if (!threads_[t].outputs_.empty()) {
 
+            //Store and empty thread output buffer
             threads_[t].out_mtx_.lock();
             locs.swap(threads_[t].outputs_);
             threads_[t].out_mtx_.unlock();
 
-            //read_buffer_[i].swap(channel_fast5s_[i].front());
+            //Loop over alignments
             while(!locs.empty()) {
+
+                //Mark channel as not aligning
                 u16 ch = locs.front().get_channel();
                 channel_busy_[ch] = false;
+
+                //If channel has next read, add channel to aln queue
                 if (!read_buffer_[ch].empty()) {
                     channel_queue_.push_back(ch);
-                    //std::cerr << ch << " open\n";
-                } else {
-                    //std::cerr << ch << " full\n";
                 }
+
+                //Store previous alignment
                 ret.push_back(locs.front().str());
                 locs.pop_front();
             }
         }
 
-        //std::cerr.flush();
-
+        //Count reads aligning in each thread
         read_counts[t] = threads_[t].read_count();
         active_count += read_counts[t];
     }
 
+    //Estimate how much to fill each thread
     u16 target = channel_queue_.size() + active_count,
         per_thread = target / threads_.size() + (target % thread_ids_.size() > 0);
 
-    //std::cerr << active_count << " waiting or whatever\n";
-
     for (u16 t = 0; t < thread_ids_.size(); t++) {
+
+        //If thread not full
         if (read_counts[t] < per_thread) {
             threads_[t].in_mtx_.lock();
+
+            //Fill thread till full
             while (!channel_queue_.empty() && read_counts[t] < per_thread) {
-                //std::cerr << "cq " << channel_queue_.empty() << " "
-                //          << extra << " "
-                //          << (per_thread + (t < extra)) << " " 
-                //          << read_counts[t] << " ";
-                u16 ch = channel_queue_.front();
-                //std::cerr << t << " " << ch << " busy\n";
+
+                //Get next channel to align
+                u16 ch = channel_queue_.front(); 
                 channel_queue_.pop_front();
+
+                //Add new read to thread queue
                 threads_[t].new_reads_.push_back(Fast5Read());
                 threads_[t].new_reads_.back().swap(read_buffer_[ch]);
+
+                //Mark channel busy
                 channel_busy_[ch] = true;
                 read_counts[t]++;
             }
@@ -199,6 +206,7 @@ std::vector<std::string> ChannelPool::update() {
 
     Timer t;
 
+    //Open new fast5s
     for (u16 ch = 0; ch < channel_fast5s_.size(); ch++) {
         if (!read_buffer_[ch].empty() || channel_fast5s_[ch].empty()) continue;
         read_buffer_[ch] = Fast5Read(channel_fast5s_[ch].front());
@@ -207,30 +215,6 @@ std::vector<std::string> ChannelPool::update() {
         if (!channel_busy_[ch]) channel_queue_.push_back(ch);
     }
 
-    //std::cerr << "READ TIME " << t.get() << "\n";
-
-
-    //std::sort(thread_ids_.begin(), thread_ids_.end(),
-    //            [&read_counts](u16 t1, u16 t2) {
-    //                return read_counts[t1] < read_counts[t2];
-    //            });
-
-    //for (u16 i = 0; i < thread_ids_.size() && !channel_queue_.empty(); i++) {
-    //    MapperThread &t = threads_[thread_ids_[i]];
-    //    u16 next_count = read_counts[thread_ids_[(i+1)%threads_.size()]];
-
-    //    t.in_mtx_.lock();
-    //    while(t.read_count() <= next_count && !channel_queue_.empty()) {
-    //        u16 ch = channel_queue_.front();
-    //        channel_queue_.pop_front();
-    //        t.new_reads_.push_back(Fast5Read());
-    //        t.new_reads_.back().swap(read_buffer_[ch]);
-    //        channel_busy_[ch] = true;
-    //        std::cerr << i << " " << ch << " busy\n"; //TODO: JUST ADDED THIS, RUN IT AND SEE WHAT HAPPENS
-    //    }
-    //    t.in_mtx_.unlock();
-    //}
-        
     return ret;
 }
 

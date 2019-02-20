@@ -104,6 +104,12 @@ float MapperParams::get_source_prob() const {
     return evpr_threshes_.front();
 }
 
+u16 MapperParams::get_max_events(u16 event_i) const {
+    if (event_i + evt_map_count_ > max_events_proc_) 
+        return params_.max_events_proc_ - event_i_;
+    return params_.max_events_proc_;
+}
+
 ReadLoc::ReadLoc(const std::string &rd_name, u16 channel_id = 0) 
     : rd_name_(rd_name),
       channel_id_(channel_id),
@@ -433,7 +439,7 @@ bool Mapper::add_sample(float s) {
     return false;
 }
 
-ReadLoc Mapper::get_mapping() const {
+ReadLoc Mapper::get_loc() const {
     return read_loc_;
 }
 
@@ -486,13 +492,14 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
     return read_loc_;
 }
 
-bool Mapper::chunk_empty() const {
-    return chunk_buffer_.empty();
+bool Mapper::is_chunk_processed() const {
+    return chunk_processed_;
 }
 
 bool Mapper::swap_chunk(std::vector<float> &chunk) {
-    if (!chunk_empty()) return false;
+    if (!is_chunk_processed()) return false;
     chunk_buffer_.swap(chunk);
+    chunk_processed_ = false;
     return true;
 }
 
@@ -524,19 +531,16 @@ u16 Mapper::process_chunk() {
 
     chunk_buffer_.clear();
     chunk_i_ = 0;
+    chunk_processed_ = true;
     return nevents;
 }
 
-bool Mapper::map_chunk(u16 nevents) {
-
-    if (event_i_ + nevents > params_.max_events_proc_) {
-        nevents = params_.max_events_proc_ - event_i_;
-    }
-
+bool Mapper::map_chunk() {
+    u16 nevents = params_.get_max_events(event_i_);
+    //TODO: add timeout to params
     for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
         if (add_event(norm_.pop_event())) return true;
     }
-    
     return false;
 }
 

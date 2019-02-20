@@ -66,6 +66,7 @@ class MapperParams {
                  u32 evt_buffer_len,
                  u32 evt_winlen1,
                  u32 evt_winlen2,
+                 u16 evt_map_count,
                  float evt_thresh1,
                  float evt_thresh2,
                  float evt_peak_height,
@@ -76,6 +77,7 @@ class MapperParams {
                  float min_mean_conf,
                  float min_top_conf);
     
+    u16 get_max_events(u16 event_i) const;
     float get_prob_thresh(u64 fm_length) const;
     float get_source_prob() const;
 
@@ -91,6 +93,8 @@ class MapperParams {
         min_aln_len_,
         max_events_proc_,
         evt_buffer_len_;
+
+    u16 evt_map_count_;
 
     float max_stay_frac_,
           min_seed_prob_,
@@ -153,10 +157,10 @@ class Mapper {
 
     bool swap_chunk(std::vector<float> &chunk);
     u16 process_chunk();
-    bool map_chunk(u16 nevents);
-    bool chunk_empty() const;
+    bool map_chunk();
+    bool is_chunk_processed() const;
 
-    ReadLoc get_mapping() const;
+    ReadLoc get_loc() const;
 
     private:
 
@@ -209,7 +213,6 @@ class Mapper {
 
     friend bool operator< (const PathBuffer &p1, const PathBuffer &p2);
 
-
     private:
 
     bool add_event(float event);
@@ -224,6 +227,7 @@ class Mapper {
     SeedTracker seed_tracker_;
 
     u16 channel_;
+    bool chunk_processed_;
     std::vector<float> chunk_buffer_, kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;
     std::vector<bool> sources_added_;
