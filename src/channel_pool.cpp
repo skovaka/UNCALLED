@@ -295,7 +295,7 @@ void ChannelPool::MapperThread::run() {
         if (!finished.empty()) {
             out_mtx_.lock();
             for (u16 f : finished) {
-                outputs_.push_back(mappers_[active_reads_[f].channel].get_mapping());
+                outputs_.push_back(mappers_[active_reads_[f].channel].get_loc());
             }
             out_mtx_.unlock();
 

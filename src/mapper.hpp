@@ -66,7 +66,7 @@ class MapperParams {
                  u32 evt_buffer_len,
                  u32 evt_winlen1,
                  u32 evt_winlen2,
-                 u16 evt_map_count,
+                 u16 evt_batch_size,
                  float evt_thresh1,
                  float evt_thresh2,
                  float evt_peak_height,
@@ -94,7 +94,7 @@ class MapperParams {
         max_events_proc_,
         evt_buffer_len_;
 
-    u16 evt_map_count_;
+    u16 evt_batch_size_;
 
     float max_stay_frac_,
           min_seed_prob_,

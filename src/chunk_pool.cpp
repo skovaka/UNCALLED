@@ -28,7 +28,6 @@
 
 //TODO: legit chunk default
 ReadStream::ReadStream(u16 chunk_len=4500, const std::string &name="") {
-    channel_ = channel;
     name_ = name;
 }
 
@@ -41,8 +40,6 @@ bool ReadStream::empty() const {
 }
 
 ChunkPool::ChunkPool(MapperParams &params, u16 nthreads, u16 nchannels) {
-    fast5_count_ = 0;
-
     for (u16 t = 0; t < nthreads; t++) {
         threads_.emplace_back(mappers_);
     }
@@ -50,7 +47,6 @@ ChunkPool::ChunkPool(MapperParams &params, u16 nthreads, u16 nchannels) {
     //mappers_.reserve(nchannels);
     channel_active_.reserve(nchannels);
     read_buffer_.resize(nchannels);
-    channel_fast5s_.resize(nchannels);
     buffer_queue_.reserve(nchannels);
     for (u16 i = 0; i < nchannels; i++) {
         mappers_.push_back(Mapper(params, i));
@@ -60,30 +56,6 @@ ChunkPool::ChunkPool(MapperParams &params, u16 nthreads, u16 nchannels) {
     for (u16 t = 0; t < nthreads; t++) {
         threads_[t].start();
     }
-}
-
-void ChunkPool::add_fast5s(const std::vector<std::string> &fast5s, 
-                             const std::vector<u16> &channels) {
-
-    if (fast5s.size() != channels.size()) {
-        std::cerr << "Error: size of filenames and channels not same\n";
-        return;
-    }
-
-    for (u64 i = 0; i < fast5s.size(); i++) {
-        channel_fast5s_[channels[i]-1].push_back(fast5s[i]);
-        fast5_count_++;
-    }
-
-    for (u16 i = 0; i < channel_fast5s_.size(); i++) {
-        if (channel_fast5s_[i].empty()) continue;
-        read_buffer_[i] = Fast5Read(channel_fast5s_[i].front());
-        channel_fast5s_[i].pop_front();
-        buffer_queue_.push_back(i);
-        fast5_count_--;
-    }
-
-    std::cerr << "Reads " << fast5_count_ << " " << buffer_queue_.size() << "\n";
 }
 
 void ChunkPool::new_read(u16 ch, const std::string &name) {
@@ -132,7 +104,7 @@ std::vector<std::string> ChunkPool::update() {
     //TODO: combine queues, partition into active/buffer regions
     for (u16 i = buffer_queue_.size()-1; i < buffer_queue_.size(); i--) {
         u16 ch = buffer_queue_[i];
-        if (mappers_[ch].add_chunk(read_buffer_[ch].chunk_)) {
+        if (mappers_[ch].swap_chunk(read_buffer_[ch].chunk_)) {
             if (i != buffer_queue_.size()-1) {
                  buffer_queue_[i] = buffer_queue_.back();
             }
@@ -157,8 +129,8 @@ std::vector<std::string> ChunkPool::update() {
             //TODO: compute number exactly, only lock while adding
             threads_[t].in_mtx_.lock();
             while (!active_queue_.empty() && read_counts[t] < per_thread) {
-                u16 ch = active_queue_.front(); 
-                active_queue_.pop_front();
+                u16 ch = active_queue_.back(); 
+                active_queue_.pop_back();
                 threads_[t].in_chs_.push_back(ch);
                 channel_active_[ch] = true;
                 read_counts[t]++;
@@ -171,10 +143,10 @@ std::vector<std::string> ChunkPool::update() {
 }
 
 bool ChunkPool::all_finished() {
-    if (fast5_count_ > 0) return false;
+    if (!buffer_queue_.empty()) return false;
 
     for (MapperThread &t : threads_) {
-        if (t.read_count() > 0 || !t.outputs_.empty()) return false;
+        if (t.read_count() > 0 || !t.out_chs_.empty()) return false;
     }
 
     return true;
@@ -204,8 +176,9 @@ void ChunkPool::MapperThread::start() {
     thread_ = std::thread(&ChunkPool::MapperThread::run, this);
 }
 
+
 u16 ChunkPool::MapperThread::read_count() const {
-    return new_reads_.size() + active_reads_.size();
+    return in_chs_.size() + active_chs_.size();
 }
 
 void ChunkPool::MapperThread::run() {
@@ -249,7 +222,7 @@ void ChunkPool::MapperThread::run() {
             out_mtx_.unlock();
 
             for (auto i : out_tmp_) {
-                active_chs_[i].swap(active_chs_.back());
+                active_chs_[i] = active_chs_.back();
                 active_chs_.pop_back();
             }
             out_tmp_.clear();

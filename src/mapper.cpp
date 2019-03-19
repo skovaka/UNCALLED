@@ -37,6 +37,7 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
                            u32 evt_buffer_len,
                            u32 evt_winlen1,
                            u32 evt_winlen2,
+                           u16 evt_batch_size,
                            float evt_thresh1,
                            float evt_thresh2,
                            float evt_peak_height,
@@ -63,6 +64,7 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
           min_aln_len_(min_aln_len),
           max_events_proc_(max_events_proc),
           evt_buffer_len_(evt_buffer_len),
+          evt_batch_size_(evt_batch_size),
           max_stay_frac_(max_stay_frac),
           min_seed_prob_(min_seed_prob),
           min_mean_conf_(min_mean_conf),
@@ -105,9 +107,9 @@ float MapperParams::get_source_prob() const {
 }
 
 u16 MapperParams::get_max_events(u16 event_i) const {
-    if (event_i + evt_map_count_ > max_events_proc_) 
-        return params_.max_events_proc_ - event_i_;
-    return params_.max_events_proc_;
+    if (event_i + evt_batch_size_ > max_events_proc_) 
+        return max_events_proc_ - event_i;
+    return max_events_proc_;
 }
 
 ReadLoc::ReadLoc(const std::string &rd_name, u16 channel_id = 0) 

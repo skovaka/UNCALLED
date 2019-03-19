@@ -5,6 +5,7 @@
 #include "mapper.hpp"
 #include "fast5_pool.hpp"
 #include "channel_pool.hpp"
+#include "chunk_pool.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -16,7 +17,7 @@ PYBIND11_MODULE(align, m) {
         .def(py::init<const std::string &,
                       const std::string &,
                       const std::string &,
-                      u32, u32, u32, u32, u32, u32,  u32, u32, u32, u32,
+                      u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u16,
                       float, float, float, float, float, 
                       float, float, float, float>());
 
@@ -37,6 +38,13 @@ PYBIND11_MODULE(align, m) {
         .def("update", &ChannelPool::update)
         .def("all_finished", &ChannelPool::all_finished)
         .def("stop_all", &ChannelPool::stop_all); 
+
+    py::class_<ChunkPool>(m, "ChunkPool")
+        .def(py::init<MapperParams &, u16, u16>()) 
+        .def("update", &ChunkPool::update)
+        .def("all_finished", &ChunkPool::all_finished)
+        .def("stop_all", &ChunkPool::stop_all); 
     
     m.def("self_align", &self_align);
 }
+
