@@ -28,21 +28,22 @@
 #include <vector>
 #include <deque>
 #include "mapper.hpp"
+#include "fast5_reader.hpp"
 
-class Fast5Read {
-    public:
-    Fast5Read();
-    Fast5Read(const std::string &filename);
-
-    void swap(Fast5Read &r);
-    float next_sig();
-    bool empty() const;
-    
-    std::vector<float> signal;
-    std::string name;
-    u16 channel;
-    u32 i;
-};
+//class Fast5Read {
+//    public:
+//    Fast5Read();
+//    Fast5Read(const std::string &filename);
+//
+//    void swap(Fast5Read &r);
+//    float next_sig();
+//    bool empty() const;
+//    
+//    std::vector<float> signal;
+//    std::string name;
+//    u16 channel;
+//    u32 i;
+//};
 
 class ChannelPool {
     public:

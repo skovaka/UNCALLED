@@ -25,70 +25,7 @@
 #include <chrono>
 #include "channel_pool.hpp"
 #include "mapper.hpp"
-
-
-Fast5Read::Fast5Read() :
-    signal(),
-    name(""),
-    channel(0),
-    i(0) {}
-
-Fast5Read::Fast5Read(const std::string &filename) 
-    : i(0) {
-
-    if (filename.empty()) {
-        signal = std::vector<float>();
-        name = "";
-        channel = 0;
-        return;
-    }
-
-    if (!fast5::File::is_valid_file(filename)) {
-        std::cerr << "Error: '" << filename << "' is not a valid file \n";
-        return;
-    }
-
-    fast5::File file;
-
-    try {
-        file.open(filename);
-        
-        if (!file.is_open()) {  
-            std::cerr << "Error: unable to open '" << filename << "'\n";
-        } else {
-            
-            std::vector<i16> int_signal = file.get_raw_int_samples();
-            signal.resize(int_signal.size());
-            for (u32 i = 0; i < int_signal.size(); i++) {
-                signal[i] = (float) int_signal[i];
-            }
-            //signal = file.get_raw_samples();
-            
-            name = file.get_raw_samples_params().read_id;
-            channel = atoi(file.get_channel_id_params().channel_number.c_str()) - 1;
-        
-        }
-
-    } catch (hdf5_tools::Exception& e) {
-        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
-    }
-}
-
-void Fast5Read::swap(Fast5Read &r) {
-    signal.swap(r.signal);
-    name.swap(r.name);
-    std::swap(i, r.i);
-    std::swap(channel, r.channel);
-}
-
-float Fast5Read::next_sig() {
-    return signal[i++];
-}
-
-bool Fast5Read::empty() const {
-    return i >= signal.size();
-}
-    
+#include "fast5_reader.hpp"
 
 ChannelPool::ChannelPool(MapperParams &params, u16 nthreads, u16 nchannels) {
     fast5_count_ = 0;
@@ -276,7 +213,7 @@ void ChannelPool::MapperThread::run() {
             in_mtx_.unlock();
 
             for (Fast5Read &r : new_tmp) {
-                mappers_[r.channel].new_read(r.name);
+                mappers_[r.channel].new_read(r.id);
                 active_reads_.push_back(Fast5Read());
                 active_reads_.back().swap(r);
             }

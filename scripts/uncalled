@@ -28,6 +28,7 @@ import os
 import argparse
 import time
 import re
+import time
 
 class ArgFormat(argparse.ArgumentDefaultsHelpFormatter, 
                 argparse.MetavarTypeHelpFormatter):
@@ -41,7 +42,7 @@ def get_parser():
     map_parser.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to align. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
     map_parser.add_argument("-x", "--bwa-prefix", required=True, type=str, help="BWA prefix to align to. Must be processed by \"uncalled index\".")
     map_parser.add_argument("-t", "--threads", default=1, type=int, help="Number of threads to use for mapping")
-    map_parser.add_argument("-b", "--batch-size", default=5, type=int, help="Maximum number of reads buffered per thread")
+    map_parser.add_argument("-R", "--read-batch-size", default=5, type=int, help="Maximum number of reads buffered per thread")
     map_parser.add_argument("-e", "--max-events-proc", default=30000, type=int, help="Will give up on a read after this many events have been processed")
     map_parser.add_argument("-a", "--min-aln-len", default=25, type=int, help="Minimum number of basepairs a mapping must cover.")
     map_parser.add_argument("-s", "--seed-len", default=22, type=int, help="Seed length in events.")
@@ -50,6 +51,7 @@ def get_parser():
     map_parser.add_argument("-y", "--max-consec-stay", default=8, type=int, help="Maximum consecutive stay events.")
     map_parser.add_argument("-p", "--max-paths", default=10000, type=int, help="Maximum number of paths to consider per event.")
     map_parser.add_argument("-n", "--event-buffer-len", default=0, type=int, help="Size of buffer used to normalize and read events")
+    map_parser.add_argument("-E", "--evt-batch-size", default=5, type=int, help="Number of events to align per read per thread iteration")
     map_parser.add_argument("-C", "--num-channels", default=None, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
     map_parser.add_argument("-F", "--max-stay-frac", default=0.5, type=float, help="Expected fraction of events which are stays")
     map_parser.add_argument("-S", "--min-seed-prob", default=-3.75, type=float, help="Average event probability threshold per seed")
@@ -92,6 +94,7 @@ def map_cmd(args):
                                 args.event_buffer_len,
                                 args.evt_window_length1,
                                 args.evt_window_length2,
+                                args.evt_batch_size,
                                 args.evt_threshold1,
                                 args.evt_threshold2,
                                 args.evt_peak_height,
@@ -131,7 +134,7 @@ def map_cmd(args):
     else:
 
         if args.num_channels == None:
-            mapper = align.Fast5Pool(params, args.threads, args.batch_size)
+            mapper = align.Fast5Pool(params, args.threads, args.read_batch_size)
             mapper.add_fast5s(fast5s)
         else:
             mapper = align.ChannelPool(params, args.threads, args.num_channels)
@@ -142,15 +145,36 @@ def map_cmd(args):
             mapper.add_fast5s(fast5s, channels)
 
         sys.stderr.write("Aligning\n")
+        sys.stderr.flush()
+
+
 
         try:
 
+            st = time.time()
+
             while not mapper.all_finished():
+                #en = time.time()
+                #sys.stderr.write("PYTHON1 %f\n" % (en-st))
+                #sys.stderr.flush()
+
+                #st = time.time()
                 alns = mapper.update()
+                #en = time.time()
+                #sys.stderr.write("PYTHON2 %f\n" % (en-st))
+                #sys.stderr.flush()
+
                 for a in alns:
                     sys.stdout.write("%s\n" % a)
                 sys.stdout.flush()
+
+                #sys.stderr.write("PYTHON3\n")
+                #sys.stderr.flush()
                 time.sleep(0.1)
+                #sys.stderr.write("PYTHON4\n")
+                #sys.stderr.flush()
+
+                st = time.time()
 
         except KeyboardInterrupt:
             pass
