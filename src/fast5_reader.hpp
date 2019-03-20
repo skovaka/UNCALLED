@@ -78,10 +78,13 @@ class ChunkSim {
     std::vector<ChChunk> get_read_chunks();
     void stop_receiving_read(u16 channel, u32 number);
 
+    bool is_running;
+
     private:
     u32 max_loaded_, num_loaded_;
     u16 chunk_len_;
     Timer timer_;
+    u64 tshift_;
     std::deque<std::string> fast5_names_;
     std::vector< std::deque<Chunk> > chunks_;
 };

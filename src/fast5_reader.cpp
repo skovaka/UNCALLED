@@ -27,9 +27,9 @@ Chunk::Chunk(const std::string &_id, u32 _number, u64 _chunk_start_sample,
              const std::vector<float> &_raw_data, u32 raw_st=0, u32 raw_len=4000) 
     : id(_id),
       number(_number),
-      chunk_start_sample(_chunk_start_sample),
-      raw_data(raw_len) {
+      chunk_start_sample(_chunk_start_sample) {
     if (raw_st + raw_len > _raw_data.size()) raw_len = _raw_data.size() - raw_st;
+    raw_data.resize(raw_len);
     for (u32 i = 0; i < raw_len; i++) raw_data[i] = _raw_data[raw_st+i];
 }
 
@@ -106,7 +106,7 @@ bool Fast5Read::empty() const {
 
 u32 Fast5Read::get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) {
     u32 count = 0;
-    for (u32 i = 0; i < raw_data.size()+(max_length-1); i += max_length) {
+    for (u32 i = 0; i < raw_data.size(); i += max_length) {
         chunk_queue.emplace_back(id, number, start_sample+i, raw_data, i, max_length);
         count++;
     }
@@ -125,6 +125,8 @@ ChunkSim::ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len)
      chunk_len_(chunk_len),
      chunks_(num_chs) {
     timer_.reset();
+    tshift_ = -1;
+    is_running = true;
 }
 
 void ChunkSim::add_files(const std::vector<std::string> &fnames) {
@@ -132,28 +134,48 @@ void ChunkSim::add_files(const std::vector<std::string> &fnames) {
     for (i = 0; i < fnames.size() && num_loaded_ < max_loaded_; i++) {
         Fast5Read r(fnames[i]);
         r.get_chunks(chunks_[r.channel], chunk_len_);
+        if (r.start_sample < tshift_) { 
+            tshift_ = r.start_sample;
+            std::cout << "shift " << tshift_ << "\n";
+        }
     }
     for (; i < fnames.size(); i++) fast5_names_.push_back(fnames[i]); 
 }
 
 std::vector<ChChunk> ChunkSim::get_read_chunks() {
-    u64 time = timer_.get();
+    u64 time = (timer_.get()*4) + tshift_;
     
     std::vector<ChChunk> ret;
+    is_running = false;
 
     for (u16 c = 0; c < chunks_.size(); c++) {
+        if (chunks_[c].empty()) continue;
+        is_running = true; 
+
         //Find first chunk that ends after current time
         //Ideally will be second chunk, unless we missed some
         u16 i = 0;
-        for (; i < chunks_[c].size() && chunks_[c][i].get_end() < time; i++) {}
+        for (; i < chunks_[c].size() && chunks_[c][i].chunk_start_sample+chunk_len_ < time; i++);
 
         //Skip if first chunk, otherwise add previous chunk
-        if (i-- == 0) continue; 
+        if (i-- == 0) {
+            continue; 
+        }// else if (i != 0) {
+        //    std::cout << "Skipped " << i << " " << c << " "
+        //              << chunks_[c][0].chunk_start_sample << "-"
+        //              << chunks_[c][0].get_end() << " "
+        //              << chunks_[c][1].chunk_start_sample << "-"
+        //              << chunks_[c][1].get_end() << " ";
+        //}
         ret.emplace_back(c, chunks_[c][i]);
 
         //Remove all finished chunks
-        for (; i < chunks_[c].size(); i--) chunks_[c].pop_front();
+        for (; i < chunks_[c].size(); i--) {
+            chunks_[c].pop_front();
+        }
     }
+
+    //if (ret.size() > 0) std::cout << time << "\t";
 
     return ret;
 }
