@@ -1,6 +1,7 @@
 #include <iostream>
 #include <unistd.h>
 #include "fast5_reader.hpp"
+#include "chunk_pool.hpp"
 #include "mapper.hpp"
 
 const std::string MODEL = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/models/r94_5mers.txt";
@@ -11,8 +12,7 @@ int main(int argc, char** argv) {
     std::string index(argv[1]), reads_fname(argv[2]);
     u32 read_count = atoi(argv[3]);
 
-    std::cout << "I remember how to write a c++ program!\n";
-    MapperParams params(index, MODEL, PROBFN,
+    MapperParams params(index, MODEL,
                         22,    //seed_len
                         25,    //min_aln_len
                         0,     //min_rep_len
@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
                         8,     //max_consec_stay
                         10000, //max_paths
                         30000, //max_events_proc
-                        0,     //evt_buffer_len TODO: what should it be
+                        6000,     //evt_buffer_len TODO: what should it be
                         3,     //evt_winlen1
                         6,     //evt_winlen2
                         5,     //evt_batch_size
@@ -49,21 +49,42 @@ int main(int argc, char** argv) {
 
     u32 i = 0;
     while (getline(reads_file, read_fname) && i < read_count) {
+        if (read_fname[0] == '#') continue;
         fast5_names.push_back(read_fname);
         i++;
     }
     std::cerr << t.get() << "\tfilenames read, splitting into chunks...\n";
     
     ChunkSim sim(read_count, 512, 4000, fast5_names);
+    ChunkPool pool(params, 512, 1);
 
     std::cerr << t.get() << "\tchunks generated, aligning\n";
 
+    const u64 MAX_SLEEP = 250;
+
     while (sim.is_running) {
+        u64 t0 = t.get();
         std::vector<ChChunk> chunks = sim.get_read_chunks();
-        if (!chunks.empty()) {
-            std::cout << t.get() << "\t" << chunks.size() << " chunks\n";
+        
+        //if (!chunks.empty()) {
+        //    std::cout << t.get() << "\t" << chunks.size() << " chunks\n";
+        //}
+
+        for (ChChunk &ch : chunks) {
+            std::cout << "# chunk " << ch.first << " " << ch.second.id << "\n";
+            std::cout.flush();
+            pool.add_chunk(ch.first, ch.second);
         }
-        usleep(250000);
+
+
+        for (ReadLoc aln : pool.update()) {
+            std::cout << aln.str() << "\n";
+            std::cout.flush();
+            sim.stop_receiving_read(aln.get_channel(), aln.get_number());
+        }
+
+        u64 dt = t.get() - t0;
+        if (dt < MAX_SLEEP) usleep(1000*(MAX_SLEEP - dt));
     }
 
 }

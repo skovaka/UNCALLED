@@ -23,6 +23,12 @@
 
 #include "fast5_reader.hpp"
 
+Chunk::Chunk() 
+    : id(""),
+      number(0),
+      chunk_start_sample(0),
+      raw_data() {}
+
 Chunk::Chunk(const std::string &_id, u32 _number, u64 _chunk_start_sample, 
              const std::vector<float> &_raw_data, u32 raw_st=0, u32 raw_len=4000) 
     : id(_id),
@@ -41,6 +47,17 @@ Chunk::Chunk(const Chunk &c)
 
 u64 Chunk::get_end() {
     return chunk_start_sample + raw_data.size();
+}
+
+void Chunk::swap(Chunk &c) {
+    std::swap(id, c.id);
+    std::swap(number, c.number);
+    std::swap(chunk_start_sample, c.chunk_start_sample);
+    raw_data.swap(c.raw_data);
+}
+
+bool Chunk::empty() const {
+    return raw_data.empty();
 }
 
 Fast5Read::Fast5Read() :
@@ -136,7 +153,7 @@ void ChunkSim::add_files(const std::vector<std::string> &fnames) {
         r.get_chunks(chunks_[r.channel], chunk_len_);
         if (r.start_sample < tshift_) { 
             tshift_ = r.start_sample;
-            std::cout << "shift " << tshift_ << "\n";
+            //std::cout << "shift " << tshift_ << "\n";
         }
     }
     for (; i < fnames.size(); i++) fast5_names_.push_back(fnames[i]); 

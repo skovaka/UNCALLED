@@ -30,6 +30,7 @@
 #include "kmer_model.hpp"
 #include "normalizer.hpp"
 #include "seed_tracker.hpp"
+#include "fast5_reader.hpp"
 #include "timer.hpp"
 
 #define PAF_TIME_TAG "YT:f:"
@@ -51,11 +52,12 @@
 #define PAF_TRACKER_TAG "YK:f:"
 #endif
 
+#define INDEX_SUFF ".uncl"
+
 class MapperParams {
     public:
     MapperParams(const std::string &bwa_prefix,
                  const std::string &model_fname,
-                 const std::string &probfn_fname,
                  u32 seed_len, 
                  u32 min_aln_len,
                  u32 min_rep_len, 
@@ -109,7 +111,7 @@ class MapperParams {
 class ReadLoc {
     public:
     ReadLoc();
-    ReadLoc(const std::string &rd_name, u16 channel_id);
+    ReadLoc(const std::string &rd_name, u16 channel=0, u32 number=0);
 
     bool set_ref_loc(const MapperParams &params, const SeedGroup &seeds);
     void set_read_len(const MapperParams &params, u32 len);
@@ -119,6 +121,7 @@ class ReadLoc {
     std::string str() const;
     bool is_valid() const; 
     u16 get_channel() const;
+    u32 get_number() const;
 
     friend std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
 
@@ -130,7 +133,8 @@ class ReadLoc {
 
     private:
     std::string rd_name_, rf_name_;
-    u16 channel_id_;
+    u16 rd_channel_;
+    u32 rd_number_;
     u64 rd_st_, rd_en_, rd_len_,
         rf_st_, rf_en_, rf_len_;
     u16 match_count_;
@@ -149,13 +153,14 @@ class Mapper {
 
     ~Mapper();
 
-    void new_read(const std::string &name);
+    void new_read(const std::string &name, u32 number=0);
 
     std::string map_fast5(const std::string &fast5_name);
     ReadLoc add_samples(const std::vector<float> &samples);
     bool add_sample(float s);
 
-    bool swap_chunk(std::vector<float> &chunk);
+    //bool swap_chunk(std::vector<float> &chunk);
+    bool swap_chunk(Chunk &chunk);
     u16 process_chunk();
     bool map_chunk();
     bool is_chunk_processed() const;
@@ -227,6 +232,7 @@ class Mapper {
     SeedTracker seed_tracker_;
 
     u16 channel_;
+    u32 read_num_;
     bool chunk_processed_;
     std::vector<float> chunk_buffer_, kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;

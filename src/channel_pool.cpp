@@ -213,7 +213,7 @@ void ChannelPool::MapperThread::run() {
             in_mtx_.unlock();
 
             for (Fast5Read &r : new_tmp) {
-                mappers_[r.channel].new_read(r.id);
+                mappers_[r.channel].new_read(r.id, r.number);
                 active_reads_.push_back(Fast5Read());
                 active_reads_.back().swap(r);
             }

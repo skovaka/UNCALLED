@@ -31,11 +31,14 @@
 
 class Chunk {
     public:
+    Chunk();
     Chunk(const std::string &_id, u32 _number, u64 _chunk_start_sample, 
           const std::vector<float> &_raw_data, u32 raw_st, u32 raw_len);
     Chunk(const Chunk &c);
 
     u64 get_end();
+    void swap(Chunk &c);
+    bool empty() const;
 
     std::string id;
     u32 number;

@@ -16,7 +16,6 @@ PYBIND11_MODULE(align, m) {
     py::class_<MapperParams>(m, "MapperParams")
         .def(py::init<const std::string &,
                       const std::string &,
-                      const std::string &,
                       u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u16,
                       float, float, float, float, float, 
                       float, float, float, float>());

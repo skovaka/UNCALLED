@@ -37,17 +37,17 @@ class ReadStream {
     bool empty() const;
 
     std::vector<float> chunk_;
-    std::string name_;
+    std::string id_;
 };
 
 class ChunkPool {
     public:
     ChunkPool(MapperParams &params, u16 nchannels, u16 nthreads);
     
-    void new_read(u16 ch, const std::string &name);
-    bool add_chunk(u16 ch, std::vector<float> &chunk);
+    void new_read(u16 ch, const std::string &id);
+    bool add_chunk(u16 ch, Chunk &chunk);
 
-    std::vector<std::string> update();
+    std::vector<ReadLoc> update();
     bool all_finished();
     void stop_all();
 
@@ -82,7 +82,7 @@ class ChunkPool {
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;
     std::vector<MapperThread> threads_;
-    std::vector<ReadStream> read_buffer_;
+    std::vector<Chunk> read_buffer_;
 
     std::vector<u16> buffer_queue_, active_queue_, out_chs_;
     std::vector<bool> channel_active_;

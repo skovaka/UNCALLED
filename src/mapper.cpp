@@ -26,7 +26,6 @@
 
 MapperParams::MapperParams(const std::string &bwa_prefix,
                            const std::string &model_fname,
-                           const std::string &probfn_fname,
                            u32 seed_len, 
                            u32 min_aln_len,
                            u32 min_rep_len, 
@@ -70,7 +69,8 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
           min_mean_conf_(min_mean_conf),
           min_top_conf_(min_top_conf) {
     
-    std::ifstream infile(probfn_fname);
+    //TODO: exception handling
+    std::ifstream infile(bwa_prefix + INDEX_SUFF);
     float prob, frac;
     u64 fmlen = 0;
     infile >> prob >> frac;
@@ -109,12 +109,13 @@ float MapperParams::get_source_prob() const {
 u16 MapperParams::get_max_events(u16 event_i) const {
     if (event_i + evt_batch_size_ > max_events_proc_) 
         return max_events_proc_ - event_i;
-    return max_events_proc_;
+    return evt_batch_size_;
 }
 
-ReadLoc::ReadLoc(const std::string &rd_name, u16 channel_id = 0) 
+ReadLoc::ReadLoc(const std::string &rd_name, u16 channel, u32 number) 
     : rd_name_(rd_name),
-      channel_id_(channel_id),
+      rd_channel_(channel),
+      rd_number_(number),
       rd_st_(0),
       rd_en_(0),
       rd_len_(0),
@@ -171,7 +172,11 @@ bool ReadLoc::is_valid() const {
 }
 
 u16 ReadLoc::get_channel() const {
-    return channel_id_;
+    return rd_channel_;
+}
+
+u32 ReadLoc::get_number() const {
+    return rd_number_;
 }
 
 std::string ReadLoc::str() const {
@@ -350,7 +355,10 @@ Mapper::Mapper(const MapperParams &ap, u16 channel)
                     ap.min_top_conf_,
                     ap.min_aln_len_,
                     ap.seed_len_),
-      channel_(channel)
+      channel_(channel),
+      read_num_(0),
+      chunk_processed_(true)
+
      {
 
 
@@ -382,14 +390,15 @@ Mapper::~Mapper() {
     }
 }
 
-void Mapper::new_read(const std::string &name) {
-
-    read_loc_ = ReadLoc(name, channel_);
+void Mapper::new_read(const std::string &id, u32 number) {
+    read_loc_ = ReadLoc(id, channel_, number);
+    read_num_ = number;
     prev_size_ = 0;
     event_i_ = 0;
     chunk_i_ = 0;
     seed_tracker_.reset();
     event_detector_.reset();
+    norm_.skip_unread();
     timer_.reset();
 }
 
@@ -407,7 +416,7 @@ std::string Mapper::map_fast5(const std::string &fast5_name) {
         if (file.is_open()) {  
             auto fast5_info = file.get_raw_samples_params();
             auto raw_samples = file.get_raw_samples();
-            new_read(fast5_info.read_id);
+            new_read(fast5_info.read_id, fast5_info.read_number);
             aln = add_samples(raw_samples);
 
         } else {
@@ -453,6 +462,7 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
         #endif
 
         std::vector<Event> events = event_detector_.add_samples(samples);
+        std::vector<Event> old(events);
         model_.normalize(events);
 
         #ifdef DEBUG_TIME
@@ -498,14 +508,16 @@ bool Mapper::is_chunk_processed() const {
     return chunk_processed_;
 }
 
-bool Mapper::swap_chunk(std::vector<float> &chunk) {
+bool Mapper::swap_chunk(Chunk &chunk) {
     if (!is_chunk_processed()) return false;
-    chunk_buffer_.swap(chunk);
+    if (chunk.number != read_num_) new_read(chunk.id, chunk.number);
+    chunk_buffer_.swap(chunk.raw_data);
     chunk_processed_ = false;
     return true;
 }
 
 u16 Mapper::process_chunk() {
+    if (chunk_processed_) return 0; 
     
     #ifdef DEBUG_TIME
     read_loc_.sigproc_time_ += timer_.lap();
@@ -562,7 +574,7 @@ bool Mapper::add_event(float event) {
     #ifdef DEBUG_TIME
     read_loc_.prob_time_ += timer_.lap();
     #endif
-
+    
     //Find neighbors of previous nodes
     for (u32 pi = 0; pi < prev_size_; pi++) {
         if (!prev_paths_[pi].is_valid()) {
@@ -781,6 +793,7 @@ bool Mapper::add_event(float event) {
         read_loc_.tracker_time_ += timer_.lap();
         #endif
 
+        read_num_ = 0;
         return true;
     }
 

@@ -4,7 +4,7 @@ HDF5_LIB=-L/home-4/skovaka1@jhu.edu/anaconda3/lib /home-4/skovaka1@jhu.edu/anaco
 BWA_LIB=-L/home-4/skovaka1@jhu.edu/code/nanopore_aligner/bwa /home-4/skovaka1@jhu.edu/code/nanopore_aligner/bwa/libbwa.a
 HDF5_INCLUDE=-I/home-4/skovaka1@jhu.edu/software/include
 CC=g++
-CFLAGS=-Wall -std=c++11 -g #-O3
+CFLAGS=-Wall -std=c++11 -O3
 INCLUDE=-I../fast5/include -I../pybind11/include -I../ -I../pdqsort #${BOOST_INCLUDE}
 
 all: simulator_test

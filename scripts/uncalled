@@ -83,7 +83,6 @@ def map_cmd(args):
 
     params = align.MapperParams(args.bwa_prefix,
                                 index.MODEL_FNAME,
-                                args.bwa_prefix + index.PARAM_SUFF,
                                 args.seed_len,
                                 args.min_aln_len,
                                 args.min_rep_len,

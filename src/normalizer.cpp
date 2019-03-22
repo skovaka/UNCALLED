@@ -80,6 +80,12 @@ float Normalizer::pop_event() {
     return e;
 }
 
+void Normalizer::skip_unread() {
+    rd_ = wr_;
+    is_full_ = false;
+    is_empty_ = true;
+}
+
 bool Normalizer::empty() const {
     return is_empty_;
 }
