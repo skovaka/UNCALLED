@@ -80,6 +80,7 @@ class ChunkSim {
 
     std::vector<ChChunk> get_read_chunks();
     void stop_receiving_read(u16 channel, u32 number);
+    void unblock(u16 channel, u32 number);
 
     bool is_running;
 
@@ -90,6 +91,7 @@ class ChunkSim {
     u64 tshift_;
     std::deque<std::string> fast5_names_;
     std::vector< std::deque<Chunk> > chunks_;
+    std::vector< u64 > tshifts_;
 };
 
 #endif

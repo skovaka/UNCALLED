@@ -4,8 +4,8 @@
 #include "chunk_pool.hpp"
 #include "mapper.hpp"
 
-const std::string MODEL = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/models/r94_5mers.txt";
-const std::string PROBFN = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
+const std::string MODEL = "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers.txt";
+const std::string PROBFN = "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
 
 
 int main(int argc, char** argv) {
@@ -73,14 +73,16 @@ int main(int argc, char** argv) {
         for (ChChunk &ch : chunks) {
             std::cout << "# chunk " << ch.first << " " << ch.second.id << "\n";
             std::cout.flush();
-            pool.add_chunk(ch.first, ch.second);
+            if (!pool.add_chunk(ch.first, ch.second)) {
+                std::cout << "Couldn't add\n";
+            }
         }
 
 
         for (ReadLoc aln : pool.update()) {
             std::cout << aln.str() << "\n";
             std::cout.flush();
-            sim.stop_receiving_read(aln.get_channel(), aln.get_number());
+            sim.unblock(aln.get_channel(), aln.get_number());
         }
 
         u64 dt = t.get() - t0;

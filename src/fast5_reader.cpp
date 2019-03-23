@@ -140,7 +140,8 @@ ChunkSim::ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len)
    : max_loaded_(max_loaded),
      num_loaded_(0),
      chunk_len_(chunk_len),
-     chunks_(num_chs) {
+     chunks_(num_chs),
+     tshifts_(num_chs, 0) {
     timer_.reset();
     tshift_ = -1;
     is_running = true;
@@ -172,18 +173,19 @@ std::vector<ChChunk> ChunkSim::get_read_chunks() {
         //Find first chunk that ends after current time
         //Ideally will be second chunk, unless we missed some
         u16 i = 0;
-        for (; i < chunks_[c].size() && chunks_[c][i].chunk_start_sample+chunk_len_ < time; i++);
+        for (; i < chunks_[c].size() && 
+               chunks_[c][i].chunk_start_sample+chunk_len_ < time+tshifts_[c]; i++);
 
         //Skip if first chunk, otherwise add previous chunk
         if (i-- == 0) {
             continue; 
-        }// else if (i != 0) {
-        //    std::cout << "Skipped " << i << " " << c << " "
-        //              << chunks_[c][0].chunk_start_sample << "-"
-        //              << chunks_[c][0].get_end() << " "
-        //              << chunks_[c][1].chunk_start_sample << "-"
-        //              << chunks_[c][1].get_end() << " ";
-        //}
+        } else if (i != 0) {
+            std::cout << "Skipped " << i << " " << c << " "
+                      << chunks_[c][0].chunk_start_sample << "-"
+                      << chunks_[c][0].get_end() << " "
+                      << chunks_[c][1].chunk_start_sample << "-"
+                      << chunks_[c][1].get_end() << " ";
+        }
         ret.emplace_back(c, chunks_[c][i]);
 
         //Remove all finished chunks
@@ -201,5 +203,13 @@ void ChunkSim::stop_receiving_read(u16 channel, u32 number) {
     while (!chunks_[channel].empty() && chunks_[channel][0].number == number) {
         chunks_[channel].pop_front();
     }
+}
+
+void ChunkSim::unblock(u16 channel, u32 number) {
+    u64 t0 = chunks_[channel].front().chunk_start_sample;
+    while (!chunks_[channel].empty() && chunks_[channel][0].number == number) {
+        chunks_[channel].pop_front();
+    }
+    tshifts_[channel] += chunks_[channel].front().chunk_start_sample - t0;
 }
 

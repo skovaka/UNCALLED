@@ -18,11 +18,14 @@ Normalizer::Normalizer(const KmerModel &model,
 
 bool Normalizer::add_event(float newevt) {
     if (is_full_) {
+        std::cout << "FULL UP\n";
         return false;
     }
 
     double oldevt = events_[wr_];
     events_[wr_] = newevt;
+    //std::cout << wr_ << " " << rd_ << " " << newevt << " " 
+    //          << is_empty_ << " " << is_full_ << " push\n";
 
     //Based on https://stackoverflow.com/questions/5147378/rolling-variance-algorithm
     if (n_ == events_.size()) {
@@ -37,11 +40,12 @@ bool Normalizer::add_event(float newevt) {
         mean_ += dt1 / n_;
         double dt2 = newevt - mean_;
         varsum_ += dt1*dt2;
-        is_empty_ = false;
     }
+
 
     wr_ = (wr_ + 1) % events_.size();
 
+    is_empty_ = false;
     is_full_ = wr_ == rd_;
 
     return true;
@@ -74,6 +78,8 @@ NormParams Normalizer::get_params() const {
 float Normalizer::pop_event() {
     NormParams np = get_params();
     float e = (float) (np.scale * events_[rd_] + np.shift);
+    //std::cout << wr_ << " " << rd_ << " " << e << " " 
+    //          << is_empty_ << " " << is_full_ << " pop\n";
     rd_ = (rd_+1) % events_.size();
     is_empty_ = rd_ == wr_;
     is_full_ = false;
