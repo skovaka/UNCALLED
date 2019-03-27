@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     std::cerr << t.get() << "\tfilenames read, splitting into chunks...\n";
     
     ChunkSim sim(read_count, 512, 4000, fast5_names);
-    ChunkPool pool(params, 512, 1);
+    ChunkPool pool(params, 512, 2);
 
     std::cerr << t.get() << "\tchunks generated, aligning\n";
 
@@ -88,5 +88,7 @@ int main(int argc, char** argv) {
         u64 dt = t.get() - t0;
         if (dt < MAX_SLEEP) usleep(1000*(MAX_SLEEP - dt));
     }
+
+    pool.stop_all();
 
 }

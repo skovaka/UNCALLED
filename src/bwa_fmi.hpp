@@ -35,8 +35,8 @@ class BwaFMI {
     public:
 
     BwaFMI();
-
     BwaFMI(const std::string &prefix);
+    ~BwaFMI();
 
     Range get_neighbor(Range range, u8 base) const;
 

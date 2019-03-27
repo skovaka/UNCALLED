@@ -58,6 +58,10 @@ ChunkPool::ChunkPool(MapperParams &params, u16 nchannels, u16 nthreads) {
     }
 }
 
+//ChunkPool::~ChunkPool() {
+//
+//}
+
 void ChunkPool::new_read(u16 ch, const std::string &name) {
     read_buffer_[ch].id = name;
     //TODO: what if channel currently active?
@@ -140,6 +144,7 @@ std::vector<ReadLoc> ChunkPool::update() {
                 read_counts[t]++;
             }
             threads_[t].in_mtx_.unlock();
+            std::cout.flush();
         }
     }
 
