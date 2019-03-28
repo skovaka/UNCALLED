@@ -130,18 +130,23 @@ u32 Fast5Read::get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) {
     return count;
 }
 
-ChunkSim::ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len, const std::vector<std::string> &fnames) 
-    : ChunkSim(max_loaded, num_chs, chunk_len) {
+ChunkSim::ChunkSim(u32 max_loaded, 
+                   u32 num_chs, 
+                   u16 chunk_len, 
+                   float speed,
+                   const std::vector<std::string> &fnames) 
+    : ChunkSim(max_loaded, num_chs, chunk_len, speed) {
     add_files(fnames);
     timer_.reset();
 }
 
-ChunkSim::ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len)
+ChunkSim::ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len, float speed)
    : max_loaded_(max_loaded),
      num_loaded_(0),
      chunk_len_(chunk_len),
-     chunks_(num_chs),
-     tshifts_(num_chs, 0) {
+     speed_(speed),
+     chshifts_(num_chs, 0),
+     chunks_(num_chs) {
     timer_.reset();
     tshift_ = -1;
     is_running = true;
@@ -154,14 +159,13 @@ void ChunkSim::add_files(const std::vector<std::string> &fnames) {
         r.get_chunks(chunks_[r.channel], chunk_len_);
         if (r.start_sample < tshift_) { 
             tshift_ = r.start_sample;
-            //std::cout << "shift " << tshift_ << "\n";
         }
     }
     for (; i < fnames.size(); i++) fast5_names_.push_back(fnames[i]); 
 }
 
 std::vector<ChChunk> ChunkSim::get_read_chunks() {
-    u64 time = (timer_.get()*4) + tshift_;
+    u64 time = (timer_.get() * speed_) + tshift_;
     
     std::vector<ChChunk> ret;
     is_running = false;
@@ -174,7 +178,7 @@ std::vector<ChChunk> ChunkSim::get_read_chunks() {
         //Ideally will be second chunk, unless we missed some
         u16 i = 0;
         for (; i < chunks_[c].size() && 
-               chunks_[c][i].chunk_start_sample+chunk_len_ < time+tshifts_[c]; i++);
+               chunks_[c][i].chunk_start_sample+chunk_len_ < time+chshifts_[c]; i++);
 
         //Skip if first chunk, otherwise add previous chunk
         if (i-- == 0) {
@@ -184,7 +188,7 @@ std::vector<ChChunk> ChunkSim::get_read_chunks() {
                       << chunks_[c][0].chunk_start_sample << "-"
                       << chunks_[c][0].get_end() << " "
                       << chunks_[c][1].chunk_start_sample << "-"
-                      << chunks_[c][1].get_end() << " ";
+                      << chunks_[c][1].get_end() << "\n";
         }
         ret.emplace_back(c, chunks_[c][i]);
 
@@ -210,6 +214,6 @@ void ChunkSim::unblock(u16 channel, u32 number) {
     while (!chunks_[channel].empty() && chunks_[channel][0].number == number) {
         chunks_[channel].pop_front();
     }
-    tshifts_[channel] += chunks_[channel].front().chunk_start_sample - t0;
+    chshifts_[channel] += chunks_[channel].front().chunk_start_sample - t0;
 }
 

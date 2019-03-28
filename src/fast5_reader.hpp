@@ -73,8 +73,8 @@ class Fast5Read {
 
 class ChunkSim {
     public:
-    ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len, const std::vector<std::string> &fnames);
-    ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len);
+    ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len, float speed, const std::vector<std::string> &fnames);
+    ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len, float speed);
     
     void add_files(const std::vector<std::string> &fnames);
 
@@ -87,11 +87,12 @@ class ChunkSim {
     private:
     u32 max_loaded_, num_loaded_;
     u16 chunk_len_;
+    float speed_;
     Timer timer_;
     u64 tshift_;
+    std::vector< u64 > chshifts_;
     std::deque<std::string> fast5_names_;
     std::vector< std::deque<Chunk> > chunks_;
-    std::vector< u64 > tshifts_;
 };
 
 #endif

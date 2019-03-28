@@ -4,13 +4,16 @@
 #include "chunk_pool.hpp"
 #include "mapper.hpp"
 
-const std::string MODEL = "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers.txt";
-const std::string PROBFN = "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
+//const std::string MODEL = "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers.txt";
+//const std::string PROBFN = "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
 
+const std::string MODEL = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/models/r94_5mers.txt";
+const std::string PROBFN = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
 
 int main(int argc, char** argv) {
     std::string index(argv[1]), reads_fname(argv[2]);
     u32 read_count = atoi(argv[3]);
+    float speed = atof(argv[4]);
 
     MapperParams params(index, MODEL,
                         22,    //seed_len
@@ -55,12 +58,12 @@ int main(int argc, char** argv) {
     }
     std::cerr << t.get() << "\tfilenames read, splitting into chunks...\n";
     
-    ChunkSim sim(read_count, 512, 4000, fast5_names);
+    ChunkSim sim(read_count, 512, 4000, speed, fast5_names);
     ChunkPool pool(params, 512, 2);
 
     std::cerr << t.get() << "\tchunks generated, aligning\n";
 
-    const u64 MAX_SLEEP = 250;
+    const u64 MAX_SLEEP = 10;
 
     while (sim.is_running) {
         u64 t0 = t.get();
