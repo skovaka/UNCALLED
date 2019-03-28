@@ -83,6 +83,7 @@ class ChunkPool {
     std::vector<Mapper> mappers_;
     std::vector<MapperThread> threads_;
     std::vector<Chunk> read_buffer_;
+    std::vector<ReadLoc> locs_;
 
     std::vector<u16> buffer_queue_, active_queue_, out_chs_;
     std::vector<bool> channel_active_;

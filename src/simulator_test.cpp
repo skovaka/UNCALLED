@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
 
     std::cerr << t.get() << "\tchunks generated, aligning\n";
 
-    const u64 MAX_SLEEP = 10;
+    const u64 MAX_SLEEP = 250;
 
     while (sim.is_running) {
         u64 t0 = t.get();
@@ -77,10 +77,9 @@ int main(int argc, char** argv) {
             std::cout << "# chunk " << ch.first << " " << ch.second.id << "\n";
             std::cout.flush();
             if (!pool.add_chunk(ch.first, ch.second)) {
-                std::cout << "Couldn't add\n";
+                std::cout << "# couldn't add\n";
             }
         }
-
 
         for (ReadLoc aln : pool.update()) {
             std::cout << aln.str() << "\n";

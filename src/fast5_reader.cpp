@@ -183,13 +183,13 @@ std::vector<ChChunk> ChunkSim::get_read_chunks() {
         //Skip if first chunk, otherwise add previous chunk
         if (i-- == 0) {
             continue; 
-        } else if (i != 0) {
-            std::cout << "Skipped " << i << " " << c << " "
-                      << chunks_[c][0].chunk_start_sample << "-"
-                      << chunks_[c][0].get_end() << " "
-                      << chunks_[c][1].chunk_start_sample << "-"
-                      << chunks_[c][1].get_end() << "\n";
-        }
+        }// else if (i != 0) {
+        //    std::cout << "# skipped " << i << " " << c << " "
+        //              << chunks_[c][0].chunk_start_sample << "-"
+        //              << chunks_[c][0].get_end() << " "
+        //              << chunks_[c][1].chunk_start_sample << "-"
+        //              << chunks_[c][1].get_end() << "\n";
+        //}
         ret.emplace_back(c, chunks_[c][i]);
 
         //Remove all finished chunks

@@ -70,17 +70,36 @@ void ChunkPool::new_read(u16 ch, const std::string &name) {
 
 //Add chunk to master buffer
 bool ChunkPool::add_chunk(u16 ch, Chunk &c) {
-    if (!read_buffer_[ch].empty()) return false; //TODO: reset mapper here?
-    //TODO: what if channel currently active?
-    read_buffer_[ch].swap(c);
-    //read_buffer_[ch].id_ = id;
-    //chunk.swap(read_buffer_[ch].chunk_);
-    buffer_queue_.push_back(ch);
-    return true;
+    //if (!read_buffer_[ch].empty()) return false; //TODO: reset mapper here?
+    ////TODO: what if channel currently active?
+    //read_buffer_[ch].swap(c);
+    //buffer_queue_.push_back(ch);
+
+    if (mappers_[ch].prev_unfinished(c.number)) {
+        locs_.push_back(mappers_[ch].pop_loc());
+        mappers_[ch].new_read(c.id, c.number);
+
+    } else {
+        if (mappers_[ch].finished()) {
+            locs_.push_back(mappers_[ch].pop_loc());
+        }
+
+        if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
+            mappers_[ch].new_read(c.id, c.number);
+            active_queue_.push_back(ch);
+        } 
+    }
+
+    if (mappers_[ch].swap_chunk(c)) {
+        return true;
+    } 
+    
+    //TODO: something about it
+
+    return false;
 }
 
 std::vector<ReadLoc> ChunkPool::update() {
-    std::vector<ReadLoc> ret;
 
     std::vector< u16 > read_counts(threads_.size());
     u16 active_count = 0;
@@ -97,8 +116,10 @@ std::vector<ReadLoc> ChunkPool::update() {
 
             //Loop over alignments
             for (auto ch : out_chs_) {
-                channel_active_[ch] = false;
-                ret.push_back(mappers_[ch].get_loc());
+                //Mape sure swap_chunk didn't read output
+                if (mappers_[ch].finished()) {
+                    locs_.push_back(mappers_[ch].pop_loc());
+                }
             }
             out_chs_.clear();
         }
@@ -109,21 +130,6 @@ std::vector<ReadLoc> ChunkPool::update() {
     }
 
     
-    //TODO: combine queues, partition into active/buffer regions
-    for (u16 i = buffer_queue_.size()-1; i < buffer_queue_.size(); i--) {
-        u16 ch = buffer_queue_[i];
-        if (mappers_[ch].swap_chunk(read_buffer_[ch])) {
-            if (i != buffer_queue_.size()-1) {
-                 buffer_queue_[i] = buffer_queue_.back();
-            }
-            buffer_queue_.pop_back();
-            if (!channel_active_[ch]) {
-                active_queue_.push_back(ch);
-                //mappers_[ch].new_read(read_buffer_[ch].id_);
-            } 
-        } 
-    }
-
     //Estimate how much to fill each thread
     u16 target = active_queue_.size() + active_count,
         per_thread = target / threads_.size() + (target % threads_.size() > 0);
@@ -140,18 +146,21 @@ std::vector<ReadLoc> ChunkPool::update() {
                 u16 ch = active_queue_.back(); 
                 active_queue_.pop_back();
                 threads_[t].in_chs_.push_back(ch);
-                channel_active_[ch] = true;
+                //std::cout << "# activated " << ch << "\n";
                 read_counts[t]++;
             }
             threads_[t].in_mtx_.unlock();
-            std::cout.flush();
         }
     }
+
+    std::vector<ReadLoc> ret;
+    ret.swap(locs_);
 
     return ret;
 }
 
 bool ChunkPool::all_finished() {
+    //TODO: think about this
     if (!buffer_queue_.empty()) return false;
 
     for (MapperThread &t : threads_) {
@@ -219,9 +228,12 @@ void ChunkPool::MapperThread::run() {
         for (u16 i = 0; i < active_chs_.size() && running_; i++) {
             u16 ch = active_chs_[i];
 
-            mappers_[ch].process_chunk();
+            mappers_[ch].process_chunk();//#) {
+                //std::cout << "# processed\n";
+            //}
 
             if (mappers_[ch].map_chunk()) {
+                //std::cout << "# mapped\n";
                 out_tmp_.push_back(i);
             }
         }

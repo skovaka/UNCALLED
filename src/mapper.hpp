@@ -148,6 +148,8 @@ std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
 class Mapper {
     public:
 
+    enum State { INACTIVE, MAPPING, SUCCESS, FAILURE };
+
     Mapper(const MapperParams &map_params, u16 channel);
     Mapper(const Mapper &m);
 
@@ -164,8 +166,13 @@ class Mapper {
     u16 process_chunk();
     bool map_chunk();
     bool is_chunk_processed() const;
+    State get_state() const;
 
+    u32 prev_unfinished(u32 next_number) const;
+
+    bool finished() const;
     ReadLoc get_loc() const;
+    ReadLoc pop_loc();
 
     private:
 
@@ -234,6 +241,7 @@ class Mapper {
     u16 channel_;
     u32 read_num_;
     bool chunk_processed_;
+    State state_;
     std::vector<float> chunk_buffer_, kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;
     std::vector<bool> sources_added_;

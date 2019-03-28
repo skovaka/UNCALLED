@@ -357,7 +357,8 @@ Mapper::Mapper(const MapperParams &ap, u16 channel)
                     ap.seed_len_),
       channel_(channel),
       read_num_(0),
-      chunk_processed_(true)
+      chunk_processed_(true),
+      state_(State::INACTIVE)
 
      {
 
@@ -396,6 +397,7 @@ void Mapper::new_read(const std::string &id, u32 number) {
     prev_size_ = 0;
     event_i_ = 0;
     chunk_i_ = 0;
+    state_ = State::MAPPING;
     seed_tracker_.reset();
     event_detector_.reset();
     norm_.skip_unread();
@@ -450,6 +452,19 @@ bool Mapper::add_sample(float s) {
     return false;
 }
 
+u32 Mapper::prev_unfinished(u32 next_number) const {
+    return state_ == State::MAPPING && read_num_ != next_number;
+}
+
+bool Mapper::finished() const {
+    return state_ == State::SUCCESS || state_ == State::FAILURE;
+}
+
+ReadLoc Mapper::pop_loc() {
+    state_ = State::INACTIVE;
+    return read_loc_;
+}
+
 ReadLoc Mapper::get_loc() const {
     return read_loc_;
 }
@@ -472,7 +487,7 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
         read_loc_.set_read_len(params_, events.size());
 
         for (u32 e = 0; e < events.size(); e++) {
-            if (e >= params_.max_events_proc_ || add_event(events[e].mean)) break;
+            if (add_event(events[e].mean)) break;
         }
     } else {
 
@@ -494,8 +509,8 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
             read_loc_.sigproc_time_ += timer_.lap();
             #endif
 
-            if (i >= params_.max_events_proc_ || add_event(m)) break;
-            else i++;
+            if (add_event(m)) break;
+            i++;
         }
     }
 
@@ -508,9 +523,18 @@ bool Mapper::is_chunk_processed() const {
     return chunk_processed_;
 }
 
+Mapper::State Mapper::get_state() const {
+    return state_;
+}
+
 bool Mapper::swap_chunk(Chunk &chunk) {
     if (!is_chunk_processed()) return false;
-    if (chunk.number != read_num_) new_read(chunk.id, chunk.number);
+
+    //New read hasn't been set
+    if (chunk.number != read_num_) {
+        state_ = State::FAILURE;
+    }
+
     chunk_buffer_.swap(chunk.raw_data);
     chunk_processed_ = false;
     return true;
@@ -555,10 +579,16 @@ bool Mapper::map_chunk() {
     for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
         if (add_event(norm_.pop_event())) return true;
     }
+
     return false;
 }
 
 bool Mapper::add_event(float event) {
+
+    if (event_i_ >= params_.max_events_proc_) {
+        state_ = State::FAILURE;
+        return true;
+    }
 
     Range prev_range;
     u16 prev_kmer;
@@ -787,13 +817,14 @@ bool Mapper::add_event(float event) {
     SeedGroup sg = seed_tracker_.get_final();
 
     if (sg.is_valid()) {
+        state_ = State::SUCCESS;
         read_loc_.set_ref_loc(params_, sg);
+        read_num_ = 0;
 
         #ifdef DEBUG_TIME
         read_loc_.tracker_time_ += timer_.lap();
         #endif
 
-        read_num_ = 0;
         return true;
     }
 
