@@ -56,6 +56,13 @@ void Chunk::swap(Chunk &c) {
     raw_data.swap(c.raw_data);
 }
 
+void Chunk::clear() {
+    raw_data.clear();
+    id = "";
+    number = 0;
+    chunk_start_sample = 0;
+}   
+
 bool Chunk::empty() const {
     return raw_data.empty();
 }
@@ -183,12 +190,12 @@ std::vector<ChChunk> ChunkSim::get_read_chunks() {
         //Skip if first chunk, otherwise add previous chunk
         if (i-- == 0) {
             continue; 
-        }// else if (i != 0) {
-        //    std::cout << "# skipped " << i << " " << c << " "
-        //              << chunks_[c][0].chunk_start_sample << "-"
-        //              << chunks_[c][0].get_end() << " "
-        //              << chunks_[c][1].chunk_start_sample << "-"
-        //              << chunks_[c][1].get_end() << "\n";
+        } //else if (i != 0) {
+          //  std::cout << "# skipped " << i << " " << c << " "
+          //            << chunks_[c][0].chunk_start_sample << "-"
+          //            << chunks_[c][0].get_end() << " "
+          //            << chunks_[c][1].chunk_start_sample << "-"
+          //            << chunks_[c][1].get_end() << "\n";
         //}
         ret.emplace_back(c, chunks_[c][i]);
 

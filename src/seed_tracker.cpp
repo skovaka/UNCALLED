@@ -119,7 +119,8 @@ void SeedTracker::reset() {
 }
 
 SeedGroup SeedTracker::get_final() {
-    if (max_map_.total_len_ < min_aln_len_) return NULL_ALN;
+    if (max_map_.total_len_ < min_aln_len_ || 
+        all_lens_.size() < 2) return NULL_ALN;
 
     float mean_len = len_sum_ / alignments_.size();
     float next_len = *std::next(all_lens_.rbegin());

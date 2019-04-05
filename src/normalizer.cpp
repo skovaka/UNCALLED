@@ -18,7 +18,7 @@ Normalizer::Normalizer(const KmerModel &model,
 
 bool Normalizer::add_event(float newevt) {
     if (is_full_) {
-        std::cout << "FULL UP\n";
+        //std::cout << "# FULL UP\n";
         return false;
     }
 
@@ -86,10 +86,35 @@ float Normalizer::pop_event() {
     return e;
 }
 
-void Normalizer::skip_unread() {
-    rd_ = wr_;
+u32 Normalizer::unread_size() const {
+    if (rd_ < wr_) return wr_ - rd_;
+    else return (n_ - rd_) + wr_;
+}
+
+u32 Normalizer::skip_unread(u32 nkeep) {
+    if (nkeep >= unread_size()) return 0;
+
+    //std::cout << "# skip " 
+    //          << nkeep << " "
+    //          << rd_ << " "
+    //          << wr_ << " "
+    //          << n_ << " ";
+
     is_full_ = false;
-    is_empty_ = true;
+    is_empty_ = nkeep == 0;
+
+    u32 new_rd;
+    if (nkeep <= wr_) new_rd = wr_ - nkeep;
+    else new_rd = n_ - (nkeep - wr_);
+    std::cout << new_rd << " "; 
+
+    u32 nskip;
+    if (new_rd > rd_) nskip = new_rd - rd_;
+    else nskip = (n_ - rd_) + new_rd;
+    std::cout << nskip << "\n"; 
+
+    rd_ = new_rd;
+    return nskip;
 }
 
 bool Normalizer::empty() const {

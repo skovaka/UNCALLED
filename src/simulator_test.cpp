@@ -12,8 +12,8 @@ const std::string PROBFN = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/
 
 int main(int argc, char** argv) {
     std::string index(argv[1]), reads_fname(argv[2]);
-    u32 read_count = atoi(argv[3]);
-    float speed = atof(argv[4]);
+    u32 nthreads = atoi(argv[3]), read_count = atoi(argv[4]);
+    float speed = atof(argv[5]);
 
     MapperParams params(index, MODEL,
                         22,    //seed_len
@@ -59,32 +59,44 @@ int main(int argc, char** argv) {
     std::cerr << t.get() << "\tfilenames read, splitting into chunks...\n";
     
     ChunkSim sim(read_count, 512, 4000, speed, fast5_names);
-    ChunkPool pool(params, 512, 2);
+    ChunkPool pool(params, 512, nthreads);
 
     std::cerr << t.get() << "\tchunks generated, aligning\n";
 
-    const u64 MAX_SLEEP = 250;
+    const u64 MAX_SLEEP = 100;
 
-    while (sim.is_running) {
+    while (sim.is_running || !pool.all_finished()) {
         u64 t0 = t.get();
-        std::vector<ChChunk> chunks = sim.get_read_chunks();
         
         //if (!chunks.empty()) {
         //    std::cout << t.get() << "\t" << chunks.size() << " chunks\n";
         //}
 
-        for (ChChunk &ch : chunks) {
-            std::cout << "# chunk " << ch.first << " " << ch.second.id << "\n";
-            std::cout.flush();
-            if (!pool.add_chunk(ch.first, ch.second)) {
-                std::cout << "# couldn't add\n";
-            }
-        }
-
         for (ReadLoc aln : pool.update()) {
             std::cout << aln.str() << "\n";
             std::cout.flush();
             sim.unblock(aln.get_channel(), aln.get_number());
+            //sim.stop_receiving_read(aln.get_channel(), aln.get_number());
+        }
+
+        std::vector<ChChunk> chunks = sim.get_read_chunks();
+        for (ChChunk &ch : chunks) {
+            std::cout << "# chunk " << ch.first << " " << ch.second.id << "\n";
+            std::cout.flush();
+
+            u16 channel = ch.first, number = ch.second.number;
+
+            bool last = ch.second.raw_data.size() < 4000;
+
+            if (!pool.add_chunk(ch.first, ch.second)) {
+                std::cout << "# couldn't add\n";
+            }
+            
+            if (last) { 
+                //std::cout << "# ending " << channel << "\n";
+                pool.end_read(channel, number);
+            }
+
         }
 
         u64 dt = t.get() - t0;
@@ -92,5 +104,4 @@ int main(int argc, char** argv) {
     }
 
     pool.stop_all();
-
 }

@@ -47,6 +47,8 @@ class ChunkPool {
     void new_read(u16 ch, const std::string &id);
     bool add_chunk(u16 ch, Chunk &chunk);
 
+    void end_read(u16 ch, u32 number);
+
     std::vector<ReadLoc> update();
     bool all_finished();
     void stop_all();
@@ -78,6 +80,8 @@ class ChunkPool {
 
         std::thread thread_;
     };
+
+    void buffer_chunk(u16 ch, Chunk &c);
 
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;

@@ -155,7 +155,9 @@ class Mapper {
 
     ~Mapper();
 
+    void skip_events(u32 n);
     void new_read(const std::string &name, u32 number=0);
+    bool end_read(u32 number);
 
     std::string map_fast5(const std::string &fast5_name);
     ReadLoc add_samples(const std::vector<float> &samples);
@@ -166,6 +168,9 @@ class Mapper {
     u16 process_chunk();
     bool map_chunk();
     bool is_chunk_processed() const;
+    void request_reset();
+    void end_reset();
+    bool is_resetting();
     State get_state() const;
 
     u32 prev_unfinished(u32 next_number) const;
@@ -240,7 +245,7 @@ class Mapper {
 
     u16 channel_;
     u32 read_num_;
-    bool chunk_processed_;
+    bool chunk_processed_, last_chunk_,reset_;
     State state_;
     std::vector<float> chunk_buffer_, kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;

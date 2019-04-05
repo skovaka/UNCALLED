@@ -68,27 +68,46 @@ void ChunkPool::new_read(u16 ch, const std::string &name) {
     //in practice rare, but could happen, especially in naive simulation
 }
 
+void ChunkPool::buffer_chunk(u16 ch, Chunk &c) {
+    if (read_buffer_[ch].empty()) {
+        buffer_queue_.push_back(ch);
+    } else {
+        //TODO: handle backlog
+        read_buffer_[ch].clear();
+    }
+    read_buffer_[ch].swap(c);
+}
+
 //Add chunk to master buffer
 bool ChunkPool::add_chunk(u16 ch, Chunk &c) {
-    //if (!read_buffer_[ch].empty()) return false; //TODO: reset mapper here?
-    ////TODO: what if channel currently active?
-    //read_buffer_[ch].swap(c);
-    //buffer_queue_.push_back(ch);
 
+    //Check if previous read is still aligning
+    //If so, tell thread to reset, store chunk in pool buffer
     if (mappers_[ch].prev_unfinished(c.number)) {
-        locs_.push_back(mappers_[ch].pop_loc());
-        mappers_[ch].new_read(c.id, c.number);
-
-    } else {
-        if (mappers_[ch].finished()) {
-            locs_.push_back(mappers_[ch].pop_loc());
-        }
-
-        if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
-            mappers_[ch].new_read(c.id, c.number);
-            active_queue_.push_back(ch);
-        } 
+        mappers_[ch].request_reset();
+        buffer_chunk(ch, c);
+        //std::cout << "# requesting reset\n";
+        return true;
     }
+
+    //Previous alignment finished but mapper hasn't reset
+    //Happens if update hasn't been called yet
+    if (mappers_[ch].finished()) {
+        if (mappers_[ch].get_loc().get_number() != c.number){ 
+            buffer_chunk(ch, c);
+            //std::cout << "# buffering chunk\n";
+        } else {
+            //std::cout << "# got finished chunk\n";
+        }
+        return true;
+    }
+
+    //Mapper inactive - need to reset graph and assign to thread
+    if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
+        mappers_[ch].new_read(c.id, c.number);
+        active_queue_.push_back(ch);
+        //std::cout << "# new in add\n";
+    } 
 
     if (mappers_[ch].swap_chunk(c)) {
         return true;
@@ -97,6 +116,10 @@ bool ChunkPool::add_chunk(u16 ch, Chunk &c) {
     //TODO: something about it
 
     return false;
+}
+
+void ChunkPool::end_read(u16 ch, u32 number) {
+    mappers_[ch].end_read(number);
 }
 
 std::vector<ReadLoc> ChunkPool::update() {
@@ -116,10 +139,8 @@ std::vector<ReadLoc> ChunkPool::update() {
 
             //Loop over alignments
             for (auto ch : out_chs_) {
-                //Mape sure swap_chunk didn't read output
-                if (mappers_[ch].finished()) {
-                    locs_.push_back(mappers_[ch].pop_loc());
-                }
+                //std::cout << "# popped " << ch << " " << t << "\n";
+                locs_.push_back(mappers_[ch].pop_loc());
             }
             out_chs_.clear();
         }
@@ -129,7 +150,33 @@ std::vector<ReadLoc> ChunkPool::update() {
         active_count += read_counts[t];
     }
 
-    
+    //std::cout << "# " << active_count << " active\n";
+    //std::cout.flush();
+
+    for (u16 i = buffer_queue_.size()-1; i < buffer_queue_.size(); i--) {
+        u16 ch = buffer_queue_[i];
+        Chunk &c = read_buffer_[ch];
+
+        if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
+            mappers_[ch].new_read(c.id, c.number);
+            active_queue_.push_back(ch);
+            //std::cout << "# new in update\n";
+        }
+
+        if (mappers_[ch].swap_chunk(read_buffer_[ch])) {
+            //std::cout << "# empty buffer\n";
+            if (i != buffer_queue_.size()-1) {
+                buffer_queue_[i] = buffer_queue_.back();
+            }
+            buffer_queue_.pop_back();
+        } //else {
+            //std::cout << "# failed to empty buffer "
+                      //<< mappers_[ch].is_resetting() << " "
+                      //<< read_buffer_[ch].raw_data.size() << " "
+                      //<< read_buffer_[ch].id << "\n";
+        //}
+    }
+
     //Estimate how much to fill each thread
     u16 target = active_queue_.size() + active_count,
         per_thread = target / threads_.size() + (target % threads_.size() > 0);
@@ -146,7 +193,7 @@ std::vector<ReadLoc> ChunkPool::update() {
                 u16 ch = active_queue_.back(); 
                 active_queue_.pop_back();
                 threads_[t].in_chs_.push_back(ch);
-                //std::cout << "# activated " << ch << "\n";
+                //std::cout << "# activated " << ch << " " << t << "\n";
                 read_counts[t]++;
             }
             threads_[t].in_mtx_.unlock();
@@ -220,34 +267,41 @@ void ChunkPool::MapperThread::run() {
             for (auto ch : in_tmp_) {
                 active_chs_.push_back(ch);
             }
+            //std::cout << "# " << tid_ << " controlling";
+            //for (auto ch : active_chs_) std::cout << " " << ch;
+            //std::cout << "\n";
 
             in_tmp_.clear(); //(pop)
         }
 
+
         //Map chunks
         for (u16 i = 0; i < active_chs_.size() && running_; i++) {
             u16 ch = active_chs_[i];
-
-            mappers_[ch].process_chunk();//#) {
-                //std::cout << "# processed\n";
-            //}
-
+            mappers_[ch].process_chunk();
+            //std::cout << "# mapping " << ch << "\n";
             if (mappers_[ch].map_chunk()) {
-                //std::cout << "# mapped\n";
                 out_tmp_.push_back(i);
+                //std::cout << "# finishch " << ch << "\n";
             }
         }
 
         //Add finished to output
         if (!out_tmp_.empty()) {
+            //std::cout << "# " << tid_ << " has " << out_chs_.size() << " pending\n";
             out_mtx_.lock();
             for (auto i : out_tmp_) out_chs_.push_back(active_chs_[i]);
             out_mtx_.unlock();
 
+            std::sort(out_tmp_.begin(), out_tmp_.end(),
+                      [](u32 a, u32 b) { return a > b; });
+            //std::cout << "# popping";
             for (auto i : out_tmp_) {
+                //std::cout << " " << i;
                 active_chs_[i] = active_chs_.back();
                 active_chs_.pop_back();
             }
+            //std::cout << "\n";
             out_tmp_.clear();
         }
     }

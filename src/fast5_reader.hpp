@@ -38,6 +38,7 @@ class Chunk {
 
     u64 get_end();
     void swap(Chunk &c);
+    void clear();
     bool empty() const;
 
     std::string id;

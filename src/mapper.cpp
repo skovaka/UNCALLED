@@ -370,7 +370,6 @@ Mapper::Mapper(const MapperParams &ap, u16 channel)
     }
     PathBuffer::TYPE_MASK = (u8) ((1 << TYPE_BITS) - 1);
 
-
     kmer_probs_ = std::vector<float>(model_.kmer_count());
     prev_paths_ = std::vector<PathBuffer>(params_.max_paths_);
     next_paths_ = std::vector<PathBuffer>(params_.max_paths_);
@@ -378,7 +377,6 @@ Mapper::Mapper(const MapperParams &ap, u16 channel)
 
     prev_size_ = 0;
     event_i_ = 0;
-    chunk_i_ = 0;
     seed_tracker_.reset();
 }
 
@@ -391,16 +389,24 @@ Mapper::~Mapper() {
     }
 }
 
+void Mapper::skip_events(u32 n) {
+    event_i_ += n;
+    prev_size_ = 0;
+}
+
 void Mapper::new_read(const std::string &id, u32 number) {
     read_loc_ = ReadLoc(id, channel_, number);
     read_num_ = number;
     prev_size_ = 0;
     event_i_ = 0;
-    chunk_i_ = 0;
+    chunk_processed_ = true;
+    reset_ = false;
+    last_chunk_ = false;
     state_ = State::MAPPING;
     seed_tracker_.reset();
     event_detector_.reset();
     norm_.skip_unread();
+    chunk_buffer_.clear();
     timer_.reset();
 }
 
@@ -462,6 +468,7 @@ bool Mapper::finished() const {
 
 ReadLoc Mapper::pop_loc() {
     state_ = State::INACTIVE;
+    reset_ = false;
     return read_loc_;
 }
 
@@ -519,6 +526,18 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
     return read_loc_;
 }
 
+void Mapper::request_reset() {
+    reset_ = true;
+}
+
+void Mapper::end_reset() {
+    reset_ = false;
+}
+
+bool Mapper::is_resetting() {
+    return reset_;
+}
+
 bool Mapper::is_chunk_processed() const {
     return chunk_processed_;
 }
@@ -528,7 +547,8 @@ Mapper::State Mapper::get_state() const {
 }
 
 bool Mapper::swap_chunk(Chunk &chunk) {
-    if (!is_chunk_processed()) return false;
+    //std::cout << "# tryna swap " << is_chunk_processed() << " " << reset_ << " " << state_ << "\n";
+    if (!is_chunk_processed() || reset_) return false;
 
     //New read hasn't been set
     if (chunk.number != read_num_) {
@@ -541,7 +561,7 @@ bool Mapper::swap_chunk(Chunk &chunk) {
 }
 
 u16 Mapper::process_chunk() {
-    if (chunk_processed_) return 0; 
+    if (chunk_processed_ || reset_) return 0; 
     
     #ifdef DEBUG_TIME
     read_loc_.sigproc_time_ += timer_.lap();
@@ -549,31 +569,43 @@ u16 Mapper::process_chunk() {
 
     float mean;
 
-    if (chunk_i_ > 0) {
-        mean = event_detector_.get_mean();
-        if (!norm_.add_event(mean)) return 0;
-    }
+    //std::cout << "# processing " << channel_ << "\n";
 
     u16 nevents = 0;
-    for (u32 i = chunk_i_; i < chunk_buffer_.size(); i++) {
+    for (u32 i = 0; i < chunk_buffer_.size(); i++) {
         if (event_detector_.add_sample(chunk_buffer_[i])) {
             mean = event_detector_.get_mean();
-            if (norm_.add_event(mean)) {
-                nevents++;
-            } else {
-                chunk_i_ = i+1;
-                return nevents;
+            if (!norm_.add_event(mean)) {
+
+                //std::cout << "# skipping unread " << channel_ << "\n";
+                u32 nskip = norm_.skip_unread(nevents);
+                skip_events(nskip);
+                //TODO: report event skip in some way
+                //std::cout << "# norm skipped " << nskip << "\n";
+                if (!norm_.add_event(mean)) {
+                    std::cout << "# error: chunk events cannot fit in normilzation buffer\n";
+                    return nevents;
+                }
             }
+            nevents++;
         }
     }
 
+    //std::cout << "# processed " << channel_ << "\n";
+
     chunk_buffer_.clear();
-    chunk_i_ = 0;
     chunk_processed_ = true;
     return nevents;
 }
 
+bool Mapper::end_read(u32 number) {
+    //set last chunk if you want to keep trying after read has ended
+    //return last_chunk_ = (read_loc_.get_number() == number);
+    return reset_ = (read_loc_.get_number() == number);
+}
+
 bool Mapper::map_chunk() {
+    if (reset_ || (last_chunk_ && norm_.empty())) return true;
     u16 nevents = params_.get_max_events(event_i_);
     //TODO: add timeout to params
     for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
@@ -585,7 +617,8 @@ bool Mapper::map_chunk() {
 
 bool Mapper::add_event(float event) {
 
-    if (event_i_ >= params_.max_events_proc_) {
+    if (reset_ || event_i_ >= params_.max_events_proc_) {
+        reset_ = false;
         state_ = State::FAILURE;
         return true;
     }

@@ -14,7 +14,8 @@ class Normalizer {
     bool add_event(float newevt);
     float pop_event();
     NormParams get_params() const;
-    void skip_unread();
+    u32 unread_size() const;
+    u32 skip_unread(u32 nkeep = 0);
     void reset(u32 buffer_size);
     bool empty() const;
     bool full() const;
