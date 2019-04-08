@@ -26,8 +26,10 @@
 
 #include <deque>
 #include "fast5.hpp"
+#include "fast5/hdf5_tools.hpp"
 #include "util.hpp"
 #include "timer.hpp"
+
 
 class Chunk {
     public:
@@ -51,16 +53,22 @@ class Chunk {
 };
 using ChChunk = std::pair<u16, Chunk>;
 
+
 class Fast5Read {
     public:
     Fast5Read();
     Fast5Read(const std::string &filename);
+    Fast5Read(const std::string &_id,
+              u16 _channel, u32 _number, u64 _start_sample,
+              const std::vector<float> _raw_data);
 
     //std::vector<Chunk> get_chunks(u16 max_length);
-    u32 get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length);
+    u32 get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) const;
     void swap(Fast5Read &r);
     float next_sig();
     bool empty() const;
+
+    static float sampling_rate;
 
     std::string id;
     u16 channel;
@@ -69,8 +77,12 @@ class Fast5Read {
     std::vector<float> raw_data;
     u32 i;
     //float median_before;
+    friend bool operator< (const Fast5Read &r1, const Fast5Read &r2);
 };
 
+bool operator< (const Fast5Read &r1, const Fast5Read &r2);
+
+u32 load_multi_fast5(const std::string &fname, std::vector<Fast5Read> &list);
 
 class ChunkSim {
     public:
@@ -78,6 +90,7 @@ class ChunkSim {
     ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len, float speed);
     
     void add_files(const std::vector<std::string> &fnames);
+    void add_reads(const std::vector<Fast5Read> &reads);
 
     std::vector<ChChunk> get_read_chunks();
     void stop_receiving_read(u16 channel, u32 number);

@@ -13,8 +13,8 @@ const std::string PROBFN = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/
 int main(int argc, char** argv) {
     std::string index(argv[1]), reads_fname(argv[2]);
     u32 nthreads = atoi(argv[3]), read_count = atoi(argv[4]);
-    float speed = atof(argv[5]);
-
+    float speed = atof(argv[5]), evt_timeout = atof(argv[6]);
+    
     MapperParams params(index, MODEL,
                         22,    //seed_len
                         25,    //min_aln_len
@@ -27,6 +27,7 @@ int main(int argc, char** argv) {
                         3,     //evt_winlen1
                         6,     //evt_winlen2
                         5,     //evt_batch_size
+                        evt_timeout,
                         1.4,   //evt_thresh1
                         9.0,   //evt_thresh2
                         0.2,   //evt_peak_height
@@ -37,31 +38,46 @@ int main(int argc, char** argv) {
                         7.00,  //min_mean_conf
                         2.25); //min_top_conf
 
-    std::ifstream reads_file(reads_fname);
-
-    if (!reads_file) {
-        std::cerr << "Error: couldn't open '" << reads_fname << "'\n";
-        return 1;
-    }
-
     Timer t;
 
-    std::string read_fname;
-    std::vector<std::string> fast5_names;
-    fast5_names.reserve(read_count);
-
-    u32 i = 0;
-    while (getline(reads_file, read_fname) && i < read_count) {
-        if (read_fname[0] == '#') continue;
-        fast5_names.push_back(read_fname);
-        i++;
-    }
-    std::cerr << t.get() << "\tfilenames read, splitting into chunks...\n";
+    //std::ifstream reads_file(reads_fname);
+    //if (!reads_file) {
+    //    std::cerr << "Error: couldn't open '" << reads_fname << "'\n";
+    //    return 1;
+    //}
+    //std::string read_fname;
+    //std::vector<std::string> fast5_names;
+    //fast5_names.reserve(read_count);
+    //u32 i = 0;
+    //while (getline(reads_file, read_fname) && i < read_count) {
+    //    if (read_fname[0] == '#') continue;
+    //    fast5_names.push_back(read_fname);
+    //    i++;
+    //}
+    //std::cerr << t.get() << "\tfilenames read, splitting into chunks...\n";
     
-    ChunkSim sim(read_count, 512, 4000, speed, fast5_names);
-    ChunkPool pool(params, 512, nthreads);
+    std::cerr << "Loading reads\n";
+    std::cerr.flush();
 
-    std::cerr << t.get() << "\tchunks generated, aligning\n";
+    std::vector<Fast5Read> reads;
+    load_multi_fast5(reads_fname, reads);
+
+    std::cerr << "Reads loaded (" << (t.lap() / 1000) << " sec), sorting\n";
+    std::cerr.flush();
+
+    std::sort(reads.begin(), reads.end());
+    while (reads.size() > read_count) reads.pop_back();
+
+    std::cerr << "Reads sorted (" << (t.lap() / 1000) << " sec), splitting into chunks\n";
+    std::cerr.flush();
+
+    ChunkSim sim(read_count, 512, 4000, speed);
+    sim.add_reads(reads);
+
+    std::cerr << "Chunks split (" << (t.lap() / 1000) << " sec), aligning\n";
+    std::cerr.flush();
+
+    ChunkPool pool(params, 512, nthreads);
 
     const u64 MAX_SLEEP = 100;
 
@@ -81,16 +97,17 @@ int main(int argc, char** argv) {
 
         std::vector<ChChunk> chunks = sim.get_read_chunks();
         for (ChChunk &ch : chunks) {
-            std::cout << "# chunk " << ch.first << " " << ch.second.id << "\n";
+            //std::cout << "# chunk " << ch.first << " " << ch.second.id << "\n";
             std::cout.flush();
 
             u16 channel = ch.first, number = ch.second.number;
 
             bool last = ch.second.raw_data.size() < 4000;
 
-            if (!pool.add_chunk(ch.first, ch.second)) {
-                std::cout << "# couldn't add\n";
-            }
+            pool.add_chunk(ch.first, ch.second);
+            //if (!pool.add_chunk(ch.first, ch.second)) {
+                //`std::cout << "# couldn't add\n";
+            //}
             
             if (last) { 
                 //std::cout << "# ending " << channel << "\n";
@@ -104,4 +121,5 @@ int main(int argc, char** argv) {
     }
 
     pool.stop_all();
+    std::cerr << "Reads aligned (" << (t.lap() / 1000) << " sec)\n";
 }

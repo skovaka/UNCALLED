@@ -67,6 +67,81 @@ bool Chunk::empty() const {
     return raw_data.empty();
 }
 
+u32 load_multi_fast5(const std::string &fname, std::vector<Fast5Read> &list) {
+    std::string root = "/";
+    hdf5_tools::File file(fname);
+    std::vector<std::string> ids = file.list_group(root);
+    u32 nloaded = 0;
+
+    for (auto read : ids) {
+        std::vector<int> samples;
+        std::string raw_path = root + read + "/Raw",
+                    sig_path = raw_path + "/Signal",
+                    ch_path = root + read + "/channel_id";
+
+        u16 channel;
+        std::string id;
+        u32 number;
+        u64 start_sample;
+        std::vector<int> int_data; 
+
+
+        for (auto a : file.get_attr_map(raw_path)) {
+            if (a.first == "read_id") {
+                id = a.second;
+            } else if (a.first == "read_number") {
+                number = atoi(a.second.c_str());
+            } else if (a.first == "start_time") {
+                start_sample = atoi(a.second.c_str());
+            }
+        }
+
+        file.read(sig_path, int_data);
+        std::vector<float> raw_data(int_data.size()); 
+
+        float digitisation = 0, range = 0, offset = 0, sampling_rate = 0;
+        for (auto a : file.get_attr_map(ch_path)) {
+            if (a.first == "channel_number") {
+                channel = atoi(a.second.c_str()) - 1;
+            } else if (a.first == "digitisation") {
+                digitisation = atof(a.second.c_str());
+            } else if (a.first == "range") {
+                range = atof(a.second.c_str());
+            } else if (a.first == "offset") {
+                offset = atof(a.second.c_str());
+            } else if (a.first == "sampling_rate") {
+                sampling_rate = atof(a.second.c_str());
+            }
+        }
+
+        if (Fast5Read::sampling_rate == 0) {
+            Fast5Read::sampling_rate = sampling_rate;
+        } else if (Fast5Read::sampling_rate != sampling_rate) {
+            std::cerr << "Error: different sampling rates between reads, which is weird\n";
+        }
+
+
+        for (u32 i = 0; i < int_data.size(); i++) {
+            raw_data[i] = ((float) int_data[i] + offset) * range / digitisation;
+        }
+
+        list.emplace_back(id, channel, number, start_sample, raw_data);
+        nloaded++;
+    }
+
+    return nloaded;
+}
+
+float Fast5Read::sampling_rate = 0;
+Fast5Read::Fast5Read(const std::string &_id,
+                     u16 _channel, u32 _number, u64 _start_sample,
+                     const std::vector<float> _raw_data) 
+    : id(_id),
+      channel(_channel),
+      number(_number),
+      start_sample(_start_sample),
+      raw_data(_raw_data) {}
+
 Fast5Read::Fast5Read() :
     id(""),
     channel(0),
@@ -103,7 +178,15 @@ Fast5Read::Fast5Read(const std::string &filename) {
             id = p.read_id;
             number = p.read_number;
             start_sample = p.start_time;
-            channel = atoi(file.get_channel_id_params().channel_number.c_str()) - 1;
+
+            auto c = file.get_channel_id_params();
+            channel = atoi(c.channel_number.c_str()) - 1;
+
+            if (Fast5Read::sampling_rate == 0) {
+                Fast5Read::sampling_rate = c.sampling_rate;
+            } else if (Fast5Read::sampling_rate != c.sampling_rate) {
+                std::cerr << "Error: different sampling rates between reads, which is weird\n";
+            }
         }
 
     } catch (hdf5_tools::Exception& e) {
@@ -128,13 +211,17 @@ bool Fast5Read::empty() const {
     return i >= raw_data.size();
 }
 
-u32 Fast5Read::get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) {
+u32 Fast5Read::get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) const {
     u32 count = 0;
     for (u32 i = 0; i < raw_data.size(); i += max_length) {
         chunk_queue.emplace_back(id, number, start_sample+i, raw_data, i, max_length);
         count++;
     }
     return count;
+}
+
+bool operator< (const Fast5Read &r1, const Fast5Read &r2) {
+    return r1.start_sample < r2.start_sample;
 }
 
 ChunkSim::ChunkSim(u32 max_loaded, 
@@ -151,12 +238,21 @@ ChunkSim::ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len, float speed)
    : max_loaded_(max_loaded),
      num_loaded_(0),
      chunk_len_(chunk_len),
-     speed_(speed),
+     speed_(speed / 1000),
      chshifts_(num_chs, 0),
      chunks_(num_chs) {
     timer_.reset();
     tshift_ = -1;
     is_running = true;
+}
+
+void ChunkSim::add_reads(const std::vector<Fast5Read> &reads) {
+    for (const Fast5Read &r : reads) {
+        r.get_chunks(chunks_[r.channel], chunk_len_);
+        if (r.start_sample < tshift_) { 
+            tshift_ = r.start_sample;
+        }
+    }
 }
 
 void ChunkSim::add_files(const std::vector<std::string> &fnames) {
@@ -172,7 +268,7 @@ void ChunkSim::add_files(const std::vector<std::string> &fnames) {
 }
 
 std::vector<ChChunk> ChunkSim::get_read_chunks() {
-    u64 time = (timer_.get() * speed_) + tshift_;
+    u64 time = (timer_.get() * speed_ * Fast5Read::sampling_rate) + tshift_;
     
     std::vector<ChChunk> ret;
     is_running = false;

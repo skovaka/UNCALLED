@@ -37,6 +37,7 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
                            u32 evt_winlen1,
                            u32 evt_winlen2,
                            u16 evt_batch_size,
+                           float evt_timeout,
                            float evt_thresh1,
                            float evt_thresh2,
                            float evt_peak_height,
@@ -64,6 +65,7 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
           max_events_proc_(max_events_proc),
           evt_buffer_len_(evt_buffer_len),
           evt_batch_size_(evt_batch_size),
+          evt_timeout_(evt_timeout),
           max_stay_frac_(max_stay_frac),
           min_seed_prob_(min_seed_prob),
           min_mean_conf_(min_mean_conf),
@@ -607,9 +609,15 @@ bool Mapper::end_read(u32 number) {
 bool Mapper::map_chunk() {
     if (reset_ || (last_chunk_ && norm_.empty())) return true;
     u16 nevents = params_.get_max_events(event_i_);
-    //TODO: add timeout to params
+    float tlimit = params_.evt_timeout_ * nevents;
+
+    Timer t;
     for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
         if (add_event(norm_.pop_event())) return true;
+        if (t.get() > tlimit) {
+            //std::cout << "# timeout " << channel_ << " " << i << "\n";
+            return false; //TODO: penalize this read
+        }
     }
 
     return false;

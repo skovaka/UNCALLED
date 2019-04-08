@@ -106,12 +106,12 @@ u32 Normalizer::skip_unread(u32 nkeep) {
     u32 new_rd;
     if (nkeep <= wr_) new_rd = wr_ - nkeep;
     else new_rd = n_ - (nkeep - wr_);
-    std::cout << new_rd << " "; 
+    //std::cout << new_rd << " "; 
 
     u32 nskip;
     if (new_rd > rd_) nskip = new_rd - rd_;
     else nskip = (n_ - rd_) + new_rd;
-    std::cout << nskip << "\n"; 
+    //std::cout << nskip << "\n"; 
 
     rd_ = new_rd;
     return nskip;

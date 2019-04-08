@@ -69,6 +69,7 @@ class MapperParams {
                  u32 evt_winlen1,
                  u32 evt_winlen2,
                  u16 evt_batch_size,
+                 float evt_timeout,
                  float evt_thresh1,
                  float evt_thresh2,
                  float evt_peak_height,
@@ -98,7 +99,8 @@ class MapperParams {
 
     u16 evt_batch_size_;
 
-    float max_stay_frac_,
+    float evt_timeout_,
+          max_stay_frac_,
           min_seed_prob_,
           min_mean_conf_,
           min_top_conf_;
