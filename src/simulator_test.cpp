@@ -14,6 +14,7 @@ int main(int argc, char** argv) {
     std::string index(argv[1]), reads_fname(argv[2]);
     u32 nthreads = atoi(argv[3]), read_count = atoi(argv[4]);
     float speed = atof(argv[5]), evt_timeout = atof(argv[6]);
+    u32 max_chunks_proc = atoi(argv[7]);
     
     MapperParams params(index, MODEL,
                         22,    //seed_len
@@ -22,7 +23,8 @@ int main(int argc, char** argv) {
                         50,    //max_rep_copy
                         8,     //max_consec_stay
                         10000, //max_paths
-                        30000, //max_events_proc
+                        30000,
+                        max_chunks_proc, //max_events_proc
                         6000,     //evt_buffer_len TODO: what should it be
                         3,     //evt_winlen1
                         6,     //evt_winlen2
@@ -40,39 +42,38 @@ int main(int argc, char** argv) {
 
     Timer t;
 
-    //std::ifstream reads_file(reads_fname);
-    //if (!reads_file) {
-    //    std::cerr << "Error: couldn't open '" << reads_fname << "'\n";
-    //    return 1;
-    //}
-    //std::string read_fname;
-    //std::vector<std::string> fast5_names;
-    //fast5_names.reserve(read_count);
-    //u32 i = 0;
-    //while (getline(reads_file, read_fname) && i < read_count) {
-    //    if (read_fname[0] == '#') continue;
-    //    fast5_names.push_back(read_fname);
-    //    i++;
-    //}
     //std::cerr << t.get() << "\tfilenames read, splitting into chunks...\n";
     
-    std::cerr << "Loading reads\n";
-    std::cerr.flush();
+    //std::cerr << "Loading reads\n";
+    //std::cerr.flush();
 
-    std::vector<Fast5Read> reads;
-    load_multi_fast5(reads_fname, reads);
+    //load_multi_fast5(reads_fname, reads);
 
-    std::cerr << "Reads loaded (" << (t.lap() / 1000) << " sec), sorting\n";
-    std::cerr.flush();
+    //std::cerr << "Reads loaded (" << (t.lap() / 1000) << " sec), sorting\n";
+    //std::cerr.flush();
 
-    std::sort(reads.begin(), reads.end());
-    while (reads.size() > read_count) reads.pop_back();
+    //std::sort(reads.begin(), reads.end());
+    //while (reads.size() > read_count) reads.pop_back();
 
-    std::cerr << "Reads sorted (" << (t.lap() / 1000) << " sec), splitting into chunks\n";
-    std::cerr.flush();
+    //std::cerr << "Reads sorted (" << (t.lap() / 1000) << " sec), splitting into chunks\n";
+    //std::cerr.flush();
+
+    std::ifstream reads_file(reads_fname);
+    if (!reads_file) {
+        std::cerr << "Error: couldn't open '" << reads_fname << "'\n";
+        return 1;
+    }
+
+    std::string read_fname;
+    std::vector<std::string> fast5_names;
+    fast5_names.reserve(read_count);
+    while (getline(reads_file, read_fname)) {
+        if (read_fname[0] == '#') continue;
+        fast5_names.push_back(read_fname);
+    }
 
     ChunkSim sim(read_count, 512, 4000, speed);
-    sim.add_reads(reads);
+    sim.add_files(fast5_names);
 
     std::cerr << "Chunks split (" << (t.lap() / 1000) << " sec), aligning\n";
     std::cerr.flush();
@@ -81,7 +82,8 @@ int main(int argc, char** argv) {
 
     const u64 MAX_SLEEP = 100;
 
-    while (sim.is_running || !pool.all_finished()) {
+    sim.start();
+    while (sim.is_running() || !pool.all_finished()) {
         u64 t0 = t.get();
         
         //if (!chunks.empty()) {
@@ -89,10 +91,14 @@ int main(int argc, char** argv) {
         //}
 
         for (ReadLoc aln : pool.update()) {
+            if (aln.is_valid()) {
+                sim.unblock(aln.get_channel(), aln.get_number());
+                aln.set_unblocked();
+            } else {
+                sim.stop_receiving_read(aln.get_channel(), aln.get_number());
+            }
             std::cout << aln.str() << "\n";
             std::cout.flush();
-            sim.unblock(aln.get_channel(), aln.get_number());
-            //sim.stop_receiving_read(aln.get_channel(), aln.get_number());
         }
 
         std::vector<ChChunk> chunks = sim.get_read_chunks();

@@ -46,7 +46,6 @@ class ChunkPool {
     
     void new_read(u16 ch, const std::string &id);
     bool add_chunk(u16 ch, Chunk &chunk);
-
     void end_read(u16 ch, u32 number);
 
     std::vector<ReadLoc> update();

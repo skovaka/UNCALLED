@@ -30,10 +30,12 @@
 #include "kmer_model.hpp"
 #include "normalizer.hpp"
 #include "seed_tracker.hpp"
-#include "fast5_reader.hpp"
+//#include "fast5_reader.hpp"
 #include "timer.hpp"
 
 #define PAF_TIME_TAG "YT:f:"
+#define PAF_UNBLOCK_TAG "ub:i:"
+#define PAF_NUMCHUNK_TAG "nc:i:"
 
 //#define DEBUG_TIME
 //#define DEBUG_SEEDS
@@ -54,6 +56,30 @@
 
 #define INDEX_SUFF ".uncl"
 
+class Chunk {
+    public:
+    Chunk();
+    Chunk(const std::string &_id, u32 _number, u64 _chunk_start_sample, 
+          const std::vector<float> &_raw_data, u32 raw_st, u32 raw_len);
+    Chunk(const Chunk &c);
+
+    u64 get_end();
+    void swap(Chunk &c);
+    void clear();
+    bool empty() const;
+    u32 get_number() const;
+    u32 size() const;
+
+    std::string id;
+    u32 number;
+    u64 chunk_start_sample;
+    std::vector<float> raw_data;
+    //std::vector<u32> chunk_classifications;
+    //float median_before, median;
+
+};
+using ChChunk = std::pair<u16, Chunk>;
+
 class MapperParams {
     public:
     MapperParams(const std::string &bwa_prefix,
@@ -65,6 +91,7 @@ class MapperParams {
                  u32 max_consec_stay,
                  u32 max_paths, 
                  u32 max_events_proc,
+                 u32 max_chunks_proc,
                  u32 evt_buffer_len,
                  u32 evt_winlen1,
                  u32 evt_winlen2,
@@ -95,6 +122,7 @@ class MapperParams {
         max_consec_stay_,
         min_aln_len_,
         max_events_proc_,
+        max_chunks_proc_,
         evt_buffer_len_;
 
     u16 evt_batch_size_;
@@ -124,6 +152,10 @@ class ReadLoc {
     bool is_valid() const; 
     u16 get_channel() const;
     u32 get_number() const;
+    std::string get_ref() const;
+
+    void set_unblocked();
+    u16 add_chunk();
 
     friend std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
 
@@ -142,6 +174,8 @@ class ReadLoc {
     u16 match_count_;
     float time_;
     bool fwd_;
+    bool unblocked_;
+    u16 num_chunks_;
 
 };
 

@@ -49,6 +49,15 @@ u64 Chunk::get_end() {
     return chunk_start_sample + raw_data.size();
 }
 
+u32 Chunk::get_number() const {
+    return number;
+}
+
+u32 Chunk::size() const {
+    return raw_data.size();
+}
+
+
 void Chunk::swap(Chunk &c) {
     std::swap(id, c.id);
     std::swap(number, c.number);
@@ -241,9 +250,8 @@ ChunkSim::ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len, float speed)
      speed_(speed / 1000),
      chshifts_(num_chs, 0),
      chunks_(num_chs) {
-    timer_.reset();
     tshift_ = -1;
-    is_running = true;
+    is_running_ = false;
 }
 
 void ChunkSim::add_reads(const std::vector<Fast5Read> &reads) {
@@ -256,26 +264,39 @@ void ChunkSim::add_reads(const std::vector<Fast5Read> &reads) {
 }
 
 void ChunkSim::add_files(const std::vector<std::string> &fnames) {
-    u32 i;
-    for (i = 0; i < fnames.size() && num_loaded_ < max_loaded_; i++) {
-        Fast5Read r(fnames[i]);
-        r.get_chunks(chunks_[r.channel], chunk_len_);
-        if (r.start_sample < tshift_) { 
-            tshift_ = r.start_sample;
-        }
+    std::vector<Fast5Read> reads;
+    for (u32 i = 0; i < fnames.size(); i++) {
+        load_multi_fast5(fnames[i], reads);
     }
-    for (; i < fnames.size(); i++) fast5_names_.push_back(fnames[i]); 
+
+    //TODO: sort each file? Note sure if I trust the order between files
+    std::sort(reads.begin(), reads.end());
+    while (reads.size() > max_loaded_) reads.pop_back();
+
+    add_reads(reads);
 }
+
+//void ChunkSim::add_files(const std::vector<std::string> &fnames) {
+//    u32 i;
+//    for (i = 0; i < fnames.size() && num_loaded_ < max_loaded_; i++) {
+//        Fast5Read r(fnames[i]);
+//        r.get_chunks(chunks_[r.channel], chunk_len_);
+//        if (r.start_sample < tshift_) { 
+//            tshift_ = r.start_sample;
+//        }
+//    }
+//    for (; i < fnames.size(); i++) fast5_names_.push_back(fnames[i]); 
+//}
 
 std::vector<ChChunk> ChunkSim::get_read_chunks() {
     u64 time = (timer_.get() * speed_ * Fast5Read::sampling_rate) + tshift_;
     
     std::vector<ChChunk> ret;
-    is_running = false;
+    is_running_ = false;
 
     for (u16 c = 0; c < chunks_.size(); c++) {
         if (chunks_[c].empty()) continue;
-        is_running = true; 
+        is_running_ = true; 
 
         //Find first chunk that ends after current time
         //Ideally will be second chunk, unless we missed some
@@ -287,6 +308,7 @@ std::vector<ChChunk> ChunkSim::get_read_chunks() {
         if (i-- == 0) {
             continue; 
         } //else if (i != 0) {
+          //
           //  std::cout << "# skipped " << i << " " << c << " "
           //            << chunks_[c][0].chunk_start_sample << "-"
           //            << chunks_[c][0].get_end() << " "
@@ -320,3 +342,18 @@ void ChunkSim::unblock(u16 channel, u32 number) {
     chshifts_[channel] += chunks_[channel].front().chunk_start_sample - t0;
 }
 
+void ChunkSim::set_time(ReadLoc &loc) {
+    u16 c = loc.get_channel();
+    u32 n = loc.get_number();
+    u64 time = (timer_.get() * speed_ * Fast5Read::sampling_rate) + tshift_ + chshifts_[c];
+    loc.set_time(time);
+}
+
+void ChunkSim::start() {
+    is_running_ = true;
+    timer_.reset();
+}
+
+bool ChunkSim::is_running() {
+    return is_running_;
+}

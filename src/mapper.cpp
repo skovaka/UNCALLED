@@ -33,6 +33,7 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
                            u32 max_consec_stay,
                            u32 max_paths, 
                            u32 max_events_proc,
+                           u32 max_chunks_proc,
                            u32 evt_buffer_len,
                            u32 evt_winlen1,
                            u32 evt_winlen2,
@@ -63,6 +64,7 @@ MapperParams::MapperParams(const std::string &bwa_prefix,
           max_consec_stay_(max_consec_stay),
           min_aln_len_(min_aln_len),
           max_events_proc_(max_events_proc),
+          max_chunks_proc_(max_chunks_proc),
           evt_buffer_len_(evt_buffer_len),
           evt_batch_size_(evt_batch_size),
           evt_timeout_(evt_timeout),
@@ -116,13 +118,17 @@ u16 MapperParams::get_max_events(u16 event_i) const {
 
 ReadLoc::ReadLoc(const std::string &rd_name, u16 channel, u32 number) 
     : rd_name_(rd_name),
+      rf_name_("*"),
       rd_channel_(channel),
       rd_number_(number),
       rd_st_(0),
       rd_en_(0),
       rd_len_(0),
       match_count_(0),
-      time_(-1) {
+      time_(-1),
+      unblocked_(false),
+      num_chunks_(0)
+       {
     
     #ifdef DEBUG_TIME
     sigproc_time_ = prob_time_ = thresh_time_ = stay_time_ = 
@@ -133,6 +139,8 @@ ReadLoc::ReadLoc(const std::string &rd_name, u16 channel, u32 number)
 
 ReadLoc::ReadLoc() {
     match_count_ = 0;
+    unblocked_=false;
+    num_chunks_=0;
 
     #ifdef DEBUG_TIME
     sigproc_time_ = prob_time_ = thresh_time_ = stay_time_ = 
@@ -173,12 +181,24 @@ bool ReadLoc::is_valid() const {
     return match_count_ > 0;
 }
 
+std::string ReadLoc::get_ref() const {
+    return rf_name_;
+}
+
 u16 ReadLoc::get_channel() const {
     return rd_channel_;
 }
 
 u32 ReadLoc::get_number() const {
     return rd_number_;
+}
+
+void ReadLoc::set_unblocked() {
+    unblocked_ = true;
+}
+
+u16 ReadLoc::add_chunk() {
+    return ++num_chunks_;
 }
 
 std::string ReadLoc::str() const {
@@ -224,6 +244,11 @@ std::string ReadLoc::str() const {
            << "\t" PAF_SOURCE_TAG  << source_time_
            << "\t" PAF_TRACKER_TAG << tracker_time_;
     #endif
+
+    if (unblocked_) {
+        ss << "\t" << PAF_UNBLOCK_TAG << 1;
+    }
+    ss << "\t" << PAF_NUMCHUNK_TAG << num_chunks_;
 
     return ss.str();
 }
@@ -401,6 +426,7 @@ void Mapper::new_read(const std::string &id, u32 number) {
     read_num_ = number;
     prev_size_ = 0;
     event_i_ = 0;
+    chunk_i_ = 0;
     chunk_processed_ = true;
     reset_ = false;
     last_chunk_ = false;
@@ -552,6 +578,15 @@ bool Mapper::swap_chunk(Chunk &chunk) {
     //std::cout << "# tryna swap " << is_chunk_processed() << " " << reset_ << " " << state_ << "\n";
     if (!is_chunk_processed() || reset_) return false;
 
+    if (params_.max_chunks_proc_ > 0 && ++chunk_i_ > params_.max_chunks_proc_) {
+        state_ = State::FAILURE;
+        reset_ = true;
+        chunk.clear();
+        return true;
+    }
+
+    read_loc_.add_chunk();
+
     //New read hasn't been set
     if (chunk.number != read_num_) {
         state_ = State::FAILURE;
@@ -607,7 +642,10 @@ bool Mapper::end_read(u32 number) {
 }
 
 bool Mapper::map_chunk() {
-    if (reset_ || (last_chunk_ && norm_.empty())) return true;
+    if (reset_ || (last_chunk_ && norm_.empty())) {
+        state_ = State::FAILURE;
+        return true;
+    }
     u16 nevents = params_.get_max_events(event_i_);
     float tlimit = params_.evt_timeout_ * nevents;
 

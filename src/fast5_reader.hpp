@@ -29,30 +29,7 @@
 #include "fast5/hdf5_tools.hpp"
 #include "util.hpp"
 #include "timer.hpp"
-
-
-class Chunk {
-    public:
-    Chunk();
-    Chunk(const std::string &_id, u32 _number, u64 _chunk_start_sample, 
-          const std::vector<float> &_raw_data, u32 raw_st, u32 raw_len);
-    Chunk(const Chunk &c);
-
-    u64 get_end();
-    void swap(Chunk &c);
-    void clear();
-    bool empty() const;
-
-    std::string id;
-    u32 number;
-    u64 chunk_start_sample;
-    std::vector<float> raw_data;
-    //std::vector<u32> chunk_classifications;
-    //float median_before, median;
-
-};
-using ChChunk = std::pair<u16, Chunk>;
-
+#include "mapper.hpp" 
 
 class Fast5Read {
     public:
@@ -91,18 +68,21 @@ class ChunkSim {
     
     void add_files(const std::vector<std::string> &fnames);
     void add_reads(const std::vector<Fast5Read> &reads);
+    void start();
 
     std::vector<ChChunk> get_read_chunks();
     void stop_receiving_read(u16 channel, u32 number);
     void unblock(u16 channel, u32 number);
+    void set_time(ReadLoc &read);
+    bool is_running();
 
-    bool is_running;
 
     private:
     u32 max_loaded_, num_loaded_;
     u16 chunk_len_;
     float speed_;
     Timer timer_;
+    bool is_running_;
     u64 tshift_;
     std::vector< u64 > chshifts_;
     std::deque<std::string> fast5_names_;

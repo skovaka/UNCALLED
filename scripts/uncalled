@@ -41,18 +41,25 @@ def get_parser():
     map_parser = sp.add_parser("map", help="Map fast5 files to a BWA index that has beeen processed by \"uncalled index\"",formatter_class=ArgFormat)
     map_parser.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to align. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
     map_parser.add_argument("-x", "--bwa-prefix", required=True, type=str, help="BWA prefix to align to. Must be processed by \"uncalled index\".")
+    map_parser.add_argument("--deplete", required=False, type=str, default="", help="Will simulate real-time selective sequencing if provided. Pore unblocking will be simulated for comma-separated list of specified references targets")
+    map_parser.add_argument("--enrich", required=False, type=str, default="", help="Will simulate real-time selective sequencing if provided. Pore unblocking NOT will be simulated for comma-separated list of specified references targets")
+    map_parser.add_argument("--even", action='store_true', help="Will only monitor even pores if set")
+    map_parser.add_argument("--sim-speed", required=False, type=float, default=1, help="Speed of real-time simulation")
+    map_parser.add_argument("--chunk-len", required=False, type=int, default=4000, help="Length of chunks")
     map_parser.add_argument("-t", "--threads", default=1, type=int, help="Number of threads to use for mapping")
     map_parser.add_argument("-R", "--read-batch-size", default=5, type=int, help="Maximum number of reads buffered per thread")
+    map_parser.add_argument("-c", "--max-chunks-proc", default=0, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
     map_parser.add_argument("-e", "--max-events-proc", default=30000, type=int, help="Will give up on a read after this many events have been processed")
     map_parser.add_argument("-a", "--min-aln-len", default=25, type=int, help="Minimum number of basepairs a mapping must cover.")
     map_parser.add_argument("-s", "--seed-len", default=22, type=int, help="Seed length in events.")
     map_parser.add_argument("-r", "--min-rep-len", default=0, type=int, help="Minimum number of basepairs a multi-mapping seed must cover")
-    map_parser.add_argument("-c", "--max-rep-copy", default=50, type=int, help="Maximum number of locations for a multi-mapping seed")
+    map_parser.add_argument("--max-rep-copy", default=50, type=int, help="Maximum number of locations for a multi-mapping seed")
     map_parser.add_argument("-y", "--max-consec-stay", default=8, type=int, help="Maximum consecutive stay events.")
     map_parser.add_argument("-p", "--max-paths", default=10000, type=int, help="Maximum number of paths to consider per event.")
-    map_parser.add_argument("-n", "--event-buffer-len", default=0, type=int, help="Size of buffer used to normalize and read events")
-    map_parser.add_argument("-E", "--evt-batch-size", default=5, type=int, help="Number of events to align per read per thread iteration")
-    map_parser.add_argument("-C", "--num-channels", default=None, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
+    map_parser.add_argument("-n", "--evt-buffer-len", default=0, type=int, help="Size of buffer used to normalize and read events")
+    map_parser.add_argument("-E", "--evt-batch-size", default=5, type=int, help="Number of events simulator will align per read per thread iteration. Only has effect when --unblock is set")
+    map_parser.add_argument("--evt-timeout", default=10.0, type=float, help="Simulator will stop aligning event batch if average time in MS to align an event exceeds this. Only has effect when --unblock is set")
+    map_parser.add_argument("-C", "--num-channels", default=512, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
     map_parser.add_argument("-F", "--max-stay-frac", default=0.5, type=float, help="Expected fraction of events which are stays")
     map_parser.add_argument("-S", "--min-seed-prob", default=-3.75, type=float, help="Average event probability threshold per seed")
     map_parser.add_argument("-M", "--min-mean-conf", default=7.00, type=float, help="Minimum ratio between longest alignment and mean alignment length to report confident alignment")
@@ -90,10 +97,12 @@ def map_cmd(args):
                                 args.max_consec_stay,
                                 args.max_paths,
                                 args.max_events_proc,
-                                args.event_buffer_len,
+                                args.max_chunks_proc, #add
+                                args.evt_buffer_len, #rename
                                 args.evt_window_length1,
                                 args.evt_window_length2,
                                 args.evt_batch_size,
+                                args.evt_timeout, #add
                                 args.evt_threshold1,
                                 args.evt_threshold2,
                                 args.evt_peak_height,
@@ -109,7 +118,7 @@ def map_cmd(args):
     if os.path.isdir(args.fast5s):
         for root, dirs, files in os.walk(args.fast5s):
             for fname in files:
-                if fname.endswith("fast5"):
+                if not fname.startswith("#") and fname.endswith("fast5"):
                     fast5s.append(os.path.abspath(os.path.join(root, fname)))
 
     elif args.fast5s.endswith("fast5"):
@@ -119,7 +128,66 @@ def map_cmd(args):
     else:
         fast5s = [os.path.abspath(l.strip()) for l in open(args.fast5s)]
 
-    if args.threads == 1 and args.num_channels == None:
+    if args.deplete != "" or args.enrich != "":
+        deplete = dict()
+        for r in args.deplete.split(","):
+            deplete[r] = True
+        for r in args.enrich.split(","):
+            deplete[r] = False
+        deplete_def = args.enrich != ""
+
+        sys.stderr.write("Loading simulator\n")
+        sys.stderr.flush()
+        sim = align.ChunkSim(args.read_batch_size, args.num_channels, args.chunk_len, args.sim_speed)
+        sim.add_files(fast5s);
+
+        sys.stderr.write("Mapping\n")
+        sys.stderr.flush()
+        pool = align.ChunkPool(params, args.num_channels, args.threads)
+
+        MAX_SLEEP = 0.01
+
+        sim.start()
+        while sim.is_running() or not pool.all_finished():
+            t0 = time.time()
+
+            for aln in pool.update():
+                sim.set_time(aln)
+                #sys.stdout.write("# aln\n")
+                #sys.stdout.flush()
+                r = aln.get_ref()
+                if ((aln.is_valid() and deplete.get(r, deplete_def))
+                    or (not aln.is_valid() and deplete_def)):
+                    sim.unblock(aln.get_channel(), aln.get_number())
+                    #sys.stdout.write("# unblocking %s %d %d\n" % (r, aln.is_valid(), deplete.get(r, deplete_def)))
+                    aln.set_unblocked()
+                else:
+                    sim.stop_receiving_read(aln.get_channel(), aln.get_number())                
+                sys.stdout.write("%s\n" % aln.str())
+                sys.stdout.flush()
+
+            
+            for channel, chunk in sim.get_read_chunks():
+                #sys.stdout.write("# chunk %d\n" % channel)
+                #sys.stdout.flush()
+                number = chunk.get_number()
+                last = chunk.size() < 4000
+
+                if args.even and channel % 2 == 1:
+                    sim.stop_receiving_read(channel, number)
+                else:
+                    pool.add_chunk(channel, chunk)
+                    if last:
+                        pool.end_read(channel, number);
+                
+
+            dt = time.time() - t0;
+            if dt < MAX_SLEEP:
+                time.sleep(MAX_SLEEP - dt);
+
+        pool.stop_all();
+
+    elif args.threads == 1 and args.num_channels == None:
         sys.stderr.write("Aligning\n")
         mapper = align.Mapper(params, 0)
 
@@ -132,10 +200,11 @@ def map_cmd(args):
             pass
     else:
 
-        if args.num_channels == None:
+        if args.num_channels == None or args.num_channels == 0:
             mapper = align.Fast5Pool(params, args.threads, args.read_batch_size)
             mapper.add_fast5s(fast5s)
         else:
+            sys.stderr.write("%d\n" % args.num_channels)
             mapper = align.ChannelPool(params, args.threads, args.num_channels)
 
             sys.stderr.write("Parsing channel IDs\n")
@@ -146,32 +215,17 @@ def map_cmd(args):
         sys.stderr.write("Aligning\n")
         sys.stderr.flush()
 
-
-
         try:
 
             st = time.time()
 
             while not mapper.all_finished():
-                #en = time.time()
-                #sys.stderr.write("PYTHON1 %f\n" % (en-st))
-                #sys.stderr.flush()
-
-                #st = time.time()
                 alns = mapper.update()
-                #en = time.time()
-                #sys.stderr.write("PYTHON2 %f\n" % (en-st))
-                #sys.stderr.flush()
-
                 for a in alns:
                     sys.stdout.write("%s\n" % a)
                 sys.stdout.flush()
 
-                #sys.stderr.write("PYTHON3\n")
-                #sys.stderr.flush()
                 time.sleep(0.1)
-                #sys.stderr.write("PYTHON4\n")
-                #sys.stderr.flush()
 
                 st = time.time()
 

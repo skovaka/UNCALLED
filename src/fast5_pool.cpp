@@ -23,6 +23,7 @@
 
 #include <thread>
 #include <chrono>
+#include "fast5_reader.hpp"
 #include "fast5_pool.hpp"
 #include "mapper.hpp"
 
@@ -86,17 +87,23 @@ std::vector<std::string> Fast5Pool::update() {
                 std::string fname = fast5s_.front();
                 fast5s_.pop_front();
 
-                fast5::File fast5;
-                open_fast5(fname, fast5);            
+                //fast5::File fast5;
+                //open_fast5(fname, fast5);            
+                //std::vector<float> samples = fast5.get_raw_samples();
+                //std::string ids = fast5.get_raw_samples_params().read_id;
+                //t.in_mtx_.lock();
+                //t.signals_in_.push_back(samples);
+                //t.ids_in_.push_back(ids);
+                //fast5.close();
+                //t.in_mtx_.unlock();
 
-                std::vector<float> samples = fast5.get_raw_samples();
-                std::string ids = fast5.get_raw_samples_params().read_id;
-
-                //TODO: buffer signal
+                std::vector<Fast5Read> reads;
+                load_multi_fast5(fname, reads);
                 t.in_mtx_.lock();
-                t.signals_in_.push_back(samples);
-                t.ids_in_.push_back(ids);
-                fast5.close();
+                for (Fast5Read &r : reads) {
+                    t.signals_in_.push_back(r.raw_data);
+                    t.ids_in_.push_back(r.id);
+                }
                 t.in_mtx_.unlock();
             }
         }
