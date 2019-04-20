@@ -23,58 +23,6 @@
 
 #include "fast5_reader.hpp"
 
-Chunk::Chunk() 
-    : id(""),
-      number(0),
-      chunk_start_sample(0),
-      raw_data() {}
-
-Chunk::Chunk(const std::string &_id, u32 _number, u64 _chunk_start_sample, 
-             const std::vector<float> &_raw_data, u32 raw_st=0, u32 raw_len=4000) 
-    : id(_id),
-      number(_number),
-      chunk_start_sample(_chunk_start_sample) {
-    if (raw_st + raw_len > _raw_data.size()) raw_len = _raw_data.size() - raw_st;
-    raw_data.resize(raw_len);
-    for (u32 i = 0; i < raw_len; i++) raw_data[i] = _raw_data[raw_st+i];
-}
-
-Chunk::Chunk(const Chunk &c) 
-    : id(c.id),
-      number(c.number),
-      chunk_start_sample(c.chunk_start_sample),
-      raw_data(c.raw_data) {}
-
-u64 Chunk::get_end() {
-    return chunk_start_sample + raw_data.size();
-}
-
-u32 Chunk::get_number() const {
-    return number;
-}
-
-u32 Chunk::size() const {
-    return raw_data.size();
-}
-
-
-void Chunk::swap(Chunk &c) {
-    std::swap(id, c.id);
-    std::swap(number, c.number);
-    std::swap(chunk_start_sample, c.chunk_start_sample);
-    raw_data.swap(c.raw_data);
-}
-
-void Chunk::clear() {
-    raw_data.clear();
-    id = "";
-    number = 0;
-    chunk_start_sample = 0;
-}   
-
-bool Chunk::empty() const {
-    return raw_data.empty();
-}
 
 u32 load_multi_fast5(const std::string &fname, std::vector<Fast5Read> &list) {
     std::string root = "/";
@@ -223,7 +171,7 @@ bool Fast5Read::empty() const {
 u32 Fast5Read::get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) const {
     u32 count = 0;
     for (u32 i = 0; i < raw_data.size(); i += max_length) {
-        chunk_queue.emplace_back(id, number, start_sample+i, raw_data, i, max_length);
+        chunk_queue.emplace_back(id, channel, number, start_sample+i, raw_data, i, max_length);
         count++;
     }
     return count;
@@ -288,10 +236,10 @@ void ChunkSim::add_files(const std::vector<std::string> &fnames) {
 //    for (; i < fnames.size(); i++) fast5_names_.push_back(fnames[i]); 
 //}
 
-std::vector<ChChunk> ChunkSim::get_read_chunks() {
+std::vector<Chunk> ChunkSim::get_read_chunks() {
     u64 time = (timer_.get() * speed_ * Fast5Read::sampling_rate) + tshift_;
     
-    std::vector<ChChunk> ret;
+    std::vector<Chunk> ret;
     is_running_ = false;
 
     for (u16 c = 0; c < chunks_.size(); c++) {
@@ -302,20 +250,17 @@ std::vector<ChChunk> ChunkSim::get_read_chunks() {
         //Ideally will be second chunk, unless we missed some
         u16 i = 0;
         for (; i < chunks_[c].size() && 
-               chunks_[c][i].chunk_start_sample+chunk_len_ < time+chshifts_[c]; i++);
+               chunks_[c][i].get_start()+chunk_len_ < time+chshifts_[c]; i++);
 
         //Skip if first chunk, otherwise add previous chunk
         if (i-- == 0) {
             continue; 
-        } //else if (i != 0) {
-          //
-          //  std::cout << "# skipped " << i << " " << c << " "
-          //            << chunks_[c][0].chunk_start_sample << "-"
-          //            << chunks_[c][0].get_end() << " "
-          //            << chunks_[c][1].chunk_start_sample << "-"
-          //            << chunks_[c][1].get_end() << "\n";
-        //}
-        ret.emplace_back(c, chunks_[c][i]);
+        }
+
+        ret.push_back(chunks_[c][i]);
+        //TODO: try code below
+        //ret.push_back(Chunk());
+        //ret.back().swap(chunks_[c][i]);
 
         //Remove all finished chunks
         for (; i < chunks_[c].size(); i--) {
@@ -323,28 +268,27 @@ std::vector<ChChunk> ChunkSim::get_read_chunks() {
         }
     }
 
-    //if (ret.size() > 0) std::cout << time << "\t";
-
     return ret;
 }
 
 void ChunkSim::stop_receiving_read(u16 channel, u32 number) {
-    while (!chunks_[channel].empty() && chunks_[channel][0].number == number) {
+    while (!chunks_[channel].empty() && 
+            chunks_[channel][0].get_number() == number) {
         chunks_[channel].pop_front();
     }
 }
 
 void ChunkSim::unblock(u16 channel, u32 number) {
-    u64 t0 = chunks_[channel].front().chunk_start_sample;
-    while (!chunks_[channel].empty() && chunks_[channel][0].number == number) {
+    u64 t0 = chunks_[channel].front().get_start();
+    while (!chunks_[channel].empty() && 
+            chunks_[channel][0].get_number() == number) {
         chunks_[channel].pop_front();
     }
-    chshifts_[channel] += chunks_[channel].front().chunk_start_sample - t0;
+    chshifts_[channel] += chunks_[channel].front().get_start() - t0;
 }
 
 void ChunkSim::set_time(ReadLoc &loc) {
     u16 c = loc.get_channel();
-    u32 n = loc.get_number();
     u64 time = (timer_.get() * speed_ * Fast5Read::sampling_rate) + tshift_ + chshifts_[c];
     loc.set_time(time);
 }

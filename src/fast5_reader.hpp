@@ -29,7 +29,8 @@
 #include "fast5/hdf5_tools.hpp"
 #include "util.hpp"
 #include "timer.hpp"
-#include "mapper.hpp" 
+#include "chunk.hpp"
+#include "mapper.hpp" //TODO: separate ReadLoc so I don't have to do this
 
 class Fast5Read {
     public:
@@ -70,7 +71,7 @@ class ChunkSim {
     void add_reads(const std::vector<Fast5Read> &reads);
     void start();
 
-    std::vector<ChChunk> get_read_chunks();
+    std::vector<Chunk> get_read_chunks();
     void stop_receiving_read(u16 channel, u32 number);
     void unblock(u16 channel, u32 number);
     void set_time(ReadLoc &read);

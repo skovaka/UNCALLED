@@ -167,16 +167,17 @@ def map_cmd(args):
                 sys.stdout.flush()
 
             
-            for channel, chunk in sim.get_read_chunks():
+            for chunk in sim.get_read_chunks():
                 #sys.stdout.write("# chunk %d\n" % channel)
                 #sys.stdout.flush()
                 number = chunk.get_number()
+                channel = chunk.get_channel()
                 last = chunk.size() < 4000
 
                 if args.even and channel % 2 == 1:
                     sim.stop_receiving_read(channel, number)
                 else:
-                    pool.add_chunk(channel, chunk)
+                    pool.add_chunk(chunk)
                     if last:
                         pool.end_read(channel, number);
                 

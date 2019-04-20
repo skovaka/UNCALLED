@@ -29,23 +29,11 @@
 #include <deque>
 #include "mapper.hpp"
 
-class ReadStream {
-    public:
-    ReadStream(u16 chunk_len, const std::string &name);
-
-    void set_name(const std::string &name);
-    bool empty() const;
-
-    std::vector<float> chunk_;
-    std::string id_;
-};
-
 class ChunkPool {
     public:
     ChunkPool(MapperParams &params, u16 nchannels, u16 nthreads);
     
-    void new_read(u16 ch, const std::string &id);
-    bool add_chunk(u16 ch, Chunk &chunk);
+    bool add_chunk(Chunk &chunk);
     void end_read(u16 ch, u32 number);
 
     std::vector<ReadLoc> update();
@@ -80,7 +68,7 @@ class ChunkPool {
         std::thread thread_;
     };
 
-    void buffer_chunk(u16 ch, Chunk &c);
+    void buffer_chunk(Chunk &c);
 
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;

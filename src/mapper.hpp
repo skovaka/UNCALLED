@@ -30,7 +30,7 @@
 #include "kmer_model.hpp"
 #include "normalizer.hpp"
 #include "seed_tracker.hpp"
-//#include "fast5_reader.hpp"
+#include "chunk.hpp"
 #include "timer.hpp"
 
 #define PAF_TIME_TAG "YT:f:"
@@ -55,30 +55,6 @@
 #endif
 
 #define INDEX_SUFF ".uncl"
-
-class Chunk {
-    public:
-    Chunk();
-    Chunk(const std::string &_id, u32 _number, u64 _chunk_start_sample, 
-          const std::vector<float> &_raw_data, u32 raw_st, u32 raw_len);
-    Chunk(const Chunk &c);
-
-    u64 get_end();
-    void swap(Chunk &c);
-    void clear();
-    bool empty() const;
-    u32 get_number() const;
-    u32 size() const;
-
-    std::string id;
-    u32 number;
-    u64 chunk_start_sample;
-    std::vector<float> raw_data;
-    //std::vector<u32> chunk_classifications;
-    //float median_before, median;
-
-};
-using ChChunk = std::pair<u16, Chunk>;
 
 class MapperParams {
     public:
@@ -186,21 +162,23 @@ class Mapper {
 
     enum State { INACTIVE, MAPPING, SUCCESS, FAILURE };
 
-    Mapper(const MapperParams &map_params, u16 channel);
+    Mapper(const MapperParams &map_params);
     Mapper(const Mapper &m);
 
     ~Mapper();
 
-    void skip_events(u32 n);
-    void new_read(const std::string &name, u32 number=0);
+
+    void new_read(const std::string &name, u16 channel=0, u32 number=0);
+    void new_read(Chunk &c);
     bool end_read(u32 number);
 
     std::string map_fast5(const std::string &fast5_name);
     ReadLoc add_samples(const std::vector<float> &samples);
     bool add_sample(float s);
 
-    //bool swap_chunk(std::vector<float> &chunk);
+    void skip_events(u32 n);
     bool swap_chunk(Chunk &chunk);
+
     u16 process_chunk();
     bool map_chunk();
     bool is_chunk_processed() const;
@@ -278,12 +256,13 @@ class Mapper {
     EventDetector event_detector_;
     Normalizer norm_;
     SeedTracker seed_tracker_;
+    Chunk chunk_;
 
-    u16 channel_;
-    u32 read_num_;
+    //u16 channel_;
+    //u32 read_num_;
     bool chunk_processed_, last_chunk_,reset_;
     State state_;
-    std::vector<float> chunk_buffer_, kmer_probs_;
+    std::vector<float> kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;
     std::vector<bool> sources_added_;
     u32 prev_size_,

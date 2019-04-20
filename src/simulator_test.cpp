@@ -101,19 +101,19 @@ int main(int argc, char** argv) {
             std::cout.flush();
         }
 
-        std::vector<ChChunk> chunks = sim.get_read_chunks();
-        for (ChChunk &ch : chunks) {
+        std::vector<Chunk> chunks = sim.get_read_chunks();
+        for (Chunk &ch : chunks) {
             //std::cout << "# chunk " << ch.first << " " << ch.second.id << "\n";
             std::cout.flush();
 
-            u16 channel = ch.first, number = ch.second.number;
+            u16 channel = ch.get_channel(), number = ch.get_number();
 
-            bool last = ch.second.raw_data.size() < 4000;
+            bool last = ch.size() < 4000;
 
-            pool.add_chunk(ch.first, ch.second);
-            //if (!pool.add_chunk(ch.first, ch.second)) {
-                //`std::cout << "# couldn't add\n";
-            //}
+            //pool.add_chunk(ch);
+            if (!pool.add_chunk(ch)) {
+                std::cout << "# couldn't add\n";
+            }
             
             if (last) { 
                 //std::cout << "# ending " << channel << "\n";

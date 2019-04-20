@@ -40,7 +40,7 @@ ChannelPool::ChannelPool(MapperParams &params, u16 nthreads, u16 nchannels) {
     read_buffer_.resize(nchannels);
     channel_fast5s_.resize(nchannels);
     for (u16 i = 0; i < nchannels; i++) {
-        mappers_.push_back(Mapper(params, i));
+        mappers_.push_back(Mapper(params));
         channel_busy_.push_back(false);
     }
 
@@ -213,7 +213,7 @@ void ChannelPool::MapperThread::run() {
             in_mtx_.unlock();
 
             for (Fast5Read &r : new_tmp) {
-                mappers_[r.channel].new_read(r.id, r.number);
+                mappers_[r.channel].new_read(r.id, r.channel, r.number);
                 active_reads_.push_back(Fast5Read());
                 active_reads_.back().swap(r);
             }

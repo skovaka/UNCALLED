@@ -16,8 +16,8 @@ all: simulator_test
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c -o $@ $^ $(INCLUDE) $(HDF5_INCLUDE) 
 
-simulator_test: simulator_test.o kmer_model.o mapper.o seed_tracker.o range.o bwa_fmi.o event_detector.o chunk_pool.o fast5_reader.o normalizer.o 
-	$(CC) $(CFLAGS) simulator_test.o kmer_model.o mapper.o seed_tracker.o range.o bwa_fmi.o event_detector.o chunk_pool.o fast5_reader.o normalizer.o -o simulator_test $(HDF5_LIB) $(BWA_LIB) $(LIBS)
+simulator_test: simulator_test.o kmer_model.o mapper.o seed_tracker.o range.o bwa_fmi.o event_detector.o chunk_pool.o fast5_reader.o normalizer.o chunk.o
+	$(CC) $(CFLAGS) simulator_test.o kmer_model.o mapper.o seed_tracker.o range.o bwa_fmi.o event_detector.o chunk_pool.o fast5_reader.o normalizer.o chunk.o -o simulator_test $(HDF5_LIB) $(BWA_LIB) $(LIBS)
 
 #uncalled: uncalled.o kmer_model.o mapper.o seed_tracker.o arg_parse.o range.o bwa_fmi.o event_detector.o chunk_pool.o fast5_reader.o
 #	$(CC) $(CFLAGS) uncalled.o kmer_model.o mapper.o seed_tracker.o arg_parse.o range.o bwa_fmi.o event_detector.o chunk_pool.o fast5_reader.o -o uncalled $(HDF5_LIB) $(BWA_LIB) $(LIBS)

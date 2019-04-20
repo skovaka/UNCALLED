@@ -370,7 +370,7 @@ bool operator< (const Mapper::PathBuffer &p1,
             p1.seed_prob_ < p2.seed_prob_);
 }
 
-Mapper::Mapper(const MapperParams &ap, u16 channel)
+Mapper::Mapper(const MapperParams &ap)
     : 
       params_(ap),
       model_(ap.model_),
@@ -382,8 +382,6 @@ Mapper::Mapper(const MapperParams &ap, u16 channel)
                     ap.min_top_conf_,
                     ap.min_aln_len_,
                     ap.seed_len_),
-      channel_(channel),
-      read_num_(0),
       chunk_processed_(true),
       state_(State::INACTIVE)
 
@@ -407,7 +405,7 @@ Mapper::Mapper(const MapperParams &ap, u16 channel)
     seed_tracker_.reset();
 }
 
-Mapper::Mapper(const Mapper &m) : Mapper(m.params_, m.channel_) {}
+Mapper::Mapper(const Mapper &m) : Mapper(m.params_) {}
 
 Mapper::~Mapper() {
     for (u32 i = 0; i < next_paths_.size(); i++) {
@@ -421,9 +419,13 @@ void Mapper::skip_events(u32 n) {
     prev_size_ = 0;
 }
 
-void Mapper::new_read(const std::string &id, u32 number) {
-    read_loc_ = ReadLoc(id, channel_, number);
-    read_num_ = number;
+void Mapper::new_read(const std::string &id, u16 channel, u32 number) {
+
+    if (prev_unfinished(number)) {
+        std::cerr << "Error: possibly lost read '" << chunk_.get_id() << "'\n";
+    }
+
+    read_loc_ = ReadLoc(id, channel, number);
     prev_size_ = 0;
     event_i_ = 0;
     chunk_i_ = 0;
@@ -434,8 +436,12 @@ void Mapper::new_read(const std::string &id, u32 number) {
     seed_tracker_.reset();
     event_detector_.reset();
     norm_.skip_unread();
-    chunk_buffer_.clear();
+    chunk_.clear();
     timer_.reset();
+}
+
+void Mapper::new_read(Chunk &c) {
+    new_read(c.get_id(), c.get_channel(), c.get_number());
 }
 
 std::string Mapper::map_fast5(const std::string &fast5_name) {
@@ -452,7 +458,7 @@ std::string Mapper::map_fast5(const std::string &fast5_name) {
         if (file.is_open()) {  
             auto fast5_info = file.get_raw_samples_params();
             auto raw_samples = file.get_raw_samples();
-            new_read(fast5_info.read_id, fast5_info.read_number);
+            new_read(fast5_info.read_id, 0, fast5_info.read_number);
             aln = add_samples(raw_samples);
 
         } else {
@@ -487,7 +493,7 @@ bool Mapper::add_sample(float s) {
 }
 
 u32 Mapper::prev_unfinished(u32 next_number) const {
-    return state_ == State::MAPPING && read_num_ != next_number;
+    return state_ == State::MAPPING && chunk_.get_number() != next_number;
 }
 
 bool Mapper::finished() const {
@@ -588,11 +594,8 @@ bool Mapper::swap_chunk(Chunk &chunk) {
     read_loc_.add_chunk();
 
     //New read hasn't been set
-    if (chunk.number != read_num_) {
-        state_ = State::FAILURE;
-    }
 
-    chunk_buffer_.swap(chunk.raw_data);
+    chunk.swap(chunk_);
     chunk_processed_ = false;
     return true;
 }
@@ -606,21 +609,18 @@ u16 Mapper::process_chunk() {
 
     float mean;
 
-    //std::cout << "# processing " << channel_ << "\n";
-
     u16 nevents = 0;
-    for (u32 i = 0; i < chunk_buffer_.size(); i++) {
-        if (event_detector_.add_sample(chunk_buffer_[i])) {
+    for (u32 i = 0; i < chunk_.size(); i++) {
+        if (event_detector_.add_sample(chunk_[i])) {
             mean = event_detector_.get_mean();
             if (!norm_.add_event(mean)) {
 
-                //std::cout << "# skipping unread " << channel_ << "\n";
                 u32 nskip = norm_.skip_unread(nevents);
                 skip_events(nskip);
                 //TODO: report event skip in some way
                 //std::cout << "# norm skipped " << nskip << "\n";
                 if (!norm_.add_event(mean)) {
-                    std::cout << "# error: chunk events cannot fit in normilzation buffer\n";
+                    std::cerr << "# error: chunk events cannot fit in normilzation buffer\n";
                     return nevents;
                 }
             }
@@ -630,7 +630,7 @@ u16 Mapper::process_chunk() {
 
     //std::cout << "# processed " << channel_ << "\n";
 
-    chunk_buffer_.clear();
+    chunk_.clear();
     chunk_processed_ = true;
     return nevents;
 }
@@ -653,7 +653,6 @@ bool Mapper::map_chunk() {
     for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
         if (add_event(norm_.pop_event())) return true;
         if (t.get() > tlimit) {
-            //std::cout << "# timeout " << channel_ << " " << i << "\n";
             return false; //TODO: penalize this read
         }
     }
@@ -898,7 +897,6 @@ bool Mapper::add_event(float event) {
     if (sg.is_valid()) {
         state_ = State::SUCCESS;
         read_loc_.set_ref_loc(params_, sg);
-        read_num_ = 0;
 
         #ifdef DEBUG_TIME
         read_loc_.tracker_time_ += timer_.lap();

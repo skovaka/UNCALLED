@@ -7,6 +7,7 @@
 #include "channel_pool.hpp"
 #include "chunk_pool.hpp"
 #include "fast5_reader.hpp"
+#include "chunk.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -42,7 +43,7 @@ PYBIND11_MODULE(align, m) {
                       >());
 
     py::class_<Mapper>(m, "Mapper")
-        .def(py::init<MapperParams &, u16>())
+        .def(py::init<MapperParams &>())
         .def("map_fast5", &Mapper::map_fast5);
 
     py::class_<ReadLoc>(m, "ReadLoc")
@@ -77,14 +78,26 @@ PYBIND11_MODULE(align, m) {
         .def("end_read", &ChunkPool::end_read);
 
     py::class_<Chunk>(m, "Chunk")
+        .def(py::init<const std::string &, //id, 
+                      u16, //channel
+                      u32, //number, 
+                      u64, //chunk_start, 
+                      const std::string &, //dtype
+                      const std::string & //raw_str
+                     >())
         .def(py::init<const std::string&, //_id, 
-                      u32, //_number, 
-                      u64, //_chunk_start_sample, 
-                      const std::vector<float>, //&_raw_data, 
-                      u32, //raw_st, 
+                      u32, //number 
+                      u16, //channel
+                      u64, //chunk_start_sample, 
+                      const std::vector<float> &, //raw_data, 
+                      u32, //raw_st
                       u32  //raw_len
                      >())
+        .def_static("set_calibration", &Chunk::set_calibration)
+        .def("get_channel", &Chunk::get_channel)
         .def("get_number", &Chunk::get_number)
+        .def("empty", &Chunk::empty)
+        .def("print", &Chunk::print)
         .def("size", &Chunk::size);
 
     py::class_<ChunkSim>(m, "ChunkSim")

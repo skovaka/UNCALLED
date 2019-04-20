@@ -26,18 +26,6 @@
 #include "chunk_pool.hpp"
 #include "mapper.hpp"
 
-//TODO: legit chunk default
-ReadStream::ReadStream(u16 chunk_len=4500, const std::string &name="") {
-    id_ = name;
-}
-
-void ReadStream::set_name(const std::string &name) {
-    id_ = name;
-}
-
-bool ReadStream::empty() const {
-    return chunk_.empty();
-}
 
 ChunkPool::ChunkPool(MapperParams &params, u16 nchannels, u16 nthreads) {
     for (u16 t = 0; t < nthreads; t++) {
@@ -49,7 +37,7 @@ ChunkPool::ChunkPool(MapperParams &params, u16 nchannels, u16 nthreads) {
     read_buffer_.resize(nchannels);
     buffer_queue_.reserve(nchannels);
     for (u16 i = 0; i < nchannels; i++) {
-        mappers_.push_back(Mapper(params, i));
+        mappers_.push_back(Mapper(params));
         channel_active_.push_back(false);
     }
 
@@ -62,13 +50,8 @@ ChunkPool::ChunkPool(MapperParams &params, u16 nchannels, u16 nthreads) {
 //
 //}
 
-void ChunkPool::new_read(u16 ch, const std::string &name) {
-    read_buffer_[ch].id = name;
-    //TODO: what if channel currently active?
-    //in practice rare, but could happen, especially in naive simulation
-}
-
-void ChunkPool::buffer_chunk(u16 ch, Chunk &c) {
+void ChunkPool::buffer_chunk(Chunk &c) {
+    u16 ch = c.get_channel();
     if (read_buffer_[ch].empty()) {
         buffer_queue_.push_back(ch);
     } else {
@@ -79,13 +62,14 @@ void ChunkPool::buffer_chunk(u16 ch, Chunk &c) {
 }
 
 //Add chunk to master buffer
-bool ChunkPool::add_chunk(u16 ch, Chunk &c) {
+bool ChunkPool::add_chunk(Chunk &c) {
+    u16 ch = c.get_channel();
 
     //Check if previous read is still aligning
     //If so, tell thread to reset, store chunk in pool buffer
-    if (mappers_[ch].prev_unfinished(c.number)) {
+    if (mappers_[ch].prev_unfinished(c.get_number())) {
         mappers_[ch].request_reset();
-        buffer_chunk(ch, c);
+        buffer_chunk(c);
         //std::cout << "# requesting reset\n";
         return true;
     }
@@ -93,20 +77,16 @@ bool ChunkPool::add_chunk(u16 ch, Chunk &c) {
     //Previous alignment finished but mapper hasn't reset
     //Happens if update hasn't been called yet
     if (mappers_[ch].finished()) {
-        if (mappers_[ch].get_loc().get_number() != c.number){ 
-            buffer_chunk(ch, c);
-            //std::cout << "# buffering chunk\n";
-        } else {
-            //std::cout << "# got finished chunk\n";
+        if (mappers_[ch].get_loc().get_number() != c.get_number()){ 
+            buffer_chunk(c);
         }
         return true;
     }
 
     //Mapper inactive - need to reset graph and assign to thread
     if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
-        mappers_[ch].new_read(c.id, c.number);
+        mappers_[ch].new_read(c);
         active_queue_.push_back(ch);
-        //std::cout << "# new in add\n";
     } 
 
     if (mappers_[ch].swap_chunk(c)) {
@@ -158,9 +138,8 @@ std::vector<ReadLoc> ChunkPool::update() {
         Chunk &c = read_buffer_[ch];
 
         if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
-            mappers_[ch].new_read(c.id, c.number);
+            mappers_[ch].new_read(c);
             active_queue_.push_back(ch);
-            //std::cout << "# new in update\n";
         }
 
         if (mappers_[ch].swap_chunk(read_buffer_[ch])) {
