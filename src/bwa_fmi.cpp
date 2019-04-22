@@ -30,22 +30,34 @@
 
 BwaFMI::BwaFMI() {
     loaded_ = false;
+    index_ = NULL;
+    bns_ = NULL;
 }
 
 BwaFMI::BwaFMI(const std::string &prefix) {
-    std::string bwt_fname = prefix + ".bwt",
-                sa_fname = prefix + ".sa";
+    if (prefix.empty()) {
+        loaded_ = false;
+        index_ = NULL;
+        bns_ = NULL;
+    } else {
+        std::string bwt_fname = prefix + ".bwt",
+                    sa_fname = prefix + ".sa";
 
-	index_ = bwt_restore_bwt(bwt_fname.c_str());
-	bwt_restore_sa(sa_fname.c_str(), index_);
-    bns_ = bns_restore(prefix.c_str());
+        index_ = bwt_restore_bwt(bwt_fname.c_str());
+        bwt_restore_sa(sa_fname.c_str(), index_);
+        bns_ = bns_restore(prefix.c_str());
 
-    loaded_ = true;
+        loaded_ = true;
+    }
 }
 
-BwaFMI::~BwaFMI() {
-    bwt_destroy(index_);
-    bns_destroy(bns_);
+void BwaFMI::destroy() {
+    if (index_ != NULL) { 
+        bwt_destroy(index_);
+    }
+    if (bns_ != NULL) { 
+        bns_destroy(bns_);
+    }
 }
 
 Range BwaFMI::get_neighbor(Range r1, u8 base) const {

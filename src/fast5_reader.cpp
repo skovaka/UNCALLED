@@ -42,7 +42,6 @@ u32 load_multi_fast5(const std::string &fname, std::vector<Fast5Read> &list) {
         u64 start_sample;
         std::vector<int> int_data; 
 
-
         for (auto a : file.get_attr_map(raw_path)) {
             if (a.first == "read_id") {
                 id = a.second;
@@ -56,6 +55,7 @@ u32 load_multi_fast5(const std::string &fname, std::vector<Fast5Read> &list) {
         file.read(sig_path, int_data);
         std::vector<float> raw_data(int_data.size()); 
 
+    
         float digitisation = 0, range = 0, offset = 0, sampling_rate = 0;
         for (auto a : file.get_attr_map(ch_path)) {
             if (a.first == "channel_number") {

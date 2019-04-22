@@ -21,11 +21,12 @@
  * SOFTWARE.
  */
 
-#ifndef ALIGNER_HPP
-#define ALIGNER_HPP
+#ifndef MAPPER_HPP
+#define MAPPER_HPP
 
 #include <iostream>
 #include <vector>
+#include "uncalled_opts.hpp"
 #include "bwa_fmi.hpp"
 #include "kmer_model.hpp"
 #include "normalizer.hpp"
@@ -56,71 +57,13 @@
 
 #define INDEX_SUFF ".uncl"
 
-class MapperParams {
-    public:
-    MapperParams(const std::string &bwa_prefix,
-                 const std::string &model_fname,
-                 u32 seed_len, 
-                 u32 min_aln_len,
-                 u32 min_rep_len, 
-                 u32 max_rep_copy, 
-                 u32 max_consec_stay,
-                 u32 max_paths, 
-                 u32 max_events_proc,
-                 u32 max_chunks_proc,
-                 u32 evt_buffer_len,
-                 u32 evt_winlen1,
-                 u32 evt_winlen2,
-                 u16 evt_batch_size,
-                 float evt_timeout,
-                 float evt_thresh1,
-                 float evt_thresh2,
-                 float evt_peak_height,
-                 float evt_min_mean,
-                 float evt_max_mean,
-                 float max_stay_frac,
-                 float min_seed_prob, 
-                 float min_mean_conf,
-                 float min_top_conf);
-    
-    u16 get_max_events(u16 event_i) const;
-    float get_prob_thresh(u64 fm_length) const;
-    float get_source_prob() const;
-
-    BwaFMI fmi_;
-    KmerModel model_;
-    EventParams event_params_;
-
-    u32 seed_len_,
-        min_rep_len_,
-        max_rep_copy_,
-        max_paths_,
-        max_consec_stay_,
-        min_aln_len_,
-        max_events_proc_,
-        max_chunks_proc_,
-        evt_buffer_len_;
-
-    u16 evt_batch_size_;
-
-    float evt_timeout_,
-          max_stay_frac_,
-          min_seed_prob_,
-          min_mean_conf_,
-          min_top_conf_;
-
-    std::vector<u64> evpr_lengths_;
-    std::vector<float> evpr_threshes_;
-    std::vector<Range> kmer_fmranges_;
-};
-
 class ReadLoc {
     public:
     ReadLoc();
     ReadLoc(const std::string &rd_name, u16 channel=0, u32 number=0);
 
-    bool set_ref_loc(const MapperParams &params, const SeedGroup &seeds);
-    void set_read_len(const MapperParams &params, u32 len);
+    bool set_ref_loc(const UncalledOpts &params, const SeedGroup &seeds);
+    void set_read_len(const UncalledOpts &params, u32 len);
 
     void set_time(float time);
 
@@ -162,7 +105,7 @@ class Mapper {
 
     enum State { INACTIVE, MAPPING, SUCCESS, FAILURE };
 
-    Mapper(const MapperParams &map_params);
+    Mapper(const UncalledOpts &map_params);
     Mapper(const Mapper &m);
 
     ~Mapper();
@@ -215,7 +158,7 @@ class Mapper {
 
         void invalidate();
         bool is_valid() const;
-        bool is_seed_valid(const MapperParams &params, 
+        bool is_seed_valid(const UncalledOpts &params, 
                            bool has_children) const;
 
         u8 type_head() const;
@@ -250,7 +193,7 @@ class Mapper {
 
     void update_seeds(PathBuffer &p, bool has_children);
 
-    const MapperParams &params_;
+    const UncalledOpts &opts_;
     const KmerModel &model_;
     const BwaFMI &fmi_;
     EventDetector event_detector_;

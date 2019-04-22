@@ -24,98 +24,6 @@
 #include "pdqsort.h"
 #include "mapper.hpp"
 
-MapperParams::MapperParams(const std::string &bwa_prefix,
-                           const std::string &model_fname,
-                           u32 seed_len, 
-                           u32 min_aln_len,
-                           u32 min_rep_len, 
-                           u32 max_rep_copy, 
-                           u32 max_consec_stay,
-                           u32 max_paths, 
-                           u32 max_events_proc,
-                           u32 max_chunks_proc,
-                           u32 evt_buffer_len,
-                           u32 evt_winlen1,
-                           u32 evt_winlen2,
-                           u16 evt_batch_size,
-                           float evt_timeout,
-                           float evt_thresh1,
-                           float evt_thresh2,
-                           float evt_peak_height,
-                           float evt_min_mean,
-                           float evt_max_mean,
-                           float max_stay_frac,
-                           float min_seed_prob, 
-                           float min_mean_conf,
-                           float min_top_conf)
-        : fmi_(BwaFMI(bwa_prefix)),
-          model_(KmerModel(model_fname, true)),
-          event_params_({evt_winlen1,
-                         evt_winlen2,
-                         evt_thresh1,
-                         evt_thresh2,
-                         evt_peak_height,
-                         evt_min_mean,
-                         evt_max_mean}),
-          seed_len_(seed_len),
-          min_rep_len_(min_rep_len),
-          max_rep_copy_(max_rep_copy),
-          max_paths_(max_paths),
-          max_consec_stay_(max_consec_stay),
-          min_aln_len_(min_aln_len),
-          max_events_proc_(max_events_proc),
-          max_chunks_proc_(max_chunks_proc),
-          evt_buffer_len_(evt_buffer_len),
-          evt_batch_size_(evt_batch_size),
-          evt_timeout_(evt_timeout),
-          max_stay_frac_(max_stay_frac),
-          min_seed_prob_(min_seed_prob),
-          min_mean_conf_(min_mean_conf),
-          min_top_conf_(min_top_conf) {
-    
-    //TODO: exception handling
-    std::ifstream infile(bwa_prefix + INDEX_SUFF);
-    float prob, frac;
-    u64 fmlen = 0;
-    infile >> prob >> frac;
-    evpr_threshes_.push_back(prob);
-    while (fmlen != 1) {
-        infile >> fmlen >> prob >> frac;
-        evpr_lengths_.push_back(fmlen);
-        evpr_threshes_.push_back(prob);
-    }
-
-    kmer_fmranges_ = std::vector<Range>(model_.kmer_count());
-    for (u16 k = 0; k < model_.kmer_count(); k++) {
-        Range r = fmi_.get_full_range(model_.get_last_base(k));
-        for (u8 i = model_.kmer_len()-2; i < model_.kmer_len(); i--) {
-            r = fmi_.get_neighbor(r, model_.get_base(k, i));
-        }
-        kmer_fmranges_[k] = r;
-    }
-}
-
-float MapperParams::get_prob_thresh(u64 fm_length) const {
-    auto pr = evpr_threshes_.begin();
-    for (auto len = evpr_lengths_.begin(); len != evpr_lengths_.end(); len++) {
-        if (fm_length > *len) {
-            break;
-        }
-        pr++;
-    }
-    return *pr;
-}
-
-float MapperParams::get_source_prob() const {
-    return evpr_threshes_.front();
-}
-
-u16 MapperParams::get_max_events(u16 event_i) const {
-    if (event_i + evt_batch_size_ > max_events_proc_) 
-        return max_events_proc_ - event_i;
-    return evt_batch_size_;
-}
-
 ReadLoc::ReadLoc(const std::string &rd_name, u16 channel, u32 number) 
     : rd_name_(rd_name),
       rf_name_("*"),
@@ -149,7 +57,7 @@ ReadLoc::ReadLoc() {
     #endif
 }
 
-bool ReadLoc::set_ref_loc(const MapperParams &params, const SeedGroup &seeds) {
+bool ReadLoc::set_ref_loc(const UncalledOpts &params, const SeedGroup &seeds) {
     u8 k_shift = (params.model_.kmer_len() - 1);
 
     rd_st_ = (u32) (params.max_stay_frac_ * seeds.evt_st_);
@@ -172,7 +80,7 @@ void ReadLoc::set_time(float time) {
     time_ = time;
 }
 
-void ReadLoc::set_read_len(const MapperParams &params, u32 len) {
+void ReadLoc::set_read_len(const UncalledOpts &params, u32 len) {
     rd_len_ = (u32) (params.max_stay_frac_ * len);
     rd_en_ = rd_len_ - 1;
 }
@@ -349,7 +257,7 @@ u8 Mapper::PathBuffer::type_tail() const {
     return event_types_ & TYPE_MASK;
 }
 
-bool Mapper::PathBuffer::is_seed_valid(const MapperParams &p,
+bool Mapper::PathBuffer::is_seed_valid(const UncalledOpts &p,
                                         bool path_ended) const{
     return (fm_range_.length() == 1 || 
                 (path_ended &&
@@ -370,9 +278,9 @@ bool operator< (const Mapper::PathBuffer &p1,
             p1.seed_prob_ < p2.seed_prob_);
 }
 
-Mapper::Mapper(const MapperParams &ap)
+Mapper::Mapper(const UncalledOpts &ap)
     : 
-      params_(ap),
+      opts_(ap),
       model_(ap.model_),
       fmi_(ap.fmi_),
       event_detector_(ap.event_params_),
@@ -388,7 +296,7 @@ Mapper::Mapper(const MapperParams &ap)
      {
 
 
-    PathBuffer::MAX_PATH_LEN = params_.seed_len_;
+    PathBuffer::MAX_PATH_LEN = opts_.seed_len_;
 
     for (u64 t = 0; t < EventType::NUM_TYPES; t++) {
         PathBuffer::TYPE_ADDS[t] = t << ((PathBuffer::MAX_PATH_LEN-2)*TYPE_BITS);
@@ -396,8 +304,8 @@ Mapper::Mapper(const MapperParams &ap)
     PathBuffer::TYPE_MASK = (u8) ((1 << TYPE_BITS) - 1);
 
     kmer_probs_ = std::vector<float>(model_.kmer_count());
-    prev_paths_ = std::vector<PathBuffer>(params_.max_paths_);
-    next_paths_ = std::vector<PathBuffer>(params_.max_paths_);
+    prev_paths_ = std::vector<PathBuffer>(opts_.max_paths_);
+    next_paths_ = std::vector<PathBuffer>(opts_.max_paths_);
     sources_added_ = std::vector<bool>(model_.kmer_count(), false);
 
     prev_size_ = 0;
@@ -405,7 +313,7 @@ Mapper::Mapper(const MapperParams &ap)
     seed_tracker_.reset();
 }
 
-Mapper::Mapper(const Mapper &m) : Mapper(m.params_) {}
+Mapper::Mapper(const Mapper &m) : Mapper(m.opts_) {}
 
 Mapper::~Mapper() {
     for (u32 i = 0; i < next_paths_.size(); i++) {
@@ -483,9 +391,9 @@ bool Mapper::add_sample(float s) {
     read_loc_.sigproc_time_ += timer_.lap();
     #endif
 
-    if (event_i_ >= params_.max_events_proc_ || add_event(m)) {
+    if (event_i_ >= opts_.max_events_proc_ || add_event(m)) {
         read_loc_.set_time(timer_.get());
-        read_loc_.set_read_len(params_, event_i_);
+        read_loc_.set_read_len(opts_, event_i_);
         return true;
     }
 
@@ -512,7 +420,7 @@ ReadLoc Mapper::get_loc() const {
 
 ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
 
-    if (params_.evt_buffer_len_ == 0) {
+    if (opts_.evt_buffer_len_ == 0) {
         #ifdef DEBUG_TIME
         timer_.reset();
         #endif
@@ -525,14 +433,14 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
         read_loc_.sigproc_time_ += timer_.lap();
         #endif
 
-        read_loc_.set_read_len(params_, events.size());
+        read_loc_.set_read_len(opts_, events.size());
 
         for (u32 e = 0; e < events.size(); e++) {
             if (add_event(events[e].mean)) break;
         }
     } else {
 
-        read_loc_.set_read_len(params_, samples.size() / 5); //TODO: this better
+        read_loc_.set_read_len(opts_, samples.size() / 5); //TODO: this better
         
         u32 i = 0;
 
@@ -584,7 +492,7 @@ bool Mapper::swap_chunk(Chunk &chunk) {
     //std::cout << "# tryna swap " << is_chunk_processed() << " " << reset_ << " " << state_ << "\n";
     if (!is_chunk_processed() || reset_) return false;
 
-    if (params_.max_chunks_proc_ > 0 && ++chunk_i_ > params_.max_chunks_proc_) {
+    if (opts_.max_chunks_proc_ > 0 && ++chunk_i_ > opts_.max_chunks_proc_) {
         state_ = State::FAILURE;
         reset_ = true;
         chunk.clear();
@@ -646,8 +554,8 @@ bool Mapper::map_chunk() {
         state_ = State::FAILURE;
         return true;
     }
-    u16 nevents = params_.get_max_events(event_i_);
-    float tlimit = params_.evt_timeout_ * nevents;
+    u16 nevents = opts_.get_max_events(event_i_);
+    float tlimit = opts_.evt_timeout_ * nevents;
 
     Timer t;
     for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
@@ -662,7 +570,7 @@ bool Mapper::map_chunk() {
 
 bool Mapper::add_event(float event) {
 
-    if (reset_ || event_i_ >= params_.max_events_proc_) {
+    if (reset_ || event_i_ >= opts_.max_events_proc_) {
         reset_ = false;
         state_ = State::FAILURE;
         return true;
@@ -695,12 +603,12 @@ bool Mapper::add_event(float event) {
         Range &prev_range = prev_path.fm_range_;
         prev_kmer = prev_path.kmer_;
 
-        evpr_thresh = params_.get_prob_thresh(prev_range.length());
+        evpr_thresh = opts_.get_prob_thresh(prev_range.length());
         #ifdef DEBUG_TIME
         read_loc_.thresh_time_ += timer_.lap();
         #endif
 
-        if (prev_path.consec_stays_ < params_.max_consec_stay_ && 
+        if (prev_path.consec_stays_ < opts_.max_consec_stay_ && 
             kmer_probs_[prev_kmer] >= evpr_thresh) {
 
             next_path->make_child(prev_path, 
@@ -793,11 +701,11 @@ bool Mapper::add_event(float event) {
             //Add source for beginning of kmer range
             if (source_kmer != prev_kmer &&
                 next_path != next_paths_.end() &&
-                kmer_probs_[source_kmer] >= params_.get_source_prob()) {
+                kmer_probs_[source_kmer] >= opts_.get_source_prob()) {
 
                 sources_added_[source_kmer] = true;
 
-                source_range = Range(params_.kmer_fmranges_[source_kmer].start_,
+                source_range = Range(opts_.kmer_fmranges_[source_kmer].start_,
                                      next_paths_[i].fm_range_.start_ - 1);
 
                 if (source_range.is_valid()) {
@@ -808,7 +716,7 @@ bool Mapper::add_event(float event) {
                 }                                    
 
                 unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
-                                        params_.kmer_fmranges_[source_kmer].end_);
+                                        opts_.kmer_fmranges_[source_kmer].end_);
             }
 
             prev_kmer = source_kmer;
@@ -825,7 +733,7 @@ bool Mapper::add_event(float event) {
             //Start source after current path
             //TODO: check if theres space for a source here, instead of after extra work?
             if (next_path != next_paths_.end() &&
-                kmer_probs_[source_kmer] >= params_.get_source_prob()) {
+                kmer_probs_[source_kmer] >= opts_.get_source_prob()) {
                 
                 source_range = unchecked_range;
                 
@@ -866,10 +774,10 @@ bool Mapper::add_event(float event) {
             next_path != next_paths_.end(); 
          kmer++) {
 
-        Range next_range = params_.kmer_fmranges_[kmer];
+        Range next_range = opts_.kmer_fmranges_[kmer];
 
         if (!sources_added_[kmer] && 
-            kmer_probs_[kmer] >= params_.get_source_prob() &&
+            kmer_probs_[kmer] >= opts_.get_source_prob() &&
             next_path != next_paths_.end() &&
             next_range.is_valid()) {
 
@@ -896,7 +804,7 @@ bool Mapper::add_event(float event) {
 
     if (sg.is_valid()) {
         state_ = State::SUCCESS;
-        read_loc_.set_ref_loc(params_, sg);
+        read_loc_.set_ref_loc(opts_, sg);
 
         #ifdef DEBUG_TIME
         read_loc_.tracker_time_ += timer_.lap();
@@ -914,7 +822,7 @@ bool Mapper::add_event(float event) {
 
 void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
 
-    if (p.is_seed_valid(params_, path_ended)) {
+    if (p.is_seed_valid(opts_, path_ended)) {
 
         #ifdef DEBUG_TIME
         read_loc_.tracker_time_ += timer_.lap();

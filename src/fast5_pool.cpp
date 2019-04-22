@@ -52,13 +52,12 @@ bool open_fast5(const std::string &filename, fast5::File &file) {
 }
 
 
-Fast5Pool::Fast5Pool(MapperParams &params, u16 nthreads, u32 batch_size) {
-    nthreads_ = nthreads;
-    batch_size_ = batch_size;
+Fast5Pool::Fast5Pool(const UncalledOpts &opts) {
+    batch_size_ = 5; //TODO: need to rewrite pretty much this whole thing
 
-    for (u16 i = 0; i < nthreads_; i++) {
+    for (u16 i = 0; i < opts.threads_; i++) {
         //threads_.push_back(MapperThread(params));
-        threads_.emplace_back(params);
+        threads_.emplace_back(opts);
     }
     for (MapperThread &t : threads_) {
         t.start();
@@ -130,10 +129,10 @@ void Fast5Pool::stop_all() {
 }
 
 
-Fast5Pool::MapperThread::MapperThread(MapperParams &params)
+Fast5Pool::MapperThread::MapperThread(const UncalledOpts &opts)
     : running_(true),
       aligning_(false),
-      mapper_(params) {}
+      mapper_(opts) {}
 
 Fast5Pool::MapperThread::MapperThread(MapperThread &&mt) 
     : running_(mt.running_),                                             

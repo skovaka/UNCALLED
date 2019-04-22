@@ -36,7 +36,7 @@ class BwaFMI {
 
     BwaFMI();
     BwaFMI(const std::string &prefix);
-    ~BwaFMI();
+    void destroy();
 
     Range get_neighbor(Range range, u8 base) const;
 

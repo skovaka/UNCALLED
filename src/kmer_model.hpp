@@ -38,8 +38,8 @@ class KmerModel {
     public:
     typedef std::vector<u16>::const_iterator neighbor_itr;
 
+    KmerModel();
     KmerModel(std::string model_fname, bool complement);
-    ~KmerModel();
 
     NormParams get_norm_params(const std::vector<Event> &events) const;
     void normalize(std::vector<Event> &events, NormParams norm={0, 0}) const;
@@ -70,7 +70,9 @@ class KmerModel {
                  std::vector<u16> &fwd_ids, 
                  std::vector<u16> &rev_ids) const;
 
-    double *lv_means_, *lv_vars_x2_, *lognorm_denoms_, *sd_means_, *sd_stdvs_;
+    //double *lv_means_, *lv_vars_x2_, *lognorm_denoms_, *sd_means_, *sd_stdvs_;
+    std::vector<double> lv_means_, lv_vars_x2_, lognorm_denoms_, sd_means_, sd_stdvs_;
+    //TODO: try floats
 
     double lambda_, model_mean_, model_stdv_;
     private:
@@ -78,7 +80,7 @@ class KmerModel {
     u16 kmer_count_, K_MASK_;
     bool complement_;
 
-    u16 *rev_comp_ids_;
+    std::vector<u16> rev_comp_ids_;
 };
 
 #endif

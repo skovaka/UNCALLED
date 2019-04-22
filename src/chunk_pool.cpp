@@ -27,21 +27,21 @@
 #include "mapper.hpp"
 
 
-ChunkPool::ChunkPool(MapperParams &params, u16 nchannels, u16 nthreads) {
-    for (u16 t = 0; t < nthreads; t++) {
+ChunkPool::ChunkPool(const UncalledOpts &opts) {
+    for (u16 t = 0; t < opts.threads_; t++) {
         threads_.emplace_back(mappers_);
     }
     
     //mappers_.reserve(nchannels);
-    channel_active_.reserve(nchannels);
-    read_buffer_.resize(nchannels);
-    buffer_queue_.reserve(nchannels);
-    for (u16 i = 0; i < nchannels; i++) {
-        mappers_.push_back(Mapper(params));
+    channel_active_.reserve(opts.num_channels_);
+    read_buffer_.resize(opts.num_channels_);
+    buffer_queue_.reserve(opts.num_channels_);
+    for (u16 i = 0; i < opts.num_channels_; i++) {
+        mappers_.push_back(Mapper(opts));
         channel_active_.push_back(false);
     }
 
-    for (u16 t = 0; t < nthreads; t++) {
+    for (u16 t = 0; t < opts.threads_; t++) {
         threads_[t].start();
     }
 }

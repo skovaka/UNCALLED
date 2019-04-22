@@ -10,3 +10,6 @@
 [submodule "pdqsort"]
 	path = pdqsort
 	url = https://github.com/orlp/pdqsort
+[submodule "argparse"]
+	path = argparse
+	url = https://github.com/hbristow/argparse.git

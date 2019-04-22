@@ -48,6 +48,9 @@ std::string get_complement(const std::string &seq) {
     return comp;
 }
 
+KmerModel::KmerModel() 
+    : k_(0) {}
+
 KmerModel::KmerModel(std::string model_fname, bool complement) {
     std::ifstream model_in(model_fname);
 
@@ -95,9 +98,9 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
     k_ = kmer.size();
     K_MASK_ =  ((1 << (2*k_)) - 1);
     kmer_count_ = pow(4, k_); //4 magic number?
-    lv_means_ = new double[kmer_count_+1];
-    lv_vars_x2_ = new double[kmer_count_+1];
-    lognorm_denoms_ = new double[kmer_count_+1];
+    lv_means_.resize(kmer_count_+1);
+    lv_vars_x2_.resize(kmer_count_+1);
+    lognorm_denoms_.resize(kmer_count_+1);
 
     lv_means_[kmer_count_] = 
     lv_vars_x2_[kmer_count_] = 
@@ -106,7 +109,7 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
     model_mean_ = 0;
 
     //Stores which kmers can follow which
-    rev_comp_ids_ = new u16[kmer_count_]; 
+    rev_comp_ids_.resize(kmer_count_); 
 
     //Read and store rest of the model
     do {
@@ -164,15 +167,6 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
         model_stdv_ += pow(lv_means_[k_id] - model_mean_, 2);
     model_stdv_ = sqrt(model_stdv_ / kmer_count_);
 
-    //std::cout << model_mean_ << " " << model_stdv_ << "\n";
-}
-
-
-KmerModel::~KmerModel() {
-    delete [] lv_means_;
-    delete [] lv_vars_x2_;
-    delete [] lognorm_denoms_;
-    delete [] rev_comp_ids_; 
 }
 
 bool KmerModel::event_valid(const Event &e) const {

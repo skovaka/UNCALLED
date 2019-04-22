@@ -31,7 +31,7 @@
 
 class Fast5Pool {
     public:
-    Fast5Pool(MapperParams &params, u16 nthreads, u32 batch_size);
+    Fast5Pool(const UncalledOpts &opts);
     
     void add_fast5s(const std::vector<std::string> &new_fast5s);
     std::vector<std::string> update();
@@ -42,7 +42,7 @@ class Fast5Pool {
 
     class MapperThread {
         public:
-        MapperThread(MapperParams &params);
+        MapperThread(const UncalledOpts &opts);
         MapperThread(MapperThread &&mt);
 
         void start();

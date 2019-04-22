@@ -31,7 +31,7 @@
 
 class ChunkPool {
     public:
-    ChunkPool(MapperParams &params, u16 nchannels, u16 nthreads);
+    ChunkPool(const UncalledOpts &opts);
     
     bool add_chunk(Chunk &chunk);
     void end_read(u16 ch, u32 number);
@@ -80,7 +80,6 @@ class ChunkPool {
     std::vector<bool> channel_active_;
 
     //Store threads in order of # active mappers
-    
 };
 
 #endif
