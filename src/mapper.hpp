@@ -33,72 +33,10 @@
 #include "seed_tracker.hpp"
 #include "chunk.hpp"
 #include "timer.hpp"
-
-#define PAF_TIME_TAG "YT:f:"
-#define PAF_UNBLOCK_TAG "ub:i:"
-#define PAF_NUMCHUNK_TAG "nc:i:"
+#include "read_buffer.hpp"
 
 //#define DEBUG_TIME
 //#define DEBUG_SEEDS
-
-#ifdef DEBUG_TIME
-#define PAF_SIGPROC_TAG "YA:f:"
-#define PAF_PROB_TAG   "YB:f:"
-#define PAF_THRESH_TAG "YC:f:"
-#define PAF_STAY_TAG   "YD:f:"
-#define PAF_NEIGHBOR_TAG "YE:f:"
-#define PAF_FMRS_TAG    "YF:f:"
-#define PAF_FMSA_TAG    "YG:f:"
-#define PAF_SORT_TAG    "YH:f:"
-#define PAF_LOOP2_TAG   "YI:f:"
-#define PAF_SOURCE_TAG  "YJ:f:"
-#define PAF_TRACKER_TAG "YK:f:"
-#endif
-
-#define INDEX_SUFF ".uncl"
-
-class ReadLoc {
-    public:
-    ReadLoc();
-    ReadLoc(const std::string &rd_name, u16 channel=0, u32 number=0);
-
-    bool set_ref_loc(const UncalledOpts &params, const SeedGroup &seeds);
-    void set_read_len(const UncalledOpts &params, u32 len);
-
-    void set_time(float time);
-
-    std::string str() const;
-    bool is_valid() const; 
-    u16 get_channel() const;
-    u32 get_number() const;
-    std::string get_ref() const;
-
-    void set_unblocked();
-    u16 add_chunk();
-
-    friend std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
-
-    #ifdef DEBUG_TIME
-    double sigproc_time_, prob_time_, thresh_time_, stay_time_,
-           neighbor_time_, fmrs_time_, fmsa_time_, 
-           sort_time_, loop2_time_, source_time_, tracker_time_;
-    #endif
-
-    private:
-    std::string rd_name_, rf_name_;
-    u16 rd_channel_;
-    u32 rd_number_;
-    u64 rd_st_, rd_en_, rd_len_,
-        rf_st_, rf_en_, rf_len_;
-    u16 match_count_;
-    float time_;
-    bool fwd_;
-    bool unblocked_;
-    u16 num_chunks_;
-
-};
-
-std::ostream &operator<< (std::ostream &out, const ReadLoc &l);
 
 class Mapper {
     public:
@@ -115,9 +53,9 @@ class Mapper {
     void new_read(Chunk &c);
     bool end_read(u32 number);
 
-    std::string map_fast5(const std::string &fast5_name);
-    ReadLoc add_samples(const std::vector<float> &samples);
-    bool add_sample(float s);
+    Paf map_fast5(const std::string &fast5_name);
+    //ReadLoc add_samples(const std::vector<float> &samples);
+    //bool add_sample(float s);
 
     void skip_events(u32 n);
     bool swap_chunk(Chunk &chunk);
@@ -133,8 +71,8 @@ class Mapper {
     u32 prev_unfinished(u32 next_number) const;
 
     bool finished() const;
-    ReadLoc get_loc() const;
-    ReadLoc pop_loc();
+    ReadBuffer &get_read();
+    void deactivate();
 
     private:
 
@@ -193,17 +131,19 @@ class Mapper {
 
     void update_seeds(PathBuffer &p, bool has_children);
 
+    void set_ref_loc(const SeedGroup &seeds);
+
     const UncalledOpts &opts_;
     const KmerModel &model_;
     const BwaFMI &fmi_;
     EventDetector event_detector_;
     Normalizer norm_;
     SeedTracker seed_tracker_;
-    Chunk chunk_;
+    ReadBuffer read_;
 
     //u16 channel_;
     //u32 read_num_;
-    bool chunk_processed_, last_chunk_,reset_;
+    bool last_chunk_, reset_;
     State state_;
     std::vector<float> kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;
@@ -212,7 +152,6 @@ class Mapper {
         event_i_,
         chunk_i_;
     Timer timer_;
-    ReadLoc read_loc_;
 
     #ifdef DEBUG_SEEDS
     std::ostream &seeds_out_;

@@ -24,147 +24,6 @@
 #include "pdqsort.h"
 #include "mapper.hpp"
 
-ReadLoc::ReadLoc(const std::string &rd_name, u16 channel, u32 number) 
-    : rd_name_(rd_name),
-      rf_name_("*"),
-      rd_channel_(channel),
-      rd_number_(number),
-      rd_st_(0),
-      rd_en_(0),
-      rd_len_(0),
-      match_count_(0),
-      time_(-1),
-      unblocked_(false),
-      num_chunks_(0)
-       {
-    
-    #ifdef DEBUG_TIME
-    sigproc_time_ = prob_time_ = thresh_time_ = stay_time_ = 
-    neighbor_time_ = fmrs_time_ = fmsa_time_ = 
-    sort_time_ = loop2_time_ = source_time_ = tracker_time_ = 0;
-    #endif
-}
-
-ReadLoc::ReadLoc() {
-    match_count_ = 0;
-    unblocked_=false;
-    num_chunks_=0;
-
-    #ifdef DEBUG_TIME
-    sigproc_time_ = prob_time_ = thresh_time_ = stay_time_ = 
-    neighbor_time_ = fmrs_time_ = fmsa_time_ = 
-    sort_time_ = loop2_time_ = source_time_ = tracker_time_ = 0;
-    #endif
-}
-
-bool ReadLoc::set_ref_loc(const UncalledOpts &params, const SeedGroup &seeds) {
-    u8 k_shift = (params.model_.kmer_len() - 1);
-
-    rd_st_ = (u32) (params.max_stay_frac_ * seeds.evt_st_);
-    rd_en_ = (u32) (params.max_stay_frac_ * (seeds.evt_en_ + params.seed_len_)) + k_shift;
-
-    match_count_ = seeds.total_len_ + k_shift;
-    fwd_ = seeds.ref_st_ > params.fmi_.size() / 2;
-
-    u64 sa_st;
-    if (fwd_) sa_st = params.fmi_.size() - (seeds.ref_en_.end_ + k_shift);
-    else      sa_st = seeds.ref_st_;
-
-    rf_len_ = params.fmi_.translate_loc(sa_st, rf_name_, rf_st_);
-    rf_en_ = rf_st_ + (seeds.ref_en_.end_ - seeds.ref_st_) + k_shift;
-
-    return rf_len_ > 0;
-}
-
-void ReadLoc::set_time(float time) {
-    time_ = time;
-}
-
-void ReadLoc::set_read_len(const UncalledOpts &params, u32 len) {
-    rd_len_ = (u32) (params.max_stay_frac_ * len);
-    rd_en_ = rd_len_ - 1;
-}
-
-bool ReadLoc::is_valid() const {
-    return match_count_ > 0;
-}
-
-std::string ReadLoc::get_ref() const {
-    return rf_name_;
-}
-
-u16 ReadLoc::get_channel() const {
-    return rd_channel_;
-}
-
-u32 ReadLoc::get_number() const {
-    return rd_number_;
-}
-
-void ReadLoc::set_unblocked() {
-    unblocked_ = true;
-}
-
-u16 ReadLoc::add_chunk() {
-    return ++num_chunks_;
-}
-
-std::string ReadLoc::str() const {
-    std::stringstream ss;
-    ss << rd_name_ << "\t"
-       << rd_len_ << "\t"
-       << rd_st_ << "\t"
-       << rd_en_ << "\t";
-    if (is_valid()) {
-        ss << (fwd_ ? '+' : '-') << "\t"
-           << rf_name_ << "\t"
-           << rf_len_ << "\t"
-           << rf_st_ << "\t"
-           << rf_en_ << "\t"
-           << match_count_ << "\t"
-           << (rf_en_ - rf_st_ + 1) << "\t"
-           << 255;
-    } else {
-        ss << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "255";
-    }
-
-    #ifndef DEBUG_TIME
-    if (time_ > 0) {
-        ss << "\t" << PAF_TIME_TAG << time_;
-    }
-    #else
-        ss << "\t" PAF_SIGPROC_TAG << sigproc_time_  
-           << "\t" PAF_PROB_TAG    << prob_time_
-           << "\t" PAF_THRESH_TAG    << thresh_time_
-           << "\t" PAF_STAY_TAG    << stay_time_
-           << "\t" PAF_NEIGHBOR_TAG    << neighbor_time_
-           << "\t" PAF_FMRS_TAG    << fmrs_time_
-           << "\t" PAF_FMSA_TAG    << fmsa_time_
-           << "\t" PAF_SORT_TAG    << sort_time_
-           << "\t" PAF_LOOP2_TAG   << loop2_time_
-           << "\t" PAF_SOURCE_TAG  << source_time_
-           << "\t" PAF_TRACKER_TAG << tracker_time_;
-    #endif
-
-    if (unblocked_) {
-        ss << "\t" << PAF_UNBLOCK_TAG << 1;
-    }
-    ss << "\t" << PAF_NUMCHUNK_TAG << num_chunks_;
-
-    return ss.str();
-}
-
-std::ostream &operator<< (std::ostream &out, const ReadLoc &l) {
-    out << l.str();
-    return out;
-}
 
 u8 Mapper::PathBuffer::MAX_PATH_LEN = 0, 
    Mapper::PathBuffer::TYPE_MASK = 0;
@@ -290,10 +149,7 @@ Mapper::Mapper(const UncalledOpts &ap)
                     ap.min_top_conf_,
                     ap.min_aln_len_,
                     ap.seed_len_),
-      chunk_processed_(true),
-      state_(State::INACTIVE)
-
-     {
+      state_(State::INACTIVE) {
 
 
     PathBuffer::MAX_PATH_LEN = opts_.seed_len_;
@@ -322,36 +178,16 @@ Mapper::~Mapper() {
     }
 }
 
-void Mapper::skip_events(u32 n) {
-    event_i_ += n;
-    prev_size_ = 0;
+ReadBuffer &Mapper::get_read() {
+    return read_;
 }
 
-void Mapper::new_read(const std::string &id, u16 channel, u32 number) {
-
-    if (prev_unfinished(number)) {
-        std::cerr << "Error: possibly lost read '" << chunk_.get_id() << "'\n";
-    }
-
-    read_loc_ = ReadLoc(id, channel, number);
-    prev_size_ = 0;
-    event_i_ = 0;
-    chunk_i_ = 0;
-    chunk_processed_ = true;
+void Mapper::deactivate() {
+    state_ = State::INACTIVE;
     reset_ = false;
-    last_chunk_ = false;
-    state_ = State::MAPPING;
-    seed_tracker_.reset();
-    event_detector_.reset();
-    norm_.skip_unread();
-    chunk_.clear();
-    timer_.reset();
 }
 
-void Mapper::new_read(Chunk &c) {
-    new_read(c.get_id(), c.get_channel(), c.get_number());
-}
-
+/*
 std::string Mapper::map_fast5(const std::string &fast5_name) {
     if (!fast5::File::is_valid_file(fast5_name)) {
         std::cerr << "Error: '" << fast5_name << "' is not a valid file \n";
@@ -398,14 +234,6 @@ bool Mapper::add_sample(float s) {
     }
 
     return false;
-}
-
-u32 Mapper::prev_unfinished(u32 next_number) const {
-    return state_ == State::MAPPING && chunk_.get_number() != next_number;
-}
-
-bool Mapper::finished() const {
-    return state_ == State::SUCCESS || state_ == State::FAILURE;
 }
 
 ReadLoc Mapper::pop_loc() {
@@ -467,6 +295,38 @@ ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
 
     return read_loc_;
 }
+*/
+
+
+void Mapper::new_read(Chunk &chunk) {
+    if (prev_unfinished(chunk.get_number())) {
+        std::cerr << "Error: possibly lost read '" << read_.id_ << "'\n";
+    }
+
+    read_ = ReadBuffer(chunk);
+    prev_size_ = 0;
+    event_i_ = 0;
+    reset_ = false;
+    last_chunk_ = false;
+    state_ = State::MAPPING;
+    seed_tracker_.reset();
+    event_detector_.reset();
+    norm_.skip_unread();
+    timer_.reset();
+}
+
+u32 Mapper::prev_unfinished(u32 next_number) const {
+    return state_ == State::MAPPING && read_.number_ != next_number;
+}
+
+bool Mapper::finished() const {
+    return state_ == State::SUCCESS || state_ == State::FAILURE;
+}
+
+void Mapper::skip_events(u32 n) {
+    event_i_ += n;
+    prev_size_ = 0;
+}
 
 void Mapper::request_reset() {
     reset_ = true;
@@ -481,7 +341,7 @@ bool Mapper::is_resetting() {
 }
 
 bool Mapper::is_chunk_processed() const {
-    return chunk_processed_;
+    return read_.chunk_processed_;
 }
 
 Mapper::State Mapper::get_state() const {
@@ -492,24 +352,21 @@ bool Mapper::swap_chunk(Chunk &chunk) {
     //std::cout << "# tryna swap " << is_chunk_processed() << " " << reset_ << " " << state_ << "\n";
     if (!is_chunk_processed() || reset_) return false;
 
-    if (opts_.max_chunks_proc_ > 0 && ++chunk_i_ > opts_.max_chunks_proc_) {
+    //TODO: put in opts
+    if (opts_.max_chunks_proc_ > 0 && read_.num_chunks_ == opts_.max_chunks_proc_) {
         state_ = State::FAILURE;
         reset_ = true;
         chunk.clear();
         return true;
     }
 
-    read_loc_.add_chunk();
-
-    //New read hasn't been set
-
-    chunk.swap(chunk_);
-    chunk_processed_ = false;
-    return true;
+    bool added = read_.add_chunk(chunk);
+    if (!added) std::cout << "# NOT ADDED " << chunk.get_id() << "\n";
+    return added;
 }
 
 u16 Mapper::process_chunk() {
-    if (chunk_processed_ || reset_) return 0; 
+    if (read_.chunk_processed_ || reset_) return 0; 
     
     #ifdef DEBUG_TIME
     read_loc_.sigproc_time_ += timer_.lap();
@@ -518,8 +375,9 @@ u16 Mapper::process_chunk() {
     float mean;
 
     u16 nevents = 0;
-    for (u32 i = 0; i < chunk_.size(); i++) {
-        if (event_detector_.add_sample(chunk_[i])) {
+    for (u32 i = 0; i < read_.chunk_.size(); i++) {
+        //std::cout << read_.chunk_[i] << "\n";
+        if (event_detector_.add_sample(read_.chunk_[i])) {
             mean = event_detector_.get_mean();
             if (!norm_.add_event(mean)) {
 
@@ -538,15 +396,15 @@ u16 Mapper::process_chunk() {
 
     //std::cout << "# processed " << channel_ << "\n";
 
-    chunk_.clear();
-    chunk_processed_ = true;
+    read_.chunk_.clear();
+    read_.chunk_processed_ = true;
     return nevents;
 }
 
 bool Mapper::end_read(u32 number) {
     //set last chunk if you want to keep trying after read has ended
     //return last_chunk_ = (read_loc_.get_number() == number);
-    return reset_ = (read_loc_.get_number() == number);
+    return reset_ = (read_.number_ == number);
 }
 
 bool Mapper::map_chunk() {
@@ -804,7 +662,7 @@ bool Mapper::add_event(float event) {
 
     if (sg.is_valid()) {
         state_ = State::SUCCESS;
-        read_loc_.set_ref_loc(opts_, sg);
+        set_ref_loc(sg);
 
         #ifdef DEBUG_TIME
         read_loc_.tracker_time_ += timer_.lap();
@@ -851,6 +709,28 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
         }
     }
 
+}
+
+void Mapper::set_ref_loc(const SeedGroup &seeds) {
+    u8 k_shift = (opts_.model_.kmer_len() - 1);
+
+    bool fwd = seeds.ref_st_ > opts_.fmi_.size() / 2;
+
+    u64 sa_st;
+    if (fwd) sa_st = opts_.fmi_.size() - (seeds.ref_en_.end_ + k_shift);
+    else      sa_st = seeds.ref_st_;
+    
+    std::string rf_name;
+    u64 rd_len = (int) (450.0 * (read_.raw_len_ / 4000.0)), //TODO don't hard code
+        rd_st = (u32) (opts_.max_stay_frac_ * seeds.evt_st_),
+        rd_en = (u32) (opts_.max_stay_frac_ * (seeds.evt_en_ + opts_.seed_len_)) + k_shift,
+        rf_st,
+        rf_len = opts_.fmi_.translate_loc(sa_st, rf_name, rf_st), //sets rf_st
+        rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_) + k_shift;
+
+    u16 match_count = seeds.total_len_ + k_shift;
+
+    read_.loc_.set_mapped(rd_st, rd_en, rd_len, rf_name, rf_st, rf_en, rf_len, match_count, fwd);
 }
 
 

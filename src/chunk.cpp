@@ -54,6 +54,7 @@ Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 start_time,
     if (raw_st + raw_len > raw_data.size()) raw_len = raw_data.size() - raw_st;
     raw_data_.resize(raw_len);
     for (u32 i = 0; i < raw_len; i++) raw_data_[i] = raw_data[raw_st+i];
+    
 }
 
 Chunk::Chunk(const Chunk &c) 

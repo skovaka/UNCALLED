@@ -3,10 +3,11 @@
 #include "pybind11/stl.h"
 #include "self_align_ref.hpp"
 #include "mapper.hpp"
-#include "fast5_pool.hpp"
+#include "simulator.hpp"
+//#include "fast5_pool.hpp"
 #include "chunk_pool.hpp"
-#include "fast5_reader.hpp"
 #include "chunk.hpp"
+#include "read_buffer.hpp"
 #include "uncalled_opts.hpp"
 
 namespace py = pybind11;
@@ -72,25 +73,31 @@ PYBIND11_MODULE(mapping, m) {
                       float // sim_speed);
                      >());
 
-    py::class_<Mapper>(m, "Mapper")
-        .def(py::init<UncalledOpts &>())
-        .def("map_fast5", &Mapper::map_fast5);
+    //py::class_<Mapper>(m, "Mapper")
+    //    .def(py::init<UncalledOpts &>())
+    //    .def("map_fast5", &Mapper::map_fast5);
 
-    py::class_<ReadLoc>(m, "ReadLoc")
-        .def(py::init())
-        .def("str", &ReadLoc::str)
-        .def("is_valid", &ReadLoc::is_valid)
-        .def("get_channel", &ReadLoc::get_channel)
-        .def("get_number", &ReadLoc::get_number)
-        .def("set_unblocked", &ReadLoc::set_unblocked)
-        .def("get_ref", &ReadLoc::get_ref);
+    py::class_<Paf> paf(m, "Paf");
+    paf.def(py::init())
+       .def("print", &Paf::print)
+       .def("is_mapped", &Paf::is_mapped)
+       .def("set_int", &Paf::set_int)
+       .def("set_float", &Paf::set_float)
+       .def("set_str", &Paf::set_str);
 
-    py::class_<Fast5Pool>(m, "Fast5Pool")
-        .def(py::init<const UncalledOpts &>())
-        .def("add_fast5s", &Fast5Pool::add_fast5s)
-        .def("update", &Fast5Pool::update)
-        .def("all_finished", &Fast5Pool::all_finished)
-        .def("stop_all", &Fast5Pool::stop_all); 
+    py::enum_<Paf::Tag>(paf, "Tag")
+        .value("MAP_TIME", Paf::Tag::MAP_TIME)
+        .value("CHUNKS", Paf::Tag::CHUNKS)
+        .value("UNBLOCK", Paf::Tag::UNBLOCK)
+        .value("KEEP", Paf::Tag::KEEP)
+        .export_values();
+
+    //py::class_<Fast5Pool>(m, "Fast5Pool")
+    //    .def(py::init<const UncalledOpts &>())
+    //    .def("add_fast5s", &Fast5Pool::add_fast5s)
+    //    .def("update", &Fast5Pool::update)
+    //    .def("all_finished", &Fast5Pool::all_finished)
+    //    .def("stop_all", &Fast5Pool::stop_all); 
 
     py::class_<ChunkPool>(m, "ChunkPool")
         .def(py::init<const UncalledOpts &>()) 
@@ -123,20 +130,15 @@ PYBIND11_MODULE(mapping, m) {
         .def("print", &Chunk::print)
         .def("size", &Chunk::size);
 
-    py::class_<ChunkSim>(m, "ChunkSim")
-        .def(py::init<u32, //max_loaded,
-                      u32, //num_chs
-                      u16, //chunk_len
-                      float //speed
-                     >())
-        .def("add_files", &ChunkSim::add_files)
-        .def("add_reads", &ChunkSim::add_reads)
-        .def("get_read_chunks", &ChunkSim::get_read_chunks)
-        .def("stop_receiving_read", &ChunkSim::stop_receiving_read)
-        .def("unblock", &ChunkSim::unblock)
-        .def("set_time", &ChunkSim::set_time)
-        .def("start", &ChunkSim::start)
-        .def("is_running", &ChunkSim::is_running);
+    py::class_<Simulator>(m, "Simulator")
+        .def(py::init<const UncalledOpts &>())
+        .def("add_fast5s", &Simulator::add_fast5s)
+        .def("get_read_chunks", &Simulator::get_read_chunks)
+        .def("stop_receiving_read", &Simulator::stop_receiving_read)
+        .def("unblock", &Simulator::unblock)
+        .def("get_time", &Simulator::get_time)
+        .def("start", &Simulator::start)
+        .def("is_running", &Simulator::is_running);
     
     m.def("self_align", &self_align);
 }

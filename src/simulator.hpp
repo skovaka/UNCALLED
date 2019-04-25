@@ -30,63 +30,31 @@
 #include "util.hpp"
 #include "timer.hpp"
 #include "chunk.hpp"
-#include "mapper.hpp" //TODO: separate ReadLoc so I don't have to do this
+#include "uncalled_opts.hpp"
+#include "read_buffer.hpp" //TODO: separate ReadLoc so I don't have to do this
 
-class Fast5Read {
+
+class Simulator {
     public:
-    Fast5Read();
-    Fast5Read(const std::string &filename);
-    Fast5Read(const std::string &_id,
-              u16 _channel, u32 _number, u64 _start_sample,
-              const std::vector<float> _raw_data);
-
-    //std::vector<Chunk> get_chunks(u16 max_length);
-    u32 get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) const;
-    void swap(Fast5Read &r);
-    float next_sig();
-    bool empty() const;
-
-    static float sampling_rate;
-
-    std::string id;
-    u16 channel;
-    u32 number;
-    u64 start_sample;
-    std::vector<float> raw_data;
-    u32 i;
-    //float median_before;
-    friend bool operator< (const Fast5Read &r1, const Fast5Read &r2);
-};
-
-bool operator< (const Fast5Read &r1, const Fast5Read &r2);
-
-u32 load_multi_fast5(const std::string &fname, std::vector<Fast5Read> &list);
-
-class ChunkSim {
-    public:
-    ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len, float speed, const std::vector<std::string> &fnames);
-    ChunkSim(u32 max_loaded, u32 num_chs, u16 chunk_len, float speed);
-    
-    void add_files(const std::vector<std::string> &fnames);
-    void add_reads(const std::vector<Fast5Read> &reads);
+    Simulator(const UncalledOpts &opts);
+    void add_fast5s(const std::string &fname, u32 max_loaded);
     void start();
 
     std::vector<Chunk> get_read_chunks();
     void stop_receiving_read(u16 channel, u32 number);
     void unblock(u16 channel, u32 number);
-    void set_time(ReadLoc &read);
+    float get_time(u16 channel);
     bool is_running();
 
 
     private:
-    u32 max_loaded_, num_loaded_;
+    u32 num_loaded_;
     u16 chunk_len_;
     float speed_;
     Timer timer_;
     bool is_running_;
     u64 tshift_;
     std::vector< u64 > chshifts_;
-    std::deque<std::string> fast5_names_;
     std::vector< std::deque<Chunk> > chunks_;
 };
 

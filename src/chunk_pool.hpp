@@ -29,14 +29,17 @@
 #include <deque>
 #include "mapper.hpp"
 
+using MapResult = std::tuple<u16, u32, Paf>;
+
 class ChunkPool {
     public:
     ChunkPool(const UncalledOpts &opts);
     
+    void start_timer();
     bool add_chunk(Chunk &chunk);
     void end_read(u16 ch, u32 number);
 
-    std::vector<ReadLoc> update();
+    std::vector<MapResult> update();
     bool all_finished();
     void stop_all();
 
@@ -73,12 +76,12 @@ class ChunkPool {
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;
     std::vector<MapperThread> threads_;
-    std::vector<Chunk> read_buffer_;
-    std::vector<ReadLoc> locs_;
+    std::vector<Chunk> chunk_buffer_;
 
     std::vector<u16> buffer_queue_, active_queue_, out_chs_;
     std::vector<bool> channel_active_;
 
+    Timer time_;
     //Store threads in order of # active mappers
 };
 
