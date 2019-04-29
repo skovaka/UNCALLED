@@ -33,7 +33,7 @@ using MapResult = std::tuple<u16, u32, Paf>;
 
 class ChunkPool {
     public:
-    ChunkPool(const UncalledOpts &opts);
+    ChunkPool();
     
     void start_timer();
     bool add_chunk(Chunk &chunk);

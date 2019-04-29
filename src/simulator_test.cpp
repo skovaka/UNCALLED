@@ -1,5 +1,6 @@
 #include <iostream>
 #include <unistd.h>
+#include "params.hpp"
 #include "simulator.hpp"
 #include "chunk_pool.hpp"
 #include "read_buffer.hpp"
@@ -17,7 +18,7 @@ int main(int argc, char** argv) {
     float speed = atof(argv[5]), evt_timeout = atof(argv[6]);
     u32 max_chunks_proc = atoi(argv[7]);
     
-    UncalledOpts params(index, MODEL,
+    Params::init_sim(index, MODEL,
                         22,    //seed_len
                         25,    //min_aln_len
                         0,     //min_rep_len
@@ -47,13 +48,13 @@ int main(int argc, char** argv) {
 
     Timer t;
 
-    Simulator sim(params);
+    Simulator sim;
     sim.add_fast5s(reads_fname, read_count);
 
     std::cerr << "Chunks split (" << (t.lap() / 1000) << " sec), aligning\n";
     std::cerr.flush();
 
-    ChunkPool pool(params);
+    ChunkPool pool;
 
     const u64 MAX_SLEEP = 100;
 

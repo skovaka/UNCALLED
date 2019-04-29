@@ -47,7 +47,7 @@ struct Detector {
 
 class EventDetector {
     public:
-    EventDetector(const EventParams &edparam);
+    EventDetector();
 
     ~EventDetector();
     

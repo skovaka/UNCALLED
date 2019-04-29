@@ -25,23 +25,23 @@
 #include <chrono>
 #include "chunk_pool.hpp"
 #include "mapper.hpp"
+#include "params.hpp"
 
-
-ChunkPool::ChunkPool(const UncalledOpts &opts) {
-    for (u16 t = 0; t < opts.threads_; t++) {
+ChunkPool::ChunkPool() {
+    for (u16 t = 0; t < PARAMS.threads; t++) {
         threads_.emplace_back(mappers_);
     }
     
     //mappers_.reserve(nchannels);
-    channel_active_.reserve(opts.num_channels_);
-    chunk_buffer_.resize(opts.num_channels_);
-    buffer_queue_.reserve(opts.num_channels_);
-    for (u16 i = 0; i < opts.num_channels_; i++) {
-        mappers_.push_back(Mapper(opts));
+    channel_active_.reserve(PARAMS.num_channels);
+    chunk_buffer_.resize(PARAMS.num_channels);
+    buffer_queue_.reserve(PARAMS.num_channels);
+    for (u16 i = 0; i < PARAMS.num_channels; i++) {
+        mappers_.push_back(Mapper());
         channel_active_.push_back(false);
     }
 
-    for (u16 t = 0; t < opts.threads_; t++) {
+    for (u16 t = 0; t < PARAMS.threads; t++) {
         threads_[t].start();
     }
 }

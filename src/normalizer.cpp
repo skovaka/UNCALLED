@@ -1,10 +1,9 @@
 #include "normalizer.hpp"
+#include "params.hpp"
 
 
-Normalizer::Normalizer(const KmerModel &model, 
-                       u32 buffer_size) 
-    : model_(model),
-      events_(buffer_size),
+Normalizer::Normalizer() 
+    : events_(PARAMS.evt_buffer_len),
       mean_(0),
       varsum_(0),
       n_(0),
@@ -69,8 +68,8 @@ void Normalizer::reset(u32 buffer_size = 0) {
 NormParams Normalizer::get_params() const {
     NormParams p;
 
-    p.scale = model_.model_stdv_ / sqrt(varsum_ / n_);
-    p.shift = model_.model_mean_ - p.scale * mean_;
+    p.scale = PARAMS.model.model_stdv_ / sqrt(varsum_ / n_);
+    p.shift = PARAMS.model.model_mean_ - p.scale * mean_;
 
     return p;
 }

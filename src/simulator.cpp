@@ -22,14 +22,15 @@
  */
 
 #include "simulator.hpp"
+#include "params.hpp"
 
-Simulator::Simulator(const UncalledOpts &opts) 
-    : chunk_len_(opts.chunk_len_),
-      speed_(opts.sim_speed_ / 1000),
+Simulator::Simulator() 
+    : chunk_len_(PARAMS.chunk_len),
+      speed_(PARAMS.sim_speed / 1000),
       is_running_(false),
       tshift_(-1),
-      chshifts_(opts.num_channels_, 0),
-      chunks_(opts.num_channels_) {}
+      chshifts_(PARAMS.num_channels, 0),
+      chunks_(PARAMS.num_channels) {}
 
 void Simulator::add_fast5s(const std::string &fname, u32 max_loaded) {
     std::vector<ReadBuffer> reads;

@@ -30,13 +30,12 @@
 #include "util.hpp"
 #include "timer.hpp"
 #include "chunk.hpp"
-#include "uncalled_opts.hpp"
 #include "read_buffer.hpp" //TODO: separate ReadLoc so I don't have to do this
 
 
 class Simulator {
     public:
-    Simulator(const UncalledOpts &opts);
+    Simulator();
     void add_fast5s(const std::string &fname, u32 max_loaded);
     void start();
 

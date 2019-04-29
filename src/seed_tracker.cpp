@@ -24,6 +24,7 @@
 #include <iostream>
 #include <set>
 #include "seed_tracker.hpp"
+#include "params.hpp"
 
 //#define DEBUG
 
@@ -103,11 +104,7 @@ std::ostream &operator<< (std::ostream &out, const SeedGroup &a) {
     return out;
 }
 
-SeedTracker::SeedTracker(u64 ref_len, float mean_thresh, float top_thresh, u8 min_aln_len, u8 win_len)
-    : ref_len_(ref_len),
-      mean_thresh_(mean_thresh),
-      top_thresh_(top_thresh),
-      min_aln_len_(min_aln_len) {
+SeedTracker::SeedTracker() {
     reset();
 }
 
@@ -119,14 +116,13 @@ void SeedTracker::reset() {
 }
 
 SeedGroup SeedTracker::get_final() {
-    if (max_map_.total_len_ < min_aln_len_ || 
+    if (max_map_.total_len_ < PARAMS.min_aln_len || 
         all_lens_.size() < 2) return NULL_ALN;
 
     float mean_len = len_sum_ / alignments_.size();
-    float next_len = *std::next(all_lens_.rbegin());
+    float second_len = *std::next(all_lens_.rbegin());
 
-    if ((mean_thresh_ > 0 && max_map_.total_len_ / mean_len >= mean_thresh_) ||
-        (top_thresh_ > 0  && max_map_.total_len_ / next_len >= top_thresh_)) {
+    if (PARAMS.check_map_conf(max_map_.total_len_, mean_len, second_len)) {
         return max_map_;
     }
     
@@ -180,7 +176,7 @@ void SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
             all_lens_.insert(l, a.total_len_);
             all_lens_.erase(l);
 
-            if (a.total_len_ >= min_aln_len_ && a.total_len_ > max_map_.total_len_) {
+            if (a.total_len_ >= PARAMS.min_aln_len && a.total_len_ > max_map_.total_len_) {
                 max_map_ = a;
             }
         }
@@ -198,7 +194,7 @@ void SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
     all_lens_.insert(new_aln.total_len_);
     len_sum_ += new_aln.total_len_;
 
-    if (new_aln.total_len_ >= min_aln_len_ && new_aln.total_len_ > max_map_.total_len_) {
+    if (new_aln.total_len_ >= PARAMS.min_aln_len && new_aln.total_len_ > max_map_.total_len_) {
         max_map_ = new_aln;
     }
 

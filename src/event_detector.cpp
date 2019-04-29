@@ -12,14 +12,14 @@
 #include <cstdlib>
 #include <iostream>
 #include <cassert>
-
+#include "params.hpp"
 #include "event_detector.hpp"
 
 typedef Detector *DetectorPtr;
 
-EventDetector::EventDetector(const EventParams &event_params) :
-    params (event_params),
-    BUF_LEN (1 + event_params.window_length2 * 2) {
+EventDetector::EventDetector() :
+    params (PARAMS.event_params),
+    BUF_LEN (1 + params.window_length2 * 2) {
 
     sum = new double[BUF_LEN];
     sumsq = new double[BUF_LEN];

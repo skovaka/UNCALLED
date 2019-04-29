@@ -8,8 +8,7 @@
 class Normalizer {
     public:
 
-    Normalizer(const KmerModel &model, 
-               u32 buffer_size);
+    Normalizer();
 
     bool add_event(float newevt);
     float pop_event();
@@ -21,7 +20,6 @@ class Normalizer {
     bool full() const;
 
     //private:
-    const KmerModel &model_;
     std::vector<double> events_;
     double mean_, varsum_;
     u32 n_, rd_, wr_;

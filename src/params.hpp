@@ -1,0 +1,168 @@
+/* MIT License
+ *
+ * Copyright (c) 2018 Sam Kovaka <skovaka@gmail.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#ifndef PARAMS_HPP
+#define PARAMS_HPP
+
+#include <iostream>
+#include <vector>
+#include "bwa_fmi.hpp"
+#include "kmer_model.hpp"
+#include "timer.hpp"
+
+#define INDEX_SUFF ".uncl"
+
+class Params {
+    public:
+    enum Mode {UNINIT, MAP, SIMULATE};
+
+    Params();
+    
+    //Map constructor
+    static void init_map (
+        const std::string &_bwa_prefix,
+        const std::string &_model_fname,
+        u32 _seed_len, 
+        u32 _min_aln_len,
+        u32 _min_rep_len, 
+        u32 _max_rep_copy, 
+        u32 _max_consec_stay,
+        u32 _max_paths, 
+        u32 _max_events_proc,
+        u32 _evt_winlen1,
+        u32 _evt_winlen2,
+        u16 _threads,
+        float _evt_thresh1,
+        float _evt_thresh2,
+        float _evt_peak_height,
+        float _evt_min_mean,
+        float _evt_max_mean,
+        float _max_stay_frac,
+        float _min_seed_prob, 
+        float _min_mean_conf,
+        float _min_top_conf);
+
+    //Simulate constructor
+    static void init_sim (
+        const std::string &_bwa_prefix,
+        const std::string &_model_fname,
+        u32 _seed_len, 
+        u32 _min_aln_len,
+        u32 _min_rep_len, 
+        u32 _max_rep_copy, 
+        u32 _max_consec_stay,
+        u32 _max_paths, 
+        u32 _max_events_proc,
+        u32 _max_chunks_proc,
+        u32 _evt_buffer_len,
+        u32 _evt_winlen1,
+        u32 _evt_winlen2,
+        u16 _threads,
+        u16 _num_channels,
+        u16 _chunk_len,
+        u16 _evt_batch_size,
+        float _evt_timeout,
+        float _evt_thresh1,
+        float _evt_thresh2,
+        float _evt_peak_height,
+        float _evt_min_mean,
+        float _evt_max_mean,
+        float _max_stay_frac,
+        float _min_seed_prob, 
+        float _min_mean_conf,
+        float _min_top_conf,
+        float _sim_speed);
+
+    u16 get_max_events(u16 event_i) const;
+    float get_prob_thresh(u64 fm_length) const;
+    float get_source_prob() const;
+    bool check_map_conf(u32 seed_len, float mean_len, float second_len);
+
+    Mode mode;
+
+    BwaFMI fmi;
+    KmerModel model;
+    EventParams event_params;
+
+    u32 seed_len,
+        min_aln_len,
+        min_rep_len,
+        max_rep_copy,
+        max_paths,
+        max_consec_stay,
+        max_events_proc,
+        max_chunks_proc,
+        evt_buffer_len;
+
+    u16 threads,
+        num_channels,
+        chunk_len,
+        evt_batch_size;
+
+    float evt_timeout,
+          max_stay_frac,
+          min_seed_prob,
+          min_mean_conf,
+          min_top_conf,
+          sim_speed;
+
+    std::vector<u64> evpr_lengths;
+    std::vector<float> evpr_threshes;
+    std::vector<Range> kmer_fmranges;
+
+    private: 
+
+    Params(Mode _mode,
+           const std::string &_bwa_prefix,
+           const std::string &_model_fname,
+           u32 _seed_len, 
+           u32 _min_aln_len,
+           u32 _min_rep_len, 
+           u32 _max_rep_copy, 
+           u32 _max_consec_stay,
+           u32 _max_paths, 
+           u32 _max_events_proc,
+           u32 _max_chunks_proc,
+           u32 _evt_buffer_len,
+           u32 _evt_winlen1,
+           u32 _evt_winlen2,
+           u16 _threads,
+           u16 _num_channels,
+           u16 _chunk_len,
+           u16 _evt_batch_size,
+           float _evt_timeout,
+           float _evt_thresh1,
+           float _evt_thresh2,
+           float _evt_peak_height,
+           float _evt_min_mean,
+           float _evt_max_mean,
+           float _max_stay_frac,
+           float _min_seed_prob, 
+           float _min_mean_conf,
+           float _min_top_conf,
+           float _sim_speed);
+};
+
+extern Params PARAMS;
+
+#endif

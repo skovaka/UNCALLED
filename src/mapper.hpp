@@ -26,7 +26,6 @@
 
 #include <iostream>
 #include <vector>
-#include "uncalled_opts.hpp"
 #include "bwa_fmi.hpp"
 #include "kmer_model.hpp"
 #include "normalizer.hpp"
@@ -43,7 +42,7 @@ class Mapper {
 
     enum State { INACTIVE, MAPPING, SUCCESS, FAILURE };
 
-    Mapper(const UncalledOpts &map_params);
+    Mapper();
     Mapper(const Mapper &m);
 
     ~Mapper();
@@ -96,8 +95,7 @@ class Mapper {
 
         void invalidate();
         bool is_valid() const;
-        bool is_seed_valid(const UncalledOpts &params, 
-                           bool has_children) const;
+        bool is_seed_valid(bool has_children) const;
 
         u8 type_head() const;
         u8 type_tail() const;
@@ -133,9 +131,6 @@ class Mapper {
 
     void set_ref_loc(const SeedGroup &seeds);
 
-    const UncalledOpts &opts_;
-    const KmerModel &model_;
-    const BwaFMI &fmi_;
     EventDetector event_detector_;
     Normalizer norm_;
     SeedTracker seed_tracker_;
