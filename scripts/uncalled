@@ -61,7 +61,7 @@ def add_sim_opts(p):
 
 def add_map_opts(p):
     p.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
-    p.add_argument("-R", "--read-count", type=int, default=None, help="Maximum number of reads to map")
+    p.add_argument("-R", "--read-count", type=int, default=0, help="Maximum number of reads to map")
     p.add_argument("-t", "--threads", default=1, type=int, help="Number of threads to use for mapping")
     p.add_argument("-e", "--max-events-proc", default=30000, type=int, help="Will give up on a read after this many events have been processed")
     p.add_argument("-a", "--min-aln-len", default=25, type=int, help="Minimum number of basepairs a mapping must cover.")
@@ -129,7 +129,10 @@ def index_cmd(args):
                      args.match_prod)
 
 def map_cmd(args):
-    opts = mapping.UncalledOpts(args.bwa_prefix,
+    sys.stderr.write("Regular mapping is currently disabled due to refactoring and a deadline\n")
+
+def map_cmd_old(args):
+    mapping.Params.init_map(args.bwa_prefix,
                         index.MODEL_FNAME,
                         args.seed_len, 
                         args.min_aln_len,
@@ -193,7 +196,7 @@ def simulate_cmd(args):
     deplete = args.deplete
 
     sys.stdout.flush()
-    opts = mapping.UncalledOpts(args.bwa_prefix,
+    opts = mapping.Params.init_sim(args.bwa_prefix,
                         index.MODEL_FNAME,
                         args.seed_len, 
                         args.min_aln_len,
@@ -223,18 +226,16 @@ def simulate_cmd(args):
                         args.sim_speed);
 
     sys.stderr.write("Reading fast5 paths\n")
-    fast5s = load_fast5s(args.fast5s)
-    print(fast5s)
 
     sys.stderr.write("Loading simulator\n")
     sys.stderr.flush()
     #TODO: pass opts, not individual params
-    sim = mapping.ChunkSim(args.read_count, args.num_channels, args.chunk_len, args.sim_speed)
-    sim.add_files(fast5s);
+    sim = mapping.Simulator()
+    sim.add_fast5s(args.fast5s, args.read_count)
 
     sys.stderr.write("Mapping\n")
     sys.stderr.flush()
-    pool = mapping.ChunkPool(opts)
+    pool = mapping.ChunkPool()
     sys.stderr.write("Pooled\n")
     sys.stderr.flush()
 
@@ -247,19 +248,14 @@ def simulate_cmd(args):
             sys.stderr.flush()
             t0 = time.time()
 
-            for aln in pool.update():
-                sys.stderr.flush()
-                sim.set_time(aln)
-                r = aln.get_ref()
-                if (aln.is_valid() and deplete) or not (aln.is_valid() or deplete):
-                    sys.stderr.flush()
-                    sim.unblock(aln.get_channel(), aln.get_number())
-                    aln.set_unblocked()
+            for ch, nm, paf in pool.update():
+                if (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
+                    paf.set_float(mapping.Paf.Tag.UNBLOCK, sim.get_time(ch))
+                    sim.unblock(ch, nm)
                 else:
-                    sys.stderr.flush()
-                    sim.stop_receiving_read(aln.get_channel(), aln.get_number())                
-                sys.stdout.write("%s\n" % aln.str())
-                sys.stdout.flush()
+                    paf.set_float(mapping.Paf.Tag.KEEP, sim.get_time(ch))
+                    sim.stop_receiving_read(ch, nm)  
+                paf.print()
 
             
             for chunk in sim.get_read_chunks():

@@ -8,7 +8,7 @@
 #include "chunk_pool.hpp"
 #include "chunk.hpp"
 #include "read_buffer.hpp"
-#include "uncalled_opts.hpp"
+#include "params.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -16,62 +16,10 @@ using namespace pybind11::literals;
 PYBIND11_MODULE(mapping, m) {
     m.doc() = "UNCALLED";
 
-    py::class_<UncalledOpts>(m, "UncalledOpts")
+    py::class_<Params>(m, "Params")
         //Map constructor
-        .def(py::init<const std::string &, //bwa_prefix,
-                      const std::string &, //model_fname,
-                      u32, // seed_len, 
-                      u32, // min_aln_len,
-                      u32, // min_rep_len, 
-                      u32, // max_rep_copy, 
-                      u32, // max_consec_stay,
-                      u32, // max_paths, 
-                      u32, // max_events_proc,
-                      u32, // evt_winlen1,
-                      u32, // evt_winlen2,
-                      u16, // threads,
-                      float, // evt_thresh1,
-                      float, // evt_thresh2,
-                      float, // evt_peak_height,
-                      float, // evt_min_mean,
-                      float, // evt_max_mean,
-                      float, // max_stay_frac,
-                      float, // min_seed_prob, 
-                      float, // min_mean_conf,
-                      float // min_top_conf);
-                     >())
-
-
-        //Simulate constructor
-        .def(py::init<const std::string &, //bwa_prefix,
-                      const std::string &, //model_fname,
-                      u32, // seed_len, 
-                      u32, // min_aln_len,
-                      u32, // min_rep_len, 
-                      u32, // max_rep_copy, 
-                      u32, // max_consec_stay,
-                      u32, // max_paths, 
-                      u32, // max_events_proc,
-                      u32, // max_chunks_proc,
-                      u32, // evt_buffer_len,
-                      u32, // evt_winlen1,
-                      u32, // evt_winlen2,
-                      u16, // threads,
-                      u16, // num_channels,
-                      u16, // chunk_len,
-                      u16, // evt_batch_size,
-                      float, // evt_timeout,
-                      float, // evt_thresh1,
-                      float, // evt_thresh2,
-                      float, // evt_peak_height,
-                      float, // evt_min_mean,
-                      float, // evt_max_mean,
-                      float, // max_stay_frac,
-                      float, // min_seed_prob, 
-                      float, // min_mean_conf,
-                      float, // min_top_conf,
-                      float // sim_speed);
-                     >());
+        .def_static("init_map", &Params::init_map)
+        .def_static("init_sim", &Params::init_sim);
 
     //py::class_<Mapper>(m, "Mapper")
     //    .def(py::init<UncalledOpts &>())
@@ -100,7 +48,7 @@ PYBIND11_MODULE(mapping, m) {
     //    .def("stop_all", &Fast5Pool::stop_all); 
 
     py::class_<ChunkPool>(m, "ChunkPool")
-        .def(py::init<const UncalledOpts &>()) 
+        .def(py::init()) 
         .def("update", &ChunkPool::update)
         .def("all_finished", &ChunkPool::all_finished)
         .def("stop_all", &ChunkPool::stop_all)
@@ -131,7 +79,7 @@ PYBIND11_MODULE(mapping, m) {
         .def("size", &Chunk::size);
 
     py::class_<Simulator>(m, "Simulator")
-        .def(py::init<const UncalledOpts &>())
+        .def(py::init())
         .def("add_fast5s", &Simulator::add_fast5s)
         .def("get_read_chunks", &Simulator::get_read_chunks)
         .def("stop_receiving_read", &Simulator::stop_receiving_read)

@@ -15,12 +15,13 @@ class make_bwa(build_ext):
 
 uncalled = Extension(
     "uncalled.mapping",
-     sources = ["src/fast5_reader.cpp",
-                "src/bwa_fmi.cpp", 
-                "src/uncalled_opts.cpp",
+     sources = ["src/read_buffer.cpp",
                 "src/uncalled.cpp",
+                "src/params.cpp",
+                "src/simulator.cpp",
+                "src/bwa_fmi.cpp", 
                 "src/chunk.cpp",
-                "src/fast5_pool.cpp",
+                #"src/fast5_pool.cpp",
                 "src/chunk_pool.cpp",
                 "src/mapper.cpp",
                 "src/seed_tracker.cpp", 
