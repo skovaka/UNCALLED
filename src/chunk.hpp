@@ -6,10 +6,6 @@
 
 class Chunk {
     public:
-    static void set_calibration(float digitisation, 
-                                const std::vector<float> &offsets, 
-                                const std::vector<float> &pa_ranges);
-
     Chunk();
 
     Chunk(const std::string &id, u16 channel, u32 number, u64 start_time, 

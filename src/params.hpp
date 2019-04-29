@@ -97,6 +97,22 @@ class Params {
     float get_prob_thresh(u64 fm_length) const;
     float get_source_prob() const;
     bool check_map_conf(u32 seed_len, float mean_len, float second_len);
+    
+    void set_sample_rate(float rate);
+    void calibrate(u16 ch, std::vector<float> samples);
+    std::vector<float> calibrate(u16 ch, std::vector<i16> samples);
+    float calibrate(u16 ch, float sample);
+    
+    bool calibration_set(u16 channel = 0);
+
+    void set_calibration(const std::vector<float> &offsets, 
+                         const std::vector<float> &pa_ranges,
+                         float digitisation = -1);
+
+    void set_calibration(u16 channel,
+                         float offsets, 
+                         float pa_ranges,
+                         float digitisation = -1);
 
     Mode mode;
 
@@ -129,6 +145,10 @@ class Params {
     std::vector<u64> evpr_lengths;
     std::vector<float> evpr_threshes;
     std::vector<Range> kmer_fmranges;
+
+    float sample_rate;
+    float calib_digitisation;
+    std::vector<float> calib_offsets, calib_coefs;
 
     private: 
 

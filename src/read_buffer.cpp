@@ -22,6 +22,8 @@
  */
 
 #include "read_buffer.hpp"
+#include "params.hpp"
+
 const std::string Paf::PAF_TAGS[] = {
     "mt", //MAP_TIME
     "nc", //CHUNKS
@@ -282,20 +284,25 @@ void ReadBuffer::fast5_init(const hdf5_tools::File &file,
             range = atof(a.second.c_str());
         } else if (a.first == "offset") {
             offset = atof(a.second.c_str());
-        }// else if (a.first == "sampling_rate") {
-        //    sampling_rate = atof(a.second.c_str());
-        //}TODO: store calibration/sample rate
+        } else if (a.first == "sampling_rate") {
+            PARAMS.set_sample_rate(atof(a.second.c_str()));
+        }
     }
+
+    PARAMS.set_calibration(channel_, offset, range, digitisation);
 
     std::string sig_path = raw_path + "/Signal";
     std::vector<i16> int_data; 
     file.read(sig_path, int_data);
+    full_signal_ = PARAMS.calibrate(channel_, int_data);
+
+    /*
     full_signal_.resize(int_data.size());
     for (u32 i = 0; i < int_data.size(); i++) {
         //std::cout << int_data[i] << " ";
         full_signal_[i] = ((float) int_data[i] + offset) * range / digitisation;
         //std::cout << full_signal_[i] << "\n";
-    }
+    }*/
 }
 
 bool ReadBuffer::add_chunk(Chunk &c) {

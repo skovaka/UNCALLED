@@ -152,7 +152,10 @@ Params::Params(Mode _mode,
     min_seed_prob   (_min_seed_prob),
     min_mean_conf   (_min_mean_conf),
     min_top_conf    (_min_top_conf),
-    sim_speed       (_sim_speed) {
+    sim_speed       (_sim_speed),
+    calib_digitisation (0),
+    calib_offsets  (_num_channels, 0), 
+    calib_coefs    (_num_channels, 0) {
     
     //TODO: exception handling
     std::ifstream infile(_bwa_prefix + INDEX_SUFF);
@@ -202,3 +205,49 @@ u16 Params::get_max_events(u16 event_i) const {
     return evt_batch_size;
 }
 
+void Params::set_sample_rate(float rate) {
+    sample_rate = rate;
+}
+
+void Params::calibrate(u16 ch, std::vector<float> samples) {
+    for (float &s : samples) s = calibrate(ch, s);
+}
+
+std::vector<float> Params::calibrate(u16 ch, std::vector<i16> samples) {
+    std::vector<float> cal(samples.size());
+    for (u32 i = 0; i < samples.size(); i++) {
+        cal[i] = calibrate(ch, samples[i]);
+    }
+    return cal;
+}
+
+float Params::calibrate(u16 ch, float sample) {
+    return (sample + calib_offsets[ch]) * calib_coefs[ch];
+}
+
+bool Params::calibration_set(u16 channel) {
+    if (calib_digitisation == 0) return false;
+    if (channel == 0) {
+        for (auto c : calib_coefs) if (c == 0) return false;
+        return true;
+    }
+    return calib_coefs[channel] == 0;
+}
+
+void Params::set_calibration(const std::vector<float> &offsets, 
+                             const std::vector<float> &pa_ranges,
+                             float digitisation) {
+    if (digitisation > 0) calib_digitisation = digitisation;
+    calib_offsets = offsets;
+    calib_coefs.reserve(pa_ranges.size());
+    for (float p : pa_ranges) calib_coefs.push_back(p / digitisation);
+}
+
+void Params::set_calibration(u16 channel,
+                             float offsets, 
+                             float pa_ranges,
+                             float digitisation) {
+    if (digitisation > 0) calib_digitisation = digitisation;
+    calib_offsets[channel] = offsets;
+    calib_coefs[channel] = pa_ranges / digitisation;
+}

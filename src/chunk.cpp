@@ -1,5 +1,6 @@
-#include "chunk.hpp"
 #include <iostream>
+#include "params.hpp"
+#include "chunk.hpp"
 
 std::vector<float> Chunk::cal_offsets_,
                    Chunk::cal_coefs_;
@@ -30,14 +31,14 @@ Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 chunk_start,
         raw_data_.resize(raw_str.size()/sizeof(u16));
         i16 *raw_arr = (i16 *) raw_str.data();
         for (u32 i = 0; i < raw_data_.size(); i++) {
-            raw_data_[i] = calibrate(raw_arr[i]);
+            raw_data_[i] = PARAMS.calibrate(channel_, raw_arr[i]);
         }
 
     } else if (dtype == "int32") {
         raw_data_.resize(raw_str.size()/sizeof(u32));
         i32 *raw_arr = (i32 *) raw_str.data();
         for (u32 i = 0; i < raw_data_.size(); i++) {
-            raw_data_[i] = calibrate(raw_arr[i]);
+            raw_data_[i] = PARAMS.calibrate(channel_, raw_arr[i]);
         }
 
     } else {
@@ -63,28 +64,6 @@ Chunk::Chunk(const Chunk &c)
       number_(c.number_),
       start_time_(c.start_time_),
       raw_data_(c.raw_data_) {}
-
-void Chunk::set_calibration(float digitisation, 
-                                   const std::vector<float> &offsets, 
-                                   const std::vector<float> &pa_ranges) {
-    cal_offsets_ = std::vector<float>(offsets);
-    cal_coefs_.reserve(pa_ranges.size());
-    for (float p : pa_ranges) cal_coefs_.push_back(p / digitisation);
-}
-
-bool Chunk::is_calibrated() const {
-    return calibrated_ || !(cal_offsets_.empty() || cal_coefs_.empty());
-}
-
-float Chunk::calibrate(i16 s) {
-    if (!is_calibrated()) return (float) s;
-    return ((float) s + cal_offsets_[channel_]) * cal_coefs_[channel_];
-}
-
-float Chunk::calibrate(i32 s) {
-    if (!is_calibrated()) return (float) s;
-    return ((float) s + cal_offsets_[channel_]) * cal_coefs_[channel_];
-}
 
 float &Chunk::operator[] (u32 i) {
     return raw_data_[i];
