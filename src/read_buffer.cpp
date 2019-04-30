@@ -330,7 +330,7 @@ u16 ReadBuffer::get_channel_idx() const {
 
 u32 ReadBuffer::get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) const {
     u32 count = 0;
-    for (u32 i = 0; i < full_signal_.size(); i += max_length) {
+    for (u32 i = 0; i+max_length <= full_signal_.size(); i += max_length) {
         chunk_queue.emplace_back(id_, get_channel(), number_, 
                                  start_sample_+i, full_signal_, 
                                  i, max_length);

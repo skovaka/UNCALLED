@@ -56,7 +56,7 @@ void Params::init_map(
          _max_rep_copy,_max_consec_stay,_max_paths,_max_events_proc,0,0,_evt_winlen1,
          _evt_winlen2,_threads,0,0,0,0,_evt_thresh1,_evt_thresh2,_evt_peak_height,
          _evt_min_mean,_evt_max_mean,_max_stay_frac,_min_seed_prob,_min_mean_conf,
-         _min_top_conf,0);
+         _min_top_conf,0,0);
 }
 
     //Simulate constructor
@@ -88,6 +88,7 @@ void Params::init_sim(
         float _min_seed_prob, 
         float _min_mean_conf,
         float _min_top_conf,
+        float _max_chunk_wait,
         float _sim_speed) {
     PARAMS =
        Params(Mode::SIMULATE,_bwa_prefix,_model_fname,_seed_len,_min_aln_len,
@@ -95,7 +96,7 @@ void Params::init_sim(
        _max_chunks_proc,_evt_buffer_len,_evt_winlen1,_evt_winlen2,_threads,
        _num_channels,_chunk_len,_evt_batch_size,_evt_timeout,_evt_thresh1,
        _evt_thresh2,_evt_peak_height,_evt_min_mean,_evt_max_mean,_max_stay_frac,
-       _min_seed_prob,_min_mean_conf,_min_top_conf,_sim_speed);
+       _min_seed_prob,_min_mean_conf,_min_top_conf,_max_chunk_wait,_sim_speed);
 }
 
 Params::Params(Mode _mode,
@@ -126,6 +127,7 @@ Params::Params(Mode _mode,
                float _min_seed_prob, 
                float _min_mean_conf,
                float _min_top_conf,
+               float _max_chunk_wait,
                float _sim_speed) :
     mode               (_mode),
     fmi                (_bwa_prefix),
@@ -152,6 +154,7 @@ Params::Params(Mode _mode,
     min_seed_prob      (_min_seed_prob),
     min_mean_conf      (_min_mean_conf),
     min_top_conf       (_min_top_conf),
+    max_chunk_wait     (_max_chunk_wait),
     sim_speed          (_sim_speed),
     sample_rate        (4000),
     calib_digitisation (0),

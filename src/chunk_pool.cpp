@@ -88,7 +88,7 @@ bool ChunkPool::add_chunk(Chunk &c) {
         mappers_[ch].new_read(c);
         active_queue_.push_back(ch);
         return true;
-    } else if (mappers_[ch].swap_chunk(c)) {
+    } else if (mappers_[ch].add_chunk(c)) {
         return true;
     } 
     
@@ -145,7 +145,7 @@ std::vector<MapResult> ChunkPool::update() {
             active_queue_.push_back(ch);
             added = true;
         } else {
-            added = mappers_[ch].swap_chunk(c);
+            added = mappers_[ch].add_chunk(c);
         } 
 
         if (added) {
@@ -243,9 +243,6 @@ void ChunkPool::MapperThread::run() {
             for (auto ch : in_tmp_) {
                 active_chs_.push_back(ch);
             }
-            //std::cout << "# " << tid_ << " controlling";
-            //for (auto ch : active_chs_) std::cout << " " << ch;
-            //std::cout << "\n";
 
             in_tmp_.clear(); //(pop)
         }
@@ -255,29 +252,23 @@ void ChunkPool::MapperThread::run() {
         for (u16 i = 0; i < active_chs_.size() && running_; i++) {
             u16 ch = active_chs_[i];
             mappers_[ch].process_chunk();
-            //std::cout << "# mapping " << ch << "\n";
             if (mappers_[ch].map_chunk()) {
                 out_tmp_.push_back(i);
-                //std::cout << "# finishch " << ch << "\n";
             }
         }
 
         //Add finished to output
         if (!out_tmp_.empty()) {
-            //std::cout << "# " << tid_ << " has " << out_chs_.size() << " pending\n";
             out_mtx_.lock();
             for (auto i : out_tmp_) out_chs_.push_back(active_chs_[i]);
             out_mtx_.unlock();
 
             std::sort(out_tmp_.begin(), out_tmp_.end(),
                       [](u32 a, u32 b) { return a > b; });
-            //std::cout << "# popping";
             for (auto i : out_tmp_) {
-                //std::cout << " " << i;
                 active_chs_[i] = active_chs_.back();
                 active_chs_.pop_back();
             }
-            //std::cout << "\n";
             out_tmp_.clear();
         }
     }

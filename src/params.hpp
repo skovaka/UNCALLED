@@ -91,6 +91,7 @@ class Params {
         float _min_seed_prob, 
         float _min_mean_conf,
         float _min_top_conf,
+        float _max_chunk_wait,
         float _sim_speed);
 
     u16 get_max_events(u16 event_i) const;
@@ -140,6 +141,7 @@ class Params {
           min_seed_prob,
           min_mean_conf,
           min_top_conf,
+          max_chunk_wait,
           sim_speed;
 
     std::vector<u64> evpr_lengths;
@@ -180,6 +182,7 @@ class Params {
            float _min_seed_prob, 
            float _min_mean_conf,
            float _min_top_conf,
+           float _max_chunk_wait,
            float _sim_speed);
 };
 

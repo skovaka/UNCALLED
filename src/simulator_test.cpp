@@ -15,8 +15,8 @@ int main(int argc, char** argv) {
 
     std::string index(argv[1]), reads_fname(argv[2]);
     u32 nthreads = atoi(argv[3]), read_count = atoi(argv[4]);
-    float speed = atof(argv[5]), evt_timeout = atof(argv[6]);
-    u32 max_chunks_proc = atoi(argv[7]);
+    u32 max_chunk_wait = atof(argv[5]);
+    u32 max_chunks_proc = atoi(argv[6]);
     
     Params::init_sim(index, MODEL,
                         22,    //seed_len
@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
                         512,   //channels
                         4000,  //chunklen
                         5,     //evt_batch_size
-                        evt_timeout,
+                        10,
                         1.4,   //evt_thresh1
                         9.0,   //evt_thresh2
                         0.2,   //evt_peak_height
@@ -44,7 +44,8 @@ int main(int argc, char** argv) {
                         -3.75, //min_seed_prob
                         7.00,  //min_mean_conf
                         2.25,  //min_top_conf
-                        speed);
+                        max_chunk_wait,  //max_chunk_wait
+                        1);
 
     Timer t;
 
@@ -84,24 +85,9 @@ int main(int argc, char** argv) {
 
         std::vector<Chunk> chunks = sim.get_read_chunks();
         for (Chunk &ch : chunks) {
-            //std::cout << "# chunk " << ch.first << " " << ch.second.id << "\n";
-            std::cout.flush();
-
-            u16 channel = ch.get_channel(), number = ch.get_number();
-
-            bool last = ch.size() < 4000;
-
-            //pool.add_chunk(ch);
             if (!pool.add_chunk(ch)) {
-                std::cerr << "Error: failed to add chunk from " 
-                          << ch.get_id() << std::endl;
+                std::cerr << "Error: failed to add chunk from " << ch.get_id() << std::endl;
             }
-            
-            if (last) { 
-                //std::cout << "# ending " << channel << "\n";
-                pool.end_read(channel, number);
-            }
-
         }
 
         u64 dt = t.get() - t0;

@@ -57,7 +57,7 @@ class Mapper {
     //bool add_sample(float s);
 
     void skip_events(u32 n);
-    bool swap_chunk(Chunk &chunk);
+    bool add_chunk(Chunk &chunk);
 
     u16 process_chunk();
     bool map_chunk();
@@ -146,7 +146,7 @@ class Mapper {
     u32 prev_size_,
         event_i_,
         chunk_i_;
-    Timer timer_;
+    Timer chunk_timer_;
 
     #ifdef DEBUG_SEEDS
     std::ostream &seeds_out_;

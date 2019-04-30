@@ -300,7 +300,7 @@ void Mapper::new_read(Chunk &chunk) {
     seed_tracker_.reset();
     event_detector_.reset();
     norm_.skip_unread();
-    timer_.reset();
+    chunk_timer_.reset();
 }
 
 u32 Mapper::prev_unfinished(u32 next_number) const {
@@ -336,8 +336,7 @@ Mapper::State Mapper::get_state() const {
     return state_;
 }
 
-bool Mapper::swap_chunk(Chunk &chunk) {
-    //std::cout << "# tryna swap " << is_chunk_processed() << " " << reset_ << " " << state_ << "\n";
+bool Mapper::add_chunk(Chunk &chunk) {
     if (!is_chunk_processed() || reset_) return false;
 
     //TODO: put in opts
@@ -349,16 +348,13 @@ bool Mapper::swap_chunk(Chunk &chunk) {
     }
 
     bool added = read_.add_chunk(chunk);
+    chunk_timer_.reset();
     if (!added) std::cout << "# NOT ADDED " << chunk.get_id() << "\n";
     return added;
 }
 
 u16 Mapper::process_chunk() {
     if (read_.chunk_processed_ || reset_) return 0; 
-    
-    #ifdef DEBUG_TIME
-    read_loc_.sigproc_time_ += timer_.lap();
-    #endif
 
     float mean;
 
@@ -396,10 +392,12 @@ bool Mapper::end_read(u32 number) {
 }
 
 bool Mapper::map_chunk() {
-    if (reset_ || (last_chunk_ && norm_.empty())) {
+    if (reset_ || chunk_timer_.get() > PARAMS.max_chunk_wait) {
         state_ = State::FAILURE;
         return true;
-    }
+
+    } else if (norm_.empty()) return false; //TODO: how often does this happen?
+
     u16 nevents = PARAMS.get_max_events(event_i_);
     float tlimit = PARAMS.evt_timeout * nevents;
 
@@ -433,9 +431,6 @@ bool Mapper::add_event(float event) {
     for (u16 kmer = 0; kmer < PARAMS.model.kmer_count(); kmer++) {
         kmer_probs_[kmer] = PARAMS.model.event_match_prob(event, kmer);
     }
-    #ifdef DEBUG_TIME
-    read_loc_.prob_time_ += timer_.lap();
-    #endif
     
     //Find neighbors of previous nodes
     for (u32 pi = 0; pi < prev_size_; pi++) {
@@ -450,9 +445,6 @@ bool Mapper::add_event(float event) {
         prev_kmer = prev_path.kmer_;
 
         evpr_thresh = PARAMS.get_prob_thresh(prev_range.length());
-        #ifdef DEBUG_TIME
-        read_loc_.thresh_time_ += timer_.lap();
-        #endif
 
         if (prev_path.consec_stays_ < PARAMS.max_consec_stay && 
             kmer_probs_[prev_kmer] >= evpr_thresh) {
@@ -471,10 +463,6 @@ bool Mapper::add_event(float event) {
         }
 
 
-        #ifdef DEBUG_TIME
-        read_loc_.stay_time_ += timer_.lap();
-        #endif
-
         //Add all the neighbors
         for (u8 b = 0; b < ALPH_SIZE; b++) {
             u16 next_kmer = PARAMS.model.get_neighbor(prev_kmer, b);
@@ -483,15 +471,8 @@ bool Mapper::add_event(float event) {
                 continue;
             }
 
-            #ifdef DEBUG_TIME
-            read_loc_.neighbor_time_ += timer_.lap();
-            #endif
 
             Range next_range = PARAMS.fmi.get_neighbor(prev_range, b);
-
-            #ifdef DEBUG_TIME
-            read_loc_.fmrs_time_ += timer_.lap();
-            #endif
 
             if (!next_range.is_valid()) {
                 continue;
@@ -510,10 +491,6 @@ bool Mapper::add_event(float event) {
             }
         }
 
-        #ifdef DEBUG_TIME
-        read_loc_.neighbor_time_ += timer_.lap();
-        #endif
-
         if (!child_found && !prev_path.sa_checked_) {
 
             update_seeds(prev_path, true);
@@ -531,10 +508,6 @@ bool Mapper::add_event(float event) {
 
         pdqsort(next_paths_.begin(), next_path);
         //std::sort(next_paths_.begin(), next_path);
-
-        #ifdef DEBUG_TIME
-        read_loc_.sort_time_ += timer_.lap();
-        #endif
 
         u16 source_kmer;
         prev_kmer = PARAMS.model.kmer_count(); 
@@ -602,19 +575,11 @@ bool Mapper::add_event(float event) {
                 }
             }
 
-            #ifdef DEBUG_TIME
-            read_loc_.loop2_time_ += timer_.lap();
-            #endif
-
             update_seeds(next_paths_[i], false);
 
         }
     }
 
-    #ifdef DEBUG_TIME
-    read_loc_.loop2_time_ += timer_.lap();
-    #endif
-    
     for (u16 kmer = 0; 
          kmer < PARAMS.model.kmer_count() && 
             next_path != next_paths_.end(); 
@@ -636,10 +601,6 @@ bool Mapper::add_event(float event) {
         }
     }
 
-    #ifdef DEBUG_TIME
-    read_loc_.source_time_ += timer_.lap();
-    #endif
-
     prev_size_ = next_path - next_paths_.begin();
     prev_paths_.swap(next_paths_);
 
@@ -652,16 +613,8 @@ bool Mapper::add_event(float event) {
         state_ = State::SUCCESS;
         set_ref_loc(sg);
 
-        #ifdef DEBUG_TIME
-        read_loc_.tracker_time_ += timer_.lap();
-        #endif
-
         return true;
     }
-
-    #ifdef DEBUG_TIME
-    read_loc_.tracker_time_ += timer_.lap();
-    #endif
 
     return false;
 }
@@ -670,10 +623,6 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
 
     if (p.is_seed_valid(path_ended)) {
 
-        #ifdef DEBUG_TIME
-        read_loc_.tracker_time_ += timer_.lap();
-        #endif
-
         p.sa_checked_ = true;
 
         for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
@@ -681,15 +630,7 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
             //Reverse the reference coords so they both go L->R
             u64 ref_en = PARAMS.fmi.size() - PARAMS.fmi.sa(s) + 1;
 
-            #ifdef DEBUG_TIME
-            read_loc_.fmsa_time_ += timer_.lap();
-            #endif
-
             seed_tracker_.add_seed(ref_en, p.match_len(), event_i_ - path_ended);
-
-            #ifdef DEBUG_TIME
-            read_loc_.tracker_time_ += timer_.lap();
-            #endif
 
             #ifdef DEBUG_SEEDS
             seed.print(seeds_out);

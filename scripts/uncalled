@@ -46,18 +46,25 @@ def add_index_opts(p):
     p.add_argument("-p", "--match-prod", default=0.05, type=float, help="Target frequency of seeds.")
     p.add_argument("-f", "--fm-percentile", default=95, type=int, help=" ")
 
-def add_sim_opts(p):
+def add_ru_opts(p):
     #TODO: selectively enrich or deplete refs in index
     p.add_argument("--deplete", required=False, action='store_true', default=False, help="Will eject reads that align to index")
     p.add_argument("--enrich", required=False, action='store_true', default=False, help="Will eject reads that don't align to index")
     p.add_argument("--even", action='store_true', help="Will only monitor even pores if set")
-    p.add_argument("--sim-speed", required=False, type=float, default=1, help="Speed of real-time simulation")
     p.add_argument("--chunk-len", required=False, type=int, default=4000, help="Length of chunks")
     p.add_argument("-n", "--evt-buffer-len", default=6000, type=int, help="Size of buffer used to normalize and read events")
     p.add_argument("-E", "--evt-batch-size", default=5, type=int, help="Number of events simulator will mapping per read per thread iteration. Only has effect when --unblock is set")
     p.add_argument("--evt-timeout", default=10.0, type=float, help="Simulator will stop aligning event batch if average time in MS to mapping an event exceeds this. Only has effect when --unblock is set")
-    p.add_argument("-C", "--num-channels", default=512, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
     p.add_argument("-c", "--max-chunks-proc", default=3, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
+    p.add_argument("--max-chunk-wait", required=False, type=float, default=2000, help="Maximum milliseconds to wait between chunks. Will give up on read if it takes longer")
+
+def add_realtime_opts(p):
+    p.add_argument('--host', default='127.0.0.1', help='MinKNOW server host.')
+    p.add_argument('--port', type=int, default=8000, help='MinKNOW server port.')
+
+def add_sim_opts(p):
+    p.add_argument("--sim-speed", required=False, type=float, default=1, help="Speed of real-time simulation")
+    p.add_argument("-C", "--num-channels", default=512, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
 
 def add_map_opts(p):
     p.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
@@ -90,13 +97,20 @@ def get_parser():
     add_bwa_opt(index_parser)
     add_index_opts(index_parser)
 
-    map_parser = sp.add_parser("map", help="Map fast5 files to a BWA index that has beeen processed by \"uncalled index\"",formatter_class=ArgFormat)
+    map_parser = sp.add_parser("map", help="Map fast5 files to a BWA index that has been processed by \"uncalled index\"",formatter_class=ArgFormat)
     add_bwa_opt(map_parser)
     add_map_opts(map_parser)
 
-    sim_parser = sp.add_parser("simulate", help="Simulate ReadUntil sequencing based on previous run",formatter_class=ArgFormat)
+    rt_parser = sp.add_parser("realtime", help="Perform real-time targeted sequencing",formatter_class=ArgFormat)
+    add_bwa_opt(rt_parser)
+    add_map_opts(rt_parser)
+    add_ru_opts(rt_parser)
+    add_realtime_opts(rt_parser)
+
+    sim_parser = sp.add_parser("simulate", help="Simulate targeted sequencing based on previous run",formatter_class=ArgFormat)
     add_bwa_opt(sim_parser)
     add_map_opts(sim_parser)
+    add_ru_opts(sim_parser)
     add_sim_opts(sim_parser)
 
     return parser
@@ -189,6 +203,37 @@ def map_cmd_old(args):
         sys.stderr.write("Waiting for threads to finish...\n")
         mapper.stop_all()
 
+def realtime_cmd(args):
+    import read_until
+    sys.stderr.write("Working on it\n")
+
+    client = read_until.ReadUntilClient(mk_host=args.host, 
+                                        mk_port=args.port, 
+                                        one_chunk=False, 
+                                        filter_strands=False)
+    client.run(min_chunk_size=args.min_chunk_size)
+
+    while client.is_running:
+        try:
+            if client.queue_length == 0:
+                time.sleep(0.01)
+                continue
+
+            sys.stdout.write("#queue_length: %d\n" % client.queue_length)
+            read_batch = client.get_read_chunks(batch_size=client.queue_length)
+            for channel, read in read_batch:
+                sys.stdout.write("%f\t%d\t%s\t%d\t%d\t%d\t%d\t%f\t%f\t%s\t%s\n" % 
+                                 (time.time(), channel, read.id, read.number, read.start_sample, 
+                                  read.chunk_start_sample, read.chunk_length, read.median, 
+                                  read.median_before, read.raw_data[0], 
+                                  ",".join(map(str, read.chunk_classifications))))
+
+                if channel % 2 == 1:
+                    client.stop_receiving_read(channel, read.number)
+        except:
+            client.reset()
+            break
+
 def simulate_cmd(args):
     if (args.enrich and args.deplete) or not (args.enrich or args.deplete):
         sys.stderr.write("Must include exactly one of '--enrich' or '--deplete'\n")
@@ -223,6 +268,7 @@ def simulate_cmd(args):
                         args.min_seed_prob, 
                         args.min_mean_conf,
                         args.min_top_conf,
+                        args.max_chunk_wait,
                         args.sim_speed);
 
     sys.stderr.write("Reading fast5 paths\n")
@@ -259,16 +305,10 @@ def simulate_cmd(args):
 
             
             for chunk in sim.get_read_chunks():
-                number = chunk.get_number()
-                channel = chunk.get_channel()
-                last = chunk.size() < 4000
-
-                if args.even and channel % 2 == 1:
-                    sim.stop_receiving_read(channel, number)
+                if args.even and chunk.get_channel() % 2 == 1:
+                    sim.stop_receiving_read(chunk.get_channel(), chunk.get_number())
                 else:
                     pool.add_chunk(chunk)
-                    if last:
-                        pool.end_read(channel, number);
                 
 
             dt = time.time() - t0;
@@ -289,6 +329,8 @@ if __name__ == "__main__":
         index_cmd(args)
     elif args.subcmd == "map":
         map_cmd(args)
+    elif args.subcmd == "realtime":
+        realtime_cmd(args)
     elif args.subcmd == "simulate":
         simulate_cmd(args)
     else:
