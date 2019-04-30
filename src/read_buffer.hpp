@@ -96,6 +96,9 @@ class ReadBuffer {
 
     u32 get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) const;
 
+    u16 get_channel() const;
+    u16 get_channel_idx() const;
+
     static void set_calibration(float digitisation, 
                                 const std::vector<float> &offsets, 
                                 const std::vector<float> &pa_ranges);
@@ -103,7 +106,7 @@ class ReadBuffer {
     static std::vector<float> cal_offsets_, cal_coefs_;
 
     Source source_;
-    u16 channel_;
+    u16 channel_idx_;
     std::string id_;
     u32 number_;
     u64 start_sample_, raw_len_;

@@ -7,7 +7,7 @@ std::vector<float> Chunk::cal_offsets_,
 
 Chunk::Chunk() 
     : id_(""),
-      channel_(0),
+      channel_idx_(0),
       number_(0),
       start_time_(0),
       raw_data_(),
@@ -16,7 +16,7 @@ Chunk::Chunk()
 Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 chunk_start, 
              const std::string &dtype, const std::string &raw_str) 
     : id_(id),
-      channel_(channel),
+      channel_idx_(channel-1),
       number_(number),
       start_time_(chunk_start) {
 
@@ -31,14 +31,14 @@ Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 chunk_start,
         raw_data_.resize(raw_str.size()/sizeof(u16));
         i16 *raw_arr = (i16 *) raw_str.data();
         for (u32 i = 0; i < raw_data_.size(); i++) {
-            raw_data_[i] = PARAMS.calibrate(channel_, raw_arr[i]);
+            raw_data_[i] = PARAMS.calibrate(get_channel(), raw_arr[i]);
         }
 
     } else if (dtype == "int32") {
         raw_data_.resize(raw_str.size()/sizeof(u32));
         i32 *raw_arr = (i32 *) raw_str.data();
         for (u32 i = 0; i < raw_data_.size(); i++) {
-            raw_data_[i] = PARAMS.calibrate(channel_, raw_arr[i]);
+            raw_data_[i] = PARAMS.calibrate(get_channel(), raw_arr[i]);
         }
 
     } else {
@@ -49,7 +49,7 @@ Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 chunk_start,
 Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 start_time, 
              const std::vector<float> &raw_data, u32 raw_st=0, u32 raw_len=4000) 
     : id_(id),
-      channel_(channel),
+      channel_idx_(channel-1),
       number_(number),
       start_time_(start_time) {
     if (raw_st + raw_len > raw_data.size()) raw_len = raw_data.size() - raw_st;
@@ -60,7 +60,7 @@ Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 start_time,
 
 Chunk::Chunk(const Chunk &c) 
     : id_(c.id_),
-      channel_(c.channel_),
+      channel_idx_(c.channel_idx_),
       number_(c.number_),
       start_time_(c.start_time_),
       raw_data_(c.raw_data_) {}
@@ -98,8 +98,12 @@ std::string Chunk::get_id() const {
     return id_;
 }
 
+u16 Chunk::get_channel_idx() const {
+    return channel_idx_;
+}
+
 u16 Chunk::get_channel() const {
-    return channel_;
+    return channel_idx_+1;
 }
 
 u32 Chunk::get_number() const {
@@ -108,7 +112,7 @@ u32 Chunk::get_number() const {
 
 void Chunk::swap(Chunk &c) {
     std::swap(id_, c.id_);
-    std::swap(channel_, c.channel_);
+    std::swap(channel_idx_, c.channel_idx_);
     std::swap(number_, c.number_);
     std::swap(start_time_, c.start_time_);
     std::swap(calibrated_, c.calibrated_);

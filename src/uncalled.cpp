@@ -71,7 +71,6 @@ PYBIND11_MODULE(mapping, m) {
                       u32, //raw_st
                       u32  //raw_len
                      >())
-        .def_static("set_calibration", &Chunk::set_calibration)
         .def("get_channel", &Chunk::get_channel)
         .def("get_number", &Chunk::get_number)
         .def("empty", &Chunk::empty)

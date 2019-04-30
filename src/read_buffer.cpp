@@ -186,7 +186,7 @@ ReadBuffer::ReadBuffer() {
 
 ReadBuffer::ReadBuffer(const ReadBuffer &r) 
     : source_          (r.source_),
-      channel_         (r.channel_),
+      channel_idx_     (r.channel_idx_),
       id_              (r.id_),
       number_          (r.number_),
       start_sample_    (r.start_sample_),
@@ -232,7 +232,7 @@ ReadBuffer::ReadBuffer(Source source, u16 channel, const std::string &id,
                        const std::vector<float> raw_data,
                        u32 raw_st, u32 raw_len) 
         : source_(source),
-          channel_(channel),
+          channel_idx_(channel-1),
           id_(id),
           number_(number),
           start_sample_(start_sample),
@@ -248,7 +248,7 @@ ReadBuffer::ReadBuffer(Source source, u16 channel, const std::string &id,
 
 ReadBuffer::ReadBuffer(Chunk &first_chunk) 
     : source_(Source::LIVE),
-      channel_(first_chunk.get_channel()),
+      channel_idx_(first_chunk.get_channel_idx()),
       id_(first_chunk.get_id()),
       number_(first_chunk.get_number()),
       start_sample_(first_chunk.get_start()),
@@ -277,7 +277,7 @@ void ReadBuffer::fast5_init(const hdf5_tools::File &file,
     float digitisation = 0, range = 0, offset = 0;//, sampling_rate = 0;
     for (auto a : file.get_attr_map(ch_path)) {
         if (a.first == "channel_number") {
-            channel_ = atoi(a.second.c_str()) - 1;
+            channel_idx_ = atoi(a.second.c_str()) - 1;
         } else if (a.first == "digitisation") {
             digitisation = atof(a.second.c_str());
         } else if (a.first == "range") {
@@ -289,12 +289,12 @@ void ReadBuffer::fast5_init(const hdf5_tools::File &file,
         }
     }
 
-    PARAMS.set_calibration(channel_, offset, range, digitisation);
+    PARAMS.set_calibration(get_channel(), offset, range, digitisation);
 
     std::string sig_path = raw_path + "/Signal";
     std::vector<i16> int_data; 
     file.read(sig_path, int_data);
-    full_signal_ = PARAMS.calibrate(channel_, int_data);
+    full_signal_ = PARAMS.calibrate(get_channel(), int_data);
 
     /*
     full_signal_.resize(int_data.size());
@@ -307,7 +307,7 @@ void ReadBuffer::fast5_init(const hdf5_tools::File &file,
 
 bool ReadBuffer::add_chunk(Chunk &c) {
     if (!chunk_processed_ || 
-        channel_ != c.get_channel() || 
+        channel_idx_ != c.get_channel_idx() || 
         number_ != c.get_number()) return false;
     num_chunks_++;
     raw_len_ += c.size();
@@ -320,10 +320,18 @@ bool ReadBuffer::empty() const {
     return full_signal_.empty() && chunk_.empty();
 }
 
+u16 ReadBuffer::get_channel() const {
+    return channel_idx_+1;
+}
+
+u16 ReadBuffer::get_channel_idx() const {
+    return channel_idx_;
+}
+
 u32 ReadBuffer::get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) const {
     u32 count = 0;
     for (u32 i = 0; i < full_signal_.size(); i += max_length) {
-        chunk_queue.emplace_back(id_, channel_, number_, 
+        chunk_queue.emplace_back(id_, get_channel(), number_, 
                                  start_sample_+i, full_signal_, 
                                  i, max_length);
         count++;

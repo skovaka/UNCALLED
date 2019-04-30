@@ -26,7 +26,7 @@
 
 Simulator::Simulator() 
     : chunk_len_(PARAMS.chunk_len),
-      speed_(PARAMS.sim_speed / 1000),
+      speed_(PARAMS.sample_rate * PARAMS.sim_speed / 1000),
       is_running_(false),
       tshift_(-1),
       chshifts_(PARAMS.num_channels, 0),
@@ -40,13 +40,13 @@ void Simulator::add_fast5s(const std::string &fname, u32 max_loaded) {
     tshift_ = reads.front().start_sample_;
 
     for (const ReadBuffer &r : reads) {
-        r.get_chunks(chunks_[r.channel_], chunk_len_);
+        r.get_chunks(chunks_[r.get_channel_idx()], chunk_len_);
     }
 }
 
 std::vector<Chunk> Simulator::get_read_chunks() {
     //TODO: store sampling rate
-    u64 time = (timer_.get() * speed_ * 4000) + tshift_;
+    u64 time = (timer_.get() * speed_) + tshift_;
     
     std::vector<Chunk> ret;
     is_running_ = false;
@@ -81,6 +81,7 @@ std::vector<Chunk> Simulator::get_read_chunks() {
 }
 
 void Simulator::stop_receiving_read(u16 channel, u32 number) {
+    channel--;
     while (!chunks_[channel].empty() && 
             chunks_[channel][0].get_number() == number) {
         chunks_[channel].pop_front();
@@ -88,6 +89,7 @@ void Simulator::stop_receiving_read(u16 channel, u32 number) {
 }
 
 void Simulator::unblock(u16 channel, u32 number) {
+    channel--;
     u64 t0 = chunks_[channel].front().get_start();
     while (!chunks_[channel].empty() && 
             chunks_[channel][0].get_number() == number) {
@@ -97,11 +99,12 @@ void Simulator::unblock(u16 channel, u32 number) {
 }
 
 float Simulator::get_time(u16 channel) {
-    return (timer_.get() * speed_ * 4000) //TODO seriuosly store this
-                    + tshift_ + chshifts_[channel];
+    channel--;
+    return (timer_.get() * speed_) + tshift_ + chshifts_[channel];
 }
 
 void Simulator::start() {
+    speed_ = PARAMS.sample_rate * PARAMS.sim_speed / 1000.0;
     is_running_ = true;
     timer_.reset();
 }

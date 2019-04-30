@@ -13,6 +13,7 @@ class Chunk {
 
     Chunk(const std::string &id, u16 channel, u32 number, u64 start_time, 
           const std::vector<float> &raw_data, u32 raw_st, u32 raw_len);
+
     Chunk(const Chunk &c);
 
 
@@ -27,6 +28,7 @@ class Chunk {
     u64 get_end() const;
     std::string get_id() const;
     u16 get_channel() const;
+    u16 get_channel_idx() const;
     u32 get_number() const;
     u32 size() const;
     bool is_calibrated() const;
@@ -41,7 +43,7 @@ class Chunk {
     static std::vector<float> cal_offsets_, cal_coefs_;
 
     std::string id_;
-    u16 channel_;
+    u16 channel_idx_;
     u32 number_;
     u64 start_time_;
     std::vector<float> raw_data_;

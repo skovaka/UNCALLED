@@ -709,7 +709,7 @@ void Mapper::set_ref_loc(const SeedGroup &seeds) {
     else      sa_st = seeds.ref_st_;
     
     std::string rf_name;
-    u64 rd_len = (int) (450.0 * (read_.raw_len_ / 4000.0)), //TODO don't hard code
+    u64 rd_len = (int) (450.0 * (read_.raw_len_ / PARAMS.sample_rate)),
         rd_st = (u32) (PARAMS.max_stay_frac * seeds.evt_st_),
         rd_en = (u32) (PARAMS.max_stay_frac * (seeds.evt_en_ + PARAMS.seed_len)) + k_shift,
         rf_st,

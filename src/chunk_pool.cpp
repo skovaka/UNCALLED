@@ -51,7 +51,7 @@ ChunkPool::ChunkPool() {
 //}
 
 void ChunkPool::buffer_chunk(Chunk &c) {
-    u16 ch = c.get_channel();
+    u16 ch = c.get_channel_idx();
     if (chunk_buffer_[ch].empty()) {
         buffer_queue_.push_back(ch);
     } else {
@@ -63,7 +63,7 @@ void ChunkPool::buffer_chunk(Chunk &c) {
 
 //Add chunk to master buffer
 bool ChunkPool::add_chunk(Chunk &c) {
-    u16 ch = c.get_channel();
+    u16 ch = c.get_channel_idx();
 
     //Check if previous read is still aligning
     //If so, tell thread to reset, store chunk in pool buffer
@@ -97,8 +97,8 @@ bool ChunkPool::add_chunk(Chunk &c) {
     return false;
 }
 
-void ChunkPool::end_read(u16 ch, u32 number) {
-    mappers_[ch].end_read(number);
+void ChunkPool::end_read(u16 channel, u32 number) {
+    mappers_[channel-1].end_read(number);
 }
 
 std::vector<MapResult> ChunkPool::update() {
@@ -120,7 +120,7 @@ std::vector<MapResult> ChunkPool::update() {
             //Loop over alignments
             for (auto ch : out_chs_) {
                 ReadBuffer &r = mappers_[ch].get_read();
-                ret.emplace_back(r.channel_, r.number_, r.loc_);
+                ret.emplace_back(r.get_channel(), r.number_, r.loc_);
                 mappers_[ch].deactivate();
             }
             out_chs_.clear();

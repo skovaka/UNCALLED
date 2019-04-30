@@ -127,35 +127,36 @@ Params::Params(Mode _mode,
                float _min_mean_conf,
                float _min_top_conf,
                float _sim_speed) :
-    mode            (_mode),
-    fmi             (_bwa_prefix),
-    model           (_model_fname, true),
-    event_params    ({_evt_winlen1,_evt_winlen2,
-                        _evt_thresh1,_evt_thresh2,
-                        _evt_peak_height,
-                        _evt_min_mean,_evt_max_mean}),
-    seed_len        (_seed_len),
-    min_aln_len     (_min_aln_len),
-    min_rep_len     (_min_rep_len),
-    max_rep_copy    (_max_rep_copy),
-    max_paths       (_max_paths),
-    max_consec_stay (_max_consec_stay),
-    max_events_proc (_max_events_proc),
-    max_chunks_proc (_max_chunks_proc),
-    evt_buffer_len  (_evt_buffer_len),
-    threads         (_threads),
-    num_channels    (_num_channels),
-    chunk_len       (_chunk_len),
-    evt_batch_size  (_evt_batch_size),
-    evt_timeout     (_evt_timeout),
-    max_stay_frac   (_max_stay_frac),
-    min_seed_prob   (_min_seed_prob),
-    min_mean_conf   (_min_mean_conf),
-    min_top_conf    (_min_top_conf),
-    sim_speed       (_sim_speed),
+    mode               (_mode),
+    fmi                (_bwa_prefix),
+    model              (_model_fname, true),
+    event_params       ({_evt_winlen1,_evt_winlen2,
+                         _evt_thresh1,_evt_thresh2,
+                         _evt_peak_height,
+                         _evt_min_mean,_evt_max_mean}),
+    seed_len           (_seed_len),
+    min_aln_len        (_min_aln_len),
+    min_rep_len        (_min_rep_len),
+    max_rep_copy       (_max_rep_copy),
+    max_paths          (_max_paths),
+    max_consec_stay    (_max_consec_stay),
+    max_events_proc    (_max_events_proc),
+    max_chunks_proc    (_max_chunks_proc),
+    evt_buffer_len     (_evt_buffer_len),
+    threads            (_threads),
+    num_channels       (_num_channels),
+    chunk_len          (_chunk_len),
+    evt_batch_size     (_evt_batch_size),
+    evt_timeout        (_evt_timeout),
+    max_stay_frac      (_max_stay_frac),
+    min_seed_prob      (_min_seed_prob),
+    min_mean_conf      (_min_mean_conf),
+    min_top_conf       (_min_top_conf),
+    sim_speed          (_sim_speed),
+    sample_rate        (4000),
     calib_digitisation (0),
-    calib_offsets  (_num_channels, 0), 
-    calib_coefs    (_num_channels, 0) {
+    calib_offsets      (_num_channels, 0), 
+    calib_coefs        (_num_channels, 0) {
     
     //TODO: exception handling
     std::ifstream infile(_bwa_prefix + INDEX_SUFF);
@@ -225,15 +226,6 @@ float Params::calibrate(u16 ch, float sample) {
     return (sample + calib_offsets[ch]) * calib_coefs[ch];
 }
 
-bool Params::calibration_set(u16 channel) {
-    if (calib_digitisation == 0) return false;
-    if (channel == 0) {
-        for (auto c : calib_coefs) if (c == 0) return false;
-        return true;
-    }
-    return calib_coefs[channel] == 0;
-}
-
 void Params::set_calibration(const std::vector<float> &offsets, 
                              const std::vector<float> &pa_ranges,
                              float digitisation) {
@@ -248,6 +240,6 @@ void Params::set_calibration(u16 channel,
                              float pa_ranges,
                              float digitisation) {
     if (digitisation > 0) calib_digitisation = digitisation;
-    calib_offsets[channel] = offsets;
-    calib_coefs[channel] = pa_ranges / digitisation;
+    calib_offsets[channel-1] = offsets;
+    calib_coefs[channel-1] = pa_ranges / digitisation;
 }
