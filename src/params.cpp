@@ -226,7 +226,7 @@ std::vector<float> Params::calibrate(u16 ch, std::vector<i16> samples) {
 }
 
 float Params::calibrate(u16 ch, float sample) {
-    return (sample + calib_offsets[ch]) * calib_coefs[ch];
+    return (sample + calib_offsets[ch-1]) * calib_coefs[ch-1];
 }
 
 void Params::set_calibration(const std::vector<float> &offsets, 
