@@ -135,10 +135,11 @@ void Paf::set_str(Tag t, std::string v) {
 }
 
 bool check_time(const hdf5_tools::File &file, std::string read) {
-    if (PARAMS.max_time == 0) return true;
+    if (PARAMS.sim_st == 0 && PARAMS.sim_en == 0) return true;
     for (auto a : file.get_attr_map(read + "/Raw")) {
         if (a.first == "start_time") {
-            return atof(a.second.c_str()) / PARAMS.sample_rate <= PARAMS.max_time;
+            float t = atof(a.second.c_str()) / PARAMS.sample_rate;
+            return (t >= PARAMS.sim_st && (PARAMS.sim_en == 0 || t <= PARAMS.sim_en));
         }
     }
     return false;

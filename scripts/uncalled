@@ -64,7 +64,8 @@ def add_realtime_opts(p):
 
 def add_sim_opts(p):
     p.add_argument("--sim-speed", required=False, type=float, default=1, help="Speed of real-time simulation")
-    p.add_argument("--max-time", required=False, type=float, default=0, help="Maximum simulation time in seconds")
+    p.add_argument("--sim-st", required=False, type=float, default=0, help="Reads that begin before this time will be filtered out")
+    p.add_argument("--sim-en", required=False, type=float, default=0, help="Reads that begin after this time will be filtered out")
 
 def add_fast5_opts(p):
     p.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
@@ -346,7 +347,8 @@ def simulate_cmd(args):
                         args.min_top_conf,
                         args.max_chunk_wait,
                         args.sim_speed,
-                        args.max_time);
+                        args.sim_st,
+                        args.sim_en);
 
     sys.stderr.write("Loading simulator\n")
     sys.stderr.flush()

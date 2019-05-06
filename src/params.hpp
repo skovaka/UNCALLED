@@ -128,7 +128,8 @@ class Params {
         float _min_top_conf,
         float _max_chunk_wait,
         float _sim_speed,
-        float _max_time);
+        float _sim_st,
+        float _sim_en);
 
     u16 get_max_events(u16 event_i) const;
     float get_prob_thresh(u64 fm_length) const;
@@ -179,7 +180,8 @@ class Params {
           min_top_conf,
           max_chunk_wait,
           sim_speed,
-          max_time;
+          sim_st,
+          sim_en;
 
     std::vector<u64> evpr_lengths;
     std::vector<float> evpr_threshes;
@@ -221,7 +223,8 @@ class Params {
            float _min_top_conf,
            float _max_chunk_wait,
            float _sim_speed,
-           float _max_time);
+           float _sim_st,
+           float _sim_en);
 };
 
 extern Params PARAMS;
