@@ -34,7 +34,7 @@
 
 class Params {
     public:
-    enum Mode {UNINIT, MAP, SIMULATE};
+    enum Mode {UNINIT, MAP, REALTIME, SIMULATE};
 
     Params();
     
@@ -61,6 +61,41 @@ class Params {
         float _min_seed_prob, 
         float _min_mean_conf,
         float _min_top_conf);
+    
+    //Realtime constructor
+    static void init_realtime (
+        const std::string &_bwa_prefix,
+        const std::string &_model_fname,
+        u32 _seed_len, 
+        u32 _min_aln_len,
+        u32 _min_rep_len, 
+        u32 _max_rep_copy, 
+        u32 _max_consec_stay,
+        u32 _max_paths, 
+        u32 _max_events_proc,
+        u32 _max_chunks_proc,
+        u32 _evt_buffer_len,
+        u32 _evt_winlen1,
+        u32 _evt_winlen2,
+        u16 _threads,
+        u16 _num_channels,
+        u16 _chunk_len,
+        u16 _evt_batch_size,
+        float _evt_timeout,
+        float _evt_thresh1,
+        float _evt_thresh2,
+        float _evt_peak_height,
+        float _evt_min_mean,
+        float _evt_max_mean,
+        float _max_stay_frac,
+        float _min_seed_prob, 
+        float _min_mean_conf,
+        float _min_top_conf,
+        float _max_chunk_wait,
+        float _digitisation,
+        std::vector<float> _offsets, 
+        std::vector<float> _ranges,
+        float sample_rate=4000);
 
     //Simulate constructor
     static void init_sim (
@@ -92,7 +127,8 @@ class Params {
         float _min_mean_conf,
         float _min_top_conf,
         float _max_chunk_wait,
-        float _sim_speed);
+        float _sim_speed,
+        float _max_time);
 
     u16 get_max_events(u16 event_i) const;
     float get_prob_thresh(u64 fm_length) const;
@@ -142,7 +178,8 @@ class Params {
           min_mean_conf,
           min_top_conf,
           max_chunk_wait,
-          sim_speed;
+          sim_speed,
+          max_time;
 
     std::vector<u64> evpr_lengths;
     std::vector<float> evpr_threshes;
@@ -183,7 +220,8 @@ class Params {
            float _min_mean_conf,
            float _min_top_conf,
            float _max_chunk_wait,
-           float _sim_speed);
+           float _sim_speed,
+           float _max_time);
 };
 
 extern Params PARAMS;

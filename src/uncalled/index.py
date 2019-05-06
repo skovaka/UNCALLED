@@ -111,6 +111,8 @@ def get_params(bwa_prefix, fmlens, kmer_len,
     out_fname = bwa_prefix + PARAM_SUFF
     params_out = open(out_fname, "w")
     sys.stderr.write("Writing %s\n" % out_fname)
+
+    path_fmlens[-1]=1
     
     for i in range(path_len):
         if path_fmlens[i] > 1 and path_fmlens[i] == path_fmlens[i+1]:

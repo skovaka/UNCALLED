@@ -19,6 +19,7 @@ PYBIND11_MODULE(mapping, m) {
     py::class_<Params>(m, "Params")
         //Map constructor
         .def_static("init_map", &Params::init_map)
+        .def_static("init_realtime", &Params::init_realtime)
         .def_static("init_sim", &Params::init_sim);
 
     //py::class_<Mapper>(m, "Mapper")
@@ -27,7 +28,7 @@ PYBIND11_MODULE(mapping, m) {
 
     py::class_<Paf> paf(m, "Paf");
     paf.def(py::init())
-       .def("print", &Paf::print)
+       .def("print_paf", &Paf::print_paf)
        .def("is_mapped", &Paf::is_mapped)
        .def("set_int", &Paf::set_int)
        .def("set_float", &Paf::set_float)

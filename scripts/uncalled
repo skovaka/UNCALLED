@@ -30,8 +30,8 @@ import time
 import re
 import time
 
-class ArgFormat(argparse.ArgumentDefaultsHelpFormatter, 
-                argparse.MetavarTypeHelpFormatter):
+class ArgFormat(argparse.ArgumentDefaultsHelpFormatter):
+                #argparse.MetavarTypeHelpFormatter):
     pass
 
 def add_bwa_opt(p):
@@ -56,7 +56,7 @@ def add_ru_opts(p):
     p.add_argument("-E", "--evt-batch-size", default=5, type=int, help="Number of events simulator will mapping per read per thread iteration. Only has effect when --unblock is set")
     p.add_argument("--evt-timeout", default=10.0, type=float, help="Simulator will stop aligning event batch if average time in MS to mapping an event exceeds this. Only has effect when --unblock is set")
     p.add_argument("-c", "--max-chunks-proc", default=3, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
-    p.add_argument("--max-chunk-wait", required=False, type=float, default=2000, help="Maximum milliseconds to wait between chunks. Will give up on read if it takes longer")
+    p.add_argument("--max-chunk-wait", required=False, type=float, default=4000, help="Maximum milliseconds to wait between chunks. Will give up on read if it takes longer")
 
 def add_realtime_opts(p):
     p.add_argument('--host', default='127.0.0.1', help='MinKNOW server host.')
@@ -64,11 +64,14 @@ def add_realtime_opts(p):
 
 def add_sim_opts(p):
     p.add_argument("--sim-speed", required=False, type=float, default=1, help="Speed of real-time simulation")
-    p.add_argument("-C", "--num-channels", default=512, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
+    p.add_argument("--max-time", required=False, type=float, default=0, help="Maximum simulation time in seconds")
 
-def add_map_opts(p):
+def add_fast5_opts(p):
     p.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
     p.add_argument("-R", "--read-count", type=int, default=0, help="Maximum number of reads to map")
+
+def add_map_opts(p):
+    p.add_argument("-C", "--num-channels", default=512, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
     p.add_argument("-t", "--threads", default=1, type=int, help="Number of threads to use for mapping")
     p.add_argument("-e", "--max-events-proc", default=30000, type=int, help="Will give up on a read after this many events have been processed")
     p.add_argument("-a", "--min-aln-len", default=25, type=int, help="Minimum number of basepairs a mapping must cover.")
@@ -93,25 +96,27 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
     sp = parser.add_subparsers(dest="subcmd")
 
-    index_parser = sp.add_parser("index", help="Calculates reference-specific parameters needed to map to a given a BWA-index.", formatter_class=ArgFormat)
+    index_parser = sp.add_parser("index", help="Calculates reference-specific parameters needed to map to a given a BWA-index.")#, formatter_class=ArgFormat)
     add_bwa_opt(index_parser)
     add_index_opts(index_parser)
 
-    map_parser = sp.add_parser("map", help="Map fast5 files to a BWA index that has been processed by \"uncalled index\"",formatter_class=ArgFormat)
+    map_parser = sp.add_parser("map", help="Map fast5 files to a BWA index that has been processed by \"uncalled index\"")#,formatter_class=ArgFormat)
     add_bwa_opt(map_parser)
     add_map_opts(map_parser)
+    add_fast5_opts(map_parser)
 
-    rt_parser = sp.add_parser("realtime", help="Perform real-time targeted sequencing",formatter_class=ArgFormat)
+    rt_parser = sp.add_parser("realtime", help="Perform real-time targeted sequencing")#,formatter_class=ArgFormat)
     add_bwa_opt(rt_parser)
     add_map_opts(rt_parser)
     add_ru_opts(rt_parser)
     add_realtime_opts(rt_parser)
 
-    sim_parser = sp.add_parser("simulate", help="Simulate targeted sequencing based on previous run",formatter_class=ArgFormat)
+    sim_parser = sp.add_parser("simulate", help="Simulate targeted sequencing based on previous run")#,formatter_class=ArgFormat)
     add_bwa_opt(sim_parser)
     add_map_opts(sim_parser)
     add_ru_opts(sim_parser)
     add_sim_opts(sim_parser)
+    add_fast5_opts(sim_parser)
 
     return parser
 
@@ -205,34 +210,105 @@ def map_cmd_old(args):
 
 def realtime_cmd(args):
     import read_until
-    sys.stderr.write("Working on it\n")
+    try:
 
-    client = read_until.ReadUntilClient(mk_host=args.host, 
-                                        mk_port=args.port, 
-                                        one_chunk=False, 
-                                        filter_strands=False)
-    client.run(min_chunk_size=args.min_chunk_size)
+        client = read_until.ReadUntilClient(mk_host=args.host, 
+                                            mk_port=args.port, 
+                                            one_chunk=False, 
+                                            filter_strands=True,
+                                            prefilter_classes={'strand', 'strand1', 'strand2'})
+        client.run()
 
-    while client.is_running:
-        try:
+        if (args.enrich and args.deplete) or not (args.enrich or args.deplete):
+            sys.stderr.write("Must include exactly one of '--enrich' or '--deplete'\n")
+            sys.exit(1)
+        deplete = args.deplete
+
+        cal = client.device.rpc.device.get_calibration(first_channel=1, last_channel=512)
+        raw_type = str(client.signal_dtype)
+
+        mapping.Params.init_realtime(args.bwa_prefix,
+                            index.MODEL_FNAME,
+                            args.seed_len, 
+                            args.min_aln_len,
+                            args.min_rep_len, 
+                            args.max_rep_copy, 
+                            args.max_consec_stay,
+                            args.max_paths, 
+                            args.max_events_proc,
+                            args.max_chunks_proc,
+                            args.evt_buffer_len,
+                            args.evt_window_length1,
+                            args.evt_window_length2,
+                            args.threads,
+                            args.num_channels,
+                            args.chunk_len,
+                            args.evt_batch_size,
+                            args.evt_timeout,
+                            args.evt_threshold1,
+                            args.evt_threshold2,
+                            args.evt_peak_height,
+                            args.evt_min_mean,
+                            args.evt_max_mean,
+                            args.max_stay_frac,
+                            args.min_seed_prob, 
+                            args.min_mean_conf,
+                            args.min_top_conf,
+                            args.max_chunk_wait,
+                            cal.digitisation,
+                            cal.offsets,
+                            cal.pa_ranges,
+                            4000)
+
+        pool = mapping.ChunkPool()
+
+        sys.stderr.write("Mapping\n")
+        
+        MAX_SLEEP = 0.01
+        
+        while client.is_running:
+            t0 = time.time()
+
+            for ch, nm, paf in pool.update():
+                if (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
+                    paf.set_float(mapping.Paf.Tag.UNBLOCK, time.time())
+                    client.unblock_read(ch, nm)
+                else:
+                    paf.set_float(mapping.Paf.Tag.KEEP, time.time())
+                    client.stop_receiving_read(ch, nm)  
+                paf.print_paf()
+                sys.stdout.flush()
+            
             if client.queue_length == 0:
-                time.sleep(0.01)
+                dt = time.time() - t0;
+                if dt < MAX_SLEEP:
+                    time.sleep(MAX_SLEEP - dt);
                 continue
 
-            sys.stdout.write("#queue_length: %d\n" % client.queue_length)
             read_batch = client.get_read_chunks(batch_size=client.queue_length)
-            for channel, read in read_batch:
-                sys.stdout.write("%f\t%d\t%s\t%d\t%d\t%d\t%d\t%f\t%f\t%s\t%s\n" % 
-                                 (time.time(), channel, read.id, read.number, read.start_sample, 
-                                  read.chunk_start_sample, read.chunk_length, read.median, 
-                                  read.median_before, read.raw_data[0], 
-                                  ",".join(map(str, read.chunk_classifications))))
 
-                if channel % 2 == 1:
+            for channel, read in read_batch:
+                if args.even and channel % 2 == 1:
                     client.stop_receiving_read(channel, read.number)
-        except:
-            client.reset()
-            break
+                else:
+                    pool.add_chunk(mapping.Chunk(read.id, 
+                                         channel, 
+                                         read.number,
+                                         read.chunk_start_sample,
+                                         raw_type,
+                                         read.raw_data))
+
+            dt = time.time() - t0;
+            if dt < MAX_SLEEP:
+                time.sleep(MAX_SLEEP - dt);
+
+    except Exception as e:
+        sys.stderr.write("Error: %s\n" % str(e))
+        pass
+
+    pool.stop_all();
+    client.reset()
+
 
 def simulate_cmd(args):
     if (args.enrich and args.deplete) or not (args.enrich or args.deplete):
@@ -269,20 +345,17 @@ def simulate_cmd(args):
                         args.min_mean_conf,
                         args.min_top_conf,
                         args.max_chunk_wait,
-                        args.sim_speed);
-
-    sys.stderr.write("Reading fast5 paths\n")
+                        args.sim_speed,
+                        args.max_time);
 
     sys.stderr.write("Loading simulator\n")
     sys.stderr.flush()
     #TODO: pass opts, not individual params
     sim = mapping.Simulator()
     sim.add_fast5s(args.fast5s, args.read_count)
+    pool = mapping.ChunkPool()
 
     sys.stderr.write("Mapping\n")
-    sys.stderr.flush()
-    pool = mapping.ChunkPool()
-    sys.stderr.write("Pooled\n")
     sys.stderr.flush()
 
     MAX_SLEEP = 0.01
@@ -301,7 +374,7 @@ def simulate_cmd(args):
                 else:
                     paf.set_float(mapping.Paf.Tag.KEEP, sim.get_time(ch))
                     sim.stop_receiving_read(ch, nm)  
-                paf.print()
+                paf.print_paf()
 
             
             for chunk in sim.get_read_chunks():

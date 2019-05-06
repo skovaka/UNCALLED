@@ -44,6 +44,7 @@ ChunkPool::ChunkPool() {
     for (u16 t = 0; t < PARAMS.threads; t++) {
         threads_[t].start();
     }
+
 }
 
 //ChunkPool::~ChunkPool() {
@@ -70,7 +71,6 @@ bool ChunkPool::add_chunk(Chunk &c) {
     if (mappers_[ch].prev_unfinished(c.get_number())) {
         mappers_[ch].request_reset();
         buffer_chunk(c);
-        //std::cout << "# requesting reset\n";
         return true;
     }
 
@@ -130,6 +130,13 @@ std::vector<MapResult> ChunkPool::update() {
         read_counts[t] = threads_[t].read_count();
         active_count += read_counts[t];
     }
+
+    //if (time_.get() >= 1000) {
+    //    time_.reset();
+    //    std::cout << "#counts";
+    //    for (u16 c : read_counts) std::cout << "\t" << c;
+    //    std::cout << "\n";
+    //}
 
     //std::cout << "# " << active_count << " active\n";
     //std::cout.flush();

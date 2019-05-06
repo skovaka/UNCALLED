@@ -35,7 +35,7 @@ Simulator::Simulator()
 void Simulator::add_fast5s(const std::string &fname, u32 max_loaded) {
     std::vector<ReadBuffer> reads;
     load_fast5s(fname, reads, max_loaded);
-    std::sort(reads.begin(), reads.end());
+    //std::sort(reads.begin(), reads.end());
 
     tshift_ = reads.front().start_sample_;
 

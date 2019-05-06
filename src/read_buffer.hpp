@@ -38,7 +38,7 @@ class Paf {
     Paf(std::string rd_name_, u64 rd_len = 0);
 
     bool is_mapped() const;
-    void print() const;
+    void print_paf() const;
     void set_read_len(u64 rd_len);
     void set_mapped(u64 rd_st, u64 rd_en, u64 rd_len, 
                     std::string rf_name,

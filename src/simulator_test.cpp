@@ -5,18 +5,18 @@
 #include "chunk_pool.hpp"
 #include "read_buffer.hpp"
 
-//const std::string MODEL = "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers.txt";
-//const std::string PROBFN = "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
+const std::string MODEL = "/home/skovaka/code/UNCALLED/src/uncalled/models/r94_5mers.txt";
+const std::string PROBFN = "/home/skovaka/code/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
 
-const std::string MODEL = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/models/r94_5mers.txt";
-const std::string PROBFN = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
+//const std::string MODEL = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/models/r94_5mers.txt";
+//const std::string PROBFN = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
 
 int main(int argc, char** argv) {
 
     std::string index(argv[1]), reads_fname(argv[2]);
     u32 nthreads = atoi(argv[3]), read_count = atoi(argv[4]);
-    u32 max_chunk_wait = atof(argv[5]);
-    u32 max_chunks_proc = atoi(argv[6]);
+    u32 max_chunk_wait = 4000;//atof(argv[5]);
+    u32 max_chunks_proc = 3;//atoi(argv[6]);
     
     Params::init_sim(index, MODEL,
                         22,    //seed_len
@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
                 sim.stop_receiving_read(channel, number);
                 paf.set_float(Paf::Tag::KEEP, sim.get_time(channel));
             }
-            paf.print();
+            paf.print_paf();
         }
 
         std::vector<Chunk> chunks = sim.get_read_chunks();

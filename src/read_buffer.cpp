@@ -61,7 +61,7 @@ bool Paf::is_mapped() const {
     return is_mapped_;
 }
 
-void Paf::print() const {
+void Paf::print_paf() const {
     std::cout << rd_name_ << "\t"
        << rd_len_ << "\t";
     if (is_mapped_) {
@@ -134,6 +134,16 @@ void Paf::set_str(Tag t, std::string v) {
     str_tags_.emplace_back(t, v);
 }
 
+bool check_time(const hdf5_tools::File &file, std::string read) {
+    if (PARAMS.max_time == 0) return true;
+    for (auto a : file.get_attr_map(read + "/Raw")) {
+        if (a.first == "start_time") {
+            return atof(a.second.c_str()) / PARAMS.sample_rate <= PARAMS.max_time;
+        }
+    }
+    return false;
+}
+
 bool is_multi_fast5(const hdf5_tools::File &file) {
     for (const std::string &s : file.list_group("/")) {
         if (s == "Raw") return false;
@@ -141,12 +151,17 @@ bool is_multi_fast5(const hdf5_tools::File &file) {
     return true;
 }
 
-u32 load_multi_fast5(const hdf5_tools::File &file, std::vector<ReadBuffer> &list, u32 max_load) { 
+u32 load_multi_fast5(const hdf5_tools::File &file, 
+                     std::vector<ReadBuffer> &list, 
+                     u32 max_load) { 
     u32 i = 0;
     for (const std::string &read : file.list_group("/")) {
-        list.emplace_back(file, ReadBuffer::Source::MULTI, "/" + read);
+        std::string path = "/" + read;
+        if (check_time(file, read)) {
+            list.emplace_back(file, ReadBuffer::Source::MULTI, "/" + read);
+        }
         i++;
-        if (max_load > 0 && list.size() >= max_load) break;
+        //if (max_load > 0 && list.size() >= max_load) break;
     }
     return i;
 }
@@ -176,6 +191,9 @@ u32 load_fast5s(const std::string &fname,
             i++;
         }
     }
+
+    std::sort(list.begin(), list.end());
+    while (max_load > 0 && list.size() > max_load) list.pop_back();
 
     return i;
 }
