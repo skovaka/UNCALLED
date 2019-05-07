@@ -263,6 +263,8 @@ def realtime_cmd(args):
 
         pool = mapping.ChunkPool()
 
+        chunk_times = [time.time() for c in range(args.num_channels)]
+
         sys.stderr.write("Mapping\n")
         
         MAX_SLEEP = 0.01
@@ -271,11 +273,12 @@ def realtime_cmd(args):
             t0 = time.time()
 
             for ch, nm, paf in pool.update():
+                t = time.time()-chunk_times[ch-1]
                 if (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
-                    paf.set_float(mapping.Paf.Tag.UNBLOCK, time.time())
+                    paf.set_float(mapping.Paf.Tag.UNBLOCK, t)
                     client.unblock_read(ch, nm)
                 else:
-                    paf.set_float(mapping.Paf.Tag.KEEP, time.time())
+                    paf.set_float(mapping.Paf.Tag.KEEP, t)
                     client.stop_receiving_read(ch, nm)  
                 paf.print_paf()
                 sys.stdout.flush()
@@ -292,12 +295,13 @@ def realtime_cmd(args):
                 if args.even and channel % 2 == 1:
                     client.stop_receiving_read(channel, read.number)
                 else:
+                    chunk_times[channel-1] = time.time()
                     pool.add_chunk(mapping.Chunk(read.id, 
-                                         channel, 
-                                         read.number,
-                                         read.chunk_start_sample,
-                                         raw_type,
-                                         read.raw_data))
+                                                 channel, 
+                                                 read.number,
+                                                 read.chunk_start_sample,
+                                                 raw_type,
+                                                 read.raw_data))
 
             dt = time.time() - t0;
             if dt < MAX_SLEEP:
@@ -361,21 +365,23 @@ def simulate_cmd(args):
     sys.stderr.flush()
 
     MAX_SLEEP = 0.01
+
+    chunk_times = [time.time() for c in range(args.num_channels)]
         
     try:
-
         sim.start()
         while sim.is_running() or not pool.all_finished():
             sys.stderr.flush()
             t0 = time.time()
 
             for ch, nm, paf in pool.update():
+                t = time.time()-chunk_times[ch-1]
                 if (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
-                    paf.set_float(mapping.Paf.Tag.UNBLOCK, sim.get_time(ch))
+                    paf.set_float(mapping.Paf.Tag.UNBLOCK, t)
                     sim.unblock(ch, nm)
                 else:
-                    paf.set_float(mapping.Paf.Tag.KEEP, sim.get_time(ch))
-                    sim.stop_receiving_read(ch, nm)  
+                    paf.set_float(mapping.Paf.Tag.KEEP, t)
+                    sim.stop_receiving_read(ch, nm)
                 paf.print_paf()
 
             
@@ -383,8 +389,8 @@ def simulate_cmd(args):
                 if args.even and chunk.get_channel() % 2 == 1:
                     sim.stop_receiving_read(chunk.get_channel(), chunk.get_number())
                 else:
+                    chunk_times[chunk.get_channel()-1] = time.time()
                     pool.add_chunk(chunk)
-                
 
             dt = time.time() - t0;
             if dt < MAX_SLEEP:

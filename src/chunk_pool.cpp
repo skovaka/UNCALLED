@@ -97,10 +97,6 @@ bool ChunkPool::add_chunk(Chunk &c) {
     return false;
 }
 
-void ChunkPool::end_read(u16 channel, u32 number) {
-    mappers_[channel-1].end_read(number);
-}
-
 std::vector<MapResult> ChunkPool::update() {
 
     std::vector< u16 > read_counts(threads_.size());
@@ -137,8 +133,6 @@ std::vector<MapResult> ChunkPool::update() {
     //    for (u16 c : read_counts) std::cout << "\t" << c;
     //    std::cout << "\n";
     //}
-
-    //std::cout << "# " << active_count << " active\n";
     //std::cout.flush();
 
     for (u16 i = buffer_queue_.size()-1; i < buffer_queue_.size(); i--) {
@@ -253,7 +247,6 @@ void ChunkPool::MapperThread::run() {
 
             in_tmp_.clear(); //(pop)
         }
-
 
         //Map chunks
         for (u16 i = 0; i < active_chs_.size() && running_; i++) {

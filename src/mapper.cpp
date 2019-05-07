@@ -341,8 +341,7 @@ bool Mapper::add_chunk(Chunk &chunk) {
 
     //TODO: put in opts
     if (read_.num_chunks_ == PARAMS.max_chunks_proc) {
-        state_ = State::FAILURE;
-        reset_ = true;
+        set_failed();
         chunk.clear();
         return true;
     }
@@ -385,10 +384,10 @@ u16 Mapper::process_chunk() {
     return nevents;
 }
 
-bool Mapper::end_read(u32 number) {
-    //set last chunk if you want to keep trying after read has ended
-    //return last_chunk_ = (read_loc_.get_number() == number);
-    return reset_ = (read_.number_ == number);
+void Mapper::set_failed() {
+    state_ = State::FAILURE;
+    reset_ = false;
+    read_.loc_.set_read_len(450.0 * (read_.raw_len_ / PARAMS.sample_rate));
 }
 
 bool Mapper::map_chunk() {
@@ -397,7 +396,7 @@ bool Mapper::map_chunk() {
         (norm_.empty() && 
          read_.chunk_processed_ && 
          read_.num_chunks_ == PARAMS.max_chunks_proc)) {
-            state_ = State::FAILURE;
+            set_failed();
             return true;
 
     } else if (norm_.empty()) {
@@ -421,8 +420,7 @@ bool Mapper::map_chunk() {
 bool Mapper::add_event(float event) {
 
     if (reset_ || event_i_ >= PARAMS.max_events_proc) {
-        reset_ = false;
-        state_ = State::FAILURE;
+        set_failed();
         return true;
     }
 

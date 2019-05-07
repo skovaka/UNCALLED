@@ -53,8 +53,7 @@ PYBIND11_MODULE(mapping, m) {
         .def("update", &ChunkPool::update)
         .def("all_finished", &ChunkPool::all_finished)
         .def("stop_all", &ChunkPool::stop_all)
-        .def("add_chunk", &ChunkPool::add_chunk)
-        .def("end_read", &ChunkPool::end_read);
+        .def("add_chunk", &ChunkPool::add_chunk);
 
     py::class_<Chunk>(m, "Chunk")
         .def(py::init<const std::string &, //id, 
