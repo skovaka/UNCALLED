@@ -134,15 +134,26 @@ void Paf::set_str(Tag t, std::string v) {
     str_tags_.emplace_back(t, v);
 }
 
-bool check_time(const hdf5_tools::File &file, std::string read) {
-    if (PARAMS.sim_st == 0 && PARAMS.sim_en == 0) return true;
-    for (auto a : file.get_attr_map(read + "/Raw")) {
-        if (a.first == "start_time") {
-            float t = atof(a.second.c_str()) / PARAMS.sample_rate;
-            return (t >= PARAMS.sim_st && (PARAMS.sim_en == 0 || t <= PARAMS.sim_en));
+bool should_load(const hdf5_tools::File &file, std::string read) {
+    bool within_time = true, even_channel = true;
+    if (PARAMS.sim_st != 0 || PARAMS.sim_en != 0) {
+        for (auto a : file.get_attr_map(read + "/Raw")) {
+            if (a.first == "start_time") {
+                float t = atof(a.second.c_str()) / PARAMS.sample_rate;
+                within_time = (t >= PARAMS.sim_st);// && (PARAMS.sim_en == 0 || t <= PARAMS.sim_en));
+            }
         }
     }
-    return false;
+
+    if (PARAMS.sim_even) {
+        for (auto a : file.get_attr_map(read + "/channel_id")) {
+            if (a.first == "channel_number") {
+                even_channel = atoi(a.second.c_str()) % 2 == 0;
+            }
+        }
+    }
+
+    return within_time && even_channel;
 }
 
 bool is_multi_fast5(const hdf5_tools::File &file) {
@@ -158,7 +169,7 @@ u32 load_multi_fast5(const hdf5_tools::File &file,
     u32 i = 0;
     for (const std::string &read : file.list_group("/")) {
         std::string path = "/" + read;
-        if (check_time(file, read)) {
+        if (should_load(file, read)) {
             list.emplace_back(file, ReadBuffer::Source::MULTI, "/" + read);
         }
         i++;
