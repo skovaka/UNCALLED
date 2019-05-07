@@ -46,10 +46,16 @@ void Simulator::add_fast5s(const std::string &fname, u32 max_loaded) {
 }
 
 std::vector<Chunk> Simulator::get_read_chunks() {
+    std::vector<Chunk> ret;
+
+    if (timer_.get() / 1000.0 > (PARAMS.sim_en - PARAMS.sim_st+1)) {
+        is_running_ = false;
+        return ret;
+    }
+
     //TODO: store sampling rate
     u64 time = (timer_.get() * speed_) + tshift_;
     
-    std::vector<Chunk> ret;
     is_running_ = false;
 
     for (u16 c = 0; c < chunks_.size(); c++) {
@@ -92,11 +98,13 @@ void Simulator::stop_receiving_read(u16 channel, u32 number) {
 void Simulator::unblock(u16 channel, u32 number) {
     channel--;
     u64 t0 = chunks_[channel].front().get_start();
+    u64 end = t0;
     while (!chunks_[channel].empty() && 
             chunks_[channel][0].get_number() == number) {
+        end = chunks_[channel].front().get_end();
         chunks_[channel].pop_front();
     }
-    chshifts_[channel] += chunks_[channel].front().get_start() - t0;
+    chshifts_[channel] += end - t0 - (0.1*PARAMS.sample_rate);
 }
 
 float Simulator::get_time(u16 channel) {

@@ -348,7 +348,8 @@ def simulate_cmd(args):
                         args.max_chunk_wait,
                         args.sim_speed,
                         args.sim_st,
-                        args.sim_en);
+                        args.sim_en,
+                        args.even);
 
     sys.stderr.write("Loading simulator\n")
     sys.stderr.flush()
