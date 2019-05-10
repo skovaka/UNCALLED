@@ -227,6 +227,7 @@ def realtime_cmd(args):
 
         cal = client.device.rpc.device.get_calibration(first_channel=1, last_channel=512)
         raw_type = str(client.signal_dtype)
+        sys.stderr.write(raw_type)
 
         mapping.Params.init_realtime(args.bwa_prefix,
                             index.MODEL_FNAME,
@@ -264,6 +265,7 @@ def realtime_cmd(args):
         pool = mapping.ChunkPool()
 
         chunk_times = [time.time() for c in range(args.num_channels)]
+        unblocked = [None for c in range(args.num_channels)]
 
         sys.stderr.write("Mapping\n")
         
@@ -276,7 +278,9 @@ def realtime_cmd(args):
                 t = time.time()-chunk_times[ch-1]
                 if (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
                     paf.set_float(mapping.Paf.Tag.UNBLOCK, t)
+                    #client.stop_receiving_read(ch, nm)  
                     client.unblock_read(ch, nm)
+                    unblocked[ch-1] = nm
                 else:
                     paf.set_float(mapping.Paf.Tag.KEEP, t)
                     client.stop_receiving_read(ch, nm)  
@@ -295,6 +299,10 @@ def realtime_cmd(args):
                 if args.even and channel % 2 == 1:
                     client.stop_receiving_read(channel, read.number)
                 else:
+                    if unblocked[channel-1] == read.number:
+                        sys.stdout.write("# recieved chunk from %s after unblocking\n" % read.id)
+                        continue
+
                     chunk_times[channel-1] = time.time()
                     pool.add_chunk(mapping.Chunk(read.id, 
                                                  channel, 
@@ -307,12 +315,13 @@ def realtime_cmd(args):
             if dt < MAX_SLEEP:
                 time.sleep(MAX_SLEEP - dt);
 
+
     except Exception as e:
         sys.stderr.write("Error: %s\n" % str(e))
         pass
 
-    pool.stop_all();
     client.reset()
+    pool.stop_all();
 
 
 def simulate_cmd(args):
