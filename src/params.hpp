@@ -52,6 +52,7 @@ class Params {
         u32 _evt_winlen1,
         u32 _evt_winlen2,
         u16 _threads,
+        u16 _num_channels,
         float _evt_thresh1,
         float _evt_thresh2,
         float _evt_peak_height,
@@ -180,17 +181,19 @@ class Params {
           min_mean_conf,
           min_top_conf,
           max_chunk_wait,
+          bp_per_samp,
           sim_speed,
           sim_st,
           sim_en;
     
     bool sim_even;
 
+
     std::vector<u64> evpr_lengths;
     std::vector<float> evpr_threshes;
     std::vector<Range> kmer_fmranges;
 
-    float sample_rate;
+    float sample_rate, bp_per_sec;
     float calib_digitisation;
     std::vector<float> calib_offsets, calib_coefs;
 

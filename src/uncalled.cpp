@@ -4,7 +4,7 @@
 #include "self_align_ref.hpp"
 #include "mapper.hpp"
 #include "simulator.hpp"
-//#include "fast5_pool.hpp"
+#include "fast5_pool.hpp"
 #include "chunk_pool.hpp"
 #include "chunk.hpp"
 #include "read_buffer.hpp"
@@ -41,12 +41,11 @@ PYBIND11_MODULE(mapping, m) {
         .value("KEEP", Paf::Tag::KEEP)
         .export_values();
 
-    //py::class_<Fast5Pool>(m, "Fast5Pool")
-    //    .def(py::init<const UncalledOpts &>())
-    //    .def("add_fast5s", &Fast5Pool::add_fast5s)
-    //    .def("update", &Fast5Pool::update)
-    //    .def("all_finished", &Fast5Pool::all_finished)
-    //    .def("stop_all", &Fast5Pool::stop_all); 
+    py::class_<Fast5Pool>(m, "Fast5Pool")
+        .def(py::init<const std::string &>())
+        .def("update", &Fast5Pool::update)
+        .def("all_finished", &Fast5Pool::all_finished)
+        .def("stop_all", &Fast5Pool::stop_all); 
 
     py::class_<ChunkPool>(m, "ChunkPool")
         .def(py::init()) 

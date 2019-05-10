@@ -33,7 +33,7 @@ Simulator::Simulator()
       chunks_(PARAMS.num_channels) {}
 
 void Simulator::add_fast5s(const std::string &fname, u32 max_loaded) {
-    std::vector<ReadBuffer> reads;
+    std::deque<ReadBuffer> reads;
     load_fast5s(fname, reads, max_loaded);
     std::cerr << "Loaded " << reads.size() << " reads\n";
     //std::sort(reads.begin(), reads.end());
