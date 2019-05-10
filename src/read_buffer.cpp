@@ -106,14 +106,13 @@ void Paf::set_read_len(u64 rd_len) {
     rd_len_ = rd_len;
 }
 
-void Paf::set_mapped(u64 rd_st, u64 rd_en, u64 rd_len,
+void Paf::set_mapped(u64 rd_st, u64 rd_en,
                           std::string rf_name,
                           u64 rf_st, u64 rf_en, u64 rf_len,
                           bool fwd, u16 matches) {
     is_mapped_ = true;
     rd_st_ = rd_st;
     rd_en_ = rd_en;
-    rd_len_ = rd_len;
     rf_name_ = rf_name;
     rf_st_ = rf_st;
     rf_en_ = rf_en;
@@ -164,7 +163,7 @@ bool is_multi_fast5(const hdf5_tools::File &file) {
 }
 
 u32 load_multi_fast5(const hdf5_tools::File &file, 
-                     std::vector<ReadBuffer> &list, 
+                     std::deque<ReadBuffer> &list, 
                      u32 max_load) { 
     u32 i = 0;
     for (const std::string &read : file.list_group("/")) {
@@ -179,15 +178,20 @@ u32 load_multi_fast5(const hdf5_tools::File &file,
 }
 
 u32 load_fast5s(const std::string &fname, 
-                std::vector<ReadBuffer> &list, 
+                std::deque<ReadBuffer> &list, 
                 u32 max_load) {
-    std::string root = "/";
-
     std::ifstream reads_file(fname);
     if (!reads_file) {
         std::cerr << "Error: couldn't open '" << fname << "'\n";
         return 1;
     }
+    
+    return load_fast5s(reads_file, list, max_load);
+}
+
+u32 load_fast5s(std::ifstream &reads_file, 
+                std::deque<ReadBuffer> &list, 
+                u32 max_load) {
 
     u32 i = 0;
     std::string read_fname;
@@ -227,6 +231,28 @@ ReadBuffer::ReadBuffer(const ReadBuffer &r)
       chunk_processed_ (r.chunk_processed_),
       loc_             (r.loc_) {}
 
+void ReadBuffer::swap(ReadBuffer &r) {
+    std::swap(source_, r.source_);
+    std::swap(channel_idx_, r.channel_idx_);
+    std::swap(id_, r.id_);
+    std::swap(number_, r.number_);
+    std::swap(start_sample_, r.start_sample_);
+    std::swap(raw_len_, r.raw_len_);
+    std::swap(full_signal_, r.full_signal_);
+    std::swap(chunk_, r.chunk_);
+    std::swap(num_chunks_, r.num_chunks_);
+    std::swap(chunk_processed_, r.chunk_processed_);
+    std::swap(loc_, r.loc_);
+}
+
+void ReadBuffer::clear() {
+    raw_len_ = 0;
+    full_signal_.clear();
+    chunk_.clear();
+    num_chunks_ = 0;
+    loc_ = Paf();
+}
+
 ReadBuffer::ReadBuffer(const hdf5_tools::File &file, Source source, 
                        const std::string root) {
     source_ = source;
@@ -255,6 +281,7 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file, Source source,
     }
 
     loc_ = Paf(id_);
+    set_raw_len(full_signal_.size());
 }
 
 ReadBuffer::ReadBuffer(Source source, u16 channel, const std::string &id, 
@@ -267,12 +294,12 @@ ReadBuffer::ReadBuffer(Source source, u16 channel, const std::string &id,
           number_(number),
           start_sample_(start_sample),
           loc_(id) {
-    if (raw_data.empty()) raw_len_ = 0;
+    if (raw_data.empty()) set_raw_len(0);
     else {
         if (raw_len == 0) raw_len = raw_data.size() - raw_st;
         full_signal_ = std::vector<float>(&raw_data[raw_st], 
                                           &raw_data[raw_st+raw_len]);
-        raw_len_ = raw_data.size();
+        set_raw_len(raw_data.size());
     }
 }
 
@@ -282,11 +309,11 @@ ReadBuffer::ReadBuffer(Chunk &first_chunk)
       id_(first_chunk.get_id()),
       number_(first_chunk.get_number()),
       start_sample_(first_chunk.get_start()),
-      raw_len_(first_chunk.size()),
       num_chunks_(1),
       chunk_processed_(false),
       loc_(id_) {
     first_chunk.pop(chunk_);
+    set_raw_len(first_chunk.size());
 }
 
 void ReadBuffer::fast5_init(const hdf5_tools::File &file, 
@@ -335,12 +362,17 @@ void ReadBuffer::fast5_init(const hdf5_tools::File &file,
     }*/
 }
 
+void ReadBuffer::set_raw_len(u64 raw_len) {
+    raw_len_ = raw_len;
+    loc_.set_read_len(raw_len_ * PARAMS.bp_per_samp);
+}
+
 bool ReadBuffer::add_chunk(Chunk &c) {
     if (!chunk_processed_ || 
         channel_idx_ != c.get_channel_idx() || 
         number_ != c.get_number()) return false;
     num_chunks_++;
-    raw_len_ += c.size();
+    set_raw_len(raw_len_ + c.size());
     chunk_processed_ = false;
     c.pop(chunk_);
     return true;

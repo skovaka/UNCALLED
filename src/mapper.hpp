@@ -48,11 +48,11 @@ class Mapper {
     ~Mapper();
 
 
-    void new_read(const std::string &name, u16 channel=0, u32 number=0);
+    void new_read(ReadBuffer &r);
     void new_read(Chunk &c);
     void set_failed();
 
-    Paf map_fast5(const std::string &fast5_name);
+    Paf map_read();
     //ReadLoc add_samples(const std::vector<float> &samples);
     //bool add_sample(float s);
 

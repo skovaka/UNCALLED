@@ -23,112 +23,45 @@
 
 #include <thread>
 #include <chrono>
-#include "fast5_reader.hpp"
+#include "read_buffer.hpp"
 #include "fast5_pool.hpp"
 #include "mapper.hpp"
+#include "params.hpp"
 
-bool open_fast5(const std::string &filename, fast5::File &file) {
-    if (!fast5::File::is_valid_file(filename)) {
-        std::cerr << "Error: '" << filename << "' is not a valid file \n";
+Fast5Pool::Fast5Pool(const std::string &fast5_list_fname) {
+    if (PARAMS.threads != 1) {
+        std::cerr << "Multi-threaded mapping currently disabled. Using single thread\n";
     }
 
-    try {
-        file.open(filename);
-        
-        if (!file.is_open()) {  
-            std::cerr << "Error: unable to open '" << filename << "'\n";
-            return false;
-        }
+    reads_file_.open(fast5_list_fname);
+    load_fast5s(reads_file_, reads_, 4000);
+    mappers_.emplace_back();
 
-        return true;
-        
-    } catch (hdf5_tools::Exception& e) {
-        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
-        return false;
-    }
-
-
-    return false;
 }
 
-
-Fast5Pool::Fast5Pool(const UncalledOpts &opts) {
-    batch_size_ = 5; //TODO: need to rewrite pretty much this whole thing
-
-    for (u16 i = 0; i < opts.threads_; i++) {
-        //threads_.push_back(MapperThread(params));
-        threads_.emplace_back(opts);
-    }
-    for (MapperThread &t : threads_) {
-        t.start();
-    }
-}
-
-void Fast5Pool::add_fast5s(const std::vector<std::string> &new_fast5s) {
-    fast5s_.insert(fast5s_.end(), new_fast5s.begin(), new_fast5s.end());
-}
-
-std::vector<std::string> Fast5Pool::update() {
-    std::vector<std::string> ret;
-
-    for (MapperThread &t : threads_) {
-        t.out_mtx_.lock();
-        while (!t.locs_out_.empty()) {
-            //TODO: parse outside
-            ret.push_back(t.locs_out_.front().str());
-            t.locs_out_.pop_front();
-        }
-        t.out_mtx_.unlock();
-
-        if (t.signals_in_.size() < batch_size_ / 2) {
-            while (!fast5s_.empty() && t.signals_in_.size() < batch_size_) {
-
-                std::string fname = fast5s_.front();
-                fast5s_.pop_front();
-
-                //fast5::File fast5;
-                //open_fast5(fname, fast5);            
-                //std::vector<float> samples = fast5.get_raw_samples();
-                //std::string ids = fast5.get_raw_samples_params().read_id;
-                //t.in_mtx_.lock();
-                //t.signals_in_.push_back(samples);
-                //t.ids_in_.push_back(ids);
-                //fast5.close();
-                //t.in_mtx_.unlock();
-
-                std::vector<Fast5Read> reads;
-                load_multi_fast5(fname, reads);
-                t.in_mtx_.lock();
-                for (Fast5Read &r : reads) {
-                    t.signals_in_.push_back(r.raw_data);
-                    t.ids_in_.push_back(r.id);
-                }
-                t.in_mtx_.unlock();
-            }
-        }
-    }
+std::vector<Paf> Fast5Pool::update() {
+    std::vector<Paf> ret;
+    if (reads_.empty()) return ret;
     
+    mappers_[0].new_read(reads_.front());
+    ret.push_back(mappers_[0].map_read());
+    reads_.pop_front();
+
+    if (reads_.empty() && !reads_file_.eof()) {
+        load_fast5s(reads_file_, reads_, 4000);
+    }
+
     return ret;
 }
 
 bool Fast5Pool::all_finished() {
-    if (!fast5s_.empty()) return false;
-
-    for (MapperThread &t : threads_) {
-        if (t.aligning_ || !t.locs_out_.empty()) return false;
-    }
-
-    return true;
+    return reads_.empty() && reads_file_.eof();
 }
 
 void Fast5Pool::stop_all() {
-    for (MapperThread &t : threads_) {
-        t.running_ = false;
-        t.thread_.join();
-    }
 }
 
-
+/*
 Fast5Pool::MapperThread::MapperThread(const UncalledOpts &opts)
     : running_(true),
       aligning_(false),
@@ -172,3 +105,4 @@ void Fast5Pool::MapperThread::run() {
         out_mtx_.unlock();
     }
 }
+*/

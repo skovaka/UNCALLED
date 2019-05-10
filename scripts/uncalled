@@ -149,9 +149,6 @@ def index_cmd(args):
                      args.match_prod)
 
 def map_cmd(args):
-    sys.stderr.write("Regular mapping is currently disabled due to refactoring and a deadline\n")
-
-def map_cmd_old(args):
     mapping.Params.init_map(args.bwa_prefix,
                         index.MODEL_FNAME,
                         args.seed_len, 
@@ -164,6 +161,7 @@ def map_cmd_old(args):
                         args.evt_window_length1,
                         args.evt_window_length2,
                         args.threads,
+                        args.num_channels,
                         args.evt_threshold1,
                         args.evt_threshold2,
                         args.evt_peak_height,
@@ -174,40 +172,22 @@ def map_cmd_old(args):
                         args.min_mean_conf,
                         args.min_top_conf);
 
-    sys.stderr.write("Reading fast5 paths\n")
-    fast5s = load_fast5s(args.fast5s)
+    sys.stderr.write("Loading fast5s\n")
 
-    if args.threads == 1:
-        sys.stderr.write("Aligning\n")
-        mapper = mapping.Mapper(opts)
+    mapper = mapping.Fast5Pool(args.fast5s)
+    sys.stderr.flush()
 
-        try:
-            for fast5 in fast5s:
-                print(mapper.map_fast5(fast5))
-                sys.stdout.flush()
+    sys.stderr.write("Mapping\n")
 
-        except KeyboardInterrupt:
-            pass
+    try:
+        while not mapper.all_finished():
+            for p in mapper.update():
+                p.print_paf()
+            #time.sleep(0.01)
+    except KeyboardInterrupt:
+        pass
 
-    else:
-        mapper = mapping.Fast5Pool(opts)
-        mapper.add_fast5s(fast5s)
-
-        sys.stderr.write("Aligning\n")
-        sys.stderr.flush()
-
-        try:
-            while not mapper.all_finished():
-                alns = mapper.update()
-                for a in alns:
-                    sys.stdout.write("%s\n" % a)
-                sys.stdout.flush()
-                time.sleep(0.01)
-        except KeyboardInterrupt:
-            pass
-
-        sys.stderr.write("Waiting for threads to finish...\n")
-        mapper.stop_all()
+    mapper.stop_all()
 
 def realtime_cmd(args):
     import read_until

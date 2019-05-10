@@ -42,6 +42,7 @@ void Params::init_map(
         u32 _evt_winlen1,
         u32 _evt_winlen2,
         u16 _threads,
+        u16 _num_channels,
         float _evt_thresh1,
         float _evt_thresh2,
         float _evt_peak_height,
@@ -54,9 +55,9 @@ void Params::init_map(
     PARAMS = 
         Params(Mode::MAP,_bwa_prefix,_model_fname,_seed_len,_min_aln_len,_min_rep_len,
          _max_rep_copy,_max_consec_stay,_max_paths,_max_events_proc,0,0,_evt_winlen1,
-         _evt_winlen2,_threads,0,0,0,0,_evt_thresh1,_evt_thresh2,_evt_peak_height,
-         _evt_min_mean,_evt_max_mean,_max_stay_frac,_min_seed_prob,_min_mean_conf,
-         _min_top_conf,0,0,0,0,0);
+         _evt_winlen2,_threads,_num_channels,0,0,0,_evt_thresh1,_evt_thresh2,
+         _evt_peak_height,_evt_min_mean,_evt_max_mean,_max_stay_frac,_min_seed_prob,
+         _min_mean_conf,_min_top_conf,0,0,0,0,0);
 }
 
 void Params::init_realtime (
@@ -211,9 +212,10 @@ Params::Params(Mode _mode,
     sim_en             (_sim_en),
     sim_even           (_sim_even),
     sample_rate        (4000),
+    bp_per_sec         (450),
     calib_digitisation (0),
     calib_offsets      (_num_channels, 0), 
-    calib_coefs        (_num_channels, 0) {
+    calib_coefs        (_num_channels, 0){
     
     //TODO: exception handling
     std::ifstream infile(_bwa_prefix + INDEX_SUFF);
@@ -235,6 +237,8 @@ Params::Params(Mode _mode,
         }
         kmer_fmranges[k] = r;
     }
+
+    bp_per_samp = bp_per_sec / sample_rate;
 }
 
 float Params::get_prob_thresh(u64 fm_length) const {
@@ -265,6 +269,7 @@ u16 Params::get_max_events(u16 event_i) const {
 
 void Params::set_sample_rate(float rate) {
     sample_rate = rate;
+    bp_per_samp = bp_per_sec / sample_rate;
 }
 
 void Params::calibrate(u16 ch, std::vector<float> samples) {

@@ -56,6 +56,8 @@ class EventDetector {
     std::vector<Event> add_samples(const std::vector<RawSample> &raw);
     Event get() const;
     float get_mean() const;
+    float mean_event_len() const;
+    u32 event_to_bp(u32 evt_i, bool last=false) const;
 
     private:
     u32 get_buf_mid();
@@ -71,6 +73,9 @@ class EventDetector {
     double evt_st_sum, evt_st_sumsq;
 
     Event event_;
+    float len_sum_;
+    u32 total_events_;
+
 
     Detector short_detector, long_detector;
 };

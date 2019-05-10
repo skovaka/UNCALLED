@@ -175,122 +175,41 @@ void Mapper::deactivate() {
     reset_ = false;
 }
 
-/*
-std::string Mapper::map_fast5(const std::string &fast5_name) {
-    if (!fast5::File::is_valid_file(fast5_name)) {
-        std::cerr << "Error: '" << fast5_name << "' is not a valid file \n";
+Paf Mapper::map_read() {
+    if (read_.loc_.is_mapped()) return read_.loc_;
+    
+    Timer t;
+
+    std::vector<Event> events = event_detector_.add_samples(read_.full_signal_);
+    PARAMS.model.normalize(events);
+     
+    for (u32 e = 0; e < events.size(); e++) {
+        if (add_event(events[e].mean)) break;
     }
 
-    ReadLoc aln;
+    read_.loc_.set_float(Paf::Tag::MAP_TIME, t.get());
 
-    try {
-        fast5::File file;
-        file.open(fast5_name);
-        
-        if (file.is_open()) {  
-            auto fast5_info = file.get_raw_samples_params();
-            auto raw_samples = file.get_raw_samples();
-            new_read(fast5_info.read_id, 0, fast5_info.read_number);
-            aln = add_samples(raw_samples);
-
-        } else {
-            std::cerr << "Error: unable to open '" << fast5_name << "'\n";
-        }
-
-        
-    } catch (hdf5_tools::Exception& e) {
-        std::cerr << "Error: hdf5 exception '" << e.what() << "'\n";
-    }
-
-    return aln.str();
+    return read_.loc_;
 }
 
-bool Mapper::add_sample(float s) {
-    ;
-    if (!event_detector_.add_sample(s)) return false;
-    norm_.add_event(event_detector_.get_mean());
-    float m = norm_.pop_event();
-
-    #ifdef DEBUG_TIME
-    read_loc_.sigproc_time_ += timer_.lap();
-    #endif
-
-    if (event_i_ >= PARAMS.max_events_proc || add_event(m)) {
-        read_loc_.set_time(timer_.get());
-        read_loc_.set_read_len(opts_, event_i_);
-        return true;
-    }
-
-    return false;
-}
-
-ReadLoc Mapper::pop_loc() {
-    state_ = State::INACTIVE;
+void Mapper::new_read(ReadBuffer &r) {
+    read_.clear();//TODO: probably shouldn't auto erase previous read
+    read_.swap(r);
+    prev_size_ = 0;
+    event_i_ = 0;
     reset_ = false;
-    return read_loc_;
+    last_chunk_ = false;
+    state_ = State::MAPPING;
+    seed_tracker_.reset();
+    event_detector_.reset();
+    norm_.skip_unread();
+    chunk_timer_.reset();
 }
-
-ReadLoc Mapper::get_loc() const {
-    return read_loc_;
-}
-
-ReadLoc Mapper::add_samples(const std::vector<float> &samples) {
-
-    if (PARAMS.evt_buffer_len == 0) {
-        #ifdef DEBUG_TIME
-        timer_.reset();
-        #endif
-
-        std::vector<Event> events = event_detector_.add_samples(samples);
-        std::vector<Event> old(events);
-        PARAMS.model.normalize(events);
-
-        #ifdef DEBUG_TIME
-        read_loc_.sigproc_time_ += timer_.lap();
-        #endif
-
-        read_loc_.set_read_len(opts_, events.size());
-
-        for (u32 e = 0; e < events.size(); e++) {
-            if (add_event(events[e].mean)) break;
-        }
-    } else {
-
-        read_loc_.set_read_len(opts_, samples.size() / 5); //TODO: this better
-        
-        u32 i = 0;
-
-        #ifdef DEBUG_TIME
-        timer_.reset();
-        #endif
-
-        float m;
-        for (auto s : samples) {
-            if (!event_detector_.add_sample(s)) continue;
-            norm_.add_event(event_detector_.get_mean());
-            m = norm_.pop_event();
-
-            #ifdef DEBUG_TIME
-            read_loc_.sigproc_time_ += timer_.lap();
-            #endif
-
-            if (add_event(m)) break;
-            i++;
-        }
-    }
-
-    read_loc_.set_time(timer_.get());
-
-    return read_loc_;
-}
-*/
-
 
 void Mapper::new_read(Chunk &chunk) {
     if (prev_unfinished(chunk.get_number())) {
         std::cerr << "Error: possibly lost read '" << read_.id_ << "'\n";
     }
-
     read_ = ReadBuffer(chunk);
     prev_size_ = 0;
     event_i_ = 0;
@@ -302,6 +221,7 @@ void Mapper::new_read(Chunk &chunk) {
     norm_.skip_unread();
     chunk_timer_.reset();
 }
+
 
 u32 Mapper::prev_unfinished(u32 next_number) const {
     return state_ == State::MAPPING && read_.number_ != next_number;
@@ -387,7 +307,6 @@ u16 Mapper::process_chunk() {
 void Mapper::set_failed() {
     state_ = State::FAILURE;
     reset_ = false;
-    read_.loc_.set_read_len(450.0 * (read_.raw_len_ / PARAMS.sample_rate));
 }
 
 bool Mapper::map_chunk() {
@@ -645,25 +564,22 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
 }
 
 void Mapper::set_ref_loc(const SeedGroup &seeds) {
-    u8 k_shift = (PARAMS.model.kmer_len() - 1);
-
     bool fwd = seeds.ref_st_ > PARAMS.fmi.size() / 2;
 
     u64 sa_st;
-    if (fwd) sa_st = PARAMS.fmi.size() - (seeds.ref_en_.end_ + k_shift);
+    if (fwd) sa_st = PARAMS.fmi.size() - (seeds.ref_en_.end_ + PARAMS.model.kmer_len() - 1);
     else      sa_st = seeds.ref_st_;
     
     std::string rf_name;
-    u64 rd_len = (int) (450.0 * (read_.raw_len_ / PARAMS.sample_rate)),
-        rd_st = (u32) (PARAMS.max_stay_frac * seeds.evt_st_),
-        rd_en = (u32) (PARAMS.max_stay_frac * (seeds.evt_en_ + PARAMS.seed_len)) + k_shift,
+    u64 rd_st = event_detector_.event_to_bp(seeds.evt_st_),
+        rd_en = event_detector_.event_to_bp(seeds.evt_en_ + PARAMS.seed_len, true),
         rf_st,
         rf_len = PARAMS.fmi.translate_loc(sa_st, rf_name, rf_st), //sets rf_st
-        rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_) + k_shift;
+        rf_en = rf_st + (rd_en - rd_st + 1);
 
-    u16 match_count = seeds.total_len_ + k_shift;
+    u16 match_count = seeds.total_len_ + PARAMS.model.kmer_len() - 1;
 
-    read_.loc_.set_mapped(rd_st, rd_en, rd_len, rf_name, rf_st, rf_en, rf_len, match_count, fwd);
+    read_.loc_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, match_count, fwd);
 }
 
 

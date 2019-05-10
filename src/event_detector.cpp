@@ -38,6 +38,9 @@ void EventDetector::reset() {
     evt_st = 0;
     evt_st_sum = evt_st_sumsq = 0.0;
 
+    len_sum_ = 0;
+    total_events_ = 0;
+
     short_detector = {
         .DEF_PEAK_POS = -1,
         .DEF_PEAK_VAL = FLT_MAX,
@@ -99,6 +102,7 @@ bool EventDetector::add_sample(RawSample s) {
 std::vector<Event> EventDetector::add_samples(const std::vector<RawSample> &raw) {
     std::vector<Event> events;
     events.reserve(raw.size() / params.window_length2);
+    reset();
 
     for (u32 i = 0; i < raw.size(); i++) {
         if (add_sample(raw[i])) {
@@ -106,7 +110,6 @@ std::vector<Event> EventDetector::add_samples(const std::vector<RawSample> &raw)
         }
     }
 
-    reset();
 
     return events;
 }
@@ -117,6 +120,14 @@ Event EventDetector::get() const {
 
 float EventDetector::get_mean() const {
     return event_.mean;
+}
+
+float EventDetector::mean_event_len() const {
+    return len_sum_ / total_events_;
+}
+
+u32 EventDetector::event_to_bp(u32 evt_i, bool last) const {
+    return (evt_i * mean_event_len() * PARAMS.bp_per_samp) + last*(PARAMS.model.kmer_len() - 1);
 }
 
 /**
@@ -268,6 +279,9 @@ Event EventDetector::create_event(u32 evt_en) {
     evt_st = evt_en;
     evt_st_sum = sum[evt_en_buf];
     evt_st_sumsq = sumsq[evt_en_buf];
+
+    len_sum_ += event_.length;
+    total_events_++;
 
     return event_;
 }

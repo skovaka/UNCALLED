@@ -31,15 +31,19 @@
 
 class Fast5Pool {
     public:
-    Fast5Pool(const UncalledOpts &opts);
+    Fast5Pool(const std::string &fast5_list_fname);
     
-    void add_fast5s(const std::vector<std::string> &new_fast5s);
-    std::vector<std::string> update();
+    std::vector<Paf> update();
+
     bool all_finished();
     void stop_all();
 
     private:
+    std::ifstream reads_file_;
+    std::deque<ReadBuffer> reads_;
+    std::vector<Mapper> mappers_;
 
+    /*
     class MapperThread {
         public:
         MapperThread(const UncalledOpts &opts);
@@ -56,11 +60,10 @@ class Fast5Pool {
         std::deque<ReadLoc> locs_out_;
         std::mutex in_mtx_, out_mtx_;
     };
+    */
+    //std::vector<MapperThread> threads_;
+    //u16 nthreads_;
 
-    u16 nthreads_;
-    std::vector<MapperThread> threads_;
-    std::deque<std::string> fast5s_;
-    u32 batch_size_;
 };
 
 

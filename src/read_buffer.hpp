@@ -40,7 +40,7 @@ class Paf {
     bool is_mapped() const;
     void print_paf() const;
     void set_read_len(u64 rd_len);
-    void set_mapped(u64 rd_st, u64 rd_en, u64 rd_len, 
+    void set_mapped(u64 rd_st, u64 rd_en, 
                     std::string rf_name,
                     u64 rf_st, u64 rf_en, u64 rf_len,
                     bool fwd, u16 matches);
@@ -92,7 +92,10 @@ class ReadBuffer {
 
     Chunk &&pop_chunk();
     void swap(ReadBuffer &r);
+    void clear();
     bool empty() const;
+
+    void set_raw_len(u64 raw_len_);
 
     u32 get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) const;
 
@@ -121,7 +124,8 @@ class ReadBuffer {
 
 bool operator< (const ReadBuffer &r1, const ReadBuffer &r2);
 
-u32 load_fast5s(const std::string &fname, std::vector<ReadBuffer> &list, u32 max_load = 0);
-u32 load_multi_fast5(const hdf5_tools::File &file, std::vector<ReadBuffer> &list, u32 max_load = 0);
+u32 load_fast5s(const std::string &fname, std::deque<ReadBuffer> &list, u32 max_load = 0);
+u32 load_fast5s(std::ifstream &file, std::deque<ReadBuffer> &list, u32 max_load = 0);
+u32 load_multi_fast5(const hdf5_tools::File &file, std::deque<ReadBuffer> &list, u32 max_load = 0);
 
 #endif
