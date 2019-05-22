@@ -163,12 +163,13 @@ bool is_multi_fast5(const hdf5_tools::File &file) {
 }
 
 u32 load_multi_fast5(const hdf5_tools::File &file, 
-                     std::deque<ReadBuffer> &list, 
-                     u32 max_load) { 
+                     std::deque<ReadBuffer> &list, u32 max_load,
+                     std::unordered_set<std::string> filter) {
     u32 i = 0;
     for (const std::string &read : file.list_group("/")) {
         std::string path = "/" + read;
-        if (should_load(file, read)) {
+        bool pass_filter = filter.empty() || filter.count(read.substr(read.find('_')+1)) > 0;
+        if (pass_filter && should_load(file, read)) {
             list.emplace_back(file, ReadBuffer::Source::MULTI, "/" + read);
         }
         i++;
@@ -177,31 +178,40 @@ u32 load_multi_fast5(const hdf5_tools::File &file,
     return i;
 }
 
-u32 load_fast5s(const std::string &fname, 
+std::deque<std::string> load_fast5s(const std::string &fname, 
                 std::deque<ReadBuffer> &list, 
-                u32 max_load) {
+                u32 max_load,
+                std::unordered_set<std::string> filter) {
     std::ifstream reads_file(fname);
+    std::deque<std::string> fast5_list;
     if (!reads_file) {
         std::cerr << "Error: couldn't open '" << fname << "'\n";
-        return 1;
+        return fast5_list;
+    }
+
+    std::string read_fname;
+    while (getline(reads_file, read_fname)) {
+        if (read_fname[0] != '#') fast5_list.push_back(read_fname);
     }
     
-    return load_fast5s(reads_file, list, max_load);
+    load_fast5s(fast5_list, list, max_load, filter);
+
+    return fast5_list;
 }
 
-u32 load_fast5s(std::ifstream &reads_file, 
-                std::deque<ReadBuffer> &list, 
-                u32 max_load) {
+u32 load_fast5s(std::deque<std::string> &fast5_list, 
+                std::deque<ReadBuffer> &list, u32 max_load,
+                std::unordered_set<std::string> filter) {
 
     u32 i = 0;
     std::string read_fname;
-    while (getline(reads_file, read_fname) && 
+    while (!fast5_list.empty() && 
             (max_load == 0 || list.size() < max_load)) {
-        if (read_fname[0] == '#') continue;
-        hdf5_tools::File file(read_fname);
+        hdf5_tools::File file(fast5_list.front());
+        fast5_list.pop_front();
         
         if (is_multi_fast5(file)) {
-            i += load_multi_fast5(file, list, max_load);
+            i += load_multi_fast5(file, list, max_load, filter);
         } else {
             list.emplace_back(file, ReadBuffer::Source::SINGLE);
             i++;

@@ -69,6 +69,7 @@ def add_sim_opts(p):
 
 def add_fast5_opts(p):
     p.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
+    p.add_argument("--filter", required=False, default="", type=str, help="Only map reads listed in this file")
     p.add_argument("-R", "--read-count", type=int, default=0, help="Maximum number of reads to map")
 
 def add_map_opts(p):
@@ -174,15 +175,20 @@ def map_cmd(args):
 
     sys.stderr.write("Loading fast5s\n")
 
-    mapper = mapping.Fast5Pool(args.fast5s)
+    mapper = mapping.Fast5Pool(args.fast5s, args.filter)
     sys.stderr.flush()
 
     sys.stderr.write("Mapping\n")
 
+    n = 0
+
     try:
-        while not mapper.all_finished():
+        while not mapper.all_finished() and (not args.read_count or n <= args.read_count):
             for p in mapper.update():
                 p.print_paf()
+                n += 1
+                if args.read_count and n > args.read_count:
+                    break
             #time.sleep(0.01)
     except KeyboardInterrupt:
         pass

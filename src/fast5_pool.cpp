@@ -28,15 +28,22 @@
 #include "mapper.hpp"
 #include "params.hpp"
 
-Fast5Pool::Fast5Pool(const std::string &fast5_list_fname) {
+Fast5Pool::Fast5Pool(const std::string &fast5_list_fname, const std::string &read_filter_fname) {
     if (PARAMS.threads != 1) {
         std::cerr << "Multi-threaded mapping currently disabled. Using single thread\n";
     }
 
-    reads_file_.open(fast5_list_fname);
-    load_fast5s(reads_file_, reads_, 4000);
-    mappers_.emplace_back();
+    if (!read_filter_fname.empty()) {
+        std::ifstream filter_file(read_filter_fname);
+        std::string read;
+        while (getline(filter_file, read)) {
+            filter_.insert(read);
+        }
+    }
 
+    fast5_list_ = load_fast5s(fast5_list_fname, reads_, 4000, filter_);
+    std::cerr << fast5_list_.size() << " " << reads_.size() << "\n";
+    mappers_.emplace_back();
 }
 
 std::vector<Paf> Fast5Pool::update() {
@@ -47,15 +54,18 @@ std::vector<Paf> Fast5Pool::update() {
     ret.push_back(mappers_[0].map_read());
     reads_.pop_front();
 
-    if (reads_.empty() && !reads_file_.eof()) {
-        load_fast5s(reads_file_, reads_, 4000);
+    if (reads_.empty() && !fast5_list_.empty()) {
+        load_fast5s(fast5_list_, reads_, 4000, filter_);
+        std::cerr << fast5_list_.size() << " " << reads_.size() << "\n";
     }
+
+    
 
     return ret;
 }
 
 bool Fast5Pool::all_finished() {
-    return reads_.empty() && reads_file_.eof();
+    return reads_.empty() && fast5_list_.empty();
 }
 
 void Fast5Pool::stop_all() {

@@ -36,7 +36,7 @@ uncalled = Extension(
                      "./pdqsort"],
      library_dirs = ["./bwa"],
      libraries = ["hdf5", "bwa", "z", "dl"],
-     extra_compile_args = ["-std=c++11", "-g"]
+     extra_compile_args = ["-std=c++11", "-O3"]
 )
 
 setup(name = "uncalled",

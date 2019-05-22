@@ -26,6 +26,7 @@
 
 #include <string>
 #include <vector>
+#include <unordered_set>
 #include "fast5/hdf5_tools.hpp"
 #include "util.hpp"
 #include "chunk.hpp"
@@ -124,8 +125,13 @@ class ReadBuffer {
 
 bool operator< (const ReadBuffer &r1, const ReadBuffer &r2);
 
-u32 load_fast5s(const std::string &fname, std::deque<ReadBuffer> &list, u32 max_load = 0);
-u32 load_fast5s(std::ifstream &file, std::deque<ReadBuffer> &list, u32 max_load = 0);
+std::deque<std::string> load_fast5s(const std::string &fast5_list, std::deque<ReadBuffer> &list, u32 max_load = 0, std::unordered_set<std::string> filter=std::unordered_set<std::string>());
+
+u32 load_fast5s(std::deque<std::string> &fast5_list, 
+                std::deque<ReadBuffer> &list, 
+                u32 max_load = 0, 
+                std::unordered_set<std::string> filter=std::unordered_set<std::string>());
+
 u32 load_multi_fast5(const hdf5_tools::File &file, std::deque<ReadBuffer> &list, u32 max_load = 0);
 
 #endif

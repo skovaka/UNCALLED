@@ -27,11 +27,12 @@
 #include <thread>
 #include <vector>
 #include <deque>
+#include <unordered_set>
 #include "mapper.hpp"
 
 class Fast5Pool {
     public:
-    Fast5Pool(const std::string &fast5_list_fname);
+    Fast5Pool(const std::string &fast5_list_fname, const std::string &read_filter_fname="");
     
     std::vector<Paf> update();
 
@@ -39,9 +40,10 @@ class Fast5Pool {
     void stop_all();
 
     private:
-    std::ifstream reads_file_;
+    std::deque<std::string> fast5_list_;
     std::deque<ReadBuffer> reads_;
     std::vector<Mapper> mappers_;
+    std::unordered_set<std::string> filter_;
 
     /*
     class MapperThread {

@@ -4,7 +4,7 @@ LIBS=-lstdc++ -lz -ldl -pthread
 #BWA_LIB=-L/home-4/skovaka1@jhu.edu/code/nanopore_aligner/bwa /home-4/skovaka1@jhu.edu/code/nanopore_aligner/bwa/libbwa.a
 
 HDF5_LIB=-lhdf5
-BWA_LIB=-L/home/skovaka/Dropbox/code/jhu/UNCALLED/bwa /home/skovaka/Dropbox/code/jhu/UNCALLED/bwa/libbwa.a
+BWA_LIB=-L/home/skovaka/code/UNCALLED/bwa /home/skovaka/code/UNCALLED/bwa/libbwa.a
 HDF5_INCLUDE=-I/home-4/skovaka1@jhu.edu/software/include
 CC=g++
 CFLAGS=-Wall -std=c++11 -O3
@@ -18,6 +18,9 @@ all: simulator_test map_test
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c -o $@ $^ $(INCLUDE) $(HDF5_INCLUDE) 
+
+find_repeats: find_repeats.o bwa_fmi.o range.o
+	$(CC) $(CFLAGS) find_repeats.o bwa_fmi.o range.o -o find_repeats $(HDF5_LIB) $(BWA_LIB) $(LIBS)
 
 map_test: map_test.o kmer_model.o mapper.o seed_tracker.o range.o bwa_fmi.o event_detector.o chunk_pool.o normalizer.o chunk.o params.o read_buffer.o fast5_pool.o
 	$(CC) $(CFLAGS) map_test.o kmer_model.o mapper.o seed_tracker.o range.o bwa_fmi.o event_detector.o chunk_pool.o normalizer.o chunk.o params.o read_buffer.o fast5_pool.o -o map_test $(HDF5_LIB) $(BWA_LIB) $(LIBS)
