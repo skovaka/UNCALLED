@@ -6,11 +6,11 @@
 #include "read_buffer.hpp"
 #include "fast5_pool.hpp"
 
-const std::string MODEL =  "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers.txt";
-const std::string PROBFN = "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
+//const std::string MODEL =  "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers.txt";
+//const std::string PROBFN = "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
 
-//const std::string MODEL = "/home/skovaka/code/UNCALLED/src/uncalled/models/r94_5mers.txt";
-//const std::string PROBFN = "/home/skovaka/code/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
+const std::string MODEL = "/home/skovaka/code/UNCALLED/src/uncalled/models/r94_5mers.txt";
+const std::string PROBFN = "/home/skovaka/code/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
 
 //const std::string MODEL = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/models/r94_5mers.txt";
 //const std::string PROBFN = "/home-4/skovaka1@jhu.edu/code/UNCALLED/src/uncalled/models/r94_5mers_threshs.txt";
@@ -18,7 +18,7 @@ const std::string PROBFN = "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled
 int main(int argc, char** argv) {
 
     std::string index(argv[1]), reads_fname(argv[2]);
-    //u32 nthreads = atoi(argv[3]), read_count = atoi(argv[4]);
+    u32 nthreads = atoi(argv[3]);//, read_count = atoi(argv[4]);
     
     Params::init_map(index, MODEL,
                         22,    //seed_len
@@ -28,9 +28,9 @@ int main(int argc, char** argv) {
                         8,     //max_consec_stay
                         10000, //max_paths
                         30000, //max_events_proc
-                        3,     //evt_winlen1
+                        3,     //e/vt_winlen1
                         6,     //evt_winlen2
-                        1,     //nthreads
+                        nthreads,     //nthreads
                         512,   //num_channels
                         1.4,   //evt_thresh1
                         9.0,   //evt_thresh2
@@ -46,10 +46,14 @@ int main(int argc, char** argv) {
     Timer t;
 
     Fast5Pool pool(reads_fname);
+    u64 MAX_SLEEP = 100;
 
     while (!pool.all_finished()) {
+        u64 t0 = t.get();
         for (Paf p : pool.update()) {
             p.print_paf();
         }
+        u64 dt = t.get() - t0;
+        if (dt < MAX_SLEEP) usleep(1000*(MAX_SLEEP - dt));
     }
 }

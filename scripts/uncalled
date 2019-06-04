@@ -183,17 +183,27 @@ def map_cmd(args):
     n = 0
 
     try:
+        MAX_SLEEP = 0.01
         while not mapper.all_finished() and (not args.read_count or n <= args.read_count):
+            t0 = time.time()
             for p in mapper.update():
                 p.print_paf()
                 n += 1
                 if args.read_count and n > args.read_count:
                     break
+            dt = time.time() - t0;
+            if dt < MAX_SLEEP:
+                time.sleep(MAX_SLEEP - dt);
             #time.sleep(0.01)
     except KeyboardInterrupt:
         pass
 
     mapper.stop_all()
+    while not mapper.all_finished():
+        time.sleep(MAX_SLEEP)
+
+    for p in mapper.update():
+        p.print_paf()
 
 def realtime_cmd(args):
     import read_until

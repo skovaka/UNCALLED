@@ -42,29 +42,30 @@ class Fast5Pool {
     private:
     std::deque<std::string> fast5_list_;
     std::deque<ReadBuffer> reads_;
-    std::vector<Mapper> mappers_;
     std::unordered_set<std::string> filter_;
 
-    /*
     class MapperThread {
         public:
-        MapperThread(const UncalledOpts &opts);
+        MapperThread();
         MapperThread(MapperThread &&mt);
 
         void start();
         void run();
 
-        bool running_, aligning_;
+        static u16 THREAD_COUNT;
+
+        u16 tid_;
+        bool running_, in_buffered_, out_buffered_, finished_;
         Mapper mapper_;
         std::thread thread_;
-        std::deque<std::string> ids_in_;
-        std::deque< std::vector<float> > signals_in_;
-        std::deque<ReadLoc> locs_out_;
+
+        ReadBuffer next_read_;
+        Paf paf_out_;
+
         std::mutex in_mtx_, out_mtx_;
     };
-    */
-    //std::vector<MapperThread> threads_;
-    //u16 nthreads_;
+
+    std::vector<MapperThread> threads_;
 
 };
 

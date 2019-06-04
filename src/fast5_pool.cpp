@@ -29,9 +29,6 @@
 #include "params.hpp"
 
 Fast5Pool::Fast5Pool(const std::string &fast5_list_fname, const std::string &read_filter_fname) {
-    if (PARAMS.threads != 1) {
-        std::cerr << "Multi-threaded mapping currently disabled. Using single thread\n";
-    }
 
     if (!read_filter_fname.empty()) {
         std::ifstream filter_file(read_filter_fname);
@@ -42,45 +39,79 @@ Fast5Pool::Fast5Pool(const std::string &fast5_list_fname, const std::string &rea
     }
 
     fast5_list_ = load_fast5s(fast5_list_fname, reads_, 4000, filter_);
-    std::cerr << fast5_list_.size() << " " << reads_.size() << "\n";
-    mappers_.emplace_back();
+
+    threads_ = std::vector<MapperThread>(PARAMS.threads);
+
+    for (u32 i = 0; i < PARAMS.threads; i++) {
+        threads_[i].next_read_.swap(reads_.front());
+        reads_.pop_front();
+        threads_[i].in_buffered_ = true;
+        threads_[i].start();
+    }
+
 }
 
 std::vector<Paf> Fast5Pool::update() {
     std::vector<Paf> ret;
-    if (reads_.empty()) return ret;
-    
-    mappers_[0].new_read(reads_.front());
-    ret.push_back(mappers_[0].map_read());
-    reads_.pop_front();
 
-    if (reads_.empty() && !fast5_list_.empty()) {
-        load_fast5s(fast5_list_, reads_, 4000, filter_);
-        std::cerr << fast5_list_.size() << " " << reads_.size() << "\n";
+    for (u32 i = 0; i < PARAMS.threads; i++) {
+        if (threads_[i].out_buffered_) {
+            ret.push_back(threads_[i].paf_out_);
+            threads_[i].out_buffered_ = false;
+        }
+
+        if (!threads_[i].in_buffered_) {
+            if (reads_.empty()) threads_[i].running_ = false;
+            else {
+                threads_[i].next_read_.swap(reads_.front());
+                reads_.pop_front();
+                threads_[i].in_buffered_ = true;
+            }
+        }
     }
 
-    
+    if (reads_.size() < PARAMS.threads) {
+        load_fast5s(fast5_list_, reads_, 4000, filter_);
+    }
 
     return ret;
 }
 
 bool Fast5Pool::all_finished() {
-    return reads_.empty() && fast5_list_.empty();
+    if (!reads_.empty()) return false;
+    for (u16 i = 0; i < PARAMS.threads; i++) {
+        if (!threads_[i].finished_) return false;
+    }
+    return true;
 }
 
 void Fast5Pool::stop_all() {
+    reads_.clear();
+    for (auto &t : threads_) {
+        t.running_ = false;
+        t.mapper_.request_reset();
+        t.thread_.join();
+    }
 }
 
-/*
-Fast5Pool::MapperThread::MapperThread(const UncalledOpts &opts)
-    : running_(true),
-      aligning_(false),
-      mapper_(opts) {}
+u16 Fast5Pool::MapperThread::THREAD_COUNT = 0;
+
+Fast5Pool::MapperThread::MapperThread()
+    : tid_(THREAD_COUNT++),
+      running_(true),
+      in_buffered_(false),
+      out_buffered_(false),
+      finished_(false) {
+    
+}
 
 Fast5Pool::MapperThread::MapperThread(MapperThread &&mt) 
-    : running_(mt.running_),                                             
-      aligning_(mt.aligning_),                                           
-      mapper_(mt.mapper_),
+    : tid_(mt.tid_),
+      running_(mt.running_),                                             
+      in_buffered_(mt.in_buffered_), 
+      out_buffered_(mt.in_buffered_), 
+      finished_(mt.finished_),
+      mapper_(),
       thread_(std::move(mt.thread_)) {}
 
 void Fast5Pool::MapperThread::start() {
@@ -88,31 +119,24 @@ void Fast5Pool::MapperThread::start() {
 }
 
 void Fast5Pool::MapperThread::run() {
-    std::string fast5_id;
-    std::vector<float> fast5_signal;
-    ReadLoc loc;
     while (running_) {
-        if (signals_in_.empty()) {
-            aligning_ = false;
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            continue;
+
+        while (!in_buffered_) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
 
-        aligning_ = true;
-        
-        in_mtx_.lock(); 
-        signals_in_.front().swap(fast5_signal);
-        ids_in_.front().swap(fast5_id);
-        ids_in_.pop_front();
-        signals_in_.pop_front();
-        in_mtx_.unlock();
+        mapper_.new_read(next_read_);
+        in_buffered_ = false;
 
-        mapper_.new_read(fast5_id);
-        loc = mapper_.add_samples(fast5_signal);
+        Paf p = mapper_.map_read();
 
-        out_mtx_.lock(); 
-        locs_out_.push_back(loc);
-        out_mtx_.unlock();
+        while (out_buffered_) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        paf_out_ = p;
+        out_buffered_ = true;
     }
+
+    finished_ = true;
 }
-*/
