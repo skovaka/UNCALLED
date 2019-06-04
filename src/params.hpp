@@ -188,9 +188,7 @@ class Params {
     
     bool sim_even;
 
-
-    std::vector<u64> evpr_lengths;
-    std::vector<float> evpr_threshes;
+    std::vector<float> prob_threshes;
     std::vector<Range> kmer_fmranges;
 
     float sample_rate, bp_per_sec;

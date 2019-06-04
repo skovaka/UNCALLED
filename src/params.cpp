@@ -222,11 +222,11 @@ Params::Params(Mode _mode,
     float prob, frac;
     u64 fmlen = 0;
     infile >> prob >> frac;
-    evpr_threshes.push_back(prob);
+    prob_threshes.resize(64, prob);
+
     while (fmlen != 1) {
         infile >> fmlen >> prob >> frac;
-        evpr_lengths.push_back(fmlen);
-        evpr_threshes.push_back(prob);
+        prob_threshes[__builtin_clzll(fmlen)] = prob;
     }
 
     kmer_fmranges = std::vector<Range>(model.kmer_count());
@@ -241,19 +241,47 @@ Params::Params(Mode _mode,
     bp_per_samp = bp_per_sec / sample_rate;
 }
 
-float Params::get_prob_thresh(u64 fm_length) const {
-    auto pr = evpr_threshes.begin();
-    for (auto len = evpr_lengths.begin(); len != evpr_lengths.end(); len++) {
-        if (fm_length > *len) {
-            break;
-        }
-        pr++;
-    }
-    return *pr;
+//Source: https://stackoverflow.com/questions/11376288/fast-computing-of-log2-for-64-bit-integers
+//const u8 tab64[64] = {
+//    63,  0, 58,  1, 59, 47, 53,  2,
+//    60, 39, 48, 27, 54, 33, 42,  3,
+//    61, 51, 37, 40, 49, 18, 28, 20,
+//    55, 30, 34, 11, 43, 14, 22,  4,
+//    62, 57, 46, 52, 38, 26, 32, 41,
+//    50, 36, 17, 19, 29, 10, 13, 21,
+//    56, 45, 25, 31, 35, 16,  9, 12,
+//    44, 24, 15,  8, 23,  7,  6,  5};
+//u8 log2_64 (u64 value) {
+//    value |= value >> 1;
+//    value |= value >> 2;
+//    value |= value >> 4;
+//    value |= value >> 8;
+//    value |= value >> 16;
+//    value |= value >> 32;
+//    return tab64[((u64)((value - (value >> 1))*0x07EDD5E59A4E28C2)) >> 58];
+//}
+
+static const u8 tab64[64] = {
+    0, 58, 1, 59, 47, 53, 2, 60, 39, 48, 27, 54, 33, 42, 3, 61,
+    51, 37, 40, 49, 18, 28, 20, 55, 30, 34, 11, 43, 14, 22, 4, 62,
+    57, 46, 52, 38, 26, 32, 41, 50, 36, 17, 19, 29, 10, 13, 21, 56,
+    45, 25, 31, 35, 16, 9, 12, 44, 24, 15, 8, 23, 7, 6, 5, 63 };
+u8 log2_64 (u64 n) {
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    n |= n >> 32;
+    return tab64[(n * 0x03f6eaf2cd271461) >> 58];
+}
+
+float Params::get_prob_thresh(u64 fmlen) const {
+    return prob_threshes[__builtin_clzll(fmlen)];
 }
 
 float Params::get_source_prob() const {
-    return evpr_threshes.front();
+    return prob_threshes.front();
 }
 
 bool Params::check_map_conf(u32 seed_len, float mean_len, float second_len) {
