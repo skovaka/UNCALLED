@@ -36,26 +36,27 @@ class ArgFormat(argparse.ArgumentDefaultsHelpFormatter):
 
 def add_bwa_opt(p):
     p.add_argument("-x", "--bwa-prefix", required=True, type=str, help="BWA prefix to mapping to. Must be processed by \"uncalled index\".")
+    p.add_argument("-p", "--preset-mode", default="", type=str, help="Mapping mode")
 
 def add_index_opts(p):
     p.add_argument("-i", "--ref-fasta", required=True, type=str, help="FASTA file used to build BWA index")
-    p.add_argument("-s", "--sample-dist", default=1000, type=int, help="Sampling distance between reference self-alignments. Reduce number for larger genomes.")
+    p.add_argument("-s", "--sample-dist", default=100, type=int, help="Sampling distance between reference self-alignments. Reduce number for larger genomes.")
     p.add_argument("-k", "--kmer-len", default=5, type=int, help="Model k-mer length")
-    p.add_argument("-1", "--matchpr1", default=0.6225, type=float, help="Minimum event match probability")
-    p.add_argument("-2", "--matchpr2", default=0.9837, type=float, help="Maximum event match probability")
-    p.add_argument("-p", "--match-prod", default=0.05, type=float, help="Target frequency of seeds.")
-    p.add_argument("-f", "--fm-percentile", default=95, type=int, help=" ")
+    p.add_argument("-1", "--matchpr1", default=0.6334, type=float, help="Minimum event match probability")
+    p.add_argument("-2", "--matchpr2", default=0.9838, type=float, help="Maximum event match probability")
+    p.add_argument("-t", "--target-prod", default=0.076, type=float, help="Target frequency of seeds.")
+    p.add_argument("-f", "--fm-percentile", default=0.05, type=float, help=" ")
 
 def add_ru_opts(p):
     #TODO: selectively enrich or deplete refs in index
-    p.add_argument("--deplete", required=False, action='store_true', default=False, help="Will eject reads that align to index")
-    p.add_argument("--enrich", required=False, action='store_true', default=False, help="Will eject reads that don't align to index")
+    p.add_argument("-D", "--deplete", required=False, action='store_true', default=False, help="Will eject reads that align to index")
+    p.add_argument("-E", "--enrich", required=False, action='store_true', default=False, help="Will eject reads that don't align to index")
+    p.add_argument("-c", "--max-chunks-proc", default=3, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
     p.add_argument("--even", action='store_true', help="Will only monitor even pores if set")
     p.add_argument("--chunk-len", required=False, type=int, default=4000, help="Length of chunks")
-    p.add_argument("-n", "--evt-buffer-len", default=6000, type=int, help="Size of buffer used to normalize and read events")
-    p.add_argument("-E", "--evt-batch-size", default=5, type=int, help="Number of events simulator will mapping per read per thread iteration. Only has effect when --unblock is set")
+    p.add_argument("--evt-buffer-len", default=6000, type=int, help="Size of buffer used to normalize and read events")
+    p.add_argument("--evt-batch-size", default=5, type=int, help="Number of events simulator will mapping per read per thread iteration. Only has effect when --unblock is set")
     p.add_argument("--evt-timeout", default=10.0, type=float, help="Simulator will stop aligning event batch if average time in MS to mapping an event exceeds this. Only has effect when --unblock is set")
-    p.add_argument("-c", "--max-chunks-proc", default=3, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
     p.add_argument("--max-chunk-wait", required=False, type=float, default=4000, help="Maximum milliseconds to wait between chunks. Will give up on read if it takes longer")
 
 def add_realtime_opts(p):
@@ -70,22 +71,22 @@ def add_sim_opts(p):
 def add_fast5_opts(p):
     p.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
     p.add_argument("--filter", required=False, default="", type=str, help="Only map reads listed in this file")
-    p.add_argument("-R", "--read-count", type=int, default=0, help="Maximum number of reads to map")
+    p.add_argument("-n", "--read-count", type=int, default=0, help="Maximum number of reads to map")
 
 def add_map_opts(p):
-    p.add_argument("-C", "--num-channels", default=512, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
     p.add_argument("-t", "--threads", default=1, type=int, help="Number of threads to use for mapping")
-    p.add_argument("-e", "--max-events-proc", default=30000, type=int, help="Will give up on a read after this many events have been processed")
-    p.add_argument("-a", "--min-aln-len", default=25, type=int, help="Minimum number of basepairs a mapping must cover.")
-    p.add_argument("-s", "--seed-len", default=22, type=int, help="Seed length in events.")
-    p.add_argument("-r", "--min-rep-len", default=0, type=int, help="Minimum number of basepairs a multi-mapping seed must cover")
+    p.add_argument("--num-channels", default=512, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
+    p.add_argument("--max-events-proc", default=30000, type=int, help="Will give up on a read after this many events have been processed")
+    p.add_argument("--min-aln-len", default=25, type=int, help="Minimum number of basepairs a mapping must cover.")
+    p.add_argument("--seed-len", default=22, type=int, help="Seed length in events.")
+    p.add_argument("--min-rep-len", default=0, type=int, help="Minimum number of basepairs a multi-mapping seed must cover")
     p.add_argument("--max-rep-copy", default=50, type=int, help="Maximum number of locations for a multi-mapping seed")
-    p.add_argument("-y", "--max-consec-stay", default=8, type=int, help="Maximum consecutive stay events.")
-    p.add_argument("-p", "--max-paths", default=10000, type=int, help="Maximum number of paths to consider per event.")
-    p.add_argument("-F", "--max-stay-frac", default=0.5, type=float, help="Expected fraction of events which are stays")
-    p.add_argument("-S", "--min-seed-prob", default=-3.75, type=float, help="Average event probability threshold per seed")
-    p.add_argument("-M", "--min-mean-conf", default=7.00, type=float, help="Minimum ratio between longest alignment and mean alignment length to report confident alignment")
-    p.add_argument("-T", "--min-top-conf", default=2.25, type=float, help="Minimum ratio between longest alignment and second-longet alignment to report confident alignment")
+    p.add_argument("--max-consec-stay", default=8, type=int, help="Maximum consecutive stay events.")
+    p.add_argument("--max-paths", default=10000, type=int, help="Maximum number of paths to consider per event.")
+    p.add_argument("--max-stay-frac", default=0.5, type=float, help="Expected fraction of events which are stays")
+    p.add_argument("--min-seed-prob", default=-3.75, type=float, help="Average event probability threshold per seed")
+    p.add_argument("--min-mean-conf", default=7.00, type=float, help="Minimum ratio between longest alignment and mean alignment length to report confident alignment")
+    p.add_argument("--min-top-conf", default=2.25, type=float, help="Minimum ratio between longest alignment and second-longet alignment to report confident alignment")
     p.add_argument("--evt-min-mean", default=30, type=float, help="Minimum un-normalized event mean")
     p.add_argument("--evt-max-mean", default=150, type=float, help="Maximum un-normalized event mean")
     p.add_argument("--evt-window-length1", default=3, type=int, help=" ")
@@ -147,11 +148,12 @@ def index_cmd(args):
                      args.fm_percentile, 
                      args.matchpr1, 
                      args.matchpr2, 
-                     args.match_prod)
+                     args.target_prod)
 
 def map_cmd(args):
     mapping.Params.init_map(args.bwa_prefix,
                         index.MODEL_FNAME,
+                        args.preset_mode,
                         args.seed_len, 
                         args.min_aln_len,
                         args.min_rep_len, 
@@ -175,7 +177,7 @@ def map_cmd(args):
 
     sys.stderr.write("Loading fast5s\n")
 
-    mapper = mapping.Fast5Pool(args.fast5s, args.filter)
+    mapper = mapping.Fast5Pool(args.fast5s, args.filter, args.read_count)
     sys.stderr.flush()
 
     sys.stderr.write("Mapping\n")
@@ -227,6 +229,7 @@ def realtime_cmd(args):
 
         mapping.Params.init_realtime(args.bwa_prefix,
                             index.MODEL_FNAME,
+                            args.preset_mode,
                             args.seed_len, 
                             args.min_aln_len,
                             args.min_rep_len, 
@@ -329,6 +332,7 @@ def simulate_cmd(args):
     sys.stdout.flush()
     opts = mapping.Params.init_sim(args.bwa_prefix,
                         index.MODEL_FNAME,
+                        args.preset_mode,
                         args.seed_len, 
                         args.min_aln_len,
                         args.min_rep_len, 

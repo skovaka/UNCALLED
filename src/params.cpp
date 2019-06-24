@@ -32,6 +32,7 @@ Params::Params() : mode(Mode::UNINIT){}
 void Params::init_map(
         const std::string &_bwa_prefix,
         const std::string &_model_fname,
+        const std::string &_param_preset,
         u32 _seed_len, 
         u32 _min_aln_len,
         u32 _min_rep_len, 
@@ -53,7 +54,7 @@ void Params::init_map(
         float _min_mean_conf,
         float _min_top_conf) {
     PARAMS = 
-        Params(Mode::MAP,_bwa_prefix,_model_fname,_seed_len,_min_aln_len,_min_rep_len,
+        Params(Mode::MAP,_bwa_prefix,_model_fname,_param_preset,_seed_len,_min_aln_len,_min_rep_len,
          _max_rep_copy,_max_consec_stay,_max_paths,_max_events_proc,0,0,_evt_winlen1,
          _evt_winlen2,_threads,_num_channels,0,0,0,_evt_thresh1,_evt_thresh2,
          _evt_peak_height,_evt_min_mean,_evt_max_mean,_max_stay_frac,_min_seed_prob,
@@ -63,6 +64,7 @@ void Params::init_map(
 void Params::init_realtime (
         const std::string &_bwa_prefix,
         const std::string &_model_fname,
+        const std::string &_param_preset,
         u32 _seed_len, 
         u32 _min_aln_len,
         u32 _min_rep_len, 
@@ -94,7 +96,7 @@ void Params::init_realtime (
         std::vector<float> _ranges,
         float _sample_rate) {
     PARAMS =
-       Params(Mode::REALTIME,_bwa_prefix,_model_fname,_seed_len,_min_aln_len,
+       Params(Mode::REALTIME,_bwa_prefix,_model_fname,_param_preset,_seed_len,_min_aln_len,
        _min_rep_len,_max_rep_copy,_max_consec_stay,_max_paths,_max_events_proc,
        _max_chunks_proc,_evt_buffer_len,_evt_winlen1,_evt_winlen2,_threads,
        _num_channels,_chunk_len,_evt_batch_size,_evt_timeout,_evt_thresh1,
@@ -108,6 +110,7 @@ void Params::init_realtime (
 void Params::init_sim(
         const std::string &_bwa_prefix,
         const std::string &_model_fname,
+        const std::string &_param_preset,
         u32 _seed_len, 
         u32 _min_aln_len,
         u32 _min_rep_len, 
@@ -139,7 +142,7 @@ void Params::init_sim(
         float _sim_en,
         bool  _sim_even) {
     PARAMS =
-       Params(Mode::SIMULATE,_bwa_prefix,_model_fname,_seed_len,_min_aln_len,
+       Params(Mode::SIMULATE,_bwa_prefix,_model_fname,_param_preset,_seed_len,_min_aln_len,
        _min_rep_len,_max_rep_copy,_max_consec_stay,_max_paths,_max_events_proc,
        _max_chunks_proc,_evt_buffer_len,_evt_winlen1,_evt_winlen2,_threads,
        _num_channels,_chunk_len,_evt_batch_size,_evt_timeout,_evt_thresh1,
@@ -151,6 +154,7 @@ void Params::init_sim(
 Params::Params(Mode _mode,
                const std::string &_bwa_prefix,
                const std::string &_model_fname,
+               const std::string &_param_preset,
                u32 _seed_len, 
                u32 _min_aln_len,
                u32 _min_rep_len, 
@@ -218,16 +222,32 @@ Params::Params(Mode _mode,
     calib_coefs        (_num_channels, 0){
     
     //TODO: exception handling
-    std::ifstream infile(_bwa_prefix + INDEX_SUFF);
-    float prob, frac;
-    u64 fmlen = 0;
-    infile >> prob >> frac;
-    prob_threshes.resize(64, prob);
+    std::ifstream param_file(_bwa_prefix + INDEX_SUFF);
+    std::string param_line;
 
-    while (fmlen != 1) {
-        infile >> fmlen >> prob >> frac;
-        prob_threshes[__builtin_clzll(fmlen)] = prob;
+    char *param_preset = (char *) _param_preset.c_str();
+    prob_threshes.resize(64);
+
+    while (getline(param_file, param_line)) {
+        char *param_name = strtok((char *) param_line.c_str(), "\t");
+        char *fn_str = strtok(NULL, "\t");
+        if ( !(_param_preset.empty() || strcmp(param_name, param_preset)) ) {
+                continue;
+        }
+
+        u8 fmbin = prob_threshes.size() - 1;
+        char *prob_str;
+        while ( (prob_str = strtok(fn_str, ",")) != NULL ) {
+            fn_str = NULL;
+            prob_threshes[fmbin] = atof(prob_str);
+            fmbin--;
+        }
+
+        for (;fmbin < prob_threshes.size(); fmbin--) {
+            prob_threshes[fmbin] = prob_threshes[fmbin+1];
+        }
     }
+
 
     kmer_fmranges = std::vector<Range>(model.kmer_count());
     for (u16 k = 0; k < model.kmer_count(); k++) {
@@ -241,40 +261,6 @@ Params::Params(Mode _mode,
     bp_per_samp = bp_per_sec / sample_rate;
 }
 
-//Source: https://stackoverflow.com/questions/11376288/fast-computing-of-log2-for-64-bit-integers
-//const u8 tab64[64] = {
-//    63,  0, 58,  1, 59, 47, 53,  2,
-//    60, 39, 48, 27, 54, 33, 42,  3,
-//    61, 51, 37, 40, 49, 18, 28, 20,
-//    55, 30, 34, 11, 43, 14, 22,  4,
-//    62, 57, 46, 52, 38, 26, 32, 41,
-//    50, 36, 17, 19, 29, 10, 13, 21,
-//    56, 45, 25, 31, 35, 16,  9, 12,
-//    44, 24, 15,  8, 23,  7,  6,  5};
-//u8 log2_64 (u64 value) {
-//    value |= value >> 1;
-//    value |= value >> 2;
-//    value |= value >> 4;
-//    value |= value >> 8;
-//    value |= value >> 16;
-//    value |= value >> 32;
-//    return tab64[((u64)((value - (value >> 1))*0x07EDD5E59A4E28C2)) >> 58];
-//}
-
-static const u8 tab64[64] = {
-    0, 58, 1, 59, 47, 53, 2, 60, 39, 48, 27, 54, 33, 42, 3, 61,
-    51, 37, 40, 49, 18, 28, 20, 55, 30, 34, 11, 43, 14, 22, 4, 62,
-    57, 46, 52, 38, 26, 32, 41, 50, 36, 17, 19, 29, 10, 13, 21, 56,
-    45, 25, 31, 35, 16, 9, 12, 44, 24, 15, 8, 23, 7, 6, 5, 63 };
-u8 log2_64 (u64 n) {
-    n |= n >> 1;
-    n |= n >> 2;
-    n |= n >> 4;
-    n |= n >> 8;
-    n |= n >> 16;
-    n |= n >> 32;
-    return tab64[(n * 0x03f6eaf2cd271461) >> 58];
-}
 
 float Params::get_prob_thresh(u64 fmlen) const {
     return prob_threshes[__builtin_clzll(fmlen)];

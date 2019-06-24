@@ -28,12 +28,14 @@
 #include "mapper.hpp"
 #include "params.hpp"
 
-Fast5Pool::Fast5Pool(const std::string &fast5_list_fname, const std::string &read_filter_fname) {
+Fast5Pool::Fast5Pool(const std::string &fast5_list_fname, 
+                     const std::string &read_filter_fname,
+                     u32 read_count) {
 
     if (!read_filter_fname.empty()) {
         std::ifstream filter_file(read_filter_fname);
         std::string read;
-        while (getline(filter_file, read)) {
+        while (getline(filter_file, read) && (read_count == 0 || filter_.size() < read_count)) {
             filter_.insert(read);
         }
     }
@@ -121,16 +123,18 @@ void Fast5Pool::MapperThread::start() {
 void Fast5Pool::MapperThread::run() {
     while (running_) {
 
-        while (!in_buffered_) {
+        while (!in_buffered_ && running_) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
+
+        if (!running_) break;
 
         mapper_.new_read(next_read_);
         in_buffered_ = false;
 
         Paf p = mapper_.map_read();
 
-        while (out_buffered_) {
+        while (out_buffered_ && running_) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
 

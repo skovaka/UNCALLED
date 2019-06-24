@@ -42,7 +42,7 @@ PYBIND11_MODULE(mapping, m) {
         .export_values();
 
     py::class_<Fast5Pool>(m, "Fast5Pool")
-        .def(py::init<const std::string &,const std::string &>())
+        .def(py::init<const std::string &,const std::string &,u32>())
         .def("update", &Fast5Pool::update)
         .def("all_finished", &Fast5Pool::all_finished)
         .def("stop_all", &Fast5Pool::stop_all); 

@@ -32,7 +32,8 @@
 
 class Fast5Pool {
     public:
-    Fast5Pool(const std::string &fast5_list_fname, const std::string &read_filter_fname="");
+    Fast5Pool(const std::string &fast5_list_fname, 
+              const std::string &read_filter_fname="", u32 read_count=0);
     
     std::vector<Paf> update();
 

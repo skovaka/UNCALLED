@@ -42,6 +42,7 @@ class Params {
     static void init_map (
         const std::string &_bwa_prefix,
         const std::string &_model_fname,
+        const std::string &_param_preset,
         u32 _seed_len, 
         u32 _min_aln_len,
         u32 _min_rep_len, 
@@ -67,6 +68,7 @@ class Params {
     static void init_realtime (
         const std::string &_bwa_prefix,
         const std::string &_model_fname,
+        const std::string &_param_preset,
         u32 _seed_len, 
         u32 _min_aln_len,
         u32 _min_rep_len, 
@@ -102,6 +104,7 @@ class Params {
     static void init_sim (
         const std::string &_bwa_prefix,
         const std::string &_model_fname,
+        const std::string &_param_preset,
         u32 _seed_len, 
         u32 _min_aln_len,
         u32 _min_rep_len, 
@@ -200,6 +203,7 @@ class Params {
     Params(Mode _mode,
            const std::string &_bwa_prefix,
            const std::string &_model_fname,
+           const std::string &_param_preset,
            u32 _seed_len, 
            u32 _min_aln_len,
            u32 _min_rep_len, 
