@@ -138,6 +138,7 @@ class Params {
 
     u16 get_max_events(u16 event_i) const;
     float get_prob_thresh(u64 fm_length) const;
+    float get_path_thresh(u32 path_length) const;
     float get_source_prob() const;
     bool check_map_conf(u32 seed_len, float mean_len, float second_len);
     
@@ -192,6 +193,7 @@ class Params {
     bool sim_even;
 
     std::vector<float> prob_threshes;
+    std::vector<float> path_threshes;
     std::vector<Range> kmer_fmranges;
 
     float sample_rate, bp_per_sec;

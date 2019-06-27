@@ -231,7 +231,8 @@ Params::Params(Mode _mode,
     while (getline(param_file, param_line)) {
         char *param_name = strtok((char *) param_line.c_str(), "\t");
         char *fn_str = strtok(NULL, "\t");
-        if ( !(_param_preset.empty() || strcmp(param_name, param_preset)) ) {
+        char *path_str = strtok(NULL, "\t");
+        if ( !_param_preset.empty() && strcmp(param_name, param_preset) ) {
                 continue;
         }
 
@@ -246,17 +247,29 @@ Params::Params(Mode _mode,
         for (;fmbin < prob_threshes.size(); fmbin--) {
             prob_threshes[fmbin] = prob_threshes[fmbin+1];
         }
+
+        while ( (prob_str = strtok(path_str, ",")) != NULL ) {
+            path_str = NULL;
+            path_threshes.push_back(atof(prob_str));
+        }
     }
 
-
+    u64 max_len = 0;
     kmer_fmranges = std::vector<Range>(model.kmer_count());
     for (u16 k = 0; k < model.kmer_count(); k++) {
-        Range r = fmi.get_full_range(model.get_last_base(k));
-        for (u8 i = model.kmer_len()-2; i < model.kmer_len(); i--) {
+
+        Range r = fmi.get_full_range(model.get_first_base(k));
+        for (u8 i = 1; i < model.kmer_len(); i++) {
             r = fmi.get_neighbor(r, model.get_base(k, i));
         }
+
         kmer_fmranges[k] = r;
+
+        if (r.length() > max_len) {
+            max_len = r.length();
+        }
     }
+
 
     bp_per_samp = bp_per_sec / sample_rate;
 }
@@ -264,6 +277,10 @@ Params::Params(Mode _mode,
 
 float Params::get_prob_thresh(u64 fmlen) const {
     return prob_threshes[__builtin_clzll(fmlen)];
+}
+
+float Params::get_path_thresh(u32 pathlen) const {
+    return path_threshes[min(pathlen, path_threshes.size())-1];
 }
 
 float Params::get_source_prob() const {

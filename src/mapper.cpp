@@ -53,6 +53,7 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     sa_checked_ = false;
 
     path_type_counts_[EventType::MATCH] = 1;
+    total_match_len_ = 1;
 
     //TODO: no loops!
     for (u8 t = 1; t < EventType::NUM_TYPES; t++) {
@@ -80,7 +81,7 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
 
     std::memcpy(path_type_counts_, p.path_type_counts_, EventType::NUM_TYPES * sizeof(u8));
     path_type_counts_[type]++;
-
+    total_match_len_ = p.total_match_len_ + (type==EventType::MATCH);
 
     if (length_ > MAX_PATH_LEN) {
         std::memcpy(prob_sums_, &(p.prob_sums_[1]), MAX_PATH_LEN * sizeof(float));
@@ -279,7 +280,6 @@ u16 Mapper::process_chunk() {
 
     u16 nevents = 0;
     for (u32 i = 0; i < read_.chunk_.size(); i++) {
-        //std::cout << read_.chunk_[i] << "\n";
         if (event_detector_.add_sample(read_.chunk_[i])) {
             mean = event_detector_.get_mean();
             if (!norm_.add_event(mean)) {
@@ -287,7 +287,6 @@ u16 Mapper::process_chunk() {
                 u32 nskip = norm_.skip_unread(nevents);
                 skip_events(nskip);
                 //TODO: report event skip in some way
-                //std::cout << "# norm skipped " << nskip << "\n";
                 if (!norm_.add_event(mean)) {
                     std::cerr << "# error: chunk events cannot fit in normilzation buffer\n";
                     return nevents;
@@ -297,7 +296,6 @@ u16 Mapper::process_chunk() {
         }
     }
 
-    //std::cout << "# processed " << channel_ << "\n";
 
     read_.chunk_.clear();
     read_.chunk_processed_ = true;
@@ -368,6 +366,7 @@ bool Mapper::add_event(float event) {
         prev_kmer = prev_path.kmer_;
 
         evpr_thresh = PARAMS.get_prob_thresh(prev_range.length());
+        //evpr_thresh = PARAMS.get_path_thresh(prev_path.total_match_len_);
 
         if (prev_path.consec_stays_ < PARAMS.max_consec_stay && 
             kmer_probs_[prev_kmer] >= evpr_thresh) {
@@ -393,7 +392,6 @@ bool Mapper::add_event(float event) {
             if (kmer_probs_[next_kmer] < evpr_thresh) {
                 continue;
             }
-
 
             Range next_range = PARAMS.fmi.get_neighbor(prev_range, b);
 
@@ -436,6 +434,7 @@ bool Mapper::add_event(float event) {
         prev_kmer = PARAMS.model.kmer_count(); 
 
         Range unchecked_range, source_range;
+        u16 unchecked_kmer = prev_kmer;
 
         for (u32 i = 0; i < next_size; i++) {
             source_kmer = next_paths_[i].kmer_;
@@ -457,9 +456,11 @@ bool Mapper::add_event(float event) {
                     next_path++;
                 }                                    
 
+                unchecked_kmer = source_kmer;
                 unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
                                         PARAMS.kmer_fmranges[source_kmer].end_);
             }
+            //TODO: check unchecked_range init?
 
             prev_kmer = source_kmer;
 
@@ -491,6 +492,7 @@ bool Mapper::add_event(float event) {
 
                 //Add it if it's a real range
                 if (source_range.is_valid()) {
+
                     next_path->make_source(source_range,
                                            source_kmer,
                                            kmer_probs_[source_kmer]);

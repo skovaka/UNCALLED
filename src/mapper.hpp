@@ -111,6 +111,7 @@ class Mapper {
         u8 length_,
             consec_stays_;
         u16 kmer_;
+        u16 total_match_len_;
 
         float seed_prob_;
         float *prob_sums_;

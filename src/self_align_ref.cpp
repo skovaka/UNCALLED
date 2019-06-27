@@ -67,7 +67,10 @@ std::vector< std::vector<u64> > self_align(const std::string &bwa_prefix,
                 ret.back().push_back(r.length());
                 r = fmi.get_neighbor(r, bases[j]);
             }
-            ret.back().push_back(r.length());
+            //Happens on Ns
+            if (r.length() > 0) {
+                ret.back().push_back(r.length());
+            }
         }
     }
 
