@@ -45,7 +45,8 @@ def add_index_opts(p):
     p.add_argument("-1", "--matchpr1", default=0.6334, type=float, help="Minimum event match probability")
     p.add_argument("-2", "--matchpr2", default=0.9838, type=float, help="Maximum event match probability")
     p.add_argument("-t", "--target-prod", default=0.076, type=float, help="Target frequency of seeds.")
-    p.add_argument("-f", "--fm-percentile", default=0.05, type=float, help=" ")
+    p.add_argument("-f", "--pathlen-percentile", default=0.05, type=float, help=" ")
+    p.add_argument("-m", "--max-pathlen", default=100, type=int, help=" ")
 
 def add_ru_opts(p):
     #TODO: selectively enrich or deplete refs in index
@@ -138,17 +139,6 @@ def load_fast5s(arg):
     else:
         fast5s = [os.path.abspath(l.strip()) for l in open(arg)]
     return fast5s
-
-def index_cmd(args):
-    fmlens = mapping.self_align(args.bwa_prefix, args.ref_fasta, args.sample_dist)
-
-    index.get_params(args.bwa_prefix, 
-                     fmlens, 
-                     args.kmer_len, 
-                     args.fm_percentile, 
-                     args.matchpr1, 
-                     args.matchpr2, 
-                     args.target_prod)
 
 def map_cmd(args):
     mapping.Params.init_map(args.bwa_prefix,
@@ -417,7 +407,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.subcmd == "index":
-        index_cmd(args)
+        index.write_params(args)
     elif args.subcmd == "map":
         map_cmd(args)
     elif args.subcmd == "realtime":

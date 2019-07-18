@@ -231,7 +231,7 @@ Params::Params(Mode _mode,
     while (getline(param_file, param_line)) {
         char *param_name = strtok((char *) param_line.c_str(), "\t");
         char *fn_str = strtok(NULL, "\t");
-        char *path_str = strtok(NULL, "\t");
+        //char *path_str = strtok(NULL, "\t");
         if ( !_param_preset.empty() && strcmp(param_name, param_preset) ) {
                 continue;
         }
@@ -248,10 +248,10 @@ Params::Params(Mode _mode,
             prob_threshes[fmbin] = prob_threshes[fmbin+1];
         }
 
-        while ( (prob_str = strtok(path_str, ",")) != NULL ) {
-            path_str = NULL;
-            path_threshes.push_back(atof(prob_str));
-        }
+        //while ( (prob_str = strtok(path_str, ",")) != NULL ) {
+        //    path_str = NULL;
+        //    path_threshes.push_back(atof(prob_str));
+        //}
     }
 
     u64 max_len = 0;

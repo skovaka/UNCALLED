@@ -434,7 +434,6 @@ bool Mapper::add_event(float event) {
         prev_kmer = PARAMS.model.kmer_count(); 
 
         Range unchecked_range, source_range;
-        u16 unchecked_kmer = prev_kmer;
 
         for (u32 i = 0; i < next_size; i++) {
             source_kmer = next_paths_[i].kmer_;
@@ -456,7 +455,6 @@ bool Mapper::add_event(float event) {
                     next_path++;
                 }                                    
 
-                unchecked_kmer = source_kmer;
                 unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
                                         PARAMS.kmer_fmranges[source_kmer].end_);
             }
@@ -566,11 +564,11 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
 }
 
 void Mapper::set_ref_loc(const SeedGroup &seeds) {
-    bool fwd = seeds.ref_st_ > PARAMS.fmi.size() / 2;
+    bool fwd = seeds.ref_st_ < PARAMS.fmi.size() / 2;
 
     u64 sa_st;
-    if (fwd) sa_st = PARAMS.fmi.size() - (seeds.ref_en_.end_ + PARAMS.model.kmer_len() - 1);
-    else      sa_st = seeds.ref_st_;
+    if (fwd) sa_st = seeds.ref_st_;
+    else      sa_st = PARAMS.fmi.size() - (seeds.ref_en_.end_ + PARAMS.model.kmer_len() - 1);
     
     std::string rf_name;
     u64 rd_st = event_detector_.event_to_bp(seeds.evt_st_),
@@ -581,7 +579,7 @@ void Mapper::set_ref_loc(const SeedGroup &seeds) {
 
     u16 match_count = seeds.total_len_ + PARAMS.model.kmer_len() - 1;
 
-    read_.loc_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, match_count, fwd);
+    read_.loc_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, fwd, match_count);
 }
 
 
