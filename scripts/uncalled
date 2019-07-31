@@ -23,6 +23,7 @@
 # SOFTWARE.
 
 from uncalled import mapping, index
+import numpy as np
 import sys                         
 import os
 import argparse
@@ -46,14 +47,15 @@ def add_index_opts(p):
     p.add_argument("-2", "--matchpr2", default=0.9838, type=float, help="Maximum event match probability")
     p.add_argument("-t", "--target-prod", default=0.076, type=float, help="Target frequency of seeds.")
     p.add_argument("-f", "--pathlen-percentile", default=0.05, type=float, help=" ")
-    p.add_argument("-m", "--max-pathlen", default=100, type=int, help=" ")
+    p.add_argument("-m", "--max-replen", default=100, type=int, help=" ")
 
 def add_ru_opts(p):
     #TODO: selectively enrich or deplete refs in index
     p.add_argument("-D", "--deplete", required=False, action='store_true', default=False, help="Will eject reads that align to index")
     p.add_argument("-E", "--enrich", required=False, action='store_true', default=False, help="Will eject reads that don't align to index")
-    p.add_argument("-c", "--max-chunks-proc", default=3, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
+    p.add_argument("-c", "--max-chunks-proc", default=10, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
     p.add_argument("--even", action='store_true', help="Will only monitor even pores if set")
+    p.add_argument("--odd", action='store_true', help="Will only monitor odd pores if set")
     p.add_argument("--chunk-len", required=False, type=int, default=4000, help="Length of chunks")
     p.add_argument("--evt-buffer-len", default=6000, type=int, help="Size of buffer used to normalize and read events")
     p.add_argument("--evt-batch-size", default=5, type=int, help="Number of events simulator will mapping per read per thread iteration. Only has effect when --unblock is set")
@@ -123,6 +125,16 @@ def get_parser():
     add_fast5_opts(sim_parser)
 
     return parser
+
+def index_cmd(arg):
+    p = index.IndexParameterizer(args)
+    p.add_preset("default", tgt_speed=115)
+    for tgt in np.arange(0.02, 0.201, 0.005):
+        try:
+            p.add_preset("prob_%.3f" % tgt, tgt)
+        except:
+            sys.stderr.write("Failed to add 'power_%.3f'\n" % tgt)
+    p.write()
 
 def load_fast5s(arg):
     fast5s = list()
@@ -352,7 +364,8 @@ def simulate_cmd(args):
                         args.sim_speed,
                         args.sim_st,
                         args.sim_en,
-                        args.even);
+                        args.even,
+                        args.odd);
 
     sys.stderr.write("Loading simulator\n")
     sys.stderr.flush()
@@ -367,6 +380,13 @@ def simulate_cmd(args):
     MAX_SLEEP = 0.01
 
     chunk_times = [time.time() for c in range(args.num_channels)]
+
+    if args.even == args.odd:
+        monitor_ch = [True for c in range(args.num_channels)]
+    elif args.even:
+        monitor_ch = [c % 2 == 1 for c in range(args.num_channels)]
+    elif args.odd:
+        monitor_ch = [c % 2 == 0 for c in range(args.num_channels)]
         
     try:
         sim.start()
@@ -386,11 +406,12 @@ def simulate_cmd(args):
 
             
             for chunk in sim.get_read_chunks():
-                if args.even and chunk.get_channel() % 2 == 1:
-                    sim.stop_receiving_read(chunk.get_channel(), chunk.get_number())
-                else:
+                #sys.stderr.write("# chunk %d\n" % chunk.get_channel())
+                if monitor_ch[chunk.get_channel()-1]:
                     chunk_times[chunk.get_channel()-1] = time.time()
                     pool.add_chunk(chunk)
+                else:
+                    sim.stop_receiving_read(chunk.get_channel(), chunk.get_number())
 
             dt = time.time() - t0;
             if dt < MAX_SLEEP:
@@ -407,7 +428,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.subcmd == "index":
-        index.write_params(args)
+        index_cmd(args)
     elif args.subcmd == "map":
         map_cmd(args)
     elif args.subcmd == "realtime":

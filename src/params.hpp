@@ -134,7 +134,8 @@ class Params {
         float _sim_speed,
         float _sim_st,
         float _sim_en,
-        bool  _sim_even);
+        bool  _sim_even,
+        bool  _sim_odd);
 
     u16 get_max_events(u16 event_i) const;
     float get_prob_thresh(u64 fm_length) const;
@@ -190,7 +191,7 @@ class Params {
           sim_st,
           sim_en;
     
-    bool sim_even;
+    bool sim_even, sim_odd;
 
     std::vector<float> prob_threshes;
     std::vector<float> path_threshes;
@@ -235,7 +236,8 @@ class Params {
            float _sim_speed,
            float _sim_st,
            float _sim_en,
-           bool  _sim_even);
+           bool  _sim_even,
+           bool  _sim_odd);
 };
 
 extern Params PARAMS;

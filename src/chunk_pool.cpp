@@ -23,6 +23,8 @@
 
 #include <thread>
 #include <chrono>
+#include <stdlib.h>
+#include <time.h>
 #include "chunk_pool.hpp"
 #include "mapper.hpp"
 #include "params.hpp"
@@ -44,6 +46,8 @@ ChunkPool::ChunkPool() {
     for (u16 t = 0; t < PARAMS.threads; t++) {
         threads_[t].start();
     }
+
+    srand(time(NULL));
 
 }
 
@@ -127,13 +131,13 @@ std::vector<MapResult> ChunkPool::update() {
         active_count += read_counts[t];
     }
 
-    //if (time_.get() >= 1000) {
-    //    time_.reset();
-    //    std::cout << "#counts";
-    //    for (u16 c : read_counts) std::cout << "\t" << c;
-    //    std::cout << "\n";
-    //}
-    //std::cout.flush();
+    if (time_.get() >= 1000) {
+        time_.reset();
+        std::cout << "#thread_reads";
+        for (u16 c : read_counts) std::cout << "\t" << c;
+        std::cout << "\n";
+    }
+    std::cout.flush();
 
     for (u16 i = buffer_queue_.size()-1; i < buffer_queue_.size(); i--) {
         u16 ch = buffer_queue_[i];//TODO: store chunks in queue
@@ -147,7 +151,7 @@ std::vector<MapResult> ChunkPool::update() {
             added = true;
         } else {
             added = mappers_[ch].add_chunk(c);
-        } 
+        }
 
         if (added) {
             if (i != buffer_queue_.size()-1) {
@@ -161,7 +165,10 @@ std::vector<MapResult> ChunkPool::update() {
     u16 target = active_queue_.size() + active_count,
         per_thread = target / threads_.size() + (target % threads_.size() > 0);
 
-    for (u16 t = 0; t < threads_.size(); t++) {
+    u16 r = (u16) rand();
+
+    for (u16 i = 0; i < threads_.size(); i++) {
+        u16 t = (r+i) % threads_.size();
 
         //If thread not full
         if (read_counts[t] < per_thread) {

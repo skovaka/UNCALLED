@@ -123,6 +123,8 @@ SeedGroup SeedTracker::get_final() {
     float second_len = *std::next(all_lens_.rbegin());
 
     if (PARAMS.check_map_conf(max_map_.total_len_, mean_len, second_len)) {
+
+        //print(std::cout, 10);
         return max_map_;
     }
     
@@ -132,6 +134,7 @@ SeedGroup SeedTracker::get_final() {
 void SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
 
     SeedGroup new_aln(Range(ref_en-ref_len+1, ref_en), evt_st);
+
 
     //Locations sorted by decreasing ref_en_.start
     //Find the largest aln s.t. aln->ref_en_.start <= new_aln.ref_en_.start

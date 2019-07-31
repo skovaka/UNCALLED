@@ -575,7 +575,9 @@ void Mapper::set_ref_loc(const SeedGroup &seeds) {
         rd_en = event_detector_.event_to_bp(seeds.evt_en_ + PARAMS.seed_len, true),
         rf_st,
         rf_len = PARAMS.fmi.translate_loc(sa_st, rf_name, rf_st), //sets rf_st
-        rf_en = rf_st + (rd_en - rd_st + 1);
+        rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_ + PARAMS.model.kmer_len());
+        //rf_en = rf_st + (rd_en - rd_st + 1);
+        //
 
     u16 match_count = seeds.total_len_ + PARAMS.model.kmer_len() - 1;
 

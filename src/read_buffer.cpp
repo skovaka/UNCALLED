@@ -134,7 +134,7 @@ void Paf::set_str(Tag t, std::string v) {
 }
 
 bool should_load(const hdf5_tools::File &file, std::string read) {
-    bool within_time = true, even_channel = true;
+    bool within_time = true;
     if (PARAMS.sim_st != 0 || PARAMS.sim_en != 0) {
         for (auto a : file.get_attr_map(read + "/Raw")) {
             if (a.first == "start_time") {
@@ -144,15 +144,22 @@ bool should_load(const hdf5_tools::File &file, std::string read) {
         }
     }
 
-    if (PARAMS.sim_even) {
+    if (!within_time) return false;
+
+    if (PARAMS.sim_even || PARAMS.sim_odd) {
+        bool even = false;
         for (auto a : file.get_attr_map(read + "/channel_id")) {
             if (a.first == "channel_number") {
-                even_channel = atoi(a.second.c_str()) % 2 == 0;
+                even = atoi(a.second.c_str()) % 2 == 0;
+                break;
             }
         }
+
+        return (even && PARAMS.sim_even) || 
+               (!even && PARAMS.sim_odd);
     }
 
-    return within_time && even_channel;
+    return true;
 }
 
 bool is_multi_fast5(const hdf5_tools::File &file) {
@@ -322,8 +329,8 @@ ReadBuffer::ReadBuffer(Chunk &first_chunk)
       num_chunks_(1),
       chunk_processed_(false),
       loc_(id_) {
-    first_chunk.pop(chunk_);
     set_raw_len(first_chunk.size());
+    first_chunk.pop(chunk_);
 }
 
 void ReadBuffer::fast5_init(const hdf5_tools::File &file, 
@@ -382,7 +389,7 @@ bool ReadBuffer::add_chunk(Chunk &c) {
         channel_idx_ != c.get_channel_idx() || 
         number_ != c.get_number()) return false;
     num_chunks_++;
-    set_raw_len(raw_len_ + c.size());
+    set_raw_len(raw_len_+c.size());
     chunk_processed_ = false;
     c.pop(chunk_);
     return true;
