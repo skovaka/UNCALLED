@@ -28,7 +28,9 @@ const std::string Paf::PAF_TAGS[] = {
     "mt", //MAP_TIME
     "nc", //CHUNKS
     "ub", //UNBLOCK
-    "kp"  //KEEP
+    "kp", //KEEP
+    "tr", //TOP_RATIO
+    "mr"  //MEAN_RATIO
 };
 
 Paf::Paf() 

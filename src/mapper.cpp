@@ -183,12 +183,25 @@ Paf Mapper::map_read() {
 
     std::vector<Event> events = event_detector_.add_samples(read_.full_signal_);
     PARAMS.model.normalize(events);
+
+    //std::cout << "== " << read_.id_ << " ==\n";
      
     for (u32 e = 0; e < events.size(); e++) {
         if (add_event(events[e].mean)) break;
     }
 
+    //std::cout << "== " << read_.id_ << " ==\n";
+
     read_.loc_.set_float(Paf::Tag::MAP_TIME, t.get());
+
+
+    //if (!read_.loc_.is_mapped()) {
+    //    read_.loc_.set_float(Paf::Tag::TOP_RATIO, seed_tracker_.get_top_conf());
+    //    read_.loc_.set_float(Paf::Tag::MEAN_RATIO, seed_tracker_.get_mean_conf());
+    //    set_ref_loc(seed_tracker_.get_best());
+    //    //read_.loc_.print_paf();
+    //    //seed_tracker_.print(std::cout, 5);
+    //}
 
     return read_.loc_;
 }
@@ -288,7 +301,6 @@ u16 Mapper::process_chunk() {
                 skip_events(nskip);
                 //TODO: report event skip in some way
                 if (!norm_.add_event(mean)) {
-                    std::cerr << "# error: chunk events cannot fit in normilzation buffer\n";
                     return nevents;
                 }
             }
@@ -306,6 +318,7 @@ void Mapper::set_failed() {
     state_ = State::FAILURE;
     reset_ = false;
 }
+
 
 bool Mapper::map_chunk() {
     if (reset_ || 
@@ -337,6 +350,9 @@ bool Mapper::map_chunk() {
 bool Mapper::add_event(float event) {
 
     if (reset_ || event_i_ >= PARAMS.max_events_proc) {
+        //std::cout << read_.id_ << "\n";
+        //seed_tracker_.print(std::cout, 10);
+        //std::cout << "\n";
         set_failed();
         return true;
     }

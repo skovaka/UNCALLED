@@ -131,7 +131,7 @@ std::vector<MapResult> ChunkPool::update() {
         active_count += read_counts[t];
     }
 
-    if (time_.get() >= 1000) {
+    if (time_.get() >= 1000 && active_count > 0) {
         time_.reset();
         std::cout << "#thread_reads";
         for (u16 c : read_counts) std::cout << "\t" << c;
@@ -238,7 +238,7 @@ void ChunkPool::MapperThread::run() {
 
     while (running_) {
         if (read_count() == 0) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
 

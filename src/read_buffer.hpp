@@ -33,7 +33,7 @@
 
 class Paf {
     public:
-    enum Tag {MAP_TIME, CHUNKS, UNBLOCK, KEEP};
+    enum Tag {MAP_TIME, CHUNKS, UNBLOCK, KEEP, TOP_RATIO, MEAN_RATIO};
 
     Paf();
     Paf(std::string rd_name_, u64 rd_len = 0);
@@ -87,9 +87,6 @@ class ReadBuffer {
                     std::string ch_path);
 
     bool add_chunk(Chunk &c);
-
-    void print_paf();
-
 
     Chunk &&pop_chunk();
     void swap(ReadBuffer &r);

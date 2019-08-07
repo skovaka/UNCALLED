@@ -31,13 +31,15 @@ import time
 import re
 import time
 
+MAX_SLEEP = 0.01
+
 class ArgFormat(argparse.ArgumentDefaultsHelpFormatter):
                 #argparse.MetavarTypeHelpFormatter):
     pass
 
 def add_bwa_opt(p):
     p.add_argument("-x", "--bwa-prefix", required=True, type=str, help="BWA prefix to mapping to. Must be processed by \"uncalled index\".")
-    p.add_argument("-p", "--preset-mode", default="", type=str, help="Mapping mode")
+    p.add_argument("-p", "--preset-mode", default="default", type=str, help="Mapping mode")
 
 def add_index_opts(p):
     p.add_argument("-i", "--ref-fasta", required=True, type=str, help="FASTA file used to build BWA index")
@@ -66,6 +68,9 @@ def add_realtime_opts(p):
     p.add_argument('--host', default='127.0.0.1', help='MinKNOW server host.')
     p.add_argument('--port', type=int, default=8000, help='MinKNOW server port.')
 
+def add_list_ports_opts(p):
+    p.add_argument('--log-dir', default='/var/log/MinKNOW', help='Directory to find MinKNOW log files')
+
 def add_sim_opts(p):
     p.add_argument("--sim-speed", required=False, type=float, default=1, help="Speed of real-time simulation")
     p.add_argument("--sim-st", required=False, type=float, default=0, help="Reads that begin before this time will be filtered out")
@@ -88,8 +93,8 @@ def add_map_opts(p):
     p.add_argument("--max-paths", default=10000, type=int, help="Maximum number of paths to consider per event.")
     p.add_argument("--max-stay-frac", default=0.5, type=float, help="Expected fraction of events which are stays")
     p.add_argument("--min-seed-prob", default=-3.75, type=float, help="Average event probability threshold per seed")
-    p.add_argument("--min-mean-conf", default=7.00, type=float, help="Minimum ratio between longest alignment and mean alignment length to report confident alignment")
-    p.add_argument("--min-top-conf", default=2.25, type=float, help="Minimum ratio between longest alignment and second-longet alignment to report confident alignment")
+    p.add_argument("--min-mean-conf", default=6.00, type=float, help="Minimum ratio between longest alignment and mean alignment length to report confident alignment")
+    p.add_argument("--min-top-conf", default=1.85, type=float, help="Minimum ratio between longest alignment and second-longet alignment to report confident alignment")
     p.add_argument("--evt-min-mean", default=30, type=float, help="Minimum un-normalized event mean")
     p.add_argument("--evt-max-mean", default=150, type=float, help="Maximum un-normalized event mean")
     p.add_argument("--evt-window-length1", default=3, type=int, help=" ")
@@ -123,6 +128,9 @@ def get_parser():
     add_ru_opts(sim_parser)
     add_sim_opts(sim_parser)
     add_fast5_opts(sim_parser)
+
+    lp_parser = sp.add_parser("list-ports", help="List the port of all MinION devices detected in the current MinKNOW session")#,formatter_class=ArgFormat)
+    add_list_ports_opts(lp_parser)
 
     return parser
 
@@ -187,7 +195,6 @@ def map_cmd(args):
     n = 0
 
     try:
-        MAX_SLEEP = 0.01
         while not mapper.all_finished() and (not args.read_count or n <= args.read_count):
             t0 = time.time()
             for p in mapper.update():
@@ -213,6 +220,8 @@ def realtime_cmd(args):
     import read_until
     try:
 
+        sys.stderr.write("Starting client\n")
+
         client = read_until.ReadUntilClient(mk_host=args.host, 
                                             mk_port=args.port, 
                                             one_chunk=False, 
@@ -227,7 +236,8 @@ def realtime_cmd(args):
 
         cal = client.device.rpc.device.get_calibration(first_channel=1, last_channel=512)
         raw_type = str(client.signal_dtype)
-        sys.stderr.write(raw_type)
+
+        sys.stderr.write("Starting mappers\n")
 
         mapping.Params.init_realtime(args.bwa_prefix,
                             index.MODEL_FNAME,
@@ -269,8 +279,6 @@ def realtime_cmd(args):
         unblocked = [None for c in range(args.num_channels)]
 
         sys.stderr.write("Mapping\n")
-        
-        MAX_SLEEP = 0.01
         
         while client.is_running:
             t0 = time.time()
@@ -316,10 +324,11 @@ def realtime_cmd(args):
             if dt < MAX_SLEEP:
                 time.sleep(MAX_SLEEP - dt);
 
+    except KeyboardInterrupt:
+        sys.stderr.write("Keyboard interrupt\n")
 
     except Exception as e:
         sys.stderr.write("Error: %s\n" % str(e))
-        pass
 
     client.reset()
     pool.stop_all();
@@ -377,7 +386,6 @@ def simulate_cmd(args):
     sys.stderr.write("Mapping\n")
     sys.stderr.flush()
 
-    MAX_SLEEP = 0.01
 
     chunk_times = [time.time() for c in range(args.num_channels)]
 
@@ -421,6 +429,32 @@ def simulate_cmd(args):
 
     pool.stop_all();
 
+def list_ports_cmd(args):
+    log_re = re.compile("^([0-9\-]+ [0-9:]+).+ : mk_instance_started_for_minion .+")
+    port_re = re.compile("jsonrpc_port = (\d+)")
+    device_re = re.compile("device_id = (\S+)")
+
+    fnames = os.listdir(args.log_dir)
+    log_fnames = list(sorted( (f for f in fnames if f.startswith("mk_manager_svc")) ))
+    latest_log = os.path.join(args.log_dir, log_fnames[-1])
+
+    for line in open(latest_log):
+        lm = log_re.match(line)
+        if not lm: continue
+        pm = port_re.search(line)
+        dm = device_re.search(line)
+
+        if pm is None or dm is None:
+            sys.stderr.write("Error: failed to parse \"%s\"\n" % line.strip())
+            continue
+
+        timestamp = lm.group(1)
+        port = pm.group(1)
+        device = dm.group(1)
+
+        sys.stdout.write("%s (%s): %s\n" % (device, timestamp, port))
+
+
 
 if __name__ == "__main__":
     
@@ -435,6 +469,8 @@ if __name__ == "__main__":
         realtime_cmd(args)
     elif args.subcmd == "simulate":
         simulate_cmd(args)
+    elif args.subcmd == "list-ports":
+        list_ports_cmd(args)
     else:
         parser.print_help()
         

@@ -29,7 +29,6 @@ import numpy as np
 import argparse
 from uncalled import mapping
 from bisect import bisect_left, bisect_right
-import matplotlib.pyplot as plt
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers.txt")
@@ -116,9 +115,9 @@ class IndexParameterizer:
             freqs.append(float(freq))
             counts.append(float(count))
 
-        self.model_ekms = np.flip(np.array(threshs))
-        self.model_pcks = np.flip(np.array(freqs))
-        self.model_counts = np.flip(np.array(counts))
+        self.model_ekms = np.flip(np.array(threshs),0)
+        self.model_pcks = np.flip(np.array(freqs),0)
+        self.model_counts = np.flip(np.array(counts),0)
 
     def get_fn_speed(self, fn_locs, fn_pcks):
         pcks = np.interp(self.all_locs, fn_locs, fn_pcks)
