@@ -227,8 +227,8 @@ u32 load_fast5s(std::deque<std::string> &fast5_list,
         }
     }
 
-    std::sort(list.begin(), list.end());
-    while (max_load > 0 && list.size() > max_load) list.pop_back();
+    //std::sort(list.begin(), list.end());
+    //while (max_load > 0 && list.size() > max_load) list.pop_back();
 
     return i;
 }

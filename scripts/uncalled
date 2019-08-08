@@ -47,9 +47,10 @@ def add_index_opts(p):
     p.add_argument("-k", "--kmer-len", default=5, type=int, help="Model k-mer length")
     p.add_argument("-1", "--matchpr1", default=0.6334, type=float, help="Minimum event match probability")
     p.add_argument("-2", "--matchpr2", default=0.9838, type=float, help="Maximum event match probability")
-    p.add_argument("-t", "--target-prod", default=0.076, type=float, help="Target frequency of seeds.")
     p.add_argument("-f", "--pathlen-percentile", default=0.05, type=float, help=" ")
     p.add_argument("-m", "--max-replen", default=100, type=int, help=" ")
+    p.add_argument("--probs", default=None, type=str, help="Find parameters with specified target probabilites (comma separated)")
+    p.add_argument("--speeds", default=None, type=str, help="Find parameters with specified speed coefficents (comma separated)")
 
 def add_ru_opts(p):
     #TODO: selectively enrich or deplete refs in index
@@ -134,15 +135,32 @@ def get_parser():
 
     return parser
 
-def index_cmd(arg):
+def index_cmd(args):
+    sys.stderr.write("Initializing parameter search\n")
     p = index.IndexParameterizer(args)
+
+    sys.stderr.write("Writing default parameters\n")
     p.add_preset("default", tgt_speed=115)
-    for tgt in np.arange(0.02, 0.201, 0.005):
-        try:
-            p.add_preset("prob_%.3f" % tgt, tgt)
-        except:
-            sys.stderr.write("Failed to add 'power_%.3f'\n" % tgt)
+
+    if args.probs != None:
+        for tgt in args.probs.split(","):
+            sys.stderr.write("Writing 'prob_%s' parameters\n" % tgt)
+            try:
+                p.add_preset("prob_%s" % tgt, tgt_prob=float(tgt))
+            except Exception as e:
+                sys.stderr.write("Failed to add 'prob_%s'\n" % tgt)
+
+    if args.speeds != None:
+        for tgt in args.speeds.split(","):
+            sys.stderr.write("Writing 'speed_%s' parameters\n" % tgt)
+            try:
+                p.add_preset("speed_%s" % tgt, tgt_speed=float(tgt))
+            except:
+                sys.stderr.write("Failed to add 'speed_%s'\n" % tgt)
+
     p.write()
+
+    sys.stderr.write("Done\n")
 
 def load_fast5s(arg):
     fast5s = list()

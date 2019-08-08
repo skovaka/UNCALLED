@@ -183,14 +183,10 @@ Paf Mapper::map_read() {
 
     std::vector<Event> events = event_detector_.add_samples(read_.full_signal_);
     PARAMS.model.normalize(events);
-
-    //std::cout << "== " << read_.id_ << " ==\n";
      
     for (u32 e = 0; e < events.size(); e++) {
         if (add_event(events[e].mean)) break;
     }
-
-    //std::cout << "== " << read_.id_ << " ==\n";
 
     read_.loc_.set_float(Paf::Tag::MAP_TIME, t.get());
 

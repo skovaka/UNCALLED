@@ -44,8 +44,6 @@ def power_fn(xmax, ymin, ymax, exp, N=100):
 
 class IndexParameterizer:
 
-    SPEED_COEFS = (0.003374158174865857, -0.9854493403555942, 71.7507490736791)
-
     def __init__(self, args):
         self.out_fname = args.bwa_prefix + PARAM_SUFF
 
@@ -62,23 +60,17 @@ class IndexParameterizer:
         fmlens = mapping.self_align(args.bwa_prefix, args.ref_fasta, args.sample_dist)
         path_kfmlens = [p[args.kmer_len-1:] if len(p) >= args.kmer_len else [1] for p in fmlens]
 
-        annfile = open(args.bwa_prefix + ".ann")
-        self.refsize = np.log2(int(annfile.readline().split()[0]))
-
         max_pathlen = 0
         all_pathlens = [len(p) for p in path_kfmlens if len(p) <= args.max_replen]
         gt1_counts = np.zeros(max(all_pathlens))
         for l in all_pathlens:
             for i in range(l):
                 gt1_counts[i] += 1
-        gt1_fracs = gt1_counts / len(all_pathlens)#TODO: try actually using this
-        #TODO: then use numpy instead of while loop
-        while gt1_counts[max_pathlen] / len(all_pathlens) > args.pathlen_percentile:
-            max_pathlen += 1
 
+        max_pathlen = np.flatnonzero(gt1_counts / len(all_pathlens) <= args.pathlen_percentile)[0]
         max_fmexp = int(np.log2(max([p[0] for p in path_kfmlens])))+1
-
         fm_path_mat = np.zeros((max_fmexp, max_pathlen))
+
         for p in path_kfmlens:
             for i in range(min(max_pathlen, len(p))):
                 fm_path_mat[int(np.log2(p[i])), i] += 1
@@ -101,8 +93,6 @@ class IndexParameterizer:
 
         self.conf_locs = np.arange(np.round(self.fm_locs[0]))
         self.all_locs = np.arange(max_pathlen)
-
-        print(len(self.all_locs), len(self.conf_locs))
 
     def get_model_threshs(self, fname=MODEL_THRESHS_FNAME):
         prob_thresh_in = open(fname)
@@ -127,7 +117,7 @@ class IndexParameterizer:
     def get_fn_prob(self, fn_locs, fn_pcks):
         return np.prod(np.interp(self.conf_locs, fn_locs, fn_pcks))
 
-    def add_preset(self, name, tgt_prod=None, tgt_speed=None, exp_st=2, init_fac=2, eps=0.00001):
+    def add_preset(self, name, tgt_prob=None, tgt_speed=None, exp_st=2, init_fac=2, eps=0.00001):
        
         exp = exp_st
         exp_min, exp_max = (None, None)
@@ -135,16 +125,17 @@ class IndexParameterizer:
         round_locs = np.arange(np.round(self.fm_locs[0]))
         full_locs = np.arange(len(self.loc_fms))
 
+        while True:
+            fn_locs,fn_pcks = power_fn(self.fm_locs[0], self.pck1, self.pck2, exp)
 
-        #TODO: use while true, don't do twice
-        fn_locs,fn_pcks = power_fn(self.fm_locs[0], self.pck1, self.pck2, exp)
+            if tgt_prob is not None:
+                delta = self.get_fn_prob(fn_locs, fn_pcks) - tgt_prob
+            elif tgt_speed is not None:
+                delta = self.get_fn_speed(fn_locs, fn_pcks) - tgt_speed
 
-        if tgt_prod is not None:
-            delta = self.get_fn_prob(fn_locs, fn_pcks) - tgt_prod
-        elif tgt_speed is not None:
-            delta = self.get_fn_speed(fn_locs, fn_pcks) - tgt_speed
+            if abs(delta) <= eps:
+                break
 
-        while abs(delta) > eps:
             if delta < 0:
                 exp_max = exp
             else:
@@ -157,26 +148,19 @@ class IndexParameterizer:
             else:
                 exp = exp_min + ((exp_max - exp_min) / 2.0)
 
-            fn_locs,fn_pcks = power_fn(self.fm_locs[0], self.pck1, self.pck2, exp)
-
-
-            if tgt_prod is not None:
-                delta = self.get_fn_prob(fn_locs, fn_pcks) - tgt_prod
-            elif tgt_speed is not None:
-                delta = self.get_fn_speed(fn_locs, fn_pcks) - tgt_speed
-
         fm_pcks = np.interp(self.fm_locs, fn_locs, fn_pcks)
         fm_ekms = np.interp(fm_pcks, self.model_pcks, self.model_ekms)
+        prob = self.get_fn_prob(fn_locs, fn_pcks)
         speed = self.get_fn_speed(fn_locs, fn_pcks)
 
-        self.functions[name] = (fm_ekms, speed)
+        self.functions[name] = (fm_ekms, prob, speed)
 
     def write(self):
         params_out = open(self.out_fname, "w")
         
         for name, fn in self.functions.items():
-            ekms, speed = fn
-            params_out.write("%s\t%s\t%.2f\n" % (name, ",".join(map(str,ekms)), speed))
+            ekms, prob, speed = fn
+            params_out.write("%s\t%s\t%.5f\t%.3f\n" % (name, ",".join(map(str,ekms)), prob, speed))
 
         params_out.close()
 

@@ -72,7 +72,7 @@ std::vector<Paf> Fast5Pool::update() {
         }
     }
 
-    if (reads_.size() < PARAMS.threads) {
+    if (reads_.size() <= PARAMS.threads) {
         load_fast5s(fast5_list_, reads_, 4000, filter_);
     }
 
