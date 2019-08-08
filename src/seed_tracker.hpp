@@ -82,7 +82,7 @@ class SeedTracker {
 
     std::vector<SeedGroup> get_alignments(u8 min_len);
 
-    bool check_ratio(const SeedGroup &aln, double ratio);
+    bool check_ratio(const SeedGroup &aln, float ratio);
 
     void print(std::ostream &out, u16 max_out);
 };

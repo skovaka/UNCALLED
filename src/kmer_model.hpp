@@ -31,7 +31,7 @@
 
 //TODO: move to normalizer
 typedef struct NormParams {
-    double shift, scale;
+    float shift, scale;
 } NormParams;
 
 class KmerModel {
@@ -70,11 +70,10 @@ class KmerModel {
                  std::vector<u16> &fwd_ids, 
                  std::vector<u16> &rev_ids) const;
 
-    //double *lv_means_, *lv_vars_x2_, *lognorm_denoms_, *sd_means_, *sd_stdvs_;
-    std::vector<double> lv_means_, lv_vars_x2_, lognorm_denoms_, sd_means_, sd_stdvs_;
+    std::vector<float> lv_means_, lv_vars_x2_, lognorm_denoms_, sd_means_, sd_stdvs_;
     //TODO: try floats
 
-    double lambda_, model_mean_, model_stdv_;
+    float lambda_, model_mean_, model_stdv_;
     private:
     u8 k_;
     u16 kmer_count_, K_MASK_;

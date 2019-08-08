@@ -30,7 +30,7 @@
 #include "util.hpp"
 #include "timer.hpp"
 #include "chunk.hpp"
-#include "read_buffer.hpp" //TODO: separate ReadLoc so I don't have to do this
+#include "read_buffer.hpp" 
 
 
 class Simulator {

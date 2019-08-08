@@ -86,12 +86,12 @@ Range Range::merge(const Range &r) const {
     return Range(min(start_, r.start_), max(end_, r.end_));
 }
 
-double Range::get_recp_overlap(const Range &r) const {
+float Range::get_recp_overlap(const Range &r) const {
     if (!intersects(r)) {
         return 0;
     }
 
-    return double(intersect(r).length()) / double(merge(r).length());
+    return float(intersect(r).length()) / float(merge(r).length());
 }
 
 Range& Range::operator=(const Range& prev) {

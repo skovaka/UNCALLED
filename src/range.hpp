@@ -25,21 +25,21 @@
 #define INCL_RANGE
 
 #include <string>
+#include "util.hpp"
 
-size_t max(size_t a, size_t b);
+u64 max(u64 a, u64 b);
 
-size_t min(size_t a, size_t b);
+u64 min(u64 a, u64 b);
 
 class Range {
     
     public:
-    //TODO: change to u64
-    size_t start_, end_; 
+    u64 start_, end_; 
 
     //Copy constructor
     Range(const Range &prev);
 
-    Range(size_t start, size_t end);
+    Range(u64 start, u64 end);
 
     Range();
 
@@ -51,7 +51,7 @@ class Range {
 
     Range merge(const Range &r) const;
 
-    double get_recp_overlap(const Range &r) const;
+    float get_recp_overlap(const Range &r) const;
 
     bool same_range(const Range &r) const;
 
@@ -59,7 +59,7 @@ class Range {
 
     bool is_valid() const;
 
-    size_t length() const;
+    u64 length() const;
 
     friend bool operator< (const Range &q1, const Range &q2);
 };

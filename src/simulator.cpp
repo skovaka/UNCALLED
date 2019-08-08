@@ -53,7 +53,6 @@ std::vector<Chunk> Simulator::get_read_chunks() {
         return ret;
     }
 
-    //TODO: store sampling rate
     u64 time = (timer_.get() * speed_) + tshift_;
     
     is_running_ = false;

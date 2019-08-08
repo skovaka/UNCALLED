@@ -53,12 +53,8 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     sa_checked_ = false;
 
     path_type_counts_[EventType::MATCH] = 1;
+    path_type_counts_[EventType::STAY] = 0;
     total_match_len_ = 1;
-
-    //TODO: no loops!
-    for (u8 t = 1; t < EventType::NUM_TYPES; t++) {
-        path_type_counts_[t] = 0;
-    }
 
     //TODO: don't write this here to speed up source loop
     prob_sums_[0] = 0;
@@ -93,8 +89,6 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
         prob_sums_[length_] = prob_sums_[length_-1] + prob;
         seed_prob_ = prob_sums_[length_] / length_;
     }
-
-
 }
 
 void Mapper::PathBuffer::invalidate() {
@@ -269,7 +263,6 @@ Mapper::State Mapper::get_state() const {
 bool Mapper::add_chunk(Chunk &chunk) {
     if (!is_chunk_processed() || reset_) return false;
 
-    //TODO: put in opts
     if (read_.num_chunks_ == PARAMS.max_chunks_proc) {
         set_failed();
         chunk.clear();
@@ -295,7 +288,6 @@ u16 Mapper::process_chunk() {
 
                 u32 nskip = norm_.skip_unread(nevents);
                 skip_events(nskip);
-                //TODO: report event skip in some way
                 if (!norm_.add_event(mean)) {
                     return nevents;
                 }
@@ -470,7 +462,6 @@ bool Mapper::add_event(float event) {
                 unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
                                         PARAMS.kmer_fmranges[source_kmer].end_);
             }
-            //TODO: check unchecked_range init?
 
             prev_kmer = source_kmer;
 

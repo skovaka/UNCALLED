@@ -225,10 +225,10 @@ void SeedTracker::print(std::ostream &out, u16 max_out = 10) {
               });
 
     Range top_ref = alns_sort[0].ref_range();
-    double top_len = alns_sort[0].total_len_;
+    float top_len = alns_sort[0].total_len_;
 
     for (unsigned int i = 0; i < min(max_out, alns_sort.size()); i++) {
-        double overlap = top_ref.get_recp_overlap(alns_sort[i].ref_range()),
+        float overlap = top_ref.get_recp_overlap(alns_sort[i].ref_range()),
                len_ratio = top_len / alns_sort[i].total_len_;
 
         alns_sort[i].print(out, false);

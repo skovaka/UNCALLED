@@ -32,6 +32,7 @@
 
 #define PI 3.1415926535897
 
+
 std::string get_reverse_complement(const std::string &seq) {
     std::string rev(seq.size(), 'N');
     for (u64 i = 0; i < seq.size(); i++) {
@@ -72,7 +73,7 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
     //Variables for reading model
     std::string kmer, neighbor_kmer;
     u16 k_id;
-    double lv_mean, lv_stdv, sd_mean, sd_stdv, lambda, weight;
+    float lv_mean, lv_stdv, sd_mean, sd_stdv, lambda, weight;
 
     //Check if table includes "ig_lambda" column
     bool has_lambda = num_cols >= 7;
@@ -207,13 +208,13 @@ u8 KmerModel::get_last_base(u16 kmer) const {
 
 NormParams KmerModel::get_norm_params(const std::vector<Event> &events) const {
     //Compute events mean
-    double events_mean = 0;
+    float events_mean = 0;
     for (auto e : events) 
         events_mean += e.mean;
     events_mean /= events.size();
 
     //Compute events stdv
-    double events_stdv = 0;
+    float events_stdv = 0;
     for (auto e : events) 
         events_stdv += pow(e.mean - events_mean, 2);
     events_stdv = sqrt(events_stdv / events.size());
@@ -228,13 +229,13 @@ NormParams KmerModel::get_norm_params(const std::vector<Event> &events) const {
 
 NormParams KmerModel::get_norm_params(const std::vector<float> &events) const {
     //Compute events mean
-    double events_mean = 0;
+    float events_mean = 0;
     for (auto e : events) 
         events_mean += e;
     events_mean /= events.size();
 
     //Compute events stdv
-    double events_stdv = 0;
+    float events_stdv = 0;
     for (auto e : events) 
         events_stdv += pow(e - events_mean, 2);
     events_stdv = sqrt(events_stdv / events.size());

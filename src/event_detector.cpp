@@ -189,10 +189,8 @@ float EventDetector::compute_tstat(u32 w_length) {
 
 bool EventDetector::peak_detect(float current_value, Detector &detector) {
 
-    u32 i = buf_mid; //TODO: just use buf_mid
-
     //Carry on if we've been masked out
-    if (detector.masked_to >= i) {
+    if (detector.masked_to >= buf_mid) {
         return false;
     }
 
@@ -207,7 +205,7 @@ bool EventDetector::peak_detect(float current_value, Detector &detector) {
                    params.peak_height) {
             // ...or we've seen a qualifying maximum
             detector.peak_value = current_value;
-            detector.peak_pos = i;
+            detector.peak_pos = buf_mid;
             //otherwise, wait to rise high enough to be considered a peak
         }
     } else {
@@ -215,7 +213,7 @@ bool EventDetector::peak_detect(float current_value, Detector &detector) {
         if (current_value > detector.peak_value) {
             //Update the peak
             detector.peak_value = current_value;
-            detector.peak_pos = i;
+            detector.peak_pos = buf_mid;
         }
         //Dominate other tstat signals if we're going to fire at some point
         if (detector.window_length == short_detector.window_length) {
@@ -236,7 +234,7 @@ bool EventDetector::peak_detect(float current_value, Detector &detector) {
         }
         //Finally, check the distance if this is a good peak
         if (detector.valid_peak
-            && (i - detector.peak_pos) >
+            && (buf_mid - detector.peak_pos) >
             detector.window_length / 2) {
             detector.peak_pos = detector.DEF_PEAK_POS;
             detector.peak_value = current_value;
