@@ -9,6 +9,6 @@ if [ -d index ]; then
 fi
 
 mkdir index
-../bwa/bwa index -p index/example_ref example_ref.fa
+../bwa/bwa index -t index/example_ref example_ref.fa
 uncalled index -x index/example_ref -i example_ref.fa
 uncalled map -x index/example_ref -i ./
