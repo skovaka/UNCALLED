@@ -64,6 +64,8 @@ def add_ru_opts(p):
     p.add_argument("--evt-batch-size", default=5, type=int, help="Number of events simulator will mapping per read per thread iteration. Only has effect when --unblock is set")
     p.add_argument("--evt-timeout", default=10.0, type=float, help="Simulator will stop aligning event batch if average time in MS to mapping an event exceeds this. Only has effect when --unblock is set")
     p.add_argument("--max-chunk-wait", required=False, type=float, default=4000, help="Maximum milliseconds to wait between chunks. Will give up on read if it takes longer")
+    p.add_argument("--scan-interval", required=False, type=float, default=5400, help="Approximate time between mux scans, in seconds")
+    p.add_argument("--scan-extra", required=False, type=float, default=90, help="Wiggle room for predicting mux scans, in seconds")
 
 def add_realtime_opts(p):
     p.add_argument('--host', default='127.0.0.1', help='MinKNOW server host.')
@@ -304,12 +306,12 @@ def realtime_cmd(args):
             for ch, nm, paf in pool.update():
                 t = time.time()-chunk_times[ch-1]
                 if (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
-                    paf.set_float(mapping.Paf.Tag.UNBLOCK, t)
-                    #client.stop_receiving_read(ch, nm)  
+                    #paf.set_float(mapping.Paf.Tag.UNBLOCK, t)
+                    paf.set_float(mapping.Paf.Tag.EJECT, t)
                     client.unblock_read(ch, nm)
                     unblocked[ch-1] = nm
                 else:
-                    paf.set_float(mapping.Paf.Tag.KEEP, t)
+                    #paf.set_float(mapping.Paf.Tag.KEEP, t)
                     client.stop_receiving_read(ch, nm)  
                 paf.print_paf()
                 sys.stdout.flush()
@@ -392,7 +394,7 @@ def simulate_cmd(args):
                         args.sim_st,
                         args.sim_en,
                         args.even,
-                        args.odd);
+                        args.odd)
 
     sys.stderr.write("Loading simulator\n")
     sys.stderr.flush()
@@ -423,10 +425,11 @@ def simulate_cmd(args):
             for ch, nm, paf in pool.update():
                 t = time.time()-chunk_times[ch-1]
                 if (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
-                    paf.set_float(mapping.Paf.Tag.UNBLOCK, t)
+                    #paf.set_float(mapping.Paf.Tag.UNBLOCK, t)
+                    paf.set_float(mapping.Paf.Tag.EJECT, t)
                     sim.unblock(ch, nm)
                 else:
-                    paf.set_float(mapping.Paf.Tag.KEEP, t)
+                    #paf.set_float(mapping.Paf.Tag.KEEP, t)
                     sim.stop_receiving_read(ch, nm)
                 paf.print_paf()
 

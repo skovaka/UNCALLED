@@ -50,6 +50,7 @@ class Mapper {
 
     void new_read(ReadBuffer &r);
     void new_read(Chunk &c);
+    void reset();
     void set_failed();
 
     Paf map_read();
@@ -147,7 +148,8 @@ class Mapper {
     u32 prev_size_,
         event_i_,
         chunk_i_;
-    Timer chunk_timer_;
+    Timer chunk_timer_, map_timer_;
+    float map_time_, wait_time_;
 
     #ifdef DEBUG_SEEDS
     std::ostream &seeds_out_;

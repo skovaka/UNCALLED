@@ -81,6 +81,10 @@ std::vector<Chunk> Simulator::get_read_chunks() {
         for (; i < chunks_[c].size(); i--) {
             chunks_[c].pop_front();
         }
+
+        if (chunks_[c].empty()) {
+            std::cout << "# " << c << " empty\n";
+        }
     }
 
     return ret;

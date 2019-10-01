@@ -33,10 +33,10 @@
 
 class Paf {
     public:
-    enum Tag {MAP_TIME, CHUNKS, UNBLOCK, KEEP, TOP_RATIO, MEAN_RATIO};
+    enum Tag {MAP_TIME, WAIT_TIME, CHANNEL, EJECT, READ_START, IN_SCAN, TOP_RATIO, MEAN_RATIO};
 
     Paf();
-    Paf(std::string rd_name_, u64 rd_len = 0);
+    Paf(const std::string &rd_name, u16 channel = 0, u64 start_sample = 0);
 
     bool is_mapped() const;
     void print_paf() const;

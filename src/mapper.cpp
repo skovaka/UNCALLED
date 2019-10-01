@@ -173,7 +173,7 @@ void Mapper::deactivate() {
 Paf Mapper::map_read() {
     if (read_.loc_.is_mapped()) return read_.loc_;
     
-    Timer t;
+    map_timer_.reset();
 
     std::vector<Event> events = event_detector_.add_samples(read_.full_signal_);
     PARAMS.model.normalize(events);
@@ -182,8 +182,7 @@ Paf Mapper::map_read() {
         if (add_event(events[e].mean)) break;
     }
 
-    read_.loc_.set_float(Paf::Tag::MAP_TIME, t.get());
-
+    read_.loc_.set_float(Paf::Tag::MAP_TIME, map_timer_.get());
 
     //if (!read_.loc_.is_mapped()) {
     //    read_.loc_.set_float(Paf::Tag::TOP_RATIO, seed_tracker_.get_top_conf());
@@ -199,15 +198,7 @@ Paf Mapper::map_read() {
 void Mapper::new_read(ReadBuffer &r) {
     read_.clear();//TODO: probably shouldn't auto erase previous read
     read_.swap(r);
-    prev_size_ = 0;
-    event_i_ = 0;
-    reset_ = false;
-    last_chunk_ = false;
-    state_ = State::MAPPING;
-    seed_tracker_.reset();
-    event_detector_.reset();
-    norm_.skip_unread();
-    chunk_timer_.reset();
+    reset();
 }
 
 void Mapper::new_read(Chunk &chunk) {
@@ -215,17 +206,25 @@ void Mapper::new_read(Chunk &chunk) {
         std::cerr << "Error: possibly lost read '" << read_.id_ << "'\n";
     }
     read_ = ReadBuffer(chunk);
+    reset();
+}
+
+void Mapper::reset() {
     prev_size_ = 0;
     event_i_ = 0;
     reset_ = false;
     last_chunk_ = false;
     state_ = State::MAPPING;
+    norm_.skip_unread();
+
     seed_tracker_.reset();
     event_detector_.reset();
-    norm_.skip_unread();
-    chunk_timer_.reset();
-}
 
+    chunk_timer_.reset();
+    map_timer_.reset();
+    map_time_ = 0;
+    wait_time_ = 0;
+}
 
 u32 Mapper::prev_unfinished(u32 next_number) const {
     return state_ == State::MAPPING && read_.number_ != next_number;
@@ -278,6 +277,8 @@ bool Mapper::add_chunk(Chunk &chunk) {
 u16 Mapper::process_chunk() {
     if (read_.chunk_processed_ || reset_) return 0; 
 
+    wait_time_ += map_timer_.lap();
+
     float mean;
 
     u16 nevents = 0;
@@ -289,6 +290,7 @@ u16 Mapper::process_chunk() {
                 u32 nskip = norm_.skip_unread(nevents);
                 skip_events(nskip);
                 if (!norm_.add_event(mean)) {
+                    map_time_ += map_timer_.lap();
                     return nevents;
                 }
             }
@@ -296,19 +298,26 @@ u16 Mapper::process_chunk() {
         }
     }
 
-
     read_.chunk_.clear();
     read_.chunk_processed_ = true;
+
+    map_time_ += map_timer_.lap();
+
     return nevents;
 }
 
 void Mapper::set_failed() {
     state_ = State::FAILURE;
     reset_ = false;
+
+    read_.loc_.set_float(Paf::Tag::MAP_TIME, map_time_);
+    read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
 }
 
 
 bool Mapper::map_chunk() {
+    wait_time_ += map_timer_.lap();
+
     if (reset_ || 
         chunk_timer_.get() > PARAMS.max_chunk_wait ||
         (norm_.empty() && 
@@ -324,13 +333,16 @@ bool Mapper::map_chunk() {
     u16 nevents = PARAMS.get_max_events(event_i_);
     float tlimit = PARAMS.evt_timeout * nevents;
 
-    Timer t;
     for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
-        if (add_event(norm_.pop_event())) return true;
-        if (t.get() > tlimit) {
-            return false; //TODO: penalize this read
+        if (add_event(norm_.pop_event())) {
+            read_.loc_.set_float(Paf::Tag::MAP_TIME, map_time_+map_timer_.get());
+            read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
+            return true;
         }
+        if (map_timer_.get() > tlimit) break;
     }
+
+    map_time_ += map_timer_.lap();
 
     return false;
 }

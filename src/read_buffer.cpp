@@ -26,9 +26,11 @@
 
 const std::string Paf::PAF_TAGS[] = {
     "mt", //MAP_TIME
-    "nc", //CHUNKS
-    "ub", //UNBLOCK
-    "kp", //KEEP
+    "wt", //WAIT_TIME
+    "ch", //CHANNEL
+    "ej", //UNBLOCK
+    "st", //START_TIME
+    "mx", //IN_SCAN
     "tr", //TOP_RATIO
     "mr"  //MEAN_RATIO
 };
@@ -46,18 +48,22 @@ Paf::Paf()
       fwd_(false),
       matches_(0) {}
 
-Paf::Paf(std::string rd_name, u64 rd_len) 
+Paf::Paf(const std::string &rd_name, u16 channel, u64 start_sample)
     : is_mapped_(false),
       rd_name_(rd_name),
       rf_name_(""),
       rd_st_(0),
       rd_en_(0),
-      rd_len_(rd_len),
+      rd_len_(0),
       rf_st_(0),
       rf_en_(0),
       rf_len_(0),
       fwd_(false),
-      matches_(0) {}
+      matches_(0) {
+    
+    set_int(Tag::CHANNEL, channel);
+    set_float(Tag::READ_START, start_sample);
+}
 
 bool Paf::is_mapped() const {
     return is_mapped_;
@@ -227,7 +233,7 @@ u32 load_fast5s(std::deque<std::string> &fast5_list,
         }
     }
 
-    //std::sort(list.begin(), list.end());
+    std::sort(list.begin(), list.end());
     //while (max_load > 0 && list.size() > max_load) list.pop_back();
 
     return i;
@@ -299,7 +305,7 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file, Source source,
     break;
     }
 
-    loc_ = Paf(id_);
+    loc_ = Paf(id_, get_channel(), start_sample_);
     set_raw_len(full_signal_.size());
 }
 
@@ -312,7 +318,7 @@ ReadBuffer::ReadBuffer(Source source, u16 channel, const std::string &id,
           id_(id),
           number_(number),
           start_sample_(start_sample),
-          loc_(id) {
+          loc_(id, channel, start_sample) {
     if (raw_data.empty()) set_raw_len(0);
     else {
         if (raw_len == 0) raw_len = raw_data.size() - raw_st;
@@ -330,7 +336,7 @@ ReadBuffer::ReadBuffer(Chunk &first_chunk)
       start_sample_(first_chunk.get_start()),
       num_chunks_(1),
       chunk_processed_(false),
-      loc_(id_) {
+      loc_(id_, channel_idx_+1, start_sample_) {
     set_raw_len(first_chunk.size());
     first_chunk.pop(chunk_);
 }

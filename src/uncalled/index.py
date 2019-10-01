@@ -118,7 +118,7 @@ class IndexParameterizer:
         return np.prod(np.interp(self.conf_locs, fn_locs, fn_pcks))
 
     def add_preset(self, name, tgt_prob=None, tgt_speed=None, exp_st=2, init_fac=2, eps=0.00001):
-       
+
         exp = exp_st
         exp_min, exp_max = (None, None)
 
@@ -133,6 +133,7 @@ class IndexParameterizer:
             elif tgt_speed is not None:
                 delta = self.get_fn_speed(fn_locs, fn_pcks) - tgt_speed
 
+
             if abs(delta) <= eps:
                 break
 
@@ -140,6 +141,8 @@ class IndexParameterizer:
                 exp_max = exp
             else:
                 exp_min = exp
+            
+            pexp = exp
 
             if exp_max == None:
                 exp *= init_fac
@@ -147,6 +150,10 @@ class IndexParameterizer:
                 exp /= init_fac
             else:
                 exp = exp_min + ((exp_max - exp_min) / 2.0)
+
+            #for floating point rounding errors
+            if exp == pexp:
+                break
 
         fm_pcks = np.interp(self.fm_locs, fn_locs, fn_pcks)
         fm_ekms = np.interp(fm_pcks, self.model_pcks, self.model_ekms)

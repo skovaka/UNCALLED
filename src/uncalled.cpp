@@ -36,9 +36,8 @@ PYBIND11_MODULE(mapping, m) {
 
     py::enum_<Paf::Tag>(paf, "Tag")
         .value("MAP_TIME", Paf::Tag::MAP_TIME)
-        .value("CHUNKS", Paf::Tag::CHUNKS)
-        .value("UNBLOCK", Paf::Tag::UNBLOCK)
-        .value("KEEP", Paf::Tag::KEEP)
+        .value("EJECT", Paf::Tag::EJECT)
+        .value("IN_SCAN", Paf::Tag::IN_SCAN)
         .export_values();
 
     py::class_<Fast5Pool>(m, "Fast5Pool")

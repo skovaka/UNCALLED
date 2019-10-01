@@ -63,7 +63,7 @@ std::vector< std::vector<u64> > self_align(const std::string &bwa_prefix,
 
             Range r = fmi.get_full_range(bases[i]);
             u64 j = i+1;
-            for (; j < bases.size() && r.length() > 1; j++) {
+            for (; j < bases.size() && r.length() > 1 ; j++) { //&& (j-i) <= 1000
                 ret.back().push_back(r.length());
                 r = fmi.get_neighbor(r, bases[j]);
             }
