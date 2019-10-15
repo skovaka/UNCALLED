@@ -33,6 +33,7 @@ class Chunk {
     u32 size() const;
     bool is_calibrated() const;
     void print() const;
+    void set_start(u64 time);
 
 
     private:

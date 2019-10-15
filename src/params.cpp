@@ -58,7 +58,7 @@ void Params::init_map(
          _max_rep_copy,_max_consec_stay,_max_paths,_max_events_proc,0,0,_evt_winlen1,
          _evt_winlen2,_threads,_num_channels,0,0,0,_evt_thresh1,_evt_thresh2,
          _evt_peak_height,_evt_min_mean,_evt_max_mean,_max_stay_frac,_min_seed_prob,
-         _min_mean_conf,_min_top_conf,0,0,0,0,true,true);
+         _min_mean_conf,_min_top_conf,0,0,0,0,0,true,true);
 }
 
 void Params::init_realtime (
@@ -101,7 +101,7 @@ void Params::init_realtime (
        _max_chunks_proc,_evt_buffer_len,_evt_winlen1,_evt_winlen2,_threads,
        _num_channels,_chunk_len,_evt_batch_size,_evt_timeout,_evt_thresh1,
        _evt_thresh2,_evt_peak_height,_evt_min_mean,_evt_max_mean,_max_stay_frac,
-       _min_seed_prob,_min_mean_conf,_min_top_conf,_max_chunk_wait,0,0,0,true,true);
+       _min_seed_prob,_min_mean_conf,_min_top_conf,_max_chunk_wait,0,0,0,0,true,true);
     PARAMS.set_calibration(_offsets, _ranges, _digitisation);
     PARAMS.set_sample_rate(_sample_rate);
 }
@@ -140,6 +140,7 @@ void Params::init_sim(
         float _sim_speed,
         float _sim_st,
         float _sim_en,
+        float _sim_gaps,
         bool  _sim_even,
         bool  _sim_odd) {
     PARAMS =
@@ -149,7 +150,7 @@ void Params::init_sim(
        _num_channels,_chunk_len,_evt_batch_size,_evt_timeout,_evt_thresh1,
        _evt_thresh2,_evt_peak_height,_evt_min_mean,_evt_max_mean,_max_stay_frac,
        _min_seed_prob,_min_mean_conf,_min_top_conf,_max_chunk_wait,
-       _sim_speed,_sim_st,_sim_en,_sim_even,_sim_odd);
+       _sim_speed,_sim_st,_sim_en,_sim_gaps,_sim_even,_sim_odd);
 }
 
 Params::Params(Mode _mode,
@@ -185,6 +186,7 @@ Params::Params(Mode _mode,
                float _sim_speed,
                float _sim_st,
                float _sim_en,
+               float _sim_gaps,
                bool  _sim_even,
                bool  _sim_odd) :
     mode               (_mode),
@@ -216,6 +218,7 @@ Params::Params(Mode _mode,
     sim_speed          (_sim_speed),
     sim_st             (_sim_st),
     sim_en             (_sim_en),
+    sim_gaps           (_sim_gaps),
     sim_even           (_sim_even),
     sim_odd            (_sim_odd),
     sample_rate        (4000),

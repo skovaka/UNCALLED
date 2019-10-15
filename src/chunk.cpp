@@ -110,6 +110,10 @@ u32 Chunk::get_number() const {
     return number_;
 }
 
+void Chunk::set_start(u64 time) {
+    start_time_ = time;
+}
+
 void Chunk::swap(Chunk &c) {
     std::swap(id_, c.id_);
     std::swap(channel_idx_, c.channel_idx_);

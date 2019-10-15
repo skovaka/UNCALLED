@@ -31,6 +31,7 @@ import time
 import re
 import time
 
+
 MAX_SLEEP = 0.01
 
 class ArgFormat(argparse.ArgumentDefaultsHelpFormatter):
@@ -78,6 +79,7 @@ def add_sim_opts(p):
     p.add_argument("--sim-speed", required=False, type=float, default=1, help="Speed of real-time simulation")
     p.add_argument("--sim-st", required=False, type=float, default=0, help="Reads that begin before this time will be filtered out")
     p.add_argument("--sim-en", required=False, type=float, default=0, help="Reads that begin after this time will be filtered out")
+    p.add_argument("--sim-gaps", required=False, type=float, default=0.1, help="Extra gaps to add between reads")
 
 def add_fast5_opts(p):
     p.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
@@ -238,6 +240,17 @@ def map_cmd(args):
 
 def realtime_cmd(args):
     import read_until
+
+    try:
+        from read_until import ChannelMonitor
+    except ImportError:
+        sys.stderr.write("Failed to load channel monitor\n")
+        class ChannelMonitor():
+            def __init__(self, _):
+                pass
+            def should_eject(self):
+                return True
+
     try:
 
         sys.stderr.write("Starting client\n")
@@ -248,6 +261,8 @@ def realtime_cmd(args):
                                             filter_strands=True,
                                             prefilter_classes={'strand', 'strand1', 'strand2'})
         client.run()
+
+        chmon = ChannelMonitor(client)
 
         if (args.enrich and args.deplete) or not (args.enrich or args.deplete):
             sys.stderr.write("Must include exactly one of '--enrich' or '--deplete'\n")
@@ -306,12 +321,14 @@ def realtime_cmd(args):
             for ch, nm, paf in pool.update():
                 t = time.time()-chunk_times[ch-1]
                 if (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
-                    #paf.set_float(mapping.Paf.Tag.UNBLOCK, t)
-                    paf.set_float(mapping.Paf.Tag.EJECT, t)
-                    client.unblock_read(ch, nm)
-                    unblocked[ch-1] = nm
+                    if chmon.should_eject():
+                        paf.set_float(mapping.Paf.Tag.EJECT, t)
+                        client.unblock_read(ch, nm)
+                        unblocked[ch-1] = nm
+                    else:
+                        paf.set_float(mapping.Paf.Tag.IN_SCAN, t)
+                        client.stop_receiving_read(ch, nm)  
                 else:
-                    #paf.set_float(mapping.Paf.Tag.KEEP, t)
                     client.stop_receiving_read(ch, nm)  
                 paf.print_paf()
                 sys.stdout.flush()
@@ -393,6 +410,7 @@ def simulate_cmd(args):
                         args.sim_speed,
                         args.sim_st,
                         args.sim_en,
+                        args.sim_gaps,
                         args.even,
                         args.odd)
 

@@ -62,7 +62,7 @@ Paf::Paf(const std::string &rd_name, u16 channel, u64 start_sample)
       matches_(0) {
     
     set_int(Tag::CHANNEL, channel);
-    set_float(Tag::READ_START, start_sample);
+    set_int(Tag::READ_START, start_sample);
 }
 
 bool Paf::is_mapped() const {
@@ -98,10 +98,10 @@ void Paf::print_paf() const {
     }
 
     for (auto t : int_tags_) { 
-        std::cout << "\t" << PAF_TAGS[t.first] << ":i:" << t.second;
+        std::cout << std::fixed << "\t" << PAF_TAGS[t.first] << ":i:" << t.second;
     }
     for (auto t : float_tags_) { 
-        std::cout << "\t" << PAF_TAGS[t.first] << ":f:" << t.second;
+        std::cout << std::fixed << "\t" << PAF_TAGS[t.first] << ":f:" << t.second;
     }
     for (auto t : str_tags_) { 
         std::cout << "\t" << PAF_TAGS[t.first] << ":Z:" << t.second;
@@ -233,7 +233,7 @@ u32 load_fast5s(std::deque<std::string> &fast5_list,
         }
     }
 
-    std::sort(list.begin(), list.end());
+    //std::sort(list.begin(), list.end());
     //while (max_load > 0 && list.size() > max_load) list.pop_back();
 
     return i;

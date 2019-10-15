@@ -134,6 +134,7 @@ class Params {
         float _sim_speed,
         float _sim_st,
         float _sim_en,
+        float _sim_gaps,
         bool  _sim_even,
         bool  _sim_odd);
 
@@ -189,7 +190,8 @@ class Params {
           bp_per_samp,
           sim_speed,
           sim_st,
-          sim_en;
+          sim_en,
+          sim_gaps;
     
     bool sim_even, sim_odd;
 
@@ -236,6 +238,7 @@ class Params {
            float _sim_speed,
            float _sim_st,
            float _sim_en,
+           float _sim_gaps,
            bool  _sim_even,
            bool  _sim_odd);
 };

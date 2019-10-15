@@ -353,7 +353,8 @@ bool Mapper::add_event(float event) {
         //std::cout << read_.id_ << "\n";
         //seed_tracker_.print(std::cout, 10);
         //std::cout << "\n";
-        set_failed();
+        //set_failed();
+        state_ = State::FAILURE;
         return true;
     }
 

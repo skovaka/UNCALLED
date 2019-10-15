@@ -36,7 +36,7 @@ void Simulator::add_fast5s(const std::string &fname, u32 max_loaded) {
     std::deque<ReadBuffer> reads;
     load_fast5s(fname, reads, max_loaded);
     std::cerr << "Loaded " << reads.size() << " reads\n";
-    //std::sort(reads.begin(), reads.end());
+    std::sort(reads.begin(), reads.end());
 
     tshift_ = reads.front().start_sample_;
 
@@ -48,12 +48,13 @@ void Simulator::add_fast5s(const std::string &fname, u32 max_loaded) {
 std::vector<Chunk> Simulator::get_read_chunks() {
     std::vector<Chunk> ret;
 
-    if (timer_.get() / 1000.0 > (PARAMS.sim_en - PARAMS.sim_st+1)) {
+
+    u64 time = (timer_.get() * speed_) + tshift_;
+
+    if (time > PARAMS.sim_en*PARAMS.sample_rate) {
         is_running_ = false;
         return ret;
     }
-
-    u64 time = (timer_.get() * speed_) + tshift_;
     
     is_running_ = false;
 
@@ -69,9 +70,10 @@ std::vector<Chunk> Simulator::get_read_chunks() {
 
         //Skip if first chunk, otherwise add previous chunk
         if (i-- == 0) {
-            continue; 
+            continue;
         }
 
+        chunks_[c][i].set_start(time-chunk_len_);
         ret.push_back(chunks_[c][i]);
         //TODO: try code below
         //ret.push_back(Chunk());
@@ -107,7 +109,7 @@ void Simulator::unblock(u16 channel, u32 number) {
         end = chunks_[channel].front().get_end();
         chunks_[channel].pop_front();
     }
-    chshifts_[channel] += end - t0 - (0.1*PARAMS.sample_rate);
+    chshifts_[channel] += end - t0 - (PARAMS.sim_gaps*PARAMS.sample_rate);
 }
 
 float Simulator::get_time(u16 channel) {
