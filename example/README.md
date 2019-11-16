@@ -14,7 +14,8 @@
 Writing index/example_ref.uncl
 Reading fast5 paths
 Aligning
-f41a60f7-de4a-4b17-9f54-387e52d60b65    3086    186     251     +       Escherichia_coli_chromosome:2400000-2410000    10000    6826    6891    63      66      255
+f41a60f7-de4a-4b17-9f54-387e52d60b65    3562    86      118     -       Escherichia_coli_chromosome:2400000-2410000    10000   6937    6975    38      39      255     ch:i:486
+       st:i:257117    mt:f:22.596806
 ```
 
 # Data Source

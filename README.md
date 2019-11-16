@@ -40,7 +40,7 @@ uncalled map -x <bwa-prefix> -i <fast5-files>  >  <out.paf>
 
 Arguments:
 - `-x/--bwa-prefix` the prefix of the index to align to. Should be a BWA index that `uncalled index` was run on
-- `-i/--fast5-files`  directory which will be recursively searched for all files with the ".fast5" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names
+- `-i/--fast5-files`  a text file containing the path to one fast5 file per line
 - `-t/--threads` number of threads to use for mapping (default: 1)
 - `-n/--read-count` maximum number of reads to map
 - `--filter` text file containing subset of read IDs (one per line) to map from the fast5 files (will map all by default)

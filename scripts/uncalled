@@ -186,7 +186,21 @@ def load_fast5s(arg):
         fast5s = [os.path.abspath(l.strip()) for l in open(arg)]
     return fast5s
 
+def assert_exists(fname):
+    if not os.path.exists(fname):
+        sys.stderr.write("Error: '%s' does not exist\n" % fname)
+        sys.exit(1)
+
 def map_cmd(args):
+
+    assert_exists(index.MODEL_FNAME)
+    assert_exists(args.bwa_prefix + ".bwt")
+    assert_exists(args.fast5s)
+    for fname in open(args.fast5s):
+        assert_exists(fname.strip())
+    if len(args.filter) > 0:
+        assert_exists(args.filter)
+
     mapping.Params.init_map(args.bwa_prefix,
                         index.MODEL_FNAME,
                         args.preset_mode,
@@ -244,6 +258,9 @@ def map_cmd(args):
 
 def realtime_cmd(args):
     import read_until
+
+    assert_exists(index.MODEL_FNAME)
+    assert_exists(args.bwa_prefix + ".bwt")
 
     try:
         from read_until import ChannelMonitor
