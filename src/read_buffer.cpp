@@ -32,11 +32,14 @@ const std::string Paf::PAF_TAGS[] = {
     "st", //START_TIME
     "mx", //IN_SCAN
     "tr", //TOP_RATIO
-    "mr"  //MEAN_RATIO
+    "mr", //MEAN_RATIO
+    "en", //ENDED
+    "kp"  //KEEP
 };
 
 Paf::Paf() 
     : is_mapped_(false),
+      ended_(false),
       rd_name_(""),
       rf_name_(""),
       rd_st_(0),
@@ -50,6 +53,7 @@ Paf::Paf()
 
 Paf::Paf(const std::string &rd_name, u16 channel, u64 start_sample)
     : is_mapped_(false),
+      ended_(false),
       rd_name_(rd_name),
       rf_name_(""),
       rd_st_(0),
@@ -67,6 +71,10 @@ Paf::Paf(const std::string &rd_name, u16 channel, u64 start_sample)
 
 bool Paf::is_mapped() const {
     return is_mapped_;
+}
+
+bool Paf::is_ended() const {
+    return ended_;
 }
 
 void Paf::print_paf() const {
@@ -112,6 +120,11 @@ void Paf::print_paf() const {
 
 void Paf::set_read_len(u64 rd_len) {
     rd_len_ = rd_len;
+}
+
+void Paf::set_ended() {
+    ended_ = true;
+    //set_int(Tag::ENDED, 1);
 }
 
 void Paf::set_mapped(u64 rd_st, u64 rd_en,

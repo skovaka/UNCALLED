@@ -318,13 +318,16 @@ void Mapper::set_failed() {
 bool Mapper::map_chunk() {
     wait_time_ += map_timer_.lap();
 
-    if (reset_ || 
-        chunk_timer_.get() > PARAMS.max_chunk_wait ||
-        (norm_.empty() && 
-         read_.chunk_processed_ && 
-         read_.num_chunks_ == PARAMS.max_chunks_proc)) {
-            set_failed();
-            return true;
+    if (reset_ || chunk_timer_.get() > PARAMS.max_chunk_wait) {
+        set_failed();
+        read_.loc_.set_ended();
+        return true;
+
+    } else if (norm_.empty() && 
+               read_.chunk_processed_ && 
+               read_.num_chunks_ == PARAMS.max_chunks_proc) {
+        set_failed();
+        return true;
 
     } else if (norm_.empty()) {
         return false;

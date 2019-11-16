@@ -30,6 +30,7 @@ import argparse
 import time
 import re
 import time
+import subprocess
 
 
 MAX_SLEEP = 0.01
@@ -71,6 +72,9 @@ def add_ru_opts(p):
 def add_realtime_opts(p):
     p.add_argument('--host', default='127.0.0.1', help='MinKNOW server host.')
     p.add_argument('--port', type=int, default=8000, help='MinKNOW server port.')
+    p.add_argument('--duration', type=float, default=48, help='Duration to map real-time run in hours. Should be slightly longer than specified runtime to add wiggle room.')
+    p.add_argument('--post-time', type=float, default=60, help='Extra time to wait after sequencing to finish analysis')
+    p.add_argument('--post-script', type=str, default=None, help='Script to run after analysis finishes')
 
 def add_list_ports_opts(p):
     p.add_argument('--log-dir', default='/var/log/MinKNOW', help='Directory to find MinKNOW log files')
@@ -314,29 +318,47 @@ def realtime_cmd(args):
         unblocked = [None for c in range(args.num_channels)]
 
         sys.stderr.write("Mapping\n")
+
+        end_time = (args.duration*60*60) + args.post_time
+        start_time = time.time()
+        last_time = start_time
+
         
         while client.is_running:
             t0 = time.time()
 
             for ch, nm, paf in pool.update():
                 t = time.time()-chunk_times[ch-1]
-                if (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
+                if paf.is_ended():
+                    paf.set_float(mapping.Paf.Tag.ENDED, t)
+                    client.stop_receiving_read(ch, nm)
+
+                elif (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
+
                     if chmon.should_eject():
                         paf.set_float(mapping.Paf.Tag.EJECT, t)
                         client.unblock_read(ch, nm)
                         unblocked[ch-1] = nm
                     else:
                         paf.set_float(mapping.Paf.Tag.IN_SCAN, t)
-                        client.stop_receiving_read(ch, nm)  
+                        client.stop_receiving_read(ch, nm)
+
                 else:
-                    client.stop_receiving_read(ch, nm)  
+                    paf.set_float(mapping.Paf.Tag.KEEP, t)
+                    client.stop_receiving_read(ch, nm)
+
                 paf.print_paf()
-                sys.stdout.flush()
             
             if client.queue_length == 0:
+
+                t = time.time()
+                if t - last_time > args.post_time and t - start_time > end_time:
+                    break
+
                 dt = time.time() - t0;
                 if dt < MAX_SLEEP:
                     time.sleep(MAX_SLEEP - dt);
+
                 continue
 
             read_batch = client.get_read_chunks(batch_size=client.queue_length)
@@ -356,6 +378,9 @@ def realtime_cmd(args):
                                                  read.chunk_start_sample,
                                                  raw_type,
                                                  read.raw_data))
+                last_time = time.time()
+
+
 
             dt = time.time() - t0;
             if dt < MAX_SLEEP:
@@ -368,7 +393,11 @@ def realtime_cmd(args):
         sys.stderr.write("Error: %s\n" % str(e))
 
     client.reset()
-    pool.stop_all();
+    pool.stop_all()
+
+    if args.post_script != None:
+        sys.stderr.write("Running post-script: '%s'\n" % args.post_script)
+        subprocess.call([args.post_script])
 
 
 def simulate_cmd(args):
@@ -442,12 +471,12 @@ def simulate_cmd(args):
 
             for ch, nm, paf in pool.update():
                 t = time.time()-chunk_times[ch-1]
-                if (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
-                    #paf.set_float(mapping.Paf.Tag.UNBLOCK, t)
+                if not paf.is_ended() and ((paf.is_mapped() and deplete) 
+                                           or not (paf.is_mapped() or deplete)):
                     paf.set_float(mapping.Paf.Tag.EJECT, t)
                     sim.unblock(ch, nm)
                 else:
-                    #paf.set_float(mapping.Paf.Tag.KEEP, t)
+                    paf.set_float(mapping.Paf.Tag.KEEP, t)
                     sim.stop_receiving_read(ch, nm)
                 paf.print_paf()
 

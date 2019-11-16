@@ -16,6 +16,7 @@ using namespace pybind11::literals;
 PYBIND11_MODULE(mapping, m) {
     m.doc() = "UNCALLED";
 
+
     py::class_<Params>(m, "Params")
         //Map constructor
         .def_static("init_map", &Params::init_map)
@@ -30,6 +31,7 @@ PYBIND11_MODULE(mapping, m) {
     paf.def(py::init())
        .def("print_paf", &Paf::print_paf)
        .def("is_mapped", &Paf::is_mapped)
+       .def("is_ended", &Paf::is_ended)
        .def("set_int", &Paf::set_int)
        .def("set_float", &Paf::set_float)
        .def("set_str", &Paf::set_str);
@@ -38,6 +40,8 @@ PYBIND11_MODULE(mapping, m) {
         .value("MAP_TIME", Paf::Tag::MAP_TIME)
         .value("EJECT", Paf::Tag::EJECT)
         .value("IN_SCAN", Paf::Tag::IN_SCAN)
+        .value("ENDED", Paf::Tag::ENDED)
+        .value("KEEP", Paf::Tag::KEEP)
         .export_values();
 
     py::class_<Fast5Pool>(m, "Fast5Pool")

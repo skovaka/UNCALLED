@@ -33,18 +33,29 @@
 
 class Paf {
     public:
-    enum Tag {MAP_TIME, WAIT_TIME, CHANNEL, EJECT, READ_START, IN_SCAN, TOP_RATIO, MEAN_RATIO};
+    enum Tag {MAP_TIME, 
+              WAIT_TIME, 
+              CHANNEL, 
+              EJECT, 
+              READ_START, 
+              IN_SCAN, 
+              TOP_RATIO, 
+              MEAN_RATIO,
+              ENDED,
+              KEEP};
 
     Paf();
     Paf(const std::string &rd_name, u16 channel = 0, u64 start_sample = 0);
 
     bool is_mapped() const;
+    bool is_ended() const;
     void print_paf() const;
     void set_read_len(u64 rd_len);
     void set_mapped(u64 rd_st, u64 rd_en, 
                     std::string rf_name,
                     u64 rf_st, u64 rf_en, u64 rf_len,
                     bool fwd, u16 matches);
+    void set_ended();
     void set_unmapped();
 
     void set_int(Tag t, int v);
@@ -54,7 +65,7 @@ class Paf {
     private:
     static const std::string PAF_TAGS[];
 
-    bool is_mapped_;
+    bool is_mapped_, ended_;
     std::string rd_name_, rf_name_;
     u64 rd_st_, rd_en_, rd_len_,
         rf_st_, rf_en_, rf_len_;
