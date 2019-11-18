@@ -2,7 +2,7 @@
 
 A **U**tility for **N**anopore **C**urrent **Al**ignment to **L**arge **E**xpanses of **D**NA
 
-![UNCALLED logo](uncalled_logo.png =300x "UNCALLED logo")
+![UNCALLED logo](uncalled_logo_small.png "UNCALLED logo")
 
 A streaming algorithm for mapping raw nanopore signal to DNA references
 
