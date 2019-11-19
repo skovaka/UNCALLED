@@ -13,9 +13,9 @@ Also supports standalone signal mapping of fast5 reads
 ## Installation
 
 ```
-git clone --recursive https://github.com/skovaka/UNCALLED.git
-cd UNCALLED
-python setup.py install
+> git clone --recursive https://github.com/skovaka/UNCALLED.git
+> cd UNCALLED
+> python setup.py install
 ```
 
 Most dependecies included via submodules, so be sure to clone with `git --recursive`
