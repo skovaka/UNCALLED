@@ -71,7 +71,7 @@ Arguments:
 
 See [example/](example/) for a simple read and reference example.
 
-## Real-Time Enrichment/Depletion
+## Real-Time ReadUntil
 
 **Example:**
 
@@ -134,7 +134,7 @@ Both modes include the following custom attributes in each PAF entry:
 
 ## Practical Considerations
 
-For real-time enrichment, the first decision to make is whether to perform **enrichment** or **depletion** (`--enrich` or `--deplete`). 
+For ReadUntil sequencing, the first decision to make is whether to perform **enrichment** or **depletion** (`--enrich` or `--deplete`). 
 In enrichment mode, UNCALLED will eject a read if it *does not* map to the reference, meaning your target should be the reference. 
 In depletion mode, UNCALLED will eject a read if it *does* map to the reference, meaning your target should be everything except your reference.
 
