@@ -118,7 +118,7 @@ Both `uncalled map` and `uncalled realtime` output to stdout in a format similar
 
 Query coordinates, residue matches, and block lengths are estimated assuming 450bp sequenced per second. This estimate can be significantly off depending on the sequencing run. UNCALLED attempts to map a read as early as possible, so the "query end" field corresponds to the leftmost position where UNCALLED was able to confidently map the read. This differs from aligners such as [minimap2](https://github.com/lh3/minimap2), which attempt to map the full length of the read.
 
-For real-time mapping read lengths are estimated by how much signal UNCALELD recieved, which by no means corresponds to how much signal was actually sequenced.
+For real-time mapping, read lengths are estimated by how much signal UNCALLED recieved, which does not necessarily correspond to how much signal was actually sequenced.
 
 Both modes include the following custom attributes in each PAF entry:
 
