@@ -36,7 +36,6 @@ import subprocess
 MAX_SLEEP = 0.01
 
 class ArgFormat(argparse.ArgumentDefaultsHelpFormatter):
-                #argparse.MetavarTypeHelpFormatter):
     pass
 
 def add_bwa_opt(p):
@@ -49,8 +48,8 @@ def add_index_opts(p):
     p.add_argument("-k", "--kmer-len", default=5, type=int, help="Model k-mer length")
     p.add_argument("-1", "--matchpr1", default=0.6334, type=float, help="Minimum event match probability")
     p.add_argument("-2", "--matchpr2", default=0.9838, type=float, help="Maximum event match probability")
-    p.add_argument("-f", "--pathlen-percentile", default=0.05, type=float, help=" ")
-    p.add_argument("-m", "--max-replen", default=100, type=int, help=" ")
+    p.add_argument("-f", "--pathlen-percentile", default=0.05, type=float, help="")
+    p.add_argument("-m", "--max-replen", default=100, type=int, help="")
     p.add_argument("--probs", default=None, type=str, help="Find parameters with specified target probabilites (comma separated)")
     p.add_argument("--speeds", default=None, type=str, help="Find parameters with specified speed coefficents (comma separated)")
 
@@ -87,13 +86,13 @@ def add_sim_opts(p):
 
 def add_fast5_opts(p):
     p.add_argument("-i", "--fast5s", required=True, type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
-    p.add_argument("--filter", required=False, default="", type=str, help="Only map reads listed in this file")
+    p.add_argument("-f", "--filter", required=False, default="", type=str, help="Only map reads listed in this file")
     p.add_argument("-n", "--read-count", type=int, default=0, help="Maximum number of reads to map")
 
 def add_map_opts(p):
     p.add_argument("-t", "--threads", default=1, type=int, help="Number of threads to use for mapping")
     p.add_argument("--num-channels", default=512, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
-    p.add_argument("--max-events-proc", default=30000, type=int, help="Will give up on a read after this many events have been processed")
+    p.add_argument("-e", "--max-events-proc", default=30000, type=int, help="Will give up on a read after this many events have been processed")
     p.add_argument("--min-aln-len", default=25, type=int, help="Minimum number of basepairs a mapping must cover.")
     p.add_argument("--seed-len", default=22, type=int, help="Seed length in events.")
     p.add_argument("--min-rep-len", default=0, type=int, help="Minimum number of basepairs a multi-mapping seed must cover")
@@ -106,11 +105,11 @@ def add_map_opts(p):
     p.add_argument("--min-top-conf", default=1.85, type=float, help="Minimum ratio between longest alignment and second-longet alignment to report confident alignment")
     p.add_argument("--evt-min-mean", default=30, type=float, help="Minimum un-normalized event mean")
     p.add_argument("--evt-max-mean", default=150, type=float, help="Maximum un-normalized event mean")
-    p.add_argument("--evt-window-length1", default=3, type=int, help=" ")
-    p.add_argument("--evt-window-length2", default=6, type=int, help=" ")
-    p.add_argument("--evt-threshold1", default=1.4, type=float, help=" ")
-    p.add_argument("--evt-threshold2", default=9.0, type=float, help=" ")
-    p.add_argument("--evt-peak-height", default=0.2, type=float, help=" ")
+    p.add_argument("--evt-window-length1", default=3, type=int, help="")
+    p.add_argument("--evt-window-length2", default=6, type=int, help="")
+    p.add_argument("--evt-threshold1", default=1.4, type=float, help="")
+    p.add_argument("--evt-threshold2", default=9.0, type=float, help="")
+    p.add_argument("--evt-peak-height", default=0.2, type=float, help="")
 
 def get_parser():
     parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references")
@@ -122,8 +121,8 @@ def get_parser():
 
     map_parser = sp.add_parser("map", help="Map fast5 files to a BWA index that has been processed by \"uncalled index\"")#,formatter_class=ArgFormat)
     add_bwa_opt(map_parser)
-    add_map_opts(map_parser)
     add_fast5_opts(map_parser)
+    add_map_opts(map_parser)
 
     rt_parser = sp.add_parser("realtime", help="Perform real-time targeted sequencing")#,formatter_class=ArgFormat)
     add_bwa_opt(rt_parser)
@@ -131,12 +130,13 @@ def get_parser():
     add_ru_opts(rt_parser)
     add_realtime_opts(rt_parser)
 
-    sim_parser = sp.add_parser("simulate", help="Simulate targeted sequencing based on previous run")#,formatter_class=ArgFormat)
-    add_bwa_opt(sim_parser)
-    add_map_opts(sim_parser)
-    add_ru_opts(sim_parser)
-    add_sim_opts(sim_parser)
-    add_fast5_opts(sim_parser)
+    #Incomplete feature, currectly disabled
+    #sim_parser = sp.add_parser("simulate", help="Simulate targeted sequencing based on previous run")#,formatter_class=ArgFormat)
+    #add_bwa_opt(sim_parser)
+    #add_map_opts(sim_parser)
+    #add_ru_opts(sim_parser)
+    #add_sim_opts(sim_parser)
+    #add_fast5_opts(sim_parser)
 
     lp_parser = sp.add_parser("list-ports", help="List the port of all MinION devices detected in the current MinKNOW session")#,formatter_class=ArgFormat)
     add_list_ports_opts(lp_parser)
@@ -552,10 +552,11 @@ if __name__ == "__main__":
         map_cmd(args)
     elif args.subcmd == "realtime":
         realtime_cmd(args)
-    elif args.subcmd == "simulate":
-        simulate_cmd(args)
     elif args.subcmd == "list-ports":
         list_ports_cmd(args)
+    #Incomplete feature, currently disabled
+    #elif args.subcmd == "simulate":
+    #    simulate_cmd(args)
     else:
         parser.print_help()
         

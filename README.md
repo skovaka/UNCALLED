@@ -156,5 +156,3 @@ UNCALLED currently only supports reads sequenced with r9.4 chemistry.
 
 UNCALLED is a work in progress. Many parameters exist that are not documented here, but can be seen on the command line help information. Most users should leave these unchanged. They may be removed in future versions, or be replaced with hyperparameters that adjust the accuracy and speed of UNCALLED.
 
-You may notice a `simulate` subcommand which I have also not documented. This feature is incomplete, may not be useful, and will likely be removed in future versions.
-
