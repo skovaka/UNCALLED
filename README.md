@@ -116,15 +116,15 @@ Note exactly one of `--deplete` or `--enrich` must be specified
 
 Both `uncalled map` and `uncalled realtime` output to stdout in a format similar to [PAF](https://github.com/lh3/miniasm/blob/master/PAF.md). Unmapped reads are output with reference-location-dependent fields replaced with \*s. Lines that begin with "#" are comments that useful for debugging.
 
-Query coordinates, residue matches, and block lengths are estimated assuming 450bp sequenced per second. This estimate can be significantly off depending on the sequencing run. UNCALLED attempts to map a read as early as possible, so the "query end" field corresponds to the leftmost position where UNCALLED was able to confidently map the read. This differs from aligners such as [minimap2](https://github.com/lh3/minimap2), which attempt to map the full length of the read.
+Query coordinates, residue matches, and block lengths are estimated assuming 450bp sequenced per second. This estimate can be significantly off depending on the sequencing run. UNCALLED attempts to map a read as early as possible, so the "query end" field corresponds to the leftmost position where UNCALLED was able to confidently map the read. In many cases this may only be 450bp or 900bp into the read, even if the read is many times longer than this. This differs from aligners such as [minimap2](https://github.com/lh3/minimap2), which attempt to map the full length of the read.
 
-For real-time mapping, read lengths are estimated by how much signal UNCALLED recieved, which does not necessarily correspond to how much signal was actually sequenced.
+For real-time mapping, read lengths are estimated by how much signal UNCALLED received, which does not necessarily correspond to how much signal was actually sequenced.
 
 Both modes include the following custom attributes in each PAF entry:
 
 - `mt`: **map time**. Time in milliseconds it took to map the read.
 - `ch`: **channel**. MinION channel that the read came from.
-- `st`: **start sample**. Global _sequenicng_ start time of the read (in signal samples, 4000 samples/sec).
+- `st`: **start sample**. Global _sequencing_ start time of the read (in signal samples, 4000 samples/sec).
 
 `uncalled realtime` also includes the following attributes:
 
@@ -140,7 +140,7 @@ For ReadUntil sequencing, the first decision to make is whether to perform **enr
 In enrichment mode, UNCALLED will eject a read if it *does not* map to the reference, meaning your target should be the reference. 
 In depletion mode, UNCALLED will eject a read if it *does* map to the reference, meaning your target should be everything except your reference.
 
-Note that enrichment necessitates a quick decision as to whether or not a read maps, since you want to eject a read as fast as possible. Usually ~95% of reads can be mapped within three seconds for highly non-reptetive references, so setting `-c/--max-chunks-proc` to `3` generally works well for enrichment. The default value of `10` works well for depletion.
+Note that enrichment necessitates a quick decision as to whether or not a read maps, since you want to eject a read as fast as possible. Usually ~95% of reads can be mapped within three seconds for highly non-repetitive references, so setting `-c/--max-chunks-proc` to `3` generally works well for enrichment. The default value of `10` works well for depletion.
 
 UNCALLED currently does not support large (> ~100Mb) or highly repetitive references. 
 The speed and mapping rate both progressively drop as references become larger and more repetitive. 
@@ -148,7 +148,7 @@ Bacterial genomes or small collections of bacterial genomes typically work well.
 Small segments of eukaryotic genomes can also be used, however the presence of any repetitvie elements will harm the performance. 
 We hope to provide tools and/or guidelines for masking such references in the near future, and increasing the supported reference size and repeat tolerance is a long-term goal.
 
-ReadUntil works best with longer reads. Maximize your read lengths for best results.
+ReadUntil works best with longer reads. Maximize your read lengths for best results. You may also need to perform a nuclease flush and reloading to achive the highest yield of on-target bases.
 
 UNCALLED currently only supports reads sequenced with r9.4 chemistry.
 
