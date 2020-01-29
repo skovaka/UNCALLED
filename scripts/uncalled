@@ -22,7 +22,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from uncalled import mapping, index
+from uncalled import mapping, index, pafstats
 import numpy as np
 import sys                         
 import os
@@ -129,6 +129,9 @@ def get_parser():
     add_map_opts(rt_parser)
     add_ru_opts(rt_parser)
     add_realtime_opts(rt_parser)
+
+    ps_parser = sp.add_parser("pafstats", help="Computes speed and accuracy of UNCALLED mappings. Given an UNCALLED PAF file, will compute mean/median BP mapped per second, number of BP required to map each read, and total number of milliseconds to map each read. Can also optionally compute accuracy with respect to reference alignments, for example output by minimap2.")
+    pafstats.add_opts(ps_parser)
 
     #Incomplete feature, currectly disabled
     #sim_parser = sp.add_parser("simulate", help="Simulate targeted sequencing based on previous run")#,formatter_class=ArgFormat)
@@ -554,6 +557,8 @@ if __name__ == "__main__":
         realtime_cmd(args)
     elif args.subcmd == "list-ports":
         list_ports_cmd(args)
+    elif args.subcmd == "pafstats":
+        pafstats.run(args)
     #Incomplete feature, currently disabled
     #elif args.subcmd == "simulate":
     #    simulate_cmd(args)

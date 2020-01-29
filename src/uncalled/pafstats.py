@@ -14,7 +14,6 @@ class PafEntry:
         else:
             tabs = line
 
-
         self.qr_name = tabs[0]
         self.qr_len = int(tabs[1])
         self.is_mapped = tabs[4] != ("*" if fromstr else None)
@@ -108,9 +107,6 @@ class PafEntry:
         return s
 
 
-        
-
-
 def parse_paf(infile, max_load=None):
     if isinstance(infile, str):
         infile = open(infile)
@@ -162,24 +158,27 @@ def paf_ref_compare(qry, ref, ret_qry=True, check_locs=True, ext=1.5):
 
     return tp, tn, fp, fn, fp_unmap
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Computes speed and accuracy of UNCALLED mappings. Given an UNCALLED PAF file, will compute mean/median BP mapped per second, number of BP required to map each read, and total number of milliseconds to map each read. Can also optionally compute accuracy with respect to reference alignments, for example output by minimap2.")
+def add_opts(parser):
     parser.add_argument("infile", type=str, help="PAF file output by UNCALLED")
     parser.add_argument("-n", "--max-reads", required=False, type=int, default=None, help="Will only look at first n reads if specified")
     parser.add_argument("-r", "--ref-paf", required=False, type=str, default=None, help="Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA.")
     parser.add_argument("-a", "--annotate", action='store_true', help="Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag")
-    args = parser.parse_args()
 
+def run(args):
     locs = [p for p in parse_paf(args.infile, args.max_reads)]
+
+    num_mapped = sum([p.is_mapped for p in locs])
 
     statsout = sys.stderr if args.annotate else sys.stdout
 
-    statsout.write("%d reads, %d mapped\n\n" % (len(locs), sum([p.is_mapped for p in locs])))
+    statsout.write("Summary: %d reads, %d mapped (%.2f%%)\n\n" % (len(locs), num_mapped, 100*num_mapped/len(locs)))
 
     if args.ref_paf != None:
+        statsout.write("Comparing to reference PAF\n")
         tp, tn, fp, fn, fp_unmap = paf_ref_compare(locs, parse_paf(args.ref_paf))
         ntp,ntn,nfp,nfn,nfp_unmap = map(len, [tp, tn, fp, fn, fp_unmap])
         n = len(locs)
+
         statsout.write("     P     N\n")
         statsout.write("T %6.2f %5.2f\n" % (100*ntp/n, 100*ntn/n))
         statsout.write("F %6.2f %5.2f\n" % (100*(nfp)/n, 100*nfn/n))
@@ -202,6 +201,7 @@ if __name__ == "__main__":
         map_bp = np.array([p.qr_en for p in locs if p.is_mapped])
         map_bpps = 1000*map_bp/map_ms
 
-        statsout.write("BP per sec: %8.2f %8.2f\n" % (np.mean(map_bpps), np.median(map_bpps)))
-        statsout.write("BP mapped:  %8.2f %8.2f\n" % (np.mean(map_bp),   np.median(map_bp)))
-        statsout.write("MS to map:  %8.2f %8.2f\n" % (np.mean(map_ms),   np.median(map_ms)))
+        statsout.write("Speed            Mean    Median\n")
+        statsout.write("BP per sec: %9.2f %9.2f\n" % (np.mean(map_bpps), np.median(map_bpps)))
+        statsout.write("BP mapped:  %9.2f %9.2f\n" % (np.mean(map_bp),   np.median(map_bp)))
+        statsout.write("MS to map:  %9.2f %9.2f\n" % (np.mean(map_ms),   np.median(map_ms)))
