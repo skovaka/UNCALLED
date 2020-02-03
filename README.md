@@ -134,6 +134,34 @@ Both modes include the following custom attributes in each PAF entry:
 - `mx`: **mux scan**. Time that the read _would have_ been ejected, had it not have occured within a mux scan.
 - `wt`: **wait time**. Time in milliseconds that the read was queued but was not actively being mapped, either due to thread delays or waiting for new chunks.
 
+### pafstats
+
+We have included a functionality called `uncalled pafstats` which computes speed statistcs from a PAF file output by UNCALLED. Accuracy statistics can also be included if provided a ground truth PAF file, for example based on minimap2 alignments of basecalled reads. There is also an option to output the original UNCALLED PAF annotated with comparisions to the ground truth.
+
+**Example:**
+```
+> uncalled pafstats -r minimap2_alns.paf -n 5000 -a uncalled_out.paf > uncalled_ann.paf
+Summary: 5000 reads, 4373 mapped (89.46%)
+
+Comparing to reference PAF
+     P     N
+T  88.74  6.80
+F   0.60  3.74
+NA: 0.12
+
+Speed            Mean    Median
+BP per sec:   4878.24   4540.50
+BP mapped:     636.29    362.00
+MS to map:     140.99     89.96
+```
+
+Accuracy statistics:
+- TP: true positive - percent infile reads that overlap reference read locations
+- FP: false positive - percent infile reads that do not overlap reference read locations
+- TN: true negative - percent of reads which were not aligned in reference or infile
+- FN: false negative - percent of reads which were aligned in the reference but not in the infile
+- NA: not aligned/not applicable - percent of reads aligned in infile but not in reference. Could be considered a false positive, but the truth is unkown.
+
 ## Practical Considerations
 
 For ReadUntil sequencing, the first decision to make is whether to perform **enrichment** or **depletion** (`--enrich` or `--deplete`). 
@@ -146,7 +174,7 @@ UNCALLED currently does not support large (> ~100Mb) or highly repetitive refere
 The speed and mapping rate both progressively drop as references become larger and more repetitive. 
 Bacterial genomes or small collections of bacterial genomes typically work well. 
 Small segments of eukaryotic genomes can also be used, however the presence of any repetitvie elements will harm the performance. 
-We hope to provide tools and/or guidelines for masking such references in the near future, and increasing the supported reference size and repeat tolerance is a long-term goal.
+See [masking](masking/) for repeat masking scripts and guidlines.
 
 ReadUntil works best with longer reads. Maximize your read lengths for best results. You may also need to perform a nuclease flush and reloading to achive the highest yield of on-target bases.
 
