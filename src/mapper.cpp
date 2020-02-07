@@ -199,6 +199,10 @@ void Mapper::new_read(ReadBuffer &r) {
     read_.clear();//TODO: probably shouldn't auto erase previous read
     read_.swap(r);
     reset();
+
+    #ifdef DEBUG_SEEDS
+    seeds_out_.open(read_.id_ + "_seeds.bed");
+    #endif
 }
 
 void Mapper::new_read(Chunk &chunk) {
@@ -210,6 +214,10 @@ void Mapper::new_read(Chunk &chunk) {
 }
 
 void Mapper::reset() {
+    #ifdef DEBUG_SEEDS
+    seeds_out_.close();
+    #endif
+
     prev_size_ = 0;
     event_i_ = 0;
     reset_ = false;
@@ -353,10 +361,6 @@ bool Mapper::map_chunk() {
 bool Mapper::add_event(float event) {
 
     if (reset_ || event_i_ >= PARAMS.max_events_proc) {
-        //std::cout << read_.id_ << "\n";
-        //seed_tracker_.print(std::cout, 10);
-        //std::cout << "\n";
-        //set_failed();
         state_ = State::FAILURE;
         return true;
     }
@@ -434,8 +438,13 @@ bool Mapper::add_event(float event) {
 
         if (!child_found && !prev_path.sa_checked_) {
 
+            //Add seeds for non-extended paths
+            //Extended paths will be updated after sources filled in
             update_seeds(prev_path, true);
 
+            #ifdef DEBUG_SEEDS
+            print_debug_seeds(prev_path);
+            #endif
         }
 
         if (next_path == next_paths_.end()) {
@@ -443,6 +452,7 @@ bool Mapper::add_event(float event) {
         }
     }
 
+    //Create sources between gaps
     if (next_path != next_paths_.begin()) {
 
         u32 next_size = next_path - next_paths_.begin();
@@ -518,7 +528,6 @@ bool Mapper::add_event(float event) {
             }
 
             update_seeds(next_paths_[i], false);
-
         }
     }
 
@@ -555,6 +564,12 @@ bool Mapper::add_event(float event) {
         state_ = State::SUCCESS;
         set_ref_loc(sg);
 
+        #ifdef DEBUG_SEEDS
+        for (u32 pi = 0; pi < prev_size_; pi++) {
+            print_debug_seeds(prev_paths_[pi]);
+        }
+        #endif
+
         return true;
     }
 
@@ -573,14 +588,41 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
             u64 ref_en = PARAMS.fmi.size() - PARAMS.fmi.sa(s) + 1;
 
             seed_tracker_.add_seed(ref_en, p.match_len(), event_i_ - path_ended);
-
-            #ifdef DEBUG_SEEDS
-            seed.print(seeds_out);
-            #endif
         }
     }
-
 }
+
+#ifdef DEBUG_SEEDS
+void Mapper::print_debug_seeds(PathBuffer &p) {
+
+    if (!p.is_seed_valid(true)) return;
+
+    for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
+        //Reverse the reference coords so they both go L->R
+        u64 ref_en = PARAMS.fmi.size() - (PARAMS.fmi.sa(s) + 1);
+
+        bool fwd = ref_en < PARAMS.fmi.size() / 2;
+
+        u64 sa_st;
+        if (fwd) sa_st = ref_en - (p.match_len() + PARAMS.model.kmer_len() - 1)  + 1;
+        else     sa_st = PARAMS.fmi.size() - ref_en - 1;
+
+        std::string rf_name;
+        u64 rf_st;
+        PARAMS.fmi.translate_loc(sa_st, rf_name, rf_st);
+
+        if (rf_st > PARAMS.fmi.size()) {
+            rf_st = 0;
+        }
+          
+        seeds_out_ << rf_name << "\t"
+                   << rf_st << "\t"
+                   << (rf_st + p.match_len() + PARAMS.model.kmer_len() - 1) << "\t"
+                   << event_i_ << "\t"
+                   << (fwd ? "+" : "-") << "\n";
+    }
+}
+#endif
 
 void Mapper::set_ref_loc(const SeedGroup &seeds) {
     bool fwd = seeds.ref_st_ < PARAMS.fmi.size() / 2;
@@ -595,8 +637,6 @@ void Mapper::set_ref_loc(const SeedGroup &seeds) {
         rf_st,
         rf_len = PARAMS.fmi.translate_loc(sa_st, rf_name, rf_st), //sets rf_st
         rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_ + PARAMS.model.kmer_len());
-        //rf_en = rf_st + (rd_en - rd_st + 1);
-        //
 
     u16 match_count = seeds.total_len_ + PARAMS.model.kmer_len() - 1;
 

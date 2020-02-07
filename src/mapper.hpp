@@ -152,7 +152,8 @@ class Mapper {
     float map_time_, wait_time_;
 
     #ifdef DEBUG_SEEDS
-    std::ostream &seeds_out_;
+    std::ofstream seeds_out_;
+    void print_debug_seeds(PathBuffer &p);
     #endif
 };
 
