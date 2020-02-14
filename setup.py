@@ -16,12 +16,13 @@ class make_bwa(build_ext):
 uncalled = Extension(
     "uncalled.mapping",
      sources = ["src/mapper.cpp",
+                "src/fast5_pool.cpp",
+                "src/fm_profiler.cpp",
+                "src/bwa_fmi.cpp", 
                 "src/uncalled.cpp",
                 "src/read_buffer.cpp",
-                "src/fast5_pool.cpp",
                 "src/params.cpp",
                 "src/simulator.cpp",
-                "src/bwa_fmi.cpp", 
                 "src/chunk.cpp",
                 "src/chunk_pool.cpp",
                 "src/seed_tracker.cpp", 
@@ -40,7 +41,7 @@ uncalled = Extension(
 )
 
 setup(name = "uncalled",
-      version = "0.1",
+      version = "1.1",
       description = "Rapidly maps raw nanopore signal to DNA references",
       author = "Sam Kovaka",
       author_email = "skovaka@gmail.com",
