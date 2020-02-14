@@ -31,6 +31,7 @@ import time
 import re
 import time
 import subprocess
+from threading import Event, Thread
 
 
 MAX_SLEEP = 0.01
@@ -259,21 +260,81 @@ def map_cmd(args):
     for p in mapper.update():
         p.print_paf()
 
+#ChannelMonitor monitors the states of channels to determine
+#if a mux scan is happening. Used to prevent ejections during
+#mux scans, which could disrupt the mux scan
+class ChannelMonitor(object):
+    def __init__(self, client, scan_thresh=0.99):
+        
+        self.client = client
+
+        self.running = Event()
+
+        self.in_scan = False
+
+        self.scan_thresh = scan_thresh
+
+        self.ch_mux = np.zeros(512, dtype=int)
+        self.mux_counts = np.zeros(5, dtype=float)
+        self.mux_counts[0] = len(self.ch_mux)
+
+        self._process_thread = Thread(
+            target=self._run,
+            name="channel_monitor"
+        )
+        self._process_thread.start()
+
+        self.t0 = time.time()
+
+    def scan_update(self):
+        m = np.argmax(self.mux_counts)
+        ps = self.in_scan
+        self.in_scan = (m != 0 and 
+                        (self.mux_counts[m] / (len(self.ch_mux)-self.mux_counts[0])
+                            > self.scan_thresh))
+        if self.in_scan != ps:
+            sys.stderr.write("%.2f in_scan changed to %d\n" % (time.time()-self.t0, self.in_scan))
+
+    def should_eject(self):
+        return not self.in_scan
+
+    def _update_muxs(self, channels):
+        for channels in channels:
+            if not self.client.is_running:
+                break
+
+            for ch in channels.channel_states:
+                nmx = int(ch.config.well)
+                omx = self.ch_mux[ch.channel-1]
+                if omx != nmx:
+                    self.mux_counts[omx] -= 1
+                    self.mux_counts[nmx] += 1
+                    self.ch_mux[ch.channel-1] = nmx
+
+            self.scan_update()
+
+    def _run(self, **kwargs):
+        self.running.set()
+
+        channels = self.client.connection.data.get_channel_states(
+            first_channel = 1,
+            last_channel = 512,
+            use_channel_states_ids = False
+        )
+
+        try:
+            self._update_muxs(channels)
+        except Exception as e:
+            self.client.logger.info(e)
+
+        # signal to the server that we are done with the stream.
+        channels.cancel()
+
 def realtime_cmd(args):
     import read_until
 
     assert_exists(index.MODEL_FNAME)
     assert_exists(args.bwa_prefix + ".bwt")
-
-    try:
-        from read_until import ChannelMonitor
-    except ImportError:
-        sys.stderr.write("Failed to load channel monitor\n")
-        class ChannelMonitor():
-            def __init__(self, _):
-                pass
-            def should_eject(self):
-                return True
 
     try:
 
@@ -518,9 +579,9 @@ def simulate_cmd(args):
     pool.stop_all();
 
 def list_ports_cmd(args):
-    log_re = re.compile("^([0-9\-]+ [0-9:]+).+ : mk_instance_started_for_minion .+")
+    log_re = re.compile("^([0-9\-]+ [0-9:]+).+ :.+instance_started.+")
     port_re = re.compile("jsonrpc_port = (\d+)")
-    device_re = re.compile("device_id = (\S+)")
+    device_re = re.compile("(device_id|instance) = ([^\s,]+)")
 
     fnames = os.listdir(args.log_dir)
     log_fnames = list(sorted( (f for f in fnames if f.startswith("mk_manager_svc")) ))
@@ -529,6 +590,7 @@ def list_ports_cmd(args):
     for line in open(latest_log):
         lm = log_re.match(line)
         if not lm: continue
+        print(line)
         pm = port_re.search(line)
         dm = device_re.search(line)
 
@@ -538,7 +600,7 @@ def list_ports_cmd(args):
 
         timestamp = lm.group(1)
         port = pm.group(1)
-        device = dm.group(1)
+        device = dm.group(2)
 
         sys.stdout.write("%s (%s): %s\n" % (device, timestamp, port))
 
