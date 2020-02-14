@@ -20,6 +20,8 @@ Read the [preprint on BioRxiv](https://www.biorxiv.org/content/10.1101/2020.02.0
 > python setup.py install
 ```
 
+UNCALLED for ReadUntil sequenecing requires the [ONT ReadUntil API](https://github.com/nanoporetech/read_until_api). UNCALLED must then be installed into the MinKNOW environment alongside the ReadUntil API (see Real-Time ReadUntil below).
+
 Most dependecies included via submodules, so be sure to clone with `git --recursive`
 
 UNCALLED must be installed into a python environment. To install without root privileges use the `--user` or `--prefix=<local-dir>` flag when installing, or use a tool such as [virtualenv](https://virtualenv.pypa.io) or [anaconda](https://www.anaconda.com).
@@ -28,7 +30,6 @@ Requires python-dev and GCC >= 4.8.1
 
 [HDF5](https://www.hdfgroup.org/downloads/hdf5/) must be installed. Libraries and headers should be in system paths (ie `$LD_LIBRARY_PATH` and `$CPATH` respectively), or specified by running `python setup.py build_ext --library-dirs <hdf5-location>/lib --include-dirs <hdf5-location>/include` prior to installation.
 
-The use of ReadUntil currently requires an ONT developer licence. Contact [ONT support](https://nanoporetech.com/contact) for more information. UNCALLED must then be installed into the MinKNOW environment alongside the ReadUntil API, using the same command specified in the ReadUntil API private GitHub repository.
 
 We recommend running on a Linux machine. UNCALLED has been successfully installed and run on Mac computers, but real-time ReadUntil has not been tested on a Mac. Installing UNCALLED has not been attempted on Windows.
 
@@ -81,7 +82,7 @@ See [example/](example/) for a simple read and reference example.
 > uncalled list-ports
 MN02686 (2019-11-18 12:30:56): 8000
 
-> /opt/ONT/MinKNOW/ont-python/bin/uncalled realtime --port 8000 -t 16 -x E.coli --enrich -c 3 --post-script basecall.sh > uncalled_out.paf 
+> /opt/ont/minknow/ont-python/bin/uncalled realtime --port 8000 -t 16 -x E.coli --enrich -c 3 --post-script basecall.sh > uncalled_out.paf 
 Starting client
 Starting mappers
 Mapping
@@ -94,7 +95,16 @@ d9acafe3-23dd-4a0f-83db-efe299ee59a4 1355 *     *     *     *      *      *     
 8a6ec472-a289-4c50-9a75-589d7c21ef99 451  98 369 + Escherichia_coli 4765434 3421845 3422097 56 253 255 ch:i:490 st:i:29456 mt:f:79.419411 wt:f:8.551202 kp:f:0.097424
 ```
 
-As mentioned above, you must sign an ONT developer licence to use UNCALLED for ReadUntil. This will grant you access to a private GitHub repository where you can install the ReadUntil API into your MinKNOW environment. You must install UNCALLED in the same way, and run the instance installed into MinKNOW environment (the above example assumes your MinKNOW python environment is located at `/opt/ONT/MinKNOW/ont-python`). We recommend that you try mapping fast5s with the MinKNOW installation via `uncalled map` before real-time enrichment, as runtime issues involving hdf5 libraries could come up if UNCALELD is not installed properly.
+You must install UNCALLED into the MinKNOW enrironment. If HDF5 is not installed in the root filesystem, you may have to specify the library and include directory by running `setup.py build_ext` prior to installation: 
+
+```
+sudo /opt/ont/minknow/ont-python/bin/python setup.py build_ext --library-dirs /path/to/hdf5/lib --include-dirs /path/to/hdf5/include
+sudo /opt/ont/minknow/ont-python/bin/python setup.py install
+```
+
+The above commands assume your MinKNOW python environment is located at `/opt/ont/minknow/ont-python`.
+
+We recommend that you try mapping fast5s with the MinKNOW installation via `uncalled map` before real-time enrichment, as runtime issues involving hdf5 libraries could come up if UNCALELD is not installed properly.
 
 The command should be run once sequencing has begun and the "Channels Panel" has appeared. Running earlier may cause issues, including crashing MinKNOW and requiring you to restart your computer. Reads will not be ejected until the first mux scan has finished, which provides a ~1.5 minute window to start UNCALLED without missing any reads.
 
