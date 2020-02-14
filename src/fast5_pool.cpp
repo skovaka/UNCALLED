@@ -88,12 +88,24 @@ bool Fast5Pool::all_finished() {
 }
 
 void Fast5Pool::stop_all() {
+    #ifdef FM_PROFILER
+    FMProfiler prof_combined;
+    #endif
+
     reads_.clear();
     for (auto &t : threads_) {
         t.running_ = false;
         t.mapper_.request_reset();
         t.thread_.join();
+
+        #ifdef FM_PROFILER
+        prof_combined.combine(t.mapper_.fm_profiler_);
+        #endif
     }
+
+    #ifdef FM_PROFILER
+    prof_combined.write("query_counts.bed");
+    #endif
 }
 
 u16 Fast5Pool::MapperThread::THREAD_COUNT = 0;

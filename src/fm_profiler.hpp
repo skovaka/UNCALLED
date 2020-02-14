@@ -21,40 +21,27 @@
  * SOFTWARE.
  */
 
-#ifndef INCL_BWAFMI
-#define INCL_BWAFMI
+#ifndef FM_PROFILER_HPP
+#define FM_PROFILER_HPP
 
 #include <string>
 #include <climits>
-#include <utility>
 #include "util.hpp"
 #include "range.hpp"
-#include "bwa/bwt.h"
-#include "bwa/bntseq.h"
+#include "params.hpp"
 
-class BwaFMI {
+class FMProfiler {
     public:
 
-    BwaFMI();
-    BwaFMI(const std::string &prefix);
-    void destroy();
+    FMProfiler();
 
-    Range get_neighbor(Range range, u8 base) const;
+    void add_range(Range r);
+    void add_kmer(u16 k);
+    void flush_kmers();
+    void combine(const FMProfiler &p);
+    void write(const std::string &fname);
 
-    Range get_full_range(u8 base) const;
-
-    u64 sa(u64 i) const;
-
-    u64 size() const;
-
-    u64 translate_loc(u64 sa_loc, std::string &ref_name, u64 &ref_loc) const;
-
-    std::vector< std::pair<std::string, u64> > get_seqs() const;
-
-    private:
-    bwt_t *index_;
-    bntseq_t *bns_;
-    bool loaded_;
+    std::vector<u32> range_counts_, kmer_counts_;
 };
 
 #endif

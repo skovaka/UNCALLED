@@ -33,9 +33,11 @@
 #include "chunk.hpp"
 #include "timer.hpp"
 #include "read_buffer.hpp"
+#include "fm_profiler.hpp"
 
 //#define DEBUG_TIME
 //#define DEBUG_SEEDS
+//#define FM_PROFILER
 
 class Mapper {
     public:
@@ -73,6 +75,10 @@ class Mapper {
     bool finished() const;
     ReadBuffer &get_read();
     void deactivate();
+
+    #ifdef FM_PROFILER
+    FMProfiler fm_profiler_;
+    #endif
 
     private:
 
@@ -155,6 +161,7 @@ class Mapper {
     std::ofstream seeds_out_;
     void print_debug_seeds(PathBuffer &p);
     #endif
+
 };
 
 

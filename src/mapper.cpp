@@ -59,6 +59,7 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     //TODO: don't write this here to speed up source loop
     prob_sums_[0] = 0;
     prob_sums_[1] = prob;
+
 }
 
 
@@ -89,6 +90,7 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
         prob_sums_[length_] = prob_sums_[length_-1] + prob;
         seed_prob_ = prob_sums_[length_] / length_;
     }
+
 }
 
 void Mapper::PathBuffer::invalidate() {
@@ -155,6 +157,7 @@ Mapper::Mapper()
 Mapper::Mapper(const Mapper &m) : Mapper() {}
 
 Mapper::~Mapper() {
+
     for (u32 i = 0; i < next_paths_.size(); i++) {
         next_paths_[i].free_buffers();
         prev_paths_[i].free_buffers();
@@ -203,6 +206,7 @@ void Mapper::new_read(ReadBuffer &r) {
     #ifdef DEBUG_SEEDS
     seeds_out_.open(read_.id_ + "_seeds.bed");
     #endif
+
 }
 
 void Mapper::new_read(Chunk &chunk) {
@@ -400,6 +404,9 @@ bool Mapper::add_event(float event) {
                                   prev_kmer, 
                                   kmer_probs_[prev_kmer], 
                                   EventType::STAY);
+            #ifdef FM_PROFILER
+            fm_profiler_.add_range(prev_range);
+            #endif
 
             child_found = true;
 
@@ -407,7 +414,6 @@ bool Mapper::add_event(float event) {
                 break;
             }
         }
-
 
         //Add all the neighbors
         for (u8 b = 0; b < ALPH_SIZE; b++) {
@@ -429,12 +435,18 @@ bool Mapper::add_event(float event) {
                                   kmer_probs_[next_kmer], 
                                   EventType::MATCH);
 
+
+            #ifdef FM_PROFILER
+            fm_profiler_.add_range(next_range);
+            #endif
+
             child_found = true;
 
             if (++next_path == next_paths_.end()) {
                 break;
             }
         }
+
 
         if (!child_found && !prev_path.sa_checked_) {
 
@@ -483,6 +495,10 @@ bool Mapper::add_event(float event) {
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
                     next_path++;
+
+                    #ifdef FM_PROFILER
+                    fm_profiler_.add_range(source_range);
+                    #endif
                 }                                    
 
                 unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
@@ -524,6 +540,10 @@ bool Mapper::add_event(float event) {
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
                     next_path++;
+
+                    #ifdef FM_PROFILER
+                    fm_profiler_.add_range(source_range);
+                    #endif
                 }
             }
 
@@ -546,6 +566,10 @@ bool Mapper::add_event(float event) {
             //TODO: don't write to prob buffer here to speed up source loop
             next_path->make_source(next_range, kmer, kmer_probs_[kmer]);
             next_path++;
+
+            #ifdef FM_PROFILER
+            fm_profiler_.add_kmer(kmer);
+            #endif
 
         } else {
             sources_added_[kmer] = false;

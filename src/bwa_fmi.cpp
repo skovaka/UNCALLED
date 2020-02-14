@@ -86,3 +86,15 @@ u64 BwaFMI::translate_loc(u64 sa_loc, std::string &ref_name, u64 &ref_loc) const
     ref_loc = sa_loc - bns_->anns[rid].offset;
     return bns_->anns[rid].len;
 }
+
+std::vector< std::pair<std::string, u64> > BwaFMI::get_seqs() const {
+    std::vector< std::pair<std::string, u64> > seqs;
+
+    for (i32 i = 0; i < bns_->n_seqs; i++) {
+        bntann1_t ann = bns_->anns[i];
+        std::string name = std::string(ann.name);
+        seqs.push_back( std::pair<std::string, u64>(name, ann.len) );
+    }
+
+    return seqs;
+}
