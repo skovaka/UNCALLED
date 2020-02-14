@@ -10,6 +10,8 @@ Enables real-time enrichment or depletion on Oxford Nanopore Technologies (ONT) 
 
 Also supports standalone signal mapping of fast5 reads
 
+Read the [preprint on BioRxiv](https://www.biorxiv.org/content/10.1101/2020.02.03.931923v1)
+
 ## Installation
 
 ```
@@ -174,7 +176,7 @@ UNCALLED currently does not support large (> ~100Mb) or highly repetitive refere
 The speed and mapping rate both progressively drop as references become larger and more repetitive. 
 Bacterial genomes or small collections of bacterial genomes typically work well. 
 Small segments of eukaryotic genomes can also be used, however the presence of any repetitvie elements will harm the performance. 
-We hope to provide tools and/or guidelines for masking such references in the near future, and increasing the supported reference size and repeat tolerance is a long-term goal.
+See [masking](masking/) for repeat masking scripts and guidlines.
 
 ReadUntil works best with longer reads. Maximize your read lengths for best results. You may also need to perform a nuclease flush and reloading to achive the highest yield of on-target bases.
 
