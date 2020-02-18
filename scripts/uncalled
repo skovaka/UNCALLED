@@ -73,7 +73,7 @@ def add_ru_opts(p):
 def add_realtime_opts(p):
     p.add_argument('--host', default='127.0.0.1', help='MinKNOW server host.')
     p.add_argument('--port', type=int, default=8000, help='MinKNOW server port.')
-    p.add_argument('--duration', type=float, default=48, help='Duration to map real-time run in hours. Should be slightly longer than specified runtime to add wiggle room.')
+    p.add_argument('--duration', type=float, default=None, help='Duration to map real-time run in hours. Should be slightly longer than specified runtime to add wiggle room.')
     p.add_argument('--post-time', type=float, default=60, help='Extra time to wait after sequencing to finish analysis')
     p.add_argument('--post-script', type=str, default=None, help='Script to run after analysis finishes')
 
@@ -281,6 +281,9 @@ MK_FINISHING = 4
 
 class UncClient(read_until.ReadUntilClient):
     def __init__(self, mk_host=8000, mk_port="127.0.0.1", chunk_len=4000, scan_thresh=0.99):
+        self.chmon_running = Event()
+        self.chmon_thread = None
+
         read_until.ReadUntilClient.__init__(
                 self,
                 mk_host=mk_host,  
@@ -290,9 +293,8 @@ class UncClient(read_until.ReadUntilClient):
                 prefilter_classes={'strand', 'strand1', 'strand2'}
         )
 
-        self.chmon_running = Event()
 
-        self.in_scan = True
+        self.in_scan = True 
         self.scan_thresh = scan_thresh
         self.chunk_len = chunk_len
 
@@ -307,25 +309,43 @@ class UncClient(read_until.ReadUntilClient):
 
         self._start_chmon()
 
-        self.t0 = time.time()
-
         self._set_chunk_len(scan_wait)
 
         read_until.ReadUntilClient.run(self, *kwargs)
+
+        self.start_time = time.time()
+
+    def reset(self, timeout=5):
+        sys.stderr.write("killing client\n")
+        read_until.ReadUntilClient.reset(self, timeout)
+
+        if self.chmon_thread is not None:
+            sys.stderr.write("killing chmon\n")
+            self.chmon_running.clear()
+            sys.stderr.write("joining\n")
+            self.chmon_thread.join()
+            sys.stderr.write("killed chmon\n")
+            if self.chmon_thread.is_alive():
+                sys.stderr.write("Channel monitor didn't exit right\n")
+        self.chmon_thread = None
+
+    def get_runtime(self):
+        return time.time() - self.start_time
 
     def should_eject(self):
         return not self.in_scan
 
     def _start_chmon(self):
+        self.start_time = time.time()
         self.last_scan = time.time()
         self.in_scan = True
 
-        self.running.set()
-        self._chmon_thread = Thread(
+        self.chmon_running.set()
+        self.chmon_thread = Thread(
             target=self._run_chmon,
             name="channel_monitor"
         )
-        self._chmon_thread.start()
+        self.chmon_thread.start()
 
     def _scan_update(self):
         m = np.argmax(self.mux_counts)
@@ -338,7 +358,8 @@ class UncClient(read_until.ReadUntilClient):
             self.last_scan = time.time()
 
         if self.in_scan != ps:
-            sys.stderr.write("%.2f in_scan changed to %d\n" % (time.time()-self.t0, self.in_scan))
+            sys.stderr.write("%.2f in_scan changed to %d\n" % 
+                             (self.get_runtime(), self.in_scan))
 
     def _get_status(self):
         return self.connection.acquisition.current_status().status
@@ -348,25 +369,25 @@ class UncClient(read_until.ReadUntilClient):
             sys.stderr.write("Run already in progress\n")
             return True
 
-        started = False
-        start_time = None
+        processing = False
+        proc_time = None
         
         sys.stderr.write("Waiting for run to start\n")
 
         while True:
             if self._get_status() == MK_PROCESSING:
-                if start_time == None:
-                    start_time = time.time()
+                if proc_time == None:
+                    proc_time = time.time()
 
-                    if not started:
+                    if not processing:
                         sys.stderr.write("Waiting for steady state\n")
-                        started = True
+                        processing = True
 
-                elif time.time() - start_time >= steady:
+                elif time.time() - proc_time >= steady:
                     return True
 
-            elif start_time != None:
-                start_time = None
+            elif proc_time != None:
+                proc_time = None
 
             time.sleep(refresh)
 
@@ -404,7 +425,7 @@ class UncClient(read_until.ReadUntilClient):
     def _update_muxs(self, channels):
         sys.stderr.write("Starting chmon\n")
         for channels in channels:
-            if not self.is_running:
+            if not self.chmon_running.is_set():
                 sys.stderr.write("Stopping\n")
                 break
 
@@ -420,8 +441,11 @@ class UncClient(read_until.ReadUntilClient):
 
             if self._get_status() != MK_PROCESSING:
                 sys.stderr.write("Run finished\n")
+                self.chmon_running.clear()
                 self.running.clear()
+                break
 
+        sys.stderr.write("Leaving chmod\n")
 
     def _run_chmon(self, **kwargs):
         channels = self.connection.data.get_channel_states(
@@ -434,11 +458,11 @@ class UncClient(read_until.ReadUntilClient):
             self._update_muxs(channels)
         except Exception as e:
             sys.stderr.write(traceback.format_exc())
+        sys.stderr.write("Really leaving chmod\n")
 
         # signal to the server that we are done with the stream.
         channels.cancel()
-
-
+        sys.stderr.write("doooon\n")
 
 def realtime_cmd(args):
 
@@ -450,18 +474,11 @@ def realtime_cmd(args):
 
     try:
 
-        #client = read_until.ReadUntilClient(mk_host=args.host, 
-        #                                    mk_port=args.port, 
-        #                                    one_chunk=False, 
-        #                                    filter_strands=True,
-        #                                    prefilter_classes={'strand', 'strand1', 'strand2'})
         client = UncClient(args.host, args.port, args.chunk_len)
 
         sys.stderr.write("Connected to MinKNOW server\n")
 
         client.run()
-
-        #chmon = ChannelMonitor(client)
 
         if (args.enrich and args.deplete) or not (args.enrich or args.deplete):
             sys.stderr.write("Must include exactly one of '--enrich' or '--deplete'\n")
@@ -512,11 +529,11 @@ def realtime_cmd(args):
 
         sys.stderr.write("Mapping\n")
 
-        end_time = (args.duration*60*60) + args.post_time
-        start_time = time.time()
-        last_time = start_time
+        if args.duration == None:
+            end_time = float("inf")
+        else:
+            end_time = args.duration*60*60
 
-        
         while client.is_running:
             t0 = time.time()
 
@@ -541,18 +558,6 @@ def realtime_cmd(args):
                     client.stop_receiving_read(ch, nm)
 
                 paf.print_paf()
-            
-            if client.queue_length == 0:
-
-                t = time.time()
-                if t - last_time > args.post_time and t - start_time > end_time:
-                    break
-
-                dt = time.time() - t0;
-                if dt < MAX_SLEEP:
-                    time.sleep(MAX_SLEEP - dt);
-
-                continue
 
             read_batch = client.get_read_chunks(batch_size=client.queue_length)
 
@@ -564,8 +569,6 @@ def realtime_cmd(args):
                         sys.stdout.write("# recieved chunk from %s after unblocking\n" % read.id)
                         continue
 
-                    #sys.stderr.write("chunk %d\n" % read.chunk_length)
-
                     chunk_times[channel-1] = time.time()
                     pool.add_chunk(mapping.Chunk(read.id, 
                                                  channel, 
@@ -573,9 +576,13 @@ def realtime_cmd(args):
                                                  read.chunk_start_sample,
                                                  raw_type,
                                                  read.raw_data))
-                last_time = time.time()
+                #last_time = time.time()
 
-
+            if client.get_runtime() >= end_time:
+                sys.stderr.write("Ending\n")
+                client.reset()
+                client = None
+                break
 
             dt = time.time() - t0;
             if dt < MAX_SLEEP:
