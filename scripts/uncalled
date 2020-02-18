@@ -32,6 +32,7 @@ import re
 import time
 import subprocess
 from threading import Event, Thread
+import traceback
 
 
 MAX_SLEEP = 0.01
@@ -268,39 +269,143 @@ class ChannelMonitor(object):
         
         self.client = client
 
-        self.running = Event()
 
-        self.in_scan = False
+import read_until
 
+MK_ERROR_STATUS = 0
+MK_READY = 1
+MK_STARTING = 2
+MK_PROCESSING = 3
+MK_FINISHING = 4
+
+
+class UncClient(read_until.ReadUntilClient):
+    def __init__(self, mk_host=8000, mk_port="127.0.0.1", chunk_len=4000, scan_thresh=0.99):
+        read_until.ReadUntilClient.__init__(
+                self,
+                mk_host=mk_host,  
+                mk_port=mk_port,  
+                one_chunk=False,    
+                filter_strands=True,
+                prefilter_classes={'strand', 'strand1', 'strand2'}
+        )
+
+        self.chmon_running = Event()
+
+        self.in_scan = True
         self.scan_thresh = scan_thresh
+        self.chunk_len = chunk_len
 
         self.ch_mux = np.zeros(512, dtype=int)
         self.mux_counts = np.zeros(5, dtype=float)
         self.mux_counts[0] = len(self.ch_mux)
 
-        self._process_thread = Thread(
-            target=self._run,
-            name="channel_monitor"
-        )
-        self._process_thread.start()
+
+    def run(self, steady_wait=10, scan_wait=5, refresh=0.5, **kwargs):
+
+        self._wait_for_start(steady_wait, refresh)
+
+        self._start_chmon()
 
         self.t0 = time.time()
 
-    def scan_update(self):
+        self._set_chunk_len(scan_wait)
+
+        read_until.ReadUntilClient.run(self, *kwargs)
+
+    def should_eject(self):
+        return not self.in_scan
+
+    def _start_chmon(self):
+        self.last_scan = time.time()
+        self.in_scan = True
+
+        self.running.set()
+        self._chmon_thread = Thread(
+            target=self._run_chmon,
+            name="channel_monitor"
+        )
+        self._chmon_thread.start()
+
+    def _scan_update(self):
         m = np.argmax(self.mux_counts)
         ps = self.in_scan
         self.in_scan = (m != 0 and 
                         (self.mux_counts[m] / (len(self.ch_mux)-self.mux_counts[0])
                             > self.scan_thresh))
+
+        if self.in_scan:
+            self.last_scan = time.time()
+
         if self.in_scan != ps:
             sys.stderr.write("%.2f in_scan changed to %d\n" % (time.time()-self.t0, self.in_scan))
 
-    def should_eject(self):
-        return not self.in_scan
+    def _get_status(self):
+        return self.connection.acquisition.current_status().status
+
+    def _wait_for_start(self, steady=10, refresh=0.5):
+        if self._get_status() == MK_PROCESSING:
+            sys.stderr.write("Run already in progress\n")
+            return True
+
+        started = False
+        start_time = None
+        
+        sys.stderr.write("Waiting for run to start\n")
+
+        while True:
+            if self._get_status() == MK_PROCESSING:
+                if start_time == None:
+                    start_time = time.time()
+
+                    if not started:
+                        sys.stderr.write("Waiting for steady state\n")
+                        started = True
+
+                elif time.time() - start_time >= steady:
+                    return True
+
+            elif start_time != None:
+                start_time = None
+
+            time.sleep(refresh)
+
+        self.last_scan = time.time()
+
+    def _set_chunk_len(self, scan_wait=5):
+
+        #Don't want to restart acquisition during mux scan
+        scan_gap = time.time() - self.last_scan
+        if self.in_scan or scan_gap < scan_wait:
+            sys.stderr.write("Checking for initial mux scan\n")
+            while self.in_scan or scan_gap < scan_wait:
+                time.sleep(max(0.1, scan_wait - scan_gap))
+                scan_gap = time.time() - self.last_scan
+
+        chunk_sec = self.chunk_len/4000.0
+
+        client = self.connection.analysis_configuration
+        config = client.get_analysis_configuration()
+
+        prev_sec = config.read_detection.break_reads_after_seconds.value
+
+        sys.stderr.write("Setting chunk length to %.2f seconds\n" % chunk_sec)
+        if prev_sec != chunk_sec:
+
+            self.connection.acquisition.stop(wait_until_ready=True, keep_power_on=True)
+
+            config.read_detection.break_reads_after_seconds.value=chunk_sec
+            client.set_analysis_configuration(config)
+
+            self.connection.acquisition.start(wait_until_processing=True)
+
+            self._start_chmon()
 
     def _update_muxs(self, channels):
+        sys.stderr.write("Starting chmon\n")
         for channels in channels:
-            if not self.client.is_running:
+            if not self.is_running:
+                sys.stderr.write("Stopping\n")
                 break
 
             for ch in channels.channel_states:
@@ -311,12 +416,15 @@ class ChannelMonitor(object):
                     self.mux_counts[nmx] += 1
                     self.ch_mux[ch.channel-1] = nmx
 
-            self.scan_update()
+            self._scan_update()
 
-    def _run(self, **kwargs):
-        self.running.set()
+            if self._get_status() != MK_PROCESSING:
+                sys.stderr.write("Run finished\n")
+                self.running.clear()
 
-        channels = self.client.connection.data.get_channel_states(
+
+    def _run_chmon(self, **kwargs):
+        channels = self.connection.data.get_channel_states(
             first_channel = 1,
             last_channel = 512,
             use_channel_states_ids = False
@@ -325,27 +433,35 @@ class ChannelMonitor(object):
         try:
             self._update_muxs(channels)
         except Exception as e:
-            self.client.logger.info(e)
+            sys.stderr.write(traceback.format_exc())
 
         # signal to the server that we are done with the stream.
         channels.cancel()
 
+
+
 def realtime_cmd(args):
-    import read_until
 
     assert_exists(index.MODEL_FNAME)
     assert_exists(args.bwa_prefix + ".bwt")
 
+    pool = None
+    client = None
+
     try:
 
-        client = read_until.ReadUntilClient(mk_host=args.host, 
-                                            mk_port=args.port, 
-                                            one_chunk=False, 
-                                            filter_strands=True,
-                                            prefilter_classes={'strand', 'strand1', 'strand2'})
+        #client = read_until.ReadUntilClient(mk_host=args.host, 
+        #                                    mk_port=args.port, 
+        #                                    one_chunk=False, 
+        #                                    filter_strands=True,
+        #                                    prefilter_classes={'strand', 'strand1', 'strand2'})
+        client = UncClient(args.host, args.port, args.chunk_len)
+
+        sys.stderr.write("Connected to MinKNOW server\n")
+
         client.run()
 
-        chmon = ChannelMonitor(client)
+        #chmon = ChannelMonitor(client)
 
         if (args.enrich and args.deplete) or not (args.enrich or args.deplete):
             sys.stderr.write("Must include exactly one of '--enrich' or '--deplete'\n")
@@ -412,7 +528,7 @@ def realtime_cmd(args):
 
                 elif (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
 
-                    if chmon.should_eject():
+                    if client.should_eject():
                         paf.set_float(mapping.Paf.Tag.EJECT, t)
                         client.unblock_read(ch, nm)
                         unblocked[ch-1] = nm
@@ -448,6 +564,8 @@ def realtime_cmd(args):
                         sys.stdout.write("# recieved chunk from %s after unblocking\n" % read.id)
                         continue
 
+                    #sys.stderr.write("chunk %d\n" % read.chunk_length)
+
                     chunk_times[channel-1] = time.time()
                     pool.add_chunk(mapping.Chunk(read.id, 
                                                  channel, 
@@ -467,10 +585,13 @@ def realtime_cmd(args):
         sys.stderr.write("Keyboard interrupt\n")
 
     except Exception as e:
-        sys.stderr.write("Error: %s\n" % str(e))
+        sys.stderr.write(traceback.format_exc())
 
-    client.reset()
-    pool.stop_all()
+    if client != None:
+        client.reset()
+
+    if pool != None:
+        pool.stop_all()
 
     if args.post_script != None:
         sys.stderr.write("Running post-script: '%s'\n" % args.post_script)
@@ -572,11 +693,12 @@ def simulate_cmd(args):
     except KeyboardInterrupt:
         pass
 
-    pool.stop_all();
+    if pool != None:
+        pool.stop_all()
 
 def list_ports_cmd(args):
     log_re = re.compile("^([0-9\-]+ [0-9:]+).+ :.+instance_started.+")
-    port_re = re.compile("jsonrpc_port = (\d+)")
+    port_re = re.compile("grpc_port = (\d+)")
     device_re = re.compile("(device_id|instance) = ([^\s,]+)")
 
     fnames = os.listdir(args.log_dir)
@@ -586,7 +708,6 @@ def list_ports_cmd(args):
     for line in open(latest_log):
         lm = log_re.match(line)
         if not lm: continue
-        print(line)
         pm = port_re.search(line)
         dm = device_re.search(line)
 
