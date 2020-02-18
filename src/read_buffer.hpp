@@ -35,6 +35,7 @@ class Paf {
     public:
     enum Tag {MAP_TIME, 
               WAIT_TIME, 
+              RECEIVE_TIME,
               CHANNEL, 
               EJECT, 
               READ_START, 

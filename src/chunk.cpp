@@ -47,7 +47,7 @@ Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 chunk_start,
 }
 
 Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 start_time, 
-             const std::vector<float> &raw_data, u32 raw_st=0, u32 raw_len=4000) 
+             const std::vector<float> &raw_data, u32 raw_st=0, u32 raw_len=PARAMS.chunk_len) 
     : id_(id),
       channel_idx_(channel-1),
       number_(number),

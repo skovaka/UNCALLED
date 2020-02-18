@@ -160,6 +160,8 @@ class Params {
                          float pa_ranges,
                          float digitisation = -1);
 
+    u32 get_time();
+
     Mode mode;
 
     BwaFMI fmi;
@@ -241,6 +243,8 @@ class Params {
            float _sim_gaps,
            bool  _sim_even,
            bool  _sim_odd);
+
+    Timer master_time;
 };
 
 extern Params PARAMS;

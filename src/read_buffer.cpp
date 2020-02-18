@@ -27,6 +27,7 @@
 const std::string Paf::PAF_TAGS[] = {
     "mt", //MAP_TIME
     "wt", //WAIT_TIME
+    "rt", //RECEIVE_TIME
     "ch", //CHANNEL
     "ej", //UNBLOCK
     "st", //START_TIME
@@ -350,6 +351,7 @@ ReadBuffer::ReadBuffer(Chunk &first_chunk)
       num_chunks_(1),
       chunk_processed_(false),
       loc_(id_, channel_idx_+1, start_sample_) {
+    loc_.set_int(Paf::Tag::RECEIVE_TIME, PARAMS.get_time());
     set_raw_len(first_chunk.size());
     first_chunk.pop(chunk_);
 }

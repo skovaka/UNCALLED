@@ -10,3 +10,6 @@
 [submodule "pdqsort"]
 	path = pdqsort
 	url = https://github.com/orlp/pdqsort
+[submodule "read_until_api"]
+	path = read_until_api
+	url = https://github.com/nanoporetech/read_until_api.git

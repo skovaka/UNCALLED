@@ -278,8 +278,13 @@ Params::Params(Mode _mode,
 
 
     bp_per_samp = bp_per_sec / sample_rate;
+    
+    master_time.reset();
 }
 
+u32 Params::get_time() {
+    return master_time.get();
+}
 
 float Params::get_prob_thresh(u64 fmlen) const {
     return prob_threshes[__builtin_clzll(fmlen)];
