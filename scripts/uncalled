@@ -59,9 +59,10 @@ def add_ru_opts(p):
     p.add_argument("-D", "--deplete", required=False, action='store_true', default=False, help="Will eject reads that align to index")
     p.add_argument("-E", "--enrich", required=False, action='store_true', default=False, help="Will eject reads that don't align to index")
     p.add_argument("-c", "--max-chunks-proc", default=10, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
+    p.add_argument("--full", action='store_true', help="Will monitor all pores if set (default)")
     p.add_argument("--even", action='store_true', help="Will only monitor even pores if set")
     p.add_argument("--odd", action='store_true', help="Will only monitor odd pores if set")
-    p.add_argument("--chunk-len", required=False, type=int, default=4000, help="Length of chunks")
+    p.add_argument("--chunk-size", required=False, type=float, default=1, help="Length of chunks in seconds")
     p.add_argument("--evt-buffer-len", default=6000, type=int, help="Size of buffer used to normalize and read events")
     p.add_argument("--evt-batch-size", default=5, type=int, help="Number of events simulator will mapping per read per thread iteration. Only has effect when --unblock is set")
     p.add_argument("--evt-timeout", default=10.0, type=float, help="Simulator will stop aligning event batch if average time in MS to mapping an event exceeds this. Only has effect when --unblock is set")
@@ -73,8 +74,6 @@ def add_realtime_opts(p):
     p.add_argument('--host', default='127.0.0.1', help='MinKNOW server host.')
     p.add_argument('--port', type=int, default=8000, help='MinKNOW server port.')
     p.add_argument('--duration', type=float, default=None, help='Duration to map real-time run in hours. Should be slightly longer than specified runtime to add wiggle room.')
-    p.add_argument('--post-time', type=float, default=60, help='Extra time to wait after sequencing to finish analysis')
-    p.add_argument('--post-script', type=str, default=None, help='Script to run after analysis finishes')
 
 def add_list_ports_opts(p):
     p.add_argument('--log-dir', default='/var/log/MinKNOW', help='Directory to find MinKNOW log files')
@@ -273,10 +272,10 @@ def realtime_cmd(args):
     client = None
 
     try:
-        client = minknow_client.Client(args.host, args.port, args.chunk_len)
+        client = minknow_client.Client(args.host, args.port, args.chunk_size)
 
-
-        client.run()
+        if not client.run():
+            sys.exit(1)
 
         if (args.enrich and args.deplete) or not (args.enrich or args.deplete):
             sys.stderr.write("Must include exactly one of '--enrich' or '--deplete'\n")
@@ -302,7 +301,7 @@ def realtime_cmd(args):
                             args.evt_window_length2,
                             args.threads,
                             args.num_channels,
-                            args.chunk_len,
+                            int(args.chunk_size*4000),
                             args.evt_batch_size,
                             args.evt_timeout,
                             args.evt_threshold1,
@@ -377,7 +376,6 @@ def realtime_cmd(args):
                 #last_time = time.time()
 
             if client.get_runtime() >= end_time:
-                client.log("Ending")
                 client.reset()
                 client = None
                 break
@@ -392,15 +390,14 @@ def realtime_cmd(args):
     except Exception as e:
         sys.stderr.write(traceback.format_exc())
 
+    #client.log("Finished")
+
     if client != None:
         client.reset()
 
     if pool != None:
         pool.stop_all()
 
-    if args.post_script != None:
-        sys.stderr.write("Running post-script: '%s'\n" % args.post_script)
-        subprocess.call([args.post_script])
 
 
 def simulate_cmd(args):
@@ -426,7 +423,7 @@ def simulate_cmd(args):
                         args.evt_window_length2,
                         args.threads,
                         args.num_channels,
-                        args.chunk_len,
+                        int(args.chunk_size*4000),
                         args.evt_batch_size,
                         args.evt_timeout,
                         args.evt_threshold1,

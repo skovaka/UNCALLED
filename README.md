@@ -20,7 +20,7 @@ Read the [preprint on BioRxiv](https://www.biorxiv.org/content/10.1101/2020.02.0
 > python setup.py install
 ```
 
-UNCALLED for ReadUntil sequenecing requires the [ONT ReadUntil API](https://github.com/nanoporetech/read_until_api). UNCALLED must then be installed into the MinKNOW environment alongside the ReadUntil API (see Real-Time ReadUntil below).
+UNCALLED for ReadUntil sequenecing requires the [ONT ReadUntil API](https://github.com/nanoporetech/read_until_api), which is provided as a submodule but must be installed separately into the MinKNOW environment. UNCALLED must also be installed into the MinKNOW environment alongside the ReadUntil API for ReadUntil sequencing (see Real-Time ReadUntil below).
 
 Most dependecies included via submodules, so be sure to clone with `git --recursive`
 
@@ -104,15 +104,16 @@ sudo /opt/ont/minknow/ont-python/bin/python setup.py install
 
 The above commands assume your MinKNOW python environment is located at `/opt/ont/minknow/ont-python`.
 
-We recommend that you try mapping fast5s with the MinKNOW installation via `uncalled map` before real-time enrichment, as runtime issues involving hdf5 libraries could come up if UNCALELD is not installed properly.
+We recommend that you try mapping fast5s with the MinKNOW installation via `uncalled map` before real-time enrichment, as runtime issues involving hdf5 libraries could come up if UNCALLED is not installed properly.
 
-The command should be run once sequencing has begun and the "Channels Panel" has appeared. Running earlier may cause issues, including crashing MinKNOW and requiring you to restart your computer. Reads will not be ejected until the first mux scan has finished, which provides a ~1.5 minute window to start UNCALLED without missing any reads.
+The command can be run at any time before or during a sequencing run, although if you want to chagne the chunk size you must run the commend *before* startin the run (see below). Reads will not be ejected until after the first mux scan finishes.
 
 Arguments:
 
 - `-x/--bwa-prefix` the prefix of the index to align to. Should be a BWA index that `uncalled index` was run on
 - `-t/--threads` number of threads to use for mapping (default: 1)
-- `-c/--max-chunks-proc` number of chunks to attempt mapping before giving up on a read (default: 10). One chunk is approximately one second of sequencing (~450bp).
+- `-c/--max-chunks-proc` number of chunks to attempt mapping before giving up on a read (default: 10).
+- `--chunk-size` size of chunks in seconds (default: 1). Note: this is a new feature and may not work as intended (see below)
 - `--port` MinION device port. Use `uncalled list-ports` command to see all devices that have been plugged in since MinKNOW started.
 - `--enrich` will *keep* reads that map to the reference if included
 - `--deplete` will *eject* reads that map to the reference if included
@@ -123,6 +124,11 @@ Arguments:
 - `--post-time` buffer time to wait after the last read before running the post-script, in seconds (default: 60). Useful because MinKNOW's sequencing time is not always exact.
 
 Note exactly one of `--deplete` or `--enrich` must be specified
+
+###Altering Chunk Size
+
+The ReadUntil API recieves signal is "chunks", which by default are one second's worth of signal. This can be changed using the `--chunk-size` parameter. Note that `--max-chunks-proc` should also be changed to compensate for changes to chunks size. *If the chunk size is changed, you must start running UNCALLED before sequencing begins.* UNCALLED is unable change the chunk size mid-seqencing-run. In general reducing the chunk size should improve enrichment, although [previous work](http://dx.doi.org/10.1101/2020.02.03.926956) has found that the API becomes unreliable with chunks sizes less than 0.4 seconds. We have not thoroughly tested this feature, and recommend using the default 1 second chunk size for most cases. In the future this default size may be reduced.
+
 
 ## Output Format
 
@@ -180,7 +186,7 @@ For ReadUntil sequencing, the first decision to make is whether to perform **enr
 In enrichment mode, UNCALLED will eject a read if it *does not* map to the reference, meaning your target should be the reference. 
 In depletion mode, UNCALLED will eject a read if it *does* map to the reference, meaning your target should be everything except your reference.
 
-Note that enrichment necessitates a quick decision as to whether or not a read maps, since you want to eject a read as fast as possible. Usually ~95% of reads can be mapped within three seconds for highly non-repetitive references, so setting `-c/--max-chunks-proc` to `3` generally works well for enrichment. The default value of `10` works well for depletion.
+Note that enrichment necessitates a quick decision as to whether or not a read maps, since you want to eject a read as fast as possible. Usually ~95% of reads can be mapped within three seconds for highly non-repetitive references, so setting `-c/--max-chunks-proc` to `3` generally works well for enrichment. The default value of `10` works well for depletion. Note these values assume `--chunk-size` is set to the default 1 second.
 
 UNCALLED currently does not support large (> ~100Mb) or highly repetitive references. 
 The speed and mapping rate both progressively drop as references become larger and more repetitive. 

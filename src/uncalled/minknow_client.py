@@ -19,11 +19,16 @@ if ru_loaded:
     MK_PROCESSING = 3
     MK_FINISHING = 4
 
+    RN_STARTING = 0
+    RN_RUNNING = 1
+    RN_FINISHING = 2
+    RN_COMPLETED = 3
+
     class Client(read_until.ReadUntilClient):
         def __init__(self, 
                      mk_host=8000, 
                      mk_port="127.0.0.1", 
-                     chunk_len=4000, 
+                     chunk_size=1.0, 
                      scan_thresh=0.99):
 
             logging.basicConfig(
@@ -45,7 +50,7 @@ if ru_loaded:
 
             self.in_scan = True 
             self.scan_thresh = scan_thresh
-            self.chunk_len = chunk_len
+            self.chunk_size = chunk_size
 
             self.ch_mux = np.zeros(512, dtype=int)
             self.mux_counts = np.zeros(5, dtype=float)
@@ -56,16 +61,18 @@ if ru_loaded:
 
 
         def run(self, steady_wait=10, scan_wait=5, refresh=0.5, **kwargs):
+            self.anl_client = self.connection.analysis_configuration
 
-            self._wait_for_start(steady_wait, refresh)
+            if not self._wait_for_start(steady_wait, refresh):
+                return False
 
             self._start_chmon()
-
-            self._set_chunk_len(scan_wait)
 
             read_until.ReadUntilClient.run(self, *kwargs)
 
             self.start_time = time.time()
+            
+            return True
 
         def reset(self, timeout=5):
             read_until.ReadUntilClient.reset(self, timeout)
@@ -98,6 +105,23 @@ if ru_loaded:
             )
             self.chmon_thread.start()
 
+        def _run_chmon(self, **kwargs):
+            channels = self.connection.data.get_channel_states(
+                first_channel = 1,
+                last_channel = 512,
+                use_channel_states_ids = False
+            )
+
+            try:
+                self._update_muxs(channels)
+            except Exception as e:
+                self.unc_log.error(traceback.format_exc())
+
+            # signal to the server that we are done with the stream.
+            channels.cancel()
+
+            self.log("Finished")
+
         def _scan_update(self):
             #ps = self.in_scan
 
@@ -112,67 +136,6 @@ if ru_loaded:
             #if self.in_scan != ps:
             #    sys.stderr.write("%.2f in_scan changed to %d\n" % 
             #                     (self.get_runtime(), self.in_scan))
-
-        def _get_status(self):
-            return self.connection.acquisition.current_status().status
-
-        def _wait_for_start(self, steady=10, refresh=0.5):
-            if self._get_status() == MK_PROCESSING:
-                self.log("Run already in progress")
-                return True
-
-            processing = False
-            proc_time = None
-            
-            self.log("Waiting for run to start")
-
-            while True:
-                if self._get_status() == MK_PROCESSING:
-                    if proc_time == None:
-                        proc_time = time.time()
-
-                        if not processing:
-                            self.log("Waiting for steady state")
-                            processing = True
-
-                    elif time.time() - proc_time >= steady:
-                        return True
-
-                elif proc_time != None:
-                    proc_time = None
-
-                time.sleep(refresh)
-
-            self.last_scan = time.time()
-
-        def _set_chunk_len(self, scan_wait=5):
-
-            #Don't want to restart acquisition during mux scan
-            scan_gap = time.time() - self.last_scan
-            if self.in_scan or scan_gap < scan_wait:
-                self.log("Checking for initial mux scan")
-                while self.in_scan or scan_gap < scan_wait:
-                    time.sleep(max(0.1, scan_wait - scan_gap))
-                    scan_gap = time.time() - self.last_scan
-
-            chunk_sec = self.chunk_len/4000.0
-
-            client = self.connection.analysis_configuration
-            config = client.get_analysis_configuration()
-
-            prev_sec = config.read_detection.break_reads_after_seconds.value
-
-            self.log("Setting chunk length to %.2f seconds" % chunk_sec)
-            if prev_sec != chunk_sec:
-
-                self.connection.acquisition.stop(wait_until_ready=True, keep_power_on=True)
-
-                config.read_detection.break_reads_after_seconds.value=chunk_sec
-                client.set_analysis_configuration(config)
-
-                self.connection.acquisition.start(wait_until_processing=True)
-
-                self._start_chmon()
 
         def _update_muxs(self, channels):
             for channels in channels:
@@ -189,24 +152,66 @@ if ru_loaded:
 
                 self._scan_update()
 
-                if self._get_status() != MK_PROCESSING:
+                if self._get_minknow_status() != MK_PROCESSING:
                     self.chmon_running.clear()
                     self.running.clear()
                     break
 
 
-        def _run_chmon(self, **kwargs):
-            channels = self.connection.data.get_channel_states(
-                first_channel = 1,
-                last_channel = 512,
-                use_channel_states_ids = False
-            )
 
-            try:
-                self._update_muxs(channels)
-            except Exception as e:
-                sys.unc_log.error(traceback.format_exc())
+        def _get_minknow_status(self):
+            return self.connection.acquisition.current_status().status
 
-            # signal to the server that we are done with the stream.
-            channels.cancel()
+        def _get_run_state(self):
+            return self.connection.acquisition.get_acquisition_info().state
+
+
+        def _wait_for_start(self, steady=10, refresh=0.01):
+            if self._get_minknow_status() == MK_PROCESSING:
+                self.log("Run already in progress")
+                if self._update_chunk_len(False):
+                    self.unc_log.error("ERROR: cannot set chunk size when run is in progress. Please stop the sequencing run and start UNCALLED before re-starting if you want to change the chunks size.")
+                    return False
+                return True
+
+            processing = False
+            proc_time = None
+            
+            self.log("Waiting for run to start")
+
+            while True:
+                status = self._get_minknow_status()
+                state = self._get_run_state()
+
+                if status == MK_STARTING or state == RN_STARTING:
+                    self._update_chunk_len(True)
+
+                if status == MK_PROCESSING:
+                    if proc_time == None:
+                        proc_time = time.time()
+
+                        if not processing:
+                            self.log("Waiting for steady state")
+                            processing = True
+
+                    elif time.time() - proc_time >= steady:
+                        return True
+
+                elif proc_time != None:
+                    proc_time = None
+
+                time.sleep(refresh)
+
+            return False
+
+        def _update_chunk_len(self, change=True):
+            anl_config = self.anl_client.get_analysis_configuration()
+            if self.chunk_size != anl_config.read_detection.break_reads_after_seconds.value:
+                if change:
+                    anl_config.read_detection.break_reads_after_seconds.value=self.chunk_size
+                    self.anl_client.set_analysis_configuration(anl_config)
+                    self.log("Setting chunk size to %.2f" % (self.chunk_size))
+                return True
+            return False
+
 
