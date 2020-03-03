@@ -125,7 +125,7 @@ Arguments:
 
 Note exactly one of `--deplete` or `--enrich` must be specified
 
-###Altering Chunk Size
+### Altering Chunk Size
 
 The ReadUntil API recieves signal is "chunks", which by default are one second's worth of signal. This can be changed using the `--chunk-size` parameter. Note that `--max-chunks-proc` should also be changed to compensate for changes to chunks size. *If the chunk size is changed, you must start running UNCALLED before sequencing begins.* UNCALLED is unable change the chunk size mid-seqencing-run. In general reducing the chunk size should improve enrichment, although [previous work](http://dx.doi.org/10.1101/2020.02.03.926956) has found that the API becomes unreliable with chunks sizes less than 0.4 seconds. We have not thoroughly tested this feature, and recommend using the default 1 second chunk size for most cases. In the future this default size may be reduced.
 
