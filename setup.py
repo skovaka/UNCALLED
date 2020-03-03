@@ -41,7 +41,7 @@ uncalled = Extension(
 )
 
 setup(name = "uncalled",
-      version = "1.1",
+      version = "1.2",
       description = "Rapidly maps raw nanopore signal to DNA references",
       author = "Sam Kovaka",
       author_email = "skovaka@gmail.com",

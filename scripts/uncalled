@@ -45,7 +45,8 @@ def add_bwa_opt(p):
 
 def add_index_opts(p):
     p.add_argument("-i", "--ref-fasta", required=True, type=str, help="FASTA file used to build BWA index")
-    p.add_argument("-s", "--sample-dist", default=100, type=int, help="Sampling distance between reference self-alignments. Reduce number for larger genomes.")
+    p.add_argument("-s", "--max-sample-dist", default=100, type=int, help="Maximum average sampling distance between reference self-alignments.")
+    p.add_argument("--min-samples", default=50000, type=int, help="Minimum number of self-alignments to produce (approximate, due to deterministically random start locations)")
     p.add_argument("-k", "--kmer-len", default=5, type=int, help="Model k-mer length")
     p.add_argument("-1", "--matchpr1", default=0.6334, type=float, help="Minimum event match probability")
     p.add_argument("-2", "--matchpr2", default=0.9838, type=float, help="Maximum event match probability")
@@ -150,7 +151,6 @@ def index_cmd(args):
     sys.stderr.write("Initializing parameter search\n")
     p = index.IndexParameterizer(args)
 
-    sys.stderr.write("Writing default parameters\n")
     p.add_preset("default", tgt_speed=115)
 
     if args.probs != None:
@@ -198,6 +198,7 @@ def map_cmd(args):
 
     assert_exists(index.MODEL_FNAME)
     assert_exists(args.bwa_prefix + ".bwt")
+    assert_exists(args.bwa_prefix + ".uncl")
     assert_exists(args.fast5s)
     for fname in open(args.fast5s):
         assert_exists(fname.strip())
@@ -267,6 +268,7 @@ def realtime_cmd(args):
 
     assert_exists(index.MODEL_FNAME)
     assert_exists(args.bwa_prefix + ".bwt")
+    assert_exists(args.bwa_prefix + ".uncl")
 
     pool = None
     client = None

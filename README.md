@@ -26,7 +26,7 @@ Most dependecies included via submodules, so be sure to clone with `git --recurs
 
 UNCALLED must be installed into a python environment. To install without root privileges use the `--user` or `--prefix=<local-dir>` flag when installing, or use a tool such as [virtualenv](https://virtualenv.pypa.io) or [anaconda](https://www.anaconda.com).
 
-Requires python-dev and GCC >= 4.8.1
+Requires python-dev, numpy, and GCC >= 4.8.1
 
 [HDF5](https://www.hdfgroup.org/downloads/hdf5/) must be installed. Libraries and headers should be in system paths (ie `$LD_LIBRARY_PATH` and `$CPATH` respectively), or specified by running `python setup.py build_ext --library-dirs <hdf5-location>/lib --include-dirs <hdf5-location>/include` prior to installation.
 
@@ -190,8 +190,9 @@ Note that enrichment necessitates a quick decision as to whether or not a read m
 
 UNCALLED currently does not support large (> ~100Mb) or highly repetitive references. 
 The speed and mapping rate both progressively drop as references become larger and more repetitive. 
-Bacterial genomes or small collections of bacterial genomes typically work well. 
+Bacterial genomes or small collections of divergent bacterial genomes typically work well. 
 Small segments of eukaryotic genomes can also be used, however the presence of any repetitvie elements will harm the performance. 
+Collections of highly similar genomes wil not work well, as conserved sequences introduce repeats.
 See [masking](masking/) for repeat masking scripts and guidlines.
 
 ReadUntil works best with longer reads. Maximize your read lengths for best results. You may also need to perform a nuclease flush and reloading to achive the highest yield of on-target bases.

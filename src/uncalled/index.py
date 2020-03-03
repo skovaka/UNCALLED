@@ -34,13 +34,13 @@ ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers.txt")
 MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers_threshs.txt")
 PARAM_SUFF = ".uncl"
+ANN_SUFF = ".ann"
 
 def power_fn(xmax, ymin, ymax, exp, N=100):
     dt = 1.0/N
     t = np.arange(0, 1+dt, dt)
 
     return t*xmax, (t**exp) * (ymax-ymin) + ymin
-
 
 class IndexParameterizer:
 
@@ -57,7 +57,17 @@ class IndexParameterizer:
 
     def calc_map_stats(self, args):
 
-        fmlens = mapping.self_align(args.bwa_prefix, args.ref_fasta, args.sample_dist)
+        ann_in = open(args.bwa_prefix + ANN_SUFF)
+        header = ann_in.readline()
+        ref_len = int(header.split()[0])
+        ann_in.close()
+
+        if ref_len / args.max_sample_dist < args.min_samples:
+            sample_dist = int(np.ceil(ref_len/args.min_samples))
+        else:
+            sample_dist = args.max_sample_dist
+
+        fmlens = mapping.self_align(args.bwa_prefix, args.ref_fasta, sample_dist)
         path_kfmlens = [p[args.kmer_len-1:] if len(p) >= args.kmer_len else [1] for p in fmlens]
 
         max_pathlen = 0
@@ -112,7 +122,8 @@ class IndexParameterizer:
     def get_fn_speed(self, fn_locs, fn_pcks):
         pcks = np.interp(self.all_locs, fn_locs, fn_pcks)
         counts = np.interp(pcks, self.model_pcks, self.model_counts)
-        return np.dot(counts, self.loc_fms) / (self.speed_denom)
+        speed = np.dot(counts, self.loc_fms) / (self.speed_denom)
+        return speed
 
     def get_fn_prob(self, fn_locs, fn_pcks):
         return np.prod(np.interp(self.conf_locs, fn_locs, fn_pcks))
@@ -122,20 +133,30 @@ class IndexParameterizer:
         exp = exp_st
         exp_min, exp_max = (None, None)
 
-        round_locs = np.arange(np.round(self.fm_locs[0]))
-        full_locs = np.arange(len(self.loc_fms))
+        pdelta = None
+
+        pck1 = self.pck1
+        pck2 = self.pck2
+
+        sys.stderr.write("Computing %s parameters\n" % name)
 
         while True:
-            fn_locs,fn_pcks = power_fn(self.fm_locs[0], self.pck1, self.pck2, exp)
+            fn_locs,fn_pcks = power_fn(self.fm_locs[0], pck1, pck2, exp)
 
             if tgt_prob is not None:
                 delta = self.get_fn_prob(fn_locs, fn_pcks) - tgt_prob
             elif tgt_speed is not None:
                 delta = self.get_fn_speed(fn_locs, fn_pcks) - tgt_speed
 
-
             if abs(delta) <= eps:
                 break
+            
+            if delta == pdelta:
+                #This works well for small references
+                #TODO: check for larger references
+                sys.stderr.write("Maxed out %s parameters\n" % name)
+                break
+            pdelta = delta
 
             if delta < 0:
                 exp_max = exp
@@ -160,6 +181,10 @@ class IndexParameterizer:
         prob = self.get_fn_prob(fn_locs, fn_pcks)
         speed = self.get_fn_speed(fn_locs, fn_pcks)
 
+        #while len(fm_ekms) > 2 and fm_ekms[-1] == fm_ekms[-2]:
+        #    fm_ekms = fm_ekms[:-1]
+
+        sys.stderr.write("Writing %s parameters\n" % name)
         self.functions[name] = (fm_ekms, prob, speed)
 
     def write(self):
