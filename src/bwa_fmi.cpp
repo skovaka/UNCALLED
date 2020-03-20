@@ -26,7 +26,10 @@
 #include <algorithm>
 #include <iomanip>
 #include <climits>
+#include <cmath>
 #include "bwa_fmi.hpp"
+
+BwaFMI NULL_FMI;
 
 BwaFMI::BwaFMI() {
     loaded_ = false;
@@ -34,7 +37,7 @@ BwaFMI::BwaFMI() {
     bns_ = NULL;
 }
 
-BwaFMI::BwaFMI(const std::string &prefix) {
+BwaFMI::BwaFMI(const std::string &prefix, const KmerModel &model) {
     if (prefix.empty()) {
         loaded_ = false;
         index_ = NULL;
@@ -48,6 +51,24 @@ BwaFMI::BwaFMI(const std::string &prefix) {
         bns_ = bns_restore(prefix.c_str());
 
         loaded_ = true;
+    }
+
+    if (model.is_loaded()) {
+        u64 max_len = 0;
+        kmer_ranges_ = std::vector<Range>(model.kmer_count());
+        for (u16 k = 0; k < model.kmer_count(); k++) {
+
+            Range r = get_base_range(model.get_first_base(k));
+            for (u8 i = 1; i < model.kmer_len(); i++) {
+                r = get_neighbor(r, model.get_base(k, i));
+            }
+
+            kmer_ranges_[k] = r;
+
+            if (r.length() > max_len) {
+                max_len = r.length();
+            }
+        }
     }
 }
 
@@ -66,7 +87,11 @@ Range BwaFMI::get_neighbor(Range r1, u8 base) const {
     return Range(index_->L2[base] + os + 1, index_->L2[base] + oe);
 }
 
-Range BwaFMI::get_full_range(u8 base) const {
+Range BwaFMI::get_kmer_range(u16 kmer) const {
+    return kmer_ranges_[kmer];
+}
+
+Range BwaFMI::get_base_range(u8 base) const {
     return Range(index_->L2[base], index_->L2[base+1]);
 }
 

@@ -27,14 +27,9 @@ import sys
 import os
 import numpy as np
 import argparse
-from uncalled import mapping
+from uncalled import mapping, params
 from bisect import bisect_left, bisect_right
 
-ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
-MODEL_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers.txt")
-MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers_threshs.txt")
-PARAM_SUFF = ".uncl"
-ANN_SUFF = ".ann"
 
 def power_fn(xmax, ymin, ymax, exp, N=100):
     dt = 1.0/N
@@ -45,7 +40,7 @@ def power_fn(xmax, ymin, ymax, exp, N=100):
 class IndexParameterizer:
 
     def __init__(self, args):
-        self.out_fname = args.bwa_prefix + PARAM_SUFF
+        self.out_fname = args.bwa_prefix + params.INDEX_UNCL_SUFF
 
         self.pck1 = args.matchpr1
         self.pck2 = args.matchpr2
@@ -57,7 +52,7 @@ class IndexParameterizer:
 
     def calc_map_stats(self, args):
 
-        ann_in = open(args.bwa_prefix + ANN_SUFF)
+        ann_in = open(args.bwa_prefix + params.INDEX_ANN_SUFF)
         header = ann_in.readline()
         ref_len = int(header.split()[0])
         ann_in.close()
@@ -104,7 +99,7 @@ class IndexParameterizer:
         self.conf_locs = np.arange(np.round(self.fm_locs[0]))
         self.all_locs = np.arange(max_pathlen)
 
-    def get_model_threshs(self, fname=MODEL_THRESHS_FNAME):
+    def get_model_threshs(self, fname=params.MODEL_THRESHS_FNAME):
         prob_thresh_in = open(fname)
         threshs = list()
         freqs = list()

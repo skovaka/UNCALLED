@@ -28,7 +28,6 @@
 #include <climits>
 #include "util.hpp"
 #include "range.hpp"
-#include "params.hpp"
 
 class FMProfiler {
     public:

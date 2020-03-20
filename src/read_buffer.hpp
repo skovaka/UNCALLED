@@ -33,6 +33,7 @@
 
 class Paf {
     public:
+
     enum Tag {MAP_TIME, 
               WAIT_TIME, 
               RECEIVE_TIME,
@@ -63,6 +64,7 @@ class Paf {
     void set_float(Tag t, float v);
     void set_str(Tag t, std::string v);
 
+
     private:
     static const std::string PAF_TAGS[];
 
@@ -78,8 +80,18 @@ class Paf {
     std::vector< std::pair<Tag, std::string> > str_tags_;
 };
 
+typedef struct {
+    u16 num_channels;
+    float bp_per_sec;
+    float sample_rate;
+    float bp_per_samp;
+    float calib_digitisation;
+    std::vector<float> calib_offsets, calib_coefs;
+} ReadParams;
+
 class ReadBuffer {
     public:
+    static ReadParams PRMS;
 
     enum Source {MULTI, SINGLE, BULK, LIVE};
 
@@ -87,7 +99,7 @@ class ReadBuffer {
     ReadBuffer();
     ReadBuffer(const ReadBuffer &read);
     ReadBuffer(const std::string &filename);
-    ReadBuffer(const hdf5_tools::File &file, Source source, const std::string root="/");
+    ReadBuffer(const hdf5_tools::File &file, const std::string &raw_path, const std::string &ch_path);
     ReadBuffer(Source source, u16 channel, const std::string &id = "", 
                u32 number = 0, u64 start_sample = 0, 
                const std::vector<float> raw_data = std::vector<float>(),
@@ -112,11 +124,14 @@ class ReadBuffer {
     u16 get_channel() const;
     u16 get_channel_idx() const;
 
-    static void set_calibration(float digitisation, 
-                                const std::vector<float> &offsets, 
-                                const std::vector<float> &pa_ranges);
-    static float sampling_rate;
-    static std::vector<float> cal_offsets_, cal_coefs_;
+    static std::vector<float> calibrate(u16 ch, std::vector<i16> samples);
+    static void calibrate(u16 ch, std::vector<float> samples);
+
+    static float calibrate(u16 ch, float sample);
+
+    static void set_calibration(const std::vector<float> &offsets, const std::vector<float> &pa_ranges, float digitisation);
+
+    static void set_calibration(u16 channel, float offsets, float pa_ranges, float digitisation);
 
     Source source_;
     u16 channel_idx_;
@@ -133,14 +148,5 @@ class ReadBuffer {
 };
 
 bool operator< (const ReadBuffer &r1, const ReadBuffer &r2);
-
-std::deque<std::string> load_fast5s(const std::string &fast5_list, std::deque<ReadBuffer> &list, u32 max_load = 0, std::unordered_set<std::string> filter=std::unordered_set<std::string>());
-
-u32 load_fast5s(std::deque<std::string> &fast5_list, 
-                std::deque<ReadBuffer> &list, 
-                u32 max_load = 0, 
-                std::unordered_set<std::string> filter=std::unordered_set<std::string>());
-
-u32 load_multi_fast5(const hdf5_tools::File &file, std::deque<ReadBuffer> &list, u32 max_load = 0);
 
 #endif

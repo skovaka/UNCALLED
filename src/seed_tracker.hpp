@@ -30,8 +30,19 @@
 #include <algorithm>
 #include "util.hpp"
 #include "range.hpp"
+//typedef struct {
+//    float min_mean_conf = 6.00;
+//    float min_top_conf = 1.85;
+//} TrackerParams;
+
+typedef struct {
+    u32 min_aln_len;
+    float min_mean_conf;
+    float min_top_conf;
+} TrackerParams;
 
 class SeedGroup {
+
     public:
 
     u64 ref_st_;
@@ -60,8 +71,10 @@ bool operator< (const SeedGroup &q1, const SeedGroup &q2);
 std::ostream &operator<< (std::ostream &out, const SeedGroup &a);
 
 class SeedTracker {
-
     public:
+    static TrackerParams PRMS;
+    
+    //const TrackerParams prms;
 
     std::set<SeedGroup> alignments_;
     std::multiset<u32> all_lens_;
@@ -70,6 +83,7 @@ class SeedTracker {
     float len_sum_;
 
     SeedTracker();
+    SeedTracker(TrackerParams params);
 
     //SeedGroup add_seed(SeedGroup sg);
     void add_seed(u64 ref_en, u32 ref_len, u32 evt_st);
@@ -83,6 +97,7 @@ class SeedTracker {
     std::vector<SeedGroup> get_alignments(u8 min_len);
 
     bool check_ratio(const SeedGroup &aln, float ratio);
+    bool check_map_conf(u32 seed_len, float mean_len, float second_len);
 
     void print(std::ostream &out, u16 max_out);
 };

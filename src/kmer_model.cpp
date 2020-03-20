@@ -32,6 +32,7 @@
 
 #define PI 3.1415926535897
 
+KmerModel NULL_MODEL;
 
 std::string get_reverse_complement(const std::string &seq) {
     std::string rev(seq.size(), 'N');
@@ -50,7 +51,7 @@ std::string get_complement(const std::string &seq) {
 }
 
 KmerModel::KmerModel() 
-    : k_(0) {}
+    :  k_(0), loaded_(false) {}
 
 KmerModel::KmerModel(std::string model_fname, bool complement) {
     std::ifstream model_in(model_fname);
@@ -168,6 +169,11 @@ KmerModel::KmerModel(std::string model_fname, bool complement) {
         model_stdv_ += pow(lv_means_[k_id] - model_mean_, 2);
     model_stdv_ = sqrt(model_stdv_ / kmer_count_);
 
+    loaded_ = true;
+}
+
+bool KmerModel::is_loaded() const {
+    return loaded_;
 }
 
 bool KmerModel::event_valid(const Event &e) const {

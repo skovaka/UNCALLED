@@ -47,6 +47,8 @@ struct Detector {
 
 class EventDetector {
     public:
+    static EventParams PRMS;
+
     EventDetector();
 
     ~EventDetector();
@@ -65,7 +67,6 @@ class EventDetector {
     bool peak_detect(float current_value, Detector &detector);
     Event create_event(u32 evt_en); 
 
-    const EventParams params;
     const u32 BUF_LEN;
     double *sum, *sumsq;
 

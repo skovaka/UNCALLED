@@ -41,6 +41,8 @@ class KmerModel {
     KmerModel();
     KmerModel(std::string model_fname, bool complement);
 
+    bool is_loaded() const;
+
     NormParams get_norm_params(const std::vector<Event> &events) const;
     void normalize(std::vector<Event> &events, NormParams norm={0, 0}) const;
 
@@ -77,10 +79,12 @@ class KmerModel {
     private:
     u8 k_;
     u16 kmer_count_, K_MASK_;
-    bool complement_;
+    bool loaded_, complement_;
 
     std::vector<u16> rev_comp_ids_;
 };
+
+extern KmerModel NULL_MODEL;
 
 #endif
 

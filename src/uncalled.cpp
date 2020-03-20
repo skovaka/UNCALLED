@@ -3,29 +3,24 @@
 #include "pybind11/stl.h"
 #include "self_align_ref.hpp"
 #include "mapper.hpp"
-#include "simulator.hpp"
+//#include "simulator.hpp"
 #include "fast5_pool.hpp"
 #include "chunk_pool.hpp"
 #include "chunk.hpp"
 #include "read_buffer.hpp"
-#include "params.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
 
+
 PYBIND11_MODULE(mapping, m) {
     m.doc() = "UNCALLED";
 
+    py::class_<Conf> conf(m, "Conf");
 
-    py::class_<Params>(m, "Params")
-        //Map constructor
-        .def_static("init_map", &Params::init_map)
-        .def_static("init_realtime", &Params::init_realtime)
-        .def_static("init_sim", &Params::init_sim);
-
-    //py::class_<Mapper>(m, "Mapper")
-    //    .def(py::init<UncalledOpts &>())
-    //    .def("map_fast5", &Mapper::map_fast5);
+    conf.def(py::init<const std::string &>())
+        .def("load_conf", &Conf::load_conf);
+    Conf::add_pybind_vars(conf);
 
     py::class_<Paf> paf(m, "Paf");
     paf.def(py::init())
@@ -44,18 +39,32 @@ PYBIND11_MODULE(mapping, m) {
         .value("KEEP", Paf::Tag::KEEP)
         .export_values();
 
+
+
+    //.def(py::init<const std::string &,const std::string &,u32>())
     py::class_<Fast5Pool>(m, "Fast5Pool")
-        .def(py::init<const std::string &,const std::string &,u32>())
+        .def(py::init<Conf &>())
         .def("update", &Fast5Pool::update)
         .def("all_finished", &Fast5Pool::all_finished)
         .def("stop_all", &Fast5Pool::stop_all); 
 
     py::class_<ChunkPool>(m, "ChunkPool")
-        .def(py::init()) 
+        .def(py::init<Conf &>()) 
         .def("update", &ChunkPool::update)
         .def("all_finished", &ChunkPool::all_finished)
         .def("stop_all", &ChunkPool::stop_all)
         .def("add_chunk", &ChunkPool::add_chunk);
+    
+    py::enum_<RealtimeParams::Mode>(m, "RealtimeMode")
+        .value("DEPLETE", RealtimeParams::Mode::DEPLETE)
+        .value("ENRICH", RealtimeParams::Mode::ENRICH)
+        .export_values();
+
+    py::enum_<RealtimeParams::ActiveChs>(m, "ActiveChs")
+        .value("FULL", RealtimeParams::ActiveChs::FULL)
+        .value("EVEN", RealtimeParams::ActiveChs::EVEN)
+        .value("ODD", RealtimeParams::ActiveChs::ODD)
+        .export_values();
 
     py::class_<Chunk>(m, "Chunk")
         .def(py::init<const std::string &, //id, 
@@ -79,15 +88,15 @@ PYBIND11_MODULE(mapping, m) {
         .def("print", &Chunk::print)
         .def("size", &Chunk::size);
 
-    py::class_<Simulator>(m, "Simulator")
-        .def(py::init())
-        .def("add_fast5s", &Simulator::add_fast5s)
-        .def("get_read_chunks", &Simulator::get_read_chunks)
-        .def("stop_receiving_read", &Simulator::stop_receiving_read)
-        .def("unblock", &Simulator::unblock)
-        .def("get_time", &Simulator::get_time)
-        .def("start", &Simulator::start)
-        .def("is_running", &Simulator::is_running);
+    //py::class_<Simulator>(m, "Simulator")
+    //    .def(py::init())
+    //    .def("add_fast5s", &Simulator::add_fast5s)
+    //    .def("get_read_chunks", &Simulator::get_read_chunks)
+    //    .def("stop_receiving_read", &Simulator::stop_receiving_read)
+    //    .def("unblock", &Simulator::unblock)
+    //    .def("get_time", &Simulator::get_time)
+    //    .def("start", &Simulator::start)
+    //    .def("is_running", &Simulator::is_running);
     
     m.def("self_align", &self_align);
 }

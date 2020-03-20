@@ -27,6 +27,7 @@
 #include <string>
 #include <climits>
 #include <utility>
+#include "kmer_model.hpp"
 #include "util.hpp"
 #include "range.hpp"
 #include "bwa/bwt.h"
@@ -36,12 +37,13 @@ class BwaFMI {
     public:
 
     BwaFMI();
-    BwaFMI(const std::string &prefix);
+    BwaFMI(const std::string &prefix, const KmerModel &model=NULL_MODEL);
     void destroy();
 
     Range get_neighbor(Range range, u8 base) const;
 
-    Range get_full_range(u8 base) const;
+    Range get_base_range(u8 base) const;
+    Range get_kmer_range(u16 kmer) const;
 
     u64 sa(u64 i) const;
 
@@ -55,6 +57,9 @@ class BwaFMI {
     bwt_t *index_;
     bntseq_t *bns_;
     bool loaded_;
+    std::vector<Range> kmer_ranges_;
 };
+
+extern BwaFMI NULL_FMI;
 
 #endif

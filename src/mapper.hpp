@@ -39,8 +39,33 @@
 //#define DEBUG_SEEDS
 //#define FM_PROFILER
 
+typedef struct {
+    //standard mapping
+    u32 seed_len;
+    u32 min_rep_len;
+    u32 max_rep_copy;
+    u32 max_paths;
+    u32 max_consec_stay;
+    u32 max_events;
+    float max_stay_frac;
+    float min_seed_prob;
+    std::vector<float> prob_threshes;
+
+    //realtime only
+    u32 max_chunks;
+    u32 evt_buffer_len;
+    u16 evt_batch_size;
+    float chunk_size;
+    float evt_timeout;
+    float max_chunk_wait;
+} MapperParams;
+
 class Mapper {
     public:
+
+    static MapperParams PRMS;
+    static BwaFMI fmi;
+    static KmerModel model;
 
     enum State { INACTIVE, MAPPING, SUCCESS, FAILURE };
 
@@ -49,6 +74,9 @@ class Mapper {
 
     ~Mapper();
 
+    float get_prob_thresh(u64 fmlen) const;
+    float get_source_prob() const;
+    u16 get_max_events() const;
 
     void new_read(ReadBuffer &r);
     void new_read(Chunk &c);
@@ -61,6 +89,8 @@ class Mapper {
 
     void skip_events(u32 n);
     bool add_chunk(Chunk &chunk);
+
+    u32 event_to_bp(u32 evt_i, bool last=false) const;
 
     u16 process_chunk();
     bool map_chunk();
@@ -139,6 +169,7 @@ class Mapper {
 
     void set_ref_loc(const SeedGroup &seeds);
 
+
     EventDetector event_detector_;
     Normalizer norm_;
     SeedTracker seed_tracker_;
@@ -161,7 +192,6 @@ class Mapper {
     std::ofstream seeds_out_;
     void print_debug_seeds(PathBuffer &p);
     #endif
-
 };
 
 

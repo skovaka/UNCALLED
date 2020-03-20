@@ -31,8 +31,8 @@
 #include "self_align_ref.hpp"
 
 std::vector< std::vector<u64> > self_align(const std::string &bwa_prefix,
-                                         const std::string fasta_fname,
-                                         u32 sample_dist) {
+                                           const std::string fasta_fname,
+                                           u32 sample_dist) {
 
     BwaFMI fmi(bwa_prefix);
 
@@ -61,7 +61,8 @@ std::vector< std::vector<u64> > self_align(const std::string &bwa_prefix,
 
             ret.push_back(std::vector<u64>());
 
-            Range r = fmi.get_full_range(bases[i]);
+            //TODO: start with kmers, not bases
+            Range r = fmi.get_base_range(bases[i]);
             u64 j = i+1;
             for (; j < bases.size() && r.length() > 1 ; j++) { //&& (j-i) <= 1000
                 ret.back().push_back(r.length());

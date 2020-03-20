@@ -1,9 +1,9 @@
 #include "normalizer.hpp"
-#include "params.hpp"
+#include "mapper.hpp"
 
 
 Normalizer::Normalizer() 
-    : events_(PARAMS.evt_buffer_len),
+    : events_(Mapper::PRMS.evt_buffer_len),
       mean_(0),
       varsum_(0),
       n_(0),
@@ -68,8 +68,8 @@ void Normalizer::reset(u32 buffer_size = 0) {
 NormParams Normalizer::get_params() const {
     NormParams p;
 
-    p.scale = PARAMS.model.model_stdv_ / sqrt(varsum_ / n_);
-    p.shift = PARAMS.model.model_mean_ - p.scale * mean_;
+    p.scale = Mapper::model.model_stdv_ / sqrt(varsum_ / n_);
+    p.shift = Mapper::model.model_mean_ - p.scale * mean_;
 
     return p;
 }

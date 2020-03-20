@@ -22,7 +22,9 @@
  */
 
 #include "read_buffer.hpp"
-#include "params.hpp"
+#include "mapper.hpp"
+
+ReadParams ReadBuffer::PRMS;
 
 const std::string Paf::PAF_TAGS[] = {
     "mt", //MAP_TIME
@@ -155,103 +157,6 @@ void Paf::set_str(Tag t, std::string v) {
     str_tags_.emplace_back(t, v);
 }
 
-bool should_load(const hdf5_tools::File &file, std::string read) {
-    bool within_time = true;
-    if (PARAMS.sim_st != 0 || PARAMS.sim_en != 0) {
-        for (auto a : file.get_attr_map(read + "/Raw")) {
-            if (a.first == "start_time") {
-                float t = atof(a.second.c_str()) / PARAMS.sample_rate;
-                within_time = (t >= PARAMS.sim_st);// && (PARAMS.sim_en == 0 || t <= PARAMS.sim_en));
-            }
-        }
-    }
-
-    if (!within_time) return false;
-
-    if (PARAMS.sim_even || PARAMS.sim_odd) {
-        bool even = false;
-        for (auto a : file.get_attr_map(read + "/channel_id")) {
-            if (a.first == "channel_number") {
-                even = atoi(a.second.c_str()) % 2 == 0;
-                break;
-            }
-        }
-
-        return (even && PARAMS.sim_even) || 
-               (!even && PARAMS.sim_odd);
-    }
-
-    return true;
-}
-
-bool is_multi_fast5(const hdf5_tools::File &file) {
-    for (const std::string &s : file.list_group("/")) {
-        if (s == "Raw") return false;
-    }
-    return true;
-}
-
-u32 load_multi_fast5(const hdf5_tools::File &file, 
-                     std::deque<ReadBuffer> &list, u32 max_load,
-                     std::unordered_set<std::string> filter) {
-    u32 i = 0;
-    for (const std::string &read : file.list_group("/")) {
-        std::string path = "/" + read;
-        bool pass_filter = filter.empty() || filter.count(read.substr(read.find('_')+1)) > 0;
-        if (pass_filter && should_load(file, read)) {
-            list.emplace_back(file, ReadBuffer::Source::MULTI, "/" + read);
-        }
-        i++;
-        //if (max_load > 0 && list.size() >= max_load) break;
-    }
-    return i;
-}
-
-std::deque<std::string> load_fast5s(const std::string &fname, 
-                std::deque<ReadBuffer> &list, 
-                u32 max_load,
-                std::unordered_set<std::string> filter) {
-    std::ifstream reads_file(fname);
-    std::deque<std::string> fast5_list;
-    if (!reads_file) {
-        std::cerr << "Error: couldn't open '" << fname << "'\n";
-        return fast5_list;
-    }
-
-    std::string read_fname;
-    while (getline(reads_file, read_fname)) {
-        if (read_fname[0] != '#') fast5_list.push_back(read_fname);
-    }
-    
-    load_fast5s(fast5_list, list, max_load, filter);
-
-    return fast5_list;
-}
-
-u32 load_fast5s(std::deque<std::string> &fast5_list, 
-                std::deque<ReadBuffer> &list, u32 max_load,
-                std::unordered_set<std::string> filter) {
-
-    u32 i = 0;
-    std::string read_fname;
-    while (!fast5_list.empty() && 
-            (max_load == 0 || list.size() < max_load)) {
-        hdf5_tools::File file(fast5_list.front());
-        fast5_list.pop_front();
-        
-        if (is_multi_fast5(file)) {
-            i += load_multi_fast5(file, list, max_load, filter);
-        } else {
-            list.emplace_back(file, ReadBuffer::Source::SINGLE);
-            i++;
-        }
-    }
-
-    //std::sort(list.begin(), list.end());
-    //while (max_load > 0 && list.size() > max_load) list.pop_back();
-
-    return i;
-}
 
 ReadBuffer::ReadBuffer() {
     
@@ -292,32 +197,43 @@ void ReadBuffer::clear() {
     loc_ = Paf();
 }
 
-ReadBuffer::ReadBuffer(const hdf5_tools::File &file, Source source, 
-                       const std::string root) {
-    source_ = source;
-    std::string raw_path, ch_path;
-                 
-    switch (source) {
-    case Source::MULTI:
-        raw_path = root + "/Raw";
-        ch_path = root + "/channel_id";
-        fast5_init(file, raw_path, ch_path);
-    break;
-    case Source::SINGLE:
-        raw_path = root + "Raw/Reads";
-        ch_path = root + "UniqueGlobalKey/channel_id";
-        raw_path += "/" + file.list_group(raw_path).front();
-        fast5_init(file, raw_path, ch_path);
-    break;
+ReadBuffer::ReadBuffer(const hdf5_tools::File &file, 
+                       const std::string &raw_path, 
+                       const std::string &ch_path) {
 
-    case Source::BULK:
-        std::cerr << "Bulk not supported yet\n";
-    break;
-    
-    default:
-        std::cerr << "Error: invalid fast5 source\n";
-    break;
+    for (auto a : file.get_attr_map(raw_path)) {
+        if (a.first == "read_id") {
+            id_ = a.second;
+        } else if (a.first == "read_number") {
+            number_ = atoi(a.second.c_str());
+        } else if (a.first == "start_time") {
+            start_sample_ = atoi(a.second.c_str());
+        }
     }
+
+    float digitisation = 0, range = 0, offset = 0;//, sampling_rate = 0;
+    for (auto a : file.get_attr_map(ch_path)) {
+        if (a.first == "channel_number") {
+            channel_idx_ = atoi(a.second.c_str()) - 1;
+        } else if (a.first == "digitisation") {
+            digitisation = atof(a.second.c_str());
+        } else if (a.first == "range") {
+            range = atof(a.second.c_str());
+        } else if (a.first == "offset") {
+            offset = atof(a.second.c_str());
+        } //else if (a.first == "sampling_rate") {
+            //PARAMS.set_sample_rate(atof(a.second.c_str()));
+        //}
+    }
+
+
+    set_calibration(get_channel(), offset, range, digitisation);
+
+
+    std::string sig_path = raw_path + "/Signal";
+    std::vector<i16> int_data; 
+    file.read(sig_path, int_data);
+    full_signal_ = calibrate(get_channel(), int_data);
 
     loc_ = Paf(id_, get_channel(), start_sample_);
     set_raw_len(full_signal_.size());
@@ -351,60 +267,14 @@ ReadBuffer::ReadBuffer(Chunk &first_chunk)
       num_chunks_(1),
       chunk_processed_(false),
       loc_(id_, channel_idx_+1, start_sample_) {
-    loc_.set_int(Paf::Tag::RECEIVE_TIME, PARAMS.get_time());
+    //loc_.set_int(Paf::Tag::RECEIVE_TIME, PARAMS.get_time());//TODO: FIX
     set_raw_len(first_chunk.size());
     first_chunk.pop(chunk_);
 }
 
-void ReadBuffer::fast5_init(const hdf5_tools::File &file, 
-                            std::string raw_path, 
-                            std::string ch_path) {
-
-
-    for (auto a : file.get_attr_map(raw_path)) {
-        if (a.first == "read_id") {
-            id_ = a.second;
-        } else if (a.first == "read_number") {
-            number_ = atoi(a.second.c_str());
-        } else if (a.first == "start_time") {
-            start_sample_ = atoi(a.second.c_str());
-        }
-    }
-
-    float digitisation = 0, range = 0, offset = 0;//, sampling_rate = 0;
-    for (auto a : file.get_attr_map(ch_path)) {
-        if (a.first == "channel_number") {
-            channel_idx_ = atoi(a.second.c_str()) - 1;
-        } else if (a.first == "digitisation") {
-            digitisation = atof(a.second.c_str());
-        } else if (a.first == "range") {
-            range = atof(a.second.c_str());
-        } else if (a.first == "offset") {
-            offset = atof(a.second.c_str());
-        } else if (a.first == "sampling_rate") {
-            PARAMS.set_sample_rate(atof(a.second.c_str()));
-        }
-    }
-
-    PARAMS.set_calibration(get_channel(), offset, range, digitisation);
-
-    std::string sig_path = raw_path + "/Signal";
-    std::vector<i16> int_data; 
-    file.read(sig_path, int_data);
-    full_signal_ = PARAMS.calibrate(get_channel(), int_data);
-
-    /*
-    full_signal_.resize(int_data.size());
-    for (u32 i = 0; i < int_data.size(); i++) {
-        //std::cout << int_data[i] << " ";
-        full_signal_[i] = ((float) int_data[i] + offset) * range / digitisation;
-        //std::cout << full_signal_[i] << "\n";
-    }*/
-}
-
 void ReadBuffer::set_raw_len(u64 raw_len) {
     raw_len_ = raw_len;
-    loc_.set_read_len(raw_len_ * PARAMS.bp_per_samp);
+    loc_.set_read_len(raw_len_ * PRMS.bp_per_samp);
 }
 
 bool ReadBuffer::add_chunk(Chunk &c) {
@@ -445,3 +315,36 @@ bool operator< (const ReadBuffer &r1, const ReadBuffer &r2) {
     return r1.start_sample_ < r2.start_sample_;
 }
 
+void ReadBuffer::calibrate(u16 ch, std::vector<float> samples) {
+    for (float &s : samples) s = calibrate(ch, s);
+}
+
+std::vector<float> ReadBuffer::calibrate(u16 ch, std::vector<i16> samples) {
+    std::vector<float> cal(samples.size());
+    for (u32 i = 0; i < samples.size(); i++) {
+        cal[i] = calibrate(ch, samples[i]);
+    }
+    return cal;
+}
+
+float ReadBuffer::calibrate(u16 ch, float sample) {
+    return (sample + PRMS.calib_offsets[ch-1]) * PRMS.calib_coefs[ch-1];
+}
+
+void ReadBuffer::set_calibration(const std::vector<float> &offsets, 
+                                 const std::vector<float> &pa_ranges,
+                                 float digitisation) {
+    if (digitisation > 0) PRMS.calib_digitisation = digitisation;
+    PRMS.calib_offsets = offsets;
+    PRMS.calib_coefs.reserve(pa_ranges.size());
+    for (float p : pa_ranges) PRMS.calib_coefs.push_back(p / digitisation);
+}
+
+void ReadBuffer::set_calibration(u16 channel,
+                             float offsets, 
+                             float pa_ranges,
+                             float digitisation) {
+    if (digitisation > 0) PRMS.calib_digitisation = digitisation;
+    PRMS.calib_offsets[channel-1] = offsets;
+    PRMS.calib_coefs[channel-1] = pa_ranges / digitisation;
+}

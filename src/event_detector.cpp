@@ -12,14 +12,14 @@
 #include <cstdlib>
 #include <iostream>
 #include <cassert>
-#include "params.hpp"
 #include "event_detector.hpp"
 
 typedef Detector *DetectorPtr;
 
+EventParams EventDetector::PRMS;
+
 EventDetector::EventDetector() :
-    params (PARAMS.event_params),
-    BUF_LEN (1 + params.window_length2 * 2) {
+    BUF_LEN (1 + PRMS.window_length2 * 2) {
 
     sum = new double[BUF_LEN];
     sumsq = new double[BUF_LEN];
@@ -44,8 +44,8 @@ void EventDetector::reset() {
     short_detector = {
         .DEF_PEAK_POS = -1,
         .DEF_PEAK_VAL = FLT_MAX,
-        .threshold = params.threshold1,
-        .window_length = params.window_length1,
+        .threshold = PRMS.threshold1,
+        .window_length = PRMS.window_length1,
         .masked_to = 0,
         .peak_pos = -1,
         .peak_value = FLT_MAX,
@@ -55,8 +55,8 @@ void EventDetector::reset() {
     long_detector = {
         .DEF_PEAK_POS = -1,
         .DEF_PEAK_VAL = FLT_MAX,
-        .threshold = params.threshold2,
-        .window_length = params.window_length2,
+        .threshold = PRMS.threshold2,
+        .window_length = PRMS.window_length2,
         .masked_to = 0,
         .peak_pos = -1,
         .peak_value = FLT_MAX,
@@ -83,17 +83,17 @@ bool EventDetector::add_sample(RawSample s) {
     t++;
     buf_mid = get_buf_mid();
 
-    double tstat1 = compute_tstat(params.window_length1),
-           tstat2 = compute_tstat(params.window_length2);
+    double tstat1 = compute_tstat(PRMS.window_length1),
+           tstat2 = compute_tstat(PRMS.window_length2);
 
     bool p1 = peak_detect(tstat1, short_detector),
          p2 = peak_detect(tstat2, long_detector);
 
     if (p1 || p2) {
-        create_event(buf_mid-params.window_length1+1);
+        create_event(buf_mid-PRMS.window_length1+1);
 
-        return event_.mean >= params.min_mean &&
-               event_.mean <= params.max_mean;
+        return event_.mean >= PRMS.min_mean &&
+               event_.mean <= PRMS.max_mean;
     }
     
     return false;
@@ -101,7 +101,7 @@ bool EventDetector::add_sample(RawSample s) {
 
 std::vector<Event> EventDetector::add_samples(const std::vector<RawSample> &raw) {
     std::vector<Event> events;
-    events.reserve(raw.size() / params.window_length2);
+    events.reserve(raw.size() / PRMS.window_length2);
     reset();
 
     for (u32 i = 0; i < raw.size(); i++) {
@@ -124,10 +124,6 @@ float EventDetector::get_mean() const {
 
 float EventDetector::mean_event_len() const {
     return len_sum_ / total_events_;
-}
-
-u32 EventDetector::event_to_bp(u32 evt_i, bool last) const {
-    return (evt_i * mean_event_len() * PARAMS.bp_per_samp) + last*(PARAMS.model.kmer_len() - 1);
 }
 
 /**
@@ -202,7 +198,7 @@ bool EventDetector::peak_detect(float current_value, Detector &detector) {
             //Either record a deeper minimum...
             detector.peak_value = current_value;
         } else if (current_value - detector.peak_value >
-                   params.peak_height) {
+                   PRMS.peak_height) {
             // ...or we've seen a qualifying maximum
             detector.peak_value = current_value;
             detector.peak_pos = buf_mid;
@@ -228,7 +224,7 @@ bool EventDetector::peak_detect(float current_value, Detector &detector) {
             }
         }
         //Have we convinced ourselves we've seen a peak
-        if (detector.peak_value - current_value > params.peak_height
+        if (detector.peak_value - current_value > PRMS.peak_height
             && detector.peak_value > detector.threshold) {
             detector.valid_peak = true;
         }

@@ -13,3 +13,6 @@
 [submodule "read_until_api"]
 	path = read_until_api
 	url = https://github.com/nanoporetech/read_until_api.git
+[submodule "toml11"]
+	path = toml11
+	url = https://github.com/ToruNiina/toml11.git

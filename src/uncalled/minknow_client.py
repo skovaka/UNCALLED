@@ -205,13 +205,19 @@ if ru_loaded:
             return False
 
         def _update_chunk_len(self, change=True):
-            anl_config = self.anl_client.get_analysis_configuration()
-            if self.chunk_size != anl_config.read_detection.break_reads_after_seconds.value:
-                if change:
-                    anl_config.read_detection.break_reads_after_seconds.value=self.chunk_size
-                    self.anl_client.set_analysis_configuration(anl_config)
-                    self.log("Setting chunk size to %.2f" % (self.chunk_size))
-                return True
+            try:
+                anl_config = self.anl_client.get_analysis_configuration()
+            except:
+                self.unc_log.warning("Warning: failed to check chunk size. If chunk size is set to 1 second this is fine, otherwise stop the run, use a 1 second chunk size, and please report this error.")
+                return False
+
+                if self.chunk_size != anl_config.read_detection.break_reads_after_seconds.value:
+                    if change:
+                        #Credit to Matt Loose for directing me to the parameter to change
+                        anl_config.read_detection.break_reads_after_seconds.value=self.chunk_size
+                        self.anl_client.set_analysis_configuration(anl_config)
+                        self.log("Setting chunk size to %.2f" % (self.chunk_size))
+                    return True
             return False
 
 

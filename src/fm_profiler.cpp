@@ -24,12 +24,12 @@
 #include <string>
 #include <iostream>
 #include "bwa_fmi.hpp"
-#include "params.hpp"
 #include "fm_profiler.hpp"
+#include "mapper.hpp"
 
 FMProfiler::FMProfiler() {
-    range_counts_.resize(PARAMS.fmi.size());
-    kmer_counts_.resize(PARAMS.model.kmer_count());
+    range_counts_.resize(Mapper::fmi.size());
+    kmer_counts_.resize(Mapper::model.kmer_count());
 }
 
 void FMProfiler::add_range(Range r) {
@@ -46,7 +46,7 @@ void FMProfiler::flush_kmers() {
     for (u64 k = 0; k < kmer_counts_.size(); k++) {
         if (kmer_counts_[k] == 0) continue;
 
-        Range r = PARAMS.kmer_fmranges[k];
+        Range r = Mapper::fmi.get_kmer_range(k);
         for (u64 i = r.start_; i <= r.end_; i++) {
             range_counts_[i] += kmer_counts_[k];
         }
@@ -70,13 +70,13 @@ void FMProfiler::write(const std::string &fname) {
     std::vector<u32> ref_counts(range_counts_.size());
 
     for (u64 i = 0; i < ref_counts.size(); i++) {
-        ref_counts[PARAMS.fmi.sa(i)] = range_counts_[i];
+        ref_counts[Mapper::fmi.sa(i)] = range_counts_[i];
     }
 
     std::ofstream out(fname);
 
     u64 i = 0;
-    for (auto seq : PARAMS.fmi.get_seqs()) {
+    for (auto seq : Mapper::fmi.get_seqs()) {
         std::string name = seq.first;
         u64 len = seq.second;
         for (u64 j = 0; j < len; j++) {

@@ -27,22 +27,25 @@
 #include <time.h>
 #include "chunk_pool.hpp"
 #include "mapper.hpp"
-#include "params.hpp"
 
-ChunkPool::ChunkPool() {
-    for (u16 t = 0; t < PARAMS.threads; t++) {
+
+
+ChunkPool::ChunkPool(Conf &conf) {
+    for (u16 t = 0; t < conf.threads; t++) {
         threads_.emplace_back(mappers_);
     }
-    
-    channel_active_.reserve(PARAMS.num_channels);
-    chunk_buffer_.resize(PARAMS.num_channels);
-    buffer_queue_.reserve(PARAMS.num_channels);
-    for (u16 i = 0; i < PARAMS.num_channels; i++) {
-        mappers_.push_back(Mapper());
-        channel_active_.push_back(false);
-    }
 
-    for (u16 t = 0; t < PARAMS.threads; t++) {
+    mappers_.resize(conf.num_channels);
+    channel_active_.resize(conf.num_channels, false);
+    chunk_buffer_.resize(conf.num_channels);
+    buffer_queue_.reserve(conf.num_channels);
+
+    //for (u16 i = 0; i < conf.num_channels; i++) {
+    //    mappers_.push_back(Mapper());
+    //    channel_active_.push_back(false);
+    //}
+
+    for (u16 t = 0; t < conf.threads; t++) {
         threads_[t].start();
     }
 
@@ -64,6 +67,7 @@ void ChunkPool::buffer_chunk(Chunk &c) {
 //Add chunk to master buffer
 bool ChunkPool::add_chunk(Chunk &c) {
     u16 ch = c.get_channel_idx();
+
 
     //Check if previous read is still aligning
     //If so, tell thread to reset, store chunk in pool buffer

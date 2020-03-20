@@ -1,0 +1,68 @@
+# This is a TOML document
+
+[global]
+threads = 1
+num_channels = 512
+kmer_model = "models/r94_5mers.txt"
+bwa_prefix = ""
+preset_mode = "default"
+
+[index]
+max_sample_dist = 100
+min_samples = 50000
+kmer_len = 5
+matchpr1 = 0.6334
+matchpr2 = 0.9838
+pathlen_percentile = 0.05
+max_replen = 100
+
+[signal]
+sample_rate = 4000
+bp_per_sec = 450
+
+[fast5_params]
+max_buffer = 100
+max_reads = 0
+
+[readuntil]
+monitor = "full"
+mode = "deplete"
+host = "127.0.0.1"
+port = 8000
+duration = 0.0
+
+[mapper]
+max_events = 30000
+seed_len = 22
+min_rep_len = 0
+max_rep_copy = 50
+max_consec_stay = 8
+max_paths = 10000
+max_stay_frac = 0.5
+min_seed_prob = -3.75
+
+max_chunks = 10
+evt_buffer_len = 6000
+evt_batch_size = 5
+evt_timeout = 10.0
+chunk_size = 1.0
+max_chunk_wait = 4000.0 
+
+[seed_tracker]
+min_aln_len = 25
+min_mean_conf = 6.00
+min_top_conf = 1.85
+
+[event_detector]
+min_mean = 30.0
+max_mean = 150.0
+window_length1 = 3
+window_length2 = 6
+threshold1 = 1.4
+threshold2 = 9.0
+peak_height = 0.2
+
+
+[list_ports]
+log_dir = '/var/log/MinKNOW'
+

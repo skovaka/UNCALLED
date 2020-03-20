@@ -28,12 +28,13 @@
 #include <vector>
 #include <deque>
 #include "mapper.hpp"
+#include "conf.hpp"
 
 using MapResult = std::tuple<u16, u32, Paf>;
 
 class ChunkPool {
     public:
-    ChunkPool();
+    ChunkPool(Conf &conf);
     
     void start_timer();
     bool add_chunk(Chunk &chunk);

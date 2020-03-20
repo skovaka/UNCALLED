@@ -23,7 +23,10 @@
 
 #include "pdqsort.h"
 #include "mapper.hpp"
-#include "params.hpp"
+
+MapperParams Mapper::PRMS;
+BwaFMI Mapper::fmi;
+KmerModel Mapper::model;
 
 u8 Mapper::PathBuffer::MAX_PATH_LEN = 0, 
    Mapper::PathBuffer::TYPE_MASK = 0;
@@ -116,13 +119,13 @@ u8 Mapper::PathBuffer::type_tail() const {
 bool Mapper::PathBuffer::is_seed_valid(bool path_ended) const{
     return (fm_range_.length() == 1 || 
                 (path_ended &&
-                 fm_range_.length() <= PARAMS.max_rep_copy &&
-                 match_len() >= PARAMS.min_rep_len)) &&
+                 fm_range_.length() <= PRMS.max_rep_copy &&
+                 match_len() >= PRMS.min_rep_len)) &&
 
-           length_ >= PARAMS.seed_len &&
+           length_ >= PRMS.seed_len &&
            (path_ended || type_head() == EventType::MATCH) &&
-           (path_ended || path_type_counts_[EventType::STAY] <= PARAMS.max_stay_frac * PARAMS.seed_len) &&
-          seed_prob_ >= PARAMS.min_seed_prob;
+           (path_ended || path_type_counts_[EventType::STAY] <= PRMS.max_stay_frac * PRMS.seed_len) &&
+          seed_prob_ >= PRMS.min_seed_prob;
 }
 
 
@@ -136,18 +139,17 @@ bool operator< (const Mapper::PathBuffer &p1,
 Mapper::Mapper()
     : state_(State::INACTIVE) {
 
-
-    PathBuffer::MAX_PATH_LEN = PARAMS.seed_len;
+    PathBuffer::MAX_PATH_LEN = PRMS.seed_len;
 
     for (u64 t = 0; t < EventType::NUM_TYPES; t++) {
         PathBuffer::TYPE_ADDS[t] = t << ((PathBuffer::MAX_PATH_LEN-2)*TYPE_BITS);
     }
     PathBuffer::TYPE_MASK = (u8) ((1 << TYPE_BITS) - 1);
 
-    kmer_probs_ = std::vector<float>(PARAMS.model.kmer_count());
-    prev_paths_ = std::vector<PathBuffer>(PARAMS.max_paths);
-    next_paths_ = std::vector<PathBuffer>(PARAMS.max_paths);
-    sources_added_ = std::vector<bool>(PARAMS.model.kmer_count(), false);
+    kmer_probs_ = std::vector<float>(model.kmer_count());
+    prev_paths_ = std::vector<PathBuffer>(PRMS.max_paths);
+    next_paths_ = std::vector<PathBuffer>(PRMS.max_paths);
+    sources_added_ = std::vector<bool>(model.kmer_count(), false);
 
     prev_size_ = 0;
     event_i_ = 0;
@@ -164,6 +166,20 @@ Mapper::~Mapper() {
     }
 }
 
+float Mapper::get_prob_thresh(u64 fmlen) const {
+    return PRMS.prob_threshes[__builtin_clzll(fmlen)];
+}
+
+float Mapper::get_source_prob() const {
+    return PRMS.prob_threshes.front();
+}
+
+u16 Mapper::get_max_events() const {
+    if (event_i_ + PRMS.evt_batch_size > PRMS.max_events) 
+        return PRMS.max_events - event_i_;
+    return PRMS.evt_batch_size;
+}
+
 ReadBuffer &Mapper::get_read() {
     return read_;
 }
@@ -175,11 +191,11 @@ void Mapper::deactivate() {
 
 Paf Mapper::map_read() {
     if (read_.loc_.is_mapped()) return read_.loc_;
-    
+
     map_timer_.reset();
 
     std::vector<Event> events = event_detector_.add_samples(read_.full_signal_);
-    PARAMS.model.normalize(events);
+    model.normalize(events);
      
     for (u32 e = 0; e < events.size(); e++) {
         if (add_event(events[e].mean)) break;
@@ -274,7 +290,7 @@ Mapper::State Mapper::get_state() const {
 bool Mapper::add_chunk(Chunk &chunk) {
     if (!is_chunk_processed() || reset_) return false;
 
-    if (read_.num_chunks_ == PARAMS.max_chunks_proc) {
+    if (read_.num_chunks_ == PRMS.max_chunks) {
         set_failed();
         chunk.clear();
         return true;
@@ -330,14 +346,14 @@ void Mapper::set_failed() {
 bool Mapper::map_chunk() {
     wait_time_ += map_timer_.lap();
 
-    if (reset_ || chunk_timer_.get() > PARAMS.max_chunk_wait) {
+    if (reset_ || chunk_timer_.get() > PRMS.max_chunk_wait) {
         set_failed();
         read_.loc_.set_ended();
         return true;
 
     } else if (norm_.empty() && 
                read_.chunk_processed_ && 
-               read_.num_chunks_ == PARAMS.max_chunks_proc) {
+               read_.num_chunks_ == PRMS.max_chunks) {
         set_failed();
         return true;
 
@@ -345,8 +361,8 @@ bool Mapper::map_chunk() {
         return false;
     }
 
-    u16 nevents = PARAMS.get_max_events(event_i_);
-    float tlimit = PARAMS.evt_timeout * nevents;
+    u16 nevents = get_max_events();
+    float tlimit = PRMS.evt_timeout * nevents;
 
     for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
         if (add_event(norm_.pop_event())) {
@@ -364,7 +380,7 @@ bool Mapper::map_chunk() {
 
 bool Mapper::add_event(float event) {
 
-    if (reset_ || event_i_ >= PARAMS.max_events_proc) {
+    if (reset_ || event_i_ >= PRMS.max_events) {
         state_ = State::FAILURE;
         return true;
     }
@@ -377,8 +393,8 @@ bool Mapper::add_event(float event) {
 
     auto next_path = next_paths_.begin();
 
-    for (u16 kmer = 0; kmer < PARAMS.model.kmer_count(); kmer++) {
-        kmer_probs_[kmer] = PARAMS.model.event_match_prob(event, kmer);
+    for (u16 kmer = 0; kmer < model.kmer_count(); kmer++) {
+        kmer_probs_[kmer] = model.event_match_prob(event, kmer);
     }
     
     //Find neighbors of previous nodes
@@ -393,10 +409,10 @@ bool Mapper::add_event(float event) {
         Range &prev_range = prev_path.fm_range_;
         prev_kmer = prev_path.kmer_;
 
-        evpr_thresh = PARAMS.get_prob_thresh(prev_range.length());
-        //evpr_thresh = PARAMS.get_path_thresh(prev_path.total_match_len_);
+        evpr_thresh = get_prob_thresh(prev_range.length());
+        //evpr_thresh = PRMS.get_path_thresh(prev_path.total_match_len_);
 
-        if (prev_path.consec_stays_ < PARAMS.max_consec_stay && 
+        if (prev_path.consec_stays_ < PRMS.max_consec_stay && 
             kmer_probs_[prev_kmer] >= evpr_thresh) {
 
             next_path->make_child(prev_path, 
@@ -417,13 +433,13 @@ bool Mapper::add_event(float event) {
 
         //Add all the neighbors
         for (u8 b = 0; b < ALPH_SIZE; b++) {
-            u16 next_kmer = PARAMS.model.get_neighbor(prev_kmer, b);
+            u16 next_kmer = model.get_neighbor(prev_kmer, b);
 
             if (kmer_probs_[next_kmer] < evpr_thresh) {
                 continue;
             }
 
-            Range next_range = PARAMS.fmi.get_neighbor(prev_range, b);
+            Range next_range = fmi.get_neighbor(prev_range, b);
 
             if (!next_range.is_valid()) {
                 continue;
@@ -473,7 +489,7 @@ bool Mapper::add_event(float event) {
         //std::sort(next_paths_.begin(), next_path);
 
         u16 source_kmer;
-        prev_kmer = PARAMS.model.kmer_count(); 
+        prev_kmer = model.kmer_count(); 
 
         Range unchecked_range, source_range;
 
@@ -483,11 +499,11 @@ bool Mapper::add_event(float event) {
             //Add source for beginning of kmer range
             if (source_kmer != prev_kmer &&
                 next_path != next_paths_.end() &&
-                kmer_probs_[source_kmer] >= PARAMS.get_source_prob()) {
+                kmer_probs_[source_kmer] >= get_source_prob()) {
 
                 sources_added_[source_kmer] = true;
 
-                source_range = Range(PARAMS.kmer_fmranges[source_kmer].start_,
+                source_range = Range(fmi.get_kmer_range(source_kmer).start_,
                                      next_paths_[i].fm_range_.start_ - 1);
 
                 if (source_range.is_valid()) {
@@ -502,7 +518,7 @@ bool Mapper::add_event(float event) {
                 }                                    
 
                 unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
-                                        PARAMS.kmer_fmranges[source_kmer].end_);
+                                        fmi.get_kmer_range(source_kmer).end_);
             }
 
             prev_kmer = source_kmer;
@@ -519,7 +535,7 @@ bool Mapper::add_event(float event) {
             //Start source after current path
             //TODO: check if theres space for a source here, instead of after extra work?
             if (next_path != next_paths_.end() &&
-                kmer_probs_[source_kmer] >= PARAMS.get_source_prob()) {
+                kmer_probs_[source_kmer] >= get_source_prob()) {
                 
                 source_range = unchecked_range;
                 
@@ -552,14 +568,14 @@ bool Mapper::add_event(float event) {
     }
 
     for (u16 kmer = 0; 
-         kmer < PARAMS.model.kmer_count() && 
+         kmer < model.kmer_count() && 
             next_path != next_paths_.end(); 
          kmer++) {
 
-        Range next_range = PARAMS.kmer_fmranges[kmer];
+        Range next_range = fmi.get_kmer_range(kmer);
 
         if (!sources_added_[kmer] && 
-            kmer_probs_[kmer] >= PARAMS.get_source_prob() &&
+            kmer_probs_[kmer] >= get_source_prob() &&
             next_path != next_paths_.end() &&
             next_range.is_valid()) {
 
@@ -609,7 +625,7 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
         for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
 
             //Reverse the reference coords so they both go L->R
-            u64 ref_en = PARAMS.fmi.size() - PARAMS.fmi.sa(s) + 1;
+            u64 ref_en = fmi.size() - fmi.sa(s) + 1;
 
             seed_tracker_.add_seed(ref_en, p.match_len(), event_i_ - path_ended);
         }
@@ -623,46 +639,50 @@ void Mapper::print_debug_seeds(PathBuffer &p) {
 
     for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
         //Reverse the reference coords so they both go L->R
-        u64 ref_en = PARAMS.fmi.size() - (PARAMS.fmi.sa(s) + 1);
+        u64 ref_en = fmi.size() - (fmi.sa(s) + 1);
 
-        bool fwd = ref_en < PARAMS.fmi.size() / 2;
+        bool fwd = ref_en < fmi.size() / 2;
 
         u64 sa_st;
-        if (fwd) sa_st = ref_en - (p.match_len() + PARAMS.model.kmer_len() - 1)  + 1;
-        else     sa_st = PARAMS.fmi.size() - ref_en - 1;
+        if (fwd) sa_st = ref_en - (p.match_len() + model.kmer_len() - 1)  + 1;
+        else     sa_st = fmi.size() - ref_en - 1;
 
         std::string rf_name;
         u64 rf_st;
-        PARAMS.fmi.translate_loc(sa_st, rf_name, rf_st);
+        fmi.translate_loc(sa_st, rf_name, rf_st);
 
-        if (rf_st > PARAMS.fmi.size()) {
+        if (rf_st > fmi.size()) {
             rf_st = 0;
         }
           
         seeds_out_ << rf_name << "\t"
                    << rf_st << "\t"
-                   << (rf_st + p.match_len() + PARAMS.model.kmer_len() - 1) << "\t"
+                   << (rf_st + p.match_len() + model.kmer_len() - 1) << "\t"
                    << event_i_ << "\t"
                    << (fwd ? "+" : "-") << "\n";
     }
 }
 #endif
 
+u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
+    return (evt_i * event_detector_.mean_event_len() * ReadBuffer::PRMS.bp_per_samp) + last*(model.kmer_len() - 1);
+}                  
+
 void Mapper::set_ref_loc(const SeedGroup &seeds) {
-    bool fwd = seeds.ref_st_ < PARAMS.fmi.size() / 2;
+    bool fwd = seeds.ref_st_ < fmi.size() / 2;
 
     u64 sa_st;
     if (fwd) sa_st = seeds.ref_st_;
-    else      sa_st = PARAMS.fmi.size() - (seeds.ref_en_.end_ + PARAMS.model.kmer_len() - 1);
+    else      sa_st = fmi.size() - (seeds.ref_en_.end_ + model.kmer_len() - 1);
     
     std::string rf_name;
-    u64 rd_st = event_detector_.event_to_bp(seeds.evt_st_),
-        rd_en = event_detector_.event_to_bp(seeds.evt_en_ + PARAMS.seed_len, true),
+    u64 rd_st = event_to_bp(seeds.evt_st_),
+        rd_en = event_to_bp(seeds.evt_en_ + PRMS.seed_len, true),
         rf_st,
-        rf_len = PARAMS.fmi.translate_loc(sa_st, rf_name, rf_st), //sets rf_st
-        rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_ + PARAMS.model.kmer_len());
+        rf_len = fmi.translate_loc(sa_st, rf_name, rf_st), //sets rf_st
+        rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_ + model.kmer_len());
 
-    u16 match_count = seeds.total_len_ + PARAMS.model.kmer_len() - 1;
+    u16 match_count = seeds.total_len_ + model.kmer_len() - 1;
 
     read_.loc_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, fwd, match_count);
 }

@@ -23,65 +23,181 @@
 
 #include <thread>
 #include <chrono>
-#include "read_buffer.hpp"
 #include "fast5_pool.hpp"
-#include "mapper.hpp"
-#include "params.hpp"
 
-Fast5Pool::Fast5Pool(const std::string &fast5_list_fname, 
-                     const std::string &read_filter_fname,
-                     u32 read_count) {
 
-    if (!read_filter_fname.empty()) {
-        std::ifstream filter_file(read_filter_fname);
-        std::string read;
-        while (getline(filter_file, read) && (read_count == 0 || filter_.size() < read_count)) {
-            filter_.insert(read);
+const std::string Fast5Loader::FMT_RAW_PATHS[] = {
+    "/Raw",      //MULTI
+    "/Raw/Reads" //SINGLE
+};
+
+const std::string Fast5Loader::FMT_CH_PATHS[] = {
+    "/channel_id",                //MULTI
+    "/UniqueGlobalKey/channel_id" //SINGLE
+};
+
+Fast5Loader::Fast5Loader(const Fast5Params &p) : PRMS(p) {
+    total_buffered_ = 0;
+    
+    std::ifstream list_file(PRMS.fast5_list);
+    std::string fast5_name;
+    while (getline(list_file, fast5_name)) {
+        fast5_list_.push_back(fast5_name);
+    }
+    
+    if (!PRMS.fast5_filter.empty()) {
+        std::ifstream filter_file(PRMS.fast5_filter);
+        std::string read_name;
+
+        while (getline(filter_file, read_name) && filter_.size() < PRMS.max_reads) {
+            filter_.insert(read_name);
         }
     }
+}
 
-    fast5_list_ = load_fast5s(fast5_list_fname, reads_, 4000, filter_);
+bool Fast5Loader::empty() {
+    return buffered_reads_.empty() && fast5_list_.empty();
+}
 
-    threads_ = std::vector<MapperThread>(PARAMS.threads);
+bool Fast5Loader::open_next() {
 
-    for (u32 i = 0; i < PARAMS.threads; i++) {
-        threads_[i].next_read_.swap(reads_.front());
-        reads_.pop_front();
-        threads_[i].in_buffered_ = true;
-        threads_[i].start();
+    read_paths_.clear();
+    if (open_fast5_.is_open()) open_fast5_.close();
+    if (fast5_list_.empty()) return false;
+
+
+    open_fast5_.open(fast5_list_.front());
+    fast5_list_.pop_front();
+
+
+    open_fmt_ = Format::UNKNOWN;
+    for (const std::string &s : open_fast5_.list_group("/")) {
+        if (s == "Raw") {
+            open_fmt_ = Format::SINGLE;
+            break;
+        }
+    }
+    if (open_fmt_ == Format::UNKNOWN) open_fmt_ = Format::MULTI; //TODO: add support for old multi format
+
+
+    switch (open_fmt_) {
+    case Format::SINGLE:
+        read_paths_.push_back("");
+        return true;
+
+    case Format::MULTI:
+        for (const std::string &read : open_fast5_.list_group("/")) {
+            std::string id = read.substr(read.find('_')+1);
+            if (filter_.empty() || filter_.count(id) > 0) {
+                read_paths_.push_back("/"+read);
+            }
+        }
+        return true;
+    default:
+        return false;
     }
 
+    return false; 
+}
+
+u32 Fast5Loader::buffer_reads() {
+    u32 count = 0;
+
+    //TODO: max total default to max int
+    while (buffered_reads_.size() < PRMS.max_buffer && (PRMS.max_reads == 0 || total_buffered_ < PRMS.max_reads)) {
+        if (read_paths_.empty()) {
+            if(!open_next()) break;
+        }
+
+
+        std::string raw_path = read_paths_.front() + FMT_RAW_PATHS[open_fmt_],
+                    ch_path =  read_paths_.front() + FMT_CH_PATHS[open_fmt_];
+        read_paths_.pop_front();
+
+        buffered_reads_.emplace_back(open_fast5_, raw_path, ch_path);
+
+
+        count++;
+        total_buffered_++;
+    }
+
+
+    if (PRMS.max_reads != 0 && total_buffered_ >= PRMS.max_reads) {
+        read_paths_.clear();
+        fast5_list_.clear();
+    }
+
+    return count;
+}
+
+ReadBuffer Fast5Loader::pop_read() {
+    //TODO: swap to speed up?
+    ReadBuffer r = buffered_reads_.front();
+    buffered_reads_.pop_front();
+    return r;
+}
+
+u32 Fast5Loader::buffered_count() {
+    return buffered_reads_.size();
+}
+
+
+//Fast5Pool::Fast5Pool(const std::string &fast5_list_fname, 
+//                     const std::string &read_filter_fname,
+//                     u32 read_count) 
+//    : fast5s_(fast5_list_fname, 100, read_filter_fname, read_count) {
+Fast5Pool::Fast5Pool(Conf &conf)
+    : fast5s_(conf.fast5_prms) {
+
+    conf.load_index_params();
+    Mapper::model = KmerModel(conf.kmer_model, true);
+    Mapper::fmi = BwaFMI(conf.bwa_prefix, Mapper::model);
+
+    fast5s_.buffer_reads();
+
+
+    threads_ = std::vector<MapperThread>(conf.threads);
+
+    for (u32 i = 0; i < threads_.size(); i++) {
+        if (!fast5s_.empty()) {
+            ReadBuffer r = fast5s_.pop_read();
+            threads_[i].next_read_.swap(r);
+            threads_[i].in_buffered_ = true;
+        }
+        threads_[i].start();
+    }
 }
 
 std::vector<Paf> Fast5Pool::update() {
     std::vector<Paf> ret;
 
-    for (u32 i = 0; i < PARAMS.threads; i++) {
+
+    for (u32 i = 0; i < threads_.size(); i++) {
         if (threads_[i].out_buffered_) {
             ret.push_back(threads_[i].paf_out_);
             threads_[i].out_buffered_ = false;
         }
 
+
         if (!threads_[i].in_buffered_) {
-            if (reads_.empty()) threads_[i].running_ = false;
-            else {
-                threads_[i].next_read_.swap(reads_.front());
-                reads_.pop_front();
+            if (fast5s_.empty()) { 
+                threads_[i].running_ = false;
+            } else {
+                ReadBuffer r = fast5s_.pop_read();
+                threads_[i].next_read_.swap(r);
                 threads_[i].in_buffered_ = true;
             }
         }
     }
 
-    if (reads_.size() <= PARAMS.threads) {
-        load_fast5s(fast5_list_, reads_, 4000, filter_);
-    }
+    fast5s_.buffer_reads();
 
     return ret;
 }
 
 bool Fast5Pool::all_finished() {
-    if (!reads_.empty()) return false;
-    for (u16 i = 0; i < PARAMS.threads; i++) {
+    if (!fast5s_.empty()) return false;
+    for (u16 i = 0; i < threads_.size(); i++) {
         if (!threads_[i].finished_) return false;
     }
     return true;
@@ -92,7 +208,7 @@ void Fast5Pool::stop_all() {
     FMProfiler prof_combined;
     #endif
 
-    reads_.clear();
+    //reads_.clear();
     for (auto &t : threads_) {
         t.running_ = false;
         t.mapper_.request_reset();
@@ -134,7 +250,6 @@ void Fast5Pool::MapperThread::start() {
 
 void Fast5Pool::MapperThread::run() {
     while (running_) {
-
         while (!in_buffered_ && running_) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }

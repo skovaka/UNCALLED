@@ -1,9 +1,11 @@
 #include <iostream>
-#include "params.hpp"
 #include "chunk.hpp"
+#include "read_buffer.hpp"
 
 std::vector<float> Chunk::cal_offsets_,
                    Chunk::cal_coefs_;
+
+
 
 Chunk::Chunk() 
     : id_(""),
@@ -31,14 +33,14 @@ Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 chunk_start,
         raw_data_.resize(raw_str.size()/sizeof(u16));
         i16 *raw_arr = (i16 *) raw_str.data();
         for (u32 i = 0; i < raw_data_.size(); i++) {
-            raw_data_[i] = PARAMS.calibrate(get_channel(), raw_arr[i]);
+            raw_data_[i] = ReadBuffer::calibrate(get_channel(), raw_arr[i]);
         }
 
     } else if (dtype == "int32") {
         raw_data_.resize(raw_str.size()/sizeof(u32));
         i32 *raw_arr = (i32 *) raw_str.data();
         for (u32 i = 0; i < raw_data_.size(); i++) {
-            raw_data_[i] = PARAMS.calibrate(get_channel(), raw_arr[i]);
+            raw_data_[i] = ReadBuffer::calibrate(get_channel(), raw_arr[i]);
         }
 
     } else {
@@ -47,7 +49,7 @@ Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 chunk_start,
 }
 
 Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 start_time, 
-             const std::vector<float> &raw_data, u32 raw_st=0, u32 raw_len=PARAMS.chunk_len) 
+             const std::vector<float> &raw_data, u32 raw_st, u32 raw_len) 
     : id_(id),
       channel_idx_(channel-1),
       number_(number),
