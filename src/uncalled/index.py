@@ -57,12 +57,17 @@ class IndexParameterizer:
         ref_len = int(header.split()[0])
         ann_in.close()
 
-        if ref_len / args.max_sample_dist < args.min_samples:
+        approx_samps = ref_len / args.max_sample_dist
+        if approx_samps < args.min_samples:
             sample_dist = int(np.ceil(ref_len/args.min_samples))
+            sys.stderr.write("Maxed %.2f\n" % sample_dist)
+        elif approx_samps > args.max_samples:
+            sample_dist = int(np.floor(ref_len/args.max_samples))
         else:
             sample_dist = args.max_sample_dist
+            sys.stderr.write("NOT maxed %.2f\n" % sample_dist)
 
-        fmlens = mapping.self_align(args.bwa_prefix, args.ref_fasta, sample_dist)
+        fmlens = mapping.self_align(args.bwa_prefix, sample_dist)
         path_kfmlens = [p[args.kmer_len-1:] if len(p) >= args.kmer_len else [1] for p in fmlens]
 
         max_pathlen = 0

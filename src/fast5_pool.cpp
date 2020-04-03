@@ -49,7 +49,7 @@ Fast5Loader::Fast5Loader(const Fast5Params &p) : PRMS(p) {
         std::ifstream filter_file(PRMS.fast5_filter);
         std::string read_name;
 
-        while (getline(filter_file, read_name) && filter_.size() < PRMS.max_reads) {
+        while (getline(filter_file, read_name) && (PRMS.max_reads == 0 || filter_.size() < PRMS.max_reads)) {
             filter_.insert(read_name);
         }
     }
@@ -65,10 +65,8 @@ bool Fast5Loader::open_next() {
     if (open_fast5_.is_open()) open_fast5_.close();
     if (fast5_list_.empty()) return false;
 
-
     open_fast5_.open(fast5_list_.front());
     fast5_list_.pop_front();
-
 
     open_fmt_ = Format::UNKNOWN;
     for (const std::string &s : open_fast5_.list_group("/")) {
@@ -105,10 +103,11 @@ u32 Fast5Loader::buffer_reads() {
 
     //TODO: max total default to max int
     while (buffered_reads_.size() < PRMS.max_buffer && (PRMS.max_reads == 0 || total_buffered_ < PRMS.max_reads)) {
-        if (read_paths_.empty()) {
+
+        while (read_paths_.empty()) {
             if(!open_next()) break;
         }
-
+        if (read_paths_.empty()) break;
 
         std::string raw_path = read_paths_.front() + FMT_RAW_PATHS[open_fmt_],
                     ch_path =  read_paths_.front() + FMT_CH_PATHS[open_fmt_];
@@ -155,7 +154,6 @@ Fast5Pool::Fast5Pool(Conf &conf)
 
     fast5s_.buffer_reads();
 
-
     threads_ = std::vector<MapperThread>(conf.threads);
 
     for (u32 i = 0; i < threads_.size(); i++) {
@@ -170,7 +168,6 @@ Fast5Pool::Fast5Pool(Conf &conf)
 
 std::vector<Paf> Fast5Pool::update() {
     std::vector<Paf> ret;
-
 
     for (u32 i = 0; i < threads_.size(); i++) {
         if (threads_[i].out_buffered_) {

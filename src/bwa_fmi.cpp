@@ -28,6 +28,8 @@
 #include <climits>
 #include <cmath>
 #include "bwa_fmi.hpp"
+#include "bwa/utils.h"
+
 
 BwaFMI NULL_FMI;
 
@@ -38,6 +40,8 @@ BwaFMI::BwaFMI() {
 }
 
 BwaFMI::BwaFMI(const std::string &prefix, const KmerModel &model) {
+    pacseq_ = NULL;
+
     if (prefix.empty()) {
         loaded_ = false;
         index_ = NULL;
@@ -52,6 +56,24 @@ BwaFMI::BwaFMI(const std::string &prefix, const KmerModel &model) {
 
         loaded_ = true;
     }
+
+
+    //TESTING
+
+
+	//u8 *pacseq;
+
+
+    //for (u32 i = 0; i < 10; i++) {
+    //    for (u8 j = 0; j < 4; j++) {
+    //        u8 b = (pacseq[i] >> (j*2)) & 0x3;
+    //        std::cout << (int) b << " ";
+    //    }
+    //    std::cout << "\n";
+    //}
+
+    //TESTING
+
 
     if (model.is_loaded()) {
         u64 max_len = 0;
@@ -112,6 +134,11 @@ u64 BwaFMI::translate_loc(u64 sa_loc, std::string &ref_name, u64 &ref_loc) const
     return bns_->anns[rid].len;
 }
 
+bool BwaFMI::pacseq_loaded() const {
+    return pacseq_ != NULL;
+
+}
+
 std::vector< std::pair<std::string, u64> > BwaFMI::get_seqs() const {
     std::vector< std::pair<std::string, u64> > seqs;
 
@@ -123,3 +150,17 @@ std::vector< std::pair<std::string, u64> > BwaFMI::get_seqs() const {
 
     return seqs;
 }
+
+void BwaFMI::load_pacseq() {
+    if (!pacseq_loaded()) {
+        //Copied from bwa/bwase.c
+        pacseq_ = (u8*) calloc(bns_->l_pac/4+1, 1);
+        err_fread_noeof(pacseq_, 1, bns_->l_pac/4+1, bns_->fp_pac);
+    }   
+}
+
+u8 BwaFMI::get_base(u64 i) {
+    return (pacseq_[i>>2] >> ( ((3^i)&3) << 1 )) & 3;
+}
+
+

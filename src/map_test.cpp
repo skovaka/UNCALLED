@@ -1,9 +1,5 @@
 #include <iostream>
 #include <unistd.h>
-#include "params.hpp"
-#include "simulator.hpp"
-#include "chunk_pool.hpp"
-#include "read_buffer.hpp"
 #include "fast5_pool.hpp"
 
 //const std::string MODEL =  "/home/skovaka/Dropbox/code/jhu/UNCALLED/src/uncalled/models/r94_5mers.txt";
@@ -17,9 +13,9 @@ const std::string PROBFN = "/home/skovaka/code/UNCALLED/src/uncalled/models/r94_
 
 int main(int argc, char** argv) {
 
-    std::string index(argv[1]), reads_fname(argv[2]);
-    u32 nthreads = atoi(argv[3]);//, read_count = atoi(argv[4]);
+    std::string index(argv[1]), reads_fname(argv[2]), conf_fname(argv[3]);
     
+
     Params::init_map(index, MODEL,
                         22,    //seed_len
                         25,    //min_aln_len

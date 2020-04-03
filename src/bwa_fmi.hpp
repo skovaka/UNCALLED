@@ -53,9 +53,14 @@ class BwaFMI {
 
     std::vector< std::pair<std::string, u64> > get_seqs() const;
 
+    bool pacseq_loaded() const;
+    void load_pacseq();
+    u8 get_base(u64 i);
+
     private:
     bwt_t *index_;
     bntseq_t *bns_;
+    u8 *pacseq_;
     bool loaded_;
     std::vector<Range> kmer_ranges_;
 };

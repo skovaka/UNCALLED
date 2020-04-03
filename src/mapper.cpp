@@ -24,6 +24,7 @@
 #include "pdqsort.h"
 #include "mapper.hpp"
 
+
 MapperParams Mapper::PRMS;
 BwaFMI Mapper::fmi;
 KmerModel Mapper::model;
@@ -159,6 +160,10 @@ Mapper::Mapper()
 Mapper::Mapper(const Mapper &m) : Mapper() {}
 
 Mapper::~Mapper() {
+
+    #ifdef DEBUG_SEEDS
+    seeds_out_.close();
+    #endif
 
     for (u32 i = 0; i < next_paths_.size(); i++) {
         next_paths_[i].free_buffers();
@@ -564,6 +569,10 @@ bool Mapper::add_event(float event) {
             }
 
             update_seeds(next_paths_[i], false);
+
+            #ifdef DEBUG_SEEDS
+            print_debug_seeds(next_paths_[i]);
+            #endif
         }
     }
 
@@ -604,11 +613,11 @@ bool Mapper::add_event(float event) {
         state_ = State::SUCCESS;
         set_ref_loc(sg);
 
-        #ifdef DEBUG_SEEDS
-        for (u32 pi = 0; pi < prev_size_; pi++) {
-            print_debug_seeds(prev_paths_[pi]);
-        }
-        #endif
+        //#ifdef DEBUG_SEEDS
+        //for (u32 pi = 0; pi < prev_size_; pi++) {
+        //    print_debug_seeds(prev_paths_[pi]);
+        //}
+        //#endif
 
         return true;
     }

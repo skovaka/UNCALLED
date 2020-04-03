@@ -30,20 +30,13 @@
 #include "timer.hpp"
 #include "self_align_ref.hpp"
 
-int main(int argc, char** argv) {
-    std::string bwa_prefix(argv[1]),
-                fasta_fname(argv[2]);
-    u32 min_k = atoi(argv[3]);
+std::vector< std::vector<u64> > self_align(const std::string &bwa_prefix,
+                                           const std::string fasta_fname,
+                                           u32 sample_dist) {
+
+    srand(0);
 
     BwaFMI fmi(bwa_prefix);
-    
-
-    //for (u64 i = 0; i < 50; i++) {
-    //    std::cout << BASE_CHARS[fmi.get_base(i)];
-    //}
-    //std::cout << "\n";
-
-    //return 0;
 
     //std::vector< std::vector<u8> > seqs;
     //std::ifstream fasta_in(fasta_fname);
@@ -57,32 +50,40 @@ int main(int argc, char** argv) {
     //        }
     //    }
     //}
-    //
 
     fmi.load_pacseq();
     auto seqs = fmi.get_seqs();
     u64 st = 0;
+    
+    std::vector< std::vector<u64> > ret;
 
     for (auto s : seqs) {
         std::string name = s.first;
         u64 len = s.second;
 
         for (u64 i = 0; i < len; i++) {
-            Range r = fmi.get_base_range(fmi.get_base(st+i));
-            u64 j = i+1;
-            for (; j < len && r.length() > 1; j++) {
-                r = fmi.get_neighbor(r, fmi.get_base(st+j));
+            if (rand() % sample_dist != 0) {
+                continue;
             }
-            j--;
 
-            if (j-i >= min_k) {
-                std::cout << (j-i) << "\t" << name << "\t" << i << "\t" << j << "\t";
-                for (u32 l = i; l < j; l++) std::cout << BASE_CHARS[BASE_COMP_B[fmi.get_base(st+l)]];
-                std::cout << "\n";
+            ret.push_back(std::vector<u64>());
+
+            //TODO: start with kmers, not bases
+            Range r = fmi.get_base_range(BASE_COMP_B[fmi.get_base(st+i)]);
+            u64 j = i+1;
+            for (; j < len && r.length() > 1 ; j++) { //&& (j-i) <= 1000
+                ret.back().push_back(r.length());
+                r = fmi.get_neighbor(r, BASE_COMP_B[fmi.get_base(j)]);
+            }
+            //Happens on Ns
+            if (r.length() > 0) {
+                ret.back().push_back(r.length());
             }
         }
 
         st += len;
     }
+
+    return ret;
 }
 

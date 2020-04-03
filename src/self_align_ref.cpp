@@ -31,48 +31,59 @@
 #include "self_align_ref.hpp"
 
 std::vector< std::vector<u64> > self_align(const std::string &bwa_prefix,
-                                           const std::string fasta_fname,
                                            u32 sample_dist) {
+
+    srand(0);
 
     BwaFMI fmi(bwa_prefix);
 
-    std::vector< std::vector<u8> > seqs;
-    std::ifstream fasta_in(fasta_fname);
-    std::string fasta_line;
-    while (getline(fasta_in, fasta_line)) {
-        if (fasta_line[0] == '>') {
-            seqs.push_back(std::vector<u8>());
-        } else {
-            for (char c : fasta_line) {
-                seqs.back().push_back(BASE_COMP_B[BASE_BYTES[(u8)c]]);
-            }
-        }
-    }
+    //std::vector< std::vector<u8> > seqs;
+    //std::ifstream fasta_in(fasta_fname);
+    //std::string fasta_line;
+    //while (getline(fasta_in, fasta_line)) {
+    //    if (fasta_line[0] == '>') {
+    //        seqs.push_back(std::vector<u8>());
+    //    } else {
+    //        for (char c : fasta_line) {
+    //            seqs.back().push_back(BASE_COMP_B[BASE_BYTES[(u8)c]]);
+    //        }
+    //    }
+    //}
 
-    srand(0);
+    fmi.load_pacseq();
+    auto seqs = fmi.get_seqs();
+    u64 st = 0;
     
     std::vector< std::vector<u64> > ret;
 
-    for (auto bases : seqs) {
-        for (u64 i = 0; i < bases.size(); i++) {
+    for (auto s : seqs) {
+        std::string name = s.first;
+        u64 len = s.second;
+
+        for (u64 i = 0; i < len; i++) {
+            
+
             if (rand() % sample_dist != 0) {
                 continue;
             }
 
             ret.push_back(std::vector<u64>());
 
+
             //TODO: start with kmers, not bases
-            Range r = fmi.get_base_range(bases[i]);
+            Range r = fmi.get_base_range(BASE_COMP_B[fmi.get_base(st+i)]);
             u64 j = i+1;
-            for (; j < bases.size() && r.length() > 1 ; j++) { //&& (j-i) <= 1000
+            for (; j < len && r.length() > 1 ; j++) { //&& (j-i) <= 1000
                 ret.back().push_back(r.length());
-                r = fmi.get_neighbor(r, bases[j]);
+                r = fmi.get_neighbor(r, BASE_COMP_B[fmi.get_base(st+j)]);
             }
             //Happens on Ns
             if (r.length() > 0) {
                 ret.back().push_back(r.length());
             }
         }
+
+        st += len;
     }
 
     return ret;
