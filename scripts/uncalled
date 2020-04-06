@@ -80,7 +80,8 @@ def add_list_ports_opts(p):
     p.add_argument('--log-dir', default='/var/log/MinKNOW', help='Directory to find MinKNOW log files')
 
 def add_fast5_opts(p):
-    p.add_argument("-i", "--fast5-list", required=True, type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
+    p.add_argument("fast5s", nargs='+', type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
+    p.add_argument("-r", "--recursive", required=False, default="", type=str, help="")
     p.add_argument("-f", "--fast5-filter", required=False, default="", type=str, help="Only map reads listed in this file")
     p.add_argument("-n", "--max-reads", type=int, default=0, help="Maximum number of reads to map")
 
@@ -157,21 +158,42 @@ def index_cmd(args):
 
     sys.stderr.write("Done\n")
 
-def load_fast5s(arg):
-    fast5_list = list()
-    if os.path.isdir(arg):
-        for root, dirs, files in os.walk(arg):
-            for fname in files:
-                if not fname.startswith("#") and fname.endswith("fast5"):
-                    fast5_list.append(os.path.abspath(os.path.join(root, fname)))
+def fast5_path(fname):
+    if fname.startswith("#") or not fname.endswith("fast5"):
+        return None
 
-    elif arg.endswith("fast5"):
-        for fname in arg.split(","):
-            fast5_list.append(os.path.abspath(fname))
+    path = os.path.abspath(fname)
+    if not os.path.isfile(path):
+        sys.stderr.write("Warning: \"%s\" is not a fast5 file.\n")
+        return None
 
-    else:
-        fast5_list = [os.path.abspath(l.strip()) for l in open(arg)]
-    return fast5_list
+    return path
+
+def load_fast5s(fast5s, recursive):
+    for path in fast5s:
+        path = path.strip()
+        isdir = os.path.isdir(path)
+
+        #Recursive directory search 
+        if isdir and recursive:
+            for root, dirs, files in os.walk(path):
+                for fname in files:
+                    yield fast5_path(os.path.join(root, fname))
+
+        #Non-recursive directory search 
+        elif isdir and not recursive:
+            for fname in os.listdir(path):
+                yield fast5_path(os.path.join(path, fname))
+
+        #Read fast5 name directly
+        elif path.endswith("fast5"):
+            yield fast5_path(path)
+
+        #Read fast5 filenames from text file
+        else:
+            with open(path) as infile:
+                for fname in infile:
+                    yield fast5_path(fname)
 
 def assert_exists(fname):
     if not os.path.exists(fname):
@@ -185,17 +207,21 @@ def map_cmd(args):
     assert_exists(params.MODEL_FNAME)
     assert_exists(conf.bwa_prefix + ".bwt")
     assert_exists(conf.bwa_prefix + ".uncl")
-    assert_exists(conf.fast5_list)
 
-    for fname in open(conf.fast5_list):
-        assert_exists(fname.strip())
+    #for fname in open(conf.fast5_list):
+    #    assert_exists(fname.strip())
+
     if len(conf.fast5_filter) > 0:
         assert_exists(conf.fast5_filter)
 
-    sys.stderr.write("Loading fast5_list\n")
     sys.stderr.flush()
 
     mapper = mapping.Fast5Pool(conf)
+
+    sys.stderr.write("Loading fast5s\n")
+    for fast5 in load_fast5s(args.fast5s, args.recursive):
+        if fast5 != None:
+            mapper.add_fast5(fast5)
 
     sys.stderr.flush()
 
@@ -205,27 +231,28 @@ def map_cmd(args):
     n = 0
 
     try:
-        while not mapper.all_finished() and (not conf.max_reads or n <= conf.max_reads):
+        while not mapper.all_finished():
             t0 = time.time()
             for p in mapper.update():
                 p.print_paf()
                 n += 1
-                if mapper.all_finished() or (conf.max_reads and n > conf.max_reads):
-                    break
             dt = time.time() - t0;
             if dt < MAX_SLEEP:
                 time.sleep(MAX_SLEEP - dt);
             #time.sleep(0.01)
     except KeyboardInterrupt:
         pass
+    
+    sys.stderr.write("Finishing\n")
 
+    mapper.update()
     mapper.stop_all()
-    while not mapper.all_finished():
-        time.sleep(MAX_SLEEP)
+    #while not mapper.all_finished():
+    #    time.sleep(MAX_SLEEP)
 
-    for p in mapper.update():
-        p.print_paf()
-        sys.stdout.flush()
+    #for p in mapper.update():
+    #    p.print_paf()
+    #    sys.stdout.flush()
 
 def realtime_cmd(args):
 

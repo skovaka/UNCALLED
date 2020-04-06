@@ -38,12 +38,12 @@ PYBIND11_MODULE(mapping, m) {
         .value("KEEP", Paf::Tag::KEEP)
         .export_values();
 
-
-
     //.def(py::init<const std::string &,const std::string &,u32>())
+
     py::class_<Fast5Pool>(m, "Fast5Pool")
         .def(py::init<Conf &>())
         .def("update", &Fast5Pool::update)
+        .def("add_fast5", &Fast5Pool::add_fast5)
         .def("all_finished", &Fast5Pool::all_finished)
         .def("stop_all", &Fast5Pool::stop_all); 
 

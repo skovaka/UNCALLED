@@ -42,6 +42,8 @@ class Fast5Loader {
     //Fast5Loader(std::string fast5_list_fname, u32 max_buffer, std::string read_filter_fname="", u32 max_reads=UINT_MAX);
     Fast5Loader(const Fast5Params &p);
 
+    void add_fast5(const std::string &fast5_name);
+
     ReadBuffer pop_read();
     u32 buffered_count();
     u32 buffer_reads();
@@ -76,6 +78,7 @@ class Fast5Pool {
 
     bool all_finished();
     void stop_all();
+    void add_fast5(const std::string &fname);
 
     private:
     Fast5Loader fast5s_;
@@ -94,7 +97,7 @@ class Fast5Pool {
         static u16 THREAD_COUNT;
 
         u16 tid_;
-        bool running_, in_buffered_, out_buffered_, finished_;
+        bool running_, stopped_, in_buffered_, out_buffered_, finished_;
         Mapper mapper_;
         std::thread thread_;
 

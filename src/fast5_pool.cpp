@@ -39,11 +39,11 @@ const std::string Fast5Loader::FMT_CH_PATHS[] = {
 Fast5Loader::Fast5Loader(const Fast5Params &p) : PRMS(p) {
     total_buffered_ = 0;
     
-    std::ifstream list_file(PRMS.fast5_list);
-    std::string fast5_name;
-    while (getline(list_file, fast5_name)) {
-        fast5_list_.push_back(fast5_name);
-    }
+    //std::ifstream list_file(PRMS.fast5_list);
+    //std::string fast5_name;
+    //while (getline(list_file, fast5_name)) {
+    //    fast5_list_.push_back(fast5_name);
+    //}
     
     if (!PRMS.fast5_filter.empty()) {
         std::ifstream filter_file(PRMS.fast5_filter);
@@ -53,6 +53,10 @@ Fast5Loader::Fast5Loader(const Fast5Params &p) : PRMS(p) {
             filter_.insert(read_name);
         }
     }
+}
+
+void Fast5Loader::add_fast5(const std::string &fast5_name) {
+    fast5_list_.push_back(fast5_name);
 }
 
 bool Fast5Loader::empty() {
@@ -147,7 +151,7 @@ Fast5Pool::Fast5Pool(Conf &conf)
     Mapper::model = KmerModel(conf.kmer_model, true);
     Mapper::fmi = BwaFMI(conf.bwa_prefix, Mapper::model);
 
-    fast5s_.buffer_reads();
+    //fast5s_.buffer_reads();
 
     threads_ = std::vector<MapperThread>(conf.threads);
 
@@ -163,6 +167,8 @@ Fast5Pool::Fast5Pool(Conf &conf)
 
 std::vector<Paf> Fast5Pool::update() {
     std::vector<Paf> ret;
+
+    fast5s_.buffer_reads();
 
     for (u32 i = 0; i < threads_.size(); i++) {
         if (threads_[i].out_buffered_) {
@@ -182,10 +188,14 @@ std::vector<Paf> Fast5Pool::update() {
         }
     }
 
-    fast5s_.buffer_reads();
 
     return ret;
 }
+
+void Fast5Pool::add_fast5(const std::string &fast5_name) {
+    fast5s_.add_fast5(fast5_name);
+}
+
 
 bool Fast5Pool::all_finished() {
     if (!fast5s_.empty()) return false;
@@ -202,7 +212,9 @@ void Fast5Pool::stop_all() {
 
     //reads_.clear();
     for (auto &t : threads_) {
-        t.running_ = false;
+	//t.running_ = false;
+        t.stopped_ = true;
+        //t.out_buffered_ = false;
         t.mapper_.request_reset();
         t.thread_.join();
 
@@ -221,6 +233,7 @@ u16 Fast5Pool::MapperThread::THREAD_COUNT = 0;
 Fast5Pool::MapperThread::MapperThread()
     : tid_(THREAD_COUNT++),
       running_(true),
+      stopped_(false),
       in_buffered_(false),
       out_buffered_(false),
       finished_(false) {
@@ -241,7 +254,7 @@ void Fast5Pool::MapperThread::start() {
 }
 
 void Fast5Pool::MapperThread::run() {
-    while (running_) {
+    while (running_ && !stopped_) {
         while (!in_buffered_ && running_) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
@@ -258,7 +271,11 @@ void Fast5Pool::MapperThread::run() {
         }
 
         paf_out_ = p;
-        out_buffered_ = true;
+        out_buffered_ = !stopped_;
+    }
+
+    while (out_buffered_) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     finished_ = true;
