@@ -39,12 +39,11 @@ class ArgFormat(argparse.ArgumentDefaultsHelpFormatter):
     pass
 
 def add_bwa_opt(p):
-    p.add_argument("-x", "--bwa-prefix", required=True, type=str, help="BWA prefix to mapping to. Must be processed by \"uncalled index\".")
+    p.add_argument("bwa_prefix", type=str, help="BWA prefix to mapping to. Must be processed by \"uncalled index\".")
     p.add_argument("-p", "--index-preset", default="default", type=str, help="Mapping mode")
 
 
 def add_index_opts(p):
-    p.add_argument("-i", "--ref-fasta", required=False, type=str, help="FASTA file used to build BWA index")
     p.add_argument("-s", "--max-sample-dist", default=100, type=int, help="Maximum average sampling distance between reference self-alignments.")
     p.add_argument("--min-samples", default=50000, type=int, help="Minimum number of self-alignments to produce (approximate, due to deterministically random start locations)")
     p.add_argument("--max-samples", default=1000000, type=int, help="Maximum number of self-alignments to produce (approximate, due to deterministically random start locations)")
@@ -192,8 +191,8 @@ def load_fast5s(fast5s, recursive):
         #Read fast5 filenames from text file
         else:
             with open(path) as infile:
-                for fname in infile:
-                    yield fast5_path(fname)
+                for line in infile:
+                    yield fast5_path(line.strip())
 
 def assert_exists(fname):
     if not os.path.exists(fname):
@@ -231,7 +230,7 @@ def map_cmd(args):
     n = 0
 
     try:
-        while not mapper.all_finished():
+        while mapper.running():
             t0 = time.time()
             for p in mapper.update():
                 p.print_paf()
@@ -239,20 +238,11 @@ def map_cmd(args):
             dt = time.time() - t0;
             if dt < MAX_SLEEP:
                 time.sleep(MAX_SLEEP - dt);
-            #time.sleep(0.01)
     except KeyboardInterrupt:
         pass
     
     sys.stderr.write("Finishing\n")
-
-    mapper.update()
-    mapper.stop_all()
-    #while not mapper.all_finished():
-    #    time.sleep(MAX_SLEEP)
-
-    #for p in mapper.update():
-    #    p.print_paf()
-    #    sys.stdout.flush()
+    mapper.stop()
 
 def realtime_cmd(args):
 

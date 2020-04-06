@@ -76,9 +76,9 @@ class Fast5Pool {
 
     std::vector<Paf> update();
 
-    bool all_finished();
-    void stop_all();
+    bool running();
     void add_fast5(const std::string &fname);
+    void stop();
 
     private:
     Fast5Loader fast5s_;
@@ -97,7 +97,13 @@ class Fast5Pool {
         static u16 THREAD_COUNT;
 
         u16 tid_;
-        bool running_, stopped_, in_buffered_, out_buffered_, finished_;
+
+        //running: run method has not ended
+        //stopped: force stopped, like by keyboard interrupt
+        //finished: no more reads left to process
+        bool running_, stopped_, finished_, 
+             in_buffered_, out_buffered_;
+
         Mapper mapper_;
         std::thread thread_;
 
