@@ -140,11 +140,6 @@ u32 Fast5Loader::buffered_count() {
     return buffered_reads_.size();
 }
 
-
-//Fast5Pool::Fast5Pool(const std::string &fast5_list_fname, 
-//                     const std::string &read_filter_fname,
-//                     u32 read_count) 
-//    : fast5s_(fast5_list_fname, 100, read_filter_fname, read_count) {
 Fast5Pool::Fast5Pool(Conf &conf)
     : fast5s_(conf.fast5_prms) {
 

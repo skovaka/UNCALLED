@@ -16,7 +16,7 @@ class make_bwa(build_ext):
 uncalled = Extension(
     "uncalled.mapping",
      sources = [
-                "src/conf.cpp",
+                #"src/conf.cpp",
                 "src/mapper.cpp",
                 "src/self_align_ref.cpp",
                 "src/fm_profiler.cpp",
@@ -38,7 +38,8 @@ uncalled = Extension(
                      "./toml11"],
      library_dirs = ["./bwa"],
      libraries = ["hdf5", "bwa", "z", "dl"],
-     extra_compile_args = ["-std=c++11", "-O3"]
+     extra_compile_args = ["-std=c++11", "-O3"],
+     define_macros = [("PYBIND", None)]
 )
 
 setup(name = "uncalled",

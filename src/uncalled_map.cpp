@@ -14,34 +14,12 @@ const std::string PROBFN = "/home/skovaka/code/UNCALLED/src/uncalled/models/r94_
 int main(int argc, char** argv) {
 
     std::string index(argv[1]), reads_fname(argv[2]), conf_fname(argv[3]);
+
+    Conf conf(conf_fname);
     
-
-    Params::init_map(index, MODEL,
-                        22,    //seed_len
-                        25,    //min_aln_len
-                        0,     //min_rep_len
-                        50,    //max_rep_copy
-                        8,     //max_consec_stay
-                        10000, //max_paths
-                        30000, //max_events_proc
-                        3,     //e/vt_winlen1
-                        6,     //evt_winlen2
-                        nthreads,     //nthreads
-                        512,   //num_channels
-                        1.4,   //evt_thresh1
-                        9.0,   //evt_thresh2
-                        0.2,   //evt_peak_height
-                        30,    //evt_min_mean
-                        150,   //evt_max_mean
-                        0.5,   //max_stay_frac
-                        -3.75, //min_seed_prob
-                        7.00,  //min_mean_conf
-                        2.25  //min_top_conf
-                        );
-
     Timer t;
 
-    Fast5Pool pool(reads_fname);
+    Fast5Pool pool(conf);
     u64 MAX_SLEEP = 100;
 
     while (!pool.all_finished()) {
