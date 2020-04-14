@@ -59,13 +59,12 @@ Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 start_time,
     for (u32 i = 0; i < raw_len; i++) raw_data_[i] = raw_data[raw_st+i];
     
 }
-
-Chunk::Chunk(const Chunk &c) 
-    : id_(c.id_),
-      channel_idx_(c.channel_idx_),
-      number_(c.number_),
-      start_time_(c.start_time_),
-      raw_data_(c.raw_data_) {}
+//Chunk::Chunk(const Chunk &c) 
+//    : id_(c.id_),
+//      channel_idx_(c.channel_idx_),
+//      number_(c.number_),
+//      start_time_(c.start_time_),
+//      raw_data_(c.raw_data_) {}
 
 float &Chunk::operator[] (u32 i) {
     return raw_data_[i];
@@ -129,3 +128,6 @@ void Chunk::clear() {
     raw_data_.clear();
 }   
 
+bool operator< (const Chunk &r1, const Chunk &r2) {
+    return r1.start_time_ < r2.start_time_;
+}

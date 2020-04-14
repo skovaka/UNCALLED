@@ -31,6 +31,25 @@
 #include "util.hpp"
 #include "chunk.hpp"
 
+
+typedef struct {
+    u16 num_channels;
+    float bp_per_sec;
+    float sample_rate;
+    float calib_digitisation;
+    float chunk_time;
+    std::vector<float> calib_offsets, calib_coefs;
+
+    float bp_per_samp() {
+        return bp_per_sec / sample_rate;
+    }
+
+    u16 chunk_len() {
+        return (u16) (chunk_time * sample_rate);
+    }
+
+} ReadParams;
+
 class Paf {
     public:
 
@@ -80,15 +99,6 @@ class Paf {
     std::vector< std::pair<Tag, std::string> > str_tags_;
 };
 
-typedef struct {
-    u16 num_channels;
-    float bp_per_sec;
-    float sample_rate;
-    float bp_per_samp;
-    float calib_digitisation;
-    std::vector<float> calib_offsets, calib_coefs;
-} ReadParams;
-
 class ReadBuffer {
     public:
     static ReadParams PRMS;
@@ -97,7 +107,7 @@ class ReadBuffer {
 
 
     ReadBuffer();
-    ReadBuffer(const ReadBuffer &read);
+    //ReadBuffer(const ReadBuffer &read);
     ReadBuffer(const std::string &filename);
     ReadBuffer(const hdf5_tools::File &file, const std::string &raw_path, const std::string &ch_path);
     ReadBuffer(Source source, u16 channel, const std::string &id = "", 
@@ -119,7 +129,7 @@ class ReadBuffer {
 
     void set_raw_len(u64 raw_len_);
 
-    u32 get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) const;
+    u32 get_chunks(std::deque<Chunk> &chunk_queue, u32 max=UINT_MAX) const;
 
     u16 get_channel() const;
     u16 get_channel_idx() const;

@@ -674,7 +674,7 @@ void Mapper::print_debug_seeds(PathBuffer &p) {
 #endif
 
 u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
-    return (evt_i * event_detector_.mean_event_len() * ReadBuffer::PRMS.bp_per_samp) + last*(model.kmer_len() - 1);
+    return (evt_i * event_detector_.mean_event_len() * ReadBuffer::PRMS.bp_per_samp()) + last*(model.kmer_len() - 1);
 }                  
 
 void Mapper::set_ref_loc(const SeedGroup &seeds) {

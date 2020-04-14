@@ -34,6 +34,7 @@
 #include "mapper.hpp"
 #include "seed_tracker.hpp"
 #include "read_buffer.hpp"
+#include "fast5_reader.hpp"
 #include "toml.hpp"
 
 #ifdef PYBIND
@@ -41,12 +42,6 @@
 #endif
 
 #define INDEX_SUFF ".uncl"
-
-typedef struct {
-    std::string fast5_list;
-    std::string fast5_filter;
-    u32 max_reads, max_buffer;
-} Fast5Params;
 
 const std::string ACTIVE_STRS[] = {"full", "even", "odd"};
 const std::string MODE_STRS[] = {"deplete", "enrich"};
@@ -63,6 +58,10 @@ typedef struct {
     float duration;
 } RealtimeParams;
 
+typedef struct {
+    float start, end, speed;
+} SimParams;
+
 #define GET_SET(T, N) T get_##N() { return N; } \
                       void set_##N(const T &v) { N = v; }
 
@@ -78,6 +77,11 @@ typedef struct {
 
 #define GET_TOML_EXTERN(C, T, V, S) GET_NAMED_TOML(C, T, S.V, #V)
 #define GET_TOML(C, T, V) GET_NAMED_TOML(C, T, V, #V)
+
+#define GET_NAMED_TOML(C, T, V, N) { \
+    if (C.contains(N)) \
+        V = toml::find<T>(C,N); \
+}
 
 class Conf {
     public:
@@ -103,7 +107,7 @@ class Conf {
             GET_TOML_EXTERN(subconf, u32, max_buffer, fast5_prms);
             GET_TOML_EXTERN(subconf, u32, max_reads, fast5_prms);
             GET_TOML_EXTERN(subconf, std::string, fast5_list, fast5_prms);
-            GET_TOML_EXTERN(subconf, std::string, fast5_filter, fast5_prms);
+            GET_TOML_EXTERN(subconf, std::string, read_list, fast5_prms);
         }
 
         if (conf.contains("realtime")) {
@@ -133,14 +137,12 @@ class Conf {
             }
         }
 
-        if (conf.contains("signal")) {
-            const auto subconf = toml::find(conf, "signal");
+        if (conf.contains("reads")) {
+            const auto subconf = toml::find(conf, "reads");
 
             GET_TOML_EXTERN(subconf, u16, bp_per_sec, ReadBuffer::PRMS);
             GET_TOML_EXTERN(subconf, u16, sample_rate, ReadBuffer::PRMS);
-
-            ReadBuffer::PRMS.bp_per_samp = (ReadBuffer::PRMS.bp_per_sec / 
-                                            ReadBuffer::PRMS.sample_rate);
+            GET_TOML_EXTERN(subconf, float, chunk_time, ReadBuffer::PRMS);
         }
 
         if (conf.contains("mapper")) {
@@ -159,7 +161,6 @@ class Conf {
             GET_TOML_EXTERN(subconf, u32, evt_buffer_len, Mapper::PRMS);
             GET_TOML_EXTERN(subconf, u16, evt_batch_size, Mapper::PRMS);
             GET_TOML_EXTERN(subconf, float, evt_timeout, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, chunk_size, Mapper::PRMS);
             GET_TOML_EXTERN(subconf, float, max_chunk_wait, Mapper::PRMS);
         }
 
@@ -181,6 +182,15 @@ class Conf {
             GET_TOML_EXTERN(subconf, u32, window_length1, EventDetector::PRMS);
             GET_TOML_EXTERN(subconf, u32, window_length2, EventDetector::PRMS);
         }
+
+        //if (conf.contains("simulator")) {
+        //    const auto subconf = toml::find(conf, "simulator");
+        //    GET_TOML_EXTERN(subconf, float, speed, SimPool::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, start, SimPool::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, end, SimPool::PRMS);
+
+        //    SimPool::PRMS.time_coef = 
+        //}
     }
 
     Conf() {}
@@ -196,7 +206,7 @@ class Conf {
     GET_SET(std::string, index_preset)
 
     GET_SET_EXTERN(std::string, fast5_prms, fast5_list)
-    GET_SET_EXTERN(std::string, fast5_prms, fast5_filter)
+    GET_SET_EXTERN(std::string, fast5_prms, read_list)
     GET_SET_EXTERN(u32, fast5_prms, max_reads)
     GET_SET_EXTERN(u32, fast5_prms, max_buffer)
 
@@ -208,7 +218,10 @@ class Conf {
 
     GET_SET_EXTERN(u32, Mapper::PRMS, max_events)
     GET_SET_EXTERN(u32, Mapper::PRMS, max_chunks)
-    GET_SET_EXTERN(float, Mapper::PRMS, chunk_size)
+
+
+    GET_SET_EXTERN(float, ReadBuffer::PRMS, chunk_time);
+    GET_SET_EXTERN(float, ReadBuffer::PRMS, sample_rate);
 
     #ifdef PYBIND
     static void add_pybind_vars(pybind11::class_<Conf> &c) {
@@ -219,7 +232,7 @@ class Conf {
         DEFPRP(index_preset)
 
         DEFPRP(fast5_list)
-        DEFPRP(fast5_filter)
+        DEFPRP(read_list)
         DEFPRP(max_reads)
         DEFPRP(max_buffer)
 
@@ -231,7 +244,7 @@ class Conf {
 
         DEFPRP(max_events)
         DEFPRP(max_chunks)
-        DEFPRP(chunk_size)
+        DEFPRP(chunk_time)
     }
     #endif
 
@@ -272,6 +285,7 @@ class Conf {
 
     Fast5Params fast5_prms;
     RealtimeParams realtime_prms;
+    //SimParams sim_prms;
 };
 
 #endif

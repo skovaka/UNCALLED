@@ -8,14 +8,13 @@ class Chunk {
     public:
     Chunk();
 
+    //Chunk(const Chunk &c);
+
     Chunk(const std::string &id, u16 channel, u32 number, u64 start_time, 
           const std::string &dtype, const std::string &raw_str);
 
     Chunk(const std::string &id, u16 channel, u32 number, u64 start_time, 
           const std::vector<float> &raw_data, u32 raw_st, u32 raw_len);
-
-    Chunk(const Chunk &c);
-
 
     bool pop(std::vector<float> &raw_data);
     void swap(Chunk &c);
@@ -52,6 +51,9 @@ class Chunk {
     //std::vector<u32> chunk_classifications;
     //float median_before, median;
 
+    friend bool operator< (const Chunk &r1, const Chunk &r2);
 };
+
+bool operator< (const Chunk &r1, const Chunk &r2);
 
 #endif

@@ -25,12 +25,16 @@
 #include <chrono>
 #include <stdlib.h>
 #include <time.h>
-#include "chunk_pool.hpp"
+#include "realtime_pool.hpp"
 #include "mapper.hpp"
 
 
 
-ChunkPool::ChunkPool(Conf &conf) {
+RealtimePool::RealtimePool(Conf &conf) {
+    conf.load_index_params();
+    Mapper::model = KmerModel(conf.kmer_model, true);
+    Mapper::fmi = BwaFMI(conf.bwa_prefix, Mapper::model);
+
     for (u16 t = 0; t < conf.threads; t++) {
         threads_.emplace_back(mappers_);
     }
@@ -53,7 +57,7 @@ ChunkPool::ChunkPool(Conf &conf) {
 
 }
 
-void ChunkPool::buffer_chunk(Chunk &c) {
+void RealtimePool::buffer_chunk(Chunk &c) {
     u16 ch = c.get_channel_idx();
     if (chunk_buffer_[ch].empty()) {
         buffer_queue_.push_back(ch);
@@ -65,7 +69,7 @@ void ChunkPool::buffer_chunk(Chunk &c) {
 }
 
 //Add chunk to master buffer
-bool ChunkPool::add_chunk(Chunk &c) {
+bool RealtimePool::add_chunk(Chunk &c) {
     u16 ch = c.get_channel_idx();
 
 
@@ -97,7 +101,7 @@ bool ChunkPool::add_chunk(Chunk &c) {
     return false;
 }
 
-std::vector<MapResult> ChunkPool::update() {
+std::vector<MapResult> RealtimePool::update() {
 
     std::vector< u16 > read_counts(threads_.size());
     u16 active_count = 0;
@@ -184,7 +188,7 @@ std::vector<MapResult> ChunkPool::update() {
     return ret;
 }
 
-bool ChunkPool::all_finished() {
+bool RealtimePool::all_finished() {
     if (!buffer_queue_.empty()) return false;
 
     for (MapperThread &t : threads_) {
@@ -194,36 +198,36 @@ bool ChunkPool::all_finished() {
     return true;
 }
 
-void ChunkPool::stop_all() {
+void RealtimePool::stop_all() {
     for (MapperThread &t : threads_) {
         t.running_ = false;
         t.thread_.join();
     }
 }
 
-u16 ChunkPool::MapperThread::num_threads = 0;
+u16 RealtimePool::MapperThread::num_threads = 0;
 
-ChunkPool::MapperThread::MapperThread(std::vector<Mapper> &mappers)
+RealtimePool::MapperThread::MapperThread(std::vector<Mapper> &mappers)
     : tid_(num_threads++),
       mappers_(mappers),
       running_(true) {}
 
-ChunkPool::MapperThread::MapperThread(MapperThread &&mt) 
+RealtimePool::MapperThread::MapperThread(MapperThread &&mt) 
     : tid_(mt.tid_),
       mappers_(mt.mappers_),
       running_(mt.running_),                                             
       thread_(std::move(mt.thread_)) {}
 
-void ChunkPool::MapperThread::start() {
-    thread_ = std::thread(&ChunkPool::MapperThread::run, this);
+void RealtimePool::MapperThread::start() {
+    thread_ = std::thread(&RealtimePool::MapperThread::run, this);
 }
 
 
-u16 ChunkPool::MapperThread::read_count() const {
+u16 RealtimePool::MapperThread::read_count() const {
     return in_chs_.size() + active_chs_.size();
 }
 
-void ChunkPool::MapperThread::run() {
+void RealtimePool::MapperThread::run() {
     std::string fast5_id;
     std::vector<float> fast5_signal;
 

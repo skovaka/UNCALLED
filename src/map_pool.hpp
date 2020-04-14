@@ -30,49 +30,10 @@
 #include <unordered_set>
 #include "conf.hpp"
 
-//typedef struct {
-//    std::string fast5_list;
-//    std::string filter;
-//    u32 max_reads, max_buffer;
-//} Fast5Params;
-
-
-class Fast5Loader {
-    public:
-    //Fast5Loader(std::string fast5_list_fname, u32 max_buffer, std::string read_filter_fname="", u32 max_reads=UINT_MAX);
-    Fast5Loader(const Fast5Params &p);
-
-    void add_fast5(const std::string &fast5_name);
-
-    ReadBuffer pop_read();
-    u32 buffered_count();
-    u32 buffer_reads();
-    bool empty();
-
-    Fast5Params PRMS;
-
-    private:
-    enum Format {MULTI, SINGLE, UNKNOWN};
-    static const std::string FMT_RAW_PATHS[], FMT_CH_PATHS[];
-
-    bool open_next();
-
-    u32 max_buffer_, total_buffered_, max_reads_;
-
-    std::deque<std::string> fast5_list_;
-    std::unordered_set<std::string> filter_;
-
-    hdf5_tools::File open_fast5_;
-    Format open_fmt_;
-    std::deque<std::string> read_paths_;
-
-    std::deque<ReadBuffer> buffered_reads_;
-};
-
-class Fast5Pool {
+class MapPool {
     public:
 
-    Fast5Pool(Conf &conf);
+    MapPool(Conf &conf);
 
     std::vector<Paf> update();
 
@@ -81,10 +42,7 @@ class Fast5Pool {
     void stop();
 
     private:
-    Fast5Loader fast5s_;
-    //std::deque<std::string> fast5_list_;
-    //std::deque<ReadBuffer> reads_;
-    //std::unordered_set<std::string> filter_;
+    Fast5Reader fast5s_;
 
     class MapperThread {
         public:

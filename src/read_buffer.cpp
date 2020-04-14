@@ -162,18 +162,18 @@ ReadBuffer::ReadBuffer() {
     
 }
 
-ReadBuffer::ReadBuffer(const ReadBuffer &r) 
-    : source_          (r.source_),
-      channel_idx_     (r.channel_idx_),
-      id_              (r.id_),
-      number_          (r.number_),
-      start_sample_    (r.start_sample_),
-      raw_len_         (r.raw_len_),
-      full_signal_     (r.full_signal_),
-      chunk_           (r.chunk_),
-      num_chunks_      (r.num_chunks_),
-      chunk_processed_ (r.chunk_processed_),
-      loc_             (r.loc_) {}
+//ReadBuffer::ReadBuffer(const ReadBuffer &r) 
+//    : source_          (r.source_),
+//      channel_idx_     (r.channel_idx_),
+//      id_              (r.id_),
+//      number_          (r.number_),
+//      start_sample_    (r.start_sample_),
+//      raw_len_         (r.raw_len_),
+//      full_signal_     (r.full_signal_),
+//      chunk_           (r.chunk_),
+//      num_chunks_      (r.num_chunks_),
+//      chunk_processed_ (r.chunk_processed_),
+//      loc_             (r.loc_) {}
 
 void ReadBuffer::swap(ReadBuffer &r) {
     std::swap(source_, r.source_);
@@ -274,7 +274,7 @@ ReadBuffer::ReadBuffer(Chunk &first_chunk)
 
 void ReadBuffer::set_raw_len(u64 raw_len) {
     raw_len_ = raw_len;
-    loc_.set_read_len(raw_len_ * PRMS.bp_per_samp);
+    loc_.set_read_len(raw_len_ * PRMS.bp_per_samp());
 }
 
 bool ReadBuffer::add_chunk(Chunk &c) {
@@ -300,12 +300,13 @@ u16 ReadBuffer::get_channel_idx() const {
     return channel_idx_;
 }
 
-u32 ReadBuffer::get_chunks(std::deque<Chunk> &chunk_queue, u16 max_length) const {
-    u32 count = 0; //
-    for (u32 i = 0; i+max_length <= full_signal_.size(); i += max_length) {
+u32 ReadBuffer::get_chunks(std::deque<Chunk> &chunk_queue, u32 max) const {
+    u32 count = 0;
+    u16 l = PRMS.chunk_len();
+    for (u32 i = 0; i+l <= full_signal_.size() && count < max; i += l) {
         chunk_queue.emplace_back(id_, get_channel(), number_, 
                                  start_sample_+i, full_signal_, 
-                                 i, max_length);
+                                 i, l);
         count++;
     }
     return count;

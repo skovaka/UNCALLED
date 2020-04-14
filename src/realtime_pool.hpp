@@ -21,37 +21,26 @@
  * SOFTWARE.
  */
 
-#ifndef CHANNEL_POOL_HPP
-#define CHANNEL_POOL_HPP
+#ifndef CHUNK_POOL_HPP
+#define CHUNK_POOL_HPP
 
 #include <thread>
 #include <vector>
 #include <deque>
 #include "mapper.hpp"
-#include "fast5_reader.hpp"
+#include "conf.hpp"
 
-//class Fast5Read {
-//    public:
-//    Fast5Read();
-//    Fast5Read(const std::string &filename);
-//
-//    void swap(Fast5Read &r);
-//    float next_sig();
-//    bool empty() const;
-//    
-//    std::vector<float> signal;
-//    std::string name;
-//    u16 channel;
-//    u32 i;
-//};
+using MapResult = std::tuple<u16, u32, Paf>;
 
-class ChannelPool {
+class RealtimePool {
     public:
-    ChannelPool(MapperParams &params, u16 nchannels, u16 nthreads);
+    RealtimePool(Conf &conf);
     
-    void add_fast5s(const std::vector<std::string> &fast5s, 
-                    const std::vector<u16> &channels);
-    std::vector<std::string> update();
+    void start_timer();
+    bool add_chunk(Chunk &chunk);
+    void end_read(u16 ch, u32 number);
+
+    std::vector<MapResult> update();
     bool all_finished();
     void stop_all();
 
@@ -75,29 +64,26 @@ class ChannelPool {
         bool running_;
 
         //Corrasponding inputs/output
-        std::vector< Fast5Read > new_reads_, active_reads_;
-        std::deque< ReadLoc > outputs_;
+        std::vector< u16 > in_chs_, in_tmp_, 
+                           out_chs_, out_tmp_,
+                           active_chs_;
+        std::mutex in_mtx_, out_mtx_;
 
         std::thread thread_;
-        std::mutex in_mtx_, out_mtx_;
     };
+
+    void buffer_chunk(Chunk &c);
 
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;
-
-    std::deque<u16> channel_queue_;
-    std::vector<bool> channel_busy_;
-
-    //Store threads in order of # active mappers
-    std::vector<u16> thread_ids_;
-    
     std::vector<MapperThread> threads_;
+    std::vector<Chunk> chunk_buffer_;
 
-    u64 fast5_count_;
-    std::vector< std::deque<std::string> > channel_fast5s_;
-    std::vector<Fast5Read> read_buffer_;
-    
+    std::vector<u16> buffer_queue_, active_queue_, out_chs_;
+    std::vector<bool> channel_active_;
 
+    Timer time_;
+    //Store threads in order of # active mappers
 };
 
 #endif

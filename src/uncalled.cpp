@@ -4,8 +4,8 @@
 #include "self_align_ref.hpp"
 #include "mapper.hpp"
 //#include "simulator.hpp"
-#include "fast5_pool.hpp"
-#include "chunk_pool.hpp"
+#include "map_pool.hpp"
+#include "realtime_pool.hpp"
 #include "chunk.hpp"
 #include "read_buffer.hpp"
 
@@ -40,19 +40,19 @@ PYBIND11_MODULE(mapping, m) {
 
     //.def(py::init<const std::string &,const std::string &,u32>())
 
-    py::class_<Fast5Pool>(m, "Fast5Pool")
+    py::class_<MapPool>(m, "MapPool")
         .def(py::init<Conf &>())
-        .def("update", &Fast5Pool::update)
-        .def("add_fast5", &Fast5Pool::add_fast5)
-        .def("running", &Fast5Pool::running)
-        .def("stop", &Fast5Pool::stop); 
+        .def("update", &MapPool::update)
+        .def("add_fast5", &MapPool::add_fast5)
+        .def("running", &MapPool::running)
+        .def("stop", &MapPool::stop); 
 
-    py::class_<ChunkPool>(m, "ChunkPool")
+    py::class_<RealtimePool>(m, "RealtimePool")
         .def(py::init<Conf &>()) 
-        .def("update", &ChunkPool::update)
-        .def("all_finished", &ChunkPool::all_finished)
-        .def("stop_all", &ChunkPool::stop_all)
-        .def("add_chunk", &ChunkPool::add_chunk);
+        .def("update", &RealtimePool::update)
+        .def("all_finished", &RealtimePool::all_finished)
+        .def("stop_all", &RealtimePool::stop_all)
+        .def("add_chunk", &RealtimePool::add_chunk);
     
     py::enum_<RealtimeParams::Mode>(m, "RealtimeMode")
         .value("DEPLETE", RealtimeParams::Mode::DEPLETE)
