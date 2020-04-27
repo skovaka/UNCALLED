@@ -62,7 +62,6 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     //TODO: don't write this here to speed up source loop
     prob_sums_[0] = 0;
     prob_sums_[1] = prob;
-
 }
 
 
@@ -154,6 +153,8 @@ Mapper::Mapper()
     prev_size_ = 0;
     event_i_ = 0;
     seed_tracker_.reset();
+
+    norm_.set_target(model.get_mean(), model.get_stdv());
 }
 
 Mapper::Mapper(const Mapper &m) : Mapper() {}
@@ -198,22 +199,11 @@ Paf Mapper::map_read() {
 
     map_timer_.reset();
 
-    std::vector<Event> events = event_detector_.add_samples(read_.full_signal_);
-    model.normalize(events);
-     
-    for (u32 e = 0; e < events.size(); e++) {
-        if (add_event(events[e].mean)) break;
-    }
+    norm_.set_signal(evdt_.get_means(read_.full_signal_));
+
+    while (!map_next()) {}
 
     read_.loc_.set_float(Paf::Tag::MAP_TIME, map_timer_.get());
-
-    //if (!read_.loc_.is_mapped()) {
-    //    read_.loc_.set_float(Paf::Tag::TOP_RATIO, seed_tracker_.get_top_conf());
-    //    read_.loc_.set_float(Paf::Tag::MEAN_RATIO, seed_tracker_.get_mean_conf());
-    //    set_ref_loc(seed_tracker_.get_best());
-    //    //read_.loc_.print_paf();
-    //    //seed_tracker_.print(std::cout, 5);
-    //}
 
     return read_.loc_;
 }
@@ -250,7 +240,7 @@ void Mapper::reset() {
     norm_.skip_unread();
 
     seed_tracker_.reset();
-    event_detector_.reset();
+    evdt_.reset();
 
     chunk_timer_.reset();
     map_timer_.reset();
@@ -315,13 +305,14 @@ u16 Mapper::process_chunk() {
 
     u16 nevents = 0;
     for (u32 i = 0; i < read_.chunk_.size(); i++) {
-        if (event_detector_.add_sample(read_.chunk_[i])) {
-            mean = event_detector_.get_mean();
-            if (!norm_.add_event(mean)) {
+        if (evdt_.add_sample(read_.chunk_[i])) {
+            mean = evdt_.get_mean();
+
+            if (!norm_.push(mean)) {
 
                 u32 nskip = norm_.skip_unread(nevents);
                 skip_events(nskip);
-                if (!norm_.add_event(mean)) {
+                if (!norm_.push(mean)) {
                     map_time_ += map_timer_.lap();
                     return nevents;
                 }
@@ -369,7 +360,7 @@ bool Mapper::map_chunk() {
     float tlimit = PRMS.evt_timeout * nevents;
 
     for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
-        if (add_event(norm_.pop_event())) {
+        if (map_next()) {
             read_.loc_.set_float(Paf::Tag::MAP_TIME, map_time_+map_timer_.get());
             read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
             return true;
@@ -382,11 +373,17 @@ bool Mapper::map_chunk() {
     return false;
 }
 
-bool Mapper::add_event(float event) {
-
-    if (reset_ || event_i_ >= PRMS.max_events) {
+bool Mapper::map_next() {
+    if (norm_.empty() || reset_ || event_i_ >= PRMS.max_events) {
         state_ = State::FAILURE;
         return true;
+    }
+
+    float event = norm_.pop();
+
+    //TODO: store kmer_probs_ in static array
+    for (u16 kmer = 0; kmer < kmer_probs_.size(); kmer++) {
+        kmer_probs_[kmer] = model.event_match_prob(event, kmer);
     }
 
     Range prev_range;
@@ -394,12 +391,8 @@ bool Mapper::add_event(float event) {
     float evpr_thresh;
     bool child_found;
 
-
     auto next_path = next_paths_.begin();
 
-    for (u16 kmer = 0; kmer < kmer_probs_.size(); kmer++) {
-        kmer_probs_[kmer] = model.event_match_prob(event, kmer);
-    }
     
     //Find neighbors of previous nodes
     for (u32 pi = 0; pi < prev_size_; pi++) {
@@ -632,7 +625,7 @@ void Mapper::print_debug_seeds(PathBuffer &p) {
         bool fwd = ref_en < fmi.size() / 2;
 
         u64 sa_st;
-        if (fwd) sa_st = ref_en - (p.match_len() + model.kmer_len() - 1)  + 1;
+        if (fwd) sa_st = ref_en - (p.match_len() + KLEN - 1)  + 1;
         else     sa_st = fmi.size() - ref_en - 1;
 
         std::string rf_name;
@@ -645,7 +638,7 @@ void Mapper::print_debug_seeds(PathBuffer &p) {
           
         seeds_out_ << rf_name << "\t"
                    << rf_st << "\t"
-                   << (rf_st + p.match_len() + model.kmer_len() - 1) << "\t"
+                   << (rf_st + p.match_len() + KLEN) - 1) << "\t"
                    << event_i_ << "\t"
                    << (fwd ? "+" : "-") << "\n";
     }
@@ -653,7 +646,7 @@ void Mapper::print_debug_seeds(PathBuffer &p) {
 #endif
 
 u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
-    return (evt_i * event_detector_.mean_event_len() * ReadBuffer::PRMS.bp_per_samp()) + last*(model.kmer_len() - 1);
+    return (evt_i * evdt_.mean_event_len() * ReadBuffer::PRMS.bp_per_samp()) + last*(KLEN - 1);
 }                  
 
 void Mapper::set_ref_loc(const SeedGroup &seeds) {
@@ -661,16 +654,16 @@ void Mapper::set_ref_loc(const SeedGroup &seeds) {
 
     u64 sa_st;
     if (fwd) sa_st = seeds.ref_st_;
-    else      sa_st = fmi.size() - (seeds.ref_en_.end_ + model.kmer_len() - 1);
+    else      sa_st = fmi.size() - (seeds.ref_en_.end_ + KLEN - 1);
     
     std::string rf_name;
     u64 rd_st = event_to_bp(seeds.evt_st_),
         rd_en = event_to_bp(seeds.evt_en_ + PRMS.seed_len, true),
         rf_st = 0,
         rf_len = fmi.translate_loc(sa_st, rf_name, rf_st), //sets rf_st
-        rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_ + model.kmer_len());
+        rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_ + KLEN);
 
-    u16 match_count = seeds.total_len_ + model.kmer_len() - 1;
+    u16 match_count = seeds.total_len_ + KLEN - 1;
 
     read_.loc_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, fwd, match_count);
 }

@@ -3,7 +3,7 @@
 
 
 Normalizer::Normalizer() 
-    : events_(Mapper::PRMS.evt_buffer_len),
+    : signal_(Mapper::PRMS.evt_buffer_len),
       mean_(0),
       varsum_(0),
       n_(0),
@@ -11,24 +11,44 @@ Normalizer::Normalizer()
       wr_(0),
       is_full_(false),
       is_empty_(true) {
-
 }
 
-bool Normalizer::add_event(float newevt) {
+Normalizer::Normalizer(float tgt_mean, float tgt_stdv) :
+    tgt_mean_(tgt_mean),
+    tgt_stdv_(tgt_stdv) {}
+
+void Normalizer::set_target(float tgt_mean, float tgt_stdv) {
+    tgt_mean_ = tgt_mean;
+    tgt_stdv_ = tgt_stdv; 
+}
+
+void Normalizer::set_signal(const std::vector<float> &signal) {
+    signal_ = signal;
+    n_ = signal_.size();
+    rd_ = wr_ = 0;
+    is_full_ = true;
+    is_empty_ = false;
+
+    mean_ = 0;
+    for (float e : signal_) mean_ += e;
+    mean_ /= n_;
+
+    varsum_ = 0;
+    for (auto e : signal_) varsum_ += pow(e - mean_, 2);
+}
+
+bool Normalizer::push(float newevt) {
     if (is_full_) {
-        //std::cout << "# FULL UP\n";
         return false;
     }
 
-    double oldevt = events_[wr_];
-    events_[wr_] = newevt;
-    //std::cout << wr_ << " " << rd_ << " " << newevt << " " 
-    //          << is_empty_ << " " << is_full_ << " push\n";
+    double oldevt = signal_[wr_];
+    signal_[wr_] = newevt;
 
     //Based on https://stackoverflow.com/questions/5147378/rolling-variance-algorithm
-    if (n_ == events_.size()) {
+    if (n_ == signal_.size()) {
         double oldmean = mean_;
-        mean_ += (newevt - oldevt) / events_.size();
+        mean_ += (newevt - oldevt) / signal_.size();
         varsum_ += (newevt + oldevt - oldmean - mean_) * (newevt - oldevt);
 
     //Based on https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_Online_algorithm
@@ -40,8 +60,7 @@ bool Normalizer::add_event(float newevt) {
         varsum_ += dt1*dt2;
     }
 
-
-    wr_ = (wr_ + 1) % events_.size();
+    wr_ = (wr_ + 1) % signal_.size();
 
     is_empty_ = false;
     is_full_ = wr_ == rd_;
@@ -49,7 +68,7 @@ bool Normalizer::add_event(float newevt) {
     return true;
 }
 
-void Normalizer::reset(u32 buffer_size = 0) {
+void Normalizer::reset(u32 buffer_size) {
     n_ = 0;
     rd_ = 0;
     wr_ = 0;
@@ -57,30 +76,26 @@ void Normalizer::reset(u32 buffer_size = 0) {
     is_full_ = false;
     is_empty_ = true;
 
-    if (buffer_size != 0 && buffer_size != events_.size()) {
-        events_.resize(buffer_size);
+    if (buffer_size != 0 && buffer_size != signal_.size()) {
+        signal_.resize(buffer_size);
     }
 
-    events_[0] = 0;
+    signal_[0] = 0;
 }
 
-NormParams Normalizer::get_params() const {
-    NormParams p;
-
-    p.scale = Mapper::model.model_stdv_ / sqrt(varsum_ / n_);
-    p.shift = Mapper::model.model_mean_ - p.scale * mean_;
-
-    return p;
+float Normalizer::at(u32 i) const {
+    float scale = tgt_stdv_ / sqrt(varsum_ / n_);
+    float shift = tgt_mean_ - scale * mean_;
+    return scale * signal_[i] + shift;
 }
 
-float Normalizer::pop_event() {
-    NormParams np = get_params();
-    float e = (float) (np.scale * events_[rd_] + np.shift);
-    //std::cout << wr_ << " " << rd_ << " " << e << " " 
-    //          << is_empty_ << " " << is_full_ << " pop\n";
-    rd_ = (rd_+1) % events_.size();
+float Normalizer::pop() {
+    float e = at(rd_);
+
+    rd_ = (rd_+1) % signal_.size();
     is_empty_ = rd_ == wr_;
     is_full_ = false;
+
     return e;
 }
 

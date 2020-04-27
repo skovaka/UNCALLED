@@ -28,6 +28,8 @@
 #include <vector>
 #include "bwa_index.hpp"
 #include "normalizer.hpp"
+#include "event_detector.hpp"
+#include "pore_model.hpp"
 #include "seed_tracker.hpp"
 #include "read_buffer.hpp"
 
@@ -81,8 +83,6 @@ class Mapper {
     void set_failed();
 
     Paf map_read();
-    //ReadLoc add_samples(const std::vector<float> &samples);
-    //bool add_sample(float s);
 
     void skip_events(u32 n);
     bool add_chunk(Chunk &chunk);
@@ -156,14 +156,14 @@ class Mapper {
 
     private:
 
-    bool add_event(float event);
+    bool map_next();
 
     void update_seeds(PathBuffer &p, bool has_children);
 
     void set_ref_loc(const SeedGroup &seeds);
 
 
-    EventDetector event_detector_;
+    EventDetector evdt_;
     Normalizer norm_;
     SeedTracker seed_tracker_;
     ReadBuffer read_;

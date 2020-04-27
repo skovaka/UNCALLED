@@ -99,7 +99,7 @@ bool EventDetector::add_sample(RawSample s) {
     return false;
 }
 
-std::vector<Event> EventDetector::add_samples(const std::vector<RawSample> &raw) {
+std::vector<Event> EventDetector::get_events(const std::vector<RawSample> &raw) {
     std::vector<Event> events;
     events.reserve(raw.size() / PRMS.window_length2);
     reset();
@@ -110,12 +110,26 @@ std::vector<Event> EventDetector::add_samples(const std::vector<RawSample> &raw)
         }
     }
 
-
     return events;
 }
 
-Event EventDetector::get() const {
+Event EventDetector::get_event() const {
     return event_;
+}
+
+//TODO: template with float, double, Event?
+std::vector<float> EventDetector::get_means(const std::vector<RawSample> &raw) {
+    std::vector<float> events;
+    events.reserve(raw.size() / PRMS.window_length2);
+    reset();
+
+    for (u32 i = 0; i < raw.size(); i++) {
+        if (add_sample(raw[i])) {
+            events.push_back(event_.mean);
+        }
+    }
+
+    return events;
 }
 
 float EventDetector::get_mean() const {

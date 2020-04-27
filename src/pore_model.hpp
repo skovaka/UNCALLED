@@ -29,20 +29,17 @@
 #include <cmath>
 #include "util.hpp"
 #include "bp.hpp"
-#include "event_detector.hpp"
-
-//TODO: move to normalizer
-typedef struct NormParams {
-    float shift, scale;
-} NormParams;
 
 template<KmerLen KLEN>
 class PoreModel {
     public:
 
     PoreModel() 
-        :  k_(0), loaded_(false) {}
+        :  loaded_(false) {}
 
+    //TODO: clean up IO
+    //maybe load from toml and/or header file
+    //make scripts for model to toml and header?
     PoreModel(std::string model_fname, bool complement) {
         kmer_count_ = kmer_count<KLEN>();
 
@@ -101,9 +98,6 @@ class PoreModel {
 
         model_mean_ = 0;
 
-        //Stores which kmers can follow which
-        rev_comp_ids_.resize(kmer_count_); 
-
         //Read and store rest of the model
         do {
             //Get unique ID for the kmer
@@ -159,6 +153,14 @@ class PoreModel {
         loaded_ = true;
     }
 
+    float get_mean() const {
+        return model_mean_;
+    }
+
+    float get_stdv() const {
+        return model_stdv_;
+    }
+
     bool is_loaded() const {
         return loaded_;
     }
@@ -172,104 +174,11 @@ class PoreModel {
     }
 
 
-    ///////////////////////////////////////////////////////////////
-    //MOVE TO normalizer.hpp (or combine with normalizer?)
-    //////////////////////////////////////////////////////////////
-
-    NormParams get_norm_params(const std::vector<Event> &events) const {
-        //Compute events mean
-        float events_mean = 0;
-        for (auto e : events) 
-            events_mean += e.mean;
-        events_mean /= events.size();
-
-        //Compute events stdv
-        float events_stdv = 0;
-        for (auto e : events) 
-            events_stdv += pow(e.mean - events_mean, 2);
-        events_stdv = sqrt(events_stdv / events.size());
-
-        /* get scaling parameters */
-        NormParams params;
-        params.scale = model_stdv_ / events_stdv;
-        params.shift = model_mean_ - (params.scale * events_mean);
-
-        return params;
-    }
-
-    NormParams get_norm_params(const std::vector<float> &events) const {
-        //Compute events mean
-        float events_mean = 0;
-        for (auto e : events) 
-            events_mean += e;
-        events_mean /= events.size();
-
-        //Compute events stdv
-        float events_stdv = 0;
-        for (auto e : events) 
-            events_stdv += pow(e - events_mean, 2);
-        events_stdv = sqrt(events_stdv / events.size());
-        
-        /* get scaling parameters */
-        NormParams params;
-        params.scale = model_stdv_ / events_stdv;
-        params.shift = model_mean_ - (params.scale * events_mean);
-
-        return params;
-    }
-
-    void normalize(std::vector<Event> &events, NormParams norm={0,0}) const {
-        if (norm.scale == 0) {
-            norm = get_norm_params(events);
-        }
-        for (size_t i = 0; i < events.size(); i++) {
-            events[i].mean = norm.scale * events[i].mean + norm.shift;
-        }
-    }
-
-    void normalize(std::vector<float> &events, NormParams norm={0,0}) const {
-        if (norm.scale == 0) {
-            norm = get_norm_params(events);
-        }
-        for (size_t i = 0; i < events.size(); i++) {
-            events[i] = norm.scale * events[i] + norm.shift;
-        }
-    }
-
-
-
-    inline u8 kmer_len() const {return k_;}
-
-    //PoreModel(std::string model_fname, bool complement);
-
-    //bool is_loaded() const;
-
-    //NormParams get_norm_params(const std::vector<Event> &events) const;
-    //void normalize(std::vector<Event> &events, NormParams norm={0, 0}) const;
-
-    //NormParams get_norm_params(const std::vector<float> &events) const;
-    //void normalize(std::vector<float> &raw, NormParams norm={0, 0}) const;
-
-    //u16 get_neighbor(u16 k, u8 i) const;
-
-    //bool event_valid(const Event &e) const;
-
-
-    //float event_match_prob(const Event &evt, u16 k_id) const;
-    //float event_match_prob(float evt, u16 k_id) const;
-
-    //float get_stay_prob(Event e1, Event e2) const; 
-
-
-    std::vector<float> lv_means_, lv_vars_x2_, lognorm_denoms_;
-
-    float lambda_, model_mean_, model_stdv_;
     private:
-    u8 k_;
+    std::vector<float> lv_means_, lv_vars_x2_, lognorm_denoms_;
+    float lambda_, model_mean_, model_stdv_;
     u16 kmer_count_;
     bool loaded_, complement_;
-
-    std::vector<u16> rev_comp_ids_;
 };
 
 #endif
