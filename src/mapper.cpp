@@ -24,10 +24,9 @@
 #include "pdqsort.h"
 #include "mapper.hpp"
 
-
 MapperParams Mapper::PRMS;
-BwaFMI Mapper::fmi;
-KmerModel Mapper::model;
+BwaIndex<KLEN> Mapper::fmi;
+PoreModel<KLEN> Mapper::model;
 
 u8 Mapper::PathBuffer::MAX_PATH_LEN = 0, 
    Mapper::PathBuffer::TYPE_MASK = 0;
@@ -147,10 +146,10 @@ Mapper::Mapper()
     }
     PathBuffer::TYPE_MASK = (u8) ((1 << TYPE_BITS) - 1);
 
-    kmer_probs_ = std::vector<float>(model.kmer_count());
+    kmer_probs_ = std::vector<float>(kmer_count<KLEN>());
     prev_paths_ = std::vector<PathBuffer>(PRMS.max_paths);
     next_paths_ = std::vector<PathBuffer>(PRMS.max_paths);
-    sources_added_ = std::vector<bool>(model.kmer_count(), false);
+    sources_added_ = std::vector<bool>(kmer_count<KLEN>(), false);
 
     prev_size_ = 0;
     event_i_ = 0;
@@ -398,7 +397,7 @@ bool Mapper::add_event(float event) {
 
     auto next_path = next_paths_.begin();
 
-    for (u16 kmer = 0; kmer < model.kmer_count(); kmer++) {
+    for (u16 kmer = 0; kmer < kmer_probs_.size(); kmer++) {
         kmer_probs_[kmer] = model.event_match_prob(event, kmer);
     }
     
@@ -425,10 +424,6 @@ bool Mapper::add_event(float event) {
                                   prev_kmer, 
                                   kmer_probs_[prev_kmer], 
                                   EventType::STAY);
-            #ifdef FM_PROFILER
-            fm_profiler_.add_range(prev_range);
-            #endif
-
             child_found = true;
 
             if (++next_path == next_paths_.end()) {
@@ -437,8 +432,8 @@ bool Mapper::add_event(float event) {
         }
 
         //Add all the neighbors
-        for (u8 b = 0; b < ALPH_SIZE; b++) {
-            u16 next_kmer = model.get_neighbor(prev_kmer, b);
+        for (u8 b = 0; b < BASE_COUNT; b++) {
+            u16 next_kmer = kmer_neighbor<KLEN>(prev_kmer, b);
 
             if (kmer_probs_[next_kmer] < evpr_thresh) {
                 continue;
@@ -456,10 +451,6 @@ bool Mapper::add_event(float event) {
                                   kmer_probs_[next_kmer], 
                                   EventType::MATCH);
 
-
-            #ifdef FM_PROFILER
-            fm_profiler_.add_range(next_range);
-            #endif
 
             child_found = true;
 
@@ -494,7 +485,7 @@ bool Mapper::add_event(float event) {
         //std::sort(next_paths_.begin(), next_path);
 
         u16 source_kmer;
-        prev_kmer = model.kmer_count(); 
+        prev_kmer = kmer_probs_.size(); 
 
         Range unchecked_range, source_range;
 
@@ -516,10 +507,6 @@ bool Mapper::add_event(float event) {
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
                     next_path++;
-
-                    #ifdef FM_PROFILER
-                    fm_profiler_.add_range(source_range);
-                    #endif
                 }                                    
 
                 unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
@@ -561,10 +548,6 @@ bool Mapper::add_event(float event) {
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
                     next_path++;
-
-                    #ifdef FM_PROFILER
-                    fm_profiler_.add_range(source_range);
-                    #endif
                 }
             }
 
@@ -577,7 +560,7 @@ bool Mapper::add_event(float event) {
     }
 
     for (u16 kmer = 0; 
-         kmer < model.kmer_count() && 
+         kmer < kmer_probs_.size() && 
             next_path != next_paths_.end(); 
          kmer++) {
 
@@ -591,10 +574,6 @@ bool Mapper::add_event(float event) {
             //TODO: don't write to prob buffer here to speed up source loop
             next_path->make_source(next_range, kmer, kmer_probs_[kmer]);
             next_path++;
-
-            #ifdef FM_PROFILER
-            fm_profiler_.add_kmer(kmer);
-            #endif
 
         } else {
             sources_added_[kmer] = false;
@@ -687,7 +666,7 @@ void Mapper::set_ref_loc(const SeedGroup &seeds) {
     std::string rf_name;
     u64 rd_st = event_to_bp(seeds.evt_st_),
         rd_en = event_to_bp(seeds.evt_en_ + PRMS.seed_len, true),
-        rf_st,
+        rf_st = 0,
         rf_len = fmi.translate_loc(sa_st, rf_name, rf_st), //sets rf_st
         rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_ + model.kmer_len());
 

@@ -2,15 +2,21 @@
 #define NORMALIZER_HPP
 
 #include <vector>
-#include "kmer_model.hpp"
+#include "pore_model.hpp"
 #include "util.hpp"
 
 class Normalizer {
     public:
 
     Normalizer();
+    Normalizer(float tgt_mean, float tgt_stdv);
+
+    void set_target(float tgt_mean, float tgt_stdv);
+
+    void set_events(const std::vector<float> events);
 
     bool add_event(float newevt);
+
     float pop_event();
     NormParams get_params() const;
     u32 unread_size() const;

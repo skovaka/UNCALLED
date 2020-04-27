@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -std=c++11 -O3 -g
+CFLAGS=-Wall -std=c++11 -O3 -g -fPIC
 
 #TODO: auto-download, or search common paths
 HDF5_LIB=-L/home/skovaka/anaconda3/lib /home/skovaka/anaconda3/lib/libhdf5.a
@@ -14,10 +14,10 @@ SRC=src
 BUILD=build
 BIN=bin
 
-_COMMON_OBJS=mapper.o kmer_model.o seed_tracker.o range.o bwa_fmi.o event_detector.o normalizer.o chunk.o read_buffer.o fast5_reader.o
+_COMMON_OBJS=mapper.o seed_tracker.o range.o event_detector.o normalizer.o chunk.o read_buffer.o fast5_reader.o
 
 _MAP_OBJS=$(_COMMON_OBJS) map_pool.o uncalled_map.o 
-_SIM_OBJS=$(_COMMON_OBJS) sim_pool.o uncalled_sim.o 
+_SIM_OBJS=$(_COMMON_OBJS) realtime_pool.o client_sim.o uncalled_sim.o 
 
 MAP_OBJS = $(patsubst %, $(BUILD)/%, $(_MAP_OBJS))
 SIM_OBJS = $(patsubst %, $(BUILD)/%, $(_SIM_OBJS))

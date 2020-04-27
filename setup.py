@@ -16,20 +16,17 @@ class make_bwa(build_ext):
 uncalled = Extension(
     "uncalled.mapping",
      sources = [
-                #"src/conf.cpp",
+                "src/fast5_reader.cpp",
                 "src/mapper.cpp",
                 "src/self_align_ref.cpp",
-                "src/fm_profiler.cpp",
-                "src/fast5_pool.cpp",
-                "src/bwa_fmi.cpp", 
+                "src/map_pool.cpp",
                 "src/event_detector.cpp", 
                 "src/read_buffer.cpp",
                 "src/uncalled.cpp",
                 "src/chunk.cpp",
-                "src/chunk_pool.cpp",
+                "src/realtime_pool.cpp",
                 "src/seed_tracker.cpp", 
                 "src/normalizer.cpp", 
-                "src/kmer_model.cpp", 
                 "src/range.cpp"],
      include_dirs = ["./",
                      "./pybind11/include", 
@@ -37,7 +34,7 @@ uncalled = Extension(
                      "./pdqsort",
                      "./toml11"],
      library_dirs = ["./bwa"],
-     libraries = ["hdf5", "bwa", "z", "dl"],
+     libraries = ["hdf5", "bwa", "z", "dl", "m"],
      extra_compile_args = ["-std=c++11", "-O3"],
      define_macros = [("PYBIND", None)]
 )

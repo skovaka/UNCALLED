@@ -26,18 +26,15 @@
 
 #include <iostream>
 #include <vector>
-#include "bwa_fmi.hpp"
-#include "kmer_model.hpp"
+#include "bwa_index.hpp"
 #include "normalizer.hpp"
 #include "seed_tracker.hpp"
-#include "chunk.hpp"
-#include "timer.hpp"
 #include "read_buffer.hpp"
-#include "fm_profiler.hpp"
+
+const KmerLen KLEN = KmerLen::k5;
 
 //#define DEBUG_TIME
 //#define DEBUG_SEEDS
-//#define FM_PROFILER
 
 typedef struct {
     //standard mapping
@@ -64,8 +61,8 @@ class Mapper {
     public:
 
     static MapperParams PRMS;
-    static BwaFMI fmi;
-    static KmerModel model;
+    static BwaIndex<KLEN> fmi;
+    static PoreModel<KLEN> model;
 
     enum State { INACTIVE, MAPPING, SUCCESS, FAILURE };
 
@@ -105,10 +102,6 @@ class Mapper {
     bool finished() const;
     ReadBuffer &get_read();
     void deactivate();
-
-    #ifdef FM_PROFILER
-    FMProfiler fm_profiler_;
-    #endif
 
     private:
 

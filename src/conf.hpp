@@ -26,14 +26,7 @@
 
 #include <iostream>
 #include <vector>
-#include "timer.hpp"
 #include "mapper.hpp"
-#include "bwa_fmi.hpp"
-#include "kmer_model.hpp"
-#include "event_detector.hpp"
-#include "mapper.hpp"
-#include "seed_tracker.hpp"
-#include "read_buffer.hpp"
 #include "fast5_reader.hpp"
 #include "toml.hpp"
 
@@ -59,7 +52,8 @@ typedef struct {
 } RealtimeParams;
 
 typedef struct {
-    float start, end, speed;
+    float sim_start, sim_end, sim_speed, ej_time, ej_delay;
+    std::string gap_file;
 } SimParams;
 
 #define GET_SET(T, N) T get_##N() { return N; } \
@@ -183,14 +177,15 @@ class Conf {
             GET_TOML_EXTERN(subconf, u32, window_length2, EventDetector::PRMS);
         }
 
-        //if (conf.contains("simulator")) {
-        //    const auto subconf = toml::find(conf, "simulator");
-        //    GET_TOML_EXTERN(subconf, float, speed, SimPool::PRMS);
-        //    GET_TOML_EXTERN(subconf, float, start, SimPool::PRMS);
-        //    GET_TOML_EXTERN(subconf, float, end, SimPool::PRMS);
-
-        //    SimPool::PRMS.time_coef = 
-        //}
+        if (conf.contains("simulator")) {
+            const auto subconf = toml::find(conf, "simulator");
+            GET_TOML_EXTERN(subconf, float, sim_speed, sim_prms);
+            GET_TOML_EXTERN(subconf, float, sim_start, sim_prms);
+            GET_TOML_EXTERN(subconf, float, sim_end, sim_prms);
+            GET_TOML_EXTERN(subconf, float, ej_time, sim_prms);
+            GET_TOML_EXTERN(subconf, float, ej_delay, sim_prms);
+            GET_TOML_EXTERN(subconf, std::string, gap_file, sim_prms);
+        }
     }
 
     Conf() {}
@@ -219,9 +214,15 @@ class Conf {
     GET_SET_EXTERN(u32, Mapper::PRMS, max_events)
     GET_SET_EXTERN(u32, Mapper::PRMS, max_chunks)
 
-
     GET_SET_EXTERN(float, ReadBuffer::PRMS, chunk_time);
     GET_SET_EXTERN(float, ReadBuffer::PRMS, sample_rate);
+
+    GET_SET_EXTERN(float, sim_prms, sim_start);
+    GET_SET_EXTERN(float, sim_prms, sim_end);
+    GET_SET_EXTERN(float, sim_prms, sim_speed);
+    GET_SET_EXTERN(float, sim_prms, ej_time);
+    GET_SET_EXTERN(float, sim_prms, ej_delay);
+    GET_SET_EXTERN(std::string, sim_prms, gap_file);
 
     #ifdef PYBIND
     static void add_pybind_vars(pybind11::class_<Conf> &c) {
@@ -285,7 +286,7 @@ class Conf {
 
     Fast5Params fast5_prms;
     RealtimeParams realtime_prms;
-    //SimParams sim_prms;
+    SimParams sim_prms;
 };
 
 #endif

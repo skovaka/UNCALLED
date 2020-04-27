@@ -27,7 +27,6 @@
 #include <cstdlib>
 #include "range.hpp"
 #include "bwa_fmi.hpp"
-#include "timer.hpp"
 #include "self_align_ref.hpp"
 
 int main(int argc, char** argv) {
@@ -35,7 +34,7 @@ int main(int argc, char** argv) {
                 fasta_fname(argv[2]);
     u32 min_k = atoi(argv[3]);
 
-    BwaFMI fmi(bwa_prefix);
+    BwaIndex fmi(bwa_prefix);
     
 
     //for (u64 i = 0; i < 50; i++) {

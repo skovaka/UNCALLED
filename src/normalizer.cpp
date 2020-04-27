@@ -14,7 +14,6 @@ Normalizer::Normalizer()
 
 }
 
-
 bool Normalizer::add_event(float newevt) {
     if (is_full_) {
         //std::cout << "# FULL UP\n";

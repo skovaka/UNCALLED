@@ -300,13 +300,15 @@ u16 ReadBuffer::get_channel_idx() const {
     return channel_idx_;
 }
 
-u32 ReadBuffer::get_chunks(std::deque<Chunk> &chunk_queue, u32 max) const {
+u32 ReadBuffer::get_chunks(std::deque<Chunk> &chunk_queue, u32 max, bool real_start) const {
     u32 count = 0;
     u16 l = PRMS.chunk_len();
+
+    float start = real_start ? start_sample_ : 0;
+
     for (u32 i = 0; i+l <= full_signal_.size() && count < max; i += l) {
         chunk_queue.emplace_back(id_, get_channel(), number_, 
-                                 start_sample_+i, full_signal_, 
-                                 i, l);
+                                 start+i, full_signal_, i, l);
         count++;
     }
     return count;
@@ -348,4 +350,16 @@ void ReadBuffer::set_calibration(u16 channel,
     if (digitisation > 0) PRMS.calib_digitisation = digitisation;
     PRMS.calib_offsets[channel-1] = offsets;
     PRMS.calib_coefs[channel-1] = pa_ranges / digitisation;
+}
+
+u64 ReadBuffer::get_duration() const {
+    return raw_len_;
+}
+
+u64 ReadBuffer::get_start() const {
+    return start_sample_;
+}
+
+u64 ReadBuffer::get_end() const {
+    return start_sample_ + raw_len_;
 }

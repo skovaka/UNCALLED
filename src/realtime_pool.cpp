@@ -28,12 +28,10 @@
 #include "realtime_pool.hpp"
 #include "mapper.hpp"
 
-
-
 RealtimePool::RealtimePool(Conf &conf) {
     conf.load_index_params();
-    Mapper::model = KmerModel(conf.kmer_model, true);
-    Mapper::fmi = BwaFMI(conf.bwa_prefix, Mapper::model);
+    Mapper::model = PoreModel<KLEN>(conf.kmer_model, true);
+    Mapper::fmi.load_index(conf.bwa_prefix);
 
     for (u16 t = 0; t < conf.threads; t++) {
         threads_.emplace_back(mappers_);

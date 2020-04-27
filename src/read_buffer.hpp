@@ -47,7 +47,6 @@ typedef struct {
     u16 chunk_len() {
         return (u16) (chunk_time * sample_rate);
     }
-
 } ReadParams;
 
 class Paf {
@@ -129,7 +128,11 @@ class ReadBuffer {
 
     void set_raw_len(u64 raw_len_);
 
-    u32 get_chunks(std::deque<Chunk> &chunk_queue, u32 max=UINT_MAX) const;
+    u64 get_start() const;
+    u64 get_end() const;
+    u64 get_duration() const;
+
+    u32 get_chunks(std::deque<Chunk> &chunk_queue, u32 max=UINT_MAX, bool real_start=true) const;
 
     u16 get_channel() const;
     u16 get_channel_idx() const;

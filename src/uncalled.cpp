@@ -3,7 +3,6 @@
 #include "pybind11/stl.h"
 #include "self_align_ref.hpp"
 #include "mapper.hpp"
-//#include "simulator.hpp"
 #include "map_pool.hpp"
 #include "realtime_pool.hpp"
 #include "chunk.hpp"
