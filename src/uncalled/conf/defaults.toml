@@ -16,15 +16,16 @@ matchpr2 = 0.9838
 pathlen_percentile = 0.05
 max_replen = 100
 
-[signal]
+[reads]
 sample_rate = 4000
 bp_per_sec = 450
+chunk_time = 1.0
 
 [fast5_params]
 max_buffer = 100
 max_reads = 0
 
-[readuntil]
+[realtime]
 monitor = "full"
 mode = "deplete"
 host = "127.0.0.1"
@@ -45,7 +46,6 @@ max_chunks = 10
 evt_buffer_len = 6000
 evt_batch_size = 5
 evt_timeout = 10.0
-chunk_size = 1.0
 max_chunk_wait = 4000.0 
 
 [seed_tracker]
@@ -62,7 +62,13 @@ threshold1 = 1.4
 threshold2 = 9.0
 peak_height = 0.2
 
-
 [list_ports]
 log_dir = '/var/log/MinKNOW'
 
+[simulator]
+sim_start = 0.0
+sim_end = 172800.0
+sim_speed = 1.0
+ej_delay = 0.0
+ej_time = 0.1
+gap_file = ""

@@ -35,7 +35,6 @@ INDEX_ANN_SUFF = ".ann"
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-MODEL_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers.txt")
-MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "models/r94_5mers_threshs.txt")
-
+MODEL_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers.txt")
+MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_threshs.txt")
 CONF_DEFAULTS = os.path.join(ROOT_DIR, "conf/defaults.toml")

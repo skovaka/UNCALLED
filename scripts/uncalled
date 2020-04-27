@@ -58,7 +58,7 @@ def add_index_opts(p):
 def add_ru_opts(p):
     #TODO: selectively enrich or deplete refs in index
     p.add_argument("-c", "--max-chunks", default=10, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
-    p.add_argument("--chunk-size", required=False, type=float, default=1, help="Length of chunks in seconds")
+    p.add_argument("--chunk-time", required=False, type=float, default=1, help="Length of chunks in seconds")
 
     modes = p.add_mutually_exclusive_group(required=True)
     modes.add_argument("-D", "--deplete", action='store_const', const=mapping.RealtimeMode.DEPLETE, dest='realtime_mode', help="Will eject reads that align to index")
@@ -81,7 +81,7 @@ def add_list_ports_opts(p):
 def add_fast5_opts(p):
     p.add_argument("fast5s", nargs='+', type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
     p.add_argument("-r", "--recursive", required=False, default="", type=str, help="")
-    p.add_argument("-f", "--fast5-filter", required=False, default="", type=str, help="Only map reads listed in this file")
+    p.add_argument("-l", "--read-list", required=False, default="", type=str, help="Only map reads listed in this file")
     p.add_argument("-n", "--max-reads", type=int, default=0, help="Maximum number of reads to map")
 
 def add_map_opts(p):
@@ -126,7 +126,7 @@ def load_args(args, conf):
 
         if (not a.startswith("_")):
             if hasattr(conf, a):
-                #sys.stderr.write("SET\t%s\t%s\n" % (a, str(v)))
+                sys.stderr.write("SET\t%s\t%s\n" % (a, str(v)))
                 setattr(conf, a, v)
             else:
                 sys.stderr.write("%s\t%s\n" % (a, str(v)))
@@ -210,12 +210,12 @@ def map_cmd(args):
     #for fname in open(conf.fast5_list):
     #    assert_exists(fname.strip())
 
-    if len(conf.fast5_filter) > 0:
-        assert_exists(conf.fast5_filter)
+    if len(conf.read_list) > 0:
+        assert_exists(conf.read_list)
 
     sys.stderr.flush()
 
-    mapper = mapping.Fast5Pool(conf)
+    mapper = mapping.MapPool(conf)
 
     sys.stderr.write("Loading fast5s\n")
     for fast5 in load_fast5s(args.fast5s, args.recursive):
@@ -261,7 +261,8 @@ def realtime_cmd(args):
     client = None
 
     try:
-        client = minknow_client.Client(conf.host, conf.port, conf.chunk_size)
+        sys.stderr.write("%s\t%d\t%f\n" % (conf.host, conf.port, conf.chunk_time))
+        client = minknow_client.Client(conf.host, conf.port, conf.chunk_time)
 
         if not client.run():
             sys.exit(1)
@@ -271,8 +272,9 @@ def realtime_cmd(args):
 
         cal = client.device.rpc.device.get_calibration(first_channel=1, last_channel=512)
         raw_type = str(client.signal_dtype)
+        sys.stderr.write(conf.bwa_prefix+"\n")
 
-        pool = mapping.ChunkPool(conf)
+        pool = mapping.RealtimePool(conf)
 
         chunk_times = [time.time() for c in range(conf.num_channels)]
         unblocked = [None for c in range(conf.num_channels)]
@@ -329,6 +331,7 @@ def realtime_cmd(args):
                 #last_time = time.time()
 
             if client.get_runtime() >= end_time:
+                sys.stderr.write("END IS NIGH\t%f\t%f\n" % (client.get_runtime(),end_time))
                 client.reset()
                 client = None
                 break
@@ -346,6 +349,7 @@ def realtime_cmd(args):
     #client.log("Finished")
 
     if client != None:
+        sys.stderr.write("STOP!\n")
         client.reset()
 
     if pool != None:
