@@ -27,7 +27,7 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
-#include "fast5/hdf5_tools.hpp"
+#include <fast5/hdf5_tools.hpp>
 #include "util.hpp"
 #include "chunk.hpp"
 
@@ -128,12 +128,15 @@ class ReadBuffer {
 
     void set_raw_len(u64 raw_len_);
 
+    std::string get_id() const {return id_;}
     u64 get_start() const;
     u64 get_end() const;
     u64 get_duration() const;
 
     u32 get_chunks(std::deque<Chunk> &chunk_queue, u32 max=UINT_MAX, bool real_start=true) const;
 
+    u32 size() const {return full_signal_.size();}
+    std::vector<float> get_raw() const {return full_signal_;}
     u16 get_channel() const;
     u16 get_channel_idx() const;
 

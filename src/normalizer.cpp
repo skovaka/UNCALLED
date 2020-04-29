@@ -1,9 +1,8 @@
+#include <cmath>
 #include "normalizer.hpp"
-#include "mapper.hpp"
-
 
 Normalizer::Normalizer() 
-    : signal_(Mapper::PRMS.evt_buffer_len),
+    : signal_(6000), //TODO need to set
       mean_(0),
       varsum_(0),
       n_(0),

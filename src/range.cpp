@@ -109,12 +109,10 @@ bool Range::is_valid() const {
     return start_ <= end_;
 }
 
-
 bool operator< (const Range &q1, const Range &q2) {
     return q1.start_ < q2.start_ ||
            (q1.start_ == q2.start_ && q1.end_ < q2.end_);
 }
-
 
 bool operator== (const Range &q1, const Range &q2) {
     return q1.start_ == q2.start_ && q1.end_ == q2.end_;

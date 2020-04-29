@@ -55,9 +55,55 @@ const char BASE_COMP_C[]
 
 const u8 BASE_COMP_B[] {3, 2, 1, 0};
 
-enum KmerLen {k2=2, k3=3, k4=4, k5=5, k6=6, k7=7, k8=8, k9=9};
+//class Seq {
+//    Seq(const std::string &str) {
+//        len_ = str.size();
+//        seq_.resize( (len_/4) + (len_ % 4 != 0), 0 );
+//
+//        for (u64 i = 0; i < seq_.size(); i += 1) {
+//            u8 j = i*4;
+//            for (u32 k = 0; k < 4 && j+k < str.size(); k++) {
+//                seq_[i] |= (BASE_BYTES[(u8) str[j+k]] << k);
+//            }
+//        }
+//    }
+//
+//    Seq(u8 *seq, u64 len) {
+//        len_ = len;
+//        seq_.assign(seq, seq + (len / 4) + (len_ % 4 != 0) );
+//    }
+//
+//    std::string to_str() {
+//        std::string str('N', len_);
+//
+//        for (u64 i = 0; i < seq_.size(); i += 1) {
+//            u8 j = i*4;
+//            for (u32 k = 0; k < 4 && j+k < str.size(); k++) {
+//                str[j+k] = BASE_CHARS[ (seq[i] >> k) & 0x3 ];
+//            }
+//        }
+//
+//        return str;
+//    }
+//
+//    u64 len_;
+//    std::vector<u8> seq_;
+//};
 
-#define K_MASK(k) ( (1 << (2*k)) - 1 )
+enum KmerLen {k2=2, k3=3, k4=4, k5=5};
+
+//std::vector<u8> str_to_bp(const std::string &str) {
+//    const u8 BP64 = 32;
+//    
+//    std::vector<u64> bp;
+//
+//    for (u64 i = 0; i < str.size(); i += BP64) {
+//        u64 b = 0;
+//        for (u8 j = 0; j < 32; j
+//    }
+//}
+
+#define KMASK(k) ( (1 << (2*k)) - 1 )
 
 
 template <KmerLen k>
@@ -76,12 +122,7 @@ u16 str_to_kmer(std::string kmer, u64 offset=0) {
 
 template <KmerLen k>
 u16 kmer_comp(u16 kmer) {
-    return kmer ^ K_MASK((u8) k);
-}
-
-template <KmerLen k>
-u8 kmer_base(u16 kmer, u8 i) {
-    return (u8) ((kmer >> (2 * ((u8)k-i-1))) & 0x3);
+    return kmer ^ KMASK((u8) k);
 }
 
 template <KmerLen k>
@@ -91,7 +132,35 @@ u8 kmer_head(u16 kmer) {
 
 template <KmerLen k>
 u16 kmer_neighbor(u16 kmer, u8 i) {
-    return ((kmer << 2) & K_MASK(k)) | i; 
+    return ((kmer << 2) & KMASK(k)) | i; 
+}
+
+template <KmerLen k>
+u8 kmer_base(u16 kmer, u8 i) {
+    return (u8) ((kmer >> (2 * ((u16)k-i-1))) & 0x3);
+}
+
+template <KmerLen KLEN>
+std::vector<u16> seq_to_kmers(u8 *seq, u64 st, u64 en) {
+    std::vector<u16> ret;
+
+    u64 pst = st >> 2,
+        pen = ((en) >> 2)+1;
+
+    u64 i = 0;
+    u16 kmer = 0;
+    u8 bst = (st&3), ben;
+
+    for (u64 j = pst; j < pen; j++) {
+        ben = j == pen-1 ? (en&3) : 4;
+        for (u8 k = bst; k < ben; k++) {
+            kmer = kmer_neighbor<KLEN>(kmer, (seq[j] >> ((k^3) << 1) ) & 3);
+            if (++i >= KLEN) ret.push_back(kmer);
+        }
+        bst = 0;
+    }
+
+    return ret;
 }
 
 #endif

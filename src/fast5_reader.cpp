@@ -38,9 +38,21 @@ const std::string Fast5Reader::FMT_CH_PATHS[] = {
 Fast5Reader::Fast5Reader(const Fast5Params &p) : PRMS(p) {
     total_buffered_ = 0;
 
-    if (!p.read_list.empty()) load_read_list(p.read_list);
-    if (!p.fast5_list.empty()) load_fast5_list(p.fast5_list);
-    
+    if (!PRMS.read_list.empty()) load_read_list(PRMS.read_list);
+    if (!PRMS.fast5_list.empty()) load_fast5_list(PRMS.fast5_list);
+}
+
+Fast5Reader::Fast5Reader(const std::string &fast5_list, 
+                         const std::string &read_list,
+                         u32 max_reads, u32 max_buffer) 
+    : PRMS({fast5_list, 
+            read_list, 
+            max_reads, 
+            max_buffer}) {
+
+    total_buffered_ = 0;
+    if (!PRMS.fast5_list.empty()) load_fast5_list(PRMS.fast5_list);
+    if (!PRMS.read_list.empty()) load_read_list(PRMS.read_list);
 }
 
 void Fast5Reader::add_fast5(const std::string &fast5_path) {

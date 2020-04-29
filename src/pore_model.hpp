@@ -27,6 +27,7 @@
 #include <array>
 #include <utility>
 #include <cmath>
+#include "event_detector.hpp"
 #include "util.hpp"
 #include "bp.hpp"
 
@@ -153,6 +154,15 @@ class PoreModel {
         loaded_ = true;
     }
 
+    float match_prob(float samp, u16 kmer) const {
+        return (-pow(samp - lv_means_[kmer], 2) / lv_vars_x2_[kmer]) - lognorm_denoms_[kmer];
+    }
+
+    float match_prob(const Event &evt, u16 kmer) const {
+        return match_prob(evt.mean, kmer);
+    }
+
+
     float get_mean() const {
         return model_mean_;
     }
@@ -164,15 +174,6 @@ class PoreModel {
     bool is_loaded() const {
         return loaded_;
     }
-
-    float event_match_prob(float e, u16 k_id) const {
-        return (-pow(e - lv_means_[k_id], 2) / lv_vars_x2_[k_id]) - lognorm_denoms_[k_id];
-    }
-
-    float event_match_prob(const Event &e, u16 k_id) const {
-        return event_match_prob(e.mean, k_id);
-    }
-
 
     private:
     std::vector<float> lv_means_, lv_vars_x2_, lognorm_denoms_;

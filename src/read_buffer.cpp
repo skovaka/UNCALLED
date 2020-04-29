@@ -22,7 +22,6 @@
  */
 
 #include "read_buffer.hpp"
-#include "mapper.hpp"
 
 ReadParams ReadBuffer::PRMS;
 
@@ -348,8 +347,17 @@ void ReadBuffer::set_calibration(u16 channel,
                              float pa_ranges,
                              float digitisation) {
     if (digitisation > 0) PRMS.calib_digitisation = digitisation;
-    PRMS.calib_offsets[channel-1] = offsets;
-    PRMS.calib_coefs[channel-1] = pa_ranges / digitisation;
+
+    u16 c = channel-1;
+
+    //TODO: will normalization take care of this?
+    if (PRMS.calib_offsets.size() <= c) {
+        PRMS.calib_offsets.resize(channel);
+        PRMS.calib_coefs.resize(channel);
+    }
+
+    PRMS.calib_offsets[c] = offsets;
+    PRMS.calib_coefs[c] = pa_ranges / digitisation;
 }
 
 u64 ReadBuffer::get_duration() const {

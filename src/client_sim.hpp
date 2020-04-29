@@ -25,8 +25,6 @@
 #define SIM_POOL_HPP
 
 #include <deque>
-#include "fast5.hpp"
-#include "fast5/hdf5_tools.hpp"
 #include "util.hpp"
 #include "chunk.hpp"
 #include "read_buffer.hpp" 

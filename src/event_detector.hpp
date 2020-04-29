@@ -7,7 +7,7 @@
 #ifndef EVENT_DETECTOR_HPP
 #define EVENT_DETECTOR_HPP
 
-#include "fast5.hpp"
+#include <fast5.hpp>
 #include "util.hpp"
 
 typedef fast5::EventDetection_Event Event;

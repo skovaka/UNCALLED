@@ -383,7 +383,7 @@ bool Mapper::map_next() {
 
     //TODO: store kmer_probs_ in static array
     for (u16 kmer = 0; kmer < kmer_probs_.size(); kmer++) {
-        kmer_probs_[kmer] = model.event_match_prob(event, kmer);
+        kmer_probs_[kmer] = model.match_prob(event, kmer);
     }
 
     Range prev_range;

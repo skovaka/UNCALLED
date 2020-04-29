@@ -41,6 +41,10 @@ class Fast5Reader {
     public:
     Fast5Reader(const Fast5Params &p);
 
+    Fast5Reader(const std::string &fast5_list="", 
+                const std::string &read_list="",
+                u32 max_reads=0, u32 max_buffer=100);
+
     void add_fast5(const std::string &fast5_path);
     bool load_fast5_list(const std::string &fname);
     bool add_read(const std::string &read_id);
