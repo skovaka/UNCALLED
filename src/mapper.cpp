@@ -154,7 +154,7 @@ Mapper::Mapper()
     event_i_ = 0;
     seed_tracker_.reset();
 
-    norm_.set_target(model.get_mean(), model.get_stdv());
+    norm_.set_target(model.get_means_mean(), model.get_means_stdv());
 }
 
 Mapper::Mapper(const Mapper &m) : Mapper() {}

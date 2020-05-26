@@ -126,6 +126,25 @@ u16 kmer_comp(u16 kmer) {
 }
 
 template <KmerLen k>
+u16 kmer_revcomp(u16 kmer) {
+    u16 r = ~kmer;
+    r = ( (r >> 2 & 0x3333) | (r & 0x3333) << 2 );
+    r = ( (r >> 4 & 0x0F0F) | (r & 0x0F0F) << 4 );
+    r = ( (r >> 8 & 0x00FF) | (r & 0x00FF) << 8 );
+    return r >> (2 * (8 - k));
+}
+
+template <KmerLen KLEN>
+std::vector<u16> kmers_revcomp(const std::vector<u16> &kmers) {
+    std::vector<u16> rev;
+    rev.reserve(kmers.size());
+    for (auto k = kmers.rbegin(); k != kmers.rend(); k++) {
+        rev.push_back(kmer_revcomp<KLEN>(*k));
+    }
+    return rev;
+}
+
+template <KmerLen k>
 u8 kmer_head(u16 kmer) {
     return (u8) ((kmer >> (2*( (u8)k ) - 2)) & 0x3);
 }
@@ -138,6 +157,15 @@ u16 kmer_neighbor(u16 kmer, u8 i) {
 template <KmerLen k>
 u8 kmer_base(u16 kmer, u8 i) {
     return (u8) ((kmer >> (2 * ((u16)k-i-1))) & 0x3);
+}
+
+template <KmerLen k>
+std::string kmer_to_str(u16 kmer) {
+    std::string s(k, 'N');
+    for (u8 i = 0; i < k; i++) {
+        s[i] = BASE_CHARS[kmer_base<k>(kmer, i)];
+    }
+    return s;
 }
 
 template <KmerLen KLEN>
@@ -162,5 +190,6 @@ std::vector<u16> seq_to_kmers(u8 *seq, u64 st, u64 en) {
 
     return ret;
 }
+
 
 #endif

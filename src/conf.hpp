@@ -52,8 +52,8 @@ typedef struct {
 } RealtimeParams;
 
 typedef struct {
-    float sim_start, sim_end, sim_speed, ej_time, ej_delay;
-    std::string gap_file;
+    float sim_start, sim_end, sim_speed, ej_time, ej_delay, scan_time;
+    std::string pat_prefix;
 } SimParams;
 
 #define GET_SET(T, N) T get_##N() { return N; } \
@@ -184,7 +184,8 @@ class Conf {
             GET_TOML_EXTERN(subconf, float, sim_end, sim_prms);
             GET_TOML_EXTERN(subconf, float, ej_time, sim_prms);
             GET_TOML_EXTERN(subconf, float, ej_delay, sim_prms);
-            GET_TOML_EXTERN(subconf, std::string, gap_file, sim_prms);
+            GET_TOML_EXTERN(subconf, float, scan_time, sim_prms);
+            GET_TOML_EXTERN(subconf, std::string, pat_prefix, sim_prms);
         }
     }
 
@@ -222,7 +223,8 @@ class Conf {
     GET_SET_EXTERN(float, sim_prms, sim_speed);
     GET_SET_EXTERN(float, sim_prms, ej_time);
     GET_SET_EXTERN(float, sim_prms, ej_delay);
-    GET_SET_EXTERN(std::string, sim_prms, gap_file);
+    GET_SET_EXTERN(float, sim_prms, scan_time);
+    GET_SET_EXTERN(std::string, sim_prms, pat_prefix);
 
     #ifdef PYBIND
     static void add_pybind_vars(pybind11::class_<Conf> &c) {

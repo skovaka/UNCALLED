@@ -82,6 +82,15 @@ void Normalizer::reset(u32 buffer_size) {
     signal_[0] = 0;
 }
 
+float Normalizer::get_scale() const {
+    return tgt_stdv_ / sqrt(varsum_ / n_);
+}
+
+float Normalizer::get_shift(float scale) const {
+    if (scale == 0) scale = get_scale();
+    return tgt_mean_ - scale * mean_;
+}
+
 float Normalizer::at(u32 i) const {
     float scale = tgt_stdv_ / sqrt(varsum_ / n_);
     float shift = tgt_mean_ - scale * mean_;

@@ -1,8 +1,9 @@
 /* 
  * This file was adptaed from https://github.com/nanoporetech/scrappie
- * Original resrion released under Mozzila Public Licence
+ * Original vesrion released under Mozzila Public Licence
  * Adapted for UNCALLED by Sam Kovaka <skovaka@gmail.com>
  */
+
 
 #include <float.h>
 #include <math.h>

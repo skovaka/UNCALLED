@@ -55,6 +55,9 @@ Fast5Reader::Fast5Reader(const std::string &fast5_list,
     if (!PRMS.read_list.empty()) load_read_list(PRMS.read_list);
 }
 
+Fast5Reader::Fast5Reader(u32 max_reads, u32 max_buffer) 
+    : Fast5Reader("","",max_reads,max_buffer) {}
+
 void Fast5Reader::add_fast5(const std::string &fast5_path) {
     fast5_list_.push_back(fast5_path);
 }
@@ -104,7 +107,9 @@ bool Fast5Reader::load_read_list(const std::string &fname) {
 }
 
 bool Fast5Reader::empty() {
-    return buffered_reads_.empty() && fast5_list_.empty();
+    return buffered_reads_.empty() && 
+           read_paths_.empty() && 
+           (fast5_list_.empty() || all_buffered());
 }
 
 bool Fast5Reader::open_next() {
@@ -182,6 +187,9 @@ bool Fast5Reader::all_buffered() {
 }
 
 ReadBuffer Fast5Reader::pop_read() {
+    if (buffer_size() == 0) { 
+        fill_buffer();
+    }
     //TODO: swap to speed up?
     ReadBuffer r = buffered_reads_.front();
     buffered_reads_.pop_front();

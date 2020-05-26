@@ -28,6 +28,7 @@
 #include <fstream>
 #include <cstdint>
 #include <chrono>
+#include <cassert>
 
 //Based on github.com/dnbaker/bonsai/blob/master/bonsai/include/util.h
 using i8  = std::int8_t;  using u8  = std::uint8_t;

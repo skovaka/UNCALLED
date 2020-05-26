@@ -115,38 +115,29 @@ class ReadBuffer {
                u32 raw_st = 0, u32 raw_len = 0);
     ReadBuffer(Chunk &first_chunk);
 
-    void fast5_init(const hdf5_tools::File &file, 
-                    std::string raw_path, 
-                    std::string ch_path);
-
-    bool add_chunk(Chunk &c);
-
-    Chunk &&pop_chunk();
-    void swap(ReadBuffer &r);
-    void clear();
     bool empty() const;
-
-    void set_raw_len(u64 raw_len_);
-
     std::string get_id() const {return id_;}
     u64 get_start() const;
     u64 get_end() const;
     u64 get_duration() const;
-
-    u32 get_chunks(std::deque<Chunk> &chunk_queue, u32 max=UINT_MAX, bool real_start=true) const;
-
     u32 size() const {return full_signal_.size();}
-    std::vector<float> get_raw() const {return full_signal_;}
     u16 get_channel() const;
+    const std::vector<float> &get_raw() const {return full_signal_;}
+
+    bool add_chunk(Chunk &c);
+    Chunk &&pop_chunk();
+    void swap(ReadBuffer &r);
+    void clear();
+    void set_raw_len(u64 raw_len_);
+
+    u32 get_chunks(std::vector<Chunk> &chunk_queue, u32 max=UINT_MAX, bool real_start=true) const;
+    void set_channel(u16 ch) {channel_idx_ = ch-1;}
     u16 get_channel_idx() const;
 
     static std::vector<float> calibrate(u16 ch, std::vector<i16> samples);
     static void calibrate(u16 ch, std::vector<float> samples);
-
     static float calibrate(u16 ch, float sample);
-
     static void set_calibration(const std::vector<float> &offsets, const std::vector<float> &pa_ranges, float digitisation);
-
     static void set_calibration(u16 channel, float offsets, float pa_ranges, float digitisation);
 
     Source source_;

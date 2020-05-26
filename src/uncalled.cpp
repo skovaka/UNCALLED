@@ -88,8 +88,62 @@ PYBIND11_MODULE(mapping, m) {
     
     m.def("self_align", &self_align);
 
+    //py::class_< PoreModel<KLEN> >(m, "PoreModel")
+    //    .def(py::init<const std::string &, bool>())
+    //    .def("match_prob", (float (PoreModel::*) (f &PoreModel<KLEN>::match_prob);
+
+    py::class_<ReadBuffer>(m, "ReadBuffer")
+        .def("empty",        &ReadBuffer::empty)
+        .def("size",         &ReadBuffer::size)
+        .def("get_id",       &ReadBuffer::get_id)
+        .def("get_start",    &ReadBuffer::get_start)
+        .def("get_end",      &ReadBuffer::get_end)
+        .def("get_duration", &ReadBuffer::get_duration)
+        .def("get_channel",  &ReadBuffer::get_channel)
+        .def("get_raw",      &ReadBuffer::get_raw);
+
+    py::class_<Fast5Reader>(m, "Fast5Reader")
+        .def(py::init<u32, u32>())
+        .def("add_fast5",       &Fast5Reader::add_fast5) 
+        .def("load_fast5_list", &Fast5Reader::load_fast5_list)
+        .def("add_read",        &Fast5Reader::add_read)
+        .def("load_read_list",  &Fast5Reader::load_read_list)
+        .def("pop_read",        &Fast5Reader::pop_read)
+        .def("buffer_size",     &Fast5Reader::buffer_size)
+        .def("fill_buffer",     &Fast5Reader::fill_buffer)
+        .def("all_buffered",    &Fast5Reader::all_buffered)
+        .def("empty",           &Fast5Reader::empty);
+
+    py::class_<Event>(m, "Event")
+        .def_readwrite("mean", &Event::mean)
+        .def_readwrite("stdv", &Event::stdv)
+        .def_readwrite("start", &Event::start)
+        .def_readwrite("length", &Event::length);
+
+
+    py::class_<EventDetector>(m, "EventDetector")
+        .def(py::init())
+        .def("add_sample", &EventDetector::add_sample)
+        .def("get_event",  &EventDetector::get_event)
+        .def("get_events", &EventDetector::get_events);
+
+    //py::class_<EventDetector>(m, "EventDetector")
+    //    .def(py::init<EventParams>());
+
+    //
+    //static EventParams const event_detection_defaults = {
+    //    .window_length1 = 3,
+    //    .window_length2 = 6,
+    //    .threshold1     = 1.4f,
+    //    .threshold2     = 1.1f,
+    //    .peak_height    = 0.2f,
+    //    .min_mean       = 30,
+    //    .max_mean       = 150
+    //};
+
     /////////////////////////////
 
+    /*
     py::class_< DTW<float, u16, PoreModel> >(m, "DTW")
         .def(py::init<const std::vector<float>, 
                       const std::vector<u16>,
@@ -123,5 +177,6 @@ PYBIND11_MODULE(mapping, m) {
         .value("COL", SubSeqDTW::ROW)
         .value("ROW", SubSeqDTW::ROW)
         .export_values();
+    */
 }
 

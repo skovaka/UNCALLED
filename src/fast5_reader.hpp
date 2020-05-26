@@ -39,6 +39,7 @@ typedef struct {
 
 class Fast5Reader {
     public:
+    Fast5Reader(u32 max_reads, u32 max_buffer=100);
     Fast5Reader(const Fast5Params &p);
 
     Fast5Reader(const std::string &fast5_list="", 

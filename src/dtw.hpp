@@ -19,7 +19,6 @@ class DTW {
         const Func &fn;
     } Prms;
 
-
     DTW(const std::vector<RowT> &row_vals,
         const std::vector<ColT> &col_vals,   
         const Prms &p) : 
@@ -42,7 +41,6 @@ class DTW {
         float vw,
         const Func &fn) :
         DTW ( row_vals, col_vals, {subseq,dw,hw,vw,fn} ) {}
-
 
     void compute_matrix() {
         u64 k = 0;
@@ -75,7 +73,6 @@ class DTW {
         switch (prms.subseq) {
             case DTWSubSeq::ROW:
                 for (u64 k = 0; k < rvals_.size(); k++) {
-                    //std::cout << k << " " << mat_[k*cvals_.size() + j] << "\n";
                     if (mat_[k*cvals_.size() + j] < mat_[i*cvals_.size() + j]) { 
                         i = k;
                     }
@@ -83,7 +80,6 @@ class DTW {
                 break;
             case DTWSubSeq::COL:
                 for (u64 k = 0; k < cvals_.size(); k++) {
-                    //std::cout << k << " " << mat_[i*cvals_.size() + k] << "\n";
                     if (mat_[i*cvals_.size() + k] < mat_[i*cvals_.size() + j]) {
                         j = k;
                     }
@@ -130,13 +126,14 @@ class DTW {
     }
 
     //friend std::ostream &operator<< (std::ostream &out, const DTW &a);
-    void print_path() {
+    void print_path(std::ostream &out) {
         for (auto p = path_.rbegin(); p != path_.rend(); p++) {
-            std::cout << p->first << "\t"
-                      << p->second << "\t"
-                      << rvals_[p->first] << "\t"
-                      << cvals_[p->second] << "\t"
-                      << "\n";
+            out << p->first << "\t"
+                << p->second << "\t"
+                << rvals_[p->first] << "\t"
+                << cvals_[p->second] << "\t"
+                << prms.fn(rvals_[p->first], cvals_[p->second]) << "\t"
+                << "\n";
         }
     } 
 

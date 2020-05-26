@@ -299,7 +299,7 @@ u16 ReadBuffer::get_channel_idx() const {
     return channel_idx_;
 }
 
-u32 ReadBuffer::get_chunks(std::deque<Chunk> &chunk_queue, u32 max, bool real_start) const {
+u32 ReadBuffer::get_chunks(std::vector<Chunk> &chunk_queue, u32 max, bool real_start) const {
     u32 count = 0;
     u16 l = PRMS.chunk_len();
 

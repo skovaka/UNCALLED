@@ -162,13 +162,16 @@ class PoreModel {
         return match_prob(evt.mean, kmer);
     }
 
-
-    float get_mean() const {
+    float get_means_mean() const {
         return model_mean_;
     }
 
-    float get_stdv() const {
+    float get_means_stdv() const {
         return model_stdv_;
+    }
+
+    float get_mean(u16 kmer) const {
+        return lv_means_[kmer];
     }
 
     bool is_loaded() const {

@@ -35,6 +35,8 @@ int main(int argc, char** argv) {
 
     std::vector<float> chunk_times(conf.get_num_channels(), t.get());
 
+    std::cerr << "Starting\n";
+
     while (sim.is_running()) {
         u64 t0 = t.get();
 
@@ -98,7 +100,7 @@ bool load_conf(int argc, char** argv, Conf &conf) {
         switch(opt) {  
 
             FLAG_TO_CONF('l', std::string, read_list)
-            FLAG_TO_CONF('g', std::string, gap_file)
+            FLAG_TO_CONF('g', std::string, pat_prefix)
             FLAG_TO_CONF('t', atoi, threads)
             FLAG_TO_CONF('s', atof, sim_start)
             FLAG_TO_CONF('e', atof, sim_end)
