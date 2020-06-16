@@ -38,8 +38,8 @@ We recommend running on a Linux machine. UNCALLED has been successfully installe
 **Example:**
 
 ```
-> bwa index -p E.coli E.coli.fasta
-> uncalled index -i E.coli.fasta -x E.coli
+> bwa index E.coli.fasta
+> uncalled index E.coli.fasta
 ```
 
 UNCALLED requires a [BWA](https://github.com/lh3/bwa) index. You can use a previously built BWA index, or build a new one with the BWA instance provided in the `bwa/` submodule.
@@ -51,7 +51,7 @@ Before aligning, certain reference-specific parameters must be computed using `u
 **Example:**
 
 ```
-> uncalled map -t 16 -x E.coli -i fast5_list.txt > uncalled_out.paf
+> uncalled map -t 16 E.coli.fasta fast5_list.txt > uncalled_out.paf
 Loading fast5s
 Mapping
 
@@ -62,10 +62,13 @@ eee4b762-25dd-4d4a-8a59-be47065029be 2905     *      *      *      *      *     
 e175c87b-a426-4a3f-8dc1-8e7ab5fdd30d 8052 84 154 + Escherichia_coli_chromosome 4765434 1064550 1064614 41 65  255  ch:i:182 st:i:452368 mt:f:38.611683
 ```
 
-Arguments:
+Positional arguments:
 
-- `-x/--bwa-prefix` the prefix of the index to align to. Should be a BWA index that `uncalled index` was run on
-- `-i/--fast5-files`  a text file containing the path to one fast5 file per line
+- `bwa-prefix` the prefix of the index to align to. Should be a BWA index that `uncalled index` was run on
+- `fast5-files`  a text file containing the path to one fast5 file per line
+
+Optional arguments:
+
 - `-t/--threads` number of threads to use for mapping (default: 1)
 - `-n/--read-count` maximum number of reads to map
 - `-f/--filter` text file containing subset of read IDs (one per line) to map from the fast5 files (will map all by default)
@@ -82,7 +85,7 @@ See [example/](example/) for a simple read and reference example.
 > uncalled list-ports
 MN02686 (2019-11-18 12:30:56): 8000
 
-> /opt/ont/minknow/ont-python/bin/uncalled realtime --port 8000 -t 16 -x E.coli --enrich -c 3 --post-script basecall.sh > uncalled_out.paf 
+> /opt/ont/minknow/ont-python/bin/uncalled realtime E.coli --port 8000 -t 16 --enrich -c 3 --post-script basecall.sh > uncalled_out.paf 
 Starting client
 Starting mappers
 Mapping
@@ -110,7 +113,7 @@ The command can be run at any time before or during a sequencing run, although i
 
 Arguments:
 
-- `-x/--bwa-prefix` the prefix of the index to align to. Should be a BWA index that `uncalled index` was run on
+- `bwa-prefix` the prefix of the index to align to. Should be a BWA index that `uncalled index` was run on
 - `-t/--threads` number of threads to use for mapping (default: 1)
 - `-c/--max-chunks-proc` number of chunks to attempt mapping before giving up on a read (default: 10).
 - `--chunk-size` size of chunks in seconds (default: 1). Note: this is a new feature and may not work as intended (see below)

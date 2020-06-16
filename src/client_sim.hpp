@@ -45,11 +45,12 @@ class ClientSim {
 
     bool load_itvs(const std::string &fname);
     bool load_gaps(const std::string &fname);
+    bool load_delays(const std::string &fname);
     bool load_reads(const std::string &fname, Fast5Reader &fast5sm, u32 max_chunks);
 
     std::vector<Chunk> get_read_chunks();
     void stop_receiving_read(u16 channel, u32 number);
-    void unblock(u16 channel, u32 number);
+    u32 unblock(u16 channel, u32 number);
     float get_time();
     u32 get_number(u16 channel);
     bool is_running();
@@ -60,16 +61,19 @@ class ClientSim {
 
         //private:
         public:
+        u16 channel_, intv_;
         u32 start_time_;
         bool active_;
-        std::vector<u32> gaps_;
+        std::vector<u32> gaps_, delays_;
         std::deque<u32> active_bounds_;
-        u32 g_;
+        u32 g_, d_;
 
-        ScanIntv() :
+        ScanIntv(u16 channel, u16 intv_) :
+            channel_(channel),
+            intv_(intv_),
             start_time_(UINT_MAX),
             active_(false),
-            g_(0) {}
+            g_(0), d_(0) {}
 
         void set_active(u32 st, u32 en) {
             if (st == 0) {
@@ -98,6 +102,11 @@ class ClientSim {
             while (!active_bounds_.empty() && intv_time(t) >= active_bounds_.front()) {
                 active_bounds_.pop_front();
                 active_ = !active_;
+                std::cerr << "switch "
+                          << active_ << " "
+                          << channel_ << " "
+                          << intv_ << " "
+                          << t;
             }
 
             return active_;
@@ -108,9 +117,30 @@ class ClientSim {
         }
 
         u32 next_gap() {
+            if (gaps_.empty()) {
+                if (active_) {
+                    active_ = false;
+                    active_bounds_.pop_front();
+                }
+                return 0;
+            }
             u32 gap = gaps_[g_];
             g_ = (g_+1) % gaps_.size();
             return gap;
+        }
+
+        void add_delay(u32 delay) {
+            delays_.push_back(delay);
+        }
+
+        u32 next_delay() {
+            if (delays_.empty()) {
+                return 0;//not ideal?
+            }
+
+            u32 delay = delays_[d_];
+            d_ = (d_+1) % delays_.size();
+            return delay;
         }
     };
 
@@ -119,17 +149,19 @@ class ClientSim {
         public:
         std::vector<Chunk> chunks_;
         u8 c_;
-        u32 start_, end_, duration_;
+        u32 start_, end_, duration_, number_;
 
         SimRead() :
             c_(0),
             start_(0),
             end_(0),
-            duration_(0) {}
+            duration_(0),
+            number_(0) {}
 
-        void load_read(const ReadBuffer &read, u32 max_chunks) {
+        void load_read(const ReadBuffer &read, u32 offs, u32 max_chunks) {
             duration_ = read.get_duration();
-            read.get_chunks(chunks_, max_chunks, false);
+            read.get_chunks(chunks_, max_chunks, false, offs);
+            number_ = read.get_number();
         }
 
         void start(u32 t) {
@@ -154,8 +186,7 @@ class ClientSim {
         }
 
         u32 get_number() {
-            if (c_ >= chunks_.size()) return 0;
-            return chunks_[c_].get_number();
+            return number_;
         }
 
         Chunk pop_chunk() {
@@ -183,13 +214,17 @@ class ClientSim {
     class SimChannel {
         //private:
         public:
+        u16 channel_;
         std::deque<ScanIntv> intvs_; //intervals
         std::vector<SimRead> reads_;
         u32 r_; //read index
         u32 extra_gap_;
         bool is_active_;
 
-        SimChannel() : r_(0), is_active_(false) {}
+        SimChannel(u16 channel) : 
+            channel_(channel), 
+            r_(0), 
+            is_active_(false) {}
 
         bool is_dead() {
             return intvs_.empty();
@@ -213,32 +248,40 @@ class ClientSim {
             return is_active_;
         }
 
-        void start(u32 t) {
-            assert(!is_dead());
-            extra_gap_ = 0;
-            intvs_[0].start(t);
-            reads_[r_].start(t+intvs_[0].next_gap());
-            is_active_ = intvs_[0].is_active(t);
+        bool start(u32 t) {
+            if (!is_dead()) {
+                extra_gap_ = 0;
+                intvs_[0].start(t);
+            }
+
+            return is_active(t);
         }
 
         void set_read_count(u32 n) {
             reads_.resize(n);
         }
 
-        void load_read(u32 r, const ReadBuffer &read, u32 max_chunks) {
-            reads_[r].load_read(read, max_chunks);
+        void load_read(u32 i, u32 offs, const ReadBuffer &read, u32 max_chunks) {
+            reads_[i].load_read(read, offs, max_chunks);
+        }
+
+        void add_delay(u32 i, u32 delay) {
+            while (i >= intvs_.size()) {
+                intvs_.emplace_back(channel_, intvs_.size());
+            }
+            intvs_[i].add_delay(delay);
         }
 
         void add_gap(u32 i, u32 gap) {
-            if (i >= intvs_.size()) {
-                intvs_.resize(i+1);
+            while (i >= intvs_.size()) {
+                intvs_.emplace_back(channel_, intvs_.size());
             }
             intvs_[i].add_gap(gap);
         }
 
         void set_active(u32 i, u32 start, u32 end) {
-            if (i >= intvs_.size()) {
-                intvs_.resize(i+1);
+            while (i >= intvs_.size()) {
+                intvs_.emplace_back(channel_, intvs_.size());
             }
             intvs_[i].set_active(start, end);
         }
@@ -250,7 +293,6 @@ class ClientSim {
             u32 end = reads_[r_].get_end();
             while (t >= end) {
                 r_ = (r_+1) % reads_.size();
-
 
                 reads_[r_].start(end + intvs_[0].next_gap() + extra_gap_);
                 extra_gap_ = 0;
@@ -270,7 +312,6 @@ class ClientSim {
         }
 
         bool intv_ended(u32 t) {
-            //assert(!is_dead());
             return is_dead() || intvs_[0].get_end() <= t;
         }
 
@@ -283,9 +324,11 @@ class ClientSim {
             reads_[r_].stop_receiving();
         }
 
-        void unblock(u32 t, u32 ej_delay, u32 ej_time) {
-            reads_[r_].unblock(t, ej_delay);
+        u32 unblock(u32 t, u32 ej_time) {
+            u32 delay = intvs_[0].next_delay();
+            reads_[r_].unblock(t, delay);
             extra_gap_ = ej_time;
+            return delay;
         }
     };
 

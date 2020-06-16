@@ -62,7 +62,8 @@ class Paf {
               TOP_RATIO, 
               MEAN_RATIO,
               ENDED,
-              KEEP};
+              KEEP,
+              DELAY};
 
     Paf();
     Paf(const std::string &rd_name, u16 channel = 0, u64 start_sample = 0);
@@ -130,9 +131,13 @@ class ReadBuffer {
     void clear();
     void set_raw_len(u64 raw_len_);
 
-    u32 get_chunks(std::vector<Chunk> &chunk_queue, u32 max=UINT_MAX, bool real_start=true) const;
+    u32 get_chunks(std::vector<Chunk> &chunk_queue, u32 max=UINT_MAX, bool real_start=true, u32 offs=0) const;
     void set_channel(u16 ch) {channel_idx_ = ch-1;}
     u16 get_channel_idx() const;
+
+    u32 get_number() const {
+        return number_;
+    }
 
     static std::vector<float> calibrate(u16 ch, std::vector<i16> samples);
     static void calibrate(u16 ch, std::vector<float> samples);

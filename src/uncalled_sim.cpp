@@ -21,7 +21,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-
     ClientSim sim(conf);
 
     std::cerr << "Loading mappers\n";
@@ -34,8 +33,12 @@ int main(int argc, char** argv) {
     Timer t;
 
     std::vector<float> chunk_times(conf.get_num_channels(), t.get());
+    std::vector<u32> unblocked(conf.get_num_channels(), 0);
 
-    std::cerr << "Starting\n";
+
+    bool deplete = conf.get_realtime_mode() == RealtimeParams::Mode::DEPLETE;
+
+    std::cerr << "Starting " << deplete << "\n";
 
     while (sim.is_running()) {
         u64 t0 = t.get();
@@ -46,10 +49,19 @@ int main(int argc, char** argv) {
         for (MapResult m : pool.update()) {
             std::tie(channel, number, paf) = m;
             float map_time = (t.get() - chunk_times[channel-1])/1000;
-            if (paf.is_mapped()) {
-                paf.set_float(Paf::Tag::EJECT, map_time); //TODO: match with realtime
-                sim.unblock(channel, number);
-                //aln.set_unblocked();TODO replace this
+
+            if (paf.is_ended()) {
+                paf.set_float(Paf::Tag::ENDED, map_time);
+                sim.stop_receiving_read(channel, number);
+
+            } else if ((paf.is_mapped() && deplete) || (!paf.is_mapped() && !deplete)) {
+
+                u32 delay = sim.unblock(channel, number);
+                paf.set_float(Paf::Tag::EJECT, map_time); 
+                paf.set_int(Paf::Tag::DELAY, delay); 
+
+                unblocked[channel-1] = number;
+
             } else {
                 sim.stop_receiving_read(channel, number);
                 paf.set_float(Paf::Tag::KEEP, map_time);
@@ -60,7 +72,12 @@ int main(int argc, char** argv) {
 
         std::vector<Chunk> chunks = sim.get_read_chunks();
         for (Chunk &ch : chunks) {
-            if (pool.add_chunk(ch)) {
+            if (unblocked[ch.get_channel_idx()] == ch.get_number()) {
+                std::cout << "# recieved chunk from " 
+                          << ch.get_id() 
+                          << " after unblocking\n";
+                continue;
+            } else if (pool.add_chunk(ch)) {
                 chunk_times[ch.get_channel_idx()] = t.get();
             } else {
                 std::cerr << "Error: failed to add chunk from " << ch.get_id() << std::endl;
@@ -96,15 +113,21 @@ bool load_conf(int argc, char** argv, Conf &conf) {
     int opt;
 
     //parse flags
-    while((opt = getopt(argc, argv, ":t:l:s:e:g:d:")) != -1) {
+    while((opt = getopt(argc, argv, ":t:l:s:g:c:de")) != -1) {
         switch(opt) {  
 
             FLAG_TO_CONF('l', std::string, read_list)
             FLAG_TO_CONF('g', std::string, pat_prefix)
             FLAG_TO_CONF('t', atoi, threads)
-            FLAG_TO_CONF('s', atof, sim_start)
-            FLAG_TO_CONF('e', atof, sim_end)
-            FLAG_TO_CONF('d', atof, ej_delay)
+            FLAG_TO_CONF('c', atoi, max_chunks)
+
+            case 'd':
+                conf.set_realtime_mode(RealtimeParams::Mode::DEPLETE);
+                break;
+
+            case 'e':
+                conf.set_realtime_mode(RealtimeParams::Mode::ENRICH);
+                break;
 
             case ':':  
             std::cerr << "Error: failed to load flag value\n";  

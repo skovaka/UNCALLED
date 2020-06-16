@@ -36,7 +36,8 @@ const std::string Paf::PAF_TAGS[] = {
     "tr", //TOP_RATIO
     "mr", //MEAN_RATIO
     "en", //ENDED
-    "kp"  //KEEP
+    "kp", //KEEP
+    "dl"  //DELAY
 };
 
 Paf::Paf() 
@@ -299,13 +300,13 @@ u16 ReadBuffer::get_channel_idx() const {
     return channel_idx_;
 }
 
-u32 ReadBuffer::get_chunks(std::vector<Chunk> &chunk_queue, u32 max, bool real_start) const {
+u32 ReadBuffer::get_chunks(std::vector<Chunk> &chunk_queue, u32 max, bool real_start, u32 offs) const {
     u32 count = 0;
     u16 l = PRMS.chunk_len();
 
     float start = real_start ? start_sample_ : 0;
 
-    for (u32 i = 0; i+l <= full_signal_.size() && count < max; i += l) {
+    for (u32 i = offs; i+l <= full_signal_.size() && count < max; i += l) {
         chunk_queue.emplace_back(id_, get_channel(), number_, 
                                  start+i, full_signal_, i, l);
         count++;
