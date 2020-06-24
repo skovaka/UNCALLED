@@ -106,7 +106,7 @@ class ClientSim {
                           << active_ << " "
                           << channel_ << " "
                           << intv_ << " "
-                          << t;
+                          << t << "\n";
             }
 
             return active_;

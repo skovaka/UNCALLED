@@ -45,7 +45,7 @@ ClientSim::ClientSim(Conf &conf) :
                 itvs_file = prefix + "_itvs.txt",
                 gaps_file = prefix + "_gaps.txt",
                 delays_file = prefix + "_delays.txt",
-               reads_file = prefix + "_reads.txt";
+                reads_file = prefix + "_reads.txt";
 
     channels_.reserve(conf.num_channels);
     for (u32 c = 1; c <= conf.num_channels; c++) {
@@ -84,10 +84,12 @@ bool ClientSim::load_itvs(const std::string &fname) {
     u16 ch, i;
     u32 st, en;
 
+    infile >> ch >> i >> st >> en;
     while (!infile.eof()) {
-        infile >> ch >> i >> st >> en;
         channels_[ch-1].set_active(i, st, en);
+        infile >> ch >> i >> st >> en;
     }
+
 
     return true;
 }
@@ -108,9 +110,10 @@ bool ClientSim::load_gaps(const std::string &fname) {
     u16 ch, i;
     u32 ln;
 
+    infile >> ch >> i >> ln;
     while (!infile.eof()) {
-        infile >> ch >> i >> ln;
         channels_[ch-1].add_gap(i, ln);
+        infile >> ch >> i >> ln;
     }
 
     return true;
@@ -132,9 +135,10 @@ bool ClientSim::load_delays(const std::string &fname) {
     u16 ch, i;
     u32 ln;
 
+    infile >> ch >> i >> ln;
     while (!infile.eof()) {
-        infile >> ch >> i >> ln;
         channels_[ch-1].add_delay(i, ln);
+        infile >> ch >> i >> ln;
     }
 
     return true;
@@ -165,10 +169,11 @@ bool ClientSim::load_reads(const std::string &fname, Fast5Reader &fast5s, u32 ma
     std::string rd;
     u32 offs;
 
+    infile >> ch >> rd >> offs;
     while (!infile.eof()) {
-        infile >> ch >> rd >> offs;
         fast5s.add_read(rd);
         read_locs[rd] = {ch, ch_counts[ch-1]++, offs};
+        infile >> ch >> rd >> offs;
     }
 
     for (u16 c = 0; c < ch_counts.size(); c++) {
