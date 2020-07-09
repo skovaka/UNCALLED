@@ -48,9 +48,12 @@ This script reduces the false positive mapping rate by preventing off-target DNA
 
 ## Recommendations
 
-We recommend first running `mask_internal.sh` using large number of iterations (~100), then testing references masked at various iterations by mapping fast5 reads to test the true positive rates. After some number of iterations the true positives should stop increasing. You should choose the smallest number of iterations which maximize the number of true positives. We have found a k-mer length of 10 typically works well, while the required number of iterations varies drastically depending on reference size and repetitiveness.
+We have found that 30 iterations if internal masking with k-mer length 10 works well, followed by expernal masking with `min_len` of 50bp and `min_copy` of 5. In other words, simply run:
 
-Once the true positive rate is at an acceptable level, you can test the false positive rate by mapping a large number of reads (~100,000) that you know should not map to your reference, preferably ones that you expect to be present in your sample (for example, human reads that don't come from your target regions). Then you can run `mask_external.sh` and see if the resulting reference has a lower false positive rate. We have found that a `min_len` of 50bp and `min_copy` of 5 works well.
+```
+mask_internal.sh <target_reference> 10 30 <out>
+mask_external.sh <full_reference> <out>mask30.fa 50 5 <threads> <out>mask30_
+```
 
 ## Future work
 
