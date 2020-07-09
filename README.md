@@ -153,6 +153,8 @@ cnt_total_bp    8271.651331
 
 The simulator simulates a real-time run using data from two real runs: one control run and one UNCALLED run. Reads are simulated from the control run, and the pattern of channel activity of modeled after the control run (see the paper for more details). The simulator outputs a PAF file similar to the realtime mode, which can be interperted using scripts found in [sim_scripts/](sim_scripts/).
 
+Example files which can be used as template UNCALLED sequencing summary and PAF files for the simulator can be found [here](http://labshare.cshl.edu/shares/schatzlab/www-data/UNCALLED/simulator_files/). The control reads/sequencing summary can be from any sequencing run of your sample of interest, and it does not have to match the sample used in the provided examples.
+
 The simulator can take up a large amount of memory (> 100Gb), and loading the fast5 reads can take quite a long time. To reduce the time/memory requirements you could truncate your control sequencing summary and only the loads present in the summary will be loaded, although this may reduce the accuracy of the simulation. Also, unfortunately the fast5 loading portion of the simulator cannot be exited via a keyboard interrupt and must be hard-killed. I will work on fixing this in future versions.
 
 Arguments:
