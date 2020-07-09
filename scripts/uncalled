@@ -22,7 +22,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from uncalled import mapping, index, pafstats, minknow_client, params
+from uncalled import mapping, index, pafstats, minknow_client, params, sim_utils
 import numpy as np
 import sys                         
 import os
@@ -69,6 +69,13 @@ def add_ru_opts(p):
     active.add_argument("--even", action='store_const', const=mapping.ActiveChs.EVEN, dest='active_chs', help="Will only monitor even pores if set")
     active.add_argument("--odd", action='store_const', const=mapping.ActiveChs.ODD, dest='active_chs', help="Will only monitor odd pores if set")
 
+def add_sim_opts(p):
+    p.add_argument("fast5s", nargs='+', type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
+    p.add_argument("-r", "--recursive", action="store_true")
+    p.add_argument("--ctl-seqsum", required=True, type=str, help="")
+    p.add_argument("--unc-seqsum", required=True, type=str, help="")
+    p.add_argument("--unc-paf", required=True, type=str, help="")
+    p.add_argument("--sim-speed", required=False, default=1.0, type=float, help="")
 
 def add_realtime_opts(p):
     p.add_argument('--host', default='127.0.0.1', help='MinKNOW server host.')
@@ -80,7 +87,7 @@ def add_list_ports_opts(p):
 
 def add_fast5_opts(p):
     p.add_argument("fast5s", nargs='+', type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
-    p.add_argument("-r", "--recursive", required=False, default="", type=str, help="")
+    p.add_argument("-r", "--recursive", action="store_true")
     p.add_argument("-l", "--read-list", required=False, default="", type=str, help="Only map reads listed in this file")
     p.add_argument("-n", "--max-reads", type=int, default=0, help="Maximum number of reads to map")
 
@@ -108,6 +115,12 @@ def get_parser():
     add_ru_opts(rt_parser)
     add_realtime_opts(rt_parser)
 
+    sim_parser = sp.add_parser("sim", help="Perform real-time targeted sequencing")#,formatter_class=ArgFormat)
+    add_bwa_opt(sim_parser)
+    add_sim_opts(sim_parser)
+    add_map_opts(sim_parser)
+    add_ru_opts(sim_parser)
+
     ps_parser = sp.add_parser("pafstats", help="Computes speed and accuracy of UNCALLED mappings. Given an UNCALLED PAF file, will compute mean/median BP mapped per second, number of BP required to map each read, and total number of milliseconds to map each read. Can also optionally compute accuracy with respect to reference alignments, for example output by minimap2.")
     pafstats.add_opts(ps_parser)
 
@@ -126,10 +139,9 @@ def load_args(args, conf):
 
         if (not a.startswith("_")):
             if hasattr(conf, a):
-                sys.stderr.write("SET\t%s\t%s\n" % (a, str(v)))
                 setattr(conf, a, v)
-            else:
-                sys.stderr.write("%s\t%s\n" % (a, str(v)))
+            #else:
+            #    sys.stderr.write("%s\t%s\n" % (a, str(v)))
 
 def index_cmd(args):
     sys.stderr.write("Initializing parameter search\n")
@@ -246,9 +258,7 @@ def map_cmd(args):
 
 def realtime_cmd(args):
 
-    if not minknow_client.ru_loaded:
-        sys.stderr.write("Error: read_until module not installed. Please install \"read_until_api\" submodule.\n")
-        sys.exit(1)
+    sim = args.subcmd == "sim"
 
     conf = mapping.Conf(params.CONF_DEFAULTS)
     load_args(args, conf)
@@ -261,8 +271,21 @@ def realtime_cmd(args):
     client = None
 
     try:
-        sys.stderr.write("%s\t%d\t%f\n" % (conf.host, conf.port, conf.chunk_time))
-        client = minknow_client.Client(conf.host, conf.port, conf.chunk_time)
+        if sim:
+            client = mapping.ClientSim(conf)
+            sim_utils.load_sim(client, conf)
+
+            for fast5 in load_fast5s(args.fast5s, args.recursive):
+                if fast5 != None:
+                    client.add_fast5(fast5)
+
+            client.load_fast5s()
+
+        else:
+            if not minknow_client.ru_loaded:
+                sys.stderr.write("Error: read_until module not installed. Please install \"read_until_api\" submodule.\n")
+                sys.exit(1)
+            client = minknow_client.Client(conf.host, conf.port, conf.chunk_time, conf.num_channels)
 
         if not client.run():
             sys.exit(1)
@@ -270,16 +293,16 @@ def realtime_cmd(args):
         deplete = conf.realtime_mode == mapping.RealtimeMode.DEPLETE
         even = conf.active_chs == mapping.ActiveChs.EVEN #TODO: do within mapper
 
-        cal = client.device.rpc.device.get_calibration(first_channel=1, last_channel=512)
-        raw_type = str(client.signal_dtype)
-        sys.stderr.write(conf.bwa_prefix+"\n")
+        if not sim:
+            cal = client.device.rpc.device.get_calibration(first_channel=1, last_channel=args.num_channels)
+            raw_type = str(client.signal_dtype)
 
         pool = mapping.RealtimePool(conf)
 
         chunk_times = [time.time() for c in range(conf.num_channels)]
         unblocked = [None for c in range(conf.num_channels)]
 
-        client.log("Processing reads")
+        #client.log("Processing reads")
 
         if conf.duration == None or conf.duration == 0:
             end_time = float("inf")
@@ -297,9 +320,13 @@ def realtime_cmd(args):
 
                 elif (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
 
-                    if client.should_eject():
+                    if sim or client.should_eject():
                         paf.set_float(mapping.Paf.Tag.EJECT, t)
-                        client.unblock_read(ch, nm)
+                        u = client.unblock_read(ch, nm)
+
+                        if sim:
+                            paf.set_int(mapping.Paf.Tag.DELAY, u)
+
                         unblocked[ch-1] = nm
                     else:
                         paf.set_float(mapping.Paf.Tag.IN_SCAN, t)
@@ -311,28 +338,42 @@ def realtime_cmd(args):
 
                 paf.print_paf()
 
-            read_batch = client.get_read_chunks(batch_size=client.queue_length)
+            if sim:
+                read_batch = client.get_read_chunks()
+                for channel, read in read_batch:
+                    if even and channel % 2 == 1:
+                        client.stop_receiving_read(channel, read.number)
+                    else:
+                        if unblocked[channel-1] == read.number:
+                            sys.stdout.write("# recieved chunk from %s after unblocking\n" % read.id)
+                            continue
 
-            for channel, read in read_batch:
-                if even and channel % 2 == 1:
-                    client.stop_receiving_read(channel, read.number)
-                else:
-                    if unblocked[channel-1] == read.number:
-                        sys.stdout.write("# recieved chunk from %s after unblocking\n" % read.id)
-                        continue
+                        chunk_times[channel-1] = time.time()
+                        pool.add_chunk(read)
+       
+            else:
 
-                    chunk_times[channel-1] = time.time()
-                    pool.add_chunk(mapping.Chunk(read.id, 
-                                                 channel, 
-                                                 read.number,
-                                                 read.chunk_start_sample,
-                                                 raw_type,
-                                                 read.raw_data))
-                #last_time = time.time()
+                read_batch = client.get_read_chunks(batch_size=client.queue_length)
+                for channel, read in read_batch:
+                    if even and channel % 2 == 1:
+                        client.stop_receiving_read(channel, read.number)
+                    else:
+                        if unblocked[channel-1] == read.number:
+                            sys.stdout.write("# recieved chunk from %s after unblocking\n" % read.id)
+                            continue
+
+                        chunk_times[channel-1] = time.time()
+                        pool.add_chunk(mapping.Chunk(read.id, 
+                                                     channel, 
+                                                     read.number,
+                                                     read.chunk_start_sample,
+                                                     raw_type,
+                                                     read.raw_data))
+
 
             if client.get_runtime() >= end_time:
-                sys.stderr.write("END IS NIGH\t%f\t%f\n" % (client.get_runtime(),end_time))
-                client.reset()
+                if not sim:
+                    client.reset()
                 client = None
                 break
 
@@ -348,12 +389,14 @@ def realtime_cmd(args):
 
     #client.log("Finished")
 
-    if client != None:
-        sys.stderr.write("STOP!\n")
+    if client != None and not sim:
         client.reset()
 
     if pool != None:
         pool.stop_all()
+
+def sim_cmd(args):
+    sim_utils.load_sim()
 
 def list_ports_cmd(args):
     log_re = re.compile("^([0-9\-]+ [0-9:]+).+ :.+instance_started.+")
@@ -391,7 +434,7 @@ if __name__ == "__main__":
         index_cmd(args)
     elif args.subcmd == "map":
         map_cmd(args)
-    elif args.subcmd == "realtime":
+    elif args.subcmd in {"sim", "realtime"}:
         realtime_cmd(args)
     elif args.subcmd == "list-ports":
         list_ports_cmd(args)
