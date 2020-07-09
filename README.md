@@ -92,7 +92,7 @@ See [example/](example/) for a simple read and reference example.
 > uncalled list-ports
 MN02686 (2019-11-18 12:30:56): 8000
 
-> /opt/ont/minknow/ont-python/bin/uncalled realtime E.coli --port 8000 -t 16 --enrich -c 3 > uncalled_out.paf 
+> /opt/ont/minknow/ont-python/bin/uncalled realtime E.coli.fasta --port 8000 -t 16 --enrich -c 3 > uncalled_out.paf 
 Starting client
 Starting mappers
 Mapping
@@ -141,7 +141,7 @@ The ReadUntil API recieves signal is "chunks", which by default are one second's
 **Example:**
 
 ```
-> uncalled sim E.coli /path/to/control/fast5s --ctl-seqsum /path/to/control/sequencing_summary.txt --unc-seqsum /path/to/uncalled/sequencing_summary.txt --unc-paf /path/to/uncalled/uncalled_out.paf -t 16 --enrich -c 3 --sim-speed 0.25 > uncalled_out.paf 2> uncalled_err.txt
+> uncalled sim E.coli.fasta /path/to/control/fast5s --ctl-seqsum /path/to/control/sequencing_summary.txt --unc-seqsum /path/to/uncalled/sequencing_summary.txt --unc-paf /path/to/uncalled/uncalled_out.paf -t 16 --enrich -c 3 --sim-speed 0.25 > uncalled_out.paf 2> uncalled_err.txt
 
 > sim_scripts/est_genome_yield.py -u uncalled_out.paf --enrich -x E.coli -m mm2.paf -s sequencing_summary.txt --sim-speed 0.25
 
