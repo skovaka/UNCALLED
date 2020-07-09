@@ -29,7 +29,8 @@ if ru_loaded:
                      mk_host=8000, 
                      mk_port="127.0.0.1", 
                      chunk_size=1.0, 
-                     scan_thresh=0.99):
+                     scan_thresh=0.99,
+                     num_channels=512):
 
             logging.basicConfig(
                 format='[%(asctime)s - %(name)s] %(message)s',
@@ -51,8 +52,9 @@ if ru_loaded:
             self.in_scan = True 
             self.scan_thresh = scan_thresh
             self.chunk_size = chunk_size
+            self.num_channels = num_channels
 
-            self.ch_mux = np.zeros(512, dtype=int)
+            self.ch_mux = np.zeros(num_channels, dtype=int)
             self.mux_counts = np.zeros(5, dtype=float)
             self.mux_counts[0] = len(self.ch_mux)
 
@@ -68,7 +70,7 @@ if ru_loaded:
 
             self._start_chmon()
 
-            read_until.ReadUntilClient.run(self, *kwargs)
+            read_until.ReadUntilClient.run(self, last_channel=self.num_channels, *kwargs)
 
             self.start_time = time.time()
             
@@ -110,7 +112,7 @@ if ru_loaded:
         def _run_chmon(self, **kwargs):
             channels = self.connection.data.get_channel_states(
                 first_channel = 1,
-                last_channel = 512,
+                last_channel = self.num_channels,
                 use_channel_states_ids = False
             )
 

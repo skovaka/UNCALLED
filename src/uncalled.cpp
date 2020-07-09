@@ -7,6 +7,7 @@
 #include "realtime_pool.hpp"
 #include "chunk.hpp"
 #include "read_buffer.hpp"
+#include "client_sim.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -35,6 +36,7 @@ PYBIND11_MODULE(mapping, m) {
         .value("IN_SCAN", Paf::Tag::IN_SCAN)
         .value("ENDED", Paf::Tag::ENDED)
         .value("KEEP", Paf::Tag::KEEP)
+        .value("DELAY", Paf::Tag::DELAY)
         .export_values();
 
     //.def(py::init<const std::string &,const std::string &,u32>())
@@ -80,17 +82,14 @@ PYBIND11_MODULE(mapping, m) {
                       u32, //raw_st
                       u32  //raw_len
                      >())
-        .def("get_channel", &Chunk::get_channel)
-        .def("get_number", &Chunk::get_number)
+        .def_property_readonly("channel", &Chunk::get_channel)
+        .def_property_readonly("number", &Chunk::get_number)
         .def("empty", &Chunk::empty)
         .def("print", &Chunk::print)
         .def("size", &Chunk::size);
+
     
     m.def("self_align", &self_align);
-
-    //py::class_< PoreModel<KLEN> >(m, "PoreModel")
-    //    .def(py::init<const std::string &, bool>())
-    //    .def("match_prob", (float (PoreModel::*) (f &PoreModel<KLEN>::match_prob);
 
     py::class_<ReadBuffer>(m, "ReadBuffer")
         .def("empty",        &ReadBuffer::empty)
@@ -120,63 +119,25 @@ PYBIND11_MODULE(mapping, m) {
         .def_readwrite("start", &Event::start)
         .def_readwrite("length", &Event::length);
 
-
     py::class_<EventDetector>(m, "EventDetector")
         .def(py::init())
         .def("add_sample", &EventDetector::add_sample)
         .def("get_event",  &EventDetector::get_event)
         .def("get_events", &EventDetector::get_events);
 
-    //py::class_<EventDetector>(m, "EventDetector")
-    //    .def(py::init<EventParams>());
-
-    //
-    //static EventParams const event_detection_defaults = {
-    //    .window_length1 = 3,
-    //    .window_length2 = 6,
-    //    .threshold1     = 1.4f,
-    //    .threshold2     = 1.1f,
-    //    .peak_height    = 0.2f,
-    //    .min_mean       = 30,
-    //    .max_mean       = 150
-    //};
-
-    /////////////////////////////
-
-    /*
-    py::class_< DTW<float, u16, PoreModel> >(m, "DTW")
-        .def(py::init<const std::vector<float>, 
-                      const std::vector<u16>,
-                      const KmerModel &,
-                      SubSeqDTW, float, float, float> ())
-        .def("score", &DTW<float, u16, KmerModel>::score)
-        .def("mean_score", &DTW<float, u16, KmerModel>::mean_score)
-        .def("get_path", &DTW<float, u16, KmerModel>::get_path)
-        .def("print_path", &DTW<float, u16, KmerModel>::print_path);
-    
-    py::class_<EventParams>(m, "EventParams")
-        .def(py::init());
-    
-    py::class_<EventDetector>(m, "EventDetector")
-        .def(py::init<EventParams>())
-        .def("reset", &EventDetector::reset)
-        .def("add_samples", &EventDetector::add_samples);
-
-    py::class_<ReadBuffer>(m, "ReadBuffer")
-        .def("get_raw", &ReadBuffer::get_raw)
-        .def("get_id", &ReadBuffer::get_id)
-        .def("get_raw_length", &ReadBuffer::get_raw_length);
-
-    py::class_<KmerModel>(m, "KmerModel")
-        .def(py::init<const std::string &>())
-        .def("normalize", &KmerModel::normalize)
-        .def("str_to_kmers", &KmerModel::str_to_kmers);
-    
-    py::enum_<SubSeqDTW>(m, "SubSeqDTW")
-        .value("NONE", SubSeqDTW::NONE)
-        .value("COL", SubSeqDTW::ROW)
-        .value("ROW", SubSeqDTW::ROW)
-        .export_values();
-    */
+    py::class_<ClientSim>(m, "ClientSim")
+        .def(py::init<Conf &>())
+        .def("run", &ClientSim::run)
+        .def("get_runtime", &ClientSim::get_runtime)
+        .def("get_read_chunks", &ClientSim:: get_read_chunks)
+        .def("stop_receiving_read",  &ClientSim::stop_receiving_read)
+        .def("unblock_read", &ClientSim::unblock_read)
+        .def("add_intv", &ClientSim::add_intv)
+        .def("add_gap", &ClientSim::add_gap)
+        .def("add_delay", &ClientSim::add_delay)
+        .def("add_read", &ClientSim::add_read)
+        .def("add_fast5", &ClientSim::add_fast5)
+        .def("load_fast5s", &ClientSim::load_fast5s)
+        .def_property_readonly("is_running",  &ClientSim::is_running);
 }
 

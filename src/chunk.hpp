@@ -29,6 +29,7 @@ class Chunk {
     u16 get_channel() const;
     u16 get_channel_idx() const;
     u32 get_number() const;
+    u32 get_raw_data() const;
     u32 size() const;
     bool is_calibrated() const;
     void print() const;

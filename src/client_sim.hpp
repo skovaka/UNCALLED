@@ -38,24 +38,38 @@ class ClientSim {
     public:
     ClientSim(Conf &c);
 
-    PatternMap load_pattern(const std::string &pat_fname, Fast5Reader &fast5s_);
+    bool run();
+    std::vector< std::pair<u16, Chunk> > get_read_chunks();
+    void stop_receiving_read(u16 channel, u32 number);
+    u32 unblock_read(u16 channel, u32 number);
+    bool is_running();
+    float get_runtime();
 
-    void add_fast5s(const std::string &fname, u32 max_loaded);
-    void start();
+    bool load_from_files(const std::string &prefix);
+
+    void add_intv(u16 ch, u16 i, u32 st, u32 en);
+    void add_gap(u16 ch, u16 i, u32 len);
+    void add_delay(u16 ch, u16 i, u32 len);
+    void add_read(u16 ch, const std::string &id, u32 offs);
+    void add_fast5(const std::string &fname);
+    void load_fast5s();
+
+    private:
 
     bool load_itvs(const std::string &fname);
     bool load_gaps(const std::string &fname);
     bool load_delays(const std::string &fname);
-    bool load_reads(const std::string &fname, Fast5Reader &fast5sm, u32 max_chunks);
+    bool load_reads(const std::string &fname);
 
-    std::vector<Chunk> get_read_chunks();
-    void stop_receiving_read(u16 channel, u32 number);
-    u32 unblock(u16 channel, u32 number);
-    float get_time();
+
     u32 get_number(u16 channel);
-    bool is_running();
+    float get_time();
 
-    private:
+    typedef struct {
+        u16 ch;
+        u32 i, offs;
+    } ReadLoc;
+    std::unordered_map< std::string, ReadLoc >  read_locs;
 
     class ScanIntv {
 
@@ -219,17 +233,18 @@ class ClientSim {
         std::vector<SimRead> reads_;
         u32 r_; //read index
         u32 extra_gap_;
+        u32 read_count_;
         bool is_active_;
 
         SimChannel(u16 channel) : 
             channel_(channel), 
             r_(0), 
+            read_count_(0),
             is_active_(false) {}
 
         bool is_dead() {
             return intvs_.empty();
         }
-
 
         bool is_active(u32 t) {
             if (is_dead()) return false;
@@ -257,11 +272,15 @@ class ClientSim {
             return is_active(t);
         }
 
-        void set_read_count(u32 n) {
-            reads_.resize(n);
+        u32 reserve_read() {
+            return read_count_++;
         }
 
         void load_read(u32 i, u32 offs, const ReadBuffer &read, u32 max_chunks) {
+            if (reads_.size() < read_count_) {
+                reads_.resize(read_count_);
+            }
+
             reads_[i].load_read(read, offs, max_chunks);
         }
 
@@ -335,8 +354,10 @@ class ClientSim {
     friend bool operator< (const SimRead &r1, const SimRead &r2);
 
     SimParams PRMS;
+    Fast5Reader fast5s_;
     float time_coef_; //TODO: make const?
-    u32 ej_time_, ej_delay_, scan_time_, scan_start_; //start_samp_, end_samp_, 
+    u32 ej_time_, ej_delay_, scan_time_, scan_start_, max_chunks_; //start_samp_, end_samp_, 
+
 
     bool is_running_, in_scan_;
 

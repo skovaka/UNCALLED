@@ -25,48 +25,46 @@
 
 ClientSim::ClientSim(Conf &conf) :
       PRMS(conf.sim_prms),
+      fast5s_(conf.fast5_prms),
       scan_start_(0),
       is_running_(false),
       in_scan_(false) {
 
     float sample_rate = conf.get_sample_rate();
-    time_coef_  = PRMS.sim_speed * sample_rate / 1000;
-    //start_samp_ = PRMS.sim_start * sample_rate;
-    ej_delay_   = PRMS.ej_delay  * sample_rate;
+    time_coef_  = sample_rate / 1000;
     ej_time_    = PRMS.ej_time   * sample_rate;
     scan_time_  = PRMS.scan_time * sample_rate;
-
-    std::cerr << ej_delay_ << " " << ej_time_ << " EJECT\n";
-
-    //if (PRMS.sim_end > 0) end_samp_ = PRMS.sim_end * sample_rate;
-    //else end_samp_ = INT_MAX;
-
-    std::string prefix = conf.get_pat_prefix(),
-                itvs_file = prefix + "_itvs.txt",
-                gaps_file = prefix + "_gaps.txt",
-                delays_file = prefix + "_delays.txt",
-                reads_file = prefix + "_reads.txt";
+    max_chunks_ = conf.get_max_chunks();
 
     channels_.reserve(conf.num_channels);
     for (u32 c = 1; c <= conf.num_channels; c++) {
         channels_.emplace_back(c);
     }
-
-    std::cerr << "Loading intervals\n";
-    load_itvs(itvs_file);
-
-    std::cerr << "Loading gaps\n";
-    load_gaps(gaps_file);
-
-    std::cerr << "Loading delays\n";
-    load_delays(delays_file);
-
-    std::cerr << "Loading reads\n";
-    Fast5Reader fast5s(conf.fast5_prms);
-    load_reads(reads_file, fast5s, Mapper::PRMS.max_chunks);
-    std::cerr << "Loaded\n";
 }
 
+bool ClientSim::load_from_files(const std::string &prefix) {
+    std::string itvs_file = prefix + "_itvs.txt",
+                gaps_file = prefix + "_gaps.txt",
+                delays_file = prefix + "_delays.txt",
+                reads_file = prefix + "_reads.txt";
+
+    std::cerr << "Loading " << itvs_file << "\n";
+    if (!load_itvs(itvs_file)) return false;
+
+    std::cerr << "Loading " << gaps_file << "\n";
+    if (!load_gaps(gaps_file)) return false;
+
+    std::cerr << "Loading " << delays_file << "\n";
+    if (!load_delays(delays_file)) return false;
+
+    Timer t;
+
+    std::cerr << "Loading reads\n";
+    if (!load_reads(reads_file)) return false;
+    std::cerr << "Loaded " << (t.get()/1000) << "\n";
+
+    return true;
+}
 
 bool ClientSim::load_itvs(const std::string &fname) {
     if (fname.empty()) {
@@ -86,7 +84,7 @@ bool ClientSim::load_itvs(const std::string &fname) {
 
     infile >> ch >> i >> st >> en;
     while (!infile.eof()) {
-        channels_[ch-1].set_active(i, st, en);
+        add_intv(ch, i, st, en);
         infile >> ch >> i >> st >> en;
     }
 
@@ -108,12 +106,12 @@ bool ClientSim::load_gaps(const std::string &fname) {
     }
 
     u16 ch, i;
-    u32 ln;
+    u32 len;
 
-    infile >> ch >> i >> ln;
+    infile >> ch >> i >> len;
     while (!infile.eof()) {
-        channels_[ch-1].add_gap(i, ln);
-        infile >> ch >> i >> ln;
+        add_gap(ch, i, len);
+        infile >> ch >> i >> len;
     }
 
     return true;
@@ -133,26 +131,57 @@ bool ClientSim::load_delays(const std::string &fname) {
     }
 
     u16 ch, i;
-    u32 ln;
+    u32 len;
 
-    infile >> ch >> i >> ln;
+    infile >> ch >> i >> len;
     while (!infile.eof()) {
-        channels_[ch-1].add_delay(i, ln);
-        infile >> ch >> i >> ln;
+        infile >> ch >> i >> len;
+        add_delay(ch, i, len);
     }
 
     return true;
 }
 
-typedef struct {
-    u16 ch;
-    u32 i, offs;
-} ReadEntry;//TODO better name
+void ClientSim::add_intv(u16 ch, u16 i, u32 st, u32 en) {
+    channels_[ch-1].set_active(i, st, en);
+}
 
-bool ClientSim::load_reads(const std::string &fname, Fast5Reader &fast5s, u32 max_chunks) {
-    std::unordered_map< std::string, ReadEntry >  read_locs;
-    std::vector<u32> ch_counts(channels_.size(), 0);
+void ClientSim::add_gap(u16 ch, u16 i, u32 len) {
+    channels_[ch-1].add_gap(i, len);
+}
 
+void ClientSim::add_delay(u16 ch, u16 i, u32 len) {
+    channels_[ch-1].add_delay(i, len);
+}
+
+void ClientSim::add_read(u16 ch, const std::string &id, u32 offs) {
+    read_locs[id] = {ch, channels_[ch-1].reserve_read(), offs};
+    fast5s_.add_read(id);
+}
+
+void ClientSim::add_fast5(const std::string &fname) {
+    fast5s_.add_fast5(fname);
+}
+
+
+void ClientSim::load_fast5s() {
+    u32 n = 0;
+    while(!fast5s_.empty()) {
+        ReadBuffer read = fast5s_.pop_read();
+        ReadLoc r = read_locs[read.get_id()];
+
+        read.set_channel(r.ch);
+        channels_[r.ch-1].load_read(r.i, r.offs, read, max_chunks_);
+
+        if (n % 1000 == 0) {
+            std::cerr << n << " loaded\n";
+        }
+        n++;
+    }
+}
+
+
+bool ClientSim::load_reads(const std::string &fname) {
     if (fname.empty()) {
         std::cerr << "No read file provided\n";
         return false;
@@ -171,48 +200,27 @@ bool ClientSim::load_reads(const std::string &fname, Fast5Reader &fast5s, u32 ma
 
     infile >> ch >> rd >> offs;
     while (!infile.eof()) {
-        fast5s.add_read(rd);
-        read_locs[rd] = {ch, ch_counts[ch-1]++, offs};
+        add_read(ch, rd, offs);
         infile >> ch >> rd >> offs;
     }
 
-    for (u16 c = 0; c < ch_counts.size(); c++) {
-        channels_[c].set_read_count(ch_counts[c]);
-    }
-
-    u32 n = 0;
-
-    while(!fast5s.empty()) {
-        ReadBuffer read = fast5s.pop_read();
-
-        ReadEntry r = read_locs[read.get_id()];
-        //u16 ch = ch_i.first;
-        //u32 i = ch_i.second;
-
-        read.set_channel(r.ch);
-        channels_[r.ch-1].load_read(r.i, r.offs, read, max_chunks);
-        //channels_[r.ch-1].load_read(r.i, 0, read, max_chunks);
-
-        if (n % 1000 == 0) {
-            std::cerr << n << " loaded\n";
-        }
-        n++;
-    }
 
     return true;
 }
 
-void ClientSim::start() {
+
+bool ClientSim::run() {
     is_running_ = true;
     in_scan_ = false;
     timer_.reset();
     for (SimChannel &ch : channels_) {
         ch.start(0);
     }
+    return true;
 }
 
-std::vector<Chunk> ClientSim::get_read_chunks() {
-    std::vector<Chunk> ret; //TODO rename chunks?
+std::vector< std::pair<u16, Chunk> > ClientSim::get_read_chunks() {
+    std::vector< std::pair<u16, Chunk> > ret; //TODO rename chunks?
 
     if (!is_running_) {
         return ret;
@@ -236,7 +244,7 @@ std::vector<Chunk> ClientSim::get_read_chunks() {
 
     is_running_ = false;
 
-    for (u32 c = 0; c < channels_.size(); c++) {
+    for (u16 c = 0; c < channels_.size(); c++) {
         SimChannel &ch = channels_[c];
 
         if (ch.is_dead()) continue;
@@ -256,7 +264,7 @@ std::vector<Chunk> ClientSim::get_read_chunks() {
         intvs_ended = false;
 
         while (ch.chunk_ready(time)) {
-            ret.push_back(ch.next_chunk(time));
+            ret.push_back( std::pair<u16, Chunk>(c+1, ch.next_chunk(time)));
         }
     }
 
@@ -284,7 +292,7 @@ void ClientSim::stop_receiving_read(u16 ch, u32 number) {
     }
 }
 
-u32 ClientSim::unblock(u16 ch, u32 number) {
+u32 ClientSim::unblock_read(u16 ch, u32 number) {
     if (get_number(ch) != number) { 
         return 0;
     }
@@ -295,6 +303,9 @@ float ClientSim::get_time() {
     return (timer_.get() * time_coef_);
 }
 
+float ClientSim::get_runtime() {
+    return timer_.get() / 1000;
+}
 
 bool ClientSim::is_running() {
     return is_running_;

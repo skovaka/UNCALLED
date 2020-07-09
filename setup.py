@@ -17,6 +17,7 @@ uncalled = Extension(
     "uncalled.mapping",
      sources = [
                 "src/uncalled.cpp",
+                "src/client_sim.cpp",
                 "src/fast5_reader.cpp",
                 "src/mapper.cpp",
                 "src/self_align_ref.cpp",

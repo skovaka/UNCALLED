@@ -55,7 +55,7 @@ min_top_conf = 1.85
 
 [event_detector]
 min_mean = 30.0
-max_mean = 200.0 #150.0
+max_mean = 200.0
 window_length1 = 3
 window_length2 = 6
 threshold1 = 1.4
@@ -66,9 +66,11 @@ peak_height = 0.2
 log_dir = '/var/log/MinKNOW'
 
 [simulator]
-sim_start = 0.0
+ctl_seqsum = ""
+unc_seqsum = ""
+unc_paf = "" 
 sim_speed = 1.0
+min_ch_reads = 10
 scan_time = 10.0
-ej_delay = 0.0
+scan_intv_time = 5400.0
 ej_time = 0.1
-gap_file = ""

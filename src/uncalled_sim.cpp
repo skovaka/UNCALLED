@@ -29,12 +29,11 @@ int main(int argc, char** argv) {
     const u64 MAX_SLEEP = 100;
 
     std::cerr << "Starting simulation\n";
-    sim.start();
+    sim.run();
     Timer t;
 
     std::vector<float> chunk_times(conf.get_num_channels(), t.get());
     std::vector<u32> unblocked(conf.get_num_channels(), 0);
-
 
     bool deplete = conf.get_realtime_mode() == RealtimeParams::Mode::DEPLETE;
 
@@ -70,8 +69,8 @@ int main(int argc, char** argv) {
             std::cout.flush();
         }
 
-        std::vector<Chunk> chunks = sim.get_read_chunks();
-        for (Chunk &ch : chunks) {
+        for (auto &r : sim.get_read_chunks()) {
+            Chunk &ch = r.second;
             if (unblocked[ch.get_channel_idx()] == ch.get_number()) {
                 std::cout << "# recieved chunk from " 
                           << ch.get_id() 
@@ -113,11 +112,12 @@ bool load_conf(int argc, char** argv, Conf &conf) {
     int opt;
 
     //parse flags
-    while((opt = getopt(argc, argv, ":t:l:s:g:c:de")) != -1) {
+    while((opt = getopt(argc, argv, ":t:l:s:g:c:p:de")) != -1) {
         switch(opt) {  
 
             FLAG_TO_CONF('l', std::string, read_list)
-            FLAG_TO_CONF('g', std::string, pat_prefix)
+            FLAG_TO_CONF('s', std::string, sim_prefix)
+            FLAG_TO_CONF('p', std::string, index_preset)
             FLAG_TO_CONF('t', atoi, threads)
             FLAG_TO_CONF('c', atoi, max_chunks)
 

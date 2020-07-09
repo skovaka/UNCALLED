@@ -12,6 +12,13 @@ Also supports standalone signal mapping of fast5 reads
 
 Read the [preprint on BioRxiv](https://www.biorxiv.org/content/10.1101/2020.02.03.931923v1)
 
+## Release notes
+
+- v2.0: released the ReadUntil simulator `uncalled sim`, which can predict how much enrichment UNCALLED could provide on a given reference, using a control and UNCALLED run as a template. Also CHANGED THE FORMAT OF CERTAIN ARGUMENTS. Index prefix and fast5 list are now positional, and some flags have changed names. See below for details.
+- v1.2: fixed indexing for particularly large or small reference
+- v1.1: added support for altering chunk size
+- v1.0: pre-print release
+
 ## Installation
 
 ```
@@ -85,11 +92,10 @@ See [example/](example/) for a simple read and reference example.
 > uncalled list-ports
 MN02686 (2019-11-18 12:30:56): 8000
 
-> /opt/ont/minknow/ont-python/bin/uncalled realtime E.coli --port 8000 -t 16 --enrich -c 3 --post-script basecall.sh > uncalled_out.paf 
+> /opt/ont/minknow/ont-python/bin/uncalled realtime E.coli --port 8000 -t 16 --enrich -c 3 > uncalled_out.paf 
 Starting client
 Starting mappers
 Mapping
-Running post-script: 'basecall.sh'
 
 > head -n 4 uncalled_out.paf
 81ba344d-60df-4688-b37f-9064e76a3eb8 1352 *     *     *     *      *      *      *      *      *   255 ch:i:68  st:i:29101 mt:f:375.93841 wt:f:1440.934 mx:f:0.152565
@@ -123,8 +129,6 @@ Arguments:
 - `--even` will only eject reads from even channels if included
 - `--odd` will only eject reads from odd channels if included
 - `--duration` expected duration of sequencing run in hours (default: 48)
-- `--post-script` optional path to executable to run after analysis has finished. Useful to automatically basecall after sequencing is done, for example.
-- `--post-time` buffer time to wait after the last read before running the post-script, in seconds (default: 60). Useful because MinKNOW's sequencing time is not always exact.
 
 Note exactly one of `--deplete` or `--enrich` must be specified
 
@@ -132,6 +136,41 @@ Note exactly one of `--deplete` or `--enrich` must be specified
 
 The ReadUntil API recieves signal is "chunks", which by default are one second's worth of signal. This can be changed using the `--chunk-size` parameter. Note that `--max-chunks-proc` should also be changed to compensate for changes to chunks size. *If the chunk size is changed, you must start running UNCALLED before sequencing begins.* UNCALLED is unable change the chunk size mid-seqencing-run. In general reducing the chunk size should improve enrichment, although [previous work](http://dx.doi.org/10.1101/2020.02.03.926956) has found that the API becomes unreliable with chunks sizes less than 0.4 seconds. We have not thoroughly tested this feature, and recommend using the default 1 second chunk size for most cases. In the future this default size may be reduced.
 
+## Simulator
+
+**Example:**
+
+```
+> uncalled sim E.coli /path/to/control/fast5s --ctl-seqsum /path/to/control/sequencing_summary.txt --unc-seqsum /path/to/uncalled/sequencing_summary.txt --unc-paf /path/to/uncalled/uncalled_out.paf -t 16 --enrich -c 3 --sim-speed 0.25 > uncalled_out.paf 2> uncalled_err.txt
+
+> sim_scripts/est_genome_yield.py -u uncalled_out.paf --enrich -x E.coli -m mm2.paf -s sequencing_summary.txt --sim-speed 0.25
+
+unc_on_bp       150.678033
+unc_total_bp    6094.559395
+cnt_on_bp       33.145022
+cnt_total_bp    8271.651331
+```
+
+The simulator simulates a real-time run using data from two real runs: one control run and one UNCALLED run. Reads are simulated from the control run, and the pattern of channel activity of modeled after the control run (see the paper for more details). The simulator outputs a PAF file similar to the realtime mode, which can be interperted using scripts found in [sim_scripts/](sim_scripts/).
+
+The simulator can take up a large amount of memory (> 100Gb), and loading the fast5 reads can take quite a long time. To reduce the time/memory requirements you could truncate your control sequencing summary and only the loads present in the summary will be loaded, although this may reduce the accuracy of the simulation. Also, unfortunately the fast5 loading portion of the simulator cannot be exited via a keyboard interrupt and must be hard-killed. I will work on fixing this in future versions.
+
+Arguments:
+
+- `bwa-prefix` the prefix of the index to align to. Should be a BWA index that `uncalled index` was run on
+- `control-fast5-files` path to the directory where control run fast5 files are stored, or a text file containing the path to one control fast5 per line
+- `--ctl-seqsum` sequencing summary of the control run. Read IDs must match the control fast5 files
+- `--unc-seqsum` sequencing summary of the UNCALLED run
+- `--unc-paf` PAF file output by UNCALLED from the UNCALLED run
+- `--sim-speed` scaling factor of simulation duration in the range (0.0, 1.0], where smaller values are faster. Setting below 0.125 may decrease accuracy.
+- `-t/--threads` number of threads to use for mapping (default: 1)
+- `-c/--max-chunks-proc` number of chunks to attempt mapping before giving up on a read (default: 10). Note that for the simulator, altering this changes how many chunks is loaded from each each, changing the memory requirements.
+- `--enrich` will *keep* reads that map to the reference if included
+- `--deplete` will *eject* reads that map to the reference if included
+- `--even` will only eject reads from even channels if included
+- `--odd` will only eject reads from odd channels if included
+
+Exactly one of `--deplete` or `--enrich` must be specified
 
 ## Output Format
 
@@ -191,7 +230,7 @@ In depletion mode, UNCALLED will eject a read if it *does* map to the reference,
 
 Note that enrichment necessitates a quick decision as to whether or not a read maps, since you want to eject a read as fast as possible. Usually ~95% of reads can be mapped within three seconds for highly non-repetitive references, so setting `-c/--max-chunks-proc` to `3` generally works well for enrichment. The default value of `10` works well for depletion. Note these values assume `--chunk-size` is set to the default 1 second.
 
-UNCALLED currently does not support large (> ~100Mb) or highly repetitive references. 
+UNCALLED currently does not support large (> ~1Gbp) or highly repetitive references. 
 The speed and mapping rate both progressively drop as references become larger and more repetitive. 
 Bacterial genomes or small collections of divergent bacterial genomes typically work well. 
 Small segments of eukaryotic genomes can also be used, however the presence of any repetitvie elements will harm the performance. 

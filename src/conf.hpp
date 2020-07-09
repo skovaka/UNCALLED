@@ -51,9 +51,11 @@ typedef struct {
     float duration;
 } RealtimeParams;
 
+
 typedef struct {
-    float sim_start, sim_end, sim_speed, ej_time, ej_delay, scan_time;
-    std::string pat_prefix;
+    std::string ctl_seqsum, unc_seqsum, unc_paf;
+    float sim_speed, scan_time, scan_intv_time, ej_time;
+    u32 min_ch_reads;
 } SimParams;
 
 #define GET_SET(T, N) T get_##N() { return N; } \
@@ -179,13 +181,15 @@ class Conf {
 
         if (conf.contains("simulator")) {
             const auto subconf = toml::find(conf, "simulator");
+            GET_TOML_EXTERN(subconf, std::string, ctl_seqsum, sim_prms);
+            GET_TOML_EXTERN(subconf, std::string, unc_seqsum, sim_prms);
+            GET_TOML_EXTERN(subconf, std::string, unc_paf, sim_prms);
             GET_TOML_EXTERN(subconf, float, sim_speed, sim_prms);
-            GET_TOML_EXTERN(subconf, float, sim_start, sim_prms);
-            GET_TOML_EXTERN(subconf, float, sim_end, sim_prms);
-            GET_TOML_EXTERN(subconf, float, ej_time, sim_prms);
-            GET_TOML_EXTERN(subconf, float, ej_delay, sim_prms);
             GET_TOML_EXTERN(subconf, float, scan_time, sim_prms);
-            GET_TOML_EXTERN(subconf, std::string, pat_prefix, sim_prms);
+            GET_TOML_EXTERN(subconf, float, scan_intv_time, sim_prms);
+            GET_TOML_EXTERN(subconf, float, ej_time, sim_prms);
+            GET_TOML_EXTERN(subconf, u32, min_ch_reads, sim_prms);
+
         }
     }
 
@@ -218,13 +222,15 @@ class Conf {
     GET_SET_EXTERN(float, ReadBuffer::PRMS, chunk_time);
     GET_SET_EXTERN(float, ReadBuffer::PRMS, sample_rate);
 
-    GET_SET_EXTERN(float, sim_prms, sim_start);
-    GET_SET_EXTERN(float, sim_prms, sim_end);
+
+    GET_SET_EXTERN(std::string, sim_prms, ctl_seqsum);
+    GET_SET_EXTERN(std::string, sim_prms, unc_seqsum);
+    GET_SET_EXTERN(std::string, sim_prms, unc_paf);
     GET_SET_EXTERN(float, sim_prms, sim_speed);
-    GET_SET_EXTERN(float, sim_prms, ej_time);
-    GET_SET_EXTERN(float, sim_prms, ej_delay);
     GET_SET_EXTERN(float, sim_prms, scan_time);
-    GET_SET_EXTERN(std::string, sim_prms, pat_prefix);
+    GET_SET_EXTERN(float, sim_prms, scan_intv_time);
+    GET_SET_EXTERN(float, sim_prms, ej_time);
+    GET_SET_EXTERN(u32, sim_prms, min_ch_reads);
 
     #ifdef PYBIND
     static void add_pybind_vars(pybind11::class_<Conf> &c) {
@@ -248,6 +254,15 @@ class Conf {
         DEFPRP(max_events)
         DEFPRP(max_chunks)
         DEFPRP(chunk_time)
+
+        DEFPRP(ctl_seqsum);
+        DEFPRP(unc_seqsum);
+        DEFPRP(unc_paf);
+        DEFPRP(sim_speed);
+        DEFPRP(scan_time);
+        DEFPRP(scan_intv_time);
+        DEFPRP(ej_time);
+        DEFPRP(min_ch_reads);
     }
     #endif
 
