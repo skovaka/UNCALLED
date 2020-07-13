@@ -151,7 +151,7 @@ cnt_on_bp       33.145022
 cnt_total_bp    8271.651331
 ```
 
-The simulator simulates a real-time run using data from two real runs: one control run and one UNCALLED run. Reads are simulated from the control run, and the pattern of channel activity of modeled after the control run (see the paper for more details). The simulator outputs a PAF file similar to the realtime mode, which can be interperted using scripts found in [sim_scripts/](sim_scripts/).
+The simulator simulates a real-time run using data from two real runs: one control run and one UNCALLED run. Reads are simulated from the control run, and the pattern of channel activity of modeled after the control run. The simulator outputs a PAF file similar to the realtime mode, which can be interperted using scripts found in [sim_scripts/](sim_scripts/).
 
 Example files which can be used as template UNCALLED sequencing summary and PAF files for the simulator can be found [here](http://labshare.cshl.edu/shares/schatzlab/www-data/UNCALLED/simulator_files/). The control reads/sequencing summary can be from any sequencing run of your sample of interest, and it does not have to match the sample used in the provided examples.
 
