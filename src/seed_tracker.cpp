@@ -167,8 +167,10 @@ void SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
         bool higher_sup = aln_match == alignments_.end() 
                        || aln_match->total_len_ < aln->total_len_,
              
-             in_range = e1 <= e2 && //event aln must increase
+             in_range = e1 <= e2 && //event coord must increase
+                        //r1 <= r2 &&
                         r2 - r1 <= e2 - e1 && //evt increases more than ref (+ skip)
+                        
                         (r2 - r1) >= (e2 - e1) / 12; //evt doesn't increase too much
              
         if (higher_sup && in_range) {

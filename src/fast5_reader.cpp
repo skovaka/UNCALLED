@@ -131,9 +131,28 @@ bool Fast5Reader::open_next() {
     if (open_fmt_ == Format::UNKNOWN) open_fmt_ = Format::MULTI; //TODO: add support for old multi format
 
 
+    std::string path;
     switch (open_fmt_) {
     case Format::SINGLE:
-        read_paths_.push_back("");
+        path = FMT_RAW_PATHS[Format::SINGLE];
+        for (const std::string &read : open_fast5_.list_group(path)) {
+            std::string read_id = "";
+            for (auto a : open_fast5_.get_attr_map(path+"/"+read)) {
+                if (a.first == "read_id") {
+                    read_id = a.second;
+                    break;
+                }
+            }
+
+            if (read_id.empty()) {
+                std::cerr << "Error: failed to find read_id\n";
+                return false;
+            }
+            
+            if (read_filter_.empty() || read_filter_.count(read_id) > 0) {
+                read_paths_.push_back("/"+read);
+            }
+        }
         return true;
 
     case Format::MULTI:
@@ -168,8 +187,25 @@ u32 Fast5Reader::fill_buffer() {
         }
         if (read_paths_.empty()) break;
 
-        std::string raw_path = read_paths_.front() + FMT_RAW_PATHS[open_fmt_],
-                    ch_path =  read_paths_.front() + FMT_CH_PATHS[open_fmt_];
+        std::string raw_path, ch_path;
+
+        switch (open_fmt_) {
+            case Format::SINGLE:
+                raw_path = FMT_RAW_PATHS[open_fmt_] + read_paths_.front();
+                ch_path = FMT_CH_PATHS[open_fmt_];
+                break;
+            case Format::MULTI:
+                raw_path = read_paths_.front() + FMT_RAW_PATHS[open_fmt_],
+                ch_path =  read_paths_.front() + FMT_CH_PATHS[open_fmt_];
+                break;
+            default:
+                std::cerr << "Error: unrecognized fast5 format\n";
+                read_paths_.pop_front();
+                return count;
+        }
+
+        //std::string raw_path = read_paths_.front() + FMT_RAW_PATHS[open_fmt_],
+        //            ch_path =  read_paths_.front() + FMT_CH_PATHS[open_fmt_];
         read_paths_.pop_front();
 
         buffered_reads_.emplace_back(open_fast5_, raw_path, ch_path);

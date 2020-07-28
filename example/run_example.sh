@@ -10,5 +10,5 @@ fi
 
 mkdir index
 ../bwa/bwa index -p index/example_ref example_ref.fa
-uncalled index -x index/example_ref -i example_ref.fa
-uncalled map -x index/example_ref -i fast5_filename.txt
+uncalled index index/example_ref
+uncalled map index/example_ref fast5_filename.txt

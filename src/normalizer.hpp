@@ -11,8 +11,10 @@ class Normalizer {
     Normalizer(float tgt_mean, float tgt_stdv);
 
     void set_target(float tgt_mean, float tgt_stdv);
-
     void set_signal(const std::vector<float> &signal);
+
+    float get_mean() const;
+    float get_stdv() const;
 
     float get_scale() const;
     float get_shift(float scale=0) const;

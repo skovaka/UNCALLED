@@ -139,5 +139,21 @@ PYBIND11_MODULE(mapping, m) {
         .def("add_fast5", &ClientSim::add_fast5)
         .def("load_fast5s", &ClientSim::load_fast5s)
         .def_property_readonly("is_running",  &ClientSim::is_running);
+
+    py::class_<Normalizer>(m, "Normalizer")
+        .def(py::init<float, float>())
+        .def("set_target", &Normalizer::set_target)
+        .def("set_signal", &Normalizer::set_signal)
+        .def("get_mean", &Normalizer::get_mean)
+        .def("get_stdv", &Normalizer::get_stdv)
+        .def("get_scale", &Normalizer::get_scale)
+        .def("get_shift", &Normalizer::get_shift)
+        .def("pop", &Normalizer::pop)
+        .def("push", &Normalizer::push)
+        .def("skip_unread", &Normalizer::skip_unread)
+        .def("unread_size", &Normalizer::unread_size)
+        .def("reset", &Normalizer::reset)
+        .def("empty", &Normalizer::empty)
+        .def("full", &Normalizer::full);
 }
 
