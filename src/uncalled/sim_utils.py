@@ -384,7 +384,7 @@ def load_sim(client, conf):
 
     diff = ctl.chcts - tgt_counts
 
-    odr = np.flip(np.argsort(diff))
+    odr = np.flip(np.argsort(diff),0)
     diff = diff[odr]
     tgt_counts = tgt_counts[odr]
     ctl.chsort(odr)

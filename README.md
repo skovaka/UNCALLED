@@ -33,7 +33,7 @@ Most dependecies included via submodules, so be sure to clone with `git --recurs
 
 UNCALLED must be installed into a python environment. To install without root privileges use the `--user` or `--prefix=<local-dir>` flag when installing, or use a tool such as [virtualenv](https://virtualenv.pypa.io) or [anaconda](https://www.anaconda.com).
 
-Requires python-dev, numpy, and GCC >= 4.8.1
+Requires python-dev >= 3.7.4, numpy >= 1.17.4, and GCC >= 4.8.1
 
 [HDF5](https://www.hdfgroup.org/downloads/hdf5/) must be installed. Libraries and headers should be in system paths (ie `$LD_LIBRARY_PATH` and `$CPATH` respectively), or specified by running `python setup.py build_ext --library-dirs <hdf5-location>/lib --include-dirs <hdf5-location>/include` prior to installation.
 
