@@ -78,7 +78,7 @@ Optional arguments:
 
 - `-t/--threads` number of threads to use for mapping (default: 1)
 - `-n/--read-count` maximum number of reads to map
-- `-f/--filter` text file containing subset of read IDs (one per line) to map from the fast5 files (will map all by default)
+- `-l/--read-list` text file containing subset of read IDs (one per line) to map from the fast5 files (will map all by default)
 - `-e/--max-events-proc` number of events to attempt mapping before giving up on a read (default 30,000). Note that there are approximately two events per nucleotide on average.
 
 
