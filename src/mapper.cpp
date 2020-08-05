@@ -284,7 +284,8 @@ Mapper::State Mapper::get_state() const {
 bool Mapper::add_chunk(Chunk &chunk) {
     if (!is_chunk_processed() || reset_) return false;
 
-    if (read_.num_chunks_ == PRMS.max_chunks) {
+    //if (read_.num_chunks_ == PRMS.max_chunks) {
+    if (read_.chunks_maxed()) {
         set_failed();
         chunk.clear();
         return true;
@@ -348,7 +349,7 @@ bool Mapper::map_chunk() {
 
     } else if (norm_.empty() && 
                read_.chunk_processed_ && 
-               read_.num_chunks_ == PRMS.max_chunks) {
+               read_.chunks_maxed()) {
         set_failed();
         return true;
 

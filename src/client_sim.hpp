@@ -32,8 +32,6 @@
 #include "fast5_reader.hpp" 
 #include "conf.hpp" 
 
-typedef std::unordered_map< std::string, std::pair<u16, u32> > PatternMap;
-
 class ClientSim {
     public:
     ClientSim(Conf &c);
@@ -172,9 +170,9 @@ class ClientSim {
             duration_(0),
             number_(0) {}
 
-        void load_read(const ReadBuffer &read, u32 offs, u32 max_chunks) {
+        void load_read(const ReadBuffer &read, u32 offs) {
             duration_ = read.get_duration();
-            read.get_chunks(chunks_, max_chunks, false, offs);
+            read.get_chunks(chunks_, false, offs);
             number_ = read.get_number();
         }
 
@@ -276,12 +274,12 @@ class ClientSim {
             return read_count_++;
         }
 
-        void load_read(u32 i, u32 offs, const ReadBuffer &read, u32 max_chunks) {
+        void load_read(u32 i, u32 offs, const ReadBuffer &read) {
             if (reads_.size() < read_count_) {
                 reads_.resize(read_count_);
             }
 
-            reads_[i].load_read(read, offs, max_chunks);
+            reads_[i].load_read(read, offs);
         }
 
         void add_delay(u32 i, u32 delay) {
@@ -356,7 +354,7 @@ class ClientSim {
     SimParams PRMS;
     Fast5Reader fast5s_;
     float time_coef_; //TODO: make const?
-    u32 ej_time_, ej_delay_, scan_time_, scan_start_, max_chunks_; //start_samp_, end_samp_, 
+    u32 ej_time_, ej_delay_, scan_time_, scan_start_; //start_samp_, end_samp_, 
 
 
     bool is_running_, in_scan_;

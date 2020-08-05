@@ -34,7 +34,6 @@ ClientSim::ClientSim(Conf &conf) :
     time_coef_  = sample_rate / 1000;
     ej_time_    = PRMS.ej_time   * sample_rate;
     scan_time_  = PRMS.scan_time * sample_rate;
-    max_chunks_ = conf.get_max_chunks();
 
     channels_.reserve(conf.num_channels);
     for (u32 c = 1; c <= conf.num_channels; c++) {
@@ -171,7 +170,7 @@ void ClientSim::load_fast5s() {
         ReadLoc r = read_locs[read.get_id()];
 
         read.set_channel(r.ch);
-        channels_[r.ch-1].load_read(r.i, r.offs, read, max_chunks_);
+        channels_[r.ch-1].load_read(r.i, r.offs, read);
 
         if (n % 1000 == 0) {
             std::cerr << n << " loaded\n";

@@ -49,6 +49,8 @@ typedef struct {
     std::string host;
     u16 port;
     float duration;
+
+    u32 max_active_reads;
 } RealtimeParams;
 
 
@@ -111,6 +113,7 @@ class Conf {
             GET_TOML_EXTERN(subconf, std::string, host, realtime_prms);
             GET_TOML_EXTERN(subconf, u16, port, realtime_prms);
             GET_TOML_EXTERN(subconf, float, duration, realtime_prms);
+            GET_TOML_EXTERN(subconf, u32, max_active_reads, realtime_prms);
 
             if (subconf.contains("realtime_mode")) {
                 std::string mode_str = toml::find<std::string>(subconf, "realtime_mode");
@@ -136,6 +139,7 @@ class Conf {
         if (conf.contains("reads")) {
             const auto subconf = toml::find(conf, "reads");
 
+            GET_TOML_EXTERN(subconf, u32, max_chunks, ReadBuffer::PRMS);
             GET_TOML_EXTERN(subconf, u16, bp_per_sec, ReadBuffer::PRMS);
             GET_TOML_EXTERN(subconf, u16, sample_rate, ReadBuffer::PRMS);
             GET_TOML_EXTERN(subconf, float, chunk_time, ReadBuffer::PRMS);
@@ -153,7 +157,6 @@ class Conf {
             GET_TOML_EXTERN(subconf, float, max_stay_frac, Mapper::PRMS);
             GET_TOML_EXTERN(subconf, float, min_seed_prob, Mapper::PRMS);
 
-            GET_TOML_EXTERN(subconf, u32, max_chunks, Mapper::PRMS);
             GET_TOML_EXTERN(subconf, u32, evt_buffer_len, Mapper::PRMS);
             GET_TOML_EXTERN(subconf, u16, evt_batch_size, Mapper::PRMS);
             GET_TOML_EXTERN(subconf, float, evt_timeout, Mapper::PRMS);
@@ -213,12 +216,13 @@ class Conf {
     GET_SET_EXTERN(std::string, realtime_prms, host)
     GET_SET_EXTERN(u16, realtime_prms, port)
     GET_SET_EXTERN(float, realtime_prms, duration)
+    GET_SET_EXTERN(u32, realtime_prms, max_active_reads)
     GET_SET_EXTERN(RealtimeParams::ActiveChs, realtime_prms, active_chs)
     GET_SET_EXTERN(RealtimeParams::Mode, realtime_prms, realtime_mode)
 
     GET_SET_EXTERN(u32, Mapper::PRMS, max_events)
-    GET_SET_EXTERN(u32, Mapper::PRMS, max_chunks)
 
+    GET_SET_EXTERN(u32, ReadBuffer::PRMS, max_chunks)
     GET_SET_EXTERN(float, ReadBuffer::PRMS, chunk_time);
     GET_SET_EXTERN(float, ReadBuffer::PRMS, sample_rate);
 
@@ -248,11 +252,13 @@ class Conf {
         DEFPRP(host)
         DEFPRP(port)
         DEFPRP(duration)
+        DEFPRP(max_active_reads)
         DEFPRP(active_chs)
         DEFPRP(realtime_mode)
 
-        DEFPRP(max_events)
         DEFPRP(max_chunks)
+
+        DEFPRP(max_events)
         DEFPRP(chunk_time)
 
         DEFPRP(ctl_seqsum);

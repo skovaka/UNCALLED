@@ -5,8 +5,6 @@
 std::vector<float> Chunk::cal_offsets_,
                    Chunk::cal_coefs_;
 
-
-
 Chunk::Chunk() 
     : id_(""),
       channel_idx_(0),

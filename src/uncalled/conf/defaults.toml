@@ -20,6 +20,7 @@ max_replen = 100
 sample_rate = 4000
 bp_per_sec = 450
 chunk_time = 1.0
+max_chunks = 10
 
 [fast5_params]
 max_buffer = 100
@@ -31,6 +32,7 @@ mode = "deplete"
 host = "127.0.0.1"
 port = 8000
 duration = 0.0
+max_reads_active = 512
 
 [mapper]
 max_events = 30000
@@ -42,7 +44,6 @@ max_paths = 10000
 max_stay_frac = 0.5
 min_seed_prob = -3.75
 
-max_chunks = 10
 evt_buffer_len = 6000
 evt_batch_size = 5
 evt_timeout = 10.0

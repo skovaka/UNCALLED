@@ -38,11 +38,12 @@ class RealtimePool {
     
     void start_timer();
     bool add_chunk(Chunk &chunk);
+    bool try_add_chunk(Chunk &chunk);
     void end_read(u16 ch, u32 number);
 
     std::vector<MapResult> update();
     bool all_finished();
-    void stop_all();
+    void stop_all(); //TODO: just name stop
 
     private:
 
@@ -74,13 +75,14 @@ class RealtimePool {
 
     void buffer_chunk(Chunk &c);
 
+    RealtimeParams PRMS;
+
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;
     std::vector<MapperThread> threads_;
     std::vector<Chunk> chunk_buffer_;
 
     std::vector<u16> buffer_queue_, active_queue_, out_chs_;
-    std::vector<bool> channel_active_;
 
     Timer time_;
     //Store threads in order of # active mappers

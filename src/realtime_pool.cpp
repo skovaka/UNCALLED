@@ -28,7 +28,9 @@
 #include "realtime_pool.hpp"
 #include "mapper.hpp"
 
-RealtimePool::RealtimePool(Conf &conf) {
+RealtimePool::RealtimePool(Conf &conf) :
+    PRMS(conf.realtime_prms) {
+
     conf.load_index_params();
     Mapper::model = PoreModel<KLEN>(conf.kmer_model, true);
     Mapper::fmi.load_index(conf.bwa_prefix);
@@ -38,21 +40,14 @@ RealtimePool::RealtimePool(Conf &conf) {
     }
 
     mappers_.resize(conf.num_channels);
-    channel_active_.resize(conf.num_channels, false);
     chunk_buffer_.resize(conf.num_channels);
     buffer_queue_.reserve(conf.num_channels);
-
-    //for (u16 i = 0; i < conf.num_channels; i++) {
-    //    mappers_.push_back(Mapper());
-    //    channel_active_.push_back(false);
-    //}
 
     for (u16 t = 0; t < conf.threads; t++) {
         threads_[t].start();
     }
 
     srand(time(NULL));
-
 }
 
 void RealtimePool::buffer_chunk(Chunk &c) {
@@ -66,10 +61,10 @@ void RealtimePool::buffer_chunk(Chunk &c) {
     chunk_buffer_[ch].swap(c);
 }
 
+
 //Add chunk to master buffer
 bool RealtimePool::add_chunk(Chunk &c) {
     u16 ch = c.get_channel_idx();
-
 
     //Check if previous read is still aligning
     //If so, tell thread to reset, store chunk in pool buffer
@@ -97,6 +92,26 @@ bool RealtimePool::add_chunk(Chunk &c) {
     } 
     
     return false;
+}
+
+bool RealtimePool::try_add_chunk(Chunk &c) {
+    u16 ch = c.get_channel_idx();
+
+    if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
+        mappers_[ch].new_read(c);
+        active_queue_.push_back(ch);
+
+    } else if (mappers_[ch].get_read().number_ == c.get_number()) {
+        if (mappers_[ch].finished()) return false;
+        mappers_[ch].add_chunk(c);
+
+    } else if (chunk_buffer_[ch].empty()) {
+        chunk_buffer_[ch].swap(c);
+        buffer_queue_.push_back(ch);
+
+    } else return false;
+
+    return true;
 }
 
 std::vector<MapResult> RealtimePool::update() {
@@ -136,6 +151,7 @@ std::vector<MapResult> RealtimePool::update() {
         std::cout.flush();
     }
 
+
     for (u16 i = buffer_queue_.size()-1; i < buffer_queue_.size(); i--) {
         u16 ch = buffer_queue_[i];//TODO: store chunks in queue
         Chunk &c = chunk_buffer_[ch];
@@ -159,7 +175,7 @@ std::vector<MapResult> RealtimePool::update() {
     }
 
     //Estimate how much to fill each thread
-    u16 target = active_queue_.size() + active_count,
+    u16 target = min(active_queue_.size() + active_count, PRMS.max_active_reads),
         per_thread = target / threads_.size() + (target % threads_.size() > 0);
 
     u16 r = (u16) rand();

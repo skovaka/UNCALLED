@@ -38,6 +38,7 @@ typedef struct {
     float sample_rate;
     float calib_digitisation;
     float chunk_time;
+    u32 max_chunks;
     std::vector<float> calib_offsets, calib_coefs;
 
     float bp_per_samp() {
@@ -103,17 +104,18 @@ class ReadBuffer {
     public:
     static ReadParams PRMS;
 
-    enum Source {MULTI, SINGLE, BULK, LIVE};
-
+    //enum Source {MULTI, SINGLE, BULK, LIVE};
 
     ReadBuffer();
     //ReadBuffer(const ReadBuffer &read);
     ReadBuffer(const std::string &filename);
     ReadBuffer(const hdf5_tools::File &file, const std::string &raw_path, const std::string &ch_path);
-    ReadBuffer(Source source, u16 channel, const std::string &id = "", 
-               u32 number = 0, u64 start_sample = 0, 
-               const std::vector<float> raw_data = std::vector<float>(),
-               u32 raw_st = 0, u32 raw_len = 0);
+
+    //ReadBuffer(Source source, u16 channel, const std::string &id = "", 
+    //           u32 number = 0, u64 start_sample = 0, 
+    //           const std::vector<float> raw_data = std::vector<float>(),
+    //           u32 raw_st = 0, u32 raw_len = 0);
+    
     ReadBuffer(Chunk &first_chunk);
 
     bool empty() const;
@@ -131,7 +133,11 @@ class ReadBuffer {
     void clear();
     void set_raw_len(u64 raw_len_);
 
-    u32 get_chunks(std::vector<Chunk> &chunk_queue, u32 max=UINT_MAX, bool real_start=true, u32 offs=0) const;
+    u32 chunk_count() const;
+    bool chunks_maxed() const ;
+    Chunk get_chunk(u32 i) const;
+
+    u32 get_chunks(std::vector<Chunk> &chunk_queue, bool real_start=true, u32 offs=0) const;
     void set_channel(u16 ch) {channel_idx_ = ch-1;}
     u16 get_channel_idx() const;
 
@@ -145,13 +151,13 @@ class ReadBuffer {
     static void set_calibration(const std::vector<float> &offsets, const std::vector<float> &pa_ranges, float digitisation);
     static void set_calibration(u16 channel, float offsets, float pa_ranges, float digitisation);
 
-    Source source_;
+    //Source source_;
     u16 channel_idx_;
     std::string id_;
     u32 number_;
     u64 start_sample_, raw_len_;
     std::vector<float> full_signal_, chunk_;
-    u16 num_chunks_;
+    u16 chunk_count_;
     bool chunk_processed_;
 
     Paf loc_;

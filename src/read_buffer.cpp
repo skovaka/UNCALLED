@@ -162,21 +162,9 @@ ReadBuffer::ReadBuffer() {
     
 }
 
-//ReadBuffer::ReadBuffer(const ReadBuffer &r) 
-//    : source_          (r.source_),
-//      channel_idx_     (r.channel_idx_),
-//      id_              (r.id_),
-//      number_          (r.number_),
-//      start_sample_    (r.start_sample_),
-//      raw_len_         (r.raw_len_),
-//      full_signal_     (r.full_signal_),
-//      chunk_           (r.chunk_),
-//      num_chunks_      (r.num_chunks_),
-//      chunk_processed_ (r.chunk_processed_),
-//      loc_             (r.loc_) {}
-
+//TODO: eliminate swap from mapper, rely on automatic move constructor
 void ReadBuffer::swap(ReadBuffer &r) {
-    std::swap(source_, r.source_);
+    //std::swap(source_, r.source_);
     std::swap(channel_idx_, r.channel_idx_);
     std::swap(id_, r.id_);
     std::swap(number_, r.number_);
@@ -184,7 +172,7 @@ void ReadBuffer::swap(ReadBuffer &r) {
     std::swap(raw_len_, r.raw_len_);
     std::swap(full_signal_, r.full_signal_);
     std::swap(chunk_, r.chunk_);
-    std::swap(num_chunks_, r.num_chunks_);
+    std::swap(chunk_count_, r.chunk_count_);
     std::swap(chunk_processed_, r.chunk_processed_);
     std::swap(loc_, r.loc_);
 }
@@ -193,7 +181,7 @@ void ReadBuffer::clear() {
     raw_len_ = 0;
     full_signal_.clear();
     chunk_.clear();
-    num_chunks_ = 0;
+    chunk_count_ = 0;
     loc_ = Paf();
 }
 
@@ -233,38 +221,28 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file,
     std::string sig_path = raw_path + "/Signal";
     std::vector<i16> int_data; 
     file.read(sig_path, int_data);
+
+    chunk_count_ = int_data.size() / PRMS.chunk_len();
+
+    if (chunk_count_ > PRMS.max_chunks) {
+        chunk_count_ = PRMS.max_chunks;
+        int_data.resize(chunk_count_ * PRMS.chunk_len());
+    }
+
     full_signal_ = calibrate(get_channel(), int_data);
 
     loc_ = Paf(id_, get_channel(), start_sample_);
     set_raw_len(full_signal_.size());
 }
 
-ReadBuffer::ReadBuffer(Source source, u16 channel, const std::string &id, 
-                       u32 number, u64 start_sample, 
-                       const std::vector<float> raw_data,
-                       u32 raw_st, u32 raw_len) 
-        : source_(source),
-          channel_idx_(channel-1),
-          id_(id),
-          number_(number),
-          start_sample_(start_sample),
-          loc_(id, channel, start_sample) {
-    if (raw_data.empty()) set_raw_len(0);
-    else {
-        if (raw_len == 0) raw_len = raw_data.size() - raw_st;
-        full_signal_ = std::vector<float>(&raw_data[raw_st], 
-                                          &raw_data[raw_st+raw_len]);
-        set_raw_len(raw_data.size());
-    }
-}
 
 ReadBuffer::ReadBuffer(Chunk &first_chunk) 
-    : source_(Source::LIVE),
+    : //source_(Source::LIVE),
       channel_idx_(first_chunk.get_channel_idx()),
       id_(first_chunk.get_id()),
       number_(first_chunk.get_number()),
       start_sample_(first_chunk.get_start()),
-      num_chunks_(1),
+      chunk_count_(1),
       chunk_processed_(false),
       loc_(id_, channel_idx_+1, start_sample_) {
     //loc_.set_int(Paf::Tag::RECEIVE_TIME, PARAMS.get_time());//TODO: FIX
@@ -281,7 +259,7 @@ bool ReadBuffer::add_chunk(Chunk &c) {
     if (!chunk_processed_ || 
         channel_idx_ != c.get_channel_idx() || 
         number_ != c.get_number()) return false;
-    num_chunks_++;
+    chunk_count_++;
     set_raw_len(raw_len_+c.size());
     chunk_processed_ = false;
     c.pop(chunk_);
@@ -300,13 +278,27 @@ u16 ReadBuffer::get_channel_idx() const {
     return channel_idx_;
 }
 
-u32 ReadBuffer::get_chunks(std::vector<Chunk> &chunk_queue, u32 max, bool real_start, u32 offs) const {
+bool ReadBuffer::chunks_maxed() const {
+    return chunk_count_ >= PRMS.max_chunks;
+}
+
+u32 ReadBuffer::chunk_count() const {
+    return chunk_count_; //full_signal_.size() / PRMS.chunk_len();
+}
+
+Chunk ReadBuffer::get_chunk(u32 i) const {
+    u32 st = i * PRMS.chunk_len();
+    return Chunk(id_, get_channel(), number_, start_sample_+st, 
+                 full_signal_, st, PRMS.chunk_len());
+}
+
+u32 ReadBuffer::get_chunks(std::vector<Chunk> &chunk_queue, bool real_start, u32 offs) const {
     u32 count = 0;
     u16 l = PRMS.chunk_len();
 
     float start = real_start ? start_sample_ : 0;
 
-    for (u32 i = offs; i+l <= full_signal_.size() && count < max; i += l) {
+    for (u32 i = offs; i+l <= full_signal_.size() && count < PRMS.max_chunks; i += l) {
         chunk_queue.emplace_back(id_, get_channel(), number_, 
                                  start+i, full_signal_, i, l);
         count++;
