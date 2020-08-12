@@ -261,9 +261,9 @@ bool ReadBuffer::add_chunk(Chunk &c) {
         channel_idx_ != c.get_channel_idx() || 
         number_ != c.get_number()) return false;
 
+    chunk_processed_ = false;
     chunk_count_++;
     set_raw_len(raw_len_+c.size());
-    chunk_processed_ = false;
     c.pop(chunk_);
 
     return true;

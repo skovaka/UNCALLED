@@ -105,8 +105,9 @@ bool RealtimePool::try_add_chunk(Chunk &c) {
     u16 ch = c.get_channel_idx();
 
     if (c.empty()) {
-        mappers_[ch].request_reset();
-        //std::cout << "#end " << c.get_id() << "\n";
+        if (mappers_[ch].chunk_mapped() && !mappers_[ch].finished()) {
+            mappers_[ch].request_reset();
+        }
         return false;
     }
 
@@ -127,6 +128,7 @@ bool RealtimePool::try_add_chunk(Chunk &c) {
     return false;
 }
 
+//TODO: make sure update is the same
 std::vector<MapResult> RealtimePool::update() {
 
     std::vector< u16 > read_counts(threads_.size(), 0);
@@ -164,7 +166,7 @@ std::vector<MapResult> RealtimePool::update() {
     //    std::cout.flush();
     //}
 
-
+    //Buffer queue should be ordered in "ord" mode
     for (u16 i = buffer_queue_.size()-1; i < buffer_queue_.size(); i--) {
         u16 ch = buffer_queue_[i];//TODO: store chunks in queue
         Chunk &c = chunk_buffer_[ch];

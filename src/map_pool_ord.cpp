@@ -66,10 +66,12 @@ std::vector<Paf> MapPoolOrd::update() {
         if (channels_[i].empty()) continue;
 
         if (pool_.is_read_finished(channels_[i].front())) {
-            channels_[i].pop_front();
-            chunk_idx_[i] = 0;
-            
-            if (channels_[i].empty()) continue;
+            //std::cout << "#end " << channels_[i].front().get_id() << "\n";
+            //channels_[i].pop_front();
+            //chunk_idx_[i] = 0;
+            //
+            //if (channels_[i].empty()) continue;
+            chunk_idx_[i] = channels_[i].front().chunk_count();
         }
 
         channels_empty_ = false;
@@ -80,14 +82,17 @@ std::vector<Paf> MapPoolOrd::update() {
         bool empty = chunk.empty();
 
         if (pool_.try_add_chunk(chunk)) {
+            //std::cout << "#added "
+            //          << chunk.get_id() << " "
+            //          << chunk_idx_[i] << "\n";
             chunk_idx_[i]++;
         }
         
-        if (empty) {//|| chunk_idx_[i] >= r.chunk_count()) {
-            //std::cout << "#ender " << r.get_id() << "\n";
-            channels_[i].pop_front();
-            chunk_idx_[i] = 0;
-        }
+        //if (empty) {//|| chunk_idx_[i] >= r.chunk_count()) {
+        //    //std::cout << "#ender " << r.get_id() << "\n";
+        //    channels_[i].pop_front();
+        //    chunk_idx_[i] = 0;
+        //}
     }
 
     for (const MapResult &m : pool_.update()) {

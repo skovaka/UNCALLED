@@ -292,8 +292,11 @@ bool Mapper::add_chunk(Chunk &chunk) {
     }
 
     bool added = read_.add_chunk(chunk);
-    if (added) chunk_timer_.reset();
-    //if (!added) std::cout << "# NOT ADDED " << chunk.get_id() << "\n";
+    if (added) {
+        chunk_timer_.reset();
+        //std::cerr << "# add " << chunk.get_id() 
+        //          << " " << read_.chunk_count() << "\n";
+    }
     return added;
 }
 
@@ -303,6 +306,8 @@ u16 Mapper::process_chunk() {
     wait_time_ += map_timer_.lap();
 
     float mean;
+    //std::cerr << "# got " << read_.get_id() 
+    //          << " " << read_.chunk_count() << "\n";
 
     u16 nevents = 0;
     for (u32 i = 0; i < read_.chunk_.size(); i++) {
@@ -314,7 +319,7 @@ u16 Mapper::process_chunk() {
                 u32 nskip = norm_.skip_unread(nevents);
                 skip_events(nskip);
 
-                std::cout << "#SKIP "
+                std::cerr << "#SKIP "
                           << read_.get_id() << " "
                           << nskip << "\n";
 
@@ -326,6 +331,9 @@ u16 Mapper::process_chunk() {
             nevents++;
         }
     }
+
+    //std::cerr << "# prc " << read_.get_id() 
+    //          << " " << read_.chunk_count() << "\n";
 
     read_.chunk_.clear();
     read_.chunk_processed_ = true;
@@ -344,6 +352,8 @@ void Mapper::set_failed() {
 }
 
 bool Mapper::chunk_mapped() {
+    //std::cerr << "#check " << read_.get_id() << " " << read_.chunk_processed_ << " " << norm_.empty() << "\n";
+
     return read_.chunk_processed_ && norm_.empty();
 }
 
@@ -352,24 +362,24 @@ bool Mapper::map_chunk() {
 
     if (reset_ || chunk_timer_.get() > PRMS.max_chunk_wait) {
         if (chunk_timer_.get() > PRMS.max_chunk_wait) {
-            std::cout << "#chunk timeout "
-                      << chunk_timer_.get() << " "
-                      << PRMS.max_chunk_wait << "\n";
+            //std::cerr << "#chunk timeout "
+            //          << chunk_timer_.get() << " "
+            //          << PRMS.max_chunk_wait << "\n";
         }
         set_failed();
         read_.loc_.set_ended();
-        //std::cout << "# END timer or reset\n";
+        //std::cerr << "# END timer or reset\n";
         return true;
 
     } else if (norm_.empty() && 
                read_.chunk_processed_ && 
                read_.chunks_maxed()) {
-        //std::cout << "# END maxed\n";
+        //std::cerr << "# END maxed\n";
         set_failed();
         return true;
 
     } else if (norm_.empty()) {
-        //std::cout << "# stuck empty: " 
+        //std::cerr << "# stuck empty: " 
         //          << chunk_timer_.get() << " < "
         //          << PRMS.max_chunk_wait << "\n";
         return false;
@@ -383,12 +393,14 @@ bool Mapper::map_chunk() {
         if (map_next()) {
             read_.loc_.set_float(Paf::Tag::MAP_TIME, map_time_+map_timer_.get());
             read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
+            norm_.skip_unread();
             return true;
         }
+
         if (map_timer_.get() > tlimit) {
-            std::cout << "#event timeout "
-                      << map_timer_.get() << " "
-                      << tlimit << "\n";
+            //std::cerr << "#event timeout "
+            //          << map_timer_.get() << " "
+            //          << tlimit << "\n";
             break;
         }
     }
