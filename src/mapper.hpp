@@ -90,6 +90,7 @@ class Mapper {
     u32 event_to_bp(u32 evt_i, bool last=false) const;
 
     u16 process_chunk();
+    bool chunk_mapped();
     bool map_chunk();
     bool is_chunk_processed() const;
     void request_reset();

@@ -159,6 +159,7 @@ void Paf::set_str(Tag t, std::string v) {
 
 
 ReadBuffer::ReadBuffer() {
+    chunk_count_ = 0;
     
 }
 
@@ -222,7 +223,7 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file,
     std::vector<i16> int_data; 
     file.read(sig_path, int_data);
 
-    chunk_count_ = int_data.size() / PRMS.chunk_len();
+    chunk_count_ = (int_data.size() / PRMS.chunk_len()) + (int_data.size() % PRMS.chunk_len() != 0);
 
     if (chunk_count_ > PRMS.max_chunks) {
         chunk_count_ = PRMS.max_chunks;
@@ -259,10 +260,12 @@ bool ReadBuffer::add_chunk(Chunk &c) {
     if (!chunk_processed_ || 
         channel_idx_ != c.get_channel_idx() || 
         number_ != c.get_number()) return false;
+
     chunk_count_++;
     set_raw_len(raw_len_+c.size());
     chunk_processed_ = false;
     c.pop(chunk_);
+
     return true;
 }
 
@@ -279,6 +282,11 @@ u16 ReadBuffer::get_channel_idx() const {
 }
 
 bool ReadBuffer::chunks_maxed() const {
+    //if (chunk_count_ >= PRMS.max_chunks) {
+    //    std::cout << "#MAAAX "
+    //              << chunk_count_ << " "
+    //              << PRMS.max_chunks << "\n";
+    //}
     return chunk_count_ >= PRMS.max_chunks;
 }
 
@@ -287,10 +295,21 @@ u32 ReadBuffer::chunk_count() const {
 }
 
 Chunk ReadBuffer::get_chunk(u32 i) const {
-    u32 st = i * PRMS.chunk_len();
+    u32 st = i * PRMS.chunk_len(),
+        ln = PRMS.chunk_len();
+
+    if (st > full_signal_.size()) { //return Chunk();
+        st = full_signal_.size();
+    } 
+    
+    if (st+ln > full_signal_.size()) {
+        ln = full_signal_.size() - st;
+    }
+
     return Chunk(id_, get_channel(), number_, start_sample_+st, 
-                 full_signal_, st, PRMS.chunk_len());
+                 full_signal_, st, ln);
 }
+
 
 u32 ReadBuffer::get_chunks(std::vector<Chunk> &chunk_queue, bool real_start, u32 offs) const {
     u32 count = 0;

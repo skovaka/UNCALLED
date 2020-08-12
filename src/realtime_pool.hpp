@@ -40,6 +40,7 @@ class RealtimePool {
     bool add_chunk(Chunk &chunk);
     bool try_add_chunk(Chunk &chunk);
     void end_read(u16 ch, u32 number);
+    bool is_read_finished(const ReadBuffer &r);
 
     std::vector<MapResult> update();
     bool all_finished();

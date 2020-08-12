@@ -87,36 +87,49 @@ bool RealtimePool::add_chunk(Chunk &c) {
         active_queue_.push_back(ch);
         return true;
 
-    } else if (mappers_[ch].add_chunk(c)) {
-        return true;
-    } 
+    }
     
+    return mappers_[ch].add_chunk(c);
+    
+
     return false;
+}
+
+bool RealtimePool::is_read_finished(const ReadBuffer &r) {
+    u16 ch = r.get_channel_idx();
+    return (mappers_[ch].finished() && 
+            mappers_[ch].get_read().get_number() == r.get_number());
 }
 
 bool RealtimePool::try_add_chunk(Chunk &c) {
     u16 ch = c.get_channel_idx();
 
+    if (c.empty()) {
+        mappers_[ch].request_reset();
+        //std::cout << "#end " << c.get_id() << "\n";
+        return false;
+    }
+
     if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
         mappers_[ch].new_read(c);
         active_queue_.push_back(ch);
+        return true;
 
     } else if (mappers_[ch].get_read().number_ == c.get_number()) {
-        if (mappers_[ch].finished()) return false;
-        mappers_[ch].add_chunk(c);
 
-    } else if (chunk_buffer_[ch].empty()) {
-        chunk_buffer_[ch].swap(c);
-        buffer_queue_.push_back(ch);
+        if (mappers_[ch].finished() || !mappers_[ch].chunk_mapped()) { 
+            return false;
+        }   
 
-    } else return false;
+        return mappers_[ch].add_chunk(c);
+    }
 
-    return true;
+    return false;
 }
 
 std::vector<MapResult> RealtimePool::update() {
 
-    std::vector< u16 > read_counts(threads_.size());
+    std::vector< u16 > read_counts(threads_.size(), 0);
     u16 active_count = 0;
     std::vector<MapResult> ret;
 
@@ -143,26 +156,28 @@ std::vector<MapResult> RealtimePool::update() {
         active_count += read_counts[t];
     }
 
-    if (time_.get() >= 1000 && active_count > 0) {
-        time_.reset();
-        std::cout << "#thread_reads";
-        for (u16 c : read_counts) std::cout << "\t" << c;
-        std::cout << "\n";
-        std::cout.flush();
-    }
+    //if (time_.get() >= 1000 && active_count > 0) {
+    //    time_.reset();
+    //    std::cout << "#thread_reads";
+    //    for (u16 c : read_counts) std::cout << "\t" << c;
+    //    std::cout << "\n";
+    //    std::cout.flush();
+    //}
 
 
     for (u16 i = buffer_queue_.size()-1; i < buffer_queue_.size(); i--) {
         u16 ch = buffer_queue_[i];//TODO: store chunks in queue
         Chunk &c = chunk_buffer_[ch];
 
-        bool added;
+        bool added = false;
+
+        std::cout << "# BUFFER?\n";
 
         if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
             mappers_[ch].new_read(c);
             active_queue_.push_back(ch);
             added = true;
-        } else {
+        } else if (!mappers_[ch].finished()) {
             added = mappers_[ch].add_chunk(c);
         }
 
@@ -175,7 +190,8 @@ std::vector<MapResult> RealtimePool::update() {
     }
 
     //Estimate how much to fill each thread
-    u16 target = min(active_queue_.size() + active_count, PRMS.max_active_reads),
+    //u16 target = min(active_queue_.size() + active_count, PRMS.max_active_reads),
+    u16 target = active_queue_.size() + active_count,
         per_thread = target / threads_.size() + (target % threads_.size() > 0);
 
     u16 r = (u16) rand();
@@ -201,6 +217,11 @@ std::vector<MapResult> RealtimePool::update() {
 
     return ret;
 }
+
+//void u32 ReadBuffer::end_read(u16 ch, u32 number) {
+//    ch--;
+//    if (!mappers_[ch].finished() && mappers_[ch].get_read()
+//}
 
 bool RealtimePool::all_finished() {
     if (!buffer_queue_.empty()) return false;
@@ -266,6 +287,7 @@ void RealtimePool::MapperThread::run() {
             in_tmp_.clear(); //(pop)
         }
 
+        //TODO: reads are in here
         //Map chunks
         for (u16 i = 0; i < active_chs_.size() && running_; i++) {
             u16 ch = active_chs_[i];

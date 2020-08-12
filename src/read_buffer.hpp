@@ -84,6 +84,10 @@ class Paf {
     void set_float(Tag t, float v);
     void set_str(Tag t, std::string v);
 
+    std::string get_rd_name() {
+        return rd_name_;
+    }
+
 
     private:
     static const std::string PAF_TAGS[];

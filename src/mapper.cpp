@@ -292,8 +292,8 @@ bool Mapper::add_chunk(Chunk &chunk) {
     }
 
     bool added = read_.add_chunk(chunk);
-    chunk_timer_.reset();
-    if (!added) std::cout << "# NOT ADDED " << chunk.get_id() << "\n";
+    if (added) chunk_timer_.reset();
+    //if (!added) std::cout << "# NOT ADDED " << chunk.get_id() << "\n";
     return added;
 }
 
@@ -313,6 +313,11 @@ u16 Mapper::process_chunk() {
 
                 u32 nskip = norm_.skip_unread(nevents);
                 skip_events(nskip);
+
+                std::cout << "#SKIP "
+                          << read_.get_id() << " "
+                          << nskip << "\n";
+
                 if (!norm_.push(mean)) {
                     map_time_ += map_timer_.lap();
                     return nevents;
@@ -338,24 +343,38 @@ void Mapper::set_failed() {
     read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
 }
 
+bool Mapper::chunk_mapped() {
+    return read_.chunk_processed_ && norm_.empty();
+}
 
 bool Mapper::map_chunk() {
     wait_time_ += map_timer_.lap();
 
     if (reset_ || chunk_timer_.get() > PRMS.max_chunk_wait) {
+        if (chunk_timer_.get() > PRMS.max_chunk_wait) {
+            std::cout << "#chunk timeout "
+                      << chunk_timer_.get() << " "
+                      << PRMS.max_chunk_wait << "\n";
+        }
         set_failed();
         read_.loc_.set_ended();
+        //std::cout << "# END timer or reset\n";
         return true;
 
     } else if (norm_.empty() && 
                read_.chunk_processed_ && 
                read_.chunks_maxed()) {
+        //std::cout << "# END maxed\n";
         set_failed();
         return true;
 
     } else if (norm_.empty()) {
+        //std::cout << "# stuck empty: " 
+        //          << chunk_timer_.get() << " < "
+        //          << PRMS.max_chunk_wait << "\n";
         return false;
     }
+
 
     u16 nevents = get_max_events();
     float tlimit = PRMS.evt_timeout * nevents;
@@ -366,7 +385,12 @@ bool Mapper::map_chunk() {
             read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
             return true;
         }
-        if (map_timer_.get() > tlimit) break;
+        if (map_timer_.get() > tlimit) {
+            std::cout << "#event timeout "
+                      << map_timer_.get() << " "
+                      << tlimit << "\n";
+            break;
+        }
     }
 
     map_time_ += map_timer_.lap();

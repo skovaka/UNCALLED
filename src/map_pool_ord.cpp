@@ -45,13 +45,13 @@ void MapPoolOrd::add_read(const std::string &id) {
 }
 
 void MapPoolOrd::load_fast5s() {
-    std::cout << "Loading fast5s\n";
+    std::cerr << "Loading fast5s\n";
     while(!fast5s_.empty()) {
         ReadBuffer read = fast5s_.pop_read();
         channels_[read.get_channel_idx()].push_back(read);
     }
 
-    std::cout << "Sorting reads\n";
+    std::cerr << "Sorting reads\n";
     for (auto &ch : channels_) {
         pdqsort(ch.begin(), ch.end());
     }
@@ -65,18 +65,40 @@ std::vector<Paf> MapPoolOrd::update() {
     for (u32 i = 0; i < channels_.size(); i++) {
         if (channels_[i].empty()) continue;
 
+        if (pool_.is_read_finished(channels_[i].front())) {
+            channels_[i].pop_front();
+            chunk_idx_[i] = 0;
+            
+            if (channels_[i].empty()) continue;
+        }
+
         channels_empty_ = false;
 
         ReadBuffer &r = channels_[i].front();
-        Chunk c = r.get_chunk(chunk_idx_[i]);
-        if (pool_.try_add_chunk(c)) {
-            if (++chunk_idx_[i] >= r.chunk_count()) {
-                channels_[i].pop_front();
-            }
+        Chunk chunk = r.get_chunk(chunk_idx_[i]);
+        
+        bool empty = chunk.empty();
+
+        if (pool_.try_add_chunk(chunk)) {
+            chunk_idx_[i]++;
+        }
+        
+        if (empty) {//|| chunk_idx_[i] >= r.chunk_count()) {
+            //std::cout << "#ender " << r.get_id() << "\n";
+            channels_[i].pop_front();
+            chunk_idx_[i] = 0;
         }
     }
 
     for (const MapResult &m : pool_.update()) {
+        u16 i = std::get<0>(m)-1;
+        u32 nm = std::get<1>(m);
+
+        if (!channels_[i].empty() && channels_[i].front().get_number() == nm) {
+            channels_[i].pop_front();
+            chunk_idx_[i] = 0;
+        }
+
         ret.push_back(std::get<2>(m));
     }
 
@@ -85,7 +107,7 @@ std::vector<Paf> MapPoolOrd::update() {
 
 
 bool MapPoolOrd::running() {
-    return channels_empty_ && pool_.all_finished();
+    return !(channels_empty_ && pool_.all_finished());
 }
 
 void MapPoolOrd::stop() {

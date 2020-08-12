@@ -82,6 +82,7 @@ void Chunk::print() const {
 
 bool Chunk::pop(std::vector<float> &raw_data) {
     raw_data_.swap(raw_data);
+    clear();
     return !raw_data.empty();
 }
 
