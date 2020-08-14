@@ -118,9 +118,16 @@ bool RealtimePool::try_add_chunk(Chunk &c) {
 
     } else if (mappers_[ch].get_read().number_ == c.get_number()) {
 
-        if (mappers_[ch].finished() || !mappers_[ch].chunk_mapped()) { 
+        if (!mappers_[ch].chunk_mapped() || mappers_[ch].finished()) { 
             return false;
-        }   
+        }
+
+        std::cout << "# add1 "
+                  << c.get_id() << " " 
+                  << mappers_[ch].get_read().chunk_count() << " "
+                  << mappers_[ch].get_read().raw_len_ << " "
+                  << mappers_[ch].events_mapped() << " "
+                  << mappers_[ch].is_chunk_processed() << "\n";
 
         return mappers_[ch].add_chunk(c);
     }
@@ -158,13 +165,13 @@ std::vector<MapResult> RealtimePool::update() {
         active_count += read_counts[t];
     }
 
-    //if (time_.get() >= 1000 && active_count > 0) {
-    //    time_.reset();
-    //    std::cout << "#thread_reads";
-    //    for (u16 c : read_counts) std::cout << "\t" << c;
-    //    std::cout << "\n";
-    //    std::cout.flush();
-    //}
+    if (time_.get() >= 1000 && active_count > 0) {
+        time_.reset();
+        std::cout << "#thread_reads";
+        for (u16 c : read_counts) std::cout << "\t" << c;
+        std::cout << "\n";
+        std::cout.flush();
+    }
 
     //Buffer queue should be ordered in "ord" mode
     for (u16 i = buffer_queue_.size()-1; i < buffer_queue_.size(); i--) {
@@ -192,8 +199,8 @@ std::vector<MapResult> RealtimePool::update() {
     }
 
     //Estimate how much to fill each thread
-    //u16 target = min(active_queue_.size() + active_count, PRMS.max_active_reads),
-    u16 target = active_queue_.size() + active_count,
+    u16 target = min(active_queue_.size() + active_count, PRMS.max_active_reads),
+    //u16 target = active_queue_.size() + active_count,
         per_thread = target / threads_.size() + (target % threads_.size() > 0);
 
     u16 r = (u16) rand();
@@ -208,6 +215,8 @@ std::vector<MapResult> RealtimePool::update() {
             //TODO: compute number exactly, only lock while adding
             threads_[t].in_mtx_.lock();
             while (!active_queue_.empty() && read_counts[t] < per_thread) {
+                //u16 ch = active_queue_.front(); 
+                //active_queue_.pop_front();
                 u16 ch = active_queue_.back(); 
                 active_queue_.pop_back();
                 threads_[t].in_chs_.push_back(ch);

@@ -261,10 +261,17 @@ bool ReadBuffer::add_chunk(Chunk &c) {
         channel_idx_ != c.get_channel_idx() || 
         number_ != c.get_number()) return false;
 
+    std::cout << "# add2 " << id_ << " " << chunk_processed_ << "\n";
+
     chunk_processed_ = false;
+
     chunk_count_++;
     set_raw_len(raw_len_+c.size());
     c.pop(chunk_);
+
+    //chunk_processed_ = false;
+
+    std::cout << "# add3 " << id_ << " " << chunk_processed_ << "\n";
 
     return true;
 }

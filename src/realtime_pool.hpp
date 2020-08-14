@@ -83,7 +83,9 @@ class RealtimePool {
     std::vector<MapperThread> threads_;
     std::vector<Chunk> chunk_buffer_;
 
-    std::vector<u16> buffer_queue_, active_queue_, out_chs_;
+    std::vector<u16> buffer_queue_, out_chs_;
+    //std::deque<u16> active_queue_;
+    std::vector<u16> active_queue_;
 
     Timer time_;
     //Store threads in order of # active mappers

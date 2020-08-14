@@ -223,6 +223,7 @@ void Mapper::new_read(Chunk &chunk) {
     if (prev_unfinished(chunk.get_number())) {
         std::cerr << "Error: possibly lost read '" << read_.id_ << "'\n";
     }
+    adding_ = true;
     read_ = ReadBuffer(chunk);
     reset();
 }
@@ -236,6 +237,8 @@ void Mapper::reset() {
     event_i_ = 0;
     reset_ = false;
     last_chunk_ = false;
+    processing_ = false;
+    adding_ = false;
     state_ = State::MAPPING;
     norm_.skip_unread();
 
@@ -282,26 +285,45 @@ Mapper::State Mapper::get_state() const {
 }
 
 bool Mapper::add_chunk(Chunk &chunk) {
-    if (!is_chunk_processed() || reset_) return false;
+    if (!is_chunk_processed() || reset_ || processing_) return false;
+
+    adding_ = true;
 
     //if (read_.num_chunks_ == PRMS.max_chunks) {
     if (read_.chunks_maxed()) {
+        std::cout << "# MAXED " 
+                  << chunk.get_id() << " "
+                  << is_chunk_processed() << " " 
+                  << " " << norm_.empty() << "\n";
+
         set_failed();
         chunk.clear();
+        adding_ = false;
         return true;
     }
+
+    std::cout << "# addx " << chunk.get_id() 
+              << " " << read_.chunk_count() 
+              << " " << is_chunk_processed() << "\n";
 
     bool added = read_.add_chunk(chunk);
     if (added) {
         chunk_timer_.reset();
-        //std::cerr << "# add " << chunk.get_id() 
-        //          << " " << read_.chunk_count() << "\n";
+        std::cout << "# add4 " << chunk.get_id() 
+                  << " " << read_.chunk_count() 
+                  << " " << is_chunk_processed()
+                  << " " << norm_.empty() << "\n";
     }
+
+    adding_ = false;
+
     return added;
 }
 
 u16 Mapper::process_chunk() {
-    if (read_.chunk_processed_ || reset_) return 0; 
+    if (read_.chunk_processed_ || reset_ || adding_) return 0; 
+
+    processing_ = true;
 
     wait_time_ += map_timer_.lap();
 
@@ -336,9 +358,12 @@ u16 Mapper::process_chunk() {
     //          << " " << read_.chunk_count() << "\n";
 
     read_.chunk_.clear();
+    //here?
     read_.chunk_processed_ = true;
 
     map_time_ += map_timer_.lap();
+
+    processing_ = false;
 
     return nevents;
 }

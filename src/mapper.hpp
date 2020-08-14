@@ -89,6 +89,8 @@ class Mapper {
 
     u32 event_to_bp(u32 evt_i, bool last=false) const;
 
+    u32 events_mapped() const {return event_i_;}
+
     u16 process_chunk();
     bool chunk_mapped();
     bool map_chunk();
@@ -171,7 +173,7 @@ class Mapper {
 
     //u16 channel_;
     //u32 read_num_;
-    bool last_chunk_, reset_;
+    bool last_chunk_, reset_, processing_, adding_;
     State state_;
     std::vector<float> kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;
