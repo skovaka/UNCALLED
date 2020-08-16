@@ -2,20 +2,25 @@ CC=gcc
 CFLAGS=-Wall -std=c++11 -O3 -g -fPIC
 
 #TODO: auto-download, or search common paths
-HDF5_LIB=-L/usr/lib/x86_64-linux-gnu/hdf5/serial /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.a
-HDF5_INCLUDE=-I/usr/lib/x86_64-linux-gnu/hdf5/serial/include
+#HDF5_LIB=-L/usr/lib/x86_64-linux-gnu/hdf5/serial /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.a
+#HDF5_INCLUDE=-I/usr/lib/x86_64-linux-gnu/hdf5/serial/include
 
-BWA_LIB=-L bwa bwa/libbwa.a
+LIBHDF5=./lib/libhdf5.a
+HDF5_LIB=-L./lib $(LIBHDF5)
+HDF5_INCLUDE=-I./include
+
+BWA_LIB=-L submods/bwa submods/bwa/libbwa.a
 
 LIBS=$(HDF5_LIB) $(BWA_LIB) -lstdc++ -lz -ldl -pthread -lm -lsz
-INCLUDE=-I . -I toml11 -I fast5/include -I pybind11/include -I pdqsort $(HDF5_INCLUDE)
+INCLUDE=-I submods/ -I submods/toml11 -I submods/fast5/include -I submods/pybind11/include -I submods/pdqsort $(HDF5_INCLUDE)
 
 SRC=src
 BUILD=build
 BIN=bin
+LIB=lib
+#INCLUDE=include
 
 _COMMON_OBJS=mapper.o seed_tracker.o range.o event_detector.o normalizer.o chunk.o read_buffer.o fast5_reader.o
-
 
 _MAP_ORD_OBJS=$(_COMMON_OBJS) realtime_pool.o map_pool_ord.o uncalled_map_ord.o 
 _MAP_OBJS=$(_COMMON_OBJS) map_pool.o uncalled_map.o 
@@ -37,25 +42,44 @@ MAP_ORD_BIN = $(BIN)/uncalled_map_ord
 SIM_BIN = $(BIN)/uncalled_sim
 DTW_BIN = $(BIN)/dtw_test
 
-all: $(MAP_BIN) $(MAP_ORD_BIN) $(SIM_BIN) $(DTW_BIN)
+all: dirs $(MAP_BIN) $(MAP_ORD_BIN) $(SIM_BIN) $(DTW_BIN)
 
-$(MAP_BIN): $(MAP_OBJS) 
+$(BIN)/%.o:src/%.c
+	$(CC) -c $< -o $@
+
+$(MAP_BIN): $(MAP_OBJS) $(LIBHDF5)
 	$(CC) $(CFLAGS) $(MAP_OBJS) -o $@ $(LIBS)
 
-
-$(MAP_ORD_BIN): $(MAP_ORD_OBJS) 
+$(MAP_ORD_BIN): $(MAP_ORD_OBJS) $(LIBHDF5)
 	$(CC) $(CFLAGS) $(MAP_ORD_OBJS) -o $@ $(LIBS)
 
-$(SIM_BIN): $(SIM_OBJS) 
+$(SIM_BIN): $(SIM_OBJS) $(LIBHDF5)
 	$(CC) $(CFLAGS) $(SIM_OBJS) -o $@ $(LIBS)
 
-$(DTW_BIN): $(DTW_OBJS)
+$(DTW_BIN): $(DTW_OBJS) $(LIBHDF5)
 	$(CC) $(CFLAGS) $(DTW_OBJS) -o $@ $(LIBS)
+	
+#inspired by https://github.com/jts/nanopolish/blob/master/Makefile
+$(LIBHDF5):
+	cd submods/hdf5 && \
+		./configure --enable-threadsafe --disable-hl --libdir=`pwd`/../../lib --includedir=`pwd`/../../include --prefix=`pwd`/../.. || exit 255
+	make -j 8 -C submods/hdf5 && make -C submods/hdf5 install
 
 -include $(DEPENDS)
 
 $(BUILD)/%.o: $(SRC)/%.cpp
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@ $(INCLUDE)
 
+DIRS: $(BIN) $(BUILD)
+
+.PHONY: dirs
+dirs: $(BIN)/ $(BUILD)/
+
+$(BIN)/:
+	mkdir -p $@
+
+$(BUILD)/:
+	mkdir -p $@
+
 clean:
-	rm -rf $(BUILD)/*
+	rm -rf $(BUILD)
