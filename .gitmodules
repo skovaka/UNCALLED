@@ -1,21 +1,24 @@
 [submodule "pybind11"]
-	path = modules/pybind11
+	path = submods/pybind11
 	url = https://github.com/pybind/pybind11.git
 [submodule "fast5"]
-	path = modules/fast5
+	path = submods/fast5
 	url = https://github.com/mateidavid/fast5.git
 [submodule "bwa"]
-	path = modules/bwa
+	path = submods/bwa
 	url = https://github.com/lh3/bwa
 [submodule "pdqsort"]
-	path = modules/pdqsort
+	path = submods/pdqsort
 	url = https://github.com/orlp/pdqsort
 [submodule "read_until_api"]
 	path = read_until_api
 	url = https://github.com/nanoporetech/read_until_api.git
 [submodule "toml11"]
-	path = modules/toml11
+	path = submods/toml11
 	url = https://github.com/ToruNiina/toml11.git
 [submodule "submods/hdf5"]
 	path = submods/hdf5
 	url = https://github.com/HDFGroup/hdf5.git
+[submodule "submods/read_until_api"]
+	path = submods/read_until_api
+	url = https://github.com/nanoporetech/read_until_api.git

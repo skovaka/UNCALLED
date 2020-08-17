@@ -5,14 +5,16 @@ CFLAGS=-Wall -std=c++11 -O3 -g -fPIC
 #HDF5_LIB=-L/usr/lib/x86_64-linux-gnu/hdf5/serial /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.a
 #HDF5_INCLUDE=-I/usr/lib/x86_64-linux-gnu/hdf5/serial/include
 
-LIBHDF5=./lib/libhdf5.a
-HDF5_LIB=-L./lib $(LIBHDF5)
-HDF5_INCLUDE=-I./include
+LIBHDF5=./submods/hdf5/lib/libhdf5.a
+HDF5_LIB=-L./submods/hdf5/hdf5 $(LIBHDF5)
+HDF5_INCLUDE=-I./submods/hdf5/include
 
-BWA_LIB=-L submods/bwa submods/bwa/libbwa.a
+LIBBWA=./submods/bwa/libbwa.a
+BWA_LIB=-L./submods/bwa $(LIBBWA)
+BWA_INCLUDE=-I./submods/bwa
 
 LIBS=$(HDF5_LIB) $(BWA_LIB) -lstdc++ -lz -ldl -pthread -lm -lsz
-INCLUDE=-I submods/ -I submods/toml11 -I submods/fast5/include -I submods/pybind11/include -I submods/pdqsort $(HDF5_INCLUDE)
+INCLUDE=-I submods/ -I submods/toml11 -I submods/fast5/include -I submods/pybind11/include -I submods/pdqsort $(HDF5_INCLUDE) $(BWA_INCLUDE)
 
 SRC=src
 BUILD=build
@@ -47,23 +49,26 @@ all: dirs $(MAP_BIN) $(MAP_ORD_BIN) $(SIM_BIN) $(DTW_BIN)
 $(BIN)/%.o:src/%.c
 	$(CC) -c $< -o $@
 
-$(MAP_BIN): $(MAP_OBJS) $(LIBHDF5)
+$(MAP_BIN): $(MAP_OBJS) $(LIBHDF5) $(LIBBWA)
 	$(CC) $(CFLAGS) $(MAP_OBJS) -o $@ $(LIBS)
 
-$(MAP_ORD_BIN): $(MAP_ORD_OBJS) $(LIBHDF5)
+$(MAP_ORD_BIN): $(MAP_ORD_OBJS) $(LIBHDF5) $(LIBBWA)
 	$(CC) $(CFLAGS) $(MAP_ORD_OBJS) -o $@ $(LIBS)
 
-$(SIM_BIN): $(SIM_OBJS) $(LIBHDF5)
+$(SIM_BIN): $(SIM_OBJS) $(LIBHDF5) $(LIBBWA)
 	$(CC) $(CFLAGS) $(SIM_OBJS) -o $@ $(LIBS)
 
-$(DTW_BIN): $(DTW_OBJS) $(LIBHDF5)
+$(DTW_BIN): $(DTW_OBJS) $(LIBHDF5) $(LIBBWA)
 	$(CC) $(CFLAGS) $(DTW_OBJS) -o $@ $(LIBS)
 	
 #inspired by https://github.com/jts/nanopolish/blob/master/Makefile
 $(LIBHDF5):
 	cd submods/hdf5 && \
-		./configure --enable-threadsafe --disable-hl --libdir=`pwd`/../../lib --includedir=`pwd`/../../include --prefix=`pwd`/../.. || exit 255
+		./configure --enable-threadsafe --disable-hl --prefix=`pwd` || exit 255
 	make -j 8 -C submods/hdf5 && make -C submods/hdf5 install
+
+$(LIBBWA):
+	make -C submods/bwa -f ../../src/Makefile_bwa
 
 -include $(DEPENDS)
 
