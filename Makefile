@@ -6,7 +6,7 @@ CFLAGS=-Wall -std=c++11 -O3 -g -fPIC
 #HDF5_INCLUDE=-I/usr/lib/x86_64-linux-gnu/hdf5/serial/include
 
 LIBHDF5=./submods/hdf5/lib/libhdf5.a
-HDF5_LIB=-L./submods/hdf5/hdf5 $(LIBHDF5)
+HDF5_LIB=-L./submods/hdf5/lib $(LIBHDF5)
 HDF5_INCLUDE=-I./submods/hdf5/include
 
 LIBBWA=./submods/bwa/libbwa.a

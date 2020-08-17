@@ -21,7 +21,7 @@
  * SOFTWARE.
  */
 
-#include "pdqsort.h"
+#include <pdqsort.h>
 #include "mapper.hpp"
 
 MapperParams Mapper::PRMS;
