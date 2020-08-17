@@ -261,7 +261,7 @@ bool ReadBuffer::add_chunk(Chunk &c) {
         channel_idx_ != c.get_channel_idx() || 
         number_ != c.get_number()) return false;
 
-    std::cout << "# add2 " << id_ << " " << chunk_processed_ << "\n";
+    //std::cout << "# add2 " << id_ << " " << chunk_processed_ << "\n";
 
     chunk_processed_ = false;
 
@@ -271,7 +271,7 @@ bool ReadBuffer::add_chunk(Chunk &c) {
 
     //chunk_processed_ = false;
 
-    std::cout << "# add3 " << id_ << " " << chunk_processed_ << "\n";
+    //std::cout << "# add3 " << id_ << " " << chunk_processed_ << "\n";
 
     return true;
 }

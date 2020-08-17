@@ -173,7 +173,7 @@ class Mapper {
 
     //u16 channel_;
     //u32 read_num_;
-    bool last_chunk_, reset_, processing_, adding_;
+    bool last_chunk_, reset_;//, processing_, adding_;
     State state_;
     std::vector<float> kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;
@@ -183,6 +183,8 @@ class Mapper {
         chunk_i_;
     Timer chunk_timer_, map_timer_;
     float map_time_, wait_time_;
+
+    std::mutex chunk_mtx_;
 
     #ifdef DEBUG_SEEDS
     std::ofstream seeds_out_;

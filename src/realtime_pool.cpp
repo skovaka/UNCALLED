@@ -106,6 +106,7 @@ bool RealtimePool::try_add_chunk(Chunk &c) {
 
     if (c.empty()) {
         if (mappers_[ch].chunk_mapped() && !mappers_[ch].finished()) {
+            std::cout << "# reqforce " << c.get_id() << "\n";
             mappers_[ch].request_reset();
         }
         return false;
@@ -118,16 +119,16 @@ bool RealtimePool::try_add_chunk(Chunk &c) {
 
     } else if (mappers_[ch].get_read().number_ == c.get_number()) {
 
-        if (!mappers_[ch].chunk_mapped() || mappers_[ch].finished()) { 
+        if (!mappers_[ch].chunk_mapped()) {// || mappers_[ch].finished()) { 
             return false;
         }
 
-        std::cout << "# add1 "
-                  << c.get_id() << " " 
-                  << mappers_[ch].get_read().chunk_count() << " "
-                  << mappers_[ch].get_read().raw_len_ << " "
-                  << mappers_[ch].events_mapped() << " "
-                  << mappers_[ch].is_chunk_processed() << "\n";
+        //std::cout << "# add1 "
+        //          << c.get_id() << " " 
+        //          << mappers_[ch].get_read().chunk_count() << " "
+        //          << mappers_[ch].get_read().raw_len_ << " "
+        //          << mappers_[ch].events_mapped() << " "
+        //          << mappers_[ch].is_chunk_processed() << "\n";
 
         return mappers_[ch].add_chunk(c);
     }
