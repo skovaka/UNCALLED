@@ -297,13 +297,13 @@ bool Mapper::add_chunk(Chunk &chunk) {
     }
 
     if (read_.chunks_maxed()) {
-        std::cout << "# MAXED " 
-                  << chunk.get_id() << " "
-                  << is_chunk_processed() << " " 
-                  << " " << norm_.empty() << "\n";
+        //std::cout << "# MAXED " 
+        //          << chunk.get_id() << " "
+        //          << is_chunk_processed() << " " 
+        //          << " " << norm_.empty() << "\n";
 
         set_failed();
-        read_.loc_.set_float(Paf::Tag::EJECT, 1);
+        //read_.loc_.set_float(Paf::Tag::EJECT, 1);
         chunk.clear();
 
         chunk_mtx_.unlock();
@@ -317,11 +317,11 @@ bool Mapper::add_chunk(Chunk &chunk) {
     bool added = read_.add_chunk(chunk);
     if (added) {
         chunk_timer_.reset();
-        std::cout << "# add4 " << chunk.get_id() 
-                  << " " << read_.chunk_count() 
-                  << " " << is_chunk_processed()
-                  << " " << norm_.empty()
-                  << " " << state_ << "\n";
+        //std::cout << "# add4 " << chunk.get_id() 
+        //          << " " << read_.chunk_count() 
+        //          << " " << is_chunk_processed()
+        //          << " " << norm_.empty()
+        //          << " " << state_ << "\n";
     }
 
     chunk_mtx_.unlock();
@@ -392,7 +392,7 @@ bool Mapper::map_chunk() {
 
     if (reset_ || chunk_timer_.get() > PRMS.max_chunk_wait) {
         set_failed();
-        read_.loc_.set_float(Paf::Tag::EJECT, 3);
+        //read_.loc_.set_float(Paf::Tag::EJECT, 3);
         read_.loc_.set_ended();
         //std::cerr << "# END timer or reset\n";
         return true;
@@ -405,7 +405,7 @@ bool Mapper::map_chunk() {
 
         if (norm_.empty() && read_.chunk_processed_) {
             set_failed();
-            read_.loc_.set_float(Paf::Tag::EJECT, 2);
+            //read_.loc_.set_float(Paf::Tag::EJECT, 2);
             chunk_mtx_.unlock();
             return true;
         }
@@ -448,7 +448,7 @@ bool Mapper::map_chunk() {
 bool Mapper::map_next() {
     if (norm_.empty() || reset_ || event_i_ >= PRMS.max_events) {
         state_ = State::FAILURE;
-        read_.loc_.set_float(Paf::Tag::EJECT, 0);
+        //read_.loc_.set_float(Paf::Tag::EJECT, 0);
         return true;
     }
 

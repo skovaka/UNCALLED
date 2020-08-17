@@ -104,14 +104,17 @@ bool RealtimePool::is_read_finished(const ReadBuffer &r) {
 bool RealtimePool::try_add_chunk(Chunk &c) {
     u16 ch = c.get_channel_idx();
 
+    //Chunk is empty if all read chunks were output
     if (c.empty()) {
+
+        //Give up if previous chunk done mapping
         if (mappers_[ch].chunk_mapped() && !mappers_[ch].finished()) {
-            std::cout << "# reqforce " << c.get_id() << "\n";
             mappers_[ch].request_reset();
         }
         return false;
     }
 
+    //Start new read if mapper inactive
     if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
         mappers_[ch].new_read(c);
         active_queue_.push_back(ch);
@@ -119,16 +122,10 @@ bool RealtimePool::try_add_chunk(Chunk &c) {
 
     } else if (mappers_[ch].get_read().number_ == c.get_number()) {
 
-        if (!mappers_[ch].chunk_mapped()) {// || mappers_[ch].finished()) { 
+        //Don't add if previous chunk is still mapping
+        if (!mappers_[ch].chunk_mapped()) {
             return false;
         }
-
-        //std::cout << "# add1 "
-        //          << c.get_id() << " " 
-        //          << mappers_[ch].get_read().chunk_count() << " "
-        //          << mappers_[ch].get_read().raw_len_ << " "
-        //          << mappers_[ch].events_mapped() << " "
-        //          << mappers_[ch].is_chunk_processed() << "\n";
 
         return mappers_[ch].add_chunk(c);
     }
@@ -181,7 +178,7 @@ std::vector<MapResult> RealtimePool::update() {
 
         bool added = false;
 
-        std::cout << "# BUFFER?\n";
+        //std::cout << "# BUFFER?\n";
 
         if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
             mappers_[ch].new_read(c);
