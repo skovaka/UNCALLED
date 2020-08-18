@@ -32,7 +32,8 @@ mode = "deplete"
 host = "127.0.0.1"
 port = 8000
 duration = 0.0
-max_reads_active = 512
+max_active_reads = 512
+
 
 [mapper]
 max_events = 30000
@@ -46,8 +47,8 @@ min_seed_prob = -3.75
 
 evt_buffer_len = 6000
 evt_batch_size = 5
-evt_timeout = 10.0
-max_chunk_wait = 4000.0 
+evt_timeout = 1000000.0
+max_chunk_wait = 30000000.0 
 
 [seed_tracker]
 min_aln_len = 25
