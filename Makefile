@@ -14,6 +14,7 @@ BWA_LIB=-L./submods/bwa $(LIBBWA)
 BWA_INCLUDE=-I./submods/bwa
 
 LIBS=$(HDF5_LIB) $(BWA_LIB) -lstdc++ -lz -ldl -pthread -lm -lsz
+#LIBS=-lstdc++ -lz -ldl -pthread -lm -lsz
 INCLUDE=-I submods/ -I submods/toml11 -I submods/fast5/include -I submods/pybind11/include -I submods/pdqsort $(HDF5_INCLUDE) $(BWA_INCLUDE)
 
 SRC=src
@@ -46,8 +47,8 @@ DTW_BIN = $(BIN)/dtw_test
 
 all: dirs $(MAP_BIN) $(MAP_ORD_BIN) $(SIM_BIN) $(DTW_BIN)
 
-$(BIN)/%.o:src/%.c
-	$(CC) -c $< -o $@
+#$(BIN)/%.o:src/%.c
+#	$(CC) -c $< -o $@
 
 $(MAP_BIN): $(MAP_OBJS) $(LIBHDF5) $(LIBBWA)
 	$(CC) $(CFLAGS) $(MAP_OBJS) -o $@ $(LIBS)
@@ -64,15 +65,16 @@ $(DTW_BIN): $(DTW_OBJS) $(LIBHDF5) $(LIBBWA)
 #inspired by https://github.com/jts/nanopolish/blob/master/Makefile
 $(LIBHDF5):
 	cd submods/hdf5 && \
-		./configure --enable-threadsafe --disable-hl --prefix=`pwd` || exit 255
+		./configure --enable-threadsafe --disable-hl --prefix=`pwd` --enable-shared=no --with-pic=yes || exit 255
 	make -j 8 -C submods/hdf5 && make -C submods/hdf5 install
+#--CFLAGS="-fPIC"
 
 $(LIBBWA):
 	make -C submods/bwa -f ../../src/Makefile_bwa
 
 -include $(DEPENDS)
 
-$(BUILD)/%.o: $(SRC)/%.cpp
+$(BUILD)/%.o: $(SRC)/%.cpp $(LIBHDF5) $(LIBBWA)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@ $(INCLUDE)
 
 DIRS: $(BIN) $(BUILD)

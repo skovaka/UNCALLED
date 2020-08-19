@@ -31,9 +31,9 @@
 #include "util.hpp"
 #include "bp.hpp"
 #include "range.hpp"
-#include "bwa/bwt.h"
-#include "bwa/bntseq.h"
-#include "bwa/utils.h"
+#include <bwa/bwt.h>
+#include <bwa/bntseq.h>
+#include <bwa/utils.h>
 
 template <KmerLen KLEN>
 class SubSeq {

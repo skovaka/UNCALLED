@@ -9,8 +9,8 @@ class make_bwa(build_ext):
     def run(self):
         sys.stderr.write("building libbwa\n")
         subprocess.call(["make", 
-                         "-C", "./bwa", 
-                         "-f", "../src/Makefile_bwa"])
+                         "-C", "./submods/bwa", 
+                         "-f", "../../src/Makefile_bwa"])
         build_ext.run(self)
 
 uncalled = Extension(
@@ -29,13 +29,15 @@ uncalled = Extension(
                 "src/seed_tracker.cpp", 
                 "src/normalizer.cpp", 
                 "src/range.cpp"],
-     include_dirs = ["./",
-                     "./pybind11/include", 
-                     "./fast5/include",
-                     "./pdqsort",
-                     "./toml11"],
-     library_dirs = ["./bwa"],
-     libraries = ["hdf5", "bwa", "z", "dl", "m"],
+     include_dirs = ["./submods", #TODO: consistent incl paths
+                     "./submods/hdf5/include", 
+                     "./submods/pybind11/include", 
+                     "./submods/fast5/include",
+                     "./submods/pdqsort",
+                     "./submods/toml11"],
+     #library_dirs = ["./submods/bwa ./submods/bwa/libbwa.a", "./submods/hdf5/lib ./submods/hdf5/lib/libhdf5.a"],
+     library_dirs = ["./submods/bwa", "./submods/hdf5/lib"],
+     libraries = ["bwa", "hdf5", "z", "dl", "m"],
      extra_compile_args = ["-std=c++11", "-O3"],
      define_macros = [("PYBIND", None)]
 )

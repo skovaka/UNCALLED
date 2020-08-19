@@ -1,6 +1,6 @@
 #include <iostream>
-#include "pybind11/pybind11.h"
-#include "pybind11/stl.h"
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include "self_align_ref.hpp"
 #include "mapper.hpp"
 #include "map_pool.hpp"
