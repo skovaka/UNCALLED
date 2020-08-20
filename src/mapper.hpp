@@ -106,6 +106,9 @@ class Mapper {
     ReadBuffer &get_read();
     void deactivate();
 
+    //TODO wrap in debug only flags
+    std::vector<u32> path_counts_;
+
     private:
 
     enum EventType { MATCH, STAY, NUM_TYPES };
@@ -176,11 +179,17 @@ class Mapper {
     bool last_chunk_, reset_;//, processing_, adding_;
     State state_;
     std::vector<float> kmer_probs_;
+
+    //TODO rename paths0_ and paths1_?
     std::vector<PathBuffer> prev_paths_, next_paths_;
+
     std::vector<bool> sources_added_;
+
+    //TODO rename path_count?
     u32 prev_size_,
         event_i_,
         chunk_i_;
+
     Timer chunk_timer_, map_timer_;
     float map_time_, wait_time_;
 
