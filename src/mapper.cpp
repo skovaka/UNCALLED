@@ -21,7 +21,7 @@
  * SOFTWARE.
  */
 
-#include <pdqsort.h>
+#include "pdqsort.h"
 #include "mapper.hpp"
 
 MapperParams Mapper::PRMS;
@@ -249,9 +249,6 @@ void Mapper::reset() {
     seed_tracker_.reset();
     evdt_.reset();
 
-    //WRAP
-    path_counts_.clear();
-
     chunk_timer_.reset();
     map_timer_.reset();
     map_time_ = 0;
@@ -300,13 +297,13 @@ bool Mapper::add_chunk(Chunk &chunk) {
     }
 
     if (read_.chunks_maxed()) {
-        //std::cout << "# MAXED " 
-        //          << chunk.get_id() << " "
-        //          << is_chunk_processed() << " " 
-        //          << " " << norm_.empty() << "\n";
+        std::cout << "# MAXED " 
+                  << chunk.get_id() << " "
+                  << is_chunk_processed() << " " 
+                  << " " << norm_.empty() << "\n";
 
         set_failed();
-        //read_.loc_.set_float(Paf::Tag::EJECT, 1);
+        read_.loc_.set_float(Paf::Tag::EJECT, 1);
         chunk.clear();
 
         chunk_mtx_.unlock();
@@ -320,11 +317,11 @@ bool Mapper::add_chunk(Chunk &chunk) {
     bool added = read_.add_chunk(chunk);
     if (added) {
         chunk_timer_.reset();
-        //std::cout << "# add4 " << chunk.get_id() 
-        //          << " " << read_.chunk_count() 
-        //          << " " << is_chunk_processed()
-        //          << " " << norm_.empty()
-        //          << " " << state_ << "\n";
+        std::cout << "# add4 " << chunk.get_id() 
+                  << " " << read_.chunk_count() 
+                  << " " << is_chunk_processed()
+                  << " " << norm_.empty()
+                  << " " << state_ << "\n";
     }
 
     chunk_mtx_.unlock();
@@ -334,10 +331,6 @@ bool Mapper::add_chunk(Chunk &chunk) {
 u16 Mapper::process_chunk() {
     if (read_.chunk_processed_ || reset_ || 
         !chunk_mtx_.try_lock()) return 0; 
-    
-    if (read_.chunk_count() == 1) {
-        read_.loc_.set_float(Paf::Tag::QUEUE_TIME, map_timer_.lap());
-    }
 
     wait_time_ += map_timer_.lap();
 
@@ -399,7 +392,7 @@ bool Mapper::map_chunk() {
 
     if (reset_ || chunk_timer_.get() > PRMS.max_chunk_wait) {
         set_failed();
-        //read_.loc_.set_float(Paf::Tag::EJECT, 3);
+        read_.loc_.set_float(Paf::Tag::EJECT, 3);
         read_.loc_.set_ended();
         //std::cerr << "# END timer or reset\n";
         return true;
@@ -412,7 +405,7 @@ bool Mapper::map_chunk() {
 
         if (norm_.empty() && read_.chunk_processed_) {
             set_failed();
-            //read_.loc_.set_float(Paf::Tag::EJECT, 2);
+            read_.loc_.set_float(Paf::Tag::EJECT, 2);
             chunk_mtx_.unlock();
             return true;
         }
@@ -452,11 +445,10 @@ bool Mapper::map_chunk() {
     return false;
 }
 
-//TODO better name
 bool Mapper::map_next() {
     if (norm_.empty() || reset_ || event_i_ >= PRMS.max_events) {
         state_ = State::FAILURE;
-        //read_.loc_.set_float(Paf::Tag::EJECT, 0);
+        read_.loc_.set_float(Paf::Tag::EJECT, 0);
         return true;
     }
 
@@ -470,24 +462,18 @@ bool Mapper::map_next() {
     Range prev_range;
     u16 prev_kmer;
     float evpr_thresh;
-    bool child_found = false;
+    bool child_found;
 
     auto next_path = next_paths_.begin();
 
-    u32 next_count = 0;
-    u32 pi = 0;
+    
     //Find neighbors of previous nodes
-    for (pi = 0; pi < prev_size_; pi++) {
-
-
-        //std::cout << "#pi " << pi << " " << prev_size_ << "\n";
+    for (u32 pi = 0; pi < prev_size_; pi++) {
         if (!prev_paths_[pi].is_valid()) {
             continue;
         }
 
-        if (next_count > prev_size_*5) {
-            std::cerr << "TOO BIG\n";
-        }
+        child_found = false;
 
         PathBuffer &prev_path = prev_paths_[pi];
         Range &prev_range = prev_path.fm_range_;
@@ -505,7 +491,6 @@ bool Mapper::map_next() {
                                   kmer_probs_[prev_kmer], 
                                   EventType::STAY);
             child_found = true;
-            next_count++;
 
             if (++next_path == next_paths_.end()) {
                 break;
@@ -532,10 +517,10 @@ bool Mapper::map_next() {
                                   kmer_probs_[next_kmer], 
                                   EventType::MATCH);
 
-            child_found = true;
-            next_count++;
 
-            if (++next_path >= next_paths_.end()) {
+            child_found = true;
+
+            if (++next_path == next_paths_.end()) {
                 break;
             }
         }
@@ -546,13 +531,16 @@ bool Mapper::map_next() {
             //Add seeds for non-extended paths
             //Extended paths will be updated after sources filled in
             update_seeds(prev_path, true);
+
+            #ifdef DEBUG_SEEDS
+            print_debug_seeds(prev_path);
+            #endif
         }
 
-        if (next_path >= next_paths_.end()) {
+        if (next_path == next_paths_.end()) {
             break;
         }
     }
-
 
     //Create sources between gaps
     if (next_path != next_paths_.begin()) {
@@ -585,8 +573,6 @@ bool Mapper::map_next() {
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
                     next_path++;
-                    next_count++;
-
                 }                                    
 
                 unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
@@ -628,7 +614,6 @@ bool Mapper::map_next() {
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
                     next_path++;
-                    next_count++;
                 }
             }
 
@@ -642,7 +627,7 @@ bool Mapper::map_next() {
 
     for (u16 kmer = 0; 
          kmer < kmer_probs_.size() && 
-         next_path != next_paths_.end(); 
+            next_path != next_paths_.end(); 
          kmer++) {
 
         Range next_range = fmi.get_kmer_range(kmer);
@@ -655,7 +640,6 @@ bool Mapper::map_next() {
             //TODO: don't write to prob buffer here to speed up source loop
             next_path->make_source(next_range, kmer, kmer_probs_[kmer]);
             next_path++;
-            next_count++;
 
         } else {
             sources_added_[kmer] = false;
@@ -663,22 +647,7 @@ bool Mapper::map_next() {
     }
 
     prev_size_ = next_path - next_paths_.begin();
-
-    if (prev_size_ > PRMS.max_paths) {
-        std::cerr << "# TOO MANY " 
-                  << read_.get_channel() << " "
-                  << event_i_ << " "
-                  << prev_size_ << " "
-                  << next_count << " "
-                  << (next_path - next_paths_.begin()) << " "
-                  << (next_path < next_paths_.begin()) <<  "\n";
-        abort();
-    }
-    
     prev_paths_.swap(next_paths_);
-
-    //TODO WRAP
-    path_counts_.push_back(prev_size_);
 
     //Update event index
     event_i_++;
@@ -696,11 +665,6 @@ bool Mapper::map_next() {
         //#endif
 
         return true;
-    }
-
-    if (next_count > 1000000) {
-        for (auto c : path_counts_)
-            std::cout << "# children: " << c << "\n";
     }
 
     return false;
