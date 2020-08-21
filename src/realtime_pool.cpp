@@ -27,6 +27,9 @@
 #include <time.h>
 #include "realtime_pool.hpp"
 #include "mapper.hpp"
+#include "sync_out.hpp"
+
+//SyncOut debug_out_(std::cout);
 
 RealtimePool::RealtimePool(Conf &conf) :
     PRMS(conf.realtime_prms) {
@@ -42,6 +45,8 @@ RealtimePool::RealtimePool(Conf &conf) :
     mappers_.resize(conf.num_channels);
     chunk_buffer_.resize(conf.num_channels);
     buffer_queue_.reserve(conf.num_channels);
+    active_queue_.reserve(conf.num_channels);
+
 
     for (u16 t = 0; t < conf.threads; t++) {
         threads_[t].start();
@@ -153,6 +158,8 @@ std::vector<MapResult> RealtimePool::update() {
             for (auto ch : out_chs_) {
                 ReadBuffer &r = mappers_[ch].get_read();
                 ret.emplace_back(r.get_channel(), r.number_, r.loc_);
+
+                //TODO rename set_inactive?
                 mappers_[ch].deactivate();
             }
             out_chs_.clear();
@@ -188,7 +195,6 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-
     if (time_.get() >= 1000 && active_count > 0) {
         std::cout << "#prefill_threads ("
                   << active_count << ")";
@@ -197,48 +203,64 @@ std::vector<MapResult> RealtimePool::update() {
         std::cout.flush();
     }
 
-    u16 st = (u16) rand();
-
     //Estimate how much to fill each thread
-    u16 target = min(active_queue_.size() + active_count, PRMS.max_active_reads),
-        min_per_thread = target / threads_.size(), // + (target % threads_.size() > 0);
-        remain = target % threads_.size();
+    u16 target = min(active_queue_.size() + active_count, 
+                     PRMS.max_active_reads),
+        min_per_thread = target / threads_.size(),
+        remain = target % threads_.size(),
+        max_per_thread = min_per_thread+1;
 
-    std::cout << "#targets " 
-              << active_queue_.size() << "\t"
-              << active_count << "\t"
-              << target << "\t"
-              << min_per_thread << "\t"
-              << remain << "\n";
+    for (auto c : read_counts) remain -= (c >= max_per_thread);
+
+    u16 st = 0;//(u16) rand();
+
+    //std::cout << "# tgt " 
+    //          << target << " " 
+    //          << min_per_thread << " "
+    //          << remain << "\n";
+
+    active_count = 0;
 
     for (u16 i = 0; i < threads_.size(); i++) {
 
         if (active_queue_.empty()) break;
 
-        u16 t = (st+i) % threads_.size();
+        u16 t = (st + i) % threads_.size();
 
-        u16 n = min_per_thread - read_counts[t] + (remain > 0);
+        u16 n = (min_per_thread + (remain > 0)) - read_counts[t];
 
-        //If thread not full
-        if (n > 0) {
+        if (n > 0 && n <= active_queue_.size()) {
+
+            u32 j = active_queue_.size()-n,
+                k = active_queue_.size();
+
+            //std::cout << "# j=" << j 
+            //          << " a=" << active_queue_.size()
+            //          << " n=" << n
+            //          << "\n";
+
+            //std::cout << "# queue " << t;
+            //for (u32 l = j; l < k; l++) {
+            //    std::cout << " " << active_queue_[l];
+            //}
+            //std::cout << "\n";
 
             threads_[t].in_mtx_.lock();
-
-            for (; n > 0; n--) {
-                u16 ch = active_queue_.back(); 
-                active_queue_.pop_back();
-
-                threads_[t].in_chs_.push_back(ch);
-
-                read_counts[t]++;
-                active_count++;
-            }
-
+            std::vector<u16> &in_chs = threads_[t].in_chs_;
+            in_chs.insert(in_chs.end(), 
+                          &(active_queue_[j]),
+                          &(active_queue_[k]));
             threads_[t].in_mtx_.unlock();
+
+            remain -= (remain > 0);
+
+            active_queue_.resize(j);
         }
+
+        read_counts[t] = threads_[t].read_count();
+        active_count += read_counts[t];
         
         //Countdown until remainder reaches 0
-        remain -= (remain > 0);
     }
 
     if (time_.get() >= 1000 && active_count > 0) {
@@ -311,6 +333,7 @@ void RealtimePool::MapperThread::run() {
             continue;
         }
 
+
         //Read inputs (pop, lock, and swap it)
         if (!in_chs_.empty()) {
             in_mtx_.lock();
@@ -328,7 +351,14 @@ void RealtimePool::MapperThread::run() {
         //Map chunks
         for (u16 i = 0; i < active_chs_.size() && running_; i++) {
             u16 ch = active_chs_[i];
+
+            //debug_out_ << "# thread "
+            //           << tid_ << " has ch"
+            //           << (ch+1) << "\n";
+
             mappers_[ch].process_chunk();
+
+            mappers_[ch].thread_accs_.push_back(tid_);
             if (mappers_[ch].map_chunk()) {
                 out_tmp_.push_back(i);
             }
@@ -342,8 +372,8 @@ void RealtimePool::MapperThread::run() {
             }
             out_mtx_.unlock();
 
-            //std::sort(out_tmp_.begin(), out_tmp_.end(),
-            //          [](u32 a, u32 b) { return a > b; });
+            std::sort(out_tmp_.begin(), out_tmp_.end(),
+                      [](u32 a, u32 b) { return a > b; });
             for (auto i : out_tmp_) {
                 active_chs_[i] = active_chs_.back();
                 active_chs_.pop_back();

@@ -250,7 +250,7 @@ void Mapper::reset() {
     evdt_.reset();
 
     //WRAP
-    //path_counts_.clear();
+    path_counts_.clear();
 
     chunk_timer_.reset();
     map_timer_.reset();
@@ -474,13 +474,19 @@ bool Mapper::map_next() {
 
     auto next_path = next_paths_.begin();
 
-    u32 child_count = 0;
-    
+    u32 next_count = 0;
+    u32 pi = 0;
     //Find neighbors of previous nodes
-    for (u32 pi = 0; pi < prev_size_; pi++) {
+    for (pi = 0; pi < prev_size_; pi++) {
+
+
         //std::cout << "#pi " << pi << " " << prev_size_ << "\n";
         if (!prev_paths_[pi].is_valid()) {
             continue;
+        }
+
+        if (next_count > prev_size_*5) {
+            std::cerr << "TOO BIG\n";
         }
 
         PathBuffer &prev_path = prev_paths_[pi];
@@ -499,7 +505,7 @@ bool Mapper::map_next() {
                                   kmer_probs_[prev_kmer], 
                                   EventType::STAY);
             child_found = true;
-            child_count++;
+            next_count++;
 
             if (++next_path == next_paths_.end()) {
                 break;
@@ -527,7 +533,7 @@ bool Mapper::map_next() {
                                   EventType::MATCH);
 
             child_found = true;
-            child_count++;
+            next_count++;
 
             if (++next_path >= next_paths_.end()) {
                 break;
@@ -579,6 +585,8 @@ bool Mapper::map_next() {
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
                     next_path++;
+                    next_count++;
+
                 }                                    
 
                 unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
@@ -620,6 +628,7 @@ bool Mapper::map_next() {
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
                     next_path++;
+                    next_count++;
                 }
             }
 
@@ -646,6 +655,7 @@ bool Mapper::map_next() {
             //TODO: don't write to prob buffer here to speed up source loop
             next_path->make_source(next_range, kmer, kmer_probs_[kmer]);
             next_path++;
+            next_count++;
 
         } else {
             sources_added_[kmer] = false;
@@ -653,11 +663,22 @@ bool Mapper::map_next() {
     }
 
     prev_size_ = next_path - next_paths_.begin();
+
+    if (prev_size_ > PRMS.max_paths) {
+        std::cerr << "# TOO MANY " 
+                  << read_.get_channel() << " "
+                  << event_i_ << " "
+                  << prev_size_ << " "
+                  << next_count << " "
+                  << (next_path - next_paths_.begin()) << " "
+                  << (next_path < next_paths_.begin()) <<  "\n";
+        abort();
+    }
     
     prev_paths_.swap(next_paths_);
 
     //TODO WRAP
-    //path_counts_.push_back(prev_size_);
+    path_counts_.push_back(prev_size_);
 
     //Update event index
     event_i_++;
@@ -677,9 +698,10 @@ bool Mapper::map_next() {
         return true;
     }
 
-    //if (child_count > 1000000) {
-    //    std::cout << "# children: " << child_count << "\n";
-    //}
+    if (next_count > 1000000) {
+        for (auto c : path_counts_)
+            std::cout << "# children: " << c << "\n";
+    }
 
     return false;
 }

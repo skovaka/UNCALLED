@@ -1,20 +1,22 @@
 CC=gcc
-CFLAGS=-Wall -std=c++11 -O3 -g -fPIC
+CFLAGS=-Wall -std=c++11 -g -fPIC #-O3 
 
 #TODO: auto-download, or search common paths
-HDF5_LIB=-L/usr/lib/x86_64-linux-gnu/hdf5/serial /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.a
-HDF5_INCLUDE=-I/usr/lib/x86_64-linux-gnu/hdf5/serial/include
+#HDF5_LIB=-L/usr/lib/x86_64-linux-gnu/hdf5/serial /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.a
+#HDF5_INCLUDE=-I/usr/lib/x86_64-linux-gnu/hdf5/serial/include
+HDF5_LIB=-L/home/skovaka/anaconda3 /home/skovaka/anaconda3/lib/libhdf5.a
+HDF5_INCLUDE=-I/home/skovaka/anaconda3/include
 
 BWA_LIB=-L bwa bwa/libbwa.a
 
-LIBS=$(HDF5_LIB) $(BWA_LIB) -lstdc++ -lz -ldl -pthread -lm -lsz
+LIBS=$(HDF5_LIB) $(BWA_LIB) -lstdc++ -lz -ldl -pthread -lm #-lsz
 INCLUDE=-I . -I toml11 -I fast5/include -I pybind11/include -I pdqsort $(HDF5_INCLUDE)
 
 SRC=src
 BUILD=build
 BIN=bin
 
-_COMMON_OBJS=mapper.o seed_tracker.o range.o event_detector.o normalizer.o chunk.o read_buffer.o fast5_reader.o
+_COMMON_OBJS=mapper.o seed_tracker.o range.o event_detector.o normalizer.o chunk.o read_buffer.o fast5_reader.o #sync_out.o
 
 
 _MAP_ORD_OBJS=$(_COMMON_OBJS) realtime_pool.o map_pool_ord.o uncalled_map_ord.o 

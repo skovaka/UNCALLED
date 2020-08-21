@@ -108,6 +108,7 @@ class Mapper {
 
     //TODO wrap in debug only flags
     std::vector<u32> path_counts_;
+    std::vector<u32> thread_accs_;
 
     private:
 
