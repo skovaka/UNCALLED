@@ -317,11 +317,11 @@ bool Mapper::add_chunk(Chunk &chunk) {
     bool added = read_.add_chunk(chunk);
     if (added) {
         chunk_timer_.reset();
-        std::cout << "# add4 " << chunk.get_id() 
-                  << " " << read_.chunk_count() 
-                  << " " << is_chunk_processed()
-                  << " " << norm_.empty()
-                  << " " << state_ << "\n";
+        //std::cout << "# add4 " << chunk.get_id() 
+        //          << " " << read_.chunk_count() 
+        //          << " " << is_chunk_processed()
+        //          << " " << norm_.empty()
+        //          << " " << state_ << "\n";
     }
 
     chunk_mtx_.unlock();
