@@ -22,7 +22,6 @@
  */
 
 #include "read_buffer.hpp"
-#include "sync_out.hpp"
 
 ReadParams ReadBuffer::PRMS;
 

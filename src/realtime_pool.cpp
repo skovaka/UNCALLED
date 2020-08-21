@@ -27,9 +27,6 @@
 #include <time.h>
 #include "realtime_pool.hpp"
 #include "mapper.hpp"
-#include "sync_out.hpp"
-
-//SyncOut debug_out_(std::cout);
 
 RealtimePool::RealtimePool(Conf &conf) :
     PRMS(conf.realtime_prms) {
@@ -176,8 +173,6 @@ std::vector<MapResult> RealtimePool::update() {
         Chunk &c = chunk_buffer_[ch];
 
         bool added = false;
-
-        //std::cout << "# BUFFER?\n";
 
         if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
             mappers_[ch].new_read(c);
@@ -331,13 +326,9 @@ void RealtimePool::MapperThread::run() {
         for (u16 i = 0; i < active_chs_.size() && running_; i++) {
             u16 ch = active_chs_[i];
 
-            //debug_out_ << "# thread "
-            //           << tid_ << " has ch"
-            //           << (ch+1) << "\n";
 
             mappers_[ch].process_chunk();
 
-            mappers_[ch].thread_accs_.push_back(tid_);
             if (mappers_[ch].map_chunk()) {
                 out_tmp_.push_back(i);
             }

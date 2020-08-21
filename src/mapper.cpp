@@ -297,10 +297,6 @@ bool Mapper::add_chunk(Chunk &chunk) {
     }
 
     if (read_.chunks_maxed()) {
-        std::cout << "# MAXED " 
-                  << chunk.get_id() << " "
-                  << is_chunk_processed() << " " 
-                  << " " << norm_.empty() << "\n";
 
         set_failed();
         read_.loc_.set_float(Paf::Tag::EJECT, 1);
@@ -310,18 +306,9 @@ bool Mapper::add_chunk(Chunk &chunk) {
         return true;
     }
 
-    //std::cout << "# addx " << chunk.get_id() 
-    //          << " " << read_.chunk_count() 
-    //          << " " << is_chunk_processed() << "\n";
-
     bool added = read_.add_chunk(chunk);
     if (added) {
         chunk_timer_.reset();
-        std::cout << "# add4 " << chunk.get_id() 
-                  << " " << read_.chunk_count() 
-                  << " " << is_chunk_processed()
-                  << " " << norm_.empty()
-                  << " " << state_ << "\n";
     }
 
     chunk_mtx_.unlock();

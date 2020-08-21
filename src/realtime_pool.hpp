@@ -29,7 +29,6 @@
 #include <deque>
 #include "mapper.hpp"
 #include "conf.hpp"
-#include "sync_out.hpp"
 
 using MapResult = std::tuple<u16, u32, Paf>;
 
