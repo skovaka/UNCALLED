@@ -2,12 +2,14 @@ CC=gcc
 CFLAGS=-Wall -std=c++11 -O3 -g -fPIC
 
 #TODO: auto-download, or search common paths
-HDF5_LIB=-L/usr/lib/x86_64-linux-gnu/hdf5/serial /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.a
-HDF5_INCLUDE=-I/usr/lib/x86_64-linux-gnu/hdf5/serial/include
+#HDF5_LIB=-L/usr/lib/x86_64-linux-gnu/hdf5/serial /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.a
+#HDF5_INCLUDE=-I/usr/lib/x86_64-linux-gnu/hdf5/serial/include
+HDF5_LIB=-L~/anaconda3/lib ~/anaconda3/lib/libhdf5.a
+HDF5_INCLUDE=-I~/anaconda3/include
 
 BWA_LIB=-L bwa bwa/libbwa.a
 
-LIBS=$(HDF5_LIB) $(BWA_LIB) -lstdc++ -lz -ldl -pthread -lm -lsz
+LIBS=$(HDF5_LIB) $(BWA_LIB) -lstdc++ -lz -ldl -pthread -lm 
 INCLUDE=-I . -I toml11 -I fast5/include -I pybind11/include -I pdqsort $(HDF5_INCLUDE)
 
 SRC=src
