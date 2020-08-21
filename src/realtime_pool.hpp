@@ -29,6 +29,7 @@
 #include <deque>
 #include "mapper.hpp"
 #include "conf.hpp"
+#include "sync_out.hpp"
 
 using MapResult = std::tuple<u16, u32, Paf>;
 
@@ -78,14 +79,15 @@ class RealtimePool {
 
     RealtimeParams PRMS;
 
+
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;
     std::vector<MapperThread> threads_;
     std::vector<Chunk> chunk_buffer_;
 
-    std::vector<u16> buffer_queue_, out_chs_;
-    //std::deque<u16> active_queue_;
-    std::vector<u16> active_queue_;
+    std::vector<u16> buffer_queue_, out_chs_, active_queue_;
+    //std::deque<u16> ;
+    //std::vector<u16> active_queue_;
 
     Timer time_;
     //Store threads in order of # active mappers
