@@ -21,13 +21,16 @@ int main(int argc, char** argv) {
 
     MapPoolOrd pool(conf);
 
+    Timer t;
+
     pool.load_fast5s();
 
     u64 MAX_SLEEP = 100;
 
+    std::cerr << t.lap() << " loaded\n";
+
     std::cerr << "Mapping\n";
 
-    Timer t;
 
     while (pool.running()) {
         u64 t0 = t.get();
@@ -38,9 +41,7 @@ int main(int argc, char** argv) {
         if (dt < MAX_SLEEP) usleep(1000*(MAX_SLEEP - dt));
     }
 
-    //for (Paf p : pool.update()) {
-    //    p.print_paf();
-    //}
+    std::cerr << t.lap() << " mapped\n";
 
     std::cerr << "Finishing\n";
 

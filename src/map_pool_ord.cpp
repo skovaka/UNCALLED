@@ -62,6 +62,7 @@ std::vector<Paf> MapPoolOrd::update() {
 
     channels_empty_ = true;
 
+
     for (u32 i = 0; i < channels_.size(); i++) {
         if (channels_[i].empty()) continue;
         channels_empty_ = false;
@@ -96,6 +97,13 @@ std::vector<Paf> MapPoolOrd::update() {
         }
 
         ret.push_back(std::get<2>(m));
+    }
+
+    //TODO is_running vs all_finished is confusing
+    if (!pool_.is_running()) {
+        for (auto &chs : channels_) chs.clear();
+        channels_empty_ = true;
+        pool_.stop_all();
     }
 
     return ret;

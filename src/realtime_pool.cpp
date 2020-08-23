@@ -29,7 +29,8 @@
 #include "mapper.hpp"
 
 RealtimePool::RealtimePool(Conf &conf) :
-    PRMS(conf.realtime_prms) {
+    PRMS(conf.realtime_prms),
+    running_(true) {
 
     conf.load_index_params();
     Mapper::model = PoreModel<KLEN>(conf.kmer_model, true);
@@ -199,11 +200,28 @@ std::vector<MapResult> RealtimePool::update() {
     }
 
     //Estimate how much to fill each thread
-    u16 target = min(active_queue_.size() + active_count, PRMS.max_active_reads),
-        min_per_thread = target / threads_.size(), // + (target % threads_.size() > 0);
+    u16 target = min(active_queue_.size() + active_count, PRMS.max_active_reads);
+
+    //TODO definitely dont do in realtime mode
+    if (target < PRMS.max_active_reads) {
+        active_queue_.clear();
+        for (auto &t : threads_) { 
+            t.in_mtx_.lock();
+            t.in_chs_.clear();
+            t.in_mtx_.unlock();
+
+            t.running_ = false;
+        }
+        running_ = false;
+        //stop_all();
+        //return ret;
+    }
+
+    u16 min_per_thread = target / threads_.size(), // + (target % threads_.size() > 0);
         remain = target % threads_.size();
 
     for (u32 c : read_counts) remain -= (c > min_per_thread);
+
     
 
     u16 st = (u16) rand();
@@ -267,6 +285,7 @@ bool RealtimePool::all_finished() {
 }
 
 void RealtimePool::stop_all() {
+    running_ = false;
     for (MapperThread &t : threads_) {
         t.running_ = false;
         t.thread_.join();
