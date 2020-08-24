@@ -49,6 +49,8 @@ class MapPoolOrd {
     Fast5Reader fast5s_;
     RealtimePool pool_;
 
+    u32 active_tgt_;
+
     using ChQueue = std::deque<ReadBuffer>;
     std::vector<ChQueue> channels_;
     std::vector<u32> chunk_idx_;

@@ -299,7 +299,6 @@ bool Mapper::add_chunk(Chunk &chunk) {
     if (read_.chunks_maxed()) {
 
         set_failed();
-        read_.loc_.set_float(Paf::Tag::EJECT, 1);
         chunk.clear();
 
         chunk_mtx_.unlock();
@@ -319,7 +318,12 @@ u16 Mapper::process_chunk() {
     if (read_.chunk_processed_ || reset_ || 
         !chunk_mtx_.try_lock()) return 0; 
 
+    if (read_.chunk_count() == 1) {
+        read_.loc_.set_float(Paf::Tag::QUEUE_TIME, map_timer_.lap());
+    }
+
     wait_time_ += map_timer_.lap();
+
 
     float mean;
     //std::cerr << "# got " << read_.get_id() 
@@ -379,7 +383,6 @@ bool Mapper::map_chunk() {
 
     if (reset_ || chunk_timer_.get() > PRMS.max_chunk_wait) {
         set_failed();
-        read_.loc_.set_float(Paf::Tag::EJECT, 3);
         read_.loc_.set_ended();
         //std::cerr << "# END timer or reset\n";
         return true;
@@ -392,7 +395,6 @@ bool Mapper::map_chunk() {
 
         if (norm_.empty() && read_.chunk_processed_) {
             set_failed();
-            read_.loc_.set_float(Paf::Tag::EJECT, 2);
             chunk_mtx_.unlock();
             return true;
         }
@@ -435,7 +437,6 @@ bool Mapper::map_chunk() {
 bool Mapper::map_next() {
     if (norm_.empty() || reset_ || event_i_ >= PRMS.max_events) {
         state_ = State::FAILURE;
-        read_.loc_.set_float(Paf::Tag::EJECT, 0);
         return true;
     }
 

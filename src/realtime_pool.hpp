@@ -42,11 +42,13 @@ class RealtimePool {
     void end_read(u16 ch, u32 number);
     bool is_read_finished(const ReadBuffer &r);
 
-    bool is_running() {return running_;}
+    bool is_stopped() {return stopped_;}
 
     std::vector<MapResult> update();
     bool all_finished();
     void stop_all(); //TODO: just name stop
+
+    u32 active_count() const; 
 
     private:
 
@@ -82,8 +84,9 @@ class RealtimePool {
 
     RealtimeParams PRMS;
 
-    bool running_;
+    bool stopped_;
 
+    u32 active_count_;
 
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;

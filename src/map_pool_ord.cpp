@@ -29,6 +29,7 @@
 MapPoolOrd::MapPoolOrd(Conf &conf)
     : fast5s_(conf.fast5_prms),
       pool_(conf),
+      active_tgt_(conf.realtime_prms.max_active_reads),
       channels_empty_(false) {
 
     channels_.resize(conf.get_num_channels());
@@ -91,19 +92,22 @@ std::vector<Paf> MapPoolOrd::update() {
         u32 nm = std::get<1>(m);
 
         //Remove read from channel queue
-        if (!channels_[i].empty() && channels_[i].front().get_number() == nm) {
-            channels_[i].pop_front();
-            chunk_idx_[i] = 0;
+        if (!channels_[i].empty() && 
+            channels_[i].front().get_number() == nm) {
+
+                channels_[i].pop_front();
+                chunk_idx_[i] = 0;
         }
 
         ret.push_back(std::get<2>(m));
     }
 
     //TODO is_running vs all_finished is confusing
-    if (!pool_.is_running()) {
+    //if (pool_.is_stopped()) {
+    if (pool_.active_count() < active_tgt_) {
+        pool_.stop_all();
         for (auto &chs : channels_) chs.clear();
         channels_empty_ = true;
-        pool_.stop_all();
     }
 
     return ret;

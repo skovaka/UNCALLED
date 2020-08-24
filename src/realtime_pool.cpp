@@ -30,7 +30,7 @@
 
 RealtimePool::RealtimePool(Conf &conf) :
     PRMS(conf.realtime_prms),
-    running_(true) {
+    stopped_(false) {
 
     conf.load_index_params();
     Mapper::model = PoreModel<KLEN>(conf.kmer_model, true);
@@ -140,7 +140,7 @@ bool RealtimePool::try_add_chunk(Chunk &c) {
 std::vector<MapResult> RealtimePool::update() {
 
     std::vector< u16 > read_counts(threads_.size(), 0);
-    u16 active_count = 0;
+    active_count_ = 0;
     std::vector<MapResult> ret;
 
     //Get alignment outputs
@@ -165,7 +165,7 @@ std::vector<MapResult> RealtimePool::update() {
 
         //Count reads aligning in each thread
         read_counts[t] = threads_[t].read_count();
-        active_count += read_counts[t];
+        active_count_ += read_counts[t];
     }
 
     //Buffer queue should be ordered in "ord" mode
@@ -191,38 +191,27 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-    if (time_.get() >= 1000 && active_count > 0) {
+    if (time_.get() >= 1000 && active_count_ > 0) {
         std::cout << "#prefill_threads ("
-                  << active_count << ")";
+                  << active_count_ << ")";
         for (u16 c : read_counts) std::cout << " " << c;
         std::cout << "\n";
         std::cout.flush();
     }
 
     //Estimate how much to fill each thread
-    u16 target = min(active_queue_.size() + active_count, PRMS.max_active_reads);
+    u16 target = min(active_queue_.size() + active_count_, PRMS.max_active_reads);
 
     //TODO definitely dont do in realtime mode
-    if (target < PRMS.max_active_reads) {
-        active_queue_.clear();
-        for (auto &t : threads_) { 
-            t.in_mtx_.lock();
-            t.in_chs_.clear();
-            t.in_mtx_.unlock();
-
-            t.running_ = false;
-        }
-        running_ = false;
-        //stop_all();
-        //return ret;
-    }
+    //if (target < PRMS.max_active_reads) {
+    //    stop_all();
+    //    return ret;
+    //}
 
     u16 min_per_thread = target / threads_.size(), // + (target % threads_.size() > 0);
         remain = target % threads_.size();
 
     for (u32 c : read_counts) remain -= (c > min_per_thread);
-
-    
 
     u16 st = (u16) rand();
 
@@ -251,15 +240,15 @@ std::vector<MapResult> RealtimePool::update() {
             remain -= (remain > 0);
 
             read_counts[t] += n;
-            active_count += n;
+            active_count_ += n;
         }
     }
 
-    if (time_.get() >= 1000 && active_count > 0) {
+    if (time_.get() >= 1000 && active_count_ > 0) {
         time_.reset();
 
         std::cout << "#pstfill_threads ("
-                  << active_count << ")";
+                  << active_count_ << ")";
 
         for (u16 c : read_counts) std::cout << " " << c;
         std::cout << "\n";
@@ -267,6 +256,10 @@ std::vector<MapResult> RealtimePool::update() {
     }
 
     return ret;
+}
+
+u32 RealtimePool::active_count() const {
+    return active_count_;
 }
 
 //void u32 ReadBuffer::end_read(u16 ch, u32 number) {
@@ -285,10 +278,15 @@ bool RealtimePool::all_finished() {
 }
 
 void RealtimePool::stop_all() {
-    running_ = false;
-    for (MapperThread &t : threads_) {
-        t.running_ = false;
-        t.thread_.join();
+    if (!stopped_) {
+        stopped_ = true;
+        for (MapperThread &t : threads_) {
+            t.running_ = false;
+            t.thread_.join();
+        }
+
+        active_queue_.clear();
+        buffer_queue_.clear();
     }
 }
 
@@ -325,7 +323,6 @@ void RealtimePool::MapperThread::run() {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
-
 
         //Read inputs (pop, lock, and swap it)
         if (!in_chs_.empty()) {
@@ -370,4 +367,14 @@ void RealtimePool::MapperThread::run() {
             out_tmp_.clear();
         }
     }
+
+    active_chs_.clear();
+
+    in_mtx_.lock();
+    in_chs_.clear();
+    in_mtx_.unlock();
+
+    out_mtx_.lock();
+    out_chs_.clear();
+    out_mtx_.unlock();
 }
