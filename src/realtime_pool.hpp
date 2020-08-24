@@ -42,6 +42,8 @@ class RealtimePool {
     void end_read(u16 ch, u32 number);
     bool is_read_finished(const ReadBuffer &r);
 
+    bool is_running() {return running_;}
+
     std::vector<MapResult> update();
     bool all_finished();
     void stop_all(); //TODO: just name stop
@@ -54,6 +56,8 @@ class RealtimePool {
         MapperThread(MapperThread &&mt);
 
         void start();
+        void stop();
+
         void run();
 
         u16 read_count() const;
@@ -78,14 +82,17 @@ class RealtimePool {
 
     RealtimeParams PRMS;
 
+    bool running_;
+
+
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;
     std::vector<MapperThread> threads_;
     std::vector<Chunk> chunk_buffer_;
 
-    std::vector<u16> buffer_queue_, out_chs_;
-    //std::deque<u16> active_queue_;
-    std::vector<u16> active_queue_;
+    std::vector<u16> buffer_queue_, out_chs_, active_queue_;
+    //std::deque<u16> ;
+    //std::vector<u16> active_queue_;
 
     Timer time_;
     //Store threads in order of # active mappers

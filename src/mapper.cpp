@@ -220,12 +220,18 @@ void Mapper::new_read(ReadBuffer &r) {
 }
 
 void Mapper::new_read(Chunk &chunk) {
+    if (!chunk_mtx_.try_lock()) {
+        std::cerr << "Error: failed to create new read '" << read_.id_ << "'\n";
+        return;
+    }
+
     if (prev_unfinished(chunk.get_number())) {
         std::cerr << "Error: possibly lost read '" << read_.id_ << "'\n";
     }
-    adding_ = true;
     read_ = ReadBuffer(chunk);
     reset();
+
+    chunk_mtx_.unlock();
 }
 
 void Mapper::reset() {
@@ -237,8 +243,6 @@ void Mapper::reset() {
     event_i_ = 0;
     reset_ = false;
     last_chunk_ = false;
-    processing_ = false;
-    adding_ = false;
     state_ = State::MAPPING;
     norm_.skip_unread();
 
@@ -285,45 +289,35 @@ Mapper::State Mapper::get_state() const {
 }
 
 bool Mapper::add_chunk(Chunk &chunk) {
-    if (!is_chunk_processed() || reset_ || processing_) return false;
+    if (!chunk_mtx_.try_lock()) return false;
 
-    adding_ = true;
-
-    //if (read_.num_chunks_ == PRMS.max_chunks) {
-    if (read_.chunks_maxed()) {
-        std::cout << "# MAXED " 
-                  << chunk.get_id() << " "
-                  << is_chunk_processed() << " " 
-                  << " " << norm_.empty() << "\n";
-
-        set_failed();
-        chunk.clear();
-        adding_ = false;
-        return true;
+    if (!is_chunk_processed() || finished() || reset_) { 
+        chunk_mtx_.unlock();
+        return false;
     }
 
-    std::cout << "# addx " << chunk.get_id() 
-              << " " << read_.chunk_count() 
-              << " " << is_chunk_processed() << "\n";
+    if (read_.chunks_maxed()) {
+
+        set_failed();
+        read_.loc_.set_float(Paf::Tag::EJECT, 1);
+        chunk.clear();
+
+        chunk_mtx_.unlock();
+        return true;
+    }
 
     bool added = read_.add_chunk(chunk);
     if (added) {
         chunk_timer_.reset();
-        std::cout << "# add4 " << chunk.get_id() 
-                  << " " << read_.chunk_count() 
-                  << " " << is_chunk_processed()
-                  << " " << norm_.empty() << "\n";
     }
 
-    adding_ = false;
-
+    chunk_mtx_.unlock();
     return added;
 }
 
 u16 Mapper::process_chunk() {
-    if (read_.chunk_processed_ || reset_ || adding_) return 0; 
-
-    processing_ = true;
+    if (read_.chunk_processed_ || reset_ || 
+        !chunk_mtx_.try_lock()) return 0; 
 
     wait_time_ += map_timer_.lap();
 
@@ -347,6 +341,8 @@ u16 Mapper::process_chunk() {
 
                 if (!norm_.push(mean)) {
                     map_time_ += map_timer_.lap();
+
+                    chunk_mtx_.unlock();
                     return nevents;
                 }
             }
@@ -354,17 +350,13 @@ u16 Mapper::process_chunk() {
         }
     }
 
-    //std::cerr << "# prc " << read_.get_id() 
-    //          << " " << read_.chunk_count() << "\n";
-
     read_.chunk_.clear();
-    //here?
+
     read_.chunk_processed_ = true;
 
     map_time_ += map_timer_.lap();
 
-    processing_ = false;
-
+    chunk_mtx_.unlock();
     return nevents;
 }
 
@@ -386,12 +378,8 @@ bool Mapper::map_chunk() {
     wait_time_ += map_timer_.lap();
 
     if (reset_ || chunk_timer_.get() > PRMS.max_chunk_wait) {
-        if (chunk_timer_.get() > PRMS.max_chunk_wait) {
-            //std::cerr << "#chunk timeout "
-            //          << chunk_timer_.get() << " "
-            //          << PRMS.max_chunk_wait << "\n";
-        }
         set_failed();
+        read_.loc_.set_float(Paf::Tag::EJECT, 3);
         read_.loc_.set_ended();
         //std::cerr << "# END timer or reset\n";
         return true;
@@ -399,11 +387,20 @@ bool Mapper::map_chunk() {
     } else if (norm_.empty() && 
                read_.chunk_processed_ && 
                read_.chunks_maxed()) {
-        //std::cerr << "# END maxed\n";
-        set_failed();
-        return true;
 
-    } else if (norm_.empty()) {
+        chunk_mtx_.lock();
+
+        if (norm_.empty() && read_.chunk_processed_) {
+            set_failed();
+            read_.loc_.set_float(Paf::Tag::EJECT, 2);
+            chunk_mtx_.unlock();
+            return true;
+        }
+
+        chunk_mtx_.unlock();
+    }
+
+    if (norm_.empty()) {
         //std::cerr << "# stuck empty: " 
         //          << chunk_timer_.get() << " < "
         //          << PRMS.max_chunk_wait << "\n";
@@ -438,6 +435,7 @@ bool Mapper::map_chunk() {
 bool Mapper::map_next() {
     if (norm_.empty() || reset_ || event_i_ >= PRMS.max_events) {
         state_ = State::FAILURE;
+        read_.loc_.set_float(Paf::Tag::EJECT, 0);
         return true;
     }
 

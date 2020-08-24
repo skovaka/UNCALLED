@@ -62,49 +62,48 @@ std::vector<Paf> MapPoolOrd::update() {
 
     channels_empty_ = true;
 
+
     for (u32 i = 0; i < channels_.size(); i++) {
         if (channels_[i].empty()) continue;
-
-        if (pool_.is_read_finished(channels_[i].front())) {
-            //std::cout << "#end " << channels_[i].front().get_id() << "\n";
-            //channels_[i].pop_front();
-            //chunk_idx_[i] = 0;
-            //
-            //if (channels_[i].empty()) continue;
-            chunk_idx_[i] = channels_[i].front().chunk_count();
-        }
-
         channels_empty_ = false;
 
+        //Skip the read if the mapper has finished
+        //It will be removed from the queue below
+        if (pool_.is_read_finished(channels_[i].front())) {
+            //chunk_idx_[i] = channels_[i].front().chunk_count();
+            continue;
+        }
+
+        //Get next chunk
         ReadBuffer &r = channels_[i].front();
         Chunk chunk = r.get_chunk(chunk_idx_[i]);
         
-        bool empty = chunk.empty();
-
+        //Try adding to pool
+        //If sucessfful, move to next chunk
         if (pool_.try_add_chunk(chunk)) {
-            //std::cout << "#added "
-            //          << chunk.get_id() << " "
-            //          << chunk_idx_[i] << "\n";
             chunk_idx_[i]++;
         }
-        
-        //if (empty) {//|| chunk_idx_[i] >= r.chunk_count()) {
-        //    //std::cout << "#ender " << r.get_id() << "\n";
-        //    channels_[i].pop_front();
-        //    chunk_idx_[i] = 0;
-        //}
     }
 
+    //Get mapping results
     for (const MapResult &m : pool_.update()) {
         u16 i = std::get<0>(m)-1;
         u32 nm = std::get<1>(m);
 
+        //Remove read from channel queue
         if (!channels_[i].empty() && channels_[i].front().get_number() == nm) {
             channels_[i].pop_front();
             chunk_idx_[i] = 0;
         }
 
         ret.push_back(std::get<2>(m));
+    }
+
+    //TODO is_running vs all_finished is confusing
+    if (!pool_.is_running()) {
+        for (auto &chs : channels_) chs.clear();
+        channels_empty_ = true;
+        pool_.stop_all();
     }
 
     return ret;

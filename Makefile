@@ -1,9 +1,6 @@
 CC=gcc
-CFLAGS=-Wall -std=c++11 -O3 -g -fPIC
+CFLAGS=-Wall -std=c++11 -g -fPIC #-O3 
 
-#TODO: auto-download, or search common paths
-#HDF5_LIB=-L/usr/lib/x86_64-linux-gnu/hdf5/serial /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.a
-#HDF5_INCLUDE=-I/usr/lib/x86_64-linux-gnu/hdf5/serial/include
 
 LIBHDF5=./submods/hdf5/lib/libhdf5.a
 HDF5_LIB=-L./submods/hdf5/lib $(LIBHDF5)
@@ -23,7 +20,7 @@ BIN=bin
 LIB=lib
 #INCLUDE=include
 
-_COMMON_OBJS=mapper.o seed_tracker.o range.o event_detector.o normalizer.o chunk.o read_buffer.o fast5_reader.o
+_COMMON_OBJS=mapper.o seed_tracker.o range.o event_detector.o normalizer.o chunk.o read_buffer.o fast5_reader.o #sync_out.o
 
 _MAP_ORD_OBJS=$(_COMMON_OBJS) realtime_pool.o map_pool_ord.o uncalled_map_ord.o 
 _MAP_OBJS=$(_COMMON_OBJS) map_pool.o uncalled_map.o 

@@ -28,6 +28,7 @@ ReadParams ReadBuffer::PRMS;
 const std::string Paf::PAF_TAGS[] = {
     "mt", //MAP_TIME
     "wt", //WAIT_TIME
+    "qt", //QUEUE_TIME
     "rt", //RECEIVE_TIME
     "ch", //CHANNEL
     "ej", //UNBLOCK
@@ -118,7 +119,7 @@ void Paf::print_paf() const {
         std::cout << "\t" << PAF_TAGS[t.first] << ":Z:" << t.second;
     }
 
-    std::cout << std::endl;
+    std::cout << "\n";
 }
 
 void Paf::set_read_len(u64 rd_len) {
@@ -261,17 +262,11 @@ bool ReadBuffer::add_chunk(Chunk &c) {
         channel_idx_ != c.get_channel_idx() || 
         number_ != c.get_number()) return false;
 
-    std::cout << "# add2 " << id_ << " " << chunk_processed_ << "\n";
-
     chunk_processed_ = false;
 
     chunk_count_++;
     set_raw_len(raw_len_+c.size());
     c.pop(chunk_);
-
-    //chunk_processed_ = false;
-
-    std::cout << "# add3 " << id_ << " " << chunk_processed_ << "\n";
 
     return true;
 }
@@ -289,11 +284,6 @@ u16 ReadBuffer::get_channel_idx() const {
 }
 
 bool ReadBuffer::chunks_maxed() const {
-    //if (chunk_count_ >= PRMS.max_chunks) {
-    //    std::cout << "#MAAAX "
-    //              << chunk_count_ << " "
-    //              << PRMS.max_chunks << "\n";
-    //}
     return chunk_count_ >= PRMS.max_chunks;
 }
 
