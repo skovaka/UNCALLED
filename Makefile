@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -std=c++11 -g -fPIC #-O3 
+CFLAGS=-Wall -std=c++11 -g -fPIC -O3 
 
 
 LIBHDF5=./submods/hdf5/lib/libhdf5.a
@@ -10,8 +10,7 @@ LIBBWA=./submods/bwa/libbwa.a
 BWA_LIB=-L./submods/bwa $(LIBBWA)
 BWA_INCLUDE=-I./submods/bwa
 
-LIBS=$(HDF5_LIB) $(BWA_LIB) -lstdc++ -lz -ldl -pthread -lm -lsz
-#LIBS=-lstdc++ -lz -ldl -pthread -lm -lsz
+LIBS=$(HDF5_LIB) $(BWA_LIB) -lstdc++ -lz -ldl -pthread -lm 
 INCLUDE=-I submods/ -I submods/toml11 -I submods/fast5/include -I submods/pybind11/include -I submods/pdqsort $(HDF5_INCLUDE) $(BWA_INCLUDE)
 
 SRC=src
