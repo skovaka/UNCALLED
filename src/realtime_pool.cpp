@@ -32,9 +32,7 @@ RealtimePool::RealtimePool(Conf &conf) :
     PRMS(conf.realtime_prms),
     stopped_(false) {
 
-    conf.load_index_params();
-    Mapper::model = PoreModel<KLEN>(conf.kmer_model, true);
-    Mapper::fmi.load_index(conf.bwa_prefix);
+    Mapper::load_static(conf.bwa_prefix, conf.kmer_model, conf.index_preset);
 
     for (u16 t = 0; t < conf.threads; t++) {
         threads_.emplace_back(mappers_);

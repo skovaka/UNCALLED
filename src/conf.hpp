@@ -34,8 +34,6 @@
 #include "pybind11/pybind11.h"
 #endif
 
-#define INDEX_SUFF ".uncl"
-
 const std::string ACTIVE_STRS[] = {"full", "even", "odd"};
 const std::string MODE_STRS[] = {"deplete", "enrich"};
 
@@ -145,23 +143,23 @@ class Conf {
             GET_TOML_EXTERN(subconf, float, chunk_time, ReadBuffer::PRMS);
         }
 
-        if (conf.contains("mapper")) {
-            const auto subconf = toml::find(conf, "mapper");
+        //if (conf.contains("mapper")) {
+        //    const auto subconf = toml::find(conf, "mapper");
 
-            GET_TOML_EXTERN(subconf, u32, seed_len, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, min_rep_len, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_rep_copy, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_paths, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_consec_stay, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_events, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, max_stay_frac, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, min_seed_prob, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, seed_len, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, min_rep_len, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, max_rep_copy, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, max_paths, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, max_consec_stay, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, max_events, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, max_stay_frac, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, min_seed_prob, Mapper::PRMS);
 
-            GET_TOML_EXTERN(subconf, u32, evt_buffer_len, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u16, evt_batch_size, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, evt_timeout, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, max_chunk_wait, Mapper::PRMS);
-        }
+        //    GET_TOML_EXTERN(subconf, u32, evt_buffer_len, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u16, evt_batch_size, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, evt_timeout, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, max_chunk_wait, Mapper::PRMS);
+        //}
 
         if (conf.contains("seed_tracker")) {
             const auto subconf = toml::find(conf, "seed_tracker");
@@ -171,16 +169,16 @@ class Conf {
             GET_TOML_EXTERN(subconf, u32, min_aln_len, SeedTracker::PRMS);
         }
 
-        if (conf.contains("event_detector")) {
-            const auto subconf = toml::find(conf, "event_detector");
-            GET_TOML_EXTERN(subconf, float, min_mean, EventDetector::PRMS);
-            GET_TOML_EXTERN(subconf, float, max_mean, EventDetector::PRMS);
-            GET_TOML_EXTERN(subconf, float, threshold1, EventDetector::PRMS);
-            GET_TOML_EXTERN(subconf, float, threshold2, EventDetector::PRMS);
-            GET_TOML_EXTERN(subconf, float, peak_height, EventDetector::PRMS);
-            GET_TOML_EXTERN(subconf, u32, window_length1, EventDetector::PRMS);
-            GET_TOML_EXTERN(subconf, u32, window_length2, EventDetector::PRMS);
-        }
+        //if (conf.contains("event_detector")) {
+        //    const auto subconf = toml::find(conf, "event_detector");
+        //    GET_TOML_EXTERN(subconf, float, min_mean, EventDetector::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, max_mean, EventDetector::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, threshold1, EventDetector::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, threshold2, EventDetector::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, peak_height, EventDetector::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, window_length1, EventDetector::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, window_length2, EventDetector::PRMS);
+        //}
 
         if (conf.contains("simulator")) {
             const auto subconf = toml::find(conf, "simulator");
@@ -272,35 +270,6 @@ class Conf {
     }
     #endif
 
-    void load_index_params() {
-        
-        std::ifstream param_file(bwa_prefix + INDEX_SUFF);
-        std::string param_line;
-
-        char *index_preset_c = (char *) index_preset.c_str();
-        Mapper::PRMS.prob_threshes.resize(64);
-
-        while (getline(param_file, param_line)) {
-            char *param_name = strtok((char *) param_line.c_str(), "\t");
-            char *fn_str = strtok(NULL, "\t");
-            //char *path_str = strtok(NULL, "\t");
-            if ( !index_preset.empty() && strcmp(param_name, index_preset_c) ) {
-                    continue;
-            }
-
-            u8 fmbin = Mapper::PRMS.prob_threshes.size() - 1;
-            char *prob_str;
-            while ( (prob_str = strtok(fn_str, ",")) != NULL ) {
-                fn_str = NULL;
-                Mapper::PRMS.prob_threshes[fmbin] = atof(prob_str);
-                fmbin--;
-            }
-
-            for (;fmbin < Mapper::PRMS.prob_threshes.size(); fmbin--) {
-                Mapper::PRMS.prob_threshes[fmbin] = Mapper::PRMS.prob_threshes[fmbin+1];
-            }
-        }
-    }
 
     u16 threads, num_channels;
     std::string bwa_prefix;
