@@ -5,12 +5,34 @@ import os
 import subprocess
 import sys
 
-class make_bwa(build_ext):
+class make_libs(build_ext):
     def run(self):
         sys.stderr.write("building libbwa\n")
-        subprocess.call(["make", 
-                         "-C", "./submods/bwa", 
-                         "-f", "../../src/Makefile_bwa"])
+
+        subprocess.call([
+            "make", 
+             "-C", "./submods/bwa", 
+             "-f", "../../src/Makefile_bwa"
+        ])
+
+        wd = os.getcwd()
+
+        os.chdir("submods/hdf5")
+
+        subprocess.call([
+            "./configure", 
+                "--enable-threadsafe", 
+                "--disable-hl",
+                "--prefix=`pwd`" ,
+                "--enable-shared=no",
+                "--with-pic=yes"
+        ])
+
+        subprocess.call(["make"])
+        subprocess.call(["make", "install"])
+
+        os.chdir(wd)
+
         build_ext.run(self)
 
 uncalled = Extension(
@@ -54,4 +76,4 @@ setup(name = "uncalled",
       ext_modules = [uncalled],
       package_data = {'uncalled': ['models/*', 'conf/*']},
       scripts = ['scripts/uncalled'],
-      cmdclass={'build_ext': make_bwa})
+      cmdclass={'build_ext': make_libs})
