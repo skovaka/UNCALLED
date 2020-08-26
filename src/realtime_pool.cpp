@@ -191,13 +191,13 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-    if (time_.get() >= 1000 && active_count_ > 0) {
-        std::cout << "#prefill_threads ("
-                  << active_count_ << ")";
-        for (u16 c : read_counts) std::cout << " " << c;
-        std::cout << "\n";
-        std::cout.flush();
-    }
+    //if (time_.get() >= 1000 && active_count_ > 0) {
+    //    std::cout << "#prefill_threads ("
+    //              << active_count_ << ")";
+    //    for (u16 c : read_counts) std::cout << " " << c;
+    //    std::cout << "\n";
+    //    std::cout.flush();
+    //}
 
     //Estimate how much to fill each thread
     u16 target = min(active_queue_.size() + active_count_, PRMS.max_active_reads);
@@ -244,16 +244,16 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-    if (time_.get() >= 1000 && active_count_ > 0) {
-        time_.reset();
+    //if (time_.get() >= 1000 && active_count_ > 0) {
+    //    time_.reset();
 
-        std::cout << "#pstfill_threads ("
-                  << active_count_ << ")";
+    //    std::cout << "#pstfill_threads ("
+    //              << active_count_ << ")";
 
-        for (u16 c : read_counts) std::cout << " " << c;
-        std::cout << "\n";
-        std::cout.flush();
-    }
+    //    for (u16 c : read_counts) std::cout << " " << c;
+    //    std::cout << "\n";
+    //    std::cout.flush();
+    //}
 
     return ret;
 }

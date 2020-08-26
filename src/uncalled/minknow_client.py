@@ -61,6 +61,8 @@ if ru_loaded:
             self.logger.setLevel(logging.WARNING)
             self.unc_log = logging.getLogger('UNCALLED')
 
+            #self.device = minknow.Device(self.connection)
+
 
         def run(self, steady_wait=10, scan_wait=5, refresh=0.5, **kwargs):
             self.anl_client = self.connection.analysis_configuration
@@ -78,8 +80,6 @@ if ru_loaded:
 
         def reset(self, timeout=5):
             read_until.ReadUntilClient.reset(self, timeout)
-
-            sys.stderr.write("RESET\n")
 
             if self.chmon_thread is not None:
                 self.chmon_running.clear()
@@ -142,11 +142,8 @@ if ru_loaded:
             #                     (self.get_runtime(), self.in_scan))
 
         def _update_muxs(self, channels):
-            sys.stderr.write("update?\n")
             for channels in channels:
-                sys.stderr.write("update...\n")
                 if not self.chmon_running.is_set():
-                    sys.stderr.write("whoops\n")
                     break
 
                 for ch in channels.channel_states:
@@ -158,14 +155,11 @@ if ru_loaded:
                         self.ch_mux[ch.channel-1] = nmx
 
                 self._scan_update()
-                sys.stderr.write("UPDATE...\n")
 
                 if self._get_minknow_status() != MK_PROCESSING:
-                    sys.stderr.write("dang\n")
                     self.chmon_running.clear()
                     self.running.clear()
                     break
-                sys.stderr.write("UPDATE!\n")
 
 
 

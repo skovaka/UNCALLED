@@ -294,7 +294,6 @@ def realtime_cmd(args):
         even = conf.active_chs == mapping.ActiveChs.EVEN #TODO: do within mapper
 
         if not sim:
-            cal = client.device.rpc.device.get_calibration(first_channel=1, last_channel=args.num_channels)
             raw_type = str(client.signal_dtype)
 
         pool = mapping.RealtimePool(conf)
