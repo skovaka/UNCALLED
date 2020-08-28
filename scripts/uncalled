@@ -45,7 +45,7 @@ def add_bwa_opt(p):
 
 def add_index_opts(p):
     p.add_argument("fasta_filename", type=str, help="FASTA file to index")
-    p.add_argument("-o", "--bwa-prefix", default=None, type=int, help="Index output prefix. Will use input fasta filename by default")
+    p.add_argument("-o", "--bwa-prefix", default=None, type=str, help="Index output prefix. Will use input fasta filename by default")
     p.add_argument("-s", "--max-sample-dist", default=100, type=int, help="Maximum average sampling distance between reference self-alignments.")
     p.add_argument("--min-samples", default=50000, type=int, help="Minimum number of self-alignments to produce (approximate, due to deterministically random start locations)")
     p.add_argument("--max-samples", default=1000000, type=int, help="Maximum number of self-alignments to produce (approximate, due to deterministically random start locations)")

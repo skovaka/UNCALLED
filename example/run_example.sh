@@ -9,6 +9,5 @@ if [ -d index ]; then
 fi
 
 mkdir index
-../bwa/bwa index -p index/example_ref example_ref.fa
-uncalled index index/example_ref
+uncalled index -o index/example_ref example_ref.fa
 uncalled map index/example_ref fast5_filename.txt
