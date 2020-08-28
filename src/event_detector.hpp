@@ -10,6 +10,8 @@
 #include <fast5.hpp>
 #include "util.hpp"
 
+
+
 //typedef fast5::EventDetection_Event Event;
 typedef fast5::Basecall_Event BCEvent;
 typedef fast5::Raw_Sample RawSample;
@@ -21,6 +23,34 @@ typedef struct {
     u32 length;
 } Event;
 
+typedef struct EventParams {
+    u32 window_length1;
+    u32 window_length2;
+    float threshold1;
+    float threshold2;
+    float peak_height;
+    float min_mean;
+    float max_mean;
+
+    EventParams() : 
+        window_length1(3),
+        window_length2(6),
+        threshold1    (1.4f),
+        threshold2    (1.1f),
+        peak_height   (0.2f),
+        min_mean      (30),
+        max_mean      (200) {}
+} EventParams;
+
+static EventParams const event_detection_defaults = EventParams();
+//    .window_length1 = 3,
+//    .window_length2 = 6,
+//    .threshold1     = 1.4f,
+//    .threshold2     = 1.1f,
+//    .peak_height    = 0.2f,
+//    .min_mean       = 30,
+//    .max_mean       = 150
+//};
 
 struct Detector {
     i32 DEF_PEAK_POS;
@@ -34,29 +64,8 @@ struct Detector {
 };
 
 class EventDetector {
-
-    typedef struct Params {
-        u32 window_length1;
-        u32 window_length2;
-        float threshold1;
-        float threshold2;
-        float peak_height;
-        float min_mean;
-        float max_mean;
-    } Params;
-
-    static Params constexpr PRMS_DEF = {
-        .window_length1 = 3,
-        .window_length2 = 6,
-        .threshold1     = 1.4f,
-        .threshold2     = 9.0f,
-        .peak_height    = 0.2f,
-        .min_mean       = 30,
-        .max_mean       = 200
-    };
-
     public:
-    static Params PRMS;
+    static EventParams PRMS;
 
     EventDetector();
 

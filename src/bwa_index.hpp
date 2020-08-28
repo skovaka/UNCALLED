@@ -185,10 +185,6 @@ class BwaIndex {
         return INT_MAX;
     } 
 
-    bool is_loaded() const {
-        return loaded_;
-    }
-
     bool pacseq_loaded() const {
         return pacseq_ != NULL;
     }

@@ -32,7 +32,9 @@ RealtimePool::RealtimePool(Conf &conf) :
     PRMS(conf.realtime_prms),
     stopped_(false) {
 
-    Mapper::load_static(conf.bwa_prefix, conf.kmer_model, conf.index_preset);
+    conf.load_index_params();
+    Mapper::model = PoreModel<KLEN>(conf.kmer_model, true);
+    Mapper::fmi.load_index(conf.bwa_prefix);
 
     for (u16 t = 0; t < conf.threads; t++) {
         threads_.emplace_back(mappers_);
@@ -189,13 +191,13 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-    //if (time_.get() >= 1000 && active_count_ > 0) {
-    //    std::cout << "#prefill_threads ("
-    //              << active_count_ << ")";
-    //    for (u16 c : read_counts) std::cout << " " << c;
-    //    std::cout << "\n";
-    //    std::cout.flush();
-    //}
+    if (time_.get() >= 1000 && active_count_ > 0) {
+        std::cout << "#prefill_threads ("
+                  << active_count_ << ")";
+        for (u16 c : read_counts) std::cout << " " << c;
+        std::cout << "\n";
+        std::cout.flush();
+    }
 
     //Estimate how much to fill each thread
     u16 target = min(active_queue_.size() + active_count_, PRMS.max_active_reads);
@@ -242,16 +244,16 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-    //if (time_.get() >= 1000 && active_count_ > 0) {
-    //    time_.reset();
+    if (time_.get() >= 1000 && active_count_ > 0) {
+        time_.reset();
 
-    //    std::cout << "#pstfill_threads ("
-    //              << active_count_ << ")";
+        std::cout << "#pstfill_threads ("
+                  << active_count_ << ")";
 
-    //    for (u16 c : read_counts) std::cout << " " << c;
-    //    std::cout << "\n";
-    //    std::cout.flush();
-    //}
+        for (u16 c : read_counts) std::cout << " " << c;
+        std::cout << "\n";
+        std::cout.flush();
+    }
 
     return ret;
 }

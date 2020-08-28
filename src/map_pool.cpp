@@ -28,8 +28,9 @@
 MapPool::MapPool(Conf &conf)
     : fast5s_(conf.fast5_prms) {
 
-
-    Mapper::load_static(conf.bwa_prefix, conf.kmer_model, conf.index_preset);
+    conf.load_index_params();
+    Mapper::model = PoreModel<KLEN>(conf.kmer_model, true);
+    Mapper::fmi.load_index(conf.bwa_prefix);
 
     threads_ = std::vector<MapperThread>(conf.threads);
 
