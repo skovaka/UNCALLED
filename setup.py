@@ -6,6 +6,11 @@ import sys
 
 __version__ = "2.1"
 
+ROOT_DIR = os.getcwd()
+
+SUBMOD_DIR = os.path.join(ROOT_DIR, "submods")
+SUBMODS = ["bwa", "fast5", "hdf5", "pdqsort", "read_until_api", "toml11"]
+
 class get_pybind_include(object):
     """Helper class to determine the pybind11 include path
     The purpose of this class is to postpone importing pybind11
@@ -16,15 +21,29 @@ class get_pybind_include(object):
         import pybind11
         return pybind11.get_include()
 
-class make_libs(build_ext):
+class pre_build(build_ext):
     def run(self):
+
+        submods_loaded = True
+        for submod in SUBMODS:
+            if not os.path.exists(os.path.join(SUBMOD_DIR, submod)):
+                submods_loaded = False
+                break
+
+        if not submods_loaded:
+            sys.stderr.write("Downloading submodules\n")
+            subprocess.check_call([
+                "git", "submodule", "update", "--init"
+            ])
+        else:
+            sys.stderr.write("All submodules present\n")
 
         if os.path.exists("./submods/bwa/libbwa.a"):
             sys.stderr.write("Found libbwa.a\n")
         else:
             sys.stderr.write("building libbwa\n")
 
-            subprocess.call([
+            subprocess.check_call([
                 "make", 
                  "-C", "./submods/bwa", 
                  "-f", "../../src/Makefile_bwa"
@@ -33,23 +52,24 @@ class make_libs(build_ext):
         if os.path.exists("./submods/hdf5/lib/libhdf5.a"):
             sys.stderr.write("Found libhdf5.a\n")
         else:
-            wd = os.getcwd()
 
-            os.chdir("submods/hdf5")
+            hdf5_dir = os.path.join(ROOT_DIR, "submods/hdf5")
 
-            subprocess.call([
+            os.chdir(hdf5_dir)
+
+            subprocess.check_call([
                 "./configure", 
                     "--enable-threadsafe", 
                     "--disable-hl",
-                    "--prefix=`pwd`" ,
+                    "--prefix", hdf5_dir,
                     "--enable-shared=no",
                     "--with-pic=yes"
             ])
 
-            subprocess.call(["make"])
-            subprocess.call(["make", "install"])
+            subprocess.check_call(["make"])
+            subprocess.check_call(["make", "install"])
 
-            os.chdir(wd)
+            os.chdir(ROOT_DIR)
 
         build_ext.run(self)
 
@@ -98,5 +118,5 @@ setup(name = "uncalled",
       classifiers=[
           "Programming Language :: Python :: 3"
       ],
-      cmdclass={'build_ext': make_libs},
+      cmdclass={'build_ext': pre_build},
       python_requires=">=3.6")
