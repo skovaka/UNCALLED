@@ -1,6 +1,3 @@
-[submodule "pybind11"]
-	path = submods/pybind11
-	url = https://github.com/pybind/pybind11.git
 [submodule "fast5"]
 	path = submods/fast5
 	url = https://github.com/mateidavid/fast5.git
