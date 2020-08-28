@@ -115,7 +115,7 @@ def get_parser():
     add_ru_opts(rt_parser)
     add_realtime_opts(rt_parser)
 
-    sim_parser = sp.add_parser("sim", help="Perform real-time targeted sequencing")#,formatter_class=ArgFormat)
+    sim_parser = sp.add_parser("sim", help="Simulate real-time target sequencing")#,formatter_class=ArgFormat)
     add_bwa_opt(sim_parser)
     add_sim_opts(sim_parser)
     add_map_opts(sim_parser)
