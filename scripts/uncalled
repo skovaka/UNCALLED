@@ -44,6 +44,8 @@ def add_bwa_opt(p):
 
 
 def add_index_opts(p):
+    p.add_argument("fasta_filename", type=str, help="FASTA file to index")
+    p.add_argument("-o", "--bwa-prefix", default=None, type=int, help="Index output prefix. Will use input fasta filename by default")
     p.add_argument("-s", "--max-sample-dist", default=100, type=int, help="Maximum average sampling distance between reference self-alignments.")
     p.add_argument("--min-samples", default=50000, type=int, help="Minimum number of self-alignments to produce (approximate, due to deterministically random start locations)")
     p.add_argument("--max-samples", default=1000000, type=int, help="Maximum number of self-alignments to produce (approximate, due to deterministically random start locations)")
@@ -57,7 +59,7 @@ def add_index_opts(p):
 
 def add_ru_opts(p):
     #TODO: selectively enrich or deplete refs in index
-    p.add_argument("-c", "--max-chunks", default=10, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
+    p.add_argument("-c", "--max-chunks", default=10, required=True, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
     p.add_argument("--chunk-time", required=False, type=float, default=1, help="Length of chunks in seconds")
 
     modes = p.add_mutually_exclusive_group(required=True)
@@ -101,7 +103,7 @@ def get_parser():
     sp = parser.add_subparsers(dest="subcmd")
 
     index_parser = sp.add_parser("index", help="Calculates reference-specific parameters needed to map to a given a BWA-index.")#, formatter_class=ArgFormat)
-    add_bwa_opt(index_parser)
+    #add_bwa_opt(index_parser)
     add_index_opts(index_parser)
 
     map_parser = sp.add_parser("map", help="Map fast5 files to a BWA index that has been processed by \"uncalled index\"")#,formatter_class=ArgFormat)
@@ -144,6 +146,22 @@ def load_args(args, conf):
             #    sys.stderr.write("%s\t%s\n" % (a, str(v)))
 
 def index_cmd(args):
+
+    if args.bwa_prefix == None:
+        args.bwa_prefix = args.fasta_filename
+
+    bwa_built = True
+
+    for suff in index.BWA_SUFFS:
+        if not os.path.exists(args.bwa_prefix + suff):
+            bwa_built = False
+            break
+
+    if bwa_built:
+        sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % args.bwa_prefix)
+    else:
+        mapping.BwaIndex.create(args.fasta_filename, args.bwa_prefix)
+
     sys.stderr.write("Initializing parameter search\n")
     p = index.IndexParameterizer(args)
 

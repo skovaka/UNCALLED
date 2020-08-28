@@ -20,7 +20,7 @@ max_replen = 100
 sample_rate = 4000
 bp_per_sec = 450
 chunk_time = 1.0
-max_chunks = 10
+max_chunks = 1000000
 
 [fast5_params]
 max_buffer = 100

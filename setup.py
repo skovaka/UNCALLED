@@ -30,7 +30,7 @@ class make_libs(build_ext):
                  "-f", "../../src/Makefile_bwa"
             ])
 
-        if os.path.exists("./submods/bwa/libhdf5.a"):
+        if os.path.exists("./submods/hdf5/lib/libhdf5.a"):
             sys.stderr.write("Found libhdf5.a\n")
         else:
             wd = os.getcwd()

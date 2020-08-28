@@ -30,8 +30,6 @@ import argparse
 from uncalled import mapping
 from bisect import bisect_left, bisect_right
 
-INDEX_UNCL_SUFF = ".uncl"
-INDEX_ANN_SUFF = ".ann"
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 

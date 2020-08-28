@@ -41,6 +41,9 @@ PYBIND11_MODULE(mapping, m) {
 
     //.def(py::init<const std::string &,const std::string &,u32>())
 
+    py::class_<BwaIndex<KLEN>>(m, "BwaIndex")
+        .def("create", &BwaIndex<KLEN>::create);
+
     py::class_<MapPool>(m, "MapPool")
         .def(py::init<Conf &>())
         .def("update", &MapPool::update)

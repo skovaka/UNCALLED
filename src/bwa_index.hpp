@@ -28,12 +28,11 @@
 #include <climits>
 #include <utility>
 #include <cstring>
+#include <bwa/bwa.h>
+#include <bwa/utils.h>
 #include "util.hpp"
 #include "bp.hpp"
 #include "range.hpp"
-#include <bwa/bwt.h>
-#include <bwa/bntseq.h>
-#include <bwa/utils.h>
 
 template <KmerLen KLEN>
 class SubSeq {
@@ -78,9 +77,23 @@ class SubSeq {
         size_;
 };
 
+//From submods/bwa/bwtindex.c
+#define BWA_BLOCK_SIZE 10000000
+
 template <KmerLen KLEN>
 class BwaIndex {
     public:
+
+    static void create(const std::string &fasta_fname, 
+                      const std::string &prefix = "") {
+
+        std::string prefix_auto = prefix.empty() ? fasta_fname : prefix;
+
+        bwa_idx_build(fasta_fname.c_str(), 
+                      prefix.c_str(), 
+                      BWTALGO_AUTO,
+                      BWA_BLOCK_SIZE);
+    }
 
     BwaIndex() :
         index_(NULL),

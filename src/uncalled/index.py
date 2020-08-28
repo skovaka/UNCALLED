@@ -30,6 +30,14 @@ import argparse
 from uncalled import mapping, params
 from bisect import bisect_left, bisect_right
 
+UNCL_SUFF = ".uncl"
+AMB_SUFF = ".amb"
+ANN_SUFF = ".ann"
+BWT_SUFF = ".bwt"
+PAC_SUFF = ".pac" 
+SA_SUFF = ".sa"
+BWA_SUFFS = [AMB_SUFF, ANN_SUFF, BWT_SUFF, PAC_SUFF, SA_SUFF]
+
 
 def power_fn(xmax, ymin, ymax, exp, N=100):
     dt = 1.0/N
@@ -40,7 +48,7 @@ def power_fn(xmax, ymin, ymax, exp, N=100):
 class IndexParameterizer:
 
     def __init__(self, args):
-        self.out_fname = args.bwa_prefix + params.INDEX_UNCL_SUFF
+        self.out_fname = args.bwa_prefix + UNCL_SUFF
 
         self.pck1 = args.matchpr1
         self.pck2 = args.matchpr2
@@ -52,7 +60,7 @@ class IndexParameterizer:
 
     def calc_map_stats(self, args):
 
-        ann_in = open(args.bwa_prefix + params.INDEX_ANN_SUFF)
+        ann_in = open(args.bwa_prefix + ANN_SUFF)
         header = ann_in.readline()
         ref_len = int(header.split()[0])
         ann_in.close()
@@ -60,12 +68,10 @@ class IndexParameterizer:
         approx_samps = ref_len / args.max_sample_dist
         if approx_samps < args.min_samples:
             sample_dist = int(np.ceil(ref_len/args.min_samples))
-            sys.stderr.write("Maxed %.2f\n" % sample_dist)
         elif approx_samps > args.max_samples:
             sample_dist = int(np.floor(ref_len/args.max_samples))
         else:
             sample_dist = args.max_sample_dist
-            sys.stderr.write("NOT maxed %.2f\n" % sample_dist)
 
         fmlens = mapping.self_align(args.bwa_prefix, sample_dist)
         path_kfmlens = [p[args.kmer_len-1:] if len(p) >= args.kmer_len else [1] for p in fmlens]
