@@ -14,6 +14,7 @@ Read the [preprint on BioRxiv](https://www.biorxiv.org/content/10.1101/2020.02.0
 
 ## Release notes
 
+- v2.1: updated ReadUntil client for latest MinKNOW version, made `uncalled index` automatically build the BWA index, added hdf5 submodule, further automated installation by auto-building hdf5, switched to using setuptools, moved submodules to submods/
 - v2.0: released the ReadUntil simulator `uncalled sim`, which can predict how much enrichment UNCALLED could provide on a given reference, using a control and UNCALLED run as a template. Also CHANGED THE FORMAT OF CERTAIN ARGUMENTS. Index prefix and fast5 list are now positional, and some flags have changed names. See below for details.
 - v1.2: fixed indexing for particularly large or small reference
 - v1.1: added support for altering chunk size
@@ -27,16 +28,13 @@ Read the [preprint on BioRxiv](https://www.biorxiv.org/content/10.1101/2020.02.0
 > python setup.py install
 ```
 
-UNCALLED for ReadUntil sequenecing requires the [ONT ReadUntil API](https://github.com/nanoporetech/read_until_api), which is provided as a submodule but must be installed separately into the MinKNOW environment. UNCALLED must also be installed into the MinKNOW environment alongside the ReadUntil API for ReadUntil sequencing (see Real-Time ReadUntil below).
-
 Most dependecies included via submodules, so be sure to clone with `git --recursive`
+
+UNCALLED for ReadUntil sequenecing requires the [ONT ReadUntil API](https://github.com/nanoporetech/read_until_api), which is provided as a submodule in [submods/read_until_api](submods/read_until_api). This must be installed in the same python environment as UNCALLED.
 
 UNCALLED must be installed into a python environment. To install without root privileges use the `--user` or `--prefix=<local-dir>` flag when installing, or use a tool such as [virtualenv](https://virtualenv.pypa.io) or [anaconda](https://www.anaconda.com).
 
-Requires python-dev >= 3.7.4, numpy >= 1.17.4, and GCC >= 4.8.1
-
-[HDF5](https://www.hdfgroup.org/downloads/hdf5/) must be installed. Libraries and headers should be in system paths (ie `$LD_LIBRARY_PATH` and `$CPATH` respectively), or specified by running `python setup.py build_ext --library-dirs <hdf5-location>/lib --include-dirs <hdf5-location>/include` prior to installation.
-
+Requires python >= 3.6, numpy>=1.12.0, pybind11 >= 2.5.0, and GCC >= 4.8.1 (note: python modules will be automatically installed by setup.py)
 
 We recommend running on a Linux machine. UNCALLED has been successfully installed and run on Mac computers, but real-time ReadUntil has not been tested on a Mac. Installing UNCALLED has not been attempted on Windows.
 
@@ -45,20 +43,22 @@ We recommend running on a Linux machine. UNCALLED has been successfully installe
 **Example:**
 
 ```
-> bwa index E.coli.fasta
-> uncalled index E.coli.fasta
+> uncalled index -o E.coli E.coli.fasta
 ```
 
-UNCALLED requires a [BWA](https://github.com/lh3/bwa) index. You can use a previously built BWA index, or build a new one with the BWA instance provided in the `bwa/` submodule.
+Optional arguments:
 
-Before aligning, certain reference-specific parameters must be computed using `uncalled index`. The `<fasta-reference>` should be the same FASTA file which was used to build the BWA index. This will create an additional file in the same directory as the BWA index named `<bwa-prefix>.uncl`.
+- `-o/--bwa_prefix` output index prefix (default: same as input fasta)
+
+
+Note that this command will use a previously built BWA index if all the required files exist with the specified prefix. Otherwise, a new BWA index will be automatically built. 
 
 ## Fast5 Mapping
 
 **Example:**
 
 ```
-> uncalled map -t 16 E.coli.fasta fast5_list.txt > uncalled_out.paf
+> uncalled map -t 16 E.coli fast5_list.txt > uncalled_out.paf
 Loading fast5s
 Mapping
 
@@ -89,10 +89,7 @@ See [example/](example/) for a simple read and reference example.
 **Example:**
 
 ```
-> uncalled list-ports
-MN02686 (2019-11-18 12:30:56): 8000
-
-> /opt/ont/minknow/ont-python/bin/uncalled realtime E.coli.fasta --port 8000 -t 16 --enrich -c 3 > uncalled_out.paf 
+> /opt/ont/minknow/ont-python/bin/uncalled realtime E.coli --port 8000 -t 16 --enrich -c 3 > uncalled_out.paf 
 Starting client
 Starting mappers
 Mapping
@@ -123,7 +120,7 @@ Arguments:
 - `-t/--threads` number of threads to use for mapping (default: 1)
 - `-c/--max-chunks-proc` number of chunks to attempt mapping before giving up on a read (default: 10).
 - `--chunk-size` size of chunks in seconds (default: 1). Note: this is a new feature and may not work as intended (see below)
-- `--port` MinION device port. Use `uncalled list-ports` command to see all devices that have been plugged in since MinKNOW started.
+- `--port` MinION device port.
 - `--enrich` will *keep* reads that map to the reference if included
 - `--deplete` will *eject* reads that map to the reference if included
 - `--even` will only eject reads from even channels if included
@@ -176,7 +173,7 @@ Exactly one of `--deplete` or `--enrich` must be specified
 
 ## Output Format
 
-Both `uncalled map` and `uncalled realtime` output to stdout in a format similar to [PAF](https://github.com/lh3/miniasm/blob/master/PAF.md). Unmapped reads are output with reference-location-dependent fields replaced with \*s. Lines that begin with "#" are comments that useful for debugging.
+UNCALLED outputs to stdout in a format similar to [PAF](https://github.com/lh3/miniasm/blob/master/PAF.md). Unmapped reads are output with reference-location-dependent fields replaced with \*s. Lines that begin with "#" are comments that useful for debugging.
 
 Query coordinates, residue matches, and block lengths are estimated assuming 450bp sequenced per second. This estimate can be significantly off depending on the sequencing run. UNCALLED attempts to map a read as early as possible, so the "query end" field corresponds to the leftmost position where UNCALLED was able to confidently map the read. In many cases this may only be 450bp or 900bp into the read, even if the read is many times longer than this. This differs from aligners such as [minimap2](https://github.com/lh3/minimap2), which attempt to map the full length of the read.
 
@@ -246,4 +243,3 @@ UNCALLED currently only supports reads sequenced with r9.4 chemistry.
 ## Undocumented Features
 
 UNCALLED is a work in progress. Many parameters exist that are not documented here, but can be seen on the command line help information. Most users should leave these unchanged. They may be removed in future versions, or be replaced with hyperparameters that adjust the accuracy and speed of UNCALLED.
-
