@@ -1,16 +1,56 @@
-from distutils.core import setup, Extension
-from distutils.command.build_ext import build_ext
-from distutils.sysconfig import get_python_inc
+from setuptools import setup, Extension
+from setuptools.command.build_ext import build_ext
 import os
 import subprocess
 import sys
 
-class make_bwa(build_ext):
+__version__ = "2.1"
+
+class get_pybind_include(object):
+    """Helper class to determine the pybind11 include path
+    The purpose of this class is to postpone importing pybind11
+    until it is actually installed, so that the ``get_include()``
+    method can be invoked. """
+
+    def __str__(self):
+        import pybind11
+        return pybind11.get_include()
+
+class make_libs(build_ext):
     def run(self):
-        sys.stderr.write("building libbwa\n")
-        subprocess.call(["make", 
-                         "-C", "./submods/bwa", 
-                         "-f", "../../src/Makefile_bwa"])
+
+        if os.path.exists("./submods/bwa/libbwa.a"):
+            sys.stderr.write("Found libbwa.a\n")
+        else:
+            sys.stderr.write("building libbwa\n")
+
+            subprocess.call([
+                "make", 
+                 "-C", "./submods/bwa", 
+                 "-f", "../../src/Makefile_bwa"
+            ])
+
+        if os.path.exists("./submods/bwa/libhdf5.a"):
+            sys.stderr.write("Found libhdf5.a\n")
+        else:
+            wd = os.getcwd()
+
+            os.chdir("submods/hdf5")
+
+            subprocess.call([
+                "./configure", 
+                    "--enable-threadsafe", 
+                    "--disable-hl",
+                    "--prefix=`pwd`" ,
+                    "--enable-shared=no",
+                    "--with-pic=yes"
+            ])
+
+            subprocess.call(["make"])
+            subprocess.call(["make", "install"])
+
+            os.chdir(wd)
+
         build_ext.run(self)
 
 uncalled = Extension(
@@ -31,10 +71,10 @@ uncalled = Extension(
                 "src/range.cpp"],
      include_dirs = ["./submods", #TODO: consistent incl paths
                      "./submods/hdf5/include", 
-                     "./submods/pybind11/include", 
                      "./submods/fast5/include",
                      "./submods/pdqsort",
-                     "./submods/toml11"],
+                     "./submods/toml11",
+                     get_pybind_include()],
      #library_dirs = ["./submods/bwa ./submods/bwa/libbwa.a", "./submods/hdf5/lib ./submods/hdf5/lib/libhdf5.a"],
      library_dirs = ["./submods/bwa", "./submods/hdf5/lib"],
      libraries = ["bwa", "hdf5", "z", "dl", "m"],
@@ -43,15 +83,20 @@ uncalled = Extension(
 )
 
 setup(name = "uncalled",
-      version = "1.3",
+      version = __version__,
       description = "Rapidly maps raw nanopore signal to DNA references",
       author = "Sam Kovaka",
       author_email = "skovaka@gmail.com",
       url = "https://github.com/skovaka/UNCALLED",
+      setup_requires=['pybind11>=2.5.0', 'numpy>=1.12.0'],
       packages=['uncalled'],
       package_dir = {'': 'src', 'uncalled': 'src/uncalled'},
       py_modules = ['uncalled.params', 'uncalled.minknow_client', 'uncalled.index', 'uncalled.pafstats'],
       ext_modules = [uncalled],
       package_data = {'uncalled': ['models/*', 'conf/*']},
       scripts = ['scripts/uncalled'],
-      cmdclass={'build_ext': make_bwa})
+      classifiers=[
+          "Programming Language :: Python :: 3"
+      ],
+      cmdclass={'build_ext': make_libs},
+      python_requires=">=3.6")

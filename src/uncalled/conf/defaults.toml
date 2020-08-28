@@ -34,7 +34,6 @@ port = 8000
 duration = 0.0
 max_active_reads = 512
 
-
 [mapper]
 max_events = 30000
 seed_len = 22
@@ -56,13 +55,13 @@ min_mean_conf = 6.00
 min_top_conf = 1.85
 
 [event_detector]
-min_mean = 30.0
-max_mean = 200.0
 window_length1 = 3
 window_length2 = 6
 threshold1 = 1.4
 threshold2 = 9.0
 peak_height = 0.2
+min_mean = 30.0
+max_mean = 200.0
 
 [list_ports]
 log_dir = '/var/log/MinKNOW'
