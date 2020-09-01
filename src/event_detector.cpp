@@ -4,7 +4,6 @@
  * Adapted for UNCALLED by Sam Kovaka <skovaka@gmail.com>
  */
 
-
 #include <float.h>
 #include <math.h>
 #include <stdbool.h>
@@ -15,11 +14,20 @@
 #include <cassert>
 #include "event_detector.hpp"
 
-EventDetector::Params EventDetector::PRMS = PRMS_DEF;
+const EventDetector::Params EventDetector::PRMS_DEF = {
+    window_length1 : 3,
+    window_length2 : 6,
+    threshold1     : 1.4f,
+    threshold2     : 9.0f,
+    peak_height    : 0.2f,
+    min_mean       : 30,
+    max_mean       : 200
+};
 
 typedef Detector *DetectorPtr;
 
-EventDetector::EventDetector() :
+EventDetector::EventDetector(Params prms) :
+    PRMS(prms),
     BUF_LEN (1 + PRMS.window_length2 * 2) {
 
     sum = new double[BUF_LEN];
@@ -27,6 +35,8 @@ EventDetector::EventDetector() :
 
     reset();
 }
+
+EventDetector::EventDetector() : EventDetector(PRMS_DEF) {}
 
 EventDetector::~EventDetector() {
     delete[] sum;

@@ -31,18 +31,23 @@
 #include "read_buffer.hpp"
 #include "util.hpp"
 
-typedef struct {
-    std::string fast5_list;
-    std::string read_list;
-    u32 max_reads, max_buffer;
-} Fast5Params;
 
 class Fast5Reader {
     public:
-    Fast5Reader(u32 max_reads, u32 max_buffer=100);
-    Fast5Reader(const Fast5Params &p);
 
-    Fast5Reader(const std::string &fast5_list="", 
+    typedef struct {
+        std::string fast5_list;
+        std::string read_list;
+        u32 max_reads, max_buffer;
+    } Params;
+    static Params const PRMS_DEF;
+
+    //TODO: remove reduntant constructors
+    Fast5Reader();
+    Fast5Reader(const Params &p);
+
+    Fast5Reader(u32 max_reads, u32 max_buffer=100);
+    Fast5Reader(const std::string &fast5_list, 
                 const std::string &read_list="",
                 u32 max_reads=0, u32 max_buffer=100);
 
@@ -59,7 +64,7 @@ class Fast5Reader {
     bool empty();
 
     private:
-    Fast5Params PRMS;
+    Params PRMS;
 
     enum Format {MULTI, SINGLE, UNKNOWN};
     static const std::string FMT_RAW_PATHS[], FMT_CH_PATHS[];

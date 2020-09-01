@@ -27,7 +27,11 @@
 
 #define DEBUG
 
-TrackerParams SeedTracker::PRMS;
+const SeedTracker::Params SeedTracker::PRMS_DEF = {
+    min_aln_len   : 25,
+    min_mean_conf : 6.00,
+    min_top_conf  : 1.85
+};
 
 SeedGroup::SeedGroup() 
     : evt_st_(1),
@@ -105,7 +109,10 @@ std::ostream &operator<< (std::ostream &out, const SeedGroup &a) {
     return out;
 }
 
-SeedTracker::SeedTracker() {
+SeedTracker::SeedTracker() : SeedTracker(PRMS_DEF) {}
+
+SeedTracker::SeedTracker(Params prms) :
+    PRMS(prms) {
     reset();
 }
 

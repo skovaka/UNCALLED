@@ -25,6 +25,13 @@
 #include <chrono>
 #include "fast5_reader.hpp"
 
+const Fast5Reader::Params Fast5Reader::PRMS_DEF = {
+    fast5_list : "",
+    read_list  : "",
+    max_reads  : 0,
+    max_buffer : 100
+};
+
 const std::string Fast5Reader::FMT_RAW_PATHS[] = {
     "/Raw",      //MULTI
     "/Raw/Reads" //SINGLE
@@ -35,7 +42,10 @@ const std::string Fast5Reader::FMT_CH_PATHS[] = {
     "/UniqueGlobalKey/channel_id" //SINGLE
 };
 
-Fast5Reader::Fast5Reader(const Fast5Params &p) : PRMS(p) {
+Fast5Reader::Fast5Reader() : 
+    Fast5Reader(PRMS_DEF) {}
+
+Fast5Reader::Fast5Reader(const Params &p) : PRMS(p) {
     total_buffered_ = 0;
 
     if (!PRMS.read_list.empty()) load_read_list(PRMS.read_list);

@@ -32,24 +32,6 @@
 #include "chunk.hpp"
 
 
-typedef struct {
-    u16 num_channels;
-    float bp_per_sec;
-    float sample_rate;
-    float calib_digitisation;
-    float chunk_time;
-    u32 max_chunks;
-    std::vector<float> calib_offsets, calib_coefs;
-
-    float bp_per_samp() {
-        return bp_per_sec / sample_rate;
-    }
-
-    u16 chunk_len() {
-        return (u16) (chunk_time * sample_rate);
-    }
-} ReadParams;
-
 class Paf {
     public:
 
@@ -107,9 +89,27 @@ class Paf {
 
 class ReadBuffer {
     public:
-    static ReadParams PRMS;
 
-    //enum Source {MULTI, SINGLE, BULK, LIVE};
+    typedef struct {
+        u16 num_channels;
+        float bp_per_sec;
+        float sample_rate;
+        float chunk_time;
+        u32 max_chunks;
+
+        float calib_digitisation;
+        std::vector<float> calib_offsets, calib_coefs;
+
+        float bp_per_samp() {
+            return bp_per_sec / sample_rate;
+        }
+
+        u16 chunk_len() {
+            return (u16) (chunk_time * sample_rate);
+        }
+    } Params;
+
+    static Params PRMS;
 
     ReadBuffer();
     //ReadBuffer(const ReadBuffer &read);

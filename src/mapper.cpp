@@ -24,7 +24,22 @@
 #include <pdqsort.h>
 #include "mapper.hpp"
 
-Mapper::Params Mapper::PRMS = Mapper::PRMS_DEF;
+Mapper::Params Mapper::PRMS = {
+    seed_len        : 22,
+    min_rep_len     : 0,
+    max_rep_copy    : 50,
+    max_paths       : 10000,
+    max_consec_stay : 8,
+    max_events      : 30000,
+    max_stay_frac   : 0.5,
+    min_seed_prob   : -3.75,
+    evt_buffer_len  : 6000,
+    evt_batch_size  : 5,
+    evt_timeout     : 1000000.0,
+    max_chunk_wait  : 30000000.0 ,
+    seed_prms       : SeedTracker::PRMS_DEF,
+    event_prms      : EventDetector::PRMS_DEF
+};
 
 BwaIndex<KLEN> Mapper::fmi;
 PoreModel<KLEN> Mapper::model;
@@ -137,8 +152,10 @@ bool operator< (const Mapper::PathBuffer &p1,
             p1.seed_prob_ < p2.seed_prob_);
 }
 
-Mapper::Mapper()
-    : state_(State::INACTIVE) {
+Mapper::Mapper() :
+    evdt_(PRMS.event_prms),
+    seed_tracker_(PRMS.seed_prms),
+    state_(State::INACTIVE) {
 
     PathBuffer::MAX_PATH_LEN = PRMS.seed_len;
 

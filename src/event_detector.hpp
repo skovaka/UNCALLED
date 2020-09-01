@@ -21,7 +21,6 @@ typedef struct {
     u32 length;
 } Event;
 
-
 struct Detector {
     i32 DEF_PEAK_POS;
     float DEF_PEAK_VAL;
@@ -35,6 +34,7 @@ struct Detector {
 
 class EventDetector {
 
+    public:
     typedef struct Params {
         u32 window_length1;
         u32 window_length2;
@@ -45,19 +45,11 @@ class EventDetector {
         float max_mean;
     } Params;
 
-    static Params constexpr PRMS_DEF = {
-        .window_length1 = 3,
-        .window_length2 = 6,
-        .threshold1     = 1.4f,
-        .threshold2     = 9.0f,
-        .peak_height    = 0.2f,
-        .min_mean       = 30,
-        .max_mean       = 200
-    };
+    static Params const PRMS_DEF;
 
-    public:
-    static Params PRMS;
+    Params PRMS;
 
+    EventDetector(Params prms);
     EventDetector();
 
     ~EventDetector();

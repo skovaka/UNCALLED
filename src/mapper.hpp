@@ -61,25 +61,15 @@ class Mapper {
         u16 evt_batch_size;
         float evt_timeout;
         float max_chunk_wait;
+
+        SeedTracker::Params seed_prms;
+        EventDetector::Params event_prms;
     } Params;
 
-    static Params constexpr PRMS_DEF = {
-        seed_len        : 22,
-        min_rep_len     : 0,
-        max_rep_copy    : 50,
-        max_paths       : 10000,
-        max_consec_stay : 8,
-        max_events      : 30000,
-        max_stay_frac   : 0.5,
-        min_seed_prob   : -3.75,
+    //static Params PRMS_DEF;
 
-        evt_buffer_len  : 6000,
-        evt_batch_size  : 5,
-        evt_timeout     : 1000000.0,
-        max_chunk_wait  : 30000000.0 
-    };
+    static Params PRMS;
 
-    static Mapper::Params PRMS;
     static BwaIndex<KLEN> fmi;
     static PoreModel<KLEN> model;
     static std::vector<float> prob_threshes_;

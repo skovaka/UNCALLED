@@ -35,11 +35,6 @@
 //    float min_top_conf = 1.85;
 //} TrackerParams;
 
-typedef struct {
-    u32 min_aln_len;
-    float min_mean_conf;
-    float min_top_conf;
-} TrackerParams;
 
 class SeedGroup {
 
@@ -72,7 +67,15 @@ std::ostream &operator<< (std::ostream &out, const SeedGroup &a);
 
 class SeedTracker {
     public:
-    static TrackerParams PRMS;
+
+    typedef struct {
+        u32 min_aln_len;
+        float min_mean_conf;
+        float min_top_conf;
+    } Params;
+    static const Params PRMS_DEF;
+
+    Params PRMS;
     
     //const TrackerParams prms;
 
@@ -83,7 +86,7 @@ class SeedTracker {
     float len_sum_;
 
     SeedTracker();
-    SeedTracker(TrackerParams params);
+    SeedTracker(Params params);
 
     //SeedGroup add_seed(SeedGroup sg);
     void add_seed(u64 ref_en, u32 ref_len, u32 evt_st);

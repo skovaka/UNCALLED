@@ -55,56 +55,10 @@ const char BASE_COMP_C[]
 
 const u8 BASE_COMP_B[] {3, 2, 1, 0};
 
-//class Seq {
-//    Seq(const std::string &str) {
-//        len_ = str.size();
-//        seq_.resize( (len_/4) + (len_ % 4 != 0), 0 );
-//
-//        for (u64 i = 0; i < seq_.size(); i += 1) {
-//            u8 j = i*4;
-//            for (u32 k = 0; k < 4 && j+k < str.size(); k++) {
-//                seq_[i] |= (BASE_BYTES[(u8) str[j+k]] << k);
-//            }
-//        }
-//    }
-//
-//    Seq(u8 *seq, u64 len) {
-//        len_ = len;
-//        seq_.assign(seq, seq + (len / 4) + (len_ % 4 != 0) );
-//    }
-//
-//    std::string to_str() {
-//        std::string str('N', len_);
-//
-//        for (u64 i = 0; i < seq_.size(); i += 1) {
-//            u8 j = i*4;
-//            for (u32 k = 0; k < 4 && j+k < str.size(); k++) {
-//                str[j+k] = BASE_CHARS[ (seq[i] >> k) & 0x3 ];
-//            }
-//        }
-//
-//        return str;
-//    }
-//
-//    u64 len_;
-//    std::vector<u8> seq_;
-//};
 
 enum KmerLen {k2=2, k3=3, k4=4, k5=5};
 
-//std::vector<u8> str_to_bp(const std::string &str) {
-//    const u8 BP64 = 32;
-//    
-//    std::vector<u64> bp;
-//
-//    for (u64 i = 0; i < str.size(); i += BP64) {
-//        u64 b = 0;
-//        for (u8 j = 0; j < 32; j
-//    }
-//}
-
 #define KMASK(k) ( (1 << (2*k)) - 1 )
-
 
 template <KmerLen k>
 inline u16 kmer_count() {

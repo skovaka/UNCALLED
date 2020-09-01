@@ -82,7 +82,17 @@ typedef struct {
 }
 
 class Conf {
+
     public:
+    u16 threads, num_channels;
+    std::string bwa_prefix;
+    std::string kmer_model;
+    std::string index_preset;
+
+    Fast5Reader::Params fast5_prms = Fast5Reader::PRMS_DEF;
+    RealtimeParams realtime_prms;
+    SimParams sim_prms;
+
     void load_conf(const std::string &fname) {
         const auto conf = toml::parse(fname);
 
@@ -99,14 +109,14 @@ class Conf {
             ReadBuffer::PRMS.calib_coefs.resize(num_channels);
         }
 
-        if (conf.contains("fast5_params")) {
-            const auto subconf = toml::find(conf, "fast5_params");
+        //if (conf.contains("fast5_params")) {
+        //    const auto subconf = toml::find(conf, "fast5_params");
 
-            GET_TOML_EXTERN(subconf, u32, max_buffer, fast5_prms);
-            GET_TOML_EXTERN(subconf, u32, max_reads, fast5_prms);
-            GET_TOML_EXTERN(subconf, std::string, fast5_list, fast5_prms);
-            GET_TOML_EXTERN(subconf, std::string, read_list, fast5_prms);
-        }
+        //    GET_TOML_EXTERN(subconf, u32, max_buffer, fast5_prms);
+        //    GET_TOML_EXTERN(subconf, u32, max_reads, fast5_prms);
+        //    GET_TOML_EXTERN(subconf, std::string, fast5_list, fast5_prms);
+        //    GET_TOML_EXTERN(subconf, std::string, read_list, fast5_prms);
+        //}
 
         if (conf.contains("realtime")) {
             const auto subconf = toml::find(conf, "realtime");
@@ -166,21 +176,21 @@ class Conf {
         if (conf.contains("seed_tracker")) {
             const auto subconf = toml::find(conf, "seed_tracker");
 
-            GET_TOML_EXTERN(subconf, float, min_mean_conf, SeedTracker::PRMS);
-            GET_TOML_EXTERN(subconf, float, min_top_conf, SeedTracker::PRMS);
-            GET_TOML_EXTERN(subconf, u32, min_aln_len, SeedTracker::PRMS);
+            GET_TOML_EXTERN(subconf, float, min_mean_conf, Mapper::PRMS.seed_prms);
+            GET_TOML_EXTERN(subconf, float, min_top_conf, Mapper::PRMS.seed_prms);
+            GET_TOML_EXTERN(subconf, u32, min_aln_len, Mapper::PRMS.seed_prms);
         }
 
-        //if (conf.contains("event_detector")) {
-        //    const auto subconf = toml::find(conf, "event_detector");
-        //    GET_TOML_EXTERN(subconf, float, min_mean, EventDetector::PRMS);
-        //    GET_TOML_EXTERN(subconf, float, max_mean, EventDetector::PRMS);
-        //    GET_TOML_EXTERN(subconf, float, threshold1, EventDetector::PRMS);
-        //    GET_TOML_EXTERN(subconf, float, threshold2, EventDetector::PRMS);
-        //    GET_TOML_EXTERN(subconf, float, peak_height, EventDetector::PRMS);
-        //    GET_TOML_EXTERN(subconf, u32, window_length1, EventDetector::PRMS);
-        //    GET_TOML_EXTERN(subconf, u32, window_length2, EventDetector::PRMS);
-        //}
+        if (conf.contains("event_detector")) {
+            const auto subconf = toml::find(conf, "event_detector");
+            GET_TOML_EXTERN(subconf, float, min_mean, Mapper::PRMS.event_prms);
+            GET_TOML_EXTERN(subconf, float, max_mean, Mapper::PRMS.event_prms);
+            GET_TOML_EXTERN(subconf, float, threshold1, Mapper::PRMS.event_prms);
+            GET_TOML_EXTERN(subconf, float, threshold2, Mapper::PRMS.event_prms);
+            GET_TOML_EXTERN(subconf, float, peak_height, Mapper::PRMS.event_prms);
+            GET_TOML_EXTERN(subconf, u32, window_length1, Mapper::PRMS.event_prms);
+            GET_TOML_EXTERN(subconf, u32, window_length2, Mapper::PRMS.event_prms);
+        }
 
         if (conf.contains("simulator")) {
             const auto subconf = toml::find(conf, "simulator");
@@ -271,15 +281,6 @@ class Conf {
         DEFPRP(min_ch_reads);
     }
     #endif
-
-    u16 threads, num_channels;
-    std::string bwa_prefix;
-    std::string kmer_model;
-    std::string index_preset;
-
-    Fast5Params fast5_prms;
-    RealtimeParams realtime_prms;
-    SimParams sim_prms;
 };
 
 #endif

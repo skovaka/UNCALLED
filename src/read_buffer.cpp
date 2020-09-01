@@ -23,7 +23,16 @@
 
 #include "read_buffer.hpp"
 
-ReadParams ReadBuffer::PRMS;
+ReadBuffer::Params ReadBuffer::PRMS = {
+    num_channels : 512,
+    bp_per_sec   : 450,
+    sample_rate  : 4000,
+    chunk_time   : 1.0,
+    max_chunks   : 1000000,
+    calib_digitisation : 0.0,
+    calib_offsets : std::vector<float>(),
+    calib_coefs : std::vector<float>()
+};
 
 const std::string Paf::PAF_TAGS[] = {
     "mt", //MAP_TIME
