@@ -38,33 +38,55 @@ const KmerLen KLEN = KmerLen::k5;
 //#define DEBUG_TIME
 //#define DEBUG_SEEDS
 
-typedef struct {
-    //standard mapping
-    u32 seed_len;
-    u32 min_rep_len;
-    u32 max_rep_copy;
-    u32 max_paths;
-    u32 max_consec_stay;
-    u32 max_events;
-    float max_stay_frac;
-    float min_seed_prob;
-    std::vector<float> prob_threshes;
-
-    //realtime only
-    u32 max_chunks;
-    u32 evt_buffer_len;
-    u16 evt_batch_size;
-    float chunk_size;
-    float evt_timeout;
-    float max_chunk_wait;
-} MapperParams;
+//TODO define as constant somewhere
+//remove "params" python module
+#define INDEX_SUFF ".uncl"
 
 class Mapper {
     public:
 
-    static MapperParams PRMS;
+    typedef struct {
+        //standard mapping
+        u32 seed_len;
+        u32 min_rep_len;
+        u32 max_rep_copy;
+        u32 max_paths;
+        u32 max_consec_stay;
+        u32 max_events;
+        float max_stay_frac;
+        float min_seed_prob;
+
+        //realtime only
+        u32 evt_buffer_len;
+        u16 evt_batch_size;
+        float evt_timeout;
+        float max_chunk_wait;
+    } Params;
+
+    static Params constexpr PRMS_DEF = {
+        seed_len        : 22,
+        min_rep_len     : 0,
+        max_rep_copy    : 50,
+        max_paths       : 10000,
+        max_consec_stay : 8,
+        max_events      : 30000,
+        max_stay_frac   : 0.5,
+        min_seed_prob   : -3.75,
+
+        evt_buffer_len  : 6000,
+        evt_batch_size  : 5,
+        evt_timeout     : 1000000.0,
+        max_chunk_wait  : 30000000.0 
+    };
+
+    static Mapper::Params PRMS;
     static BwaIndex<KLEN> fmi;
     static PoreModel<KLEN> model;
+    static std::vector<float> prob_threshes_;
+
+    static bool load_static(const std::string &index_fname,
+                            const std::string &model_fname,
+                            const std::string &index_preset);
 
     enum State { INACTIVE, MAPPING, SUCCESS, FAILURE };
 

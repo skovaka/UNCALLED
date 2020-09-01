@@ -79,8 +79,6 @@ int main(int argc, char** argv) {
         1,1,1,          //d,v,h
         costfn};         //fn
 
-
-    EventDetector::PRMS = event_detection_defaults;
     EventDetector evdt;
 
     BwaIndex<KLEN> idx(index_prefix);

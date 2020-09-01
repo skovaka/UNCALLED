@@ -69,12 +69,13 @@ bool load_conf(int argc, char** argv, Conf &conf) {
     int opt;
 
     //parse flags
-    while((opt = getopt(argc, argv, ":t:n:l:r:")) != -1) {
+    while((opt = getopt(argc, argv, ":t:n:l:r:c:")) != -1) {
         switch(opt) {  
 
             FLAG_TO_CONF('t', atoi, threads)
             FLAG_TO_CONF('n', atoi, max_reads)
             FLAG_TO_CONF('r', atoi, max_active_reads)
+            FLAG_TO_CONF('c', atoi, max_chunks)
             FLAG_TO_CONF('l', std::string, read_list)
 
             case ':':  

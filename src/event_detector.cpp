@@ -15,9 +15,9 @@
 #include <cassert>
 #include "event_detector.hpp"
 
-typedef Detector *DetectorPtr;
+EventDetector::Params EventDetector::PRMS = PRMS_DEF;
 
-EventParams EventDetector::PRMS;
+typedef Detector *DetectorPtr;
 
 EventDetector::EventDetector() :
     BUF_LEN (1 + PRMS.window_length2 * 2) {

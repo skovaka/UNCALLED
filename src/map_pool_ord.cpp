@@ -102,13 +102,12 @@ std::vector<Paf> MapPoolOrd::update() {
         ret.push_back(std::get<2>(m));
     }
 
-    //TODO is_running vs all_finished is confusing
-    //if (pool_.is_stopped()) {
-    if (pool_.active_count() < active_tgt_) {
-        pool_.stop_all();
-        for (auto &chs : channels_) chs.clear();
-        channels_empty_ = true;
-    }
+    //TODO: option to stop when lower than target
+    //if (pool_.active_count() < active_tgt_) {
+    //    pool_.stop_all();
+    //    for (auto &chs : channels_) chs.clear();
+    //    channels_empty_ = true;
+    //}
 
     return ret;
 }

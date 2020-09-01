@@ -24,9 +24,11 @@
 #include <pdqsort.h>
 #include "mapper.hpp"
 
-MapperParams Mapper::PRMS;
+Mapper::Params Mapper::PRMS = Mapper::PRMS_DEF;
+
 BwaIndex<KLEN> Mapper::fmi;
 PoreModel<KLEN> Mapper::model;
+std::vector<float> Mapper::prob_threshes_;
 
 u8 Mapper::PathBuffer::MAX_PATH_LEN = 0, 
    Mapper::PathBuffer::TYPE_MASK = 0;
@@ -171,12 +173,66 @@ Mapper::~Mapper() {
     }
 }
 
+//TODO load from conf?
+//auto load in constructor?
+bool Mapper::load_static(const std::string &bwa_prefix,
+                         const std::string &model_fname,
+                         const std::string &index_preset) {
+
+    model = PoreModel<KLEN>(model_fname, true);
+
+    if (!model.is_loaded()) {
+        std::cerr << "Error: failed to load pore model\n";
+        return false;
+    }
+
+    fmi.load_index(bwa_prefix);
+    if (!fmi.is_loaded()) {
+        std::cerr << "Error: failed to load BWA index\n";
+        return false;
+    }
+
+    std::ifstream param_file(bwa_prefix + INDEX_SUFF);
+    if (!param_file.is_open()) {
+        std::cerr << "Error: failed to load uncalled index\n";
+        return false;
+    }
+
+    std::string param_line;
+
+    char *index_preset_c = (char *) index_preset.c_str();
+    prob_threshes_.resize(64);
+
+    while (getline(param_file, param_line)) {
+        char *param_name = strtok((char *) param_line.c_str(), "\t");
+        char *fn_str = strtok(NULL, "\t");
+        //char *path_str = strtok(NULL, "\t");
+        if ( !index_preset.empty() && strcmp(param_name, index_preset_c) ) {
+                continue;
+        }
+
+        u8 fmbin = prob_threshes_.size() - 1;
+        char *prob_str;
+        while ( (prob_str = strtok(fn_str, ",")) != NULL ) {
+            fn_str = NULL;
+            prob_threshes_[fmbin] = atof(prob_str);
+            fmbin--;
+        }
+
+        for (;fmbin < prob_threshes_.size(); fmbin--) {
+            prob_threshes_[fmbin] = prob_threshes_[fmbin+1];
+        }
+    }
+
+    return true;
+}
+
 float Mapper::get_prob_thresh(u64 fmlen) const {
-    return PRMS.prob_threshes[__builtin_clzll(fmlen)];
+    return prob_threshes_[__builtin_clzll(fmlen)];
 }
 
 float Mapper::get_source_prob() const {
-    return PRMS.prob_threshes.front();
+    return prob_threshes_.front();
 }
 
 u16 Mapper::get_max_events() const {

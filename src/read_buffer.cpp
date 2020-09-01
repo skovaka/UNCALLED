@@ -340,6 +340,7 @@ std::vector<float> ReadBuffer::calibrate(u16 ch, std::vector<i16> samples) {
 
 float ReadBuffer::calibrate(u16 ch, float sample) {
     return (sample + PRMS.calib_offsets[ch-1]) * PRMS.calib_coefs[ch-1];
+    //return sample;
 }
 
 void ReadBuffer::set_calibration(const std::vector<float> &offsets, 

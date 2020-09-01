@@ -129,6 +129,10 @@ class BwaIndex {
         loaded_ = true;
     }
 
+    bool is_loaded() {
+        return loaded_;
+    }
+
     void load_pacseq() {
         if (!pacseq_loaded()) {
             //Copied from bwa/bwase.c
