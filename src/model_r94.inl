@@ -3,9 +3,7 @@
 
 #include "pore_model.hpp"
 
-ModelPreset model_r94 = {
-    k : KmerLen::k5,
-    means_stdvs : {
+const std::vector<float> model_r94_means_stdvs = {
         85.083612,	1.517846, //AAAAA
         76.635809,	1.705015, //AAAAC
         83.489101,	1.537572, //AAAAG
@@ -1029,9 +1027,9 @@ ModelPreset model_r94 = {
         98.045635,	1.708404, //TTTTA
         94.016860,	1.569772, //TTTTC
         96.127181,	1.623511, //TTTTG
-        90.405465,	1.513907} //TTTTT
+        90.405465,	1.513907  //TTTTT
 };
 
-/* vim: set ft=c: */
+const PoreModel<KmerLen::k5> model_r94(model_r94_means_stdvs, true);
 
 #endif

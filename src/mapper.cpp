@@ -23,7 +23,7 @@
 
 #include <pdqsort.h>
 #include "mapper.hpp"
-#include "model_r94.hpp"
+#include "model_r94.inl"
 
 Mapper::Params Mapper::PRMS = {
     seed_len        : 22,
@@ -198,7 +198,9 @@ bool Mapper::load_static(const std::string &bwa_prefix,
                          const std::string &index_preset) {
 
     //model = PoreModel<KLEN>(model_fname, true);
-    model = PoreModel<KLEN>(model_r94, true);
+    //model = PoreModel<KLEN>(model_r94, true);
+    model = model_r94;
+
 
     if (!model.is_loaded()) {
         std::cerr << "Error: failed to load pore model\n";

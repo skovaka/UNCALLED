@@ -73,20 +73,18 @@ class PoreModel {
         lognorm_denoms_.resize(kmer_count_);
     }
     
-    PoreModel(const ModelPreset &p, bool cmpl) : PoreModel() {
-        if (p.k != KLEN) return;
+    //PoreModel(const ModelPreset &p, bool cmpl) : PoreModel() {
+    PoreModel(const std::vector<float> &means_stdvs, bool cmpl) 
+        : PoreModel() {
+
+        //if (p.k != KLEN) return;
 
         model_mean_ = 0;
 
         u16 kmer = 0;
-        for (u32 i = 0; i < p.means_stdvs.size(); i += 2) {
-            float mean = p.means_stdvs[i],
-                  stdv = p.means_stdvs[i+1];
-
-            std::cerr << "setting "
-                      << kmer << " "
-                      << mean << " "
-                      << stdv << "\n";
+        for (u32 i = 0; i < means_stdvs.size(); i += 2) {
+            float mean = means_stdvs[i],
+                  stdv = means_stdvs[i+1];
 
             if (cmpl) {
                 init_kmer(kmer_comp<KLEN>(kmer), mean, stdv);

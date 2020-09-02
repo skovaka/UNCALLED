@@ -146,14 +146,14 @@ class Conf {
             }
         }
 
-        if (conf.contains("reads")) {
-            const auto subconf = toml::find(conf, "reads");
+        //if (conf.contains("reads")) {
+        //    const auto subconf = toml::find(conf, "reads");
 
-            GET_TOML_EXTERN(subconf, u32, max_chunks, ReadBuffer::PRMS);
-            GET_TOML_EXTERN(subconf, u16, bp_per_sec, ReadBuffer::PRMS);
-            GET_TOML_EXTERN(subconf, u16, sample_rate, ReadBuffer::PRMS);
-            GET_TOML_EXTERN(subconf, float, chunk_time, ReadBuffer::PRMS);
-        }
+        //    GET_TOML_EXTERN(subconf, u32, max_chunks, ReadBuffer::PRMS);
+        //    GET_TOML_EXTERN(subconf, u16, bp_per_sec, ReadBuffer::PRMS);
+        //    GET_TOML_EXTERN(subconf, u16, sample_rate, ReadBuffer::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, chunk_time, ReadBuffer::PRMS);
+        //}
 
         //if (conf.contains("mapper")) {
         //    const auto subconf = toml::find(conf, "mapper");
@@ -173,24 +173,24 @@ class Conf {
         //    GET_TOML_EXTERN(subconf, float, max_chunk_wait, Mapper::PRMS);
         //}
 
-        if (conf.contains("seed_tracker")) {
-            const auto subconf = toml::find(conf, "seed_tracker");
+        //if (conf.contains("seed_tracker")) {
+        //    const auto subconf = toml::find(conf, "seed_tracker");
 
-            GET_TOML_EXTERN(subconf, float, min_mean_conf, Mapper::PRMS.seed_prms);
-            GET_TOML_EXTERN(subconf, float, min_top_conf, Mapper::PRMS.seed_prms);
-            GET_TOML_EXTERN(subconf, u32, min_aln_len, Mapper::PRMS.seed_prms);
-        }
+        //    GET_TOML_EXTERN(subconf, float, min_mean_conf, Mapper::PRMS.seed_prms);
+        //    GET_TOML_EXTERN(subconf, float, min_top_conf, Mapper::PRMS.seed_prms);
+        //    GET_TOML_EXTERN(subconf, u32, min_aln_len, Mapper::PRMS.seed_prms);
+        //}
 
-        if (conf.contains("event_detector")) {
-            const auto subconf = toml::find(conf, "event_detector");
-            GET_TOML_EXTERN(subconf, float, min_mean, Mapper::PRMS.event_prms);
-            GET_TOML_EXTERN(subconf, float, max_mean, Mapper::PRMS.event_prms);
-            GET_TOML_EXTERN(subconf, float, threshold1, Mapper::PRMS.event_prms);
-            GET_TOML_EXTERN(subconf, float, threshold2, Mapper::PRMS.event_prms);
-            GET_TOML_EXTERN(subconf, float, peak_height, Mapper::PRMS.event_prms);
-            GET_TOML_EXTERN(subconf, u32, window_length1, Mapper::PRMS.event_prms);
-            GET_TOML_EXTERN(subconf, u32, window_length2, Mapper::PRMS.event_prms);
-        }
+        //if (conf.contains("event_detector")) {
+        //    const auto subconf = toml::find(conf, "event_detector");
+        //    GET_TOML_EXTERN(subconf, float, min_mean, Mapper::PRMS.event_prms);
+        //    GET_TOML_EXTERN(subconf, float, max_mean, Mapper::PRMS.event_prms);
+        //    GET_TOML_EXTERN(subconf, float, threshold1, Mapper::PRMS.event_prms);
+        //    GET_TOML_EXTERN(subconf, float, threshold2, Mapper::PRMS.event_prms);
+        //    GET_TOML_EXTERN(subconf, float, peak_height, Mapper::PRMS.event_prms);
+        //    GET_TOML_EXTERN(subconf, u32, window_length1, Mapper::PRMS.event_prms);
+        //    GET_TOML_EXTERN(subconf, u32, window_length2, Mapper::PRMS.event_prms);
+        //}
 
         if (conf.contains("simulator")) {
             const auto subconf = toml::find(conf, "simulator");
