@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef MAPPER_HPP
-#define MAPPER_HPP
+#ifndef _INCL_MAPPER
+#define _INCL_MAPPER
 
 #include <iostream>
 #include <vector>

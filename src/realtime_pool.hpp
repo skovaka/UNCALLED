@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef CHUNK_POOL_HPP
-#define CHUNK_POOL_HPP
+#ifndef _INCL_READ_CHUNK_POOL
+#define _INCL_READ_CHUNK_POOL
 
 #include <thread>
 #include <vector>

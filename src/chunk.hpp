@@ -1,5 +1,5 @@
-#ifndef CHUNK_TEST_HPP
-#define CHUNK_TEST_HPP
+#ifndef _INCL_CHUNK_TEST
+#define _INCL_CHUNK_TEST
 
 #include <vector>
 #include "util.hpp"

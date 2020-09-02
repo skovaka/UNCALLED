@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef MAP_POOL_ORD_HPP
-#define MAP_POOL_ORD_HPP
+#ifndef _INCL_MAP_POOL_ORD
+#define _INCL_MAP_POOL_ORD
 
 #include <thread>
 #include <vector>

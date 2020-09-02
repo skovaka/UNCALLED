@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef BP_HPP 
-#define BP_HPP 
+#ifndef _INCL_BP 
+#define _INCL_BP 
 
 #include <string>
 #include <vector>

@@ -21,7 +21,9 @@
  * SOFTWARE.
  */
 
-#ifndef SELF_ALN_REF_HPP
+#ifndef _INCL_SELF_ALN_REF
+#define _INCL_SELF_ALN_REF
+
 #include <vector>
 #include <string>
 #include "util.hpp"

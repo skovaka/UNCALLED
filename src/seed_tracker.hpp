@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef SEED_TRACKER_HPP
-#define SEED_TRACKER_HPP
+#ifndef _INCL_READ_SEED_TRACKER
+#define _INCL_READ_SEED_TRACKER
 
 #include <set>
 #include <vector>

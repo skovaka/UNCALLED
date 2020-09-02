@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef INCL_BWAFMI
-#define INCL_BWAFMI
+#ifndef _INCL_BWAFMI
+#define _INCL_BWAFMI
 
 #include <string>
 #include <climits>

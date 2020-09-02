@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef SIM_POOL_HPP
-#define SIM_POOL_HPP
+#ifndef _INCL_SIM_POOL
+#define _INCL_SIM_POOL
 
 #include <unordered_map>
 #include <deque>

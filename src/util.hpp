@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef INCL_UTIL
-#define INCL_UTIL
+#ifndef _INCL_UTIL
+#define _INCL_UTIL
 
 #include <string>
 #include <fstream>

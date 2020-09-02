@@ -1,5 +1,5 @@
-#ifndef DTW_HPP
-#define DTW_HPP
+#ifndef _INCL_DTW
+#define _INCL_DTW
 
 #include <vector>
 #include <iostream>

@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef FAST5_READER_HPP
-#define FAST5_READER_HPP
+#ifndef _INCL_FAST5_READER
+#define _INCL_FAST5_READER
 
 #include <thread>
 #include <vector>

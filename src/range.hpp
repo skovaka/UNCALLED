@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef INCL_RANGE
-#define INCL_RANGE
+#ifndef _INCL_RANGE
+#define _INCL_RANGE
 
 #include <string>
 #include "util.hpp"

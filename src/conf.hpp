@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef CONF_HPP
-#define CONF_HPP
+#ifndef _INCL_CONF
+#define _INCL_CONF
 
 #include <iostream>
 #include <vector>

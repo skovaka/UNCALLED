@@ -4,8 +4,8 @@
  * Adapted for UNCALLED by Sam Kovaka <skovaka@gmail.com>
  */
 
-#ifndef EVENT_DETECTOR_HPP
-#define EVENT_DETECTOR_HPP
+#ifndef _INCL_EVENT_DETECTOR
+#define _INCL_EVENT_DETECTOR
 
 #include <fast5.hpp>
 #include "util.hpp"

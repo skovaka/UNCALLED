@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef READ_BUFFER_HPP
-#define READ_BUFFER_HPP
+#ifndef _INCL_READ_BUFFER
+#define _INCL_READ_BUFFER
 
 #include <string>
 #include <vector>

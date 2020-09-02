@@ -1,5 +1,5 @@
-#ifndef NORMALIZER_HPP
-#define NORMALIZER_HPP
+#ifndef _INCL_NORMALIZER
+#define _INCL_NORMALIZER
 
 #include <vector>
 #include "util.hpp"

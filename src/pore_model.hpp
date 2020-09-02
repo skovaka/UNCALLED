@@ -31,125 +31,133 @@
 #include "util.hpp"
 #include "bp.hpp"
 
+typedef struct {
+    KmerLen k;
+    std::vector<float> means_stdvs;
+} ModelPreset;
+
 template<KmerLen KLEN>
 class PoreModel {
+
+    private:
+    std::vector<float> lv_means_, lv_vars_x2_, lognorm_denoms_;
+    float model_mean_, model_stdv_;
+    u16 kmer_count_;
+    bool loaded_, complement_;
+
     public:
 
+    void init_stdv() {
+        model_stdv_ = 0;
+
+        for (u16 kmer = 0; kmer < kmer_count_; kmer++) {
+            model_stdv_ += pow(lv_means_[kmer] - model_mean_, 2);
+        }
+
+        model_stdv_ = sqrt(model_stdv_ / kmer_count_);
+    }
+
+    void init_kmer(u16 k, float mean, float stdv) {
+        lv_means_[k] = mean;
+        lv_vars_x2_[k] = 2 * stdv * stdv;
+        lognorm_denoms_[k] = log(sqrt(M_PI * lv_vars_x2_[k]));
+    }
+
     PoreModel() 
-        :  loaded_(false) {}
+        :  loaded_(false) {
+
+        kmer_count_ = kmer_count<KLEN>();
+
+        lv_means_.resize(kmer_count_);
+        lv_vars_x2_.resize(kmer_count_);
+        lognorm_denoms_.resize(kmer_count_);
+    }
+    
+    PoreModel(const ModelPreset &p, bool cmpl) : PoreModel() {
+        if (p.k != KLEN) return;
+
+        model_mean_ = 0;
+
+        u16 kmer = 0;
+        for (u32 i = 0; i < p.means_stdvs.size(); i += 2) {
+            float mean = p.means_stdvs[i],
+                  stdv = p.means_stdvs[i+1];
+
+            std::cerr << "setting "
+                      << kmer << " "
+                      << mean << " "
+                      << stdv << "\n";
+
+            if (cmpl) {
+                init_kmer(kmer_comp<KLEN>(kmer), mean, stdv);
+            } else { 
+                init_kmer(kmer, mean, stdv);
+            }
+            
+            kmer++;
+            model_mean_ += mean;
+        }
+
+        model_mean_ /= kmer_count_;
+        init_stdv();
+
+        loaded_ = true;
+    }
 
     //TODO: clean up IO
     //maybe load from toml and/or header file
     //make scripts for model to toml and header?
-    PoreModel(std::string model_fname, bool complement) {
-        kmer_count_ = kmer_count<KLEN>();
+    PoreModel(std::string model_fname, bool cmpl) : PoreModel () {
 
         std::ifstream model_in(model_fname);
 
-        //Read header and count number of columns
-        std::string header;
-        std::getline(model_in, header);
-        u8 num_cols = 0;
-        bool prev_ws = true;
-        for (u8 i = 0; i < header.size(); i++) {
-            if (header[i] == ' ' || header[i] == '\t') {
-                prev_ws = true;
-            } else {
-                if (prev_ws)
-                    num_cols++;
-                prev_ws = false;
-            }
-        }
+        std::string _;
+        std::getline(model_in, _);
 
         //Variables for reading model
         std::string kmer_str, neighbor_kmer;
         u16 kmer;
-        float lv_mean, lv_stdv, sd_mean, sd_stdv, lambda, weight;
-
-        //Check if table includes "ig_lambda" column
-        bool has_lambda = num_cols >= 7;
-
-        //Read first line
-        if (has_lambda) {
-            model_in >> kmer_str >> lv_mean >> lv_stdv >> sd_mean 
-                >> sd_stdv >> lambda >> weight;
-            lambda_ = lambda;
-        } else if (num_cols == 3) {
-            model_in >> kmer_str >> lv_mean >> lv_stdv; 
-            lambda_ = -1;
-        } else if (num_cols == 4) {
-            model_in >> kmer_str >> lv_mean >> lv_stdv >> sd_mean; 
-            lambda_ = -1;
-        } else {
-            model_in >> kmer_str >> lv_mean >> lv_stdv >> sd_mean 
-                >> sd_stdv >> weight;
-            lambda_ = -1;
-        }
-
-        //Compute number of kmers (4^k) and reserve space for model
-
-
-        lv_means_.resize(kmer_count_+1);
-        lv_vars_x2_.resize(kmer_count_+1);
-        lognorm_denoms_.resize(kmer_count_+1);
-
-        lv_means_[kmer_count_] = 
-            lv_vars_x2_[kmer_count_] = 
-            lognorm_denoms_[kmer_count_] = -1;
+        float lv_mean, lv_stdv;
 
         model_mean_ = 0;
 
         //Read and store rest of the model
-        do {
+        for (u32 i = 0; i < kmer_count_; i++) {
+        //while (!model_in.eof()) {
+        //
+            if (model_in.eof()) {
+                std::cerr << "Error: ran out of k-mers\n";
+                return;
+            }
+
+            model_in >> kmer_str >> lv_mean >> lv_stdv; 
+
+            std::cerr << "setting "
+                      << kmer_str << " "
+                      << lv_mean << " "
+                      << lv_stdv << "\n";
+
             //Get unique ID for the kmer
             kmer = str_to_kmer<KLEN>(kmer_str);
 
+            if (kmer >= kmer_count_) {
+                std::cerr << "Error: kmer '" << kmer << "' is invalid\n";
+                return;
+            }
+
             //Complement kmer if needed
-            if (complement) {
+            if (cmpl) {
                 kmer = kmer_comp<KLEN>(kmer);
             }
 
-            //Check if kmer is valid
-            if (kmer < 0 || kmer >= kmer_count_) {
-                std::cerr << "Error: kmer '" << kmer << "' is invalid\n";
+            init_kmer(kmer, lv_mean, lv_stdv);
 
-                //Store kmer information
-            } else {
-
-                //Store model information
-                lv_means_[kmer] = lv_mean;
-                lv_vars_x2_[kmer] = 2*lv_stdv*lv_stdv;
-                lognorm_denoms_[kmer] = log(sqrt(M_PI * lv_vars_x2_[kmer]));
-
-                model_mean_ += lv_mean;
-            }
-
-            //Read first line
-            if (has_lambda) {
-                model_in >> kmer_str >> lv_mean >> lv_stdv >> sd_mean 
-                    >> sd_stdv >> lambda >> weight;
-                lambda_ = lambda;
-            } else if (num_cols == 3) {
-                model_in >> kmer_str >> lv_mean >> lv_stdv; 
-                lambda_ = -1;
-            } else if (num_cols == 4) {
-                model_in >> kmer_str >> lv_mean >> lv_stdv >> sd_mean; 
-                lambda_ = -1;
-            } else {
-                model_in >> kmer_str >> lv_mean >> lv_stdv >> sd_mean 
-                    >> sd_stdv >> weight;
-                lambda_ = -1;
-            }
-
-            //Read until eof or correct number of kmers read
-        } while (!model_in.eof());
+            model_mean_ += lv_mean;
+        }
 
         //Compute model level mean and stdv
         model_mean_ /= kmer_count_;
-        model_stdv_ = 0;
-        for (u16 kmer = 0; kmer < kmer_count_; kmer++)
-            model_stdv_ += pow(lv_means_[kmer] - model_mean_, 2);
-        model_stdv_ = sqrt(model_stdv_ / kmer_count_);
+        init_stdv();
 
         loaded_ = true;
     }
@@ -177,12 +185,6 @@ class PoreModel {
     bool is_loaded() const {
         return loaded_;
     }
-
-    private:
-    std::vector<float> lv_means_, lv_vars_x2_, lognorm_denoms_;
-    float lambda_, model_mean_, model_stdv_;
-    u16 kmer_count_;
-    bool loaded_, complement_;
 };
 
 #endif
