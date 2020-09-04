@@ -62,6 +62,8 @@ class Mapper {
         float evt_timeout;
         float max_chunk_wait;
 
+        std::string bwa_prefix, idx_preset;
+
         SeedTracker::Params seed_prms;
         EventDetector::Params event_prms;
     } Params;
@@ -74,9 +76,7 @@ class Mapper {
     static PoreModel<KLEN> model;
     static std::vector<float> prob_threshes_;
 
-    static bool load_static(const std::string &index_fname,
-                            const std::string &model_fname,
-                            const std::string &index_preset);
+    static void load_static();
 
     enum State { INACTIVE, MAPPING, SUCCESS, FAILURE };
 

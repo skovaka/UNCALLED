@@ -93,6 +93,7 @@ def add_fast5_opts(p):
     p.add_argument("-l", "--read-list", required=False, default="", type=str, help="Only map reads listed in this file")
     p.add_argument("-n", "--max-reads", type=int, default=0, help="Maximum number of reads to map")
 
+#TODO get defautls from conf
 def add_map_opts(p):
     p.add_argument("-t", "--threads", default=1, type=int, help="Number of threads to use for mapping")
     p.add_argument("--num-channels", default=512, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")

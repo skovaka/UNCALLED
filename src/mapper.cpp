@@ -36,15 +36,20 @@ Mapper::Params Mapper::PRMS = {
     min_seed_prob   : -3.75,
     evt_buffer_len  : 6000,
     evt_batch_size  : 5,
-    evt_timeout     : 1000000.0,
-    max_chunk_wait  : 30000000.0 ,
+    evt_timeout     : 10.0,
+    max_chunk_wait  : 4000.0 ,
+
+    bwa_prefix      : "",
+    idx_preset      : "default",
+
     seed_prms       : SeedTracker::PRMS_DEF,
     event_prms      : EventDetector::PRMS_DEF
 };
 
 BwaIndex<KLEN> Mapper::fmi;
-PoreModel<KLEN> Mapper::model;
 std::vector<float> Mapper::prob_threshes_;
+
+PoreModel<KLEN> Mapper::model = pmodel_r94_complement;
 
 u8 Mapper::PathBuffer::MAX_PATH_LEN = 0, 
    Mapper::PathBuffer::TYPE_MASK = 0;
@@ -158,6 +163,8 @@ Mapper::Mapper() :
     seed_tracker_(PRMS.seed_prms),
     state_(State::INACTIVE) {
 
+    load_static();
+
     PathBuffer::MAX_PATH_LEN = PRMS.seed_len;
 
     for (u64 t = 0; t < EventType::NUM_TYPES; t++) {
@@ -193,42 +200,36 @@ Mapper::~Mapper() {
 
 //TODO load from conf?
 //auto load in constructor?
-bool Mapper::load_static(const std::string &bwa_prefix,
-                         const std::string &model_fname,
-                         const std::string &index_preset) {
+void Mapper::load_static() {
 
-    //model = PoreModel<KLEN>(model_fname, true);
-    //model = PoreModel<KLEN>(model_r94, true);
-    model = model_r94;
+    if (fmi.is_loaded()) return;
 
-
-    if (!model.is_loaded()) {
-        std::cerr << "Error: failed to load pore model\n";
-        return false;
-    }
-
-    fmi.load_index(bwa_prefix);
+    fmi.load_index(PRMS.bwa_prefix);
     if (!fmi.is_loaded()) {
         std::cerr << "Error: failed to load BWA index\n";
-        return false;
+        abort();
     }
 
-    std::ifstream param_file(bwa_prefix + INDEX_SUFF);
+    std::ifstream param_file(PRMS.bwa_prefix + INDEX_SUFF);
     if (!param_file.is_open()) {
         std::cerr << "Error: failed to load uncalled index\n";
-        return false;
+        abort();
     }
 
     std::string param_line;
 
-    char *index_preset_c = (char *) index_preset.c_str();
+    char *idx_preset_c = (char *) PRMS.idx_preset.c_str();
     prob_threshes_.resize(64);
 
+    //TODO: clean up parser
+    //maybe use toml?
+    //try making backwards compatible?
+    //definitely more error checking
     while (getline(param_file, param_line)) {
         char *param_name = strtok((char *) param_line.c_str(), "\t");
         char *fn_str = strtok(NULL, "\t");
         //char *path_str = strtok(NULL, "\t");
-        if ( !index_preset.empty() && strcmp(param_name, index_preset_c) ) {
+        if ( !PRMS.idx_preset.empty() && strcmp(param_name, idx_preset_c) ) {
                 continue;
         }
 
@@ -245,7 +246,6 @@ bool Mapper::load_static(const std::string &bwa_prefix,
         }
     }
 
-    return true;
 }
 
 float Mapper::get_prob_thresh(u64 fmlen) const {

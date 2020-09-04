@@ -13,7 +13,6 @@ int main(int argc, char** argv) {
     std::cerr << "Loading conf\n";
 
     Conf conf(DEF_CONF);
-    conf.set_kmer_model(DEF_MODEL);
 
     if (!load_conf(argc, argv, conf)) {
         return 1;

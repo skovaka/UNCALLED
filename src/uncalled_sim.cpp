@@ -15,7 +15,6 @@ int main(int argc, char** argv) {
     std::cerr << "Loading conf\n";
 
     Conf conf(DEF_CONF);
-    conf.set_kmer_model(DEF_MODEL);
 
     if (!load_conf(argc, argv, conf)) {
         return 1;
@@ -115,7 +114,7 @@ bool load_conf(int argc, char** argv, Conf &conf) {
     while((opt = getopt(argc, argv, ":t:g:c:p:de")) != -1) {
         switch(opt) {  
 
-            FLAG_TO_CONF('p', std::string, index_preset)
+            FLAG_TO_CONF('p', std::string, idx_preset)
             FLAG_TO_CONF('t', atoi, threads)
             FLAG_TO_CONF('c', atoi, max_chunks)
 

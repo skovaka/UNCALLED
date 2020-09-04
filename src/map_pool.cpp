@@ -28,8 +28,6 @@
 MapPool::MapPool(Conf &conf)
     : fast5s_(conf.fast5_prms) {
 
-    Mapper::load_static(conf.bwa_prefix, conf.kmer_model, conf.index_preset);
-
     threads_ = std::vector<MapperThread>(conf.threads);
 
     //fast5s_.fill_buffer();

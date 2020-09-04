@@ -1030,6 +1030,10 @@ const std::vector<float> model_r94_means_stdvs = {
         90.405465,	1.513907  //TTTTT
 };
 
-const PoreModel<KmerLen::k5> model_r94(model_r94_means_stdvs, true);
+const PoreModel<KmerLen::k5> 
+    pmodel_r94_template(model_r94_means_stdvs, false);
+
+const PoreModel<KmerLen::k5> 
+    pmodel_r94_complement(model_r94_means_stdvs, true);
 
 #endif

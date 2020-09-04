@@ -17,9 +17,9 @@
 const EventDetector::Params EventDetector::PRMS_DEF = {
     window_length1 : 3,
     window_length2 : 6,
-    threshold1     : 1.4f,
-    threshold2     : 9.0f,
-    peak_height    : 0.2f,
+    threshold1     : 1.4,
+    threshold2     : 9.0,
+    peak_height    : 0.2,
     min_mean       : 30,
     max_mean       : 200
 };

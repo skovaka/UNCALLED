@@ -32,8 +32,6 @@ RealtimePool::RealtimePool(Conf &conf) :
     PRMS(conf.realtime_prms),
     stopped_(false) {
 
-    Mapper::load_static(conf.bwa_prefix, conf.kmer_model, conf.index_preset);
-
     for (u16 t = 0; t < conf.threads; t++) {
         threads_.emplace_back(mappers_);
     }
