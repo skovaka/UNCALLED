@@ -36,8 +36,10 @@ Mapper::Params Mapper::PRMS = {
     min_seed_prob   : -3.75,
     evt_buffer_len  : 6000,
     evt_batch_size  : 5,
-    evt_timeout     : 10.0,
-    max_chunk_wait  : 4000.0 ,
+    
+    //TODO: change when we see the mode has changed
+    evt_timeout     : 10000000.0,
+    max_chunk_wait  : 40000000.0 ,
 
     bwa_prefix      : "",
     idx_preset      : "default",

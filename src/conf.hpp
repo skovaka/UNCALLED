@@ -84,9 +84,7 @@ class Conf {
     EventDetector::Params &event_prms = mapper_prms.event_prms;
     SeedTracker::Params &seed_prms = mapper_prms.seed_prms;
 
-    //Fast5Reader::Params fast5_prms = Fast5Reader::PRMS_DEF;
-    //RealtimePool::Params realtime_prms = RealtimePool::PRMS_DEF;
-    //ClientSim::Params sim_prms = ClientSim::PRMS_DEF;
+    ReadBuffer::Params &read_prms = ReadBuffer::PRMS;
 
     Fast5Reader::Params fast5_prms = Fast5Reader::PRMS_DEF;
     RealtimeParams realtime_prms;
@@ -99,35 +97,16 @@ class Conf {
     void load_toml(const std::string &fname) {
         const auto conf = toml::parse(fname);
 
-        if (conf.contains("event_detector")) {
-            const auto subconf = toml::find(conf, "event_detector");
-            GET_TOML_EXTERN(subconf, float, min_mean, event_prms);
-            GET_TOML_EXTERN(subconf, float, max_mean, event_prms);
-            GET_TOML_EXTERN(subconf, float, threshold1, event_prms);
-            GET_TOML_EXTERN(subconf, float, threshold2, event_prms);
-            GET_TOML_EXTERN(subconf, float, peak_height, event_prms);
-            GET_TOML_EXTERN(subconf, u32, window_length1, event_prms);
-            GET_TOML_EXTERN(subconf, u32, window_length2, event_prms);
-        }
-
         if (conf.contains("global")) {
             const auto subconf = toml::find(conf, "global");
 
             GET_TOML(subconf, u16, num_channels);
             GET_TOML(subconf, u16, threads);
 
-            ReadBuffer::PRMS.calib_offsets.resize(num_channels);
-            ReadBuffer::PRMS.calib_coefs.resize(num_channels);
+            //TODO not this
+            read_prms.calib_offsets.resize(num_channels);
+            read_prms.calib_coefs.resize(num_channels);
         }
-
-        //if (conf.contains("fast5_params")) {
-        //    const auto subconf = toml::find(conf, "fast5_params");
-
-        //    GET_TOML_EXTERN(subconf, u32, max_buffer, fast5_prms);
-        //    GET_TOML_EXTERN(subconf, u32, max_reads, fast5_prms);
-        //    GET_TOML_EXTERN(subconf, std::string, fast5_list, fast5_prms);
-        //    GET_TOML_EXTERN(subconf, std::string, read_list, fast5_prms);
-        //}
 
         if (conf.contains("realtime")) {
             const auto subconf = toml::find(conf, "realtime");
@@ -157,43 +136,7 @@ class Conf {
             }
         }
 
-        //if (conf.contains("reads")) {
-        //    const auto subconf = toml::find(conf, "reads");
-
-        //    GET_TOML_EXTERN(subconf, u32, max_chunks, ReadBuffer::PRMS);
-        //    GET_TOML_EXTERN(subconf, u16, bp_per_sec, ReadBuffer::PRMS);
-        //    GET_TOML_EXTERN(subconf, u16, sample_rate, ReadBuffer::PRMS);
-        //    GET_TOML_EXTERN(subconf, float, chunk_time, ReadBuffer::PRMS);
-        //}
-
-        if (conf.contains("mapper")) {
-            const auto subconf = toml::find(conf, "mapper");
-
-            GET_TOML_EXTERN(subconf, u32, seed_len, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, min_rep_len, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_rep_copy, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_paths, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_consec_stay, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_events, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, max_stay_frac, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, min_seed_prob, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, std::string, bwa_prefix, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, std::string, idx_preset, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, evt_buffer_len, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u16, evt_batch_size, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, evt_timeout, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, max_chunk_wait, Mapper::PRMS);
-        }
-
-        if (conf.contains("seed_tracker")) {
-            const auto subconf = toml::find(conf, "seed_tracker");
-
-            GET_TOML_EXTERN(subconf, float, min_mean_conf, Mapper::PRMS.seed_prms);
-            GET_TOML_EXTERN(subconf, float, min_top_conf, Mapper::PRMS.seed_prms);
-            GET_TOML_EXTERN(subconf, u32, min_aln_len, Mapper::PRMS.seed_prms);
-        }
-
-
+        //TODO rename subsection
         if (conf.contains("simulator")) {
             const auto subconf = toml::find(conf, "simulator");
             GET_TOML_EXTERN(subconf, std::string, ctl_seqsum, sim_prms);
@@ -206,6 +149,63 @@ class Conf {
             GET_TOML_EXTERN(subconf, u32, min_ch_reads, sim_prms);
 
         }
+
+        //if (conf.contains("fast5_params")) {
+        //    const auto subconf = toml::find(conf, "fast5_params");
+
+        //    GET_TOML_EXTERN(subconf, u32, max_buffer, fast5_prms);
+        //    GET_TOML_EXTERN(subconf, u32, max_reads, fast5_prms);
+        //    GET_TOML_EXTERN(subconf, std::string, fast5_list, fast5_prms);
+        //    GET_TOML_EXTERN(subconf, std::string, read_list, fast5_prms);
+        //}
+
+        //if (conf.contains("reads")) {
+        //    const auto subconf = toml::find(conf, "reads");
+
+        //    GET_TOML_EXTERN(subconf, u32, max_chunks,   read_prms);
+        //    GET_TOML_EXTERN(subconf, u16, bp_per_sec,   read_prms);
+        //    GET_TOML_EXTERN(subconf, u16, sample_rate,  read_prms);
+        //    GET_TOML_EXTERN(subconf, float, chunk_time, read_prms);
+        //}
+
+        //if (conf.contains("mapper")) {
+        //    const auto subconf = toml::find(conf, "mapper");
+
+        //    GET_TOML_EXTERN(subconf, u32, seed_len, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, min_rep_len, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, max_rep_copy, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, max_paths, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, max_consec_stay, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, max_events, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, max_stay_frac, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, min_seed_prob, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, std::string, bwa_prefix, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, std::string, idx_preset, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u32, evt_buffer_len, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, u16, evt_batch_size, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, evt_timeout, Mapper::PRMS);
+        //    GET_TOML_EXTERN(subconf, float, max_chunk_wait, Mapper::PRMS);
+        //}
+
+        //if (conf.contains("seed_tracker")) {
+        //    const auto subconf = toml::find(conf, "seed_tracker");
+
+        //    GET_TOML_EXTERN(subconf, float, min_mean_conf, Mapper::PRMS.seed_prms);
+        //    GET_TOML_EXTERN(subconf, float, min_top_conf, Mapper::PRMS.seed_prms);
+        //    GET_TOML_EXTERN(subconf, u32, min_aln_len, Mapper::PRMS.seed_prms);
+        //}
+
+        //if (conf.contains("event_detector")) {
+        //    const auto subconf = toml::find(conf, "event_detector");
+        //    GET_TOML_EXTERN(subconf, float, min_mean, event_prms);
+        //    GET_TOML_EXTERN(subconf, float, max_mean, event_prms);
+        //    GET_TOML_EXTERN(subconf, float, threshold1, event_prms);
+        //    GET_TOML_EXTERN(subconf, float, threshold2, event_prms);
+        //    GET_TOML_EXTERN(subconf, float, peak_height, event_prms);
+        //    GET_TOML_EXTERN(subconf, u32, window_length1, event_prms);
+        //    GET_TOML_EXTERN(subconf, u32, window_length2, event_prms);
+        //}
+
     }
 
 
@@ -232,9 +232,9 @@ class Conf {
     GET_SET_EXTERN(std::string, mapper_prms, idx_preset)
     GET_SET_EXTERN(u32, mapper_prms, max_events)
 
-    GET_SET_EXTERN(u32, ReadBuffer::PRMS, max_chunks)
-    GET_SET_EXTERN(float, ReadBuffer::PRMS, chunk_time);
-    GET_SET_EXTERN(float, ReadBuffer::PRMS, sample_rate);
+    GET_SET_EXTERN(u32,   read_prms, max_chunks)
+    GET_SET_EXTERN(float, read_prms, chunk_time);
+    GET_SET_EXTERN(float, read_prms, sample_rate);
 
 
     GET_SET_EXTERN(std::string, sim_prms, ctl_seqsum);

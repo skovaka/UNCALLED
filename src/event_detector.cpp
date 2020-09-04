@@ -20,8 +20,10 @@ const EventDetector::Params EventDetector::PRMS_DEF = {
     threshold1     : 1.4,
     threshold2     : 9.0,
     peak_height    : 0.2,
-    min_mean       : 30,
-    max_mean       : 200
+
+    //TODO need to adjust once calibration figured out
+    min_mean       : 0,
+    max_mean       : 40000
 };
 
 typedef Detector *DetectorPtr;
