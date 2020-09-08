@@ -18,7 +18,8 @@ PYBIND11_MODULE(mapping, m) {
     py::class_<Conf> conf(m, "Conf");
 
     conf.def(py::init<const std::string &>())
-        .def("load_conf", &Conf::load_conf);
+        .def(py::init())
+        .def("load_toml", &Conf::load_toml);
     Conf::add_pybind_vars(conf);
 
     py::class_<Paf> paf(m, "Paf");

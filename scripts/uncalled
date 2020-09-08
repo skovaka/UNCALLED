@@ -133,8 +133,6 @@ def get_parser():
     return parser
 
 def load_args(args, conf):
-    conf.kmer_model = params.MODEL_FNAME
-
     for a, v in vars(args).items():
         if v == None:
             #sys.stderr.write("%s IS NONE\n" % a)
@@ -231,7 +229,8 @@ def assert_exists(fname):
         sys.exit(1)
 
 def map_cmd(args):
-    conf = mapping.Conf(params.CONF_DEFAULTS)
+    #conf = mapping.Conf(params.CONF_DEFAULTS)
+    conf = mapping.Conf()
     load_args(args, conf)
 
     assert_exists(params.MODEL_FNAME)
@@ -279,7 +278,8 @@ def realtime_cmd(args):
 
     sim = args.subcmd == "sim"
 
-    conf = mapping.Conf(params.CONF_DEFAULTS)
+    #conf = mapping.Conf(params.CONF_DEFAULTS)
+    conf = mapping.Conf()
     load_args(args, conf)
 
     assert_exists(params.MODEL_FNAME)

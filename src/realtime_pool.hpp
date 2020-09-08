@@ -21,8 +21,8 @@
  * SOFTWARE.
  */
 
-#ifndef _INCL_READ_CHUNK_POOL
-#define _INCL_READ_CHUNK_POOL
+#ifndef _INCL_REALTIME_POOL
+#define _INCL_REALTIME_POOL
 
 #include <thread>
 #include <vector>
@@ -34,6 +34,10 @@ using MapResult = std::tuple<u16, u32, Paf>;
 
 class RealtimePool {
     public:
+
+    //static Params const PRMS_DEF;
+    RealtimeParams PRMS;
+
     RealtimePool(Conf &conf);
     
     void start_timer();
@@ -81,8 +85,6 @@ class RealtimePool {
     };
 
     void buffer_chunk(Chunk &c);
-
-    RealtimeParams PRMS;
 
     bool stopped_;
 

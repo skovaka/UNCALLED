@@ -28,6 +28,15 @@
 #include "realtime_pool.hpp"
 #include "mapper.hpp"
 
+//const RealtimePRMS::PRMS_DEF = {
+//    active_chs = ActiveChs::FULL,
+//    realtime_mode = Mode::ENRICH,
+//    host = "127.0.0.1",
+//    port = 8000,
+//    duration = 72,
+//    max_active_reads = 512
+//};
+
 RealtimePool::RealtimePool(Conf &conf) :
     PRMS(conf.realtime_prms),
     stopped_(false) {
@@ -36,10 +45,10 @@ RealtimePool::RealtimePool(Conf &conf) :
         threads_.emplace_back(mappers_);
     }
 
-    mappers_.resize(conf.num_channels);
-    chunk_buffer_.resize(conf.num_channels);
-    buffer_queue_.reserve(conf.num_channels);
-    active_queue_.reserve(conf.num_channels);
+    mappers_.resize(conf.get_num_channels());
+    chunk_buffer_.resize(conf.get_num_channels());
+    buffer_queue_.reserve(conf.get_num_channels());
+    active_queue_.reserve(conf.get_num_channels());
 
 
     for (u16 t = 0; t < conf.threads; t++) {

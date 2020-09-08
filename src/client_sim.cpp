@@ -35,8 +35,8 @@ ClientSim::ClientSim(Conf &conf) :
     ej_time_    = PRMS.ej_time   * sample_rate;
     scan_time_  = PRMS.scan_time * sample_rate;
 
-    channels_.reserve(conf.num_channels);
-    for (u32 c = 1; c <= conf.num_channels; c++) {
+    channels_.reserve(conf.get_num_channels());
+    for (u32 c = 1; c <= conf.get_num_channels(); c++) {
         channels_.emplace_back(c);
     }
 }

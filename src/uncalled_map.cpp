@@ -12,7 +12,7 @@ bool load_conf(int argc, char** argv, Conf &conf);
 int main(int argc, char** argv) {
     std::cerr << "Loading conf\n";
 
-    Conf conf(DEF_CONF);
+    Conf conf();
 
     if (!load_conf(argc, argv, conf)) {
         return 1;
