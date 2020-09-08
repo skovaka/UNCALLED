@@ -60,7 +60,7 @@ class Mapper {
         u32 evt_buffer_len;
         u16 evt_batch_size;
         float evt_timeout;
-        float max_chunk_wait;
+        float chunk_timeout;
 
         std::string bwa_prefix, idx_preset;
 

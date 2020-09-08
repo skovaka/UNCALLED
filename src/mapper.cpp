@@ -36,14 +36,10 @@ Mapper::Params Mapper::PRMS = {
     min_seed_prob   : -3.75,
     evt_buffer_len  : 6000,
     evt_batch_size  : 5,
-    
-    //TODO: change when we see the mode has changed
-    evt_timeout     : 10000000.0,
-    max_chunk_wait  : 40000000.0 ,
-
+    evt_timeout     : 10.0,
+    chunk_timeout  : 4000.0 ,
     bwa_prefix      : "",
     idx_preset      : "default",
-
     seed_prms       : SeedTracker::PRMS_DEF,
     event_prms      : EventDetector::PRMS_DEF
 };
@@ -299,10 +295,10 @@ void Mapper::new_read(ReadBuffer &r) {
 }
 
 void Mapper::new_read(Chunk &chunk) {
-    if (!chunk_mtx_.try_lock()) {
-        std::cerr << "Error: failed to create new read '" << read_.id_ << "'\n";
-        return;
-    }
+    //if (!chunk_mtx_.try_lock()) {
+    //    std::cerr << "Error: failed to create new read '" << read_.id_ << "'\n";
+    //    return;
+    //}
 
     if (prev_unfinished(chunk.get_number())) {
         std::cerr << "Error: possibly lost read '" << read_.id_ << "'\n";
@@ -310,7 +306,7 @@ void Mapper::new_read(Chunk &chunk) {
     read_ = ReadBuffer(chunk);
     reset();
 
-    chunk_mtx_.unlock();
+    //chunk_mtx_.unlock();
 }
 
 void Mapper::reset() {
@@ -460,7 +456,7 @@ bool Mapper::chunk_mapped() {
 bool Mapper::map_chunk() {
     wait_time_ += map_timer_.lap();
 
-    if (reset_ || chunk_timer_.get() > PRMS.max_chunk_wait) {
+    if (reset_ || chunk_timer_.get() > PRMS.chunk_timeout) {
         set_failed();
         read_.loc_.set_ended();
         //std::cerr << "# END timer or reset\n";
@@ -484,7 +480,7 @@ bool Mapper::map_chunk() {
     if (norm_.empty()) {
         //std::cerr << "# stuck empty: " 
         //          << chunk_timer_.get() << " < "
-        //          << PRMS.max_chunk_wait << "\n";
+        //          << PRMS.chunk_timeout << "\n";
         return false;
     }
 

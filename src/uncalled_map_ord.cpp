@@ -3,20 +3,14 @@
 #include <unistd.h>
 #include "map_pool_ord.hpp"
 
-const std::string CONF_DIR(std::getenv("UNCALLED_CONF")),
-                  DEF_MODEL = CONF_DIR + "/r94_5mers.txt",
-                  DEF_CONF = CONF_DIR + "/defaults.toml";
-
-bool load_conf(int argc, char** argv, Conf &conf);
+void load_conf(int argc, char** argv, Conf &conf);
 
 int main(int argc, char** argv) {
     std::cerr << "Loading conf\n";
 
-    Conf conf;
+    Conf conf(Conf::Mode::MAP_ORD);
 
-    if (!load_conf(argc, argv, conf)) {
-        return 1;
-    }
+    load_conf(argc, argv, conf);
 
     MapPoolOrd pool(conf);
 
@@ -59,12 +53,12 @@ int main(int argc, char** argv) {
         conf.set_##F(T(argv[i])); \
         i++; \
     } else { \
-        std::cerr << "Error: must specify " << #F << "\n"; \
-        return false; \
+        std::cerr << "Error: must specify flag " << #F << "\n"; \
+        abort(); \
     } \
 }
 
-bool load_conf(int argc, char** argv, Conf &conf) {
+void load_conf(int argc, char** argv, Conf &conf) {
     int opt;
 
     //parse flags
@@ -78,12 +72,12 @@ bool load_conf(int argc, char** argv, Conf &conf) {
             FLAG_TO_CONF('l', std::string, read_list)
 
             case ':':  
-            std::cerr << "Error: failed to load flag value\n";  
-            return false;
+            std::cerr << "Error: failed to load flag value\n";
+            abort();
 
             case '?':  
             std::cerr << "Error: unknown flag\n";  
-            return false;
+            abort();
         }
     }
 
@@ -93,6 +87,4 @@ bool load_conf(int argc, char** argv, Conf &conf) {
 
     POSITIONAL_TO_CONF(std::string, bwa_prefix)
     POSITIONAL_TO_CONF(std::string, fast5_list)
-
-    return true;
 }

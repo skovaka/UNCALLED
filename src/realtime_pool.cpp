@@ -144,6 +144,8 @@ bool RealtimePool::try_add_chunk(Chunk &c) {
 //TODO: make sure update is the same
 std::vector<MapResult> RealtimePool::update() {
 
+    time_.reset();
+
     std::vector< u16 > read_counts(threads_.size(), 0);
     active_count_ = 0;
     std::vector<MapResult> ret;
@@ -196,13 +198,13 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-    if (time_.get() >= 1000 && active_count_ > 0) {
-        std::cout << "#prefill_threads ("
-                  << active_count_ << ")";
-        for (u16 c : read_counts) std::cout << " " << c;
-        std::cout << "\n";
-        std::cout.flush();
-    }
+    //if (time_.get() >= 1000 && active_count_ > 0) {
+    //    std::cout << "#prefill_threads " 
+    //              << active_count_ << "\n";
+        //for (u16 c : read_counts) std::cout << " " << c;
+        //std::cout << "\n";
+        //std::cout.flush();
+    //}
 
     //Estimate how much to fill each thread
     u16 target = min(active_queue_.size() + active_count_, PRMS.max_active_reads);
@@ -249,16 +251,15 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-    if (time_.get() >= 1000 && active_count_ > 0) {
-        time_.reset();
-
-        std::cout << "#pstfill_threads ("
-                  << active_count_ << ")";
-
-        for (u16 c : read_counts) std::cout << " " << c;
-        std::cout << "\n";
-        std::cout.flush();
-    }
+    //if (time_.get() >= 1000 && active_count_ > 0) {
+    //    time_.reset();
+    //    std::cout << "#pstfill_threads "
+    //              << active_count_ << " "
+    //              << time_.get() << "\n";
+    //    for (u16 c : read_counts) std::cout << " " << c;
+    //    std::cout << "\n";
+    //    std::cout.flush();
+    //}
 
     return ret;
 }
@@ -305,7 +306,7 @@ RealtimePool::MapperThread::MapperThread(std::vector<Mapper> &mappers)
 RealtimePool::MapperThread::MapperThread(MapperThread &&mt) 
     : tid_(mt.tid_),
       mappers_(mt.mappers_),
-      running_(mt.running_),                                             
+      running_(mt.running_), 
       thread_(std::move(mt.thread_)) {}
 
 void RealtimePool::MapperThread::start() {
@@ -323,6 +324,8 @@ void RealtimePool::MapperThread::run() {
 
     std::vector<u16> finished;
 
+    Timer t;
+
     while (running_) {
         if (read_count() == 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -331,9 +334,12 @@ void RealtimePool::MapperThread::run() {
 
         //Read inputs (pop, lock, and swap it)
         if (!in_chs_.empty()) {
+
+
             in_mtx_.lock();
             in_tmp_.swap(in_chs_);
             in_mtx_.unlock();
+
 
             for (auto ch : in_tmp_) {
                 active_chs_.push_back(ch);
@@ -357,6 +363,9 @@ void RealtimePool::MapperThread::run() {
 
         //Add finished to output
         if (!out_tmp_.empty()) {
+
+            t.reset();
+
             out_mtx_.lock();
             for (auto i : out_tmp_) {
                 out_chs_.push_back(active_chs_[i]);

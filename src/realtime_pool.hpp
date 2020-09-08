@@ -82,6 +82,8 @@ class RealtimePool {
         std::mutex in_mtx_, out_mtx_;
 
         std::thread thread_;
+
+        float mtx_time_;
     };
 
     void buffer_chunk(Chunk &c);

@@ -26,6 +26,7 @@
 
 #include <iostream>
 #include <vector>
+#include <cfloat>
 #include "mapper.hpp"
 #include "fast5_reader.hpp"
 #include "toplevel_prms.hpp"
@@ -59,6 +60,9 @@ class Conf {
 
     public:
 
+    enum class Mode {MAP, REALTIME, SIM, MAP_ORD, UNDEF};
+
+    Mode mode;
     u16 threads;
 
     Mapper::Params &mapper_prms = Mapper::PRMS;
@@ -71,7 +75,22 @@ class Conf {
     RealtimeParams realtime_prms = REALTIME_PRMS_DEF;
     SimParams sim_prms = SIM_PRMS_DEF;
 
-    Conf() : threads(1) {}
+    Conf() : mode(Mode::UNDEF), threads(1) {}
+
+    Conf(Mode m) : Conf() {
+        mode = m;
+
+        switch (mode) {
+
+        case Mode::MAP_ORD:
+            mapper_prms.chunk_timeout = FLT_MAX;
+            mapper_prms.evt_timeout = FLT_MAX;
+            break;
+
+        default:
+            break;
+        }
+    }
 
     void load_toml(const std::string &fname) {
         const auto conf = toml::parse(fname);
@@ -158,7 +177,7 @@ class Conf {
             GET_TOML_EXTERN(subconf, u32, evt_buffer_len, Mapper::PRMS);
             GET_TOML_EXTERN(subconf, u16, evt_batch_size, Mapper::PRMS);
             GET_TOML_EXTERN(subconf, float, evt_timeout, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, max_chunk_wait, Mapper::PRMS);
+            GET_TOML_EXTERN(subconf, float, chunk_timeout, Mapper::PRMS);
         }
 
         if (conf.contains("seed_tracker")) {
