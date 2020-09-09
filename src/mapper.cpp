@@ -37,7 +37,7 @@ Mapper::Params Mapper::PRMS = {
     evt_buffer_len  : 6000,
     evt_batch_size  : 5,
     evt_timeout     : 10.0,
-    chunk_timeout  : 4000.0 ,
+    chunk_timeout   : 4000.0,
     bwa_prefix      : "",
     idx_preset      : "default",
     seed_prms       : SeedTracker::PRMS_DEF,
@@ -49,112 +49,6 @@ std::vector<float> Mapper::prob_threshes_;
 
 PoreModel<KLEN> Mapper::model = pmodel_r94_complement;
 
-u8 Mapper::PathBuffer::MAX_PATH_LEN = 0, 
-   Mapper::PathBuffer::TYPE_MASK = 0;
-
-u32 Mapper::PathBuffer::TYPE_ADDS[EventType::NUM_TYPES];
-
-Mapper::PathBuffer::PathBuffer()
-    : length_(0),
-      prob_sums_(new float[MAX_PATH_LEN+1]) {
-}
-
-Mapper::PathBuffer::PathBuffer(const PathBuffer &p) {
-    std::memcpy(this, &p, sizeof(PathBuffer));
-}
-
-void Mapper::PathBuffer::free_buffers() {
-    delete[] prob_sums_;
-}
-
-void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
-    length_ = 1;
-    consec_stays_ = 0;
-    event_types_ = 0;
-    seed_prob_ = prob;
-    fm_range_ = range;
-    kmer_ = kmer;
-    sa_checked_ = false;
-
-    path_type_counts_[EventType::MATCH] = 1;
-    path_type_counts_[EventType::STAY] = 0;
-    total_match_len_ = 1;
-
-    //TODO: don't write this here to speed up source loop
-    prob_sums_[0] = 0;
-    prob_sums_[1] = prob;
-}
-
-
-void Mapper::PathBuffer::make_child(PathBuffer &p, 
-                                    Range &range,
-                                    u16 kmer, 
-                                    float prob, 
-                                    EventType type) {
-
-    length_ = p.length_ + (p.length_ <= MAX_PATH_LEN);
-    fm_range_ = range;
-    kmer_ = kmer;
-    sa_checked_ = p.sa_checked_;
-    event_types_ = TYPE_ADDS[type] | (p.event_types_ >> TYPE_BITS);
-    consec_stays_ = (p.consec_stays_ + (type == EventType::STAY)) * (type == EventType::STAY);
-
-    std::memcpy(path_type_counts_, p.path_type_counts_, EventType::NUM_TYPES * sizeof(u8));
-    path_type_counts_[type]++;
-    total_match_len_ = p.total_match_len_ + (type==EventType::MATCH);
-
-    if (length_ > MAX_PATH_LEN) {
-        std::memcpy(prob_sums_, &(p.prob_sums_[1]), MAX_PATH_LEN * sizeof(float));
-        prob_sums_[MAX_PATH_LEN] = prob_sums_[MAX_PATH_LEN-1] + prob;
-        seed_prob_ = (prob_sums_[MAX_PATH_LEN] - prob_sums_[0]) / MAX_PATH_LEN;
-        path_type_counts_[p.type_tail()]--;
-    } else {
-        std::memcpy(prob_sums_, p.prob_sums_, length_ * sizeof(float));
-        prob_sums_[length_] = prob_sums_[length_-1] + prob;
-        seed_prob_ = prob_sums_[length_] / length_;
-    }
-
-}
-
-void Mapper::PathBuffer::invalidate() {
-    length_ = 0;
-}
-
-bool Mapper::PathBuffer::is_valid() const {
-    return length_ > 0;
-}
-
-u8 Mapper::PathBuffer::match_len() const {
-    return path_type_counts_[EventType::MATCH];
-}
-
-u8 Mapper::PathBuffer::type_head() const {
-    return (event_types_ >> (TYPE_BITS*(MAX_PATH_LEN-2))) & TYPE_MASK;
-}
-
-u8 Mapper::PathBuffer::type_tail() const {
-    return event_types_ & TYPE_MASK;
-}
-
-bool Mapper::PathBuffer::is_seed_valid(bool path_ended) const{
-    return (fm_range_.length() == 1 || 
-                (path_ended &&
-                 fm_range_.length() <= PRMS.max_rep_copy &&
-                 match_len() >= PRMS.min_rep_len)) &&
-
-           length_ >= PRMS.seed_len &&
-           (path_ended || type_head() == EventType::MATCH) &&
-           (path_ended || path_type_counts_[EventType::STAY] <= PRMS.max_stay_frac * PRMS.seed_len) &&
-          seed_prob_ >= PRMS.min_seed_prob;
-}
-
-
-bool operator< (const Mapper::PathBuffer &p1, 
-                const Mapper::PathBuffer &p2) {
-    return p1.fm_range_ < p2.fm_range_ ||
-           (p1.fm_range_ == p2.fm_range_ && 
-            p1.seed_prob_ < p2.seed_prob_);
-}
 
 Mapper::Mapper() :
     evdt_(PRMS.event_prms),
@@ -163,10 +57,8 @@ Mapper::Mapper() :
 
     load_static();
 
-    PathBuffer::MAX_PATH_LEN = PRMS.seed_len;
-
     for (u64 t = 0; t < EventType::NUM_TYPES; t++) {
-        PathBuffer::TYPE_ADDS[t] = t << ((PathBuffer::MAX_PATH_LEN-2)*TYPE_BITS);
+        PathBuffer::TYPE_ADDS[t] = t << ((PRMS.seed_len-2)*TYPE_BITS);
     }
     PathBuffer::TYPE_MASK = (u8) ((1 << TYPE_BITS) - 1);
 
@@ -196,8 +88,6 @@ Mapper::~Mapper() {
     }
 }
 
-//TODO load from conf?
-//auto load in constructor?
 void Mapper::load_static() {
 
     if (fmi.is_loaded()) return;
@@ -804,4 +694,107 @@ void Mapper::set_ref_loc(const SeedGroup &seeds) {
     read_.loc_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, fwd, match_count);
 }
 
+u8 Mapper::PathBuffer::TYPE_MASK = 0;
+u32 Mapper::PathBuffer::TYPE_ADDS[EventType::NUM_TYPES];
 
+Mapper::PathBuffer::PathBuffer()
+    : length_(0),
+      prob_sums_(new float[PRMS.seed_len+1]) {
+}
+
+Mapper::PathBuffer::PathBuffer(const PathBuffer &p) {
+    std::memcpy(this, &p, sizeof(PathBuffer));
+}
+
+void Mapper::PathBuffer::free_buffers() {
+    delete[] prob_sums_;
+}
+
+void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
+    length_ = 1;
+    consec_stays_ = 0;
+    event_types_ = 0;
+    seed_prob_ = prob;
+    fm_range_ = range;
+    kmer_ = kmer;
+    sa_checked_ = false;
+
+    path_type_counts_[EventType::MATCH] = 1;
+    path_type_counts_[EventType::STAY] = 0;
+    total_match_len_ = 1;
+
+    //TODO: don't write this here to speed up source loop
+    prob_sums_[0] = 0;
+    prob_sums_[1] = prob;
+}
+
+
+void Mapper::PathBuffer::make_child(PathBuffer &p, 
+                                    Range &range,
+                                    u16 kmer, 
+                                    float prob, 
+                                    EventType type) {
+
+    length_ = p.length_ + (p.length_ <= PRMS.seed_len);
+    fm_range_ = range;
+    kmer_ = kmer;
+    sa_checked_ = p.sa_checked_;
+    event_types_ = TYPE_ADDS[type] | (p.event_types_ >> TYPE_BITS);
+    consec_stays_ = (p.consec_stays_ + (type == EventType::STAY)) * (type == EventType::STAY);
+
+    std::memcpy(path_type_counts_, p.path_type_counts_, EventType::NUM_TYPES * sizeof(u8));
+    path_type_counts_[type]++;
+    total_match_len_ = p.total_match_len_ + (type==EventType::MATCH);
+
+    if (length_ > PRMS.seed_len) {
+        std::memcpy(prob_sums_, &(p.prob_sums_[1]), PRMS.seed_len * sizeof(float));
+        prob_sums_[PRMS.seed_len] = prob_sums_[PRMS.seed_len-1] + prob;
+        seed_prob_ = (prob_sums_[PRMS.seed_len] - prob_sums_[0]) / PRMS.seed_len;
+        path_type_counts_[p.type_tail()]--;
+    } else {
+        std::memcpy(prob_sums_, p.prob_sums_, length_ * sizeof(float));
+        prob_sums_[length_] = prob_sums_[length_-1] + prob;
+        seed_prob_ = prob_sums_[length_] / length_;
+    }
+
+}
+
+void Mapper::PathBuffer::invalidate() {
+    length_ = 0;
+}
+
+bool Mapper::PathBuffer::is_valid() const {
+    return length_ > 0;
+}
+
+u8 Mapper::PathBuffer::match_len() const {
+    return path_type_counts_[EventType::MATCH];
+}
+
+u8 Mapper::PathBuffer::type_head() const {
+    return (event_types_ >> (TYPE_BITS*(PRMS.seed_len-2))) & TYPE_MASK;
+}
+
+u8 Mapper::PathBuffer::type_tail() const {
+    return event_types_ & TYPE_MASK;
+}
+
+bool Mapper::PathBuffer::is_seed_valid(bool path_ended) const{
+    return (fm_range_.length() == 1 || 
+                (path_ended &&
+                 fm_range_.length() <= PRMS.max_rep_copy &&
+                 match_len() >= PRMS.min_rep_len)) &&
+
+           length_ >= PRMS.seed_len &&
+           (path_ended || type_head() == EventType::MATCH) &&
+           (path_ended || path_type_counts_[EventType::STAY] <= PRMS.max_stay_frac * PRMS.seed_len) &&
+          seed_prob_ >= PRMS.min_seed_prob;
+}
+
+
+bool operator< (const Mapper::PathBuffer &p1, 
+                const Mapper::PathBuffer &p2) {
+    return p1.fm_range_ < p2.fm_range_ ||
+           (p1.fm_range_ == p2.fm_range_ && 
+            p1.seed_prob_ < p2.seed_prob_);
+}
