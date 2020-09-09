@@ -29,9 +29,6 @@ ReadBuffer::Params ReadBuffer::PRMS = {
     sample_rate  : 4000,
     chunk_time   : 1.0,
     max_chunks   : 1000000,
-    calib_digitisation : 0.0,
-    calib_offsets : std::vector<float>(),
-    calib_coefs : std::vector<float>()
 };
 
 const std::string Paf::PAF_TAGS[] = {
@@ -210,24 +207,11 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file,
         }
     }
 
-    float digitisation = 0, range = 0, offset = 0;//, sampling_rate = 0;
     for (auto a : file.get_attr_map(ch_path)) {
         if (a.first == "channel_number") {
             channel_idx_ = atoi(a.second.c_str()) - 1;
-        } else if (a.first == "digitisation") {
-            digitisation = atof(a.second.c_str());
-        } else if (a.first == "range") {
-            range = atof(a.second.c_str());
-        } else if (a.first == "offset") {
-            offset = atof(a.second.c_str());
-        } //else if (a.first == "sampling_rate") {
-            //PARAMS.set_sample_rate(atof(a.second.c_str()));
-        //}
+        }
     }
-
-
-    set_calibration(get_channel(), offset, range, digitisation);
-
 
     std::string sig_path = raw_path + "/Signal";
     std::vector<i16> int_data; 
@@ -240,7 +224,12 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file,
         int_data.resize(chunk_count_ * PRMS.chunk_len());
     }
 
-    full_signal_ = calibrate(get_channel(), int_data);
+    //full_signal_.reserve(int_data.size());
+
+    full_signal_.assign(int_data.begin(), int_data.end());
+    //for (u16 i : int_data) {
+    //    full_signal_.push_back( (float) i );
+    //}
 
     loc_ = Paf(id_, get_channel(), start_sample_);
     set_raw_len(full_signal_.size());
@@ -333,50 +322,6 @@ u32 ReadBuffer::get_chunks(std::vector<Chunk> &chunk_queue, bool real_start, u32
 
 bool operator< (const ReadBuffer &r1, const ReadBuffer &r2) {
     return r1.start_sample_ < r2.start_sample_;
-}
-
-void ReadBuffer::calibrate(u16 ch, std::vector<float> samples) {
-    for (float &s : samples) s = calibrate(ch, s);
-}
-
-std::vector<float> ReadBuffer::calibrate(u16 ch, std::vector<i16> samples) {
-    std::vector<float> cal(samples.size());
-    for (u32 i = 0; i < samples.size(); i++) {
-        cal[i] = calibrate(ch, samples[i]);
-    }
-    return cal;
-}
-
-float ReadBuffer::calibrate(u16 ch, float sample) {
-    return (sample + PRMS.calib_offsets[ch-1]) * PRMS.calib_coefs[ch-1];
-    //return sample;
-}
-
-void ReadBuffer::set_calibration(const std::vector<float> &offsets, 
-                                 const std::vector<float> &pa_ranges,
-                                 float digitisation) {
-    if (digitisation > 0) PRMS.calib_digitisation = digitisation;
-    PRMS.calib_offsets = offsets;
-    PRMS.calib_coefs.reserve(pa_ranges.size());
-    for (float p : pa_ranges) PRMS.calib_coefs.push_back(p / digitisation);
-}
-
-void ReadBuffer::set_calibration(u16 channel,
-                             float offsets, 
-                             float pa_ranges,
-                             float digitisation) {
-    if (digitisation > 0) PRMS.calib_digitisation = digitisation;
-
-    u16 c = channel-1;
-
-    //TODO: will normalization take care of this?
-    if (PRMS.calib_offsets.size() <= c) {
-        PRMS.calib_offsets.resize(channel);
-        PRMS.calib_coefs.resize(channel);
-    }
-
-    PRMS.calib_offsets[c] = offsets;
-    PRMS.calib_coefs[c] = pa_ranges / digitisation;
 }
 
 u64 ReadBuffer::get_duration() const {

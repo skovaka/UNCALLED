@@ -23,7 +23,7 @@ const EventDetector::Params EventDetector::PRMS_DEF = {
 
     //TODO need to adjust once calibration figured out
     min_mean       : 0,
-    max_mean       : 40000
+    max_mean       : 4000
 };
 
 typedef Detector *DetectorPtr;

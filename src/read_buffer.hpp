@@ -97,9 +97,6 @@ class ReadBuffer {
         float chunk_time;
         u32 max_chunks;
 
-        float calib_digitisation;
-        std::vector<float> calib_offsets, calib_coefs;
-
         float bp_per_samp() {
             return bp_per_sec / sample_rate;
         }
@@ -149,12 +146,6 @@ class ReadBuffer {
     u32 get_number() const {
         return number_;
     }
-
-    static std::vector<float> calibrate(u16 ch, std::vector<i16> samples);
-    static void calibrate(u16 ch, std::vector<float> samples);
-    static float calibrate(u16 ch, float sample);
-    static void set_calibration(const std::vector<float> &offsets, const std::vector<float> &pa_ranges, float digitisation);
-    static void set_calibration(u16 channel, float offsets, float pa_ranges, float digitisation);
 
     //Source source_;
     u16 channel_idx_;

@@ -10,8 +10,8 @@ Chunk::Chunk()
       channel_idx_(0),
       number_(0),
       start_time_(0),
-      raw_data_(),
-      calibrated_(false) {}
+      raw_data_() {}
+
 
 Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 chunk_start, 
              const std::string &dtype, const std::string &raw_str) 
@@ -22,7 +22,7 @@ Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 chunk_start,
 
     //TODO: could store chunk data as C arrays to prevent extra copy
     //probably not worth it
-    if ((calibrated_ = dtype == "float32")) {
+    if (dtype == "float32") {
         raw_data_.resize(raw_str.size()/sizeof(float));
         float *raw_arr = (float *) raw_str.data();
         raw_data_.assign(raw_arr, &raw_arr[raw_data_.size()]);
@@ -30,20 +30,24 @@ Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 chunk_start,
     } else if (dtype == "int16") {
         raw_data_.resize(raw_str.size()/sizeof(u16));
         i16 *raw_arr = (i16 *) raw_str.data();
-        for (u32 i = 0; i < raw_data_.size(); i++) {
-            raw_data_[i] = ReadBuffer::calibrate(get_channel(), raw_arr[i]);
-        }
+        raw_data_.assign(raw_arr, &raw_arr[raw_data_.size()]);
+        //for (u32 i = 0; i < raw_data_.size(); i++) {
+        //    raw_data_[i] = ReadBuffer::calibrate(get_channel(), raw_arr[i]);
+        //}
 
     } else if (dtype == "int32") {
         raw_data_.resize(raw_str.size()/sizeof(u32));
         i32 *raw_arr = (i32 *) raw_str.data();
-        for (u32 i = 0; i < raw_data_.size(); i++) {
-            raw_data_[i] = ReadBuffer::calibrate(get_channel(), raw_arr[i]);
-        }
+        raw_data_.assign(raw_arr, &raw_arr[raw_data_.size()]);
+        //for (u32 i = 0; i < raw_data_.size(); i++) {
+        //    raw_data_[i] = ReadBuffer::calibrate(get_channel(), raw_arr[i]);
+        //}
 
     } else {
         std::cerr << "Error: unsuportted raw signal dtype\n";
     }
+
+    //TODO: templatize
 }
 
 Chunk::Chunk(const std::string &id, u16 channel, u32 number, u64 start_time, 
@@ -119,7 +123,6 @@ void Chunk::swap(Chunk &c) {
     std::swap(channel_idx_, c.channel_idx_);
     std::swap(number_, c.number_);
     std::swap(start_time_, c.start_time_);
-    std::swap(calibrated_, c.calibrated_);
     raw_data_.swap(c.raw_data_);
 }
 

@@ -31,14 +31,11 @@ class Chunk {
     u32 get_number() const;
     u32 get_raw_data() const;
     u32 size() const;
-    bool is_calibrated() const;
     void print() const;
     void set_start(u64 time);
 
 
     private:
-    float calibrate(i16 s);
-    float calibrate(i32 s);
 
     //static float digitisation_;
     static std::vector<float> cal_offsets_, cal_coefs_;
@@ -48,7 +45,6 @@ class Chunk {
     u32 number_;
     u64 start_time_;
     std::vector<float> raw_data_;
-    bool calibrated_;
     //std::vector<u32> chunk_classifications;
     //float median_before, median;
 
