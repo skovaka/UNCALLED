@@ -203,6 +203,9 @@ void Mapper::reset() {
     #ifdef DEBUG_SEEDS
     seeds_out_.close();
     #endif
+    #ifdef DEBUG_SEED_LOCS
+    path_counts_.clear();
+    #endif
 
     prev_size_ = 0;
     event_i_ = 0;
@@ -602,8 +605,10 @@ bool Mapper::map_next() {
     prev_size_ = next_path - next_paths_.begin();
     prev_paths_.swap(next_paths_);
 
-    //Update event index
-    event_i_++;
+    #ifdef DEBUG_SEED_LOCS
+    path_counts_.push_back(prev_size_);
+    #endif
+
 
     SeedGroup sg = seed_tracker_.get_final();
 
@@ -611,14 +616,11 @@ bool Mapper::map_next() {
         state_ = State::SUCCESS;
         set_ref_loc(sg);
 
-        //#ifdef DEBUG_SEEDS
-        //for (u32 pi = 0; pi < prev_size_; pi++) {
-        //    print_debug_seeds(prev_paths_[pi]);
-        //}
-        //#endif
-
         return true;
     }
+
+    //Update event index
+    event_i_++;
 
     return false;
 }
@@ -664,7 +666,7 @@ void Mapper::print_debug_seeds(PathBuffer &p) {
           
         seeds_out_ << rf_name << "\t"
                    << rf_st << "\t"
-                   << (rf_st + p.match_len() + KLEN) - 1) << "\t"
+                   << ((rf_st + p.match_len() + KLEN) - 1) << "\t"
                    << event_i_ << "\t"
                    << (fwd ? "+" : "-") << "\n";
     }
@@ -683,14 +685,33 @@ void Mapper::set_ref_loc(const SeedGroup &seeds) {
     else      sa_st = fmi.size() - (seeds.ref_en_.end_ + KLEN - 1);
     
     std::string rf_name;
-    u64 rd_st = event_to_bp(seeds.evt_st_),
-        rd_en = event_to_bp(seeds.evt_en_ + PRMS.seed_len, true),
+    u64 rd_st = event_to_bp(seeds.evt_st_ - PRMS.seed_len),
+        rd_en = event_to_bp(seeds.evt_en_, true),
+        rd_len = event_to_bp(event_i_, true),
         rf_st = 0,
         rf_len = fmi.translate_loc(sa_st, rf_name, rf_st), //sets rf_st
         rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_ + KLEN);
 
     u16 match_count = seeds.total_len_ + KLEN - 1;
 
+    #ifdef DEBUG_SEED_LOCS
+    std::string seeds_str = std::to_string(seeds.seed_locs_[0]);
+    for (u32 i = 1; i < seeds.seed_locs_.size(); i++) {
+        seeds_str += "," + std::to_string(seeds.seed_locs_[i]);
+    }
+
+    std::string paths_str = std::to_string(path_counts_[0]);
+    for (u32 i = 1; i < path_counts_.size(); i++) {
+        paths_str += "," + std::to_string(path_counts_[i]);
+    }
+
+    read_.loc_.set_float(Paf::Tag::MEAN_RATIO, seed_tracker_.get_mean_conf());
+    read_.loc_.set_float(Paf::Tag::TOP_RATIO, seed_tracker_.get_top_conf());
+    read_.loc_.set_str(Paf::Tag::SEED_LOCS, seeds_str);
+    read_.loc_.set_str(Paf::Tag::PATH_COUNTS, paths_str);
+    #endif
+
+    read_.loc_.set_read_len(rd_len);
     read_.loc_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, fwd, match_count);
 }
 

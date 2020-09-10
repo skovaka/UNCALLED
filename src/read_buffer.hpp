@@ -47,7 +47,9 @@ class Paf {
               MEAN_RATIO,
               ENDED,
               KEEP,
-              DELAY};
+              DELAY,
+              SEED_LOCS,
+              PATH_COUNTS};
 
     Paf();
     Paf(const std::string &rd_name, u16 channel = 0, u64 start_sample = 0);

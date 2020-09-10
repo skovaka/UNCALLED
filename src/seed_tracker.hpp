@@ -24,6 +24,8 @@
 #ifndef _INCL_READ_SEED_TRACKER
 #define _INCL_READ_SEED_TRACKER
 
+//#define DEBUG_SEED_LOCS
+
 #include <set>
 #include <vector>
 #include <iostream>
@@ -46,12 +48,15 @@ class SeedGroup {
         evt_en_,
         total_len_;
 
+    #ifdef DEBUG_SEED_LOCS
+    std::vector<u64> seed_locs_;
+    #endif
 
     SeedGroup(Range ref_st, u32 evt_st);
-    SeedGroup(const SeedGroup &r);
+    //SeedGroup(const SeedGroup &r);
     SeedGroup();
     u64 ref_start_base() const;
-    u8 update(SeedGroup &new_aln);
+    u8 update(SeedGroup &new_seed);
     void print(std::ostream &out, bool newline, bool print_all) const;
     Range ref_range() const;
     bool is_valid();
@@ -69,7 +74,7 @@ class SeedTracker {
     public:
 
     typedef struct {
-        u32 min_aln_len;
+        u32 min_map_len;
         float min_mean_conf;
         float min_top_conf;
     } Params;
@@ -79,7 +84,7 @@ class SeedTracker {
     
     //const TrackerParams prms;
 
-    std::set<SeedGroup> alignments_;
+    std::set<SeedGroup> seed_groups_;
     std::multiset<u32> all_lens_;
     SeedGroup max_map_;
 
@@ -99,7 +104,7 @@ class SeedTracker {
 
     std::vector<SeedGroup> get_alignments(u8 min_len);
 
-    bool check_ratio(const SeedGroup &aln, float ratio);
+    bool check_ratio(const SeedGroup &s, float ratio);
     bool check_map_conf(u32 seed_len, float mean_len, float second_len);
 
     void print(std::ostream &out, u16 max_out);

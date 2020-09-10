@@ -198,6 +198,10 @@ class Mapper {
 
     std::mutex chunk_mtx_;
 
+    #ifdef DEBUG_SEED_LOCS
+    std::vector<u32> path_counts_;
+    #endif
+
     #ifdef DEBUG_SEEDS
     std::ofstream seeds_out_;
     void print_debug_seeds(PathBuffer &p);

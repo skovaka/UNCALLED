@@ -44,7 +44,9 @@ const std::string Paf::PAF_TAGS[] = {
     "mr", //MEAN_RATIO
     "en", //ENDED
     "kp", //KEEP
-    "dl"  //DELAY
+    "dl", //DELAY
+    "sl", //SEED_LOCS
+    "pc"  //PATH_COUNTS
 };
 
 Paf::Paf() 

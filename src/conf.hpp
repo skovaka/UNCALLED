@@ -185,7 +185,7 @@ class Conf {
 
             GET_TOML_EXTERN(subconf, float, min_mean_conf, Mapper::PRMS.seed_prms);
             GET_TOML_EXTERN(subconf, float, min_top_conf, Mapper::PRMS.seed_prms);
-            GET_TOML_EXTERN(subconf, u32, min_aln_len, Mapper::PRMS.seed_prms);
+            GET_TOML_EXTERN(subconf, u32, min_map_len, Mapper::PRMS.seed_prms);
         }
 
         if (conf.contains("event_detector")) {

@@ -28,7 +28,7 @@
 #define DEBUG
 
 const SeedTracker::Params SeedTracker::PRMS_DEF = {
-    min_aln_len   : 25,
+    min_map_len   : 25,
     min_mean_conf : 6.00,
     min_top_conf  : 1.85
 };
@@ -46,29 +46,32 @@ SeedGroup::SeedGroup(Range ref_st, u32 evt_st)
       evt_en_(evt_st),
       total_len_(ref_st.length()) {}
 
-SeedGroup::SeedGroup(const SeedGroup &r)
-    : ref_st_(r.ref_st_),
-      ref_en_(r.ref_en_),
-      evt_st_(r.evt_st_),
-      evt_en_(r.evt_en_),
-      total_len_(r.total_len_) {}
+//SeedGroup::SeedGroup(const SeedGroup &r)
+//    : ref_st_(r.ref_st_),
+//      ref_en_(r.ref_en_),
+//      evt_st_(r.evt_st_),
+//      evt_en_(r.evt_en_),
+//      total_len_(r.total_len_) {}
 
-
-u8 SeedGroup::update(SeedGroup &new_aln) {
+u8 SeedGroup::update(SeedGroup &new_seed) {
     u8 growth = 0;
-    if (new_aln.ref_en_.start_ < ref_en_.end_) {
-        if (new_aln.ref_en_.end_ > ref_en_.end_) {
-            growth = new_aln.ref_en_.end_ - ref_en_.end_;
-            ref_en_ = new_aln.ref_en_;
+    if (new_seed.ref_en_.start_ < ref_en_.end_) {
+        if (new_seed.ref_en_.end_ > ref_en_.end_) {
+            growth = new_seed.ref_en_.end_ - ref_en_.end_;
+            ref_en_ = new_seed.ref_en_;
         } else {
-            ref_en_.start_ = new_aln.ref_en_.start_;
+            ref_en_.start_ = new_seed.ref_en_.start_;
         }
     } else {
-        growth = new_aln.total_len_;
-        ref_en_ = new_aln.ref_en_;
+        growth = new_seed.total_len_;
+        ref_en_ = new_seed.ref_en_;
     }
 
-    evt_en_ = new_aln.evt_en_;
+    #ifdef DEBUG_SEED_LOCS
+    seed_locs_.push_back(new_seed.evt_st_);
+    #endif
+
+    evt_en_ = new_seed.evt_en_;
     total_len_ += growth;
     return growth;
 }
@@ -117,17 +120,17 @@ SeedTracker::SeedTracker(Params prms) :
 }
 
 void SeedTracker::reset() {
-    alignments_.clear();
+    seed_groups_.clear();
     all_lens_.clear();
     max_map_ = NULL_ALN;
     len_sum_ = 0;
 }
 
 SeedGroup SeedTracker::get_final() {
-    if (max_map_.total_len_ < PRMS.min_aln_len || 
+    if (max_map_.total_len_ < PRMS.min_map_len || 
         all_lens_.size() < 2) return NULL_ALN;
 
-    float mean_len = len_sum_ / alignments_.size();
+    float mean_len = len_sum_ / seed_groups_.size();
     float second_len = *std::next(all_lens_.rbegin());
 
     if (check_map_conf(max_map_.total_len_, mean_len, second_len)) {
@@ -148,31 +151,31 @@ float SeedTracker::get_top_conf() {
 }
 
 float SeedTracker::get_mean_conf() {
-    return max_map_.total_len_ / (len_sum_ / alignments_.size());
+    return max_map_.total_len_ / (len_sum_ / seed_groups_.size());
 }
 
 void SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
 
-    SeedGroup new_aln(Range(ref_en-ref_len+1, ref_en), evt_st);
-    //new_aln.print(std::cout, true, false);
+    SeedGroup new_seed(Range(ref_en-ref_len+1, ref_en), evt_st);
+    //new_seed.print(std::cout, true, false);
 
     //Locations sorted by decreasing ref_en_.start
-    //Find the largest aln s.t. aln->ref_en_.start <= new_aln.ref_en_.start
+    //Find the largest loc s.t. loc->ref_en_.start <= new_seed.ref_en_.start
     //AKA r1 <= r2
-    auto aln = alignments_.lower_bound(new_aln),
-         aln_match = alignments_.end();
+    auto loc = seed_groups_.lower_bound(new_seed),
+         loc_match = seed_groups_.end();
 
-    u64 e2 = new_aln.evt_en_, //new event aln
-        r2 = new_aln.ref_en_.start_; //new ref aln
+    u64 e2 = new_seed.evt_en_, //new event loc
+        r2 = new_seed.ref_en_.start_; //new ref loc
 
-    while (aln != alignments_.end()) {
-        u64 e1 = aln->evt_en_, //old event aln
-            r1 = aln->ref_en_.start_; //old ref aln
+    while (loc != seed_groups_.end()) {
+        u64 e1 = loc->evt_en_, //old event loc
+            r1 = loc->ref_en_.start_; //old ref loc
 
-        //We know r1 <= r2 because of alnation sort order
+        //We know r1 <= r2 because of location sort order
 
-        bool higher_sup = aln_match == alignments_.end() 
-                       || aln_match->total_len_ < aln->total_len_,
+        bool higher_sup = loc_match == seed_groups_.end() 
+                       || loc_match->total_len_ < loc->total_len_,
              
              in_range = e1 <= e2 && //event coord must increase
                         //r1 <= r2 &&
@@ -181,19 +184,20 @@ void SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
                         (r2 - r1) >= (e2 - e1) / 12; //evt doesn't increase too much
              
         if (higher_sup && in_range) {
-            aln_match = aln;
+            loc_match = loc;
         } else if (r2 - r1 >= e2) {
             break;
         }
 
-        aln++;
+        loc++;
     }
 
-    if (aln_match != alignments_.end()) {
-        SeedGroup a = *aln_match;
+    //If we find a matching seed group to join
+    if (loc_match != seed_groups_.end()) {
+        SeedGroup a = *loc_match;
 
         u32 prev_len = a.total_len_;
-        a.update(new_aln);
+        a.update(new_seed);
 
         if (a.total_len_ != prev_len) {
             len_sum_ += a.total_len_ - prev_len;
@@ -201,47 +205,46 @@ void SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
             all_lens_.insert(l, a.total_len_);
             all_lens_.erase(l);
 
-            if (a.total_len_ >= PRMS.min_aln_len && a.total_len_ > max_map_.total_len_) {
+            if (a.total_len_ >= PRMS.min_map_len && a.total_len_ > max_map_.total_len_) {
                 max_map_ = a;
             }
         }
 
-        auto hint = std::next(aln_match);
-        alignments_.erase(aln_match);
-        alignments_.insert(hint, a);
-
+        auto hint = std::next(loc_match);
+        seed_groups_.erase(loc_match);
+        seed_groups_.insert(hint, a);
     }
 
-    alignments_.insert(new_aln);
-    all_lens_.insert(new_aln.total_len_);
-    len_sum_ += new_aln.total_len_;
+    seed_groups_.insert(new_seed);
+    all_lens_.insert(new_seed.total_len_);
+    len_sum_ += new_seed.total_len_;
 
-    if (new_aln.total_len_ >= PRMS.min_aln_len && new_aln.total_len_ > max_map_.total_len_) {
-        max_map_ = new_aln;
+    if (new_seed.total_len_ >= PRMS.min_map_len && new_seed.total_len_ > max_map_.total_len_) {
+        max_map_ = new_seed;
     }
 }
 
 void SeedTracker::print(std::ostream &out, u16 max_out = 10) {
-    if (alignments_.empty()) {
+    if (seed_groups_.empty()) {
         return;
     }
 
-    std::vector<SeedGroup> alns_sort(alignments_.begin(),
-                                   alignments_.end());
+    std::vector<SeedGroup> seeds_sort(seed_groups_.begin(),
+                                     seed_groups_.end());
 
-    std::sort(alns_sort.begin(), alns_sort.end(),
+    std::sort(seeds_sort.begin(), seeds_sort.end(),
               [](const SeedGroup &a, const SeedGroup &b) -> bool {
                   return a.total_len_ > b.total_len_;
               });
 
-    Range top_ref = alns_sort[0].ref_range();
-    float top_len = alns_sort[0].total_len_;
+    Range top_ref = seeds_sort[0].ref_range();
+    float top_len = seeds_sort[0].total_len_;
 
-    for (unsigned int i = 0; i < min(max_out, alns_sort.size()); i++) {
-        float overlap = top_ref.get_recp_overlap(alns_sort[i].ref_range()),
-               len_ratio = top_len / alns_sort[i].total_len_;
+    for (unsigned int i = 0; i < std::min(max_out, (u16) seeds_sort.size()); i++) {
+        float overlap = top_ref.get_recp_overlap(seeds_sort[i].ref_range()),
+               len_ratio = top_len / seeds_sort[i].total_len_;
 
-        alns_sort[i].print(out, false);
+        seeds_sort[i].print(out, false);
         out << "\t" << len_ratio << "\t" << overlap << "\n";
     }
 }
