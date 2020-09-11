@@ -1,6 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -std=c++11 -g -fPIC -O3 
-
+CFLAGS=-Wall -std=c++11 -g -fPIC -O3 $(FLAGS)
 
 LIBHDF5=./submods/hdf5/lib/libhdf5.a
 HDF5_LIB=-L./submods/hdf5/lib $(LIBHDF5)

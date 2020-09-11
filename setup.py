@@ -1,4 +1,4 @@
-from setuptools import setup, Extension
+from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
 import os
 import subprocess
@@ -74,7 +74,7 @@ class pre_build(build_ext):
         build_ext.run(self)
 
 uncalled = Extension(
-    "uncalled.mapping",
+    "_uncalled",
      sources = [
                 "src/uncalled.cpp",
                 "src/client_sim.cpp",
@@ -102,21 +102,32 @@ uncalled = Extension(
      define_macros = [("PYBIND", None)]
 )
 
-setup(name = "uncalled",
-      version = __version__,
-      description = "Rapidly maps raw nanopore signal to DNA references",
-      author = "Sam Kovaka",
-      author_email = "skovaka@gmail.com",
-      url = "https://github.com/skovaka/UNCALLED",
-      setup_requires=['pybind11>=2.5.0', 'numpy>=1.12.0'],
-      packages=['uncalled'],
-      package_dir = {'': 'src', 'uncalled': 'src/uncalled'},
-      py_modules = ['uncalled.params', 'uncalled.minknow_client', 'uncalled.index', 'uncalled.pafstats'],
-      ext_modules = [uncalled],
-      package_data = {'uncalled': ['models/*', 'conf/*']},
-      scripts = ['scripts/uncalled'],
-      classifiers=[
-          "Programming Language :: Python :: 3"
-      ],
-      cmdclass={'build_ext': pre_build},
-      python_requires=">=3.6")
+setup(
+    name = "uncalled",
+    version = __version__,
+    description = "Rapidly maps raw nanopore signal to DNA references",
+    author = "Sam Kovaka",
+    author_email = "skovaka@gmail.com",
+    url = "https://github.com/skovaka/UNCALLED",
+    setup_requires=['pybind11>=2.5.0', 'numpy>=1.12.0'],
+    packages=find_packages(),
+    include_package_data=True,
+
+    ext_modules = [uncalled],
+
+    py_modules = [
+        'uncalled.minknow_client', 
+        'uncalled.index', 
+        'uncalled.pafstats'
+    ],
+
+    scripts = ['scripts/uncalled'],
+
+    classifiers=[
+      "Programming Language :: Python :: 3"
+    ],
+
+    cmdclass={'build_ext': pre_build},
+
+    python_requires=">=3.6"
+)

@@ -27,7 +27,8 @@ import sys
 import os
 import numpy as np
 import argparse
-from uncalled import mapping, params
+#from uncalled import mapping, params
+import uncalled as unc
 from bisect import bisect_left, bisect_right
 
 UNCL_SUFF = ".uncl"
@@ -38,6 +39,10 @@ PAC_SUFF = ".pac"
 SA_SUFF = ".sa"
 BWA_SUFFS = [AMB_SUFF, ANN_SUFF, BWT_SUFF, PAC_SUFF, SA_SUFF]
 
+ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+
+MODEL_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers.txt")
+CONF_DEFAULTS = os.path.join(ROOT_DIR, "conf/defaults.toml")
 
 def power_fn(xmax, ymin, ymax, exp, N=100):
     dt = 1.0/N
@@ -46,6 +51,7 @@ def power_fn(xmax, ymin, ymax, exp, N=100):
     return t*xmax, (t**exp) * (ymax-ymin) + ymin
 
 class IndexParameterizer:
+    MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_threshs.txt")
 
     def __init__(self, args):
         self.out_fname = args.bwa_prefix + UNCL_SUFF
@@ -73,7 +79,7 @@ class IndexParameterizer:
         else:
             sample_dist = args.max_sample_dist
 
-        fmlens = mapping.self_align(args.bwa_prefix, sample_dist)
+        fmlens = unc.self_align(args.bwa_prefix, sample_dist)
         path_kfmlens = [p[args.kmer_len-1:] if len(p) >= args.kmer_len else [1] for p in fmlens]
 
         max_pathlen = 0
@@ -110,7 +116,7 @@ class IndexParameterizer:
         self.conf_locs = np.arange(np.round(self.fm_locs[0]))
         self.all_locs = np.arange(max_pathlen)
 
-    def get_model_threshs(self, fname=params.MODEL_THRESHS_FNAME):
+    def get_model_threshs(self, fname=MODEL_THRESHS_FNAME):
         prob_thresh_in = open(fname)
         threshs = list()
         freqs = list()

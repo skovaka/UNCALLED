@@ -12,7 +12,7 @@
 namespace py = pybind11;
 using namespace pybind11::literals;
 
-PYBIND11_MODULE(mapping, m) {
+PYBIND11_MODULE(_uncalled, m) {
     m.doc() = "UNCALLED";
 
     py::class_<Conf> conf(m, "Conf");

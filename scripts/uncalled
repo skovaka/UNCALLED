@@ -23,8 +23,7 @@
 # SOFTWARE.
 
 #TODO try to improve module names
-from uncalled import mapping, index, pafstats, minknow_client, params, sim_utils
-import numpy as np
+#from uncalled import *
 import sys                         
 import os
 import argparse
@@ -33,14 +32,15 @@ import re
 import time
 import subprocess
 import traceback
+import uncalled as unc
+import numpy as np
+
+#from uncalled import mapping, index, pafstats, minknow_client, sim_utils, args
 
 MAX_SLEEP = 0.01
 
 #TODO: make defaults show up in help text
 #maybe move all this argparse stuff into a new module
-class ArgFormat(argparse.ArgumentDefaultsHelpFormatter):
-    pass
-
 
 def add_index_opts(p, conf):
     p.add_argument("fasta_filename", type=str, help="FASTA file to index")
@@ -67,16 +67,16 @@ def add_ru_opts(p, conf):
     p.add_argument("--chunk-time", required=False, type=float, default=1, help="Length of chunks in seconds")
 
     modes = p.add_mutually_exclusive_group(required=True)
-    modes.add_argument("-D", "--deplete", action='store_const', const=mapping.RealtimeMode.DEPLETE, dest='realtime_mode', help="Will eject reads that align to index")
-    modes.add_argument("-E", "--enrich", action='store_const',  const=mapping.RealtimeMode.ENRICH, dest='realtime_mode', help="Will eject reads that don't align to index")
+    modes.add_argument("-D", "--deplete", action='store_const', const=unc.RealtimeMode.DEPLETE, dest='realtime_mode', help="Will eject reads that align to index")
+    modes.add_argument("-E", "--enrich", action='store_const',  const=unc.RealtimeMode.ENRICH, dest='realtime_mode', help="Will eject reads that don't align to index")
 
     active = p.add_mutually_exclusive_group()
-    active.add_argument("--full", action='store_const', const=mapping.ActiveChs.FULL, dest='active_chs', help="Will monitor all pores if set (default)")
-    active.add_argument("--even", action='store_const', const=mapping.ActiveChs.EVEN, dest='active_chs', help="Will only monitor even pores if set")
-    active.add_argument("--odd", action='store_const', const=mapping.ActiveChs.ODD, dest='active_chs', help="Will only monitor odd pores if set")
+    active.add_argument("--full", action='store_const', const=unc.ActiveChs.FULL, dest='active_chs', help="Will monitor all pores if set (default)")
+    active.add_argument("--even", action='store_const', const=unc.ActiveChs.EVEN, dest='active_chs', help="Will only monitor even pores if set")
+    active.add_argument("--odd", action='store_const', const=unc.ActiveChs.ODD, dest='active_chs', help="Will only monitor odd pores if set")
 
 def add_sim_opts(p, conf):
-    p.add_argument("fast5s", nargs='+', type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
+    p.add_argument("fast5s", nargs='+', type=str, help="Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
     p.add_argument("-r", "--recursive", action="store_true")
     p.add_argument("--ctl-seqsum", required=True, type=str, help="")
     p.add_argument("--unc-seqsum", required=True, type=str, help="")
@@ -92,7 +92,7 @@ def add_list_ports_opts(p, conf):
     p.add_argument('--log-dir', default='/var/log/MinKNOW', help='Directory to find MinKNOW log files')
 
 def add_fast5_opts(p, conf):
-    p.add_argument("fast5s", nargs='+', type=str, help="Reads to mapping. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
+    p.add_argument("fast5s", nargs='+', type=str, help="Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
     p.add_argument("-r", "--recursive", action="store_true")
 
     p.add_argument("-l", "--read-list", default=None, type=str, help="Only map reads listed in this file")
@@ -130,7 +130,7 @@ def get_parser(conf):
     add_ru_opts(sim_parser, conf)
 
     ps_parser = sp.add_parser("pafstats", help="Computes speed and accuracy of UNCALLED mappings. Given an UNCALLED PAF file, will compute mean/median BP mapped per second, number of BP required to map each read, and total number of milliseconds to map each read. Can also optionally compute accuracy with respect to reference alignments, for example output by minimap2.")
-    pafstats.add_opts(ps_parser)
+    unc.pafstats.add_opts(ps_parser)
 
     lp_parser = sp.add_parser("list-ports", help="List the port of all MinION devices detected in the current MinKNOW session", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     add_list_ports_opts(lp_parser, conf)
@@ -156,7 +156,7 @@ def index_cmd(args):
 
     bwa_built = True
 
-    for suff in index.BWA_SUFFS:
+    for suff in unc.index.BWA_SUFFS:
         if not os.path.exists(args.bwa_prefix + suff):
             bwa_built = False
             break
@@ -164,10 +164,10 @@ def index_cmd(args):
     if bwa_built:
         sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % args.bwa_prefix)
     else:
-        mapping.BwaIndex.create(args.fasta_filename, args.bwa_prefix)
+        unc.BwaIndex.create(args.fasta_filename, args.bwa_prefix)
 
     sys.stderr.write("Initializing parameter search\n")
-    p = index.IndexParameterizer(args)
+    p = unc.index.IndexParameterizer(args)
 
     p.add_preset("default", tgt_speed=115)
 
@@ -234,11 +234,9 @@ def assert_exists(fname):
         sys.exit(1)
 
 def map_cmd(args):
-    #conf = mapping.Conf(params.CONF_DEFAULTS)
-    conf = mapping.Conf()
+    conf = unc.Conf()
     load_args(args, conf)
 
-    assert_exists(params.MODEL_FNAME)
     assert_exists(conf.bwa_prefix + ".bwt")
     assert_exists(conf.bwa_prefix + ".uncl")
 
@@ -250,7 +248,7 @@ def map_cmd(args):
 
     sys.stderr.flush()
 
-    mapper = mapping.MapPool(conf)
+    mapper = unc.MapPool(conf)
 
     sys.stderr.write("Loading fast5s\n")
     for fast5 in load_fast5s(args.fast5s, args.recursive):
@@ -283,11 +281,9 @@ def realtime_cmd(args):
 
     sim = args.subcmd == "sim"
 
-    #conf = mapping.Conf(params.CONF_DEFAULTS)
-    conf = mapping.Conf()
+    conf = unc.Conf()
     load_args(args, conf)
 
-    assert_exists(params.MODEL_FNAME)
     assert_exists(conf.bwa_prefix + ".bwt")
     assert_exists(conf.bwa_prefix + ".uncl")
 
@@ -296,8 +292,8 @@ def realtime_cmd(args):
 
     try:
         if sim:
-            client = mapping.ClientSim(conf)
-            sim_utils.load_sim(client, conf)
+            client = unc.ClientSim(conf)
+            unc.sim_utils.load_sim(client, conf)
 
             for fast5 in load_fast5s(args.fast5s, args.recursive):
                 if fast5 != None:
@@ -306,21 +302,21 @@ def realtime_cmd(args):
             client.load_fast5s()
 
         else:
-            if not minknow_client.ru_loaded:
+            if not unc.minknow_client.ru_loaded:
                 sys.stderr.write("Error: read_until module not installed. Please install \"read_until_api\" submodule.\n")
                 sys.exit(1)
-            client = minknow_client.Client(conf.host, conf.port, conf.chunk_time, conf.num_channels)
+            client = unc.minknow_client.Client(conf.host, conf.port, conf.chunk_time, conf.num_channels)
 
         if not client.run():
             sys.exit(1)
 
-        deplete = conf.realtime_mode == mapping.RealtimeMode.DEPLETE
-        even = conf.active_chs == mapping.ActiveChs.EVEN #TODO: do within mapper
+        deplete = conf.realtime_mode == unc.RealtimeMode.DEPLETE
+        even = conf.active_chs == unc.ActiveChs.EVEN #TODO: do within mapper
 
         if not sim:
             raw_type = str(client.signal_dtype)
 
-        pool = mapping.RealtimePool(conf)
+        pool = unc.RealtimePool(conf)
 
         chunk_times = [time.time() for c in range(conf.num_channels)]
         unblocked = [None for c in range(conf.num_channels)]
@@ -338,25 +334,25 @@ def realtime_cmd(args):
             for ch, nm, paf in pool.update():
                 t = time.time()-chunk_times[ch-1]
                 if paf.is_ended():
-                    paf.set_float(mapping.Paf.Tag.ENDED, t)
+                    paf.set_float(unc.Paf.Tag.ENDED, t)
                     client.stop_receiving_read(ch, nm)
 
                 elif (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
 
                     if sim or client.should_eject():
-                        paf.set_float(mapping.Paf.Tag.EJECT, t)
+                        paf.set_float(unc.Paf.Tag.EJECT, t)
                         u = client.unblock_read(ch, nm)
 
                         if sim:
-                            paf.set_int(mapping.Paf.Tag.DELAY, u)
+                            paf.set_int(unc.Paf.Tag.DELAY, u)
 
                         unblocked[ch-1] = nm
                     else:
-                        paf.set_float(mapping.Paf.Tag.IN_SCAN, t)
+                        paf.set_float(unc.Paf.Tag.IN_SCAN, t)
                         client.stop_receiving_read(ch, nm)
 
                 else:
-                    paf.set_float(mapping.Paf.Tag.KEEP, t)
+                    paf.set_float(unc.Paf.Tag.KEEP, t)
                     client.stop_receiving_read(ch, nm)
 
                 paf.print_paf()
@@ -386,7 +382,7 @@ def realtime_cmd(args):
                             continue
 
                         chunk_times[channel-1] = time.time()
-                        pool.add_chunk(mapping.Chunk(read.id, 
+                        pool.add_chunk(unc.Chunk(read.id, 
                                                      channel, 
                                                      read.number,
                                                      read.chunk_start_sample,
@@ -419,7 +415,7 @@ def realtime_cmd(args):
         pool.stop_all()
 
 def sim_cmd(args):
-    sim_utils.load_sim()
+    unc.sim_utils.load_sim()
 
 #TODO fix
 def list_ports_cmd(args):
@@ -451,7 +447,7 @@ def list_ports_cmd(args):
 
 if __name__ == "__main__":
     
-    conf = mapping.Conf()
+    conf = unc.Conf()
 
     parser = get_parser(conf)
     args = parser.parse_args()
@@ -465,7 +461,7 @@ if __name__ == "__main__":
     elif args.subcmd == "list-ports":
         list_ports_cmd(args)
     elif args.subcmd == "pafstats":
-        pafstats.run(args)
+        unc.pafstats.run(args)
     else:
         parser.print_help()
         
