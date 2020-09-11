@@ -35,6 +35,8 @@
 class MapPoolOrd {
     public:
 
+    MapOrdParams PRMS;
+
     MapPoolOrd(Conf &conf);
 
     void add_fast5(const std::string &fname);

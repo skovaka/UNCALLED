@@ -144,8 +144,6 @@ bool RealtimePool::try_add_chunk(Chunk &c) {
 //TODO: make sure update is the same
 std::vector<MapResult> RealtimePool::update() {
 
-    time_.reset();
-
     std::vector< u16 > read_counts(threads_.size(), 0);
     active_count_ = 0;
     std::vector<MapResult> ret;
@@ -198,22 +196,16 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-    //if (time_.get() >= 1000 && active_count_ > 0) {
-    //    std::cout << "#prefill_threads " 
-    //              << active_count_ << "\n";
-        //for (u16 c : read_counts) std::cout << " " << c;
-        //std::cout << "\n";
-        //std::cout.flush();
-    //}
+    if (time_.get() >= 1000 && active_count_ > 0) {
+        std::cout << "#prefill_threads " 
+                  << active_count_;
+        for (u16 c : read_counts) std::cout << " " << c;
+        std::cout << "\n";
+        std::cout.flush();
+    }
 
     //Estimate how much to fill each thread
     u16 target = min(active_queue_.size() + active_count_, PRMS.max_active_reads);
-
-    //TODO definitely dont do in realtime mode
-    //if (target < PRMS.max_active_reads) {
-    //    stop_all();
-    //    return ret;
-    //}
 
     u16 min_per_thread = target / threads_.size(), // + (target % threads_.size() > 0);
         remain = target % threads_.size();
@@ -251,15 +243,14 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-    //if (time_.get() >= 1000 && active_count_ > 0) {
-    //    time_.reset();
-    //    std::cout << "#pstfill_threads "
-    //              << active_count_ << " "
-    //              << time_.get() << "\n";
-    //    for (u16 c : read_counts) std::cout << " " << c;
-    //    std::cout << "\n";
-    //    std::cout.flush();
-    //}
+    if (time_.get() >= 1000 && active_count_ > 0) {
+        time_.reset();
+        std::cout << "#pstfill_threads "
+                  << active_count_;
+        for (u16 c : read_counts) std::cout << " " << c;
+        std::cout << "\n";
+        std::cout.flush();
+    }
 
     return ret;
 }

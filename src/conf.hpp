@@ -74,6 +74,7 @@ class Conf {
     Fast5Reader::Params fast5_prms = Fast5Reader::PRMS_DEF;
     RealtimeParams realtime_prms = REALTIME_PRMS_DEF;
     SimParams sim_prms = SIM_PRMS_DEF;
+    MapOrdParams map_ord_prms = MAP_ORD_PRMS_DEF;
 
     Conf() : mode(Mode::UNDEF), threads(1) {}
 
@@ -139,7 +140,11 @@ class Conf {
             GET_TOML_EXTERN(subconf, float, scan_intv_time, sim_prms);
             GET_TOML_EXTERN(subconf, float, ej_time, sim_prms);
             GET_TOML_EXTERN(subconf, u32, min_ch_reads, sim_prms);
+        }
 
+        if (conf.contains("map_ord")) {
+            const auto subconf = toml::find(conf, "map_ord");
+            GET_TOML_EXTERN(subconf, u32, min_active_reads, map_ord_prms);
         }
 
         if (conf.contains("fast5_params")) {
@@ -238,10 +243,11 @@ class Conf {
     GET_SET_EXTERN(float, sim_prms, ej_time);
     GET_SET_EXTERN(u32, sim_prms, min_ch_reads);
 
+    GET_SET_EXTERN(u32, map_ord_prms, min_active_reads);
+
     #ifdef PYBIND
     static void add_pybind_vars(pybind11::class_<Conf> &c) {
         DEFPRP(threads)
-
 
         DEFPRP(bwa_prefix)
         DEFPRP(idx_preset)
@@ -260,6 +266,8 @@ class Conf {
 
         DEFPRP(num_channels)
         DEFPRP(max_chunks)
+
+        DEFPRP(min_active_reads)
 
         DEFPRP(max_events)
         DEFPRP(chunk_time)

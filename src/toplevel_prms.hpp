@@ -64,4 +64,12 @@ const SimParams SIM_PRMS_DEF = {
     min_ch_reads   : 0 //TODO is this needed?
 };
 
+typedef struct {
+    u32 min_active_reads;
+} MapOrdParams;
+
+const MapOrdParams MAP_ORD_PRMS_DEF = {
+    min_active_reads : 0
+};
+
 #endif

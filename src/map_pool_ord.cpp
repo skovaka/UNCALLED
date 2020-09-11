@@ -27,9 +27,9 @@
 #include "map_pool_ord.hpp"
 
 MapPoolOrd::MapPoolOrd(Conf &conf)
-    : fast5s_(conf.fast5_prms),
+    : PRMS(conf.map_ord_prms),
+      fast5s_(conf.fast5_prms),
       pool_(conf),
-      active_tgt_(conf.get_max_active_reads()),
       channels_empty_(false) {
 
     channels_.resize(conf.get_num_channels());
@@ -103,7 +103,7 @@ std::vector<Paf> MapPoolOrd::update() {
     }
 
     //TODO: option to stop when lower than target
-    if (pool_.active_count() < active_tgt_) {
+    if (pool_.active_count() < PRMS.min_active_reads) {
         pool_.stop_all();
         for (auto &chs : channels_) chs.clear();
         channels_empty_ = true;
