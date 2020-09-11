@@ -149,7 +149,8 @@ class Mapper {
         void free_buffers();
         void print() const;
 
-        static u8 MAX_PATH_LEN, TYPE_MASK;
+        static const u8 TYPE_MASK = (u8) ((1 << TYPE_BITS) - 1);
+        static u8 MAX_PATH_LEN;
         static u32 TYPE_ADDS[EventType::NUM_TYPES];
 
         Range fm_range_;
@@ -198,13 +199,15 @@ class Mapper {
 
     std::mutex chunk_mtx_;
 
-    #ifdef DEBUG_SEED_LOCS
-    std::vector<u32> path_counts_;
-    #endif
-
     #ifdef DEBUG_SEEDS
+
+    const std::string DEBUG_PREFIX = DEBUG_SEEDS;
+    //DEF_PREFIX(DEBUG_SEEDS)
+
     std::ofstream seeds_out_;
     void print_debug_seeds(PathBuffer &p);
+
+    std::vector<u32> path_counts_;
     #endif
 };
 

@@ -48,7 +48,6 @@ class Paf {
               ENDED,
               KEEP,
               DELAY,
-              SEED_LOCS,
               PATH_COUNTS};
 
     Paf();

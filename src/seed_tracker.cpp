@@ -67,10 +67,6 @@ u8 SeedGroup::update(SeedGroup &new_seed) {
         ref_en_ = new_seed.ref_en_;
     }
 
-    #ifdef DEBUG_SEED_LOCS
-    seed_locs_.push_back(new_seed.evt_st_);
-    #endif
-
     evt_en_ = new_seed.evt_en_;
     total_len_ += growth;
     return growth;

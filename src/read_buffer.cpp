@@ -45,7 +45,6 @@ const std::string Paf::PAF_TAGS[] = {
     "en", //ENDED
     "kp", //KEEP
     "dl", //DELAY
-    "sl", //SEED_LOCS
     "pc"  //PATH_COUNTS
 };
 

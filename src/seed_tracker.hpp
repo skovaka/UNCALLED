@@ -24,8 +24,6 @@
 #ifndef _INCL_READ_SEED_TRACKER
 #define _INCL_READ_SEED_TRACKER
 
-//#define DEBUG_SEED_LOCS
-
 #include <set>
 #include <vector>
 #include <iostream>
@@ -47,10 +45,6 @@ class SeedGroup {
     u32 evt_st_,
         evt_en_,
         total_len_;
-
-    #ifdef DEBUG_SEED_LOCS
-    std::vector<u64> seed_locs_;
-    #endif
 
     SeedGroup(Range ref_st, u32 evt_st);
     //SeedGroup(const SeedGroup &r);
