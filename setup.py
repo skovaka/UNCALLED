@@ -9,7 +9,14 @@ __version__ = "2.1"
 ROOT_DIR = os.getcwd()
 
 SUBMOD_DIR = os.path.join(ROOT_DIR, "submods")
-SUBMODS = ["bwa", "fast5", "hdf5", "pdqsort", "read_until_api", "toml11"]
+SUBMODS = [
+    "bwa", 
+    "fast5", 
+    "hdf5", 
+    "pdqsort", 
+    "read_until_api", 
+    "toml11"
+]
 
 class get_pybind_include(object):
     """Helper class to determine the pybind11 include path
@@ -75,31 +82,42 @@ class pre_build(build_ext):
 
 uncalled = Extension(
     "_uncalled",
-     sources = [
-                "src/uncalled.cpp",
-                "src/client_sim.cpp",
-                "src/fast5_reader.cpp",
-                "src/mapper.cpp",
-                "src/self_align_ref.cpp",
-                "src/map_pool.cpp",
-                "src/event_detector.cpp", 
-                "src/read_buffer.cpp",
-                "src/chunk.cpp",
-                "src/realtime_pool.cpp",
-                "src/seed_tracker.cpp", 
-                "src/normalizer.cpp", 
-                "src/range.cpp"],
-     include_dirs = ["./submods", #TODO: consistent incl paths
-                     "./submods/hdf5/include", 
-                     "./submods/fast5/include",
-                     "./submods/pdqsort",
-                     "./submods/toml11",
-                     get_pybind_include()],
-     #library_dirs = ["./submods/bwa ./submods/bwa/libbwa.a", "./submods/hdf5/lib ./submods/hdf5/lib/libhdf5.a"],
-     library_dirs = ["./submods/bwa", "./submods/hdf5/lib"],
-     libraries = ["bwa", "hdf5", "z", "dl", "m"],
-     extra_compile_args = ["-std=c++11", "-O3"],
-     define_macros = [("PYBIND", None)]
+
+    sources = [
+       "src/pybinder.cpp",
+       "src/client_sim.cpp",
+       "src/fast5_reader.cpp",
+       "src/mapper.cpp",
+       "src/self_align_ref.cpp",
+       "src/map_pool.cpp",
+       "src/event_detector.cpp", 
+       "src/read_buffer.cpp",
+       "src/chunk.cpp",
+       "src/realtime_pool.cpp",
+       "src/seed_tracker.cpp", 
+       "src/normalizer.cpp", 
+       "src/range.cpp"
+    ],
+
+    include_dirs = [
+        "./submods", #TODO: consistent incl paths?
+        "./submods/hdf5/include", 
+        "./submods/fast5/include",
+        "./submods/pdqsort",
+        "./submods/toml11",
+        get_pybind_include()
+    ],
+
+    library_dirs = [
+        "./submods/bwa", 
+        "./submods/hdf5/lib"
+    ],
+
+    libraries = ["bwa", "hdf5", "z", "dl", "m"],
+
+    extra_compile_args = ["-std=c++11", "-O3"],
+
+    define_macros = [("PYBIND", None)]
 )
 
 setup(
@@ -109,25 +127,21 @@ setup(
     author = "Sam Kovaka",
     author_email = "skovaka@gmail.com",
     url = "https://github.com/skovaka/UNCALLED",
-    setup_requires=['pybind11>=2.5.0', 'numpy>=1.12.0'],
-    packages=find_packages(),
-    include_package_data=True,
-
-    ext_modules = [uncalled],
-
-    py_modules = [
-        'uncalled.minknow_client', 
-        'uncalled.index', 
-        'uncalled.pafstats'
-    ],
-
-    scripts = ['scripts/uncalled'],
 
     classifiers=[
       "Programming Language :: Python :: 3"
     ],
 
-    cmdclass={'build_ext': pre_build},
+    python_requires=">=3.6",
 
-    python_requires=">=3.6"
+    setup_requires=[
+        'pybind11>=2.5.0', 
+        'numpy>=1.12.0'
+    ],
+
+    packages=find_packages(),
+    include_package_data=True,
+    scripts = ['scripts/uncalled'],
+    ext_modules = [uncalled],
+    cmdclass={'build_ext': pre_build},
 )

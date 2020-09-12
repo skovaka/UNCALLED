@@ -1,12 +1,9 @@
 #include <iostream>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include "self_align_ref.hpp"
-#include "mapper.hpp"
 #include "map_pool.hpp"
+#include "self_align_ref.hpp"
 #include "realtime_pool.hpp"
-#include "chunk.hpp"
-#include "read_buffer.hpp"
 #include "client_sim.hpp"
 
 namespace py = pybind11;
@@ -39,8 +36,6 @@ PYBIND11_MODULE(_uncalled, m) {
         .value("KEEP", Paf::Tag::KEEP)
         .value("DELAY", Paf::Tag::DELAY)
         .export_values();
-
-    //.def(py::init<const std::string &,const std::string &,u32>())
 
     py::class_<BwaIndex<KLEN>>(m, "BwaIndex")
         .def("create", &BwaIndex<KLEN>::create);

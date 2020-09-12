@@ -1,6 +1,1 @@
-include README.md
-recursive-include src *
-recursive-include submods *
-recursive-include scripts *
 recursive-include uncalled *
-include Makefile
