@@ -34,6 +34,10 @@
 #include "bp.hpp"
 #include "range.hpp"
 
+#ifdef PYBIND
+#include <pybind11/pybind11.h>
+#endif
+
 template <KmerLen KLEN>
 class SubSeq {
     public:
@@ -220,7 +224,33 @@ class BwaIndex {
         return (pacseq_[i>>2] >> ( ((3^i)&3) << 1 )) & 3;
     }
 
-    //private:
+    #ifdef PYBIND
+
+    #define PY_BWA_INDEX_METH(P) c.def(#P, &BwaIndex<KLEN>::P);
+
+    static void pybind_defs(pybind11::class_<BwaIndex<KLEN>> &c) {
+        c.def(pybind11::init<>());
+        c.def(pybind11::init<const std::string &, bool>());
+        PY_BWA_INDEX_METH(create);
+        PY_BWA_INDEX_METH(load_index);
+        PY_BWA_INDEX_METH(is_loaded);
+        PY_BWA_INDEX_METH(load_pacseq);
+        PY_BWA_INDEX_METH(destroy);
+        PY_BWA_INDEX_METH(get_neighbor);
+        PY_BWA_INDEX_METH(get_kmer_range);
+        PY_BWA_INDEX_METH(get_base_range);
+        PY_BWA_INDEX_METH(sa);
+        PY_BWA_INDEX_METH(size);
+        PY_BWA_INDEX_METH(translate_loc);
+        PY_BWA_INDEX_METH(get_seqs);
+        PY_BWA_INDEX_METH(coord_to_sa);
+        PY_BWA_INDEX_METH(pacseq_loaded);
+        PY_BWA_INDEX_METH(get_base);
+    }
+
+    #endif
+
+    private:
     bwt_t *index_;
     bntseq_t *bns_;
     u8 *pacseq_;

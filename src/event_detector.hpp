@@ -10,9 +10,10 @@
 #include <fast5.hpp>
 #include "util.hpp"
 
-//typedef fast5::EventDetection_Event Event;
-typedef fast5::Basecall_Event BCEvent;
-typedef fast5::Raw_Sample RawSample;
+#ifdef PYBIND
+#include <pybind11/pybind11.h>
+#endif
+
 
 typedef struct {
     float mean;
@@ -55,15 +56,53 @@ class EventDetector {
     ~EventDetector();
     
     void reset();
-    bool add_sample(RawSample s);
+    bool add_sample(float s);
     Event get_event() const;
-    std::vector<Event> get_events(const std::vector<RawSample> &raw);
+    std::vector<Event> get_events(const std::vector<float> &raw);
 
     float get_mean() const;
-    std::vector<float> get_means(const std::vector<RawSample> &raw);
+    std::vector<float> get_means(const std::vector<float> &raw);
 
     float mean_event_len() const;
     u32 event_to_bp(u32 evt_i, bool last=false) const;
+
+    #ifdef PYBIND
+
+    #define PY_EVTD_METH(P) d.def(#P, &EventDetector::P);
+    #define PY_EVTD_PRM(P) p.def_readwrite(#P, &EventDetector::Params::P);
+    #define PY_EVT_VAL(P) e.def_readwrite(#P, &Event::P);
+
+    static void pybind_defs(
+            pybind11::class_<EventDetector> &d,
+            pybind11::class_<EventDetector::Params> &p,
+            pybind11::class_<Event> &e) {
+
+        d.def(pybind11::init<EventDetector::Params>());
+        d.def(pybind11::init());
+        PY_EVTD_METH(reset);
+        PY_EVTD_METH(add_sample);
+        PY_EVTD_METH(get_event);
+        PY_EVTD_METH(get_events);
+        PY_EVTD_METH(get_mean);
+        PY_EVTD_METH(get_means);
+        PY_EVTD_METH(mean_event_len);
+
+        PY_EVTD_PRM(window_length1);
+        PY_EVTD_PRM(window_length2);
+        PY_EVTD_PRM(threshold1);
+        PY_EVTD_PRM(threshold2);
+        PY_EVTD_PRM(peak_height);
+        PY_EVTD_PRM(min_mean);
+        PY_EVTD_PRM(max_mean);
+
+        PY_EVT_VAL(mean);
+        PY_EVT_VAL(stdv);
+        PY_EVT_VAL(start);
+        PY_EVT_VAL(length);
+
+    }
+
+    #endif
 
     private:
     u32 get_buf_mid();

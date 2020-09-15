@@ -10,14 +10,13 @@ namespace py = pybind11;
 using namespace pybind11::literals;
 
 PYBIND11_MODULE(_uncalled, m) {
-    m.doc() = "UNCALLED";
+    m.doc() = R"pbdoc(UNCALLED: a Utility for Nanopore Current ALignment to Large Expanses of DNA)pbdoc";
 
     py::class_<Conf> conf(m, "Conf");
+    Conf::pybind_defs(conf);
 
-    conf.def(py::init<const std::string &>())
-        .def(py::init())
-        .def("load_toml", &Conf::load_toml);
-    Conf::add_pybind_vars(conf);
+    py::class_<MapPool> map_pool(m, "MapPool");
+    MapPool::pybind_defs(map_pool);
 
     py::class_<Paf> paf(m, "Paf");
     paf.def(py::init())
@@ -37,15 +36,8 @@ PYBIND11_MODULE(_uncalled, m) {
         .value("DELAY", Paf::Tag::DELAY)
         .export_values();
 
-    py::class_<BwaIndex<KLEN>>(m, "BwaIndex")
-        .def("create", &BwaIndex<KLEN>::create);
-
-    py::class_<MapPool>(m, "MapPool")
-        .def(py::init<Conf &>())
-        .def("update", &MapPool::update)
-        .def("add_fast5", &MapPool::add_fast5)
-        .def("running", &MapPool::running)
-        .def("stop", &MapPool::stop); 
+    py::class_<BwaIndex<KLEN>> bwa_index(m, "BwaIndex");
+    BwaIndex<KLEN>::pybind_defs(bwa_index);
 
     py::class_<RealtimePool>(m, "RealtimePool")
         .def(py::init<Conf &>()) 
@@ -65,28 +57,8 @@ PYBIND11_MODULE(_uncalled, m) {
         .value("ODD", RealtimeParams::ActiveChs::ODD)
         .export_values();
 
-    py::class_<Chunk>(m, "Chunk")
-        .def(py::init<const std::string &, //id, 
-                      u16, //channel
-                      u32, //number, 
-                      u64, //chunk_start, 
-                      const std::string &, //dtype
-                      const std::string & //raw_str
-                     >())
-        .def(py::init<const std::string&, //_id, 
-                      u32, //number 
-                      u16, //channel
-                      u64, //chunk_start_sample, 
-                      const std::vector<float> &, //raw_data, 
-                      u32, //raw_st
-                      u32  //raw_len
-                     >())
-        .def_property_readonly("channel", &Chunk::get_channel)
-        .def_property_readonly("number", &Chunk::get_number)
-        .def("empty", &Chunk::empty)
-        .def("print", &Chunk::print)
-        .def("size", &Chunk::size);
-
+    py::class_<Chunk> chunk(m, "Chunk");
+    Chunk::pybind_defs(chunk);
     
     m.def("self_align", &self_align);
 
@@ -112,32 +84,13 @@ PYBIND11_MODULE(_uncalled, m) {
         .def("all_buffered",    &Fast5Reader::all_buffered)
         .def("empty",           &Fast5Reader::empty);
 
-    py::class_<Event>(m, "Event")
-        .def_readwrite("mean", &Event::mean)
-        .def_readwrite("stdv", &Event::stdv)
-        .def_readwrite("start", &Event::start)
-        .def_readwrite("length", &Event::length);
+    py::class_<Event> event(m, "Event");
+    py::class_<EventDetector> event_detector(m, "EventDetector");
+    py::class_<EventDetector::Params> event_prms(event_detector, "Params");
+    EventDetector::pybind_defs(event_detector, event_prms, event);
 
-    py::class_<EventDetector>(m, "EventDetector")
-        .def(py::init())
-        .def("add_sample", &EventDetector::add_sample)
-        .def("get_event",  &EventDetector::get_event)
-        .def("get_events", &EventDetector::get_events);
-
-    py::class_<ClientSim>(m, "ClientSim")
-        .def(py::init<Conf &>())
-        .def("run", &ClientSim::run)
-        .def("get_runtime", &ClientSim::get_runtime)
-        .def("get_read_chunks", &ClientSim:: get_read_chunks)
-        .def("stop_receiving_read",  &ClientSim::stop_receiving_read)
-        .def("unblock_read", &ClientSim::unblock_read)
-        .def("add_intv", &ClientSim::add_intv)
-        .def("add_gap", &ClientSim::add_gap)
-        .def("add_delay", &ClientSim::add_delay)
-        .def("add_read", &ClientSim::add_read)
-        .def("add_fast5", &ClientSim::add_fast5)
-        .def("load_fast5s", &ClientSim::load_fast5s)
-        .def_property_readonly("is_running",  &ClientSim::is_running);
+    py::class_<ClientSim> client_sim(m, "ClientSim");
+    ClientSim::pybind_defs(client_sim);
 
     py::class_<Normalizer>(m, "Normalizer")
         .def(py::init<float, float>())

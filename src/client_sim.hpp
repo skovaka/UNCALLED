@@ -52,6 +52,30 @@ class ClientSim {
     void add_fast5(const std::string &fname);
     void load_fast5s();
 
+    #ifdef PYBIND
+
+    #define PY_SIM_METH(P) c.def(#P, &ClientSim::P);
+    #define PY_SIM_PROP(P) c.def_property(#P, &ClientSim::get_##P, &ClientSim::set_##P);
+    #define PY_SIM_RPROP(P) c.def_property_readonly(#P, &ClientSim::P);
+
+    static void pybind_defs(pybind11::class_<ClientSim> &c) {
+        c.def(pybind11::init<Conf &>());
+        PY_SIM_METH(run);
+        PY_SIM_METH(get_runtime);
+        PY_SIM_METH(get_read_chunks);
+        PY_SIM_METH(stop_receiving_read);
+        PY_SIM_METH(unblock_read);
+        PY_SIM_METH(add_intv);
+        PY_SIM_METH(add_gap);
+        PY_SIM_METH(add_delay);
+        PY_SIM_METH(add_read);
+        PY_SIM_METH(add_fast5);
+        PY_SIM_METH(load_fast5s);
+        PY_SIM_RPROP(is_running);
+    }
+
+    #endif
+
     private:
 
     bool load_itvs(const std::string &fname);

@@ -81,7 +81,7 @@ u32 EventDetector::get_buf_mid() {
     return t - (BUF_LEN / 2) - 1;
 }
 
-bool EventDetector::add_sample(RawSample s) {
+bool EventDetector::add_sample(float s) {
 
     u32 t_mod = t % BUF_LEN;
     
@@ -112,7 +112,7 @@ bool EventDetector::add_sample(RawSample s) {
     return false;
 }
 
-std::vector<Event> EventDetector::get_events(const std::vector<RawSample> &raw) {
+std::vector<Event> EventDetector::get_events(const std::vector<float> &raw) {
     std::vector<Event> events;
     events.reserve(raw.size() / PRMS.window_length2);
     reset();
@@ -131,7 +131,7 @@ Event EventDetector::get_event() const {
 }
 
 //TODO: template with float, double, Event?
-std::vector<float> EventDetector::get_means(const std::vector<RawSample> &raw) {
+std::vector<float> EventDetector::get_means(const std::vector<float> &raw) {
     std::vector<float> events;
     events.reserve(raw.size() / PRMS.window_length2);
     reset();

@@ -47,7 +47,6 @@ const std::string MODE_STRS[] = {"deplete", "enrich"};
 #define GET_SET_EXTERN(T, E, N) T get_##N() { return E.N; } \
                                 void set_##N(const T &v) { E.N = v; }
 
-#define DEFPRP(P) c.def_property(#P, &Conf::get_##P, &Conf::set_##P);
 
 #define GET_TOML_EXTERN(C, T, V, S) GET_NAMED_TOML(C, T, S.V, #V)
 #define GET_TOML(C, T, V) GET_NAMED_TOML(C, T, V, #V)
@@ -246,7 +245,13 @@ class Conf {
     GET_SET_EXTERN(u32, map_ord_prms, min_active_reads);
 
     #ifdef PYBIND
-    static void add_pybind_vars(pybind11::class_<Conf> &c) {
+    #define DEFPRP(P) c.def_property(#P, &Conf::get_##P, &Conf::set_##P);
+
+    static void pybind_defs(pybind11::class_<Conf> &c) {
+        c.def(pybind11::init<const std::string &>())
+         .def(pybind11::init())
+         .def("load_toml", &Conf::load_toml);
+
         DEFPRP(threads)
 
         DEFPRP(bwa_prefix)
@@ -272,14 +277,14 @@ class Conf {
         DEFPRP(max_events)
         DEFPRP(chunk_time)
 
-        DEFPRP(ctl_seqsum);
-        DEFPRP(unc_seqsum);
-        DEFPRP(unc_paf);
-        DEFPRP(sim_speed);
-        DEFPRP(scan_time);
-        DEFPRP(scan_intv_time);
-        DEFPRP(ej_time);
-        DEFPRP(min_ch_reads);
+        DEFPRP(ctl_seqsum)
+        DEFPRP(unc_seqsum)
+        DEFPRP(unc_paf)
+        DEFPRP(sim_speed)
+        DEFPRP(scan_time)
+        DEFPRP(scan_intv_time)
+        DEFPRP(ej_time)
+        DEFPRP(min_ch_reads)
     }
     #endif
 };

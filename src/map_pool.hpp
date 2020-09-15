@@ -41,6 +41,19 @@ class MapPool {
     void add_fast5(const std::string &fname);
     void stop();
 
+    #ifdef PYBIND
+    #define PY_MAP_POOL_METH(P) c.def(#P, &MapPool::P);
+
+    static void pybind_defs(pybind11::class_<MapPool> &c) {
+        c.def(pybind11::init<Conf &>());
+        PY_MAP_POOL_METH(update);
+        PY_MAP_POOL_METH(running);
+        PY_MAP_POOL_METH(add_fast5);
+        PY_MAP_POOL_METH(stop);
+    }
+
+    #endif
+
     private:
     Fast5Reader fast5s_;
 
