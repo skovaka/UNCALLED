@@ -4,6 +4,10 @@
 #include <vector>
 #include "util.hpp"
 
+#ifdef PYBIND
+#include <pybind11/pybind11.h>
+#endif
+
 class Normalizer {
     public:
 
@@ -29,6 +33,31 @@ class Normalizer {
 
     bool empty() const;
     bool full() const;
+
+    #ifdef PYBIND
+
+    #define PY_NORM_METH(P) c.def(#P, &Normalizer::P);
+
+    static void pybind_defs(pybind11::class_<Normalizer> &c) {
+        c.def(pybind11::init());
+        c.def(pybind11::init<float, float>());
+
+        PY_NORM_METH(set_target);
+        PY_NORM_METH(set_signal);
+        PY_NORM_METH(get_mean);
+        PY_NORM_METH(get_stdv);
+        PY_NORM_METH(get_scale);
+        PY_NORM_METH(get_shift);
+        PY_NORM_METH(pop);
+        PY_NORM_METH(push);
+        PY_NORM_METH(skip_unread);
+        PY_NORM_METH(unread_size);
+        PY_NORM_METH(reset);
+        PY_NORM_METH(empty);
+        PY_NORM_METH(full);
+    }
+
+    #endif
 
     private:
 

@@ -31,6 +31,9 @@
 #include "read_buffer.hpp"
 #include "util.hpp"
 
+#ifdef PYBIND
+#include <pybind11/pybind11.h>
+#endif
 
 class Fast5Reader {
     public:
@@ -62,6 +65,40 @@ class Fast5Reader {
     u32 fill_buffer();
     bool all_buffered();
     bool empty();
+
+    #ifdef PYBIND
+
+    #define PY_FAST5_METH(P) c.def(#P, &Fast5Reader::P);
+    #define PY_FAST5_PRM(P) p.def_readwrite(#P, &Fast5Reader::Params::P);
+
+    static void pybind_defs(pybind11::class_<Fast5Reader> &c) {
+
+        c.def(pybind11::init());
+        c.def(pybind11::init<Params>());
+        c.def(pybind11::init<u32, u32>());
+        c.def(pybind11::init<
+                const std::string &, 
+                const std::string &, 
+                u32, u32>());
+
+        PY_FAST5_METH(add_fast5);
+        PY_FAST5_METH(load_fast5_list);
+        PY_FAST5_METH(add_read);
+        PY_FAST5_METH(load_read_list);
+        PY_FAST5_METH(pop_read);
+        PY_FAST5_METH(buffer_size);
+        PY_FAST5_METH(fill_buffer);
+        PY_FAST5_METH(all_buffered);
+        PY_FAST5_METH(empty);
+
+        pybind11::class_<Params> p(c, "Params");
+        PY_FAST5_PRM(fast5_list);
+        PY_FAST5_PRM(read_list);
+        PY_FAST5_PRM(max_reads);
+        PY_FAST5_PRM(max_buffer);
+    }
+
+    #endif
 
     private:
     Params PRMS;

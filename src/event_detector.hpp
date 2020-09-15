@@ -74,10 +74,9 @@ class EventDetector {
 
     static void pybind_defs(
             pybind11::class_<EventDetector> &d,
-            pybind11::class_<EventDetector::Params> &p,
             pybind11::class_<Event> &e) {
 
-        d.def(pybind11::init<EventDetector::Params>());
+        d.def(pybind11::init<Params>());
         d.def(pybind11::init());
         PY_EVTD_METH(reset);
         PY_EVTD_METH(add_sample);
@@ -87,6 +86,7 @@ class EventDetector {
         PY_EVTD_METH(get_means);
         PY_EVTD_METH(mean_event_len);
 
+        pybind11::class_<Params> p(d, "Params");
         PY_EVTD_PRM(window_length1);
         PY_EVTD_PRM(window_length2);
         PY_EVTD_PRM(threshold1);
@@ -99,7 +99,6 @@ class EventDetector {
         PY_EVT_VAL(stdv);
         PY_EVT_VAL(start);
         PY_EVT_VAL(length);
-
     }
 
     #endif

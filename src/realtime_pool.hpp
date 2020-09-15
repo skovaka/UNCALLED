@@ -40,7 +40,6 @@ class RealtimePool {
 
     RealtimePool(Conf &conf);
     
-    void start_timer();
     bool add_chunk(Chunk &chunk);
     bool try_add_chunk(Chunk &chunk);
     void end_read(u16 ch, u32 number);
@@ -53,6 +52,43 @@ class RealtimePool {
     void stop_all(); //TODO: just name stop
 
     u32 active_count() const; 
+
+    #ifdef PYBIND
+
+    #define PY_REALTIME_METH(P) c.def(#P, &RealtimePool::P);
+    #define PY_REALTIME_PRM(P) p.def_readwrite(#P, &RealtimeParams::P);
+    #define PY_REALTIME_MODE(P) m.value(#P, RealtimeParams::Mode::P);
+    #define PY_REALTIME_ACTIVE(P) a.value(#P, RealtimeParams::ActiveChs::P);
+
+    static void pybind_defs(pybind11::class_<RealtimePool> &c) {
+        c.def(pybind11::init<Conf &>());
+        PY_REALTIME_METH(add_chunk);
+        PY_REALTIME_METH(try_add_chunk);
+        PY_REALTIME_METH(update);
+        PY_REALTIME_METH(all_finished);
+        PY_REALTIME_METH(stop_all);
+
+        pybind11::class_<RealtimeParams> p(c, "RealtimeParams");
+        PY_REALTIME_PRM(host);
+        PY_REALTIME_PRM(port);
+        PY_REALTIME_PRM(duration);
+        PY_REALTIME_PRM(max_active_reads);
+        PY_REALTIME_PRM(active_chs);
+        PY_REALTIME_PRM(realtime_mode);
+
+        pybind11::enum_<RealtimeParams::Mode> m(c, "RealtimeMode");
+        PY_REALTIME_MODE(DEPLETE);
+        PY_REALTIME_MODE(ENRICH);
+        m.export_values();
+
+        pybind11::enum_<RealtimeParams::ActiveChs> a(c, "ActiveChs");
+        PY_REALTIME_ACTIVE(FULL);
+        PY_REALTIME_ACTIVE(EVEN);
+        PY_REALTIME_ACTIVE(ODD);
+        a.export_values();
+    }
+
+    #endif
 
     private:
 

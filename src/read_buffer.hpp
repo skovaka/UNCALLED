@@ -31,6 +31,9 @@
 #include "util.hpp"
 #include "chunk.hpp"
 
+#ifdef PYBIND
+#include <pybind11/pybind11.h>
+#endif
 
 class Paf {
     public:
@@ -72,6 +75,30 @@ class Paf {
         return rd_name_;
     }
 
+    #ifdef PYBIND
+    #define PY_PAF_METH(P) c.def(#P, &Paf::P);
+    #define PY_PAF_TAG(P) t.value(#P, Paf::Tag::P);
+
+    static void pybind_defs(pybind11::class_<Paf> &c) {
+        c.def(pybind11::init());
+        PY_PAF_METH(print_paf);
+        PY_PAF_METH(is_mapped);
+        PY_PAF_METH(is_ended);
+        PY_PAF_METH(set_int);
+        PY_PAF_METH(set_float);
+        PY_PAF_METH(set_str);
+
+        pybind11::enum_<Paf::Tag> t(c, "Tag");
+        PY_PAF_TAG(MAP_TIME);
+        PY_PAF_TAG(EJECT);
+        PY_PAF_TAG(IN_SCAN);
+        PY_PAF_TAG(ENDED);
+        PY_PAF_TAG(KEEP);
+        PY_PAF_TAG(DELAY);
+        t.export_values();
+    }
+
+    #endif
 
     private:
     static const std::string PAF_TAGS[];
@@ -109,15 +136,10 @@ class ReadBuffer {
 
     static Params PRMS;
 
+    //TODO private outside Fast5Reader (friend?)
     ReadBuffer();
-    //ReadBuffer(const ReadBuffer &read);
     ReadBuffer(const std::string &filename);
     ReadBuffer(const hdf5_tools::File &file, const std::string &raw_path, const std::string &ch_path);
-
-    //ReadBuffer(Source source, u16 channel, const std::string &id = "", 
-    //           u32 number = 0, u64 start_sample = 0, 
-    //           const std::vector<float> raw_data = std::vector<float>(),
-    //           u32 raw_st = 0, u32 raw_len = 0);
     
     ReadBuffer(Chunk &first_chunk);
 
@@ -147,6 +169,32 @@ class ReadBuffer {
     u32 get_number() const {
         return number_;
     }
+
+    #ifdef PYBIND
+
+    #define PY_READ_METH(P) c.def(#P, &ReadBuffer::P);
+    #define PY_READ_RPROP(P) c.def_property_readonly(#P, &ReadBuffer::get_##P);
+    #define PY_READ_PRM(P) p.def_readwrite(#P, &ReadBuffer::Params::P);
+
+    static void pybind_defs(pybind11::class_<ReadBuffer> &c) {
+        PY_READ_METH(empty);
+        PY_READ_METH(size); //TODO bind to __len__ ?
+        PY_READ_RPROP(id);
+        PY_READ_RPROP(start);
+        PY_READ_RPROP(end);
+        PY_READ_RPROP(duration);
+        PY_READ_RPROP(channel);
+        PY_READ_RPROP(raw);
+
+        pybind11::class_<Params> p(c, "Params");
+        PY_READ_PRM(num_channels);
+        PY_READ_PRM(bp_per_sec);
+        PY_READ_PRM(sample_rate);
+        PY_READ_PRM(chunk_time);
+        PY_READ_PRM(max_chunks);
+    }
+
+    #endif
 
     //Source source_;
     u16 channel_idx_;

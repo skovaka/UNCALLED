@@ -39,116 +39,6 @@ import numpy as np
 
 MAX_SLEEP = 0.01
 
-#TODO: make defaults show up in help text
-#maybe move all this argparse stuff into a new module
-
-def add_index_opts(p, conf):
-    p.add_argument("fasta_filename", type=str, help="FASTA file to index")
-    p.add_argument("-o", "--bwa-prefix", default=None, type=str, help="Index output prefix. Will use input fasta filename by default")
-    p.add_argument("-s", "--max-sample-dist", default=100, type=int, help="Maximum average sampling distance between reference self-alignments.")
-    p.add_argument("--min-samples", default=50000, type=int, help="Minimum number of self-alignments to produce (approximate, due to deterministically random start locations)")
-    p.add_argument("--max-samples", default=1000000, type=int, help="Maximum number of self-alignments to produce (approximate, due to deterministically random start locations)")
-    p.add_argument("-k", "--kmer-len", default=5, type=int, help="Model k-mer length")
-    p.add_argument("-1", "--matchpr1", default=0.6334, type=float, help="Minimum event match probability")
-    p.add_argument("-2", "--matchpr2", default=0.9838, type=float, help="Maximum event match probability")
-    p.add_argument("-f", "--pathlen-percentile", default=0.05, type=float, help="")
-    p.add_argument("-m", "--max-replen", default=100, type=int, help="")
-    p.add_argument("--probs", default=None, type=str, help="Find parameters with specified target probabilites (comma separated)")
-    p.add_argument("--speeds", default=None, type=str, help="Find parameters with specified speed coefficents (comma separated)")
-
-def add_bwa_opt(p, conf):
-    p.add_argument("bwa_prefix", type=str, help="BWA prefix to mapping to. Must be processed by \"uncalled index\".")
-    p.add_argument("-p", "--idx-preset", default=conf.idx_preset, type=str, help="Mapping mode")
-
-
-def add_ru_opts(p, conf):
-    #TODO: selectively enrich or deplete refs in index
-    p.add_argument("-c", "--max-chunks", default=conf.max_chunks, required=True, type=int, help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set")
-    p.add_argument("--chunk-time", required=False, type=float, default=1, help="Length of chunks in seconds")
-
-    modes = p.add_mutually_exclusive_group(required=True)
-    modes.add_argument("-D", "--deplete", action='store_const', const=unc.RealtimeMode.DEPLETE, dest='realtime_mode', help="Will eject reads that align to index")
-    modes.add_argument("-E", "--enrich", action='store_const',  const=unc.RealtimeMode.ENRICH, dest='realtime_mode', help="Will eject reads that don't align to index")
-
-    active = p.add_mutually_exclusive_group()
-    active.add_argument("--full", action='store_const', const=unc.ActiveChs.FULL, dest='active_chs', help="Will monitor all pores if set (default)")
-    active.add_argument("--even", action='store_const', const=unc.ActiveChs.EVEN, dest='active_chs', help="Will only monitor even pores if set")
-    active.add_argument("--odd", action='store_const', const=unc.ActiveChs.ODD, dest='active_chs', help="Will only monitor odd pores if set")
-
-def add_sim_opts(p, conf):
-    p.add_argument("fast5s", nargs='+', type=str, help="Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
-    p.add_argument("-r", "--recursive", action="store_true")
-    p.add_argument("--ctl-seqsum", required=True, type=str, help="")
-    p.add_argument("--unc-seqsum", required=True, type=str, help="")
-    p.add_argument("--unc-paf", required=True, type=str, help="")
-    p.add_argument("--sim-speed", required=False, default=1.0, type=float, help="")
-
-def add_realtime_opts(p, conf):
-    p.add_argument('--host', default=conf.host, help='MinKNOW server host.')
-    p.add_argument('--port', type=int, default=conf.port, help='MinKNOW server port.')
-    p.add_argument('--duration', type=float, default=conf.duration, help='Duration to map real-time run in hours. Should be slightly longer than specified runtime to add wiggle room.')
-
-def add_list_ports_opts(p, conf):
-    p.add_argument('--log-dir', default='/var/log/MinKNOW', help='Directory to find MinKNOW log files')
-
-def add_fast5_opts(p, conf):
-    p.add_argument("fast5s", nargs='+', type=str, help="Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.")
-    p.add_argument("-r", "--recursive", action="store_true")
-
-    p.add_argument("-l", "--read-list", default=None, type=str, help="Only map reads listed in this file")
-    p.add_argument("-n", "--max-reads", type=int, default=None, help="Maximum number of reads to map")
-
-#TODO get defautls from conf
-def add_map_opts(p, conf):
-    p.add_argument("-t", "--threads", default=conf.threads, type=int, help="Number of threads to use for mapping")
-    p.add_argument("--num-channels", default=conf.num_channels, type=int, help="Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation.")
-    p.add_argument("-e", "--max-events", default=conf.max_events, type=int, help="Will give up on a read after this many events have been processed")
-
-def get_parser(conf):
-    parser = argparse.ArgumentParser(description="Rapidly maps raw nanopore signal to DNA references", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    sp = parser.add_subparsers(dest="subcmd")
-
-    index_parser = sp.add_parser("index", help="Calculates reference-specific parameters needed to map to a given a BWA-index.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    #add_bwa_opt(index_parser)
-    add_index_opts(index_parser, conf)
-
-    map_parser = sp.add_parser("map", help="Map fast5 files to a BWA index that has been processed by \"uncalled index\"", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    add_bwa_opt(map_parser, conf)
-    add_fast5_opts(map_parser, conf)
-    add_map_opts(map_parser, conf)
-
-    rt_parser = sp.add_parser("realtime", help="Perform real-time targeted sequencing", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    add_bwa_opt(rt_parser, conf)
-    add_map_opts(rt_parser, conf)
-    add_ru_opts(rt_parser, conf)
-    add_realtime_opts(rt_parser, conf)
-
-    sim_parser = sp.add_parser("sim", help="Simulate real-time target sequencing", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    add_bwa_opt(sim_parser, conf)
-    add_sim_opts(sim_parser, conf)
-    add_map_opts(sim_parser, conf)
-    add_ru_opts(sim_parser, conf)
-
-    ps_parser = sp.add_parser("pafstats", help="Computes speed and accuracy of UNCALLED mappings. Given an UNCALLED PAF file, will compute mean/median BP mapped per second, number of BP required to map each read, and total number of milliseconds to map each read. Can also optionally compute accuracy with respect to reference alignments, for example output by minimap2.")
-    unc.pafstats.add_opts(ps_parser)
-
-    lp_parser = sp.add_parser("list-ports", help="List the port of all MinION devices detected in the current MinKNOW session", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    add_list_ports_opts(lp_parser, conf)
-
-    return parser
-
-def load_args(args, conf):
-    for a, v in vars(args).items():
-        if v == None:
-            #sys.stderr.write("%s IS NONE\n" % a)
-            continue
-
-        if (not a.startswith("_")):
-            if hasattr(conf, a):
-                setattr(conf, a, v)
-            #else:
-            #    sys.stderr.write("%s\t%s\n" % (a, str(v)))
-
 def index_cmd(args):
 
     if args.bwa_prefix == None:
@@ -233,9 +123,7 @@ def assert_exists(fname):
         sys.stderr.write("Error: '%s' does not exist\n" % fname)
         sys.exit(1)
 
-def map_cmd(args):
-    conf = unc.Conf()
-    load_args(args, conf)
+def map_cmd(conf, args):
 
     assert_exists(conf.bwa_prefix + ".bwt")
     assert_exists(conf.bwa_prefix + ".uncl")
@@ -277,12 +165,10 @@ def map_cmd(args):
     sys.stderr.write("Finishing\n")
     mapper.stop()
 
-def realtime_cmd(args):
+def realtime_cmd(conf, args):
 
+    #TODO replace with conf mode
     sim = args.subcmd == "sim"
-
-    conf = unc.Conf()
-    load_args(args, conf)
 
     assert_exists(conf.bwa_prefix + ".bwt")
     assert_exists(conf.bwa_prefix + ".uncl")
@@ -310,8 +196,8 @@ def realtime_cmd(args):
         if not client.run():
             sys.exit(1)
 
-        deplete = conf.realtime_mode == unc.RealtimeMode.DEPLETE
-        even = conf.active_chs == unc.ActiveChs.EVEN #TODO: do within mapper
+        deplete = conf.realtime_mode == unc.RealtimePool.DEPLETE
+        even = conf.active_chs == unc.RealtimePool.EVEN #TODO: do within mapper
 
         if not sim:
             raw_type = str(client.signal_dtype)
@@ -334,25 +220,25 @@ def realtime_cmd(args):
             for ch, nm, paf in pool.update():
                 t = time.time()-chunk_times[ch-1]
                 if paf.is_ended():
-                    paf.set_float(unc.Paf.Tag.ENDED, t)
+                    paf.set_float(unc.Paf.ENDED, t)
                     client.stop_receiving_read(ch, nm)
 
                 elif (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
 
                     if sim or client.should_eject():
-                        paf.set_float(unc.Paf.Tag.EJECT, t)
+                        paf.set_float(unc.Paf.EJECT, t)
                         u = client.unblock_read(ch, nm)
 
                         if sim:
-                            paf.set_int(unc.Paf.Tag.DELAY, u)
+                            paf.set_int(unc.Paf.DELAY, u)
 
                         unblocked[ch-1] = nm
                     else:
-                        paf.set_float(unc.Paf.Tag.IN_SCAN, t)
+                        paf.set_float(unc.Paf.IN_SCAN, t)
                         client.stop_receiving_read(ch, nm)
 
                 else:
-                    paf.set_float(unc.Paf.Tag.KEEP, t)
+                    paf.set_float(unc.Paf.KEEP, t)
                     client.stop_receiving_read(ch, nm)
 
                 paf.print_paf()
@@ -447,17 +333,15 @@ def list_ports_cmd(args):
 
 if __name__ == "__main__":
     
-    conf = unc.Conf()
 
-    parser = get_parser(conf)
-    args = parser.parse_args()
+    conf, args = unc.args.load_conf(sys.argv)
 
     if args.subcmd == "index":
         index_cmd(args)
     elif args.subcmd == "map":
-        map_cmd(args)
+        map_cmd(conf, args)
     elif args.subcmd in {"sim", "realtime"}:
-        realtime_cmd(args)
+        realtime_cmd(conf, args)
     elif args.subcmd == "list-ports":
         list_ports_cmd(args)
     elif args.subcmd == "pafstats":

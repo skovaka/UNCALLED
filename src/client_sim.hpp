@@ -71,6 +71,7 @@ class ClientSim {
         PY_SIM_METH(add_read);
         PY_SIM_METH(add_fast5);
         PY_SIM_METH(load_fast5s);
+
         PY_SIM_RPROP(is_running);
     }
 
