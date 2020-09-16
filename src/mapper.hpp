@@ -66,6 +66,11 @@ class Mapper {
 
         SeedTracker::Params seed_prms;
         EventDetector::Params event_prms;
+
+        #ifdef DEBUG_OUT
+        std::string dbg_prefix;
+        #endif
+
     } Params;
 
     //static Params PRMS_DEF;
@@ -85,6 +90,7 @@ class Mapper {
 
     ~Mapper();
 
+    static inline u64 get_fm_bin(u64 fmlen);
     float get_prob_thresh(u64 fmlen) const;
     float get_source_prob() const;
     u16 get_max_events() const;
@@ -200,14 +206,19 @@ class Mapper {
     std::mutex chunk_mtx_;
 
     #ifdef DEBUG_SEEDS
-
-    const std::string DEBUG_PREFIX = DEBUG_SEEDS;
-    //DEF_PREFIX(DEBUG_SEEDS)
-
     std::ofstream seeds_out_;
-    void print_debug_seeds(PathBuffer &p);
 
-    std::vector<u32> path_counts_;
+    void dbg_seeds_open();
+    void dbg_seeds_out(PathBuffer &p);
+    #endif
+
+    #ifdef DEBUG_PATHS
+    std::ofstream paths_out_;
+    u32 dbg_source_count_, dbg_stay_count_;
+    std::vector<u32> dbg_fm_bins_;
+
+    void dbg_paths_open();
+    void dbg_paths_out();
     #endif
 };
 

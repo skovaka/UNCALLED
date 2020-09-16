@@ -196,14 +196,16 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-    //TODO: wrap in debug opts
-    //if (time_.get() >= 1000 && active_count_ > 0) {
-    //    std::cout << "#prefill_threads " 
-    //              << active_count_;
-    //    for (u16 c : read_counts) std::cout << " " << c;
-    //    std::cout << "\n";
-    //    std::cout.flush();
-    //}
+    #ifdef DEBUG_THREADS
+    //TODO user defined refresh
+    if (time_.get() >= 500 && active_count_ > 0) {
+        std::cout << "#prefill_threads " 
+                  << active_count_;
+        for (u16 c : read_counts) std::cout << " " << c;
+        std::cout << "\n";
+        std::cout.flush();
+    }
+    #endif
 
     //Estimate how much to fill each thread
     u16 target = min(active_queue_.size() + active_count_, PRMS.max_active_reads);
@@ -244,15 +246,16 @@ std::vector<MapResult> RealtimePool::update() {
         }
     }
 
-    //TODO: wrap in debug opts
-    //if (time_.get() >= 1000 && active_count_ > 0) {
-    //    time_.reset();
-    //    std::cout << "#pstfill_threads "
-    //              << active_count_;
-    //    for (u16 c : read_counts) std::cout << " " << c;
-    //    std::cout << "\n";
-    //    std::cout.flush();
-    //}
+    #ifdef DEBUG_THREADS
+    if (time_.get() >= 500 && active_count_ > 0) {
+        time_.reset();
+        std::cout << "#pstfill_threads "
+                  << active_count_;
+        for (u16 c : read_counts) std::cout << " " << c;
+        std::cout << "\n";
+        std::cout.flush();
+    }
+    #endif
 
     return ret;
 }

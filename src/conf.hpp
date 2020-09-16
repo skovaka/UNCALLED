@@ -183,6 +183,10 @@ class Conf {
             GET_TOML_EXTERN(subconf, u16, evt_batch_size, Mapper::PRMS);
             GET_TOML_EXTERN(subconf, float, evt_timeout, Mapper::PRMS);
             GET_TOML_EXTERN(subconf, float, chunk_timeout, Mapper::PRMS);
+
+            #ifdef DEBUG_OUT
+            GET_TOML_EXTERN(subconf, std::string, dbg_prefix, Mapper::PRMS);
+            #endif
         }
 
         if (conf.contains("seed_tracker")) {
@@ -213,6 +217,8 @@ class Conf {
     GET_SET(u16, threads)
 
 
+    //TODO define get<type, param>, set<type, param>, doc<type, param>
+    //use templates
     #define GET_SET_DOC(C, T, N) \
         T get_##N() { return C##_prms.N; } \
         void set_##N(const T &v) { C##_prms.N = v; } \
@@ -233,6 +239,10 @@ class Conf {
     GET_SET_EXTERN(std::string, mapper_prms, bwa_prefix)
     GET_SET_EXTERN(std::string, mapper_prms, idx_preset)
     GET_SET_EXTERN(u32, mapper_prms, max_events)
+
+    #ifdef DEBUG_OUT
+    GET_SET_EXTERN(std::string, mapper_prms, dbg_prefix)
+    #endif
 
     GET_SET_EXTERN(u16,   read_prms, num_channels);
     GET_SET_EXTERN(u32,   read_prms, max_chunks)
@@ -268,6 +278,12 @@ class Conf {
 
         DEFPRP(bwa_prefix)
         DEFPRP(idx_preset)
+        DEFPRP(max_events)
+        DEFPRP(chunk_time)
+
+        #ifdef DEBUG_OUT
+        DEFPRP(dbg_prefix)
+        #endif
 
         DEFPRP_DOC(fast5_list)
         DEFPRP_DOC(read_list)
@@ -285,9 +301,6 @@ class Conf {
         DEFPRP(max_chunks)
 
         DEFPRP(min_active_reads)
-
-        DEFPRP(max_events)
-        DEFPRP(chunk_time)
 
         DEFPRP(ctl_seqsum)
         DEFPRP(unc_seqsum)

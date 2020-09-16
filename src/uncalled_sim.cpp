@@ -109,14 +109,23 @@ int main(int argc, char** argv) {
 
 bool load_conf(int argc, char** argv, Conf &conf) {
     int opt;
+    std::string flagstr = ":t:c:p:de";
+
+    #ifdef DEBUG_OUT
+    flagstr += "D:";
+    #endif
 
     //parse flags
-    while((opt = getopt(argc, argv, ":t:g:c:p:de")) != -1) {
+    while((opt = getopt(argc, argv, flagstr.c_str())) != -1) {
         switch(opt) {  
 
             FLAG_TO_CONF('p', std::string, idx_preset)
             FLAG_TO_CONF('t', atoi, threads)
             FLAG_TO_CONF('c', atoi, max_chunks)
+
+            #ifdef DEBUG_OUT
+            FLAG_TO_CONF('D', std::string, dbg_prefix);
+            #endif
 
             case 'd':
                 conf.set_realtime_mode(RealtimeParams::Mode::DEPLETE);

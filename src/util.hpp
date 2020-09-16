@@ -30,6 +30,16 @@
 #include <chrono>
 #include <cassert>
 
+#ifdef DEBUG_ALL
+#define DEBUG_SEEDS
+#define DEBUG_PATHS
+#define DEBUG_THREADS
+#endif
+
+#if defined(DEBUG_SEEDS) || defined(DEBUG_PATHS)
+#define DEBUG_OUT
+#endif
+
 //Based on github.com/dnbaker/bonsai/blob/master/bonsai/include/util.h
 using i8  = std::int8_t;  using u8  = std::uint8_t;
 using i16 = std::int16_t; using u16 = std::uint16_t;

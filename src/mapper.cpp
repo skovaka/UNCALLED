@@ -42,6 +42,10 @@ Mapper::Params Mapper::PRMS = {
     idx_preset      : "default",
     seed_prms       : SeedTracker::PRMS_DEF,
     event_prms      : EventDetector::PRMS_DEF
+
+    #ifdef DEBUG_OUT
+    , dbg_prefix : "dbg_"
+    #endif
 };
 
 BwaIndex<KLEN> Mapper::fmi;
@@ -71,12 +75,15 @@ Mapper::Mapper() :
     seed_tracker_.reset();
 
     norm_.set_target(model.get_means_mean(), model.get_means_stdv());
+
+    #ifdef DEBUG_PATHS
+    dbg_fm_bins_.resize(prob_threshes_.size());
+    #endif
 }
 
 Mapper::Mapper(const Mapper &m) : Mapper() {}
 
 Mapper::~Mapper() {
-
     #ifdef DEBUG_SEEDS
     if (seeds_out_.is_open()) seeds_out_.close();
     #endif
@@ -86,6 +93,7 @@ Mapper::~Mapper() {
         prev_paths_[i].free_buffers();
     }
 }
+
 
 void Mapper::load_static() {
 
@@ -135,8 +143,12 @@ void Mapper::load_static() {
 
 }
 
+inline u64 Mapper::get_fm_bin(u64 fmlen) {
+    return __builtin_clzll(fmlen);
+}
+
 float Mapper::get_prob_thresh(u64 fmlen) const {
-    return prob_threshes_[__builtin_clzll(fmlen)];
+    return prob_threshes_[get_fm_bin(fmlen)];
 }
 
 float Mapper::get_source_prob() const {
@@ -177,15 +189,13 @@ void Mapper::new_read(ReadBuffer &r) {
     read_.swap(r);
     reset();
 
-
     #ifdef DEBUG_SEEDS
-    std::cerr << "Debug: " << DEBUG_PREFIX << "\n";
-    if (!DEBUG_PREFIX.empty()) {
-        seeds_out_.open(DEBUG_PREFIX + read_.get_id() + ".bed");
-        std::cerr << "Opening " << DEBUG_PREFIX << "\n";
-    }
+    dbg_seeds_open();
     #endif
 
+    #ifdef DEBUG_PATHS
+    dbg_paths_open();
+    #endif
 }
 
 void Mapper::new_read(Chunk &chunk) {
@@ -198,415 +208,447 @@ void Mapper::new_read(Chunk &chunk) {
 
     //TODO don't just copy and paste from above
     #ifdef DEBUG_SEEDS
-    std::cerr << "Debug: " << DEBUG_PREFIX << "\n";
-    if (!DEBUG_PREFIX.empty()) {
-        seeds_out_.open(DEBUG_PREFIX + read_.get_id() + ".bed");
-        std::cerr << "Opening " << DEBUG_PREFIX << "\n";
-    }
+    dbg_seeds_open();
+    #endif
+
+    #ifdef DEBUG_PATHS
+    dbg_paths_open();
     #endif
 }
 
 void Mapper::reset() {
-        #ifdef DEBUG_SEEDS
-        if (seeds_out_.is_open()) seeds_out_.close();
-        path_counts_.clear();
-        #endif
+    #ifdef DEBUG_SEEDS
+    if (seeds_out_.is_open()) seeds_out_.close();
+    #endif
 
-        prev_size_ = 0;
-        event_i_ = 0;
-        reset_ = false;
-        last_chunk_ = false;
-        state_ = State::MAPPING;
-        norm_.skip_unread();
+    #ifdef DEBUG_PATHS
+    if (paths_out_.is_open()) paths_out_.close();
+    #endif
 
-        seed_tracker_.reset();
-        evdt_.reset();
+    prev_size_ = 0;
+    event_i_ = 0;
+    reset_ = false;
+    last_chunk_ = false;
+    state_ = State::MAPPING;
+    norm_.skip_unread();
 
-        chunk_timer_.reset();
-        map_timer_.reset();
-        map_time_ = 0;
-        wait_time_ = 0;
-    }
+    seed_tracker_.reset();
+    evdt_.reset();
 
-    u32 Mapper::prev_unfinished(u32 next_number) const {
-        return state_ == State::MAPPING && read_.number_ != next_number;
-    }
+    chunk_timer_.reset();
+    map_timer_.reset();
+    map_time_ = 0;
+    wait_time_ = 0;
+}
 
-    bool Mapper::finished() const {
-        return state_ == State::SUCCESS || state_ == State::FAILURE;
-    }
+u32 Mapper::prev_unfinished(u32 next_number) const {
+    return state_ == State::MAPPING && read_.number_ != next_number;
+}
 
-    void Mapper::skip_events(u32 n) {
-        event_i_ += n;
-        prev_size_ = 0;
-    }
+bool Mapper::finished() const {
+    return state_ == State::SUCCESS || state_ == State::FAILURE;
+}
 
-    void Mapper::request_reset() {
-        reset_ = true;
-    }
+void Mapper::skip_events(u32 n) {
+    event_i_ += n;
+    prev_size_ = 0;
+}
 
-    void Mapper::end_reset() {
-        reset_ = false;
-    }
+void Mapper::request_reset() {
+    reset_ = true;
+}
 
-    bool Mapper::is_resetting() {
-        return reset_;
-    }
+void Mapper::end_reset() {
+    reset_ = false;
+}
 
-    bool Mapper::is_chunk_processed() const {
-        return read_.chunk_processed_;
-    }
+bool Mapper::is_resetting() {
+    return reset_;
+}
 
-    Mapper::State Mapper::get_state() const {
-        return state_;
-    }
+bool Mapper::is_chunk_processed() const {
+    return read_.chunk_processed_;
+}
 
-    bool Mapper::add_chunk(Chunk &chunk) {
-        if (!chunk_mtx_.try_lock()) return false;
+Mapper::State Mapper::get_state() const {
+    return state_;
+}
 
-        if (!is_chunk_processed() || finished() || reset_) { 
-            chunk_mtx_.unlock();
-            return false;
-        }
+bool Mapper::add_chunk(Chunk &chunk) {
+    if (!chunk_mtx_.try_lock()) return false;
 
-        if (read_.chunks_maxed()) {
-
-            set_failed();
-            chunk.clear();
-
-            chunk_mtx_.unlock();
-            return true;
-        }
-
-        bool added = read_.add_chunk(chunk);
-        if (added) {
-            chunk_timer_.reset();
-        }
-
+    if (!is_chunk_processed() || finished() || reset_) { 
         chunk_mtx_.unlock();
-        return added;
-    }
-
-    u16 Mapper::process_chunk() {
-        if (read_.chunk_processed_ || reset_ || 
-            !chunk_mtx_.try_lock()) return 0; 
-
-        if (read_.chunk_count() == 1) {
-            read_.loc_.set_float(Paf::Tag::QUEUE_TIME, map_timer_.lap());
-        }
-
-        wait_time_ += map_timer_.lap();
-
-
-        float mean;
-        //std::cerr << "# got " << read_.get_id() 
-        //          << " " << read_.chunk_count() << "\n";
-
-        u16 nevents = 0;
-        for (u32 i = 0; i < read_.chunk_.size(); i++) {
-            if (evdt_.add_sample(read_.chunk_[i])) {
-                mean = evdt_.get_mean();
-
-                if (!norm_.push(mean)) {
-
-                    u32 nskip = norm_.skip_unread(nevents);
-                    skip_events(nskip);
-
-                    std::cerr << "#SKIP "
-                              << read_.get_id() << " "
-                              << nskip << "\n";
-
-                    if (!norm_.push(mean)) {
-                        map_time_ += map_timer_.lap();
-
-                        chunk_mtx_.unlock();
-                        return nevents;
-                    }
-                }
-                nevents++;
-            }
-        }
-
-        read_.chunk_.clear();
-
-        read_.chunk_processed_ = true;
-
-        map_time_ += map_timer_.lap();
-
-        chunk_mtx_.unlock();
-        return nevents;
-    }
-
-    void Mapper::set_failed() {
-        state_ = State::FAILURE;
-        reset_ = false;
-
-        read_.loc_.set_float(Paf::Tag::MAP_TIME, map_time_);
-        read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
-    }
-
-    bool Mapper::chunk_mapped() {
-        //std::cerr << "#check " << read_.get_id() << " " << read_.chunk_processed_ << " " << norm_.empty() << "\n";
-
-        return read_.chunk_processed_ && norm_.empty();
-    }
-
-    bool Mapper::map_chunk() {
-        wait_time_ += map_timer_.lap();
-
-        if (reset_ || chunk_timer_.get() > PRMS.chunk_timeout) {
-            set_failed();
-            read_.loc_.set_ended();
-            //std::cerr << "# END timer or reset\n";
-            return true;
-
-        } else if (norm_.empty() && 
-                   read_.chunk_processed_ && 
-                   read_.chunks_maxed()) {
-
-            chunk_mtx_.lock();
-
-            if (norm_.empty() && read_.chunk_processed_) {
-                set_failed();
-                chunk_mtx_.unlock();
-                return true;
-            }
-
-            chunk_mtx_.unlock();
-        }
-
-        if (norm_.empty()) {
-            //std::cerr << "# stuck empty: " 
-            //          << chunk_timer_.get() << " < "
-            //          << PRMS.chunk_timeout << "\n";
-            return false;
-        }
-
-
-        u16 nevents = get_max_events();
-        float tlimit = PRMS.evt_timeout * nevents;
-
-        for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
-            if (map_next()) {
-                read_.loc_.set_float(Paf::Tag::MAP_TIME, map_time_+map_timer_.get());
-                read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
-                norm_.skip_unread();
-                return true;
-            }
-
-            if (map_timer_.get() > tlimit) {
-                //std::cerr << "#event timeout "
-                //          << map_timer_.get() << " "
-                //          << tlimit << "\n";
-                break;
-            }
-        }
-
-        map_time_ += map_timer_.lap();
-
         return false;
     }
 
-    bool Mapper::map_next() {
-        if (norm_.empty() || reset_ || event_i_ >= PRMS.max_events) {
-            state_ = State::FAILURE;
+    if (read_.chunks_maxed()) {
+
+        set_failed();
+        chunk.clear();
+
+        chunk_mtx_.unlock();
+        return true;
+    }
+
+    bool added = read_.add_chunk(chunk);
+    if (added) {
+        chunk_timer_.reset();
+    }
+
+    chunk_mtx_.unlock();
+    return added;
+}
+
+u16 Mapper::process_chunk() {
+    if (read_.chunk_processed_ || reset_ || 
+        !chunk_mtx_.try_lock()) return 0; 
+
+    if (read_.chunk_count() == 1) {
+        read_.loc_.set_float(Paf::Tag::QUEUE_TIME, map_timer_.lap());
+    }
+
+    wait_time_ += map_timer_.lap();
+
+
+    float mean;
+    //std::cerr << "# got " << read_.get_id() 
+    //          << " " << read_.chunk_count() << "\n";
+
+    u16 nevents = 0;
+    for (u32 i = 0; i < read_.chunk_.size(); i++) {
+        if (evdt_.add_sample(read_.chunk_[i])) {
+            mean = evdt_.get_mean();
+
+            if (!norm_.push(mean)) {
+
+                u32 nskip = norm_.skip_unread(nevents);
+                skip_events(nskip);
+
+                std::cerr << "#SKIP "
+                          << read_.get_id() << " "
+                          << nskip << "\n";
+
+                if (!norm_.push(mean)) {
+                    map_time_ += map_timer_.lap();
+
+                    chunk_mtx_.unlock();
+                    return nevents;
+                }
+            }
+            nevents++;
+        }
+    }
+
+    read_.chunk_.clear();
+
+    read_.chunk_processed_ = true;
+
+    map_time_ += map_timer_.lap();
+
+    chunk_mtx_.unlock();
+    return nevents;
+}
+
+void Mapper::set_failed() {
+    state_ = State::FAILURE;
+    reset_ = false;
+
+    read_.loc_.set_float(Paf::Tag::MAP_TIME, map_time_);
+    read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
+}
+
+bool Mapper::chunk_mapped() {
+    //std::cerr << "#check " << read_.get_id() << " " << read_.chunk_processed_ << " " << norm_.empty() << "\n";
+
+    return read_.chunk_processed_ && norm_.empty();
+}
+
+bool Mapper::map_chunk() {
+    wait_time_ += map_timer_.lap();
+
+    if (reset_ || chunk_timer_.get() > PRMS.chunk_timeout) {
+        set_failed();
+        read_.loc_.set_ended();
+        //std::cerr << "# END timer or reset\n";
+        return true;
+
+    } else if (norm_.empty() && 
+               read_.chunk_processed_ && 
+               read_.chunks_maxed()) {
+
+        chunk_mtx_.lock();
+
+        if (norm_.empty() && read_.chunk_processed_) {
+            set_failed();
+            chunk_mtx_.unlock();
             return true;
         }
 
-        float event = norm_.pop();
+        chunk_mtx_.unlock();
+    }
 
-        //TODO: store kmer_probs_ in static array
-        for (u16 kmer = 0; kmer < kmer_probs_.size(); kmer++) {
-            kmer_probs_[kmer] = model.match_prob(event, kmer);
+    if (norm_.empty()) {
+        //std::cerr << "# stuck empty: " 
+        //          << chunk_timer_.get() << " < "
+        //          << PRMS.chunk_timeout << "\n";
+        return false;
+    }
+
+
+    u16 nevents = get_max_events();
+    float tlimit = PRMS.evt_timeout * nevents;
+
+    for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
+        if (map_next()) {
+            read_.loc_.set_float(Paf::Tag::MAP_TIME, map_time_+map_timer_.get());
+            read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
+            norm_.skip_unread();
+            return true;
         }
 
-        Range prev_range;
-        u16 prev_kmer;
-        float evpr_thresh;
-        bool child_found;
+        if (map_timer_.get() > tlimit) {
+            //std::cerr << "#event timeout "
+            //          << map_timer_.get() << " "
+            //          << tlimit << "\n";
+            break;
+        }
+    }
 
-        auto next_path = next_paths_.begin();
+    map_time_ += map_timer_.lap();
 
-        
-        //Find neighbors of previous nodes
-        for (u32 pi = 0; pi < prev_size_; pi++) {
-            if (!prev_paths_[pi].is_valid()) {
-                continue;
-            }
+    return false;
+}
 
-            child_found = false;
+bool Mapper::map_next() {
+    if (norm_.empty() || reset_ || event_i_ >= PRMS.max_events) {
+        state_ = State::FAILURE;
+        return true;
+    }
 
-            PathBuffer &prev_path = prev_paths_[pi];
-            Range &prev_range = prev_path.fm_range_;
-            prev_kmer = prev_path.kmer_;
+    float event = norm_.pop();
 
-            evpr_thresh = get_prob_thresh(prev_range.length());
-            //evpr_thresh = PRMS.get_path_thresh(prev_path.total_match_len_);
+    //TODO: store kmer_probs_ in static array
+    for (u16 kmer = 0; kmer < kmer_probs_.size(); kmer++) {
+        kmer_probs_[kmer] = model.match_prob(event, kmer);
+    }
 
-            if (prev_path.consec_stays_ < PRMS.max_consec_stay && 
-                kmer_probs_[prev_kmer] >= evpr_thresh) {
+    Range prev_range;
+    u16 prev_kmer;
+    float evpr_thresh;
+    bool child_found;
 
-                next_path->make_child(prev_path, 
-                                      prev_range,
-                                      prev_kmer, 
-                                      kmer_probs_[prev_kmer], 
-                                      EventType::STAY);
-                child_found = true;
+    auto next_path = next_paths_.begin();
 
-                if (++next_path == next_paths_.end()) {
-                    break;
-                }
-            }
+    #ifdef DEBUG_PATHS
+    for (auto &c : dbg_fm_bins_) c = 0;
+    dbg_stay_count_ = 0;
+    dbg_source_count_ = 0;
+    #endif
+    
+    //Find neighbors of previous nodes
+    for (u32 pi = 0; pi < prev_size_; pi++) {
+        if (!prev_paths_[pi].is_valid()) {
+            continue;
+        }
 
-            //Add all the neighbors
-            for (u8 b = 0; b < BASE_COUNT; b++) {
-                u16 next_kmer = kmer_neighbor<KLEN>(prev_kmer, b);
+        child_found = false;
 
-                if (kmer_probs_[next_kmer] < evpr_thresh) {
-                    continue;
-                }
+        PathBuffer &prev_path = prev_paths_[pi];
+        Range &prev_range = prev_path.fm_range_;
+        prev_kmer = prev_path.kmer_;
 
-                Range next_range = fmi.get_neighbor(prev_range, b);
-
-                if (!next_range.is_valid()) {
-                    continue;
-                }
-
-                next_path->make_child(prev_path, 
-                                      next_range,
-                                      next_kmer, 
-                                      kmer_probs_[next_kmer], 
-                                      EventType::MATCH);
+        evpr_thresh = get_prob_thresh(prev_range.length());
 
 
-                child_found = true;
+        //evpr_thresh = PRMS.get_path_thresh(prev_path.total_match_len_);
 
-                if (++next_path == next_paths_.end()) {
-                    break;
-                }
-            }
+        if (prev_path.consec_stays_ < PRMS.max_consec_stay && 
+            kmer_probs_[prev_kmer] >= evpr_thresh) {
 
+            next_path->make_child(prev_path, 
+                                  prev_range,
+                                  prev_kmer, 
+                                  kmer_probs_[prev_kmer], 
+                                  EventType::STAY);
+            child_found = true;
 
-            if (!child_found && !prev_path.sa_checked_) {
+            #ifdef DEBUG_PATHS
+            dbg_fm_bins_[get_fm_bin(prev_range.length())]++;
+            dbg_stay_count_++;
+            #endif
 
-                //Add seeds for non-extended paths
-                //Extended paths will be updated after sources filled in
-                update_seeds(prev_path, true);
-
-            }
-
-            if (next_path == next_paths_.end()) {
+            if (++next_path == next_paths_.end()) {
                 break;
             }
         }
 
-        //Create sources between gaps
-        if (next_path != next_paths_.begin()) {
+        //Add all the neighbors
+        for (u8 b = 0; b < BASE_COUNT; b++) {
+            u16 next_kmer = kmer_neighbor<KLEN>(prev_kmer, b);
 
-            u32 next_size = next_path - next_paths_.begin();
+            if (kmer_probs_[next_kmer] < evpr_thresh) {
+                continue;
+            }
 
-            pdqsort(next_paths_.begin(), next_path);
-            //std::sort(next_paths_.begin(), next_path);
+            Range next_range = fmi.get_neighbor(prev_range, b);
 
-            u16 source_kmer;
-            prev_kmer = kmer_probs_.size(); 
+            if (!next_range.is_valid()) {
+                continue;
+            }
 
-            Range unchecked_range, source_range;
+            next_path->make_child(prev_path, 
+                                  next_range,
+                                  next_kmer, 
+                                  kmer_probs_[next_kmer], 
+                                  EventType::MATCH);
 
-            for (u32 i = 0; i < next_size; i++) {
-                source_kmer = next_paths_[i].kmer_;
+            #ifdef DEBUG_PATHS
+            dbg_fm_bins_[get_fm_bin(next_range.length())]++;
+            #endif
 
-                //Add source for beginning of kmer range
-                if (source_kmer != prev_kmer &&
-                    next_path != next_paths_.end() &&
-                    kmer_probs_[source_kmer] >= get_source_prob()) {
+            child_found = true;
 
-                    sources_added_[source_kmer] = true;
-
-                    source_range = Range(fmi.get_kmer_range(source_kmer).start_,
-                                         next_paths_[i].fm_range_.start_ - 1);
-
-                    if (source_range.is_valid()) {
-                        next_path->make_source(source_range,
-                                               source_kmer,
-                                               kmer_probs_[source_kmer]);
-                        next_path++;
-                    }                                    
-
-                    unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
-                                            fmi.get_kmer_range(source_kmer).end_);
-                }
-
-                prev_kmer = source_kmer;
-
-                //Range next_range = next_paths_[i].fm_range_;
-
-                //Remove paths with duplicate ranges
-                //Best path will be listed last
-                if (i < next_size - 1 && next_paths_[i].fm_range_ == next_paths_[i+1].fm_range_) {
-                    next_paths_[i].invalidate();
-                    continue;
-                }
-
-                //Start source after current path
-                //TODO: check if theres space for a source here, instead of after extra work?
-                if (next_path != next_paths_.end() &&
-                    kmer_probs_[source_kmer] >= get_source_prob()) {
-                    
-                    source_range = unchecked_range;
-                    
-                    //Between this and next path ranges
-                    if (i < next_size - 1 && source_kmer == next_paths_[i+1].kmer_) {
-
-                        source_range.end_ = next_paths_[i+1].fm_range_.start_ - 1;
-
-                        if (unchecked_range.start_ <= next_paths_[i+1].fm_range_.end_) {
-                            unchecked_range.start_ = next_paths_[i+1].fm_range_.end_ + 1;
-                        }
-                    }
-
-                    //Add it if it's a real range
-                    if (source_range.is_valid()) {
-
-                        next_path->make_source(source_range,
-                                               source_kmer,
-                                               kmer_probs_[source_kmer]);
-                        next_path++;
-                    }
-                }
-
-                update_seeds(next_paths_[i], false);
+            if (++next_path == next_paths_.end()) {
+                break;
             }
         }
 
-        for (u16 kmer = 0; 
-             kmer < kmer_probs_.size() && 
-                next_path != next_paths_.end(); 
-             kmer++) {
 
-            Range next_range = fmi.get_kmer_range(kmer);
+        if (!child_found && !prev_path.sa_checked_) {
 
-            if (!sources_added_[kmer] && 
-                kmer_probs_[kmer] >= get_source_prob() &&
+            //Add seeds for non-extended paths
+            //Extended paths will be updated after sources filled in
+            update_seeds(prev_path, true);
+
+        }
+
+        if (next_path == next_paths_.end()) {
+            break;
+        }
+    }
+
+    //Create sources between gaps
+    if (next_path != next_paths_.begin()) {
+
+        u32 next_size = next_path - next_paths_.begin();
+
+        pdqsort(next_paths_.begin(), next_path);
+        //std::sort(next_paths_.begin(), next_path);
+
+        u16 source_kmer;
+        prev_kmer = kmer_probs_.size(); 
+
+        Range unchecked_range, source_range;
+
+        for (u32 i = 0; i < next_size; i++) {
+            source_kmer = next_paths_[i].kmer_;
+
+            //Add source for beginning of kmer range
+            if (source_kmer != prev_kmer &&
                 next_path != next_paths_.end() &&
-                next_range.is_valid()) {
+                kmer_probs_[source_kmer] >= get_source_prob()) {
 
-                //TODO: don't write to prob buffer here to speed up source loop
-                next_path->make_source(next_range, kmer, kmer_probs_[kmer]);
-                next_path++;
+                sources_added_[source_kmer] = true;
 
-            } else {
-                sources_added_[kmer] = false;
+                source_range = Range(fmi.get_kmer_range(source_kmer).start_,
+                                     next_paths_[i].fm_range_.start_ - 1);
+
+                if (source_range.is_valid()) {
+                    next_path->make_source(source_range,
+                                           source_kmer,
+                                           kmer_probs_[source_kmer]);
+                    next_path++;
+
+                    #ifdef DEBUG_PATHS
+                    dbg_fm_bins_[get_fm_bin(source_range.length())]++;
+                    dbg_source_count_++;
+                    #endif
+                }                                    
+
+                unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
+                                        fmi.get_kmer_range(source_kmer).end_);
             }
+
+            prev_kmer = source_kmer;
+
+            //Range next_range = next_paths_[i].fm_range_;
+
+            //Remove paths with duplicate ranges
+            //Best path will be listed last
+            if (i < next_size - 1 && next_paths_[i].fm_range_ == next_paths_[i+1].fm_range_) {
+                next_paths_[i].invalidate();
+                continue;
+            }
+
+            //Start source after current path
+            //TODO: check if theres space for a source here, instead of after extra work?
+            if (next_path != next_paths_.end() &&
+                kmer_probs_[source_kmer] >= get_source_prob()) {
+                
+                source_range = unchecked_range;
+                
+                //Between this and next path ranges
+                if (i < next_size - 1 && source_kmer == next_paths_[i+1].kmer_) {
+
+                    source_range.end_ = next_paths_[i+1].fm_range_.start_ - 1;
+
+                    if (unchecked_range.start_ <= next_paths_[i+1].fm_range_.end_) {
+                        unchecked_range.start_ = next_paths_[i+1].fm_range_.end_ + 1;
+                    }
+                }
+
+                //Add it if it's a real range
+                if (source_range.is_valid()) {
+
+                    next_path->make_source(source_range,
+                                           source_kmer,
+                                           kmer_probs_[source_kmer]);
+                    next_path++;
+
+                    #ifdef DEBUG_PATHS
+                    dbg_fm_bins_[get_fm_bin(source_range.length())]++;
+                    dbg_source_count_++;
+                    #endif
+                }
+            }
+
+            update_seeds(next_paths_[i], false);
         }
+    }
 
-        prev_size_ = next_path - next_paths_.begin();
-        prev_paths_.swap(next_paths_);
+    for (u16 kmer = 0; 
+         kmer < kmer_probs_.size() && 
+            next_path != next_paths_.end(); 
+         kmer++) {
 
-        #ifdef DEBUG_SEEDS
-    path_counts_.push_back(prev_size_);
+        Range next_range = fmi.get_kmer_range(kmer);
+
+        if (!sources_added_[kmer] && 
+            kmer_probs_[kmer] >= get_source_prob() &&
+            next_path != next_paths_.end() &&
+            next_range.is_valid()) {
+
+            //TODO: don't write to prob buffer here to speed up source loop
+            next_path->make_source(next_range, kmer, kmer_probs_[kmer]);
+            next_path++;
+
+            #ifdef DEBUG_PATHS
+            dbg_fm_bins_[get_fm_bin(next_range.length())]++;
+            dbg_source_count_++;
+            #endif
+
+        } else {
+            sources_added_[kmer] = false;
+        }
+    }
+
+    prev_size_ = next_path - next_paths_.begin();
+    prev_paths_.swap(next_paths_);
+
+    #ifdef DEBUG_PATHS
+    dbg_paths_out();
     #endif
-
 
     SeedGroup sg = seed_tracker_.get_final();
 
@@ -625,30 +667,38 @@ void Mapper::reset() {
 
 void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
 
+    if (!p.is_seed_valid(path_ended)) return;
 
-    if (p.is_seed_valid(path_ended)) {
+    //TODO: store actual SA coords?
+    //avoid checking multiple times!
+    p.sa_checked_ = true;
 
-        //TODO: store actual SA coords?
-        //avoid checking multiple times!
-        p.sa_checked_ = true;
+    #ifdef DEBUG_SEEDS
+    dbg_seeds_out(p);
+    #endif
 
-        #ifdef DEBUG_SEEDS
-        print_debug_seeds(p);
-        #endif
 
-        for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
+    for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
 
-            //Reverse the reference coords so they both go L->R
-            u64 ref_en = fmi.size() - fmi.sa(s) + 1;
+        //Reverse the reference coords so they both go L->R
+        u64 ref_en = fmi.size() - fmi.sa(s) + 1;
 
-            seed_tracker_.add_seed(ref_en, p.match_len(), event_i_ - path_ended);
-        }
+        seed_tracker_.add_seed(ref_en, p.match_len(), event_i_ - path_ended);
     }
 }
 
 #ifdef DEBUG_SEEDS
-void Mapper::print_debug_seeds(PathBuffer &p) {
+void Mapper::dbg_seeds_open() {
+    if (seeds_out_.is_open()) seeds_out_.close();
+    seeds_out_.open(PRMS.dbg_prefix + read_.get_id() + "_seeds.bed");
 
+    if (!seeds_out_.is_open()) {
+        std::cerr << "Error: failed to open seed dbg output\n";
+        abort(); //TODO don't abort
+    }
+}
+
+void Mapper::dbg_seeds_out(PathBuffer &p) {
     //TODO: check for stored SA coords, don't print if not present
     //or at least eliminate duplicated code
     if (!seeds_out_.is_open()) return;
@@ -670,26 +720,80 @@ void Mapper::print_debug_seeds(PathBuffer &p) {
         if (rf_st > fmi.size()) {
             rf_st = 0;
         }
+
+        u32 evt_st, evt_en = event_i_+1;
+
+        if (p.length_ > PRMS.seed_len) {
+            evt_st = evt_en - PRMS.seed_len;
+        } else {
+            evt_st = evt_en - p.length_;
+        }
           
         seeds_out_ << rf_name << "\t"
                    << rf_st << "\t"
                    << ((rf_st + p.match_len() + KLEN) - 1) << "\t"
-                   << event_i_ << "\t"
-                   << (fwd ? "+" : "-") << "\n";
+                   << evt_st << "|";
 
-        //Possible output fields:
-        //Range fm_range_ translated to coords
-        //u16   total_match_len_ translated to coords
-        //u16   kmer_ can get from coords, might be good to sanity check
-        //
-        //u8    length_  should include event start/end
-        //u8    consec_stays_ could be useful for tuning
-        //float seed_prob_ could be useful for tuning
-        //u8    path_type_counts_ could be useful for tuning
-        //u32   event_types_ unecissary if seed_prob included
-        //float *prob_sums_ probs unecissary if seed_prob included
-        //bool  sa_checked_ should only print if true
+        for (u32 i = 0; i < evt_en-evt_st; i++) {
+            seeds_out_ << (((p.event_types_ >> (i*TYPE_BITS)) & 1) == EventType::MATCH);
+        }
+
+        seeds_out_ << "|" << p.seed_prob_ << "\t"
+                   << (fwd ? "+" : "-") << "\n";
     }
+
+    //Possible output fields:
+    //Range fm_range_ translated to coords
+    //u16   total_match_len_ translated to coords
+    //u16   kmer_ can get from coords, might be good to sanity check
+    //
+    //u8    length_  should include event start/end
+    //u8    consec_stays_ could be useful for tuning
+    //float seed_prob_ could be useful for tuning
+    //u8    path_type_counts_ could be useful for tuning
+    //u32   event_types_ 
+    //float *prob_sums_ probs unecissary if seed_prob included
+    //bool  sa_checked_ should only print if true
+}
+#endif
+
+#ifdef DEBUG_PATHS
+void Mapper::dbg_paths_open() {
+    if (paths_out_.is_open()) paths_out_.close();
+    paths_out_.open(PRMS.dbg_prefix + read_.get_id() + "_paths.tsv");
+
+    if (!paths_out_.is_open()) {
+        std::cerr << "Error: failed to open dbg output\n";
+        abort(); //TODO don't abort
+    }
+
+    paths_out_ 
+        << "event\t"
+        << "path_count\t"
+        << "source_count\t"
+        << "stay_count\t"
+        << "fm_bin_counts\n";
+}
+
+void Mapper::dbg_paths_out() {
+    paths_out_ 
+        << event_i_ << "\t"
+        << prev_size_ << "\t"
+        << dbg_source_count_ << "\t"
+        << dbg_stay_count_ << "\t";
+
+    u32 first_gt0 = 0;
+    for (; first_gt0 < dbg_fm_bins_.size(); first_gt0++) {
+        if (dbg_fm_bins_[first_gt0] != 0) break;
+    }
+
+    for (u32 i = dbg_fm_bins_.size()-1; 
+         i < dbg_fm_bins_.size() && i >= first_gt0; 
+         i--) {
+        paths_out_ << dbg_fm_bins_[i] << " ";
+    }
+
+    paths_out_ << "\n";
 }
 #endif
 
@@ -713,17 +817,6 @@ void Mapper::set_ref_loc(const SeedGroup &seeds) {
         rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_ + KLEN);
 
     u16 match_count = seeds.total_len_ + KLEN - 1;
-
-    #ifdef DEBUG_SEEDS
-    std::string paths_str = std::to_string(path_counts_[0]);
-    for (u32 i = 1; i < path_counts_.size(); i++) {
-        paths_str += "," + std::to_string(path_counts_[i]);
-    }
-
-    read_.loc_.set_float(Paf::Tag::MEAN_RATIO, seed_tracker_.get_mean_conf());
-    read_.loc_.set_float(Paf::Tag::TOP_RATIO, seed_tracker_.get_top_conf());
-    read_.loc_.set_str(Paf::Tag::PATH_COUNTS, paths_str);
-    #endif
 
     read_.loc_.set_read_len(rd_len);
     read_.loc_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, fwd, match_count);
@@ -820,7 +913,10 @@ bool Mapper::PathBuffer::is_seed_valid(bool path_ended) const{
                  match_len() >= PRMS.min_rep_len)) &&
 
            length_ >= PRMS.seed_len &&
+
+           //TODO: is type_head() valid non non-full-length seeds?
            (path_ended || type_head() == EventType::MATCH) &&
+
            (path_ended || path_type_counts_[EventType::STAY] <= PRMS.max_stay_frac * PRMS.seed_len) &&
           seed_prob_ >= PRMS.min_seed_prob;
 }

@@ -60,9 +60,14 @@ int main(int argc, char** argv) {
 
 void load_conf(int argc, char** argv, Conf &conf) {
     int opt;
+    std::string flagstr = ":t:n:r:R:c:l:";
+
+    #ifdef DEBUG_OUT
+    flagstr += "D:";
+    #endif
 
     //parse flags
-    while((opt = getopt(argc, argv, ":t:n:l:r:R:c:")) != -1) {
+    while((opt = getopt(argc, argv, flagstr.c_str())) != -1) {
         switch(opt) {  
 
             FLAG_TO_CONF('t', atoi, threads)
@@ -71,6 +76,10 @@ void load_conf(int argc, char** argv, Conf &conf) {
             FLAG_TO_CONF('R', atoi, max_active_reads)
             FLAG_TO_CONF('c', atoi, max_chunks)
             FLAG_TO_CONF('l', std::string, read_list)
+
+            #ifdef DEBUG_OUT
+            FLAG_TO_CONF('D', std::string, dbg_prefix);
+            #endif
 
             case ':':  
             std::cerr << "Error: failed to load flag value\n";
