@@ -264,12 +264,12 @@ def add_fast5_opts(p, conf):
     p.add_argument(
             "-l", "--read-list", 
             type=str, default=None, 
-            help="Only map reads listed in this file"
+            help=unc.Conf.read_list.__doc__
     )
     p.add_argument(
             "-n", "--max-reads", 
             type=int, default=None, 
-            help="Maximum number of reads to map"
+            help=unc.Conf.max_reads.__doc__
     )
 
 #TODO get defautls from conf

@@ -45,8 +45,7 @@ const std::string MODE_STRS[] = {"deplete", "enrich"};
                       void set_##N(const T &v) { N = v; }
 
 #define GET_SET_EXTERN(T, E, N) T get_##N() { return E.N; } \
-                                void set_##N(const T &v) { E.N = v; }
-
+                                void set_##N(const T &v) { E.N = v; } 
 
 #define GET_TOML_EXTERN(C, T, V, S) GET_NAMED_TOML(C, T, S.V, #V)
 #define GET_TOML(C, T, V) GET_NAMED_TOML(C, T, V, #V)
@@ -71,6 +70,8 @@ class Conf {
     ReadBuffer::Params &read_prms = ReadBuffer::PRMS;
 
     Fast5Reader::Params fast5_prms = Fast5Reader::PRMS_DEF;
+    static constexpr Fast5Reader::Docstrs fast5_docs = Fast5Reader::DOCSTRS;
+
     RealtimeParams realtime_prms = REALTIME_PRMS_DEF;
     SimParams sim_prms = SIM_PRMS_DEF;
     MapOrdParams map_ord_prms = MAP_ORD_PRMS_DEF;
@@ -211,10 +212,16 @@ class Conf {
 
     GET_SET(u16, threads)
 
-    GET_SET_EXTERN(std::string, fast5_prms, fast5_list)
-    GET_SET_EXTERN(std::string, fast5_prms, read_list)
-    GET_SET_EXTERN(u32, fast5_prms, max_reads)
-    GET_SET_EXTERN(u32, fast5_prms, max_buffer)
+
+    #define GET_SET_DOC(C, T, N) \
+        T get_##N() { return C##_prms.N; } \
+        void set_##N(const T &v) { C##_prms.N = v; } \
+        static const char * doc_##N() { return C##_docs.N; }
+
+    GET_SET_DOC(fast5, std::string, fast5_list)
+    GET_SET_DOC(fast5, std::string, read_list)
+    GET_SET_DOC(fast5, u32, max_reads)
+    GET_SET_DOC(fast5, u32, max_buffer)
 
     GET_SET_EXTERN(std::string, realtime_prms, host)
     GET_SET_EXTERN(u16, realtime_prms, port)
@@ -246,6 +253,11 @@ class Conf {
 
     #ifdef PYBIND
     #define DEFPRP(P) c.def_property(#P, &Conf::get_##P, &Conf::set_##P);
+    #define DEFPRP_DOC(P) c.def_property( \
+                #P, \
+                &Conf::get_##P, \
+                &Conf::set_##P, \
+                Conf::doc_##P());
 
     static void pybind_defs(pybind11::class_<Conf> &c) {
         c.def(pybind11::init<const std::string &>())
@@ -257,10 +269,10 @@ class Conf {
         DEFPRP(bwa_prefix)
         DEFPRP(idx_preset)
 
-        DEFPRP(fast5_list)
-        DEFPRP(read_list)
-        DEFPRP(max_reads)
-        DEFPRP(max_buffer)
+        DEFPRP_DOC(fast5_list)
+        DEFPRP_DOC(read_list)
+        DEFPRP_DOC(max_reads)
+        DEFPRP_DOC(max_buffer)
 
         DEFPRP(host)
         DEFPRP(port)

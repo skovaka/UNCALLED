@@ -45,7 +45,23 @@ class Fast5Reader {
     } Params;
     static Params const PRMS_DEF;
 
+    typedef struct {
+        const char *fast5_list, *read_list, *max_reads, *max_buffer;
+    } Docstrs;
+    static constexpr Docstrs DOCSTRS = {
+        fast5_list : 
+            "File containing a list of paths to fast5 files, one per line.",
+        read_list : 
+            "File containing a list of read IDs. Only these reads will be loaded if specified.",
+        max_reads : 
+            "Maximum number of reads to load.",
+        max_buffer : 
+            "Maximum number of reads to store in memory."
+    };
+
+
     //TODO: remove reduntant constructors
+
     Fast5Reader();
     Fast5Reader(const Params &p);
 
@@ -55,20 +71,26 @@ class Fast5Reader {
                 u32 max_reads=0, u32 max_buffer=100);
 
     void add_fast5(const std::string &fast5_path);
+
     bool load_fast5_list(const std::string &fname);
+
     bool add_read(const std::string &read_id);
+
     bool load_read_list(const std::string &fname);
 
     ReadBuffer pop_read();
-
+ 
     u32 buffer_size();
+ 
     u32 fill_buffer();
+ 
     bool all_buffered();
+ 
     bool empty();
 
     #ifdef PYBIND
 
-    #define PY_FAST5_METH(P) c.def(#P, &Fast5Reader::P);
+    #define PY_FAST5_METH(N) c.def(#N, &Fast5Reader::N);
     #define PY_FAST5_PRM(P) p.def_readwrite(#P, &Fast5Reader::Params::P);
 
     static void pybind_defs(pybind11::class_<Fast5Reader> &c) {
