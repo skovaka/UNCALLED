@@ -232,17 +232,17 @@ def add_realtime_opts(p, conf):
     p.add_argument(
             "--host", 
             type=str, default=conf.host, 
-            help="MinKNOW server host."
+            help=unc.Conf.host.__doc__
     )
     p.add_argument(
             "--port", 
             type=int, default=conf.port, 
-            help="MinKNOW server port."
+            help=unc.Conf.port.__doc__
     )
     p.add_argument(
             "--duration", 
             type=float, default=conf.duration, 
-            help="Duration to map real-time run in hours. Should be slightly longer than specified runtime to add wiggle room."
+            help=unc.Conf.duration.__doc__
     )
 
 #def add_list_ports_opts(p, conf):
