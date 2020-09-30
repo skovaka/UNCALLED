@@ -681,6 +681,7 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
     for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
 
         //Reverse the reference coords so they both go L->R
+        //TODO: store in buffer, replace sa_checked
         u64 ref_en = fmi.size() - fmi.sa(s) + 1;
 
         seed_tracker_.add_seed(ref_en, p.match_len(), event_i_ - path_ended);

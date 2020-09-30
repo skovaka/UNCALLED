@@ -150,11 +150,9 @@ float SeedTracker::get_mean_conf() {
     return max_map_.total_len_ / (len_sum_ / seed_groups_.size());
 }
 
-void SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
-
+const SeedGroup &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
     SeedGroup new_seed(Range(ref_en-ref_len+1, ref_en), evt_st);
-    //new_seed.print(std::cout, true, false);
-
+    
     //Locations sorted by decreasing ref_en_.start
     //Find the largest loc s.t. loc->ref_en_.start <= new_seed.ref_en_.start
     //AKA r1 <= r2
@@ -188,6 +186,8 @@ void SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
         loc++;
     }
 
+    auto ret = seed_groups_.end();
+
     //If we find a matching seed group to join
     if (loc_match != seed_groups_.end()) {
         SeedGroup a = *loc_match;
@@ -208,16 +208,20 @@ void SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
 
         auto hint = std::next(loc_match);
         seed_groups_.erase(loc_match);
-        seed_groups_.insert(hint, a);
+        ret = seed_groups_.insert(hint, a);
+    } else {
+
+        all_lens_.insert(new_seed.total_len_);
+        len_sum_ += new_seed.total_len_;
+
+        if (new_seed.total_len_ >= PRMS.min_map_len && new_seed.total_len_ > max_map_.total_len_) {
+            max_map_ = new_seed;
+        }
+
+        ret = seed_groups_.insert(new_seed).first;
     }
 
-    seed_groups_.insert(new_seed);
-    all_lens_.insert(new_seed.total_len_);
-    len_sum_ += new_seed.total_len_;
-
-    if (new_seed.total_len_ >= PRMS.min_map_len && new_seed.total_len_ > max_map_.total_len_) {
-        max_map_ = new_seed;
-    }
+    return *ret;
 }
 
 void SeedTracker::print(std::ostream &out, u16 max_out = 10) {

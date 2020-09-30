@@ -88,7 +88,7 @@ class SeedTracker {
     SeedTracker(Params params);
 
     //SeedGroup add_seed(SeedGroup sg);
-    void add_seed(u64 ref_en, u32 ref_len, u32 evt_st);
+    const SeedGroup &add_seed(u64 ref_en, u32 ref_len, u32 evt_st);
     SeedGroup get_final();
     SeedGroup get_best();
     float get_top_conf();

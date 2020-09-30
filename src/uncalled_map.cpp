@@ -3,10 +3,6 @@
 #include <unistd.h>
 #include "map_pool.hpp"
 
-const std::string CONF_DIR(std::getenv("UNCALLED_CONF")),
-                  DEF_MODEL = CONF_DIR + "/r94_5mers.txt",
-                  DEF_CONF = CONF_DIR + "/defaults.toml";
-
 bool load_conf(int argc, char** argv, Conf &conf);
 
 int main(int argc, char** argv) {
