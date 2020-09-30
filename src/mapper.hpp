@@ -172,6 +172,11 @@ class Mapper {
         u8 path_type_counts_[EventType::NUM_TYPES];
 
         bool sa_checked_;
+
+        #ifdef DEBUG_OUT
+        static u32 count_;
+        u32 id_;
+        #endif
     };
 
     friend bool operator< (const PathBuffer &p1, const PathBuffer &p2);

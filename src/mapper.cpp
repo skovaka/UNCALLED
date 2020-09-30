@@ -656,6 +656,10 @@ bool Mapper::map_next() {
         state_ = State::SUCCESS;
         set_ref_loc(sg);
 
+        #ifdef DEBUG_SEEDS
+        read_.loc_.set_int(Paf::Tag::SEED_GROUP, sg.id_);
+        #endif
+
         return true;
     }
 
@@ -673,10 +677,9 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
     //avoid checking multiple times!
     p.sa_checked_ = true;
 
-    #ifdef DEBUG_SEEDS
-    dbg_seeds_out(p);
-    #endif
-
+    //#ifdef DEBUG_SEEDS
+    //dbg_seeds_out(p);
+    //#endif
 
     for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
 
@@ -684,35 +687,16 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
         //TODO: store in buffer, replace sa_checked
         u64 ref_en = fmi.size() - fmi.sa(s) + 1;
 
-        seed_tracker_.add_seed(ref_en, p.match_len(), event_i_ - path_ended);
-    }
-}
+        //Add seed and store updated seed group
+        auto sg = seed_tracker_.add_seed(ref_en, p.match_len(), event_i_ - path_ended);
 
-#ifdef DEBUG_SEEDS
-void Mapper::dbg_seeds_open() {
-    if (seeds_out_.is_open()) seeds_out_.close();
-    seeds_out_.open(PRMS.dbg_prefix + read_.get_id() + "_seeds.bed");
-
-    if (!seeds_out_.is_open()) {
-        std::cerr << "Error: failed to open seed dbg output\n";
-        abort(); //TODO don't abort
-    }
-}
-
-void Mapper::dbg_seeds_out(PathBuffer &p) {
-    //TODO: check for stored SA coords, don't print if not present
-    //or at least eliminate duplicated code
-    if (!seeds_out_.is_open()) return;
-
-    for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
-        //Reverse the reference coords so they both go L->R
-        u64 ref_en = fmi.size() - (fmi.sa(s) + 1);
-
+        //TODO de-duplicate code
+        #ifdef DEBUG_SEEDS
         bool fwd = ref_en < fmi.size() / 2;
 
         u64 sa_st;
-        if (fwd) sa_st = ref_en - (p.match_len() + KLEN - 1)  + 1;
-        else     sa_st = fmi.size() - ref_en - 1;
+        if (fwd) sa_st = ref_en - p.match_len() + 1;
+        else     sa_st = fmi.size() - (ref_en + KLEN - 1);
 
         std::string rf_name;
         u64 rf_st = 0;
@@ -733,29 +717,72 @@ void Mapper::dbg_seeds_out(PathBuffer &p) {
         seeds_out_ << rf_name << "\t"
                    << rf_st << "\t"
                    << ((rf_st + p.match_len() + KLEN) - 1) << "\t"
-                   << evt_st << "|";
 
-        for (u32 i = 0; i < evt_en-evt_st; i++) {
-            seeds_out_ << (((p.event_types_ >> (i*TYPE_BITS)) & 1) == EventType::MATCH);
-        }
+                   //name field
+                   << evt_st << "-" << evt_en << "|"
+                   << p.id_ << "|" 
+                   << sg.id_ << "\t"
 
-        seeds_out_ << "|" << p.seed_prob_ << "\t"
                    << (fwd ? "+" : "-") << "\n";
+        #endif
     }
-
-    //Possible output fields:
-    //Range fm_range_ translated to coords
-    //u16   total_match_len_ translated to coords
-    //u16   kmer_ can get from coords, might be good to sanity check
-    //
-    //u8    length_  should include event start/end
-    //u8    consec_stays_ could be useful for tuning
-    //float seed_prob_ could be useful for tuning
-    //u8    path_type_counts_ could be useful for tuning
-    //u32   event_types_ 
-    //float *prob_sums_ probs unecissary if seed_prob included
-    //bool  sa_checked_ should only print if true
 }
+
+#ifdef DEBUG_SEEDS
+void Mapper::dbg_seeds_open() {
+    if (seeds_out_.is_open()) seeds_out_.close();
+    seeds_out_.open(PRMS.dbg_prefix + read_.get_id() + "_seeds.bed");
+
+    if (!seeds_out_.is_open()) {
+        std::cerr << "Error: failed to open seed dbg output\n";
+        abort(); //TODO don't abort
+    }
+}
+
+//void Mapper::dbg_seeds_out(PathBuffer &p) {
+//    //TODO: check for stored SA coords, don't print if not present
+//    //or at least eliminate duplicated code
+//    if (!seeds_out_.is_open()) return;
+//
+//    for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
+//        //Reverse the reference coords so they both go L->R
+//        u64 ref_en = fmi.size() - fmi.sa(s) + 1;
+//
+//        bool fwd = ref_en < fmi.size() / 2;
+//
+//        u64 sa_st;
+//        if (fwd) sa_st = ref_en - p.match_len() + 1;
+//        else     sa_st = fmi.size() - (ref_en + KLEN - 1) ;
+//
+//        std::string rf_name;
+//        u64 rf_st = 0;
+//        fmi.translate_loc(sa_st, rf_name, rf_st);
+//
+//        if (rf_st > fmi.size()) {
+//            rf_st = 0;
+//        }
+//
+//        u32 evt_st, evt_en = event_i_+1;
+//
+//        if (p.length_ > PRMS.seed_len) {
+//            evt_st = evt_en - PRMS.seed_len;
+//        } else {
+//            evt_st = evt_en - p.length_;
+//        }
+//          
+//        seeds_out_ << rf_name << "\t"
+//                   << rf_st << "\t"
+//                   << ((rf_st + p.match_len() + KLEN) - 1) << "\t"
+//                   << evt_st << "|";
+//
+//        for (u32 i = 0; i < evt_en-evt_st; i++) {
+//            seeds_out_ << (((p.event_types_ >> (i*TYPE_BITS)) & 1) == EventType::MATCH);
+//        }
+//
+//        seeds_out_ << "|" << p.seed_prob_ << "\t"
+//                   << (fwd ? "+" : "-") << "\n";
+//    }
+//}
 #endif
 
 #ifdef DEBUG_PATHS
@@ -821,13 +848,22 @@ void Mapper::set_ref_loc(const SeedGroup &seeds) {
 
     read_.loc_.set_read_len(rd_len);
     read_.loc_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, fwd, match_count);
+
 }
 
 u32 Mapper::PathBuffer::TYPE_ADDS[EventType::NUM_TYPES];
 
+#ifdef DEBUG_OUT
+u32 Mapper::PathBuffer::count_ = 0;
+#endif
+
 Mapper::PathBuffer::PathBuffer()
     : length_(0),
       prob_sums_(new float[PRMS.seed_len+1]) {
+
+    #ifdef DEBUG_OUT
+    id_ = count_++;
+    #endif
 }
 
 Mapper::PathBuffer::PathBuffer(const PathBuffer &p) {

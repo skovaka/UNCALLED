@@ -38,6 +38,7 @@
 
 class SeedGroup {
 
+    //TODO: privatize
     public:
 
     u64 ref_st_;
@@ -45,6 +46,11 @@ class SeedGroup {
     u32 evt_st_,
         evt_en_,
         total_len_;
+
+    #ifdef DEBUG_OUT
+    static u32 count_;
+    u32 id_;
+    #endif
 
     SeedGroup(Range ref_st, u32 evt_st);
     //SeedGroup(const SeedGroup &r);

@@ -25,7 +25,9 @@
 #include <set>
 #include "seed_tracker.hpp"
 
-#define DEBUG
+#ifdef DEBUG_OUT
+u32 SeedGroup::count_ = 0;
+#endif
 
 const SeedTracker::Params SeedTracker::PRMS_DEF = {
     min_map_len   : 25,
@@ -37,6 +39,9 @@ SeedGroup::SeedGroup()
     : evt_st_(1),
       evt_en_(0),
       total_len_(0) {
+    #ifdef DEBUG_OUT
+    id_ = count_++;
+    #endif
 }
 
 SeedGroup::SeedGroup(Range ref_st, u32 evt_st)
@@ -44,7 +49,11 @@ SeedGroup::SeedGroup(Range ref_st, u32 evt_st)
       ref_en_(ref_st),
       evt_st_(evt_st),
       evt_en_(evt_st),
-      total_len_(ref_st.length()) {}
+      total_len_(ref_st.length()) {
+    #ifdef DEBUG_OUT
+    id_ = count_++;
+    #endif
+}
 
 //SeedGroup::SeedGroup(const SeedGroup &r)
 //    : ref_st_(r.ref_st_),
