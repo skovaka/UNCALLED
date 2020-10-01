@@ -39,7 +39,7 @@ const KmerLen KLEN = KmerLen::k5;
 //#define DEBUG_SEEDS
 
 //TODO define as constant somewhere
-//remove "params" python module
+//rematch "params" python module
 #define INDEX_SUFF ".uncl"
 
 class Mapper {
@@ -73,15 +73,15 @@ class Mapper {
 
     } Params;
 
-    //static Params PRMS_DEF;
-
     static Params PRMS;
 
+    //TODO PRIVATIZE
     static BwaIndex<KLEN> fmi;
     static PoreModel<KLEN> model;
     static std::vector<float> prob_threshes_;
 
     static void load_static();
+    static inline u64 get_fm_bin(u64 fmlen);
 
     enum State { INACTIVE, MAPPING, SUCCESS, FAILURE };
 
@@ -90,7 +90,6 @@ class Mapper {
 
     ~Mapper();
 
-    static inline u64 get_fm_bin(u64 fmlen);
     float get_prob_thresh(u64 fmlen) const;
     float get_source_prob() const;
     u16 get_max_events() const;
@@ -126,11 +125,15 @@ class Mapper {
 
     private:
 
-    enum EventType { MATCH, STAY, NUM_TYPES };
-    static const u8 TYPE_BITS = 1;
+    static const u8 EVENT_MOVE = 1,
+                    EVENT_STAY = 0;
+    static const std::array<u8,2> EVENT_TYPES;
+    static std::array<u32,EVENT_TYPES.size()> EVENT_ADDS;
+    //static u32 PATH_MASK;TODO popcount instead of store?
 
     class PathBuffer {
         public:
+
         PathBuffer();
         PathBuffer(const PathBuffer &p);
 
@@ -142,7 +145,7 @@ class Mapper {
                         Range &range, 
                         u16 kmer, 
                         float prob, 
-                        EventType type);
+                        u8 event_type);
 
         void invalidate();
         bool is_valid() const;
@@ -150,26 +153,27 @@ class Mapper {
 
         u8 type_head() const;
         u8 type_tail() const;
-        u8 match_len() const;
+        u8 move_len() const;
 
         void free_buffers();
         void print() const;
 
-        static const u8 TYPE_MASK = (u8) ((1 << TYPE_BITS) - 1);
-        static u8 MAX_PATH_LEN;
-        static u32 TYPE_ADDS[EventType::NUM_TYPES];
-
         Range fm_range_;
         u8 length_,
             consec_stays_;
+
+        u8 stay_count_, move_count_;
+        u8 path_type_counts_[EVENT_TYPES.size()];
+
+        u16 total_move_len_;
+
         u16 kmer_;
-        u16 total_match_len_;
 
         float seed_prob_;
         float *prob_sums_;
 
         u32 event_types_;
-        u8 path_type_counts_[EventType::NUM_TYPES];
+        //u8 path_type_counts_[2];
 
         bool sa_checked_;
 
