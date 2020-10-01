@@ -36,7 +36,7 @@
 //} TrackerParams;
 
 
-class SeedGroup {
+class SeedCluster {
 
     //TODO: privatize
     public:
@@ -47,28 +47,27 @@ class SeedGroup {
         evt_en_,
         total_len_;
 
-    #ifdef DEBUG_OUT
-    static u32 count_;
+    #ifdef DEBUG_SEEDS
     u32 id_;
     #endif
 
-    SeedGroup(Range ref_st, u32 evt_st);
-    //SeedGroup(const SeedGroup &r);
-    SeedGroup();
+    SeedCluster(Range ref_st, u32 evt_st);
+    //SeedCluster(const SeedCluster &r);
+    SeedCluster();
     u64 ref_start_base() const;
-    u8 update(SeedGroup &new_seed);
+    u8 update(SeedCluster &new_seed);
     void print(std::ostream &out, bool newline, bool print_all) const;
     Range ref_range() const;
     bool is_valid();
 
-    friend bool operator< (const SeedGroup &q1, const SeedGroup &q2);
-    friend std::ostream &operator<< (std::ostream &out, const SeedGroup &a);
+    friend bool operator< (const SeedCluster &q1, const SeedCluster &q2);
+    friend std::ostream &operator<< (std::ostream &out, const SeedCluster &a);
 };
 
-const SeedGroup NULL_ALN = SeedGroup();
+const SeedCluster NULL_ALN = SeedCluster();
 
-bool operator< (const SeedGroup &q1, const SeedGroup &q2);
-std::ostream &operator<< (std::ostream &out, const SeedGroup &a);
+bool operator< (const SeedCluster &q1, const SeedCluster &q2);
+std::ostream &operator<< (std::ostream &out, const SeedCluster &a);
 
 class SeedTracker {
     public:
@@ -81,30 +80,28 @@ class SeedTracker {
     static const Params PRMS_DEF;
 
     Params PRMS;
-    
-    //const TrackerParams prms;
 
-    std::set<SeedGroup> seed_groups_;
+    std::set<SeedCluster> seed_clusters_;
     std::multiset<u32> all_lens_;
-    SeedGroup max_map_;
+    SeedCluster max_map_;
 
     float len_sum_;
 
     SeedTracker();
     SeedTracker(Params params);
 
-    //SeedGroup add_seed(SeedGroup sg);
-    const SeedGroup &add_seed(u64 ref_en, u32 ref_len, u32 evt_st);
-    SeedGroup get_final();
-    SeedGroup get_best();
+    //SeedCluster add_seed(SeedCluster sg);
+    const SeedCluster &add_seed(u64 ref_en, u32 ref_len, u32 evt_st);
+    SeedCluster get_final();
+    SeedCluster get_best();
     float get_top_conf();
     float get_mean_conf();
 
     void reset();
 
-    std::vector<SeedGroup> get_alignments(u8 min_len);
+    std::vector<SeedCluster> get_alignments(u8 min_len);
 
-    bool check_ratio(const SeedGroup &s, float ratio);
+    bool check_ratio(const SeedCluster &s, float ratio);
     bool check_map_conf(u32 seed_len, float mean_len, float second_len);
 
     void print(std::ostream &out, u16 max_out);

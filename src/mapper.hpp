@@ -177,6 +177,12 @@ class Mapper {
         static u32 count_;
         u32 id_, parent_;
         #endif
+
+        static void reset_count() {
+        #ifdef DEBUG_OUT
+            count_ = 0;
+        #endif
+        }
     };
 
     friend bool operator< (const PathBuffer &p1, const PathBuffer &p2);
@@ -187,7 +193,7 @@ class Mapper {
 
     void update_seeds(PathBuffer &p, bool has_children);
 
-    void set_ref_loc(const SeedGroup &seeds);
+    void set_ref_loc(const SeedCluster &seeds);
 
 
     EventDetector evdt_;

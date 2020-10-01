@@ -25,44 +25,34 @@
 #include <set>
 #include "seed_tracker.hpp"
 
-#ifdef DEBUG_OUT
-u32 SeedGroup::count_ = 0;
-#endif
-
 const SeedTracker::Params SeedTracker::PRMS_DEF = {
     min_map_len   : 25,
     min_mean_conf : 6.00,
     min_top_conf  : 1.85
 };
 
-SeedGroup::SeedGroup() 
+SeedCluster::SeedCluster() 
     : evt_st_(1),
       evt_en_(0),
       total_len_(0) {
-    #ifdef DEBUG_OUT
-    id_ = count_++;
-    #endif
 }
 
-SeedGroup::SeedGroup(Range ref_st, u32 evt_st)
+SeedCluster::SeedCluster(Range ref_st, u32 evt_st)
     : ref_st_(ref_st.start_),
       ref_en_(ref_st),
       evt_st_(evt_st),
       evt_en_(evt_st),
       total_len_(ref_st.length()) {
-    #ifdef DEBUG_OUT
-    id_ = count_++;
-    #endif
 }
 
-//SeedGroup::SeedGroup(const SeedGroup &r)
+//SeedCluster::SeedCluster(const SeedCluster &r)
 //    : ref_st_(r.ref_st_),
 //      ref_en_(r.ref_en_),
 //      evt_st_(r.evt_st_),
 //      evt_en_(r.evt_en_),
 //      total_len_(r.total_len_) {}
 
-u8 SeedGroup::update(SeedGroup &new_seed) {
+u8 SeedCluster::update(SeedCluster &new_seed) {
     u8 growth = 0;
     if (new_seed.ref_en_.start_ < ref_en_.end_) {
         if (new_seed.ref_en_.end_ > ref_en_.end_) {
@@ -81,11 +71,11 @@ u8 SeedGroup::update(SeedGroup &new_seed) {
     return growth;
 }
 
-Range SeedGroup::ref_range() const {
+Range SeedCluster::ref_range() const {
     return Range(ref_st_, ref_en_.end_);
 }
 
-void SeedGroup::print(std::ostream &out, bool newline = false, bool print_all = false) const {
+void SeedCluster::print(std::ostream &out, bool newline = false, bool print_all = false) const {
     out << total_len_ << "\t";
 
     out << ref_st_;
@@ -98,19 +88,19 @@ void SeedGroup::print(std::ostream &out, bool newline = false, bool print_all = 
         out << "\n";
 }
 
-bool SeedGroup::is_valid() {
+bool SeedCluster::is_valid() {
     return evt_st_ <= evt_en_;
 }
 
 
-bool operator< (const SeedGroup &r1, const SeedGroup &r2) {
+bool operator< (const SeedCluster &r1, const SeedCluster &r2) {
     if (r1.ref_en_.start_ != r2.ref_en_.start_)
         return r1.ref_en_.start_ > r2.ref_en_.start_;
 
     return r1.evt_en_ > r2.evt_en_;
 }
 
-std::ostream &operator<< (std::ostream &out, const SeedGroup &a) {
+std::ostream &operator<< (std::ostream &out, const SeedCluster &a) {
     out << a.ref_st_ << "-" << a.ref_en_.end_ << "\t"
         << a.evt_st_ << "-" << (a.evt_en_) << "\t"
         << a.total_len_;
@@ -125,17 +115,17 @@ SeedTracker::SeedTracker(Params prms) :
 }
 
 void SeedTracker::reset() {
-    seed_groups_.clear();
+    seed_clusters_.clear();
     all_lens_.clear();
     max_map_ = NULL_ALN;
     len_sum_ = 0;
 }
 
-SeedGroup SeedTracker::get_final() {
+SeedCluster SeedTracker::get_final() {
     if (max_map_.total_len_ < PRMS.min_map_len || 
         all_lens_.size() < 2) return NULL_ALN;
 
-    float mean_len = len_sum_ / seed_groups_.size();
+    float mean_len = len_sum_ / seed_clusters_.size();
     float second_len = *std::next(all_lens_.rbegin());
 
     if (check_map_conf(max_map_.total_len_, mean_len, second_len)) {
@@ -147,7 +137,7 @@ SeedGroup SeedTracker::get_final() {
     return NULL_ALN;
 }
 
-SeedGroup SeedTracker::get_best() {
+SeedCluster SeedTracker::get_best() {
     return max_map_;
 }
 
@@ -156,28 +146,28 @@ float SeedTracker::get_top_conf() {
 }
 
 float SeedTracker::get_mean_conf() {
-    return max_map_.total_len_ / (len_sum_ / seed_groups_.size());
+    return max_map_.total_len_ / (len_sum_ / seed_clusters_.size());
 }
 
-const SeedGroup &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
-    SeedGroup new_seed(Range(ref_en-ref_len+1, ref_en), evt_st);
+const SeedCluster &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
+    SeedCluster new_seed(Range(ref_en-ref_len+1, ref_en), evt_st);
     
     //Locations sorted by decreasing ref_en_.start
     //Find the largest loc s.t. loc->ref_en_.start <= new_seed.ref_en_.start
     //AKA r1 <= r2
-    auto loc = seed_groups_.lower_bound(new_seed),
-         loc_match = seed_groups_.end();
+    auto loc = seed_clusters_.lower_bound(new_seed),
+         loc_match = seed_clusters_.end();
 
     u64 e2 = new_seed.evt_en_, //new event loc
         r2 = new_seed.ref_en_.start_; //new ref loc
 
-    while (loc != seed_groups_.end()) {
+    while (loc != seed_clusters_.end()) {
         u64 e1 = loc->evt_en_, //old event loc
             r1 = loc->ref_en_.start_; //old ref loc
 
         //We know r1 <= r2 because of location sort order
 
-        bool higher_sup = loc_match == seed_groups_.end() 
+        bool higher_sup = loc_match == seed_clusters_.end() 
                        || loc_match->total_len_ < loc->total_len_,
              
              in_range = e1 <= e2 && //event coord must increase
@@ -195,11 +185,11 @@ const SeedGroup &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
         loc++;
     }
 
-    auto ret = seed_groups_.end();
+    auto ret = seed_clusters_.end();
 
-    //If we find a matching seed group to join
-    if (loc_match != seed_groups_.end()) {
-        SeedGroup a = *loc_match;
+    //If we find a matching seed cluster to join
+    if (loc_match != seed_clusters_.end()) {
+        SeedCluster a = *loc_match;
 
         u32 prev_len = a.total_len_;
         a.update(new_seed);
@@ -216,12 +206,12 @@ const SeedGroup &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
         }
 
         auto hint = std::next(loc_match);
-        seed_groups_.erase(loc_match);
-        ret = seed_groups_.insert(hint, a);
+        seed_clusters_.erase(loc_match);
+        ret = seed_clusters_.insert(hint, a);
     }
     //TODO: should definitely add else back in
     //but need to recalibrate seed tracker
-    // else {
+     else {
 
         all_lens_.insert(new_seed.total_len_);
         len_sum_ += new_seed.total_len_;
@@ -230,23 +220,23 @@ const SeedGroup &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
             max_map_ = new_seed;
         }
 
-        seed_groups_.insert(new_seed).first;
-    //    ret = seed_groups_.insert(new_seed).first;
-    //}
+        new_seed.id_ = seed_clusters_.size();
+        ret = seed_clusters_.insert(new_seed).first;
+    }
 
     return *ret;
 }
 
 void SeedTracker::print(std::ostream &out, u16 max_out = 10) {
-    if (seed_groups_.empty()) {
+    if (seed_clusters_.empty()) {
         return;
     }
 
-    std::vector<SeedGroup> seeds_sort(seed_groups_.begin(),
-                                     seed_groups_.end());
+    std::vector<SeedCluster> seeds_sort(seed_clusters_.begin(),
+                                     seed_clusters_.end());
 
     std::sort(seeds_sort.begin(), seeds_sort.end(),
-              [](const SeedGroup &a, const SeedGroup &b) -> bool {
+              [](const SeedCluster &a, const SeedCluster &b) -> bool {
                   return a.total_len_ > b.total_len_;
               });
 

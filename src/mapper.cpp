@@ -66,8 +66,13 @@ Mapper::Mapper() :
     }
 
     kmer_probs_ = std::vector<float>(kmer_count<KLEN>());
+
+    PathBuffer::reset_count();//TODO is there a better way?
     prev_paths_ = std::vector<PathBuffer>(PRMS.max_paths);
+
+    PathBuffer::reset_count();
     next_paths_ = std::vector<PathBuffer>(PRMS.max_paths);
+
     sources_added_ = std::vector<bool>(kmer_count<KLEN>(), false);
 
     prev_size_ = 0;
@@ -649,14 +654,14 @@ bool Mapper::map_next() {
     dbg_paths_out();
     #endif
 
-    SeedGroup sg = seed_tracker_.get_final();
+    SeedCluster sc = seed_tracker_.get_final();
 
-    if (sg.is_valid()) {
+    if (sc.is_valid()) {
         state_ = State::SUCCESS;
-        set_ref_loc(sg);
+        set_ref_loc(sc);
 
         #ifdef DEBUG_SEEDS
-        read_.loc_.set_int(Paf::Tag::SEED_GROUP, sg.id_);
+        read_.loc_.set_int(Paf::Tag::SEED_CLUSTER, sc.id_);
         #endif
 
         return true;
@@ -686,8 +691,8 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
         //TODO: store in buffer, replace sa_checked
         u64 ref_en = fmi.size() - fmi.sa(s) + 1;
 
-        //Add seed and store updated seed group
-        auto sg = seed_tracker_.add_seed(ref_en, p.match_len(), event_i_ - path_ended);
+        //Add seed and store updated seed cluster
+        auto sc = seed_tracker_.add_seed(ref_en, p.match_len(), event_i_ - path_ended);
 
         //TODO de-duplicate code
         #ifdef DEBUG_SEEDS
@@ -705,22 +710,22 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
             rf_st = 0;
         }
 
-        u32 evt_st, evt_en = event_i_+1;
+        //u32 evt_st, evt_en = event_i_;
 
-        if (p.length_ > PRMS.seed_len) {
-            evt_st = evt_en - PRMS.seed_len;
-        } else {
-            evt_st = evt_en - p.length_;
-        }
+        //if (p.length_ > PRMS.seed_len) {
+        //    evt_st = evt_en - PRMS.seed_len + 1;
+        //} else {
+        //    evt_st = evt_en - p.length_ + 1;
+        //}
           
         seeds_out_ << rf_name << "\t"
                    << rf_st << "\t"
                    << ((rf_st + p.match_len() + KLEN) - 1) << "\t"
 
                    //name field
-                   << evt_st << "-" << evt_en << "|"
-                   << p.id_ << "|" 
-                   << sg.id_ << "\t"
+                   << (event_i_-path_ended) << ":"
+                   << p.id_ << ":"
+                   << sc.id_ << "\t"
 
                    << (fwd ? "+" : "-") << "\n";
         #endif
@@ -795,13 +800,10 @@ void Mapper::dbg_paths_open() {
     }
 
     paths_out_ 
-        << "event\t"
         << "id\t"
         << "parent\t"
         << "fm_start\t"
-        << "fm_end\t"
-        << "length\t"
-        << "consec_stays\t"
+        << "fm_len\t"
         << "kmer\t"
         << "full_len\t"
         << "seed_prob\t"
@@ -812,23 +814,31 @@ void Mapper::dbg_paths_out() {
     for (u32 i = 0; i < prev_size_; i++) {
         auto &p = prev_paths_[i];
 
+        paths_out_ << event_i_ << ":" 
+                   << p.id_ << "\t";
+
+        if (p.parent_ < PRMS.max_paths) {
+            paths_out_ << (event_i_-1) << ":" 
+                       << p.parent_ << "\t";
+        } else {
+            paths_out_ << event_i_ << ":" 
+                       << p.id_ << "\t";
+        }
+
         paths_out_
-            << event_i_ << "\t"
-            << p.id_ << "\t"
-            << p.parent_ << "\t"
             << p.fm_range_.start_ << "\t"
-            << p.fm_range_.end_ << "\t"
-            << static_cast<int>(p.length_) << "\t"
-            << static_cast<int>(p.consec_stays_) << "\t"
+            << p.fm_range_.length() << "\t"
             << kmer_to_str<KLEN>(p.kmer_) << "\t"
             << p.total_match_len_ << "\t"
-            << p.seed_prob_ << "\t"
-            << p.event_types_ << "\t";
+            << p.seed_prob_ << "\t";
 
-        for (u32 i = 0; i < min(p.length_, PRMS.seed_len); i++) {
-            u32 j = TYPE_BITS*(PRMS.seed_len-i-2);
-            paths_out_ << 
-                ((p.event_types_ >> j) & PathBuffer::TYPE_MASK);
+        auto pathlen = min(p.length_, PRMS.seed_len);
+        for (u32 i = pathlen-1; i < pathlen; i--) {
+            auto j = TYPE_BITS*(PRMS.seed_len-i-2);
+            auto t = ((p.event_types_ >> j) & PathBuffer::TYPE_MASK);
+
+            //TODO make match 1, stay 0
+            paths_out_ << (t == EventType::MATCH);
         }
 
         paths_out_ << "\n";
@@ -861,7 +871,7 @@ u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
     return (evt_i * evdt_.mean_event_len() * ReadBuffer::PRMS.bp_per_samp()) + last*(KLEN - 1);
 }                  
 
-void Mapper::set_ref_loc(const SeedGroup &seeds) {
+void Mapper::set_ref_loc(const SeedCluster &seeds) {
     bool fwd = seeds.ref_st_ < fmi.size() / 2;
 
     u64 sa_st;
@@ -925,7 +935,7 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     prob_sums_[1] = prob;
 
     #ifdef DEBUG_OUT
-    parent_ = id_;
+    parent_ = PRMS.max_paths;
     #endif
 }
 

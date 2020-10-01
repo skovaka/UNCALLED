@@ -51,7 +51,7 @@ class Paf {
               ENDED,
               KEEP,
               DELAY,
-              SEED_GROUP};
+              SEED_CLUSTER};
 
     Paf();
     Paf(const std::string &rd_name, u16 channel = 0, u64 start_sample = 0);
