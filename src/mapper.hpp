@@ -175,7 +175,7 @@ class Mapper {
 
         #ifdef DEBUG_OUT
         static u32 count_;
-        u32 id_;
+        u32 id_, parent_;
         #endif
     };
 

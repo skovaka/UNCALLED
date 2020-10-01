@@ -460,7 +460,6 @@ bool Mapper::map_next() {
 
         evpr_thresh = get_prob_thresh(prev_range.length());
 
-
         //evpr_thresh = PRMS.get_path_thresh(prev_path.total_match_len_);
 
         if (prev_path.consec_stays_ < PRMS.max_consec_stay && 
@@ -797,32 +796,65 @@ void Mapper::dbg_paths_open() {
 
     paths_out_ 
         << "event\t"
-        << "path_count\t"
-        << "source_count\t"
-        << "stay_count\t"
-        << "fm_bin_counts\n";
+        << "id\t"
+        << "parent\t"
+        << "fm_start\t"
+        << "fm_end\t"
+        << "length\t"
+        << "consec_stays\t"
+        << "kmer\t"
+        << "full_len\t"
+        << "seed_prob\t"
+        << "moves\n";
 }
 
 void Mapper::dbg_paths_out() {
-    paths_out_ 
-        << event_i_ << "\t"
-        << prev_size_ << "\t"
-        << dbg_source_count_ << "\t"
-        << dbg_stay_count_ << "\t";
+    for (u32 i = 0; i < prev_size_; i++) {
+        auto &p = prev_paths_[i];
 
-    u32 first_gt0 = 0;
-    for (; first_gt0 < dbg_fm_bins_.size(); first_gt0++) {
-        if (dbg_fm_bins_[first_gt0] != 0) break;
+        paths_out_
+            << event_i_ << "\t"
+            << p.id_ << "\t"
+            << p.parent_ << "\t"
+            << p.fm_range_.start_ << "\t"
+            << p.fm_range_.end_ << "\t"
+            << static_cast<int>(p.length_) << "\t"
+            << static_cast<int>(p.consec_stays_) << "\t"
+            << kmer_to_str<KLEN>(p.kmer_) << "\t"
+            << p.total_match_len_ << "\t"
+            << p.seed_prob_ << "\t"
+            << p.event_types_ << "\t";
+
+        for (u32 i = 0; i < min(p.length_, PRMS.seed_len); i++) {
+            u32 j = TYPE_BITS*(PRMS.seed_len-i-2);
+            paths_out_ << 
+                ((p.event_types_ >> j) & PathBuffer::TYPE_MASK);
+        }
+
+        paths_out_ << "\n";
     }
-
-    for (u32 i = dbg_fm_bins_.size()-1; 
-         i < dbg_fm_bins_.size() && i >= first_gt0; 
-         i--) {
-        paths_out_ << dbg_fm_bins_[i] << " ";
-    }
-
-    paths_out_ << "\n";
 }
+
+//void Mapper::dbg_paths_out() {
+//    paths_out_ 
+//        << event_i_ << "\t"
+//        << prev_size_ << "\t"
+//        << dbg_source_count_ << "\t"
+//        << dbg_stay_count_ << "\t";
+//
+//    u32 first_gt0 = 0;
+//    for (; first_gt0 < dbg_fm_bins_.size(); first_gt0++) {
+//        if (dbg_fm_bins_[first_gt0] != 0) break;
+//    }
+//
+//    for (u32 i = dbg_fm_bins_.size()-1; 
+//         i < dbg_fm_bins_.size() && i >= first_gt0; 
+//         i--) {
+//        paths_out_ << dbg_fm_bins_[i] << " ";
+//    }
+//
+//    paths_out_ << "\n";
+//}
 #endif
 
 u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
@@ -883,6 +915,7 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     kmer_ = kmer;
     sa_checked_ = false;
 
+
     path_type_counts_[EventType::MATCH] = 1;
     path_type_counts_[EventType::STAY] = 0;
     total_match_len_ = 1;
@@ -890,6 +923,10 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     //TODO: don't write this here to speed up source loop
     prob_sums_[0] = 0;
     prob_sums_[1] = prob;
+
+    #ifdef DEBUG_OUT
+    parent_ = id_;
+    #endif
 }
 
 
@@ -921,6 +958,9 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
         seed_prob_ = prob_sums_[length_] / length_;
     }
 
+    #ifdef DEBUG_OUT
+    parent_ = p.id_;
+    #endif
 }
 
 void Mapper::PathBuffer::invalidate() {
