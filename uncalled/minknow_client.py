@@ -8,6 +8,7 @@ import logging
 try:
     import read_until
     ru_loaded = True
+
 except ImportError:
     ru_loaded = False
 
@@ -78,8 +79,8 @@ if ru_loaded:
             
             return True
 
-        def reset(self, timeout=5):
-            read_until.ReadUntilClient.reset(self, timeout)
+        def reset(self):
+            read_until.ReadUntilClient.reset(self)
 
             if self.chmon_thread is not None:
                 self.chmon_running.clear()

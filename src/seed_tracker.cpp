@@ -218,7 +218,10 @@ const SeedGroup &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
         auto hint = std::next(loc_match);
         seed_groups_.erase(loc_match);
         ret = seed_groups_.insert(hint, a);
-    } else {
+    }
+    //TODO: should definitely add else back in
+    //but need to recalibrate seed tracker
+    // else {
 
         all_lens_.insert(new_seed.total_len_);
         len_sum_ += new_seed.total_len_;
@@ -227,8 +230,9 @@ const SeedGroup &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
             max_map_ = new_seed;
         }
 
-        ret = seed_groups_.insert(new_seed).first;
-    }
+        seed_groups_.insert(new_seed).first;
+    //    ret = seed_groups_.insert(new_seed).first;
+    //}
 
     return *ret;
 }
