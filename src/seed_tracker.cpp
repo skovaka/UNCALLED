@@ -211,7 +211,7 @@ const SeedCluster &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
     }
     //TODO: should definitely add else back in
     //but need to recalibrate seed tracker
-     else {
+    // else {
 
         all_lens_.insert(new_seed.total_len_);
         len_sum_ += new_seed.total_len_;
@@ -224,7 +224,7 @@ const SeedCluster &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
         new_seed.id_ = seed_clusters_.size();
         #endif
         ret = seed_clusters_.insert(new_seed).first;
-    }
+    //}
 
     return *ret;
 }

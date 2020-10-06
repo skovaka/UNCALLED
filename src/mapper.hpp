@@ -129,6 +129,7 @@ class Mapper {
                     EVENT_STAY = 0;
     static const std::array<u8,2> EVENT_TYPES;
     static std::array<u32,EVENT_TYPES.size()> EVENT_ADDS;
+    static u32 PATH_MASK, PATH_TAIL_MOVE;
     //static u32 PATH_MASK;TODO popcount instead of store?
 
     class PathBuffer {

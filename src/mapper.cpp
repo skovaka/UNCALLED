@@ -59,6 +59,8 @@ const std::array<u8,Mapper::EVENT_TYPES.size()> Mapper::EVENT_TYPES = {
     Mapper::EVENT_MOVE
 };
 std::array<u32,Mapper::EVENT_TYPES.size()> Mapper::EVENT_ADDS;
+u32 Mapper::PATH_MASK = 0;
+u32 Mapper::PATH_TAIL_MOVE = 0;
 
 Mapper::Mapper() :
     evdt_(PRMS.event_prms),
@@ -71,6 +73,11 @@ Mapper::Mapper() :
         EVENT_ADDS[t] = t << (PRMS.seed_len-2);
         //std::cerr << (int) t << " " << EVENT_ADDS[t] << "\n";
     }
+
+    for (u32 i = 0; i < PRMS.seed_len; i++) {
+        PATH_MASK |= 1 << i;
+    }
+    PATH_TAIL_MOVE = 1 << (PRMS.seed_len-1);
 
     kmer_probs_ = std::vector<float>(kmer_count<KLEN>());
 
@@ -838,9 +845,8 @@ void Mapper::dbg_paths_out() {
 
         if (p.is_valid()) {
             auto pathlen = min(p.length_, PRMS.seed_len);
-            for (u32 i = pathlen-1; i < pathlen; i--) {
-                auto j = PRMS.seed_len-i-1;
-                auto t = ((p.event_types_ >> j) & 1);
+            for (u32 i = 0; i < pathlen; i++) {
+                auto t = ((p.event_types_ >> i) & 1);
 
                 //TODO make match 1, stay 0
                 paths_out_ << t;
@@ -931,7 +937,8 @@ void Mapper::PathBuffer::free_buffers() {
 void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     length_ = 1;
     consec_stays_ = 0;
-    event_types_ = EVENT_ADDS[EVENT_MOVE];
+    //event_types_ = EVENT_ADDS[EVENT_MOVE];
+    event_types_ = EVENT_MOVE;
     seed_prob_ = prob;
     fm_range_ = range;
     kmer_ = kmer;
@@ -962,7 +969,8 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
     fm_range_ = range;
     kmer_ = kmer;
     sa_checked_ = p.sa_checked_;
-    event_types_ = EVENT_ADDS[type] | (p.event_types_ >> 1);
+    //event_types_ = EVENT_ADDS[type] | (p.event_types_ >> 1);
+    event_types_ = ((p.event_types_ << 1) | type) & PATH_MASK;
     consec_stays_ = (p.consec_stays_ + (type == EVENT_STAY)) * (type == EVENT_STAY);
 
     std::memcpy(path_type_counts_, p.path_type_counts_, 2 * sizeof(u8));
@@ -974,6 +982,7 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
         prob_sums_[PRMS.seed_len] = prob_sums_[PRMS.seed_len-1] + prob;
         seed_prob_ = (prob_sums_[PRMS.seed_len] - prob_sums_[0]) / PRMS.seed_len;
         path_type_counts_[p.type_tail()]--;
+        event_types_ |= PATH_TAIL_MOVE;
     } else {
         std::memcpy(prob_sums_, p.prob_sums_, length_ * sizeof(float));
         prob_sums_[length_] = prob_sums_[length_-1] + prob;
@@ -998,11 +1007,13 @@ u8 Mapper::PathBuffer::move_len() const {
 }
 
 u8 Mapper::PathBuffer::type_head() const {
-    return (event_types_ >> (PRMS.seed_len-2)) & 1;
+    //return (event_types_ >> (PRMS.seed_len-2)) & 1;
+    return event_types_ & 1;
 }
 
 u8 Mapper::PathBuffer::type_tail() const {
-    return event_types_ & 1;
+    //return event_types_ & 1;
+    return (event_types_ >> (PRMS.seed_len-2)) & 1;
 }
 
 bool Mapper::PathBuffer::is_seed_valid(bool path_ended) const{
