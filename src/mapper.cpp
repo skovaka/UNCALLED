@@ -55,7 +55,7 @@ PoreModel<KLEN> Mapper::model = pmodel_r94_complement;
 
 //u32 Mapper::EVENT_ADDS[Mapper::EVENT_TYPES.size()];
 const std::array<u8,Mapper::EVENT_TYPES.size()> Mapper::EVENT_TYPES = {
-    Mapper::EVENT_STAY, 
+    Mapper::EVENT_STAY,
     Mapper::EVENT_MOVE
 };
 std::array<u32,Mapper::EVENT_TYPES.size()> Mapper::EVENT_ADDS;
@@ -67,8 +67,9 @@ Mapper::Mapper() :
 
     load_static();
 
-    for (auto t : {EVENT_STAY, EVENT_MOVE}) {
+    for (auto t : EVENT_TYPES) {
         EVENT_ADDS[t] = t << (PRMS.seed_len-2);
+        //std::cerr << (int) t << " " << EVENT_ADDS[t] << "\n";
     }
 
     kmer_probs_ = std::vector<float>(kmer_count<KLEN>());
@@ -321,10 +322,7 @@ u16 Mapper::process_chunk() {
 
     wait_time_ += map_timer_.lap();
 
-
     float mean;
-    //std::cerr << "# got " << read_.get_id() 
-    //          << " " << read_.chunk_count() << "\n";
 
     u16 nevents = 0;
     for (u32 i = 0; i < read_.chunk_.size(); i++) {
@@ -370,8 +368,6 @@ void Mapper::set_failed() {
 }
 
 bool Mapper::chunk_mapped() {
-    //std::cerr << "#check " << read_.get_id() << " " << read_.chunk_processed_ << " " << norm_.empty() << "\n";
-
     return read_.chunk_processed_ && norm_.empty();
 }
 
@@ -400,9 +396,6 @@ bool Mapper::map_chunk() {
     }
 
     if (norm_.empty()) {
-        //std::cerr << "# stuck empty: " 
-        //          << chunk_timer_.get() << " < "
-        //          << PRMS.chunk_timeout << "\n";
         return false;
     }
 
@@ -419,9 +412,6 @@ bool Mapper::map_chunk() {
         }
 
         if (map_timer_.get() > tlimit) {
-            //std::cerr << "#event timeout "
-            //          << map_timer_.get() << " "
-            //          << tlimit << "\n";
             break;
         }
     }
@@ -820,6 +810,7 @@ void Mapper::dbg_paths_out() {
     for (u32 i = 0; i < prev_size_; i++) {
         auto &p = prev_paths_[i];
 
+
         paths_out_ << event_i_ << ":" 
                    << p.id_ << "\t";
 
@@ -833,19 +824,33 @@ void Mapper::dbg_paths_out() {
 
         paths_out_
             << p.fm_range_.start_ << "\t"
-            << p.fm_range_.length() << "\t"
-            << kmer_to_str<KLEN>(p.kmer_) << "\t"
+            << p.fm_range_.length() << "\t";
+
+        if (p.is_valid()) {
+            paths_out_ << kmer_to_str<KLEN>(p.kmer_) << "\t";
+        } else {
+            paths_out_ << "NNNNN\t"; //TODO store constant 
+        }
+
+        paths_out_ 
             << p.total_move_len_ << "\t"
             << p.seed_prob_ << "\t";
 
-        auto pathlen = min(p.length_, PRMS.seed_len);
-        for (u32 i = pathlen-1; i < pathlen; i--) {
-            auto j = PRMS.seed_len-i-2;
-            auto t = ((p.event_types_ >> j) & 1);
+        if (p.is_valid()) {
+            auto pathlen = min(p.length_, PRMS.seed_len);
+            for (u32 i = pathlen-1; i < pathlen; i--) {
+                auto j = PRMS.seed_len-i-1;
+                auto t = ((p.event_types_ >> j) & 1);
 
-            //TODO make match 1, stay 0
-            paths_out_ << (t == EVENT_MOVE);
+                //TODO make match 1, stay 0
+                paths_out_ << t;
+            }
+        } else {
+            paths_out_ << 0;
         }
+
+        paths_out_ << "\t" << ((int) p.path_type_counts_[EVENT_MOVE])
+                   << "\t" << __builtin_popcount(p.event_types_);
 
         paths_out_ << "\n";
     }
@@ -873,7 +878,9 @@ void Mapper::dbg_paths_out() {
 //}
 #endif
 
+
 u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
+    //TODO store bp_per_samp
     return (evt_i * evdt_.mean_event_len() * ReadBuffer::PRMS.bp_per_samp()) + last*(KLEN - 1);
 }                  
 
@@ -924,7 +931,7 @@ void Mapper::PathBuffer::free_buffers() {
 void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     length_ = 1;
     consec_stays_ = 0;
-    event_types_ = 0;
+    event_types_ = EVENT_ADDS[EVENT_MOVE];
     seed_prob_ = prob;
     fm_range_ = range;
     kmer_ = kmer;
@@ -1000,6 +1007,7 @@ u8 Mapper::PathBuffer::type_tail() const {
 
 bool Mapper::PathBuffer::is_seed_valid(bool path_ended) const{
     return (fm_range_.length() == 1 || 
+
                 (path_ended &&
                  fm_range_.length() <= PRMS.max_rep_copy &&
                  move_len() >= PRMS.min_rep_len)) &&
@@ -1007,9 +1015,13 @@ bool Mapper::PathBuffer::is_seed_valid(bool path_ended) const{
            length_ >= PRMS.seed_len &&
 
            //TODO: is type_head() valid non non-full-length seeds?
-           (path_ended || type_head() == EVENT_MOVE) &&
+           (path_ended || 
+            type_head() == EVENT_MOVE) &&
 
-           (path_ended || path_type_counts_[EVENT_STAY] <= PRMS.max_stay_frac * PRMS.seed_len) &&
+           //TODO can probably combine paths_ended things
+           (path_ended || 
+            path_type_counts_[EVENT_STAY] <= PRMS.max_stay_frac * PRMS.seed_len) &&
+
           seed_prob_ >= PRMS.min_seed_prob;
 }
 

@@ -163,6 +163,7 @@ class Mapper {
             consec_stays_;
 
         u8 stay_count_, move_count_;
+        u32 event_types_;
         u8 path_type_counts_[EVENT_TYPES.size()];
 
         u16 total_move_len_;
@@ -172,8 +173,6 @@ class Mapper {
         float seed_prob_;
         float *prob_sums_;
 
-        u32 event_types_;
-        //u8 path_type_counts_[2];
 
         bool sa_checked_;
 

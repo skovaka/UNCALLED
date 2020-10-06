@@ -169,32 +169,32 @@ class Conf {
         if (conf.contains("mapper")) {
             const auto subconf = toml::find(conf, "mapper");
 
-            GET_TOML_EXTERN(subconf, u32, seed_len, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, min_rep_len, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_rep_copy, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_paths, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_consec_stay, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, max_events, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, max_stay_frac, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, min_seed_prob, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, std::string, bwa_prefix, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, std::string, idx_preset, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u32, evt_buffer_len, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, u16, evt_batch_size, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, evt_timeout, Mapper::PRMS);
-            GET_TOML_EXTERN(subconf, float, chunk_timeout, Mapper::PRMS);
+            GET_TOML_EXTERN(subconf, u32, seed_len, mapper_prms);
+            GET_TOML_EXTERN(subconf, u32, min_rep_len, mapper_prms);
+            GET_TOML_EXTERN(subconf, u32, max_rep_copy, mapper_prms);
+            GET_TOML_EXTERN(subconf, u32, max_paths, mapper_prms);
+            GET_TOML_EXTERN(subconf, u32, max_consec_stay, mapper_prms);
+            GET_TOML_EXTERN(subconf, u32, max_events, mapper_prms);
+            GET_TOML_EXTERN(subconf, float, max_stay_frac, mapper_prms);
+            GET_TOML_EXTERN(subconf, float, min_seed_prob, mapper_prms);
+            GET_TOML_EXTERN(subconf, std::string, bwa_prefix, mapper_prms);
+            GET_TOML_EXTERN(subconf, std::string, idx_preset, mapper_prms);
+            GET_TOML_EXTERN(subconf, u32, evt_buffer_len, mapper_prms);
+            GET_TOML_EXTERN(subconf, u16, evt_batch_size, mapper_prms);
+            GET_TOML_EXTERN(subconf, float, evt_timeout, mapper_prms);
+            GET_TOML_EXTERN(subconf, float, chunk_timeout, mapper_prms);
 
             #ifdef DEBUG_OUT
-            GET_TOML_EXTERN(subconf, std::string, dbg_prefix, Mapper::PRMS);
+            GET_TOML_EXTERN(subconf, std::string, dbg_prefix, mapper_prms);
             #endif
         }
 
         if (conf.contains("seed_tracker")) {
             const auto subconf = toml::find(conf, "seed_tracker");
 
-            GET_TOML_EXTERN(subconf, float, min_mean_conf, Mapper::PRMS.seed_prms);
-            GET_TOML_EXTERN(subconf, float, min_top_conf, Mapper::PRMS.seed_prms);
-            GET_TOML_EXTERN(subconf, u32, min_map_len, Mapper::PRMS.seed_prms);
+            GET_TOML_EXTERN(subconf, float, min_mean_conf,seed_prms);
+            GET_TOML_EXTERN(subconf, float, min_top_conf, seed_prms);
+            GET_TOML_EXTERN(subconf, u32, min_map_len, seed_prms);
         }
 
         if (conf.contains("event_detector")) {
