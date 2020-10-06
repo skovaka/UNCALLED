@@ -154,18 +154,19 @@ class Mapper {
 
         u8 type_head() const;
         u8 type_tail() const;
-        u8 move_len() const;
+        u8 move_count() const;
+        u8 stay_count() const;
 
         void free_buffers();
         void print() const;
 
         Range fm_range_;
         u8 length_,
-            consec_stays_;
+           consec_stays_;
 
-        u8 stay_count_, move_count_;
+        //u8 stay_count_, move_count_;
+        //u8 path_type_counts_[EVENT_TYPES.size()];
         u32 event_types_;
-        u8 path_type_counts_[EVENT_TYPES.size()];
 
         u16 total_move_len_;
 
