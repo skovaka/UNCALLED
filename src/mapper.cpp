@@ -87,10 +87,6 @@ Mapper::Mapper() :
     seed_tracker_.reset();
 
     norm_.set_target(model.get_means_mean(), model.get_means_stdv());
-
-    #ifdef DEBUG_PATHS
-    dbg_fm_bins_.resize(prob_threshes_.size());
-    #endif
 }
 
 Mapper::Mapper(const Mapper &m) : Mapper() {}
@@ -201,18 +197,9 @@ void Mapper::new_read(ReadBuffer &r) {
     read_.swap(r);
     reset();
 
-    #ifdef DEBUG_SEEDS
-    dbg_seeds_open();
-    #endif
-
-    #ifdef DEBUG_PATHS
-    dbg_paths_open();
-    #endif
-
-    #ifdef DEBUG_EVENTS
-    dbg_events_open();
-    #endif
+    dbg_open_all();
 }
+
 
 void Mapper::new_read(Chunk &chunk) {
     if (prev_unfinished(chunk.get_number())) {
@@ -222,37 +209,10 @@ void Mapper::new_read(Chunk &chunk) {
     read_ = ReadBuffer(chunk);
     reset();
 
-    //TODO don't just copy and paste from above
-    #ifdef DEBUG_SEEDS
-    dbg_seeds_open();
-    #endif
-
-    #ifdef DEBUG_PATHS
-    dbg_paths_open();
-    #endif
-
-    #ifdef DEBUG_EVENTS
-    dbg_events_open();
-    #endif
+    dbg_open_all();
 }
 
 void Mapper::reset() {
-    #ifdef DEBUG_SEEDS
-    if (seeds_out_.is_open()) seeds_out_.close();
-    #endif
-
-    #ifdef DEBUG_PATHS
-    if (paths_out_.is_open()) paths_out_.close();
-    #endif
-
-    #ifdef DEBUG_EVENTS
-    if (events_out_.is_open()) events_out_.close();
-    #endif
-
-    #ifdef DEBUG_CONFIDENCE
-    confident_mapped_ = false;
-    #endif
-
     prev_size_ = 0;
     event_i_ = 0;
     reset_ = false;
@@ -267,6 +227,12 @@ void Mapper::reset() {
     map_timer_.reset();
     map_time_ = 0;
     wait_time_ = 0;
+
+    dbg_close_all();
+
+    #ifdef DEBUG_CONFIDENCE
+    confident_mapped_ = false;
+    #endif
 }
 
 u32 Mapper::prev_unfinished(u32 next_number) const {
@@ -338,22 +304,15 @@ u16 Mapper::process_chunk() {
 
     wait_time_ += map_timer_.lap();
 
-    float mean;
-
     u16 nevents = 0;
     for (u32 i = 0; i < read_.chunk_.size(); i++) {
         if (evdt_.add_sample(read_.chunk_[i])) {
 
             #ifdef DEBUG_EVENTS
-            auto e = evdt_.get_event();
-            events_out_ 
-                << e.start << "\t"
-                << e.length << "\t"
-                << e.mean << "\t"
-                << e.stdv << "\n";
+            events_.push_back(evdt_.get_event());
             #endif
 
-            mean = evdt_.get_mean();
+            auto mean = evdt_.get_mean();
 
             if (!norm_.push(mean)) {
 
@@ -375,9 +334,6 @@ u16 Mapper::process_chunk() {
         }
     }
 
-    #ifdef DEBUG_EVENTS
-    events_out_.flush();
-    #endif
 
     read_.chunk_.clear();
 
@@ -457,6 +413,8 @@ bool Mapper::map_next() {
         return true;
     }
 
+    dbg_events_out();
+
     float event = norm_.pop();
 
     //TODO: store kmer_probs_ in static array
@@ -471,12 +429,6 @@ bool Mapper::map_next() {
 
     auto next_path = next_paths_.begin();
 
-    #ifdef DEBUG_PATHS
-    for (auto &c : dbg_fm_bins_) c = 0;
-    dbg_stay_count_ = 0;
-    dbg_source_count_ = 0;
-    #endif
-    
     //Find neighbors of previous nodes
     for (u32 pi = 0; pi < prev_size_; pi++) {
         if (!prev_paths_[pi].is_valid()) {
@@ -503,11 +455,6 @@ bool Mapper::map_next() {
                                   EVENT_STAY);
             child_found = true;
 
-            #ifdef DEBUG_PATHS
-            dbg_fm_bins_[get_fm_bin(prev_range.length())]++;
-            dbg_stay_count_++;
-            #endif
-
             if (++next_path == next_paths_.end()) {
                 break;
             }
@@ -532,10 +479,6 @@ bool Mapper::map_next() {
                                   next_kmer, 
                                   kmer_probs_[next_kmer], 
                                   EVENT_MOVE);
-
-            #ifdef DEBUG_PATHS
-            dbg_fm_bins_[get_fm_bin(next_range.length())]++;
-            #endif
 
             child_found = true;
 
@@ -589,11 +532,6 @@ bool Mapper::map_next() {
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
                     next_path++;
-
-                    #ifdef DEBUG_PATHS
-                    dbg_fm_bins_[get_fm_bin(source_range.length())]++;
-                    dbg_source_count_++;
-                    #endif
                 }                                    
 
                 unchecked_range = Range(next_paths_[i].fm_range_.end_ + 1,
@@ -635,11 +573,6 @@ bool Mapper::map_next() {
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
                     next_path++;
-
-                    #ifdef DEBUG_PATHS
-                    dbg_fm_bins_[get_fm_bin(source_range.length())]++;
-                    dbg_source_count_++;
-                    #endif
                 }
             }
 
@@ -663,11 +596,6 @@ bool Mapper::map_next() {
             next_path->make_source(next_range, kmer, kmer_probs_[kmer]);
             next_path++;
 
-            #ifdef DEBUG_PATHS
-            dbg_fm_bins_[get_fm_bin(next_range.length())]++;
-            dbg_source_count_++;
-            #endif
-
         } else {
             sources_added_[kmer] = false;
         }
@@ -676,9 +604,7 @@ bool Mapper::map_next() {
     prev_size_ = next_path - next_paths_.begin();
     prev_paths_.swap(next_paths_);
 
-    #ifdef DEBUG_PATHS
     dbg_paths_out();
-    #endif
 
     SeedCluster sc = seed_tracker_.get_final();
 
@@ -712,228 +638,29 @@ bool Mapper::map_next() {
     return false;
 }
 
-void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
+void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
 
-    if (!p.is_seed_valid(path_ended)) return;
+    if (!path.is_seed_valid(path_ended)) return;
 
     //TODO: store actual SA coords?
     //avoid checking multiple times!
-    p.sa_checked_ = true;
+    path.sa_checked_ = true;
 
-    //#ifdef DEBUG_SEEDS
-    //dbg_seeds_out(p);
-    //#endif
-
-    for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
+    for (u64 s = path.fm_range_.start_; s <= path.fm_range_.end_; s++) {
 
         //Reverse the reference coords so they both go L->R
         //TODO: store in buffer, replace sa_checked
         u64 ref_en = fmi.size() - fmi.sa(s) + 1;
 
         //Add seed and store updated seed cluster
-        auto sc = seed_tracker_.add_seed(ref_en, p.move_count(), event_i_ - path_ended);
+        auto clust = 
+            seed_tracker_.add_seed(ref_en, path.move_count(), event_i_ - path_ended);
 
-        //TODO de-duplicate code
         #ifdef DEBUG_SEEDS
-        bool fwd = ref_en < fmi.size() / 2;
-
-        u64 sa_st;
-        if (fwd) sa_st = ref_en - p.move_count() + 1;
-        else     sa_st = fmi.size() - (ref_en + KLEN - 1);
-
-        std::string rf_name;
-        u64 rf_st = 0;
-        fmi.translate_loc(sa_st, rf_name, rf_st);
-
-        if (rf_st > fmi.size()) {
-            rf_st = 0;
-        }
-
-        //u32 evt_st, evt_en = event_i_;
-
-        //if (p.length_ > PRMS.seed_len) {
-        //    evt_st = evt_en - PRMS.seed_len + 1;
-        //} else {
-        //    evt_st = evt_en - p.length_ + 1;
-        //}
-          
-        seeds_out_ << rf_name << "\t"
-                   << rf_st << "\t"
-                   << ((rf_st + p.move_count() + KLEN) - 1) << "\t"
-
-                   //name field
-                   << (event_i_-path_ended) << ":"
-                   << p.id_ << ":"
-                   << sc.id_ << "\t"
-
-                   << (fwd ? "+" : "-") << "\n";
+        dbg_seeds_out(path, clust.id_, ref_en, event_i_ - path_ended);
         #endif
     }
-    #ifdef DEBUG_SEEDS
-    seeds_out_.flush();
-    #endif
 }
-
-#ifdef DEBUG_SEEDS
-void Mapper::dbg_seeds_open() {
-    if (seeds_out_.is_open()) seeds_out_.close();
-    seeds_out_.open(PRMS.dbg_prefix + read_.get_id() + "_seeds.bed");
-
-    if (!seeds_out_.is_open()) {
-        std::cerr << "Error: failed to open seed dbg output\n";
-        abort(); //TODO don't abort
-    }
-}
-
-//void Mapper::dbg_seeds_out(PathBuffer &p) {
-//    //TODO: check for stored SA coords, don't print if not present
-//    //or at least eliminate duplicated code
-//    if (!seeds_out_.is_open()) return;
-//
-//    for (u64 s = p.fm_range_.start_; s <= p.fm_range_.end_; s++) {
-//        //Reverse the reference coords so they both go L->R
-//        u64 ref_en = fmi.size() - fmi.sa(s) + 1;
-//
-//        bool fwd = ref_en < fmi.size() / 2;
-//
-//        u64 sa_st;
-//        if (fwd) sa_st = ref_en - p.move_len() + 1;
-//        else     sa_st = fmi.size() - (ref_en + KLEN - 1) ;
-//
-//        std::string rf_name;
-//        u64 rf_st = 0;
-//        fmi.translate_loc(sa_st, rf_name, rf_st);
-//
-//        if (rf_st > fmi.size()) {
-//            rf_st = 0;
-//        }
-//
-//        u32 evt_st, evt_en = event_i_+1;
-//
-//        if (p.length_ > PRMS.seed_len) {
-//            evt_st = evt_en - PRMS.seed_len;
-//        } else {
-//            evt_st = evt_en - p.length_;
-//        }
-//          
-//        seeds_out_ << rf_name << "\t"
-//                   << rf_st << "\t"
-//                   << ((rf_st + p.move_len() + KLEN) - 1) << "\t"
-//                   << evt_st << "|";
-//
-//        for (u32 i = 0; i < evt_en-evt_st; i++) {
-//            seeds_out_ << (((p.event_moves_ >> (i*TYPE_BITS)) & 1) == EventType::MOVE);
-//        }
-//
-//        seeds_out_ << "|" << p.seed_prob_ << "\t"
-//                   << (fwd ? "+" : "-") << "\n";
-//    }
-//}
-#endif
-
-
-#ifdef DEBUG_EVENTS
-void Mapper::dbg_events_open() {
-    if (events_out_.is_open()) events_out_.close();
-    events_out_.open(PRMS.dbg_prefix + read_.get_id() + "_events.tsv");
-
-    if (!events_out_.is_open()) {
-        std::cerr << "Error: failed to open event dbg output\n";
-        abort(); //TODO don't abort
-    }
-
-    events_out_ 
-        << "start\t"
-        << "length\t"
-        << "mean\t"
-        << "stdv\n";
-}
-#endif
-
-#ifdef DEBUG_PATHS
-void Mapper::dbg_paths_open() {
-    if (paths_out_.is_open()) paths_out_.close();
-    paths_out_.open(PRMS.dbg_prefix + read_.get_id() + "_paths.tsv");
-
-    if (!paths_out_.is_open()) {
-        std::cerr << "Error: failed to open path dbg output\n";
-        abort(); //TODO don't abort
-    }
-
-    paths_out_ 
-        << "id\t"
-        << "parent\t"
-        << "fm_start\t"
-        << "fm_len\t"
-        << "kmer\t"
-        << "full_len\t"
-        << "seed_prob\t"
-        << "moves\n";
-}
-
-void Mapper::dbg_paths_out() {
-    for (u32 i = 0; i < prev_size_; i++) {
-        auto &p = prev_paths_[i];
-
-
-        paths_out_ << event_i_ << ":" 
-                   << p.id_ << "\t";
-
-        if (p.parent_ < PRMS.max_paths) {
-            paths_out_ << (event_i_-1) << ":" 
-                       << p.parent_ << "\t";
-        } else {
-            paths_out_ << event_i_ << ":" 
-                       << p.id_ << "\t";
-        }
-
-        paths_out_
-            << p.fm_range_.start_ << "\t"
-            << p.fm_range_.length() << "\t";
-
-        if (p.is_valid()) {
-            paths_out_ << kmer_to_str<KLEN>(p.kmer_) << "\t";
-        } else {
-            paths_out_ << "NNNNN\t"; //TODO store constant 
-        }
-
-        paths_out_ 
-            << p.total_move_len_ << "\t"
-            << p.seed_prob_ << "\t";
-
-        if (p.is_valid()) {
-            for (u32 i = 0; i < p.length_; i++) {
-                paths_out_ << ((p.event_moves_ >> i) & 1);
-            }
-        } else {
-            paths_out_ << 0;
-        }
-
-        paths_out_ << "\n";
-    }
-}
-
-//void Mapper::dbg_paths_out() {
-//    paths_out_ 
-//        << event_i_ << "\t"
-//        << prev_size_ << "\t"
-//        << dbg_source_count_ << "\t"
-//        << dbg_stay_count_ << "\t";
-//
-//    u32 first_gt0 = 0;
-//    for (; first_gt0 < dbg_fm_bins_.size(); first_gt0++) {
-//        if (dbg_fm_bins_[first_gt0] != 0) break;
-//    }
-//
-//    for (u32 i = dbg_fm_bins_.size()-1; 
-//         i < dbg_fm_bins_.size() && i >= first_gt0; 
-//         i--) {
-//        paths_out_ << dbg_fm_bins_[i] << " ";
-//    }
-//
-//    paths_out_ << "\n";
-//}
-#endif
 
 
 u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
@@ -962,7 +689,6 @@ void Mapper::set_ref_loc(const SeedCluster &seeds) {
     read_.loc_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, fwd, match_count);
 
 }
-
 
 #ifdef DEBUG_OUT
 u32 Mapper::PathBuffer::count_ = 0;
@@ -1100,4 +826,149 @@ bool operator< (const Mapper::PathBuffer &p1,
     return p1.fm_range_ < p2.fm_range_ ||
            (p1.fm_range_ == p2.fm_range_ && 
             p1.seed_prob_ < p2.seed_prob_);
+}
+
+void Mapper::dbg_open_all() {
+    #ifdef DEBUG_SEEDS
+    dbg_open(seeds_out_, "_seeds.bed");
+    #endif
+    #ifdef DEBUG_PATHS
+    dbg_open(paths_out_, "_paths.tsv");
+    paths_out_ 
+        << "id\t"
+        << "parent\t"
+        << "fm_start\t"
+        << "fm_len\t"
+        << "kmer\t"
+        << "full_len\t"
+        << "seed_prob\t"
+        << "moves\n";
+    #endif
+    #ifdef DEBUG_EVENTS
+    dbg_open(events_out_, "_events.tsv");
+    events_out_ 
+        << "start\t"
+        << "length\t"
+        << "mean\t"
+        << "stdv\t"
+        << "scale\t"
+        << "shift\n";
+    #endif
+}
+
+#ifdef DEBUG_SEEDS
+void Mapper::dbg_open(std::ofstream &out, const std::string &suffix) {
+    if (out.is_open()) out.close();
+    std::string fname = PRMS.dbg_prefix + read_.get_id() + suffix;
+    out.open(fname);
+    if (!out.is_open()) throw "Failed to open \"" + fname + "\"";
+}
+#endif
+
+void Mapper::dbg_close_all() {
+    #ifdef DEBUG_SEEDS
+    if (seeds_out_.is_open()) seeds_out_.close();
+    #endif
+    #ifdef DEBUG_PATHS
+    if (paths_out_.is_open()) paths_out_.close();
+    #endif
+    #ifdef DEBUG_EVENTS
+    if (events_out_.is_open()) events_out_.close();
+    #endif
+}
+
+void Mapper::dbg_events_out() {
+    #ifdef DEBUG_EVENTS
+    assert(!events_.empty());
+    auto &e = events_.front();
+    events_out_ 
+        << e.start << "\t"
+        << e.length << "\t"
+        << e.mean << "\t"
+        << e.stdv << "\t"
+        << norm_.get_scale() << "\t"
+        << norm_.get_shift() << "\n";
+    events_.pop_front();
+    events_out_.flush();
+    #endif
+}
+
+void Mapper::dbg_seeds_out(const PathBuffer &path, u32 clust, u64 ref_end, u32 evt_end) {
+    #ifdef DEBUG_SEEDS
+
+    //TODO de-duplicate code
+    //should be storing SA coordinate anyway
+
+    bool fwd = ref_end < fmi.size() / 2;
+
+    u64 sa_st;
+    if (fwd) sa_st = ref_end - path.move_count() + 1;
+    else     sa_st = fmi.size() - (ref_end + KLEN - 1);
+
+    std::string rf_name;
+    u64 rf_st = 0;
+    fmi.translate_loc(sa_st, rf_name, rf_st);
+
+    if (rf_st > fmi.size()) {
+        rf_st = 0;
+    }
+
+    seeds_out_ << rf_name << "\t"
+               << rf_st << "\t"
+               << ((rf_st + path.move_count() + KLEN) - 1) << "\t"
+
+               //name field
+               << evt_end << ":"
+               << path.id_ << ":"
+               << clust << "\t"
+
+               << (fwd ? "+" : "-") << "\n";
+
+    seeds_out_.flush();
+    #endif
+
+}
+
+void Mapper::dbg_paths_out() {
+    #ifdef DEBUG_PATHS
+    for (u32 i = 0; i < prev_size_; i++) {
+        auto &p = prev_paths_[i];
+
+
+        paths_out_ << event_i_ << ":" 
+                   << p.id_ << "\t";
+
+        if (p.parent_ < PRMS.max_paths) {
+            paths_out_ << (event_i_-1) << ":" 
+                       << p.parent_ << "\t";
+        } else {
+            paths_out_ << event_i_ << ":" 
+                       << p.id_ << "\t";
+        }
+
+        paths_out_
+            << p.fm_range_.start_ << "\t"
+            << p.fm_range_.length() << "\t";
+
+        if (p.is_valid()) {
+            paths_out_ << kmer_to_str<KLEN>(p.kmer_) << "\t";
+        } else {
+            paths_out_ << "NNNNN\t"; //TODO store constant 
+        }
+
+        paths_out_ 
+            << p.total_move_len_ << "\t"
+            << p.seed_prob_ << "\t";
+
+        if (p.is_valid()) {
+            for (u32 i = 0; i < p.length_; i++) {
+                paths_out_ << ((p.event_moves_ >> i) & 1);
+            }
+        } else {
+            paths_out_ << 0;
+        }
+
+        paths_out_ << "\n";
+    }
+    #endif
 }

@@ -221,7 +221,7 @@ const SeedCluster &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
         }
 
         #ifdef DEBUG_SEEDS
-        new_seed.id_ = seed_clusters_.size();
+        new_seed.id_ = static_cast<u32>(seed_clusters_.size());
         #endif
         ret = seed_clusters_.insert(new_seed).first;
     //}

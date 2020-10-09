@@ -220,25 +220,33 @@ class Mapper {
 
     std::mutex chunk_mtx_;
 
+
+    //Debug output functions
+    //All will be empty if no DEBUG_* macros are defined
+    void dbg_open_all();
+    void dbg_close_all();
+    void dbg_seeds_out(const PathBuffer &path, u32 clust, u64 ref_end, u32 evt_end);
+    void dbg_paths_out();
+    void dbg_events_out();
+
+    //Debug helper functions and variables
+    #ifdef DEBUG_OUT
+    void dbg_open(std::ofstream &out, const std::string &suffix);
+    #endif
+
     #ifdef DEBUG_SEEDS
     std::ofstream seeds_out_;
-
     void dbg_seeds_open();
-    void dbg_seeds_out(PathBuffer &p);
     #endif
 
     #ifdef DEBUG_PATHS
     std::ofstream paths_out_;
-    u32 dbg_source_count_, dbg_stay_count_;
-    std::vector<u32> dbg_fm_bins_;
-
     void dbg_paths_open();
-    void dbg_paths_out();
     #endif
 
     #ifdef DEBUG_EVENTS
     std::ofstream events_out_;
-
+    std::deque<Event> events_;
     void dbg_events_open();
     #endif
 

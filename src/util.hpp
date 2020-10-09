@@ -38,7 +38,7 @@
 #define DEBUG_CONFIDENCE
 #endif
 
-#if defined(DEBUG_SEEDS) || defined(DEBUG_PATHS)
+#if defined(DEBUG_SEEDS) || defined(DEBUG_PATHS) || defined(DEBUG_EVENTS)
 #define DEBUG_OUT
 #endif
 
