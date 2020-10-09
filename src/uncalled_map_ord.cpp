@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
 
 void load_conf(int argc, char** argv, Conf &conf) {
     int opt;
-    std::string flagstr = ":t:n:r:R:c:l:";
+    std::string flagstr = "C:t:n:r:R:c:l:";
 
     #ifdef DEBUG_OUT
     flagstr += "D:";
@@ -80,6 +80,11 @@ void load_conf(int argc, char** argv, Conf &conf) {
             #ifdef DEBUG_OUT
             FLAG_TO_CONF('D', std::string, dbg_prefix);
             #endif
+
+            case 'C':
+            std::cerr << "Conf: " << optarg << "\n";
+            conf.load_toml(std::string(optarg));
+            break;
 
             case ':':  
             std::cerr << "Error: failed to load flag value\n";

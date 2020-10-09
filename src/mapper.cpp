@@ -208,6 +208,10 @@ void Mapper::new_read(ReadBuffer &r) {
     #ifdef DEBUG_PATHS
     dbg_paths_open();
     #endif
+
+    #ifdef DEBUG_EVENTS
+    dbg_events_open();
+    #endif
 }
 
 void Mapper::new_read(Chunk &chunk) {
@@ -226,6 +230,10 @@ void Mapper::new_read(Chunk &chunk) {
     #ifdef DEBUG_PATHS
     dbg_paths_open();
     #endif
+
+    #ifdef DEBUG_EVENTS
+    dbg_events_open();
+    #endif
 }
 
 void Mapper::reset() {
@@ -235,6 +243,14 @@ void Mapper::reset() {
 
     #ifdef DEBUG_PATHS
     if (paths_out_.is_open()) paths_out_.close();
+    #endif
+
+    #ifdef DEBUG_EVENTS
+    if (events_out_.is_open()) events_out_.close();
+    #endif
+
+    #ifdef DEBUG_CONFIDENCE
+    confident_mapped_ = false;
     #endif
 
     prev_size_ = 0;
@@ -327,6 +343,16 @@ u16 Mapper::process_chunk() {
     u16 nevents = 0;
     for (u32 i = 0; i < read_.chunk_.size(); i++) {
         if (evdt_.add_sample(read_.chunk_[i])) {
+
+            #ifdef DEBUG_EVENTS
+            auto e = evdt_.get_event();
+            events_out_ 
+                << e.start << "\t"
+                << e.length << "\t"
+                << e.mean << "\t"
+                << e.stdv << "\n";
+            #endif
+
             mean = evdt_.get_mean();
 
             if (!norm_.push(mean)) {
@@ -348,6 +374,10 @@ u16 Mapper::process_chunk() {
             nevents++;
         }
     }
+
+    #ifdef DEBUG_EVENTS
+    events_out_.flush();
+    #endif
 
     read_.chunk_.clear();
 
@@ -653,14 +683,27 @@ bool Mapper::map_next() {
     SeedCluster sc = seed_tracker_.get_final();
 
     if (sc.is_valid()) {
-        state_ = State::SUCCESS;
+
+        #ifdef DEBUG_CONFIDENCE
+        if (!confident_mapped_) {
+            read_.loc_.set_int(Paf::Tag::CONFIDENT_EVENT, event_i_);
+            confident_mapped_ = true;
+            #endif
+
+            
+            #ifdef DEBUG_SEEDS
+            read_.loc_.set_int(Paf::Tag::SEED_CLUSTER, sc.id_);
+            #endif
+
+
+        #ifdef DEBUG_CONFIDENCE
+        }
+        #else
+
         set_ref_loc(sc);
-
-        #ifdef DEBUG_SEEDS
-        read_.loc_.set_int(Paf::Tag::SEED_CLUSTER, sc.id_);
-        #endif
-
+        state_ = State::SUCCESS;
         return true;
+        #endif
     }
 
     //Update event index
@@ -726,6 +769,9 @@ void Mapper::update_seeds(PathBuffer &p, bool path_ended) {
                    << (fwd ? "+" : "-") << "\n";
         #endif
     }
+    #ifdef DEBUG_SEEDS
+    seeds_out_.flush();
+    #endif
 }
 
 #ifdef DEBUG_SEEDS
@@ -776,7 +822,7 @@ void Mapper::dbg_seeds_open() {
 //                   << evt_st << "|";
 //
 //        for (u32 i = 0; i < evt_en-evt_st; i++) {
-//            seeds_out_ << (((p.event_types_ >> (i*TYPE_BITS)) & 1) == EventType::MOVE);
+//            seeds_out_ << (((p.event_moves_ >> (i*TYPE_BITS)) & 1) == EventType::MOVE);
 //        }
 //
 //        seeds_out_ << "|" << p.seed_prob_ << "\t"
@@ -785,13 +831,32 @@ void Mapper::dbg_seeds_open() {
 //}
 #endif
 
+
+#ifdef DEBUG_EVENTS
+void Mapper::dbg_events_open() {
+    if (events_out_.is_open()) events_out_.close();
+    events_out_.open(PRMS.dbg_prefix + read_.get_id() + "_events.tsv");
+
+    if (!events_out_.is_open()) {
+        std::cerr << "Error: failed to open event dbg output\n";
+        abort(); //TODO don't abort
+    }
+
+    events_out_ 
+        << "start\t"
+        << "length\t"
+        << "mean\t"
+        << "stdv\n";
+}
+#endif
+
 #ifdef DEBUG_PATHS
 void Mapper::dbg_paths_open() {
     if (paths_out_.is_open()) paths_out_.close();
     paths_out_.open(PRMS.dbg_prefix + read_.get_id() + "_paths.tsv");
 
     if (!paths_out_.is_open()) {
-        std::cerr << "Error: failed to open dbg output\n";
+        std::cerr << "Error: failed to open path dbg output\n";
         abort(); //TODO don't abort
     }
 
@@ -837,19 +902,12 @@ void Mapper::dbg_paths_out() {
             << p.seed_prob_ << "\t";
 
         if (p.is_valid()) {
-            auto pathlen = min(p.length_, PRMS.seed_len);
-            for (u32 i = 0; i < pathlen; i++) {
-                auto t = ((p.event_types_ >> i) & 1);
-
-                //TODO make match 1, stay 0
-                paths_out_ << t;
+            for (u32 i = 0; i < p.length_; i++) {
+                paths_out_ << ((p.event_moves_ >> i) & 1);
             }
         } else {
             paths_out_ << 0;
         }
-
-        //paths_out_ << "\t" << ((int) p.path_type_counts_[EVENT_MOVE])
-        //           << "\t" << __builtin_popcount(p.event_types_);
 
         paths_out_ << "\n";
     }
@@ -930,7 +988,7 @@ void Mapper::PathBuffer::free_buffers() {
 void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     length_ = 1;
     consec_stays_ = 0;
-    event_types_ = EVENT_MOVE;
+    event_moves_ = EVENT_MOVE;
     seed_prob_ = prob;
     fm_range_ = range;
     kmer_ = kmer;
@@ -955,25 +1013,25 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
                                     Range &range,
                                     u16 kmer, 
                                     float prob, 
-                                    u8 type) {
+                                    u8 move) {
+
+    u8 stay = 1-move;
 
     length_ = p.length_ + (p.length_ < PRMS.seed_len);
     fm_range_ = range;
     kmer_ = kmer;
     sa_checked_ = p.sa_checked_;
-    event_types_ = ((p.event_types_ << 1) | type) & PATH_MASK;
-    consec_stays_ = (p.consec_stays_ + (type == EVENT_STAY)) * (type == EVENT_STAY);
+    event_moves_ = ((p.event_moves_ << 1) | move) & PATH_MASK;
+    consec_stays_ = (p.consec_stays_ + stay) * stay;
 
-    //std::memcpy(path_type_counts_, p.path_type_counts_, 2 * sizeof(u8));
-    //path_type_counts_[type]++;
-    total_move_len_ = p.total_move_len_ + (type==EVENT_MOVE);
+    total_move_len_ = p.total_move_len_ + move;
 
     if (p.length_ == PRMS.seed_len) {
         std::memcpy(prob_sums_, &(p.prob_sums_[1]), PRMS.seed_len * sizeof(float));
         prob_sums_[PRMS.seed_len] = prob_sums_[PRMS.seed_len-1] + prob;
         seed_prob_ = (prob_sums_[PRMS.seed_len] - prob_sums_[0]) / PRMS.seed_len;
-        //path_type_counts_[p.type_tail()]--;
-        event_types_ |= PATH_TAIL_MOVE;
+        event_moves_ |= PATH_TAIL_MOVE;
+
     } else {
         std::memcpy(prob_sums_, p.prob_sums_, length_ * sizeof(float));
         prob_sums_[length_] = prob_sums_[length_-1] + prob;
@@ -999,39 +1057,41 @@ u8 Mapper::PathBuffer::stay_count() const {
 }
 
 u8 Mapper::PathBuffer::move_count() const {
-    return __builtin_popcount(event_types_);
+    return __builtin_popcount(event_moves_);
     //return path_type_counts_[EVENT_MOVE];
 }
 
 u8 Mapper::PathBuffer::type_head() const {
-    //return (event_types_ >> (PRMS.seed_len-2)) & 1;
-    return event_types_ & 1;
+    //return (event_moves_ >> (PRMS.seed_len-2)) & 1;
+    return event_moves_ & 1;
 }
 
 u8 Mapper::PathBuffer::type_tail() const {
-    //return event_types_ & 1;
-    return (event_types_ >> (PRMS.seed_len-2)) & 1;
+    //return event_moves_ & 1;
+    return (event_moves_ >> (PRMS.seed_len-2)) & 1;
 }
 
-bool Mapper::PathBuffer::is_seed_valid(bool path_ended) const{
-    return (fm_range_.length() == 1 || 
+bool Mapper::PathBuffer::is_seed_valid(bool path_ended) const {
 
-                (path_ended &&
-                 fm_range_.length() <= PRMS.max_rep_copy &&
-                 move_count() >= PRMS.min_rep_len)) &&
+    //All seeds must be same length
+    //and have high probability
+    return (length_ == PRMS.seed_len &&
+            seed_prob_ >= PRMS.min_seed_prob) && (
 
-           length_ >= PRMS.seed_len &&
+               //Must be non repetitive,
+               //end in a move
+               //and not have too many stays
+               (fm_range_.length() == 1 &&
+                type_head() == EVENT_MOVE &&
+                stay_count() <= PRMS.max_stay_frac * PRMS.seed_len) ||
 
-           //TODO: is type_head() valid non non-full-length seeds?
-           (path_ended || 
-            type_head() == EVENT_MOVE) &&
-
-           //TODO can probably combine paths_ended things
-           (path_ended || 
-            stay_count() <= PRMS.max_stay_frac * PRMS.seed_len) &&
-            //path_type_counts_[EVENT_STAY] <= PRMS.max_stay_frac * PRMS.seed_len) &&
-
-          seed_prob_ >= PRMS.min_seed_prob;
+               //Unless path is terminal,
+               //not too repetitive,
+               //and not too short
+               (path_ended &&
+                fm_range_.length() <= PRMS.max_rep_copy &&
+                move_count() >= PRMS.min_rep_len)
+           );
 }
 
 

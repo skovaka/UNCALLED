@@ -83,7 +83,7 @@ class Mapper {
     static void load_static();
     static inline u64 get_fm_bin(u64 fmlen);
 
-    enum State { INACTIVE, MAPPING, SUCCESS, FAILURE };
+    enum class State { INACTIVE, MAPPING, SUCCESS, FAILURE };
 
     Mapper();
     Mapper(const Mapper &m);
@@ -166,7 +166,7 @@ class Mapper {
 
         //u8 stay_count_, move_count_;
         //u8 path_type_counts_[EVENT_TYPES.size()];
-        u32 event_types_;
+        u32 event_moves_;
 
         u16 total_move_len_;
 
@@ -174,7 +174,6 @@ class Mapper {
 
         float seed_prob_;
         float *prob_sums_;
-
 
         bool sa_checked_;
 
@@ -235,6 +234,16 @@ class Mapper {
 
     void dbg_paths_open();
     void dbg_paths_out();
+    #endif
+
+    #ifdef DEBUG_EVENTS
+    std::ofstream events_out_;
+
+    void dbg_events_open();
+    #endif
+
+    #ifdef DEBUG_CONFIDENCE
+    bool confident_mapped_;
     #endif
 };
 

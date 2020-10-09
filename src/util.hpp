@@ -33,7 +33,9 @@
 #ifdef DEBUG_ALL
 #define DEBUG_SEEDS
 #define DEBUG_PATHS
+#define DEBUG_EVENTS
 #define DEBUG_THREADS
+#define DEBUG_CONFIDENCE
 #endif
 
 #if defined(DEBUG_SEEDS) || defined(DEBUG_PATHS)

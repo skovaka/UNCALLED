@@ -38,20 +38,23 @@
 class Paf {
     public:
 
-    enum Tag {MAP_TIME, 
-              WAIT_TIME, 
-              QUEUE_TIME, 
-              RECEIVE_TIME,
-              CHANNEL, 
-              EJECT, 
-              READ_START, 
-              IN_SCAN, 
-              TOP_RATIO, 
-              MEAN_RATIO,
-              ENDED,
-              KEEP,
-              DELAY,
-              SEED_CLUSTER};
+    enum Tag {
+        MAP_TIME, 
+        WAIT_TIME, 
+        QUEUE_TIME, 
+        RECEIVE_TIME,
+        CHANNEL, 
+        EJECT, 
+        READ_START, 
+        IN_SCAN, 
+        TOP_RATIO, 
+        MEAN_RATIO,
+        ENDED,
+        KEEP,
+        DELAY,
+        SEED_CLUSTER,
+        CONFIDENT_EVENT
+    };
 
     Paf();
     Paf(const std::string &rd_name, u16 channel = 0, u64 start_sample = 0);

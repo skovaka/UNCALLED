@@ -45,7 +45,8 @@ const std::string Paf::PAF_TAGS[] = {
     "en", //ENDED
     "kp", //KEEP
     "dl", //DELAY
-    "sc"  //SEED_CLUSTER
+    "sc", //SEED_CLUSTER
+    "ce"  //CONFIDENT_EVENT
 };
 
 Paf::Paf() 
