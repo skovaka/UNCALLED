@@ -26,11 +26,11 @@ const EventDetector::Params EventDetector::PRMS_DEF = {
     max_mean       : 4000
 };
 
-typedef Detector *DetectorPtr;
-
 EventDetector::EventDetector(Params prms) :
     PRMS(prms),
-    BUF_LEN (1 + PRMS.window_length2 * 2) {
+    BUF_LEN (1 + PRMS.window_length2 * 2),
+    cal_offset_(0),
+    cal_coef_(1) {
 
     sum = new double[BUF_LEN];
     sumsq = new double[BUF_LEN];
@@ -151,6 +151,15 @@ float EventDetector::get_mean() const {
 
 float EventDetector::mean_event_len() const {
     return len_sum_ / total_events_;
+}
+
+void EventDetector::set_calibration(float offset, float range, float digitisation) {
+    cal_offset_ = offset;
+    cal_coef_ = range / digitisation;
+}
+
+float EventDetector::calibrate(float v) {
+    return (v + cal_offset_) * cal_coef_;
 }
 
 /**
@@ -292,10 +301,13 @@ Event EventDetector::create_event(u32 evt_en) {
 
     event_.start = evt_st;
     event_.length = (float)(evt_en - evt_st);
-    event_.mean = (float)(sum[evt_en_buf] - evt_st_sum) / event_.length;
+    event_.mean = (sum[evt_en_buf] - evt_st_sum) / event_.length;
     const float deltasqr = (sumsq[evt_en_buf] - evt_st_sumsq);
     const float var = deltasqr / event_.length - event_.mean * event_.mean;
     event_.stdv = sqrtf(fmaxf(var, 0.0f));
+
+    event_.mean = calibrate(event_.mean);
+    event_.stdv = calibrate(event_.stdv);
 
     evt_st = evt_en;
     evt_st_sum = sum[evt_en_buf];

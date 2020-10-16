@@ -22,17 +22,6 @@ typedef struct {
     u32 length;
 } Event;
 
-struct Detector {
-    i32 DEF_PEAK_POS;
-    float DEF_PEAK_VAL;
-    float threshold;
-    u32 window_length;
-    u32 masked_to;
-    i32 peak_pos;
-    float peak_value;
-    bool valid_peak;
-};
-
 class EventDetector {
 
     public:
@@ -65,6 +54,8 @@ class EventDetector {
 
     float mean_event_len() const;
     u32 event_to_bp(u32 evt_i, bool last=false) const;
+
+    void set_calibration(float offset, float range, float digitisation);
 
     #ifdef PYBIND
 
@@ -104,16 +95,31 @@ class EventDetector {
     #endif
 
     private:
+
+    struct Detector {
+        i32 DEF_PEAK_POS;
+        float DEF_PEAK_VAL;
+        float threshold;
+        u32 window_length;
+        u32 masked_to;
+        i32 peak_pos;
+        float peak_value;
+        bool valid_peak;
+    };
+
     u32 get_buf_mid();
     float compute_tstat(u32 w_length); 
     bool peak_detect(float current_value, Detector &detector);
     Event create_event(u32 evt_en); 
+    float calibrate(float v);
 
     const u32 BUF_LEN;
     double *sum, *sumsq;
 
     u32 t, buf_mid, evt_st;
     double evt_st_sum, evt_st_sumsq;
+
+    float cal_offset_, cal_coef_;
 
     Event event_;
     float len_sum_;

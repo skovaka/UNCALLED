@@ -209,9 +209,16 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file,
         }
     }
 
+	float cal_digit = 1, cal_range = 1, cal_offset = 0;
     for (auto a : file.get_attr_map(ch_path)) {
         if (a.first == "channel_number") {
             channel_idx_ = atoi(a.second.c_str()) - 1;
+        } else if (a.first == "digitisation") {
+            cal_digit = atof(a.second.c_str());
+        } else if (a.first == "range") {
+            cal_range = atof(a.second.c_str());
+        } else if (a.first == "offset") {
+            cal_offset = atof(a.second.c_str());
         }
     }
 
@@ -228,10 +235,11 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file,
 
     //full_signal_.reserve(int_data.size());
 
-    full_signal_.assign(int_data.begin(), int_data.end());
-    //for (u16 i : int_data) {
-    //    full_signal_.push_back( (float) i );
-    //}
+    //full_signal_.assign(int_data.begin(), int_data.end());
+    for (u16 raw : int_data) {
+		float calibrated = (cal_range * raw / cal_digit) + cal_offset;
+        full_signal_.push_back(calibrated);
+    }
 
     loc_ = Paf(id_, get_channel(), start_sample_);
     set_raw_len(full_signal_.size());

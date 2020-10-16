@@ -22,6 +22,7 @@
  */
 
 #include <pdqsort.h>
+#include <exception>
 #include "mapper.hpp"
 #include "model_r94.inl"
 
@@ -92,9 +93,7 @@ Mapper::Mapper() :
 Mapper::Mapper(const Mapper &m) : Mapper() {}
 
 Mapper::~Mapper() {
-    #ifdef DEBUG_SEEDS
-    if (seeds_out_.is_open()) seeds_out_.close();
-    #endif
+    dbg_close_all();
 
     for (u32 i = 0; i < next_paths_.size(); i++) {
         next_paths_[i].free_buffers();
@@ -196,8 +195,6 @@ void Mapper::new_read(ReadBuffer &r) {
     read_.clear();//TODO: probably shouldn't auto erase previous read
     read_.swap(r);
     reset();
-
-    dbg_open_all();
 }
 
 
@@ -208,8 +205,6 @@ void Mapper::new_read(Chunk &chunk) {
 
     read_ = ReadBuffer(chunk);
     reset();
-
-    dbg_open_all();
 }
 
 void Mapper::reset() {
@@ -412,6 +407,8 @@ bool Mapper::map_next() {
         state_ = State::FAILURE;
         return true;
     }
+
+    dbg_open_all();
 
     dbg_events_out();
 
@@ -829,51 +826,74 @@ bool operator< (const Mapper::PathBuffer &p1,
 }
 
 void Mapper::dbg_open_all() {
-    #ifdef DEBUG_SEEDS
-    dbg_open(seeds_out_, "_seeds.bed");
-    #endif
-    #ifdef DEBUG_PATHS
-    dbg_open(paths_out_, "_paths.tsv");
-    paths_out_ 
-        << "id\t"
-        << "parent\t"
-        << "fm_start\t"
-        << "fm_len\t"
-        << "kmer\t"
-        << "full_len\t"
-        << "seed_prob\t"
-        << "moves\n";
-    #endif
-    #ifdef DEBUG_EVENTS
-    dbg_open(events_out_, "_events.tsv");
-    events_out_ 
-        << "start\t"
-        << "length\t"
-        << "mean\t"
-        << "stdv\t"
-        << "scale\t"
-        << "shift\n";
+    #ifdef DEBUG_OUT
+    if (!dbg_opened_) {
+
+        #ifdef DEBUG_SEEDS
+        dbg_open(seeds_out_, "_seeds.bed");
+        #endif
+
+        #ifdef DEBUG_PATHS
+        dbg_open(paths_out_, "_paths.tsv");
+        paths_out_ 
+            << "id\t"
+            << "parent\t"
+            << "fm_start\t"
+            << "fm_len\t"
+            << "kmer\t"
+            << "full_len\t"
+            << "seed_prob\t"
+            << "moves\n";
+        #endif
+
+        #ifdef DEBUG_EVENTS
+        dbg_open(events_out_, "_events.tsv");
+        events_out_ 
+            << "start\t"
+            << "length\t"
+            << "mean\t"
+            << "stdv\t"
+            << "scale\t"
+            << "shift\n";
+        #endif
+
+        dbg_opened_ = true;
+    }
     #endif
 }
 
-#ifdef DEBUG_SEEDS
+#ifdef DEBUG_OUT
 void Mapper::dbg_open(std::ofstream &out, const std::string &suffix) {
-    if (out.is_open()) out.close();
+    if (out.is_open()) {
+        out.close();
+    }
     std::string fname = PRMS.dbg_prefix + read_.get_id() + suffix;
+    std::cerr << "Opening " << fname << " "  << out.is_open() << "\n";
     out.open(fname);
-    if (!out.is_open()) throw "Failed to open \"" + fname + "\"";
+    std::cerr << "Opened " << fname << " "  << out.is_open() << "\n";
+    if (!out.is_open()) {
+        throw std::invalid_argument("failed to open \"" + fname + "\"\n");
+    }
 }
 #endif
 
 void Mapper::dbg_close_all() {
-    #ifdef DEBUG_SEEDS
-    if (seeds_out_.is_open()) seeds_out_.close();
-    #endif
-    #ifdef DEBUG_PATHS
-    if (paths_out_.is_open()) paths_out_.close();
-    #endif
-    #ifdef DEBUG_EVENTS
-    if (events_out_.is_open()) events_out_.close();
+    #ifdef DEBUG_OUT
+    if (dbg_opened_) {
+        #ifdef DEBUG_SEEDS
+        if (seeds_out_.is_open()) seeds_out_.close();
+        #endif
+
+        #ifdef DEBUG_PATHS
+        if (paths_out_.is_open()) paths_out_.close();
+        #endif
+
+        #ifdef DEBUG_EVENTS
+        if (events_out_.is_open()) events_out_.close();
+        #endif
+
+        dbg_opened_ = false;
+    }
     #endif
 }
 

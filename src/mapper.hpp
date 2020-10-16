@@ -232,6 +232,7 @@ class Mapper {
     //Debug helper functions and variables
     #ifdef DEBUG_OUT
     void dbg_open(std::ofstream &out, const std::string &suffix);
+    bool dbg_opened_;
     #endif
 
     #ifdef DEBUG_SEEDS
