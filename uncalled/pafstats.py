@@ -4,7 +4,6 @@ import sys
 import numpy as np
 import re
 import argparse
-from bisect import bisect_left
 
 class PafEntry:
     def __init__(self, line, tags=None):
