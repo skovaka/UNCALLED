@@ -868,9 +868,7 @@ void Mapper::dbg_open(std::ofstream &out, const std::string &suffix) {
         out.close();
     }
     std::string fname = PRMS.dbg_prefix + read_.get_id() + suffix;
-    std::cerr << "Opening " << fname << " "  << out.is_open() << "\n";
     out.open(fname);
-    std::cerr << "Opened " << fname << " "  << out.is_open() << "\n";
     if (!out.is_open()) {
         throw std::invalid_argument("failed to open \"" + fname + "\"\n");
     }
