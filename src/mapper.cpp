@@ -26,7 +26,7 @@
 #include "mapper.hpp"
 #include "model_r94.inl"
 
-Mapper::Params Mapper::PRMS = {
+Mapper::Params Mapper::PRMS {
     seed_len        : 22,
     min_rep_len     : 0,
     max_rep_copy    : 50,
@@ -42,7 +42,9 @@ Mapper::Params Mapper::PRMS = {
     bwa_prefix      : "",
     idx_preset      : "default",
     seed_prms       : SeedTracker::PRMS_DEF,
-    event_prms      : EventDetector::PRMS_DEF
+    norm_prms       : Normalizer::PRMS_DEF,
+    event_prms      : EventDetector::PRMS_DEF,
+    evt_prof_prms : EventProfiler::PRMS_DEF
 
     #ifdef DEBUG_OUT
     , dbg_prefix : "dbg_"
@@ -63,6 +65,7 @@ u32 Mapper::PATH_TAIL_MOVE = 0;
 
 Mapper::Mapper() :
     evdt_(PRMS.event_prms),
+    evt_prof_(PRMS.evt_prof_prms),
     seed_tracker_(PRMS.seed_prms),
     state_(State::INACTIVE) {
 
@@ -217,6 +220,7 @@ void Mapper::reset() {
 
     seed_tracker_.reset();
     evdt_.reset();
+    evt_prof_.reset();
 
     chunk_timer_.reset();
     map_timer_.reset();
@@ -303,9 +307,13 @@ u16 Mapper::process_chunk() {
     for (u32 i = 0; i < read_.chunk_.size(); i++) {
         if (evdt_.add_sample(read_.chunk_[i])) {
 
-            #ifdef DEBUG_EVENTS
-            events_.push_back(evdt_.get_event());
-            #endif
+            //#ifdef DEBUG_EVENTS
+            //events_.push_back(evdt_.get_event());
+            //#endif
+            
+            //auto evt = evt_prof_.add_event(evdt_.get_event());
+            //if () {
+            //}
 
             auto mean = evdt_.get_mean();
 

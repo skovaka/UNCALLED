@@ -24,6 +24,7 @@ class Normalizer {
     Normalizer(Params p);
     Normalizer(float tgt_mean, float tgt_stdv);
 
+    void set_length(u32 len);
     void set_target(float tgt_mean, float tgt_stdv);
     void set_signal(const std::vector<float> &signal);
 
@@ -39,7 +40,7 @@ class Normalizer {
     bool push(float s);
     u32 skip_unread(u32 nkeep = 0);
     u32 unread_size() const;
-    void reset(u32 buffer_size);
+    void reset(u32 buffer_size = 0);
 
     bool empty() const;
     bool full() const;

@@ -1,7 +1,16 @@
 #ifndef _INCL_EVENT_PROFILER
 #define _INCL_EVENT_PROFILER
 
+#include "event_detector.hpp"
+#include "normalizer.hpp"
+
 class EventProfiler {
+
+    private:
+    float norm_scale_{1}, 
+          norm_shift_{0};
+    Normalizer window_;
+    std::deque<Event> events_;
 
     public: 
     typedef struct Params {
@@ -15,21 +24,48 @@ class EventProfiler {
 
     Params PRMS;
 
-    EventProfiler() : Params(p) {};
-    EventProfiler(Params p) :
-        window_{
+    EventProfiler() : PRMS(PRMS_DEF) {};
 
-    void set_norm(float scale, float shift);
-
-    void add_event(Event e) {
-        if 
+    EventProfiler(Params p) : PRMS(p) {
+        window_.set_length(PRMS.n);
     }
 
-    private:
-    float norm_scale_{1}, 
-          norm_shift_{0};
-    Normalizer window_;
-    std::deque<Event> win_evts_;
+    void reset() {
+        window_.reset();
+    }
+
+    void set_norm(float scale, float shift) {
+        norm_scale_ = scale;
+        norm_shift_ = shift;
+    }
+
+    bool add_event(Event e) {
+        window_.push(e.mean);
+
+        //TODO store midpoint
+        //need to decide between "radius" or enforce odd
+        if (window_.unread_size() >= PRMS.n / 2) {
+
+            //TODO reverse-normalize thresholds
+            //float win_mean = norm_scale_ * window_.get_mean() + norm_shift_;
+            float win_stdv = norm_scale_ * window_.get_stdv() + norm_shift_;
+            
+            //TODO dynamic range bounds?
+            if (win_stdv < PRMS.win_stdv_min) {
+                return false;
+            }
+        }
+
+        events_.push_back(e);
+
+        return true;
+    }
+
+    Event pop_event() {
+        Event e = events_.front();
+        events_.pop_front();
+        return e;
+    }
 
     //#ifdef PYBIND
 

@@ -74,6 +74,13 @@ bool Normalizer::push(float newevt) {
     return true;
 }
 
+void Normalizer::set_length(u32 len) {
+    if (len != 0 && len != PRMS.len) {
+        PRMS.len = len;
+        signal_.resize(len);
+    }
+}
+
 void Normalizer::reset(u32 buffer_size) {
     n_ = 0;
     rd_ = 0;
@@ -82,9 +89,7 @@ void Normalizer::reset(u32 buffer_size) {
     is_full_ = false;
     is_empty_ = true;
 
-    if (buffer_size != 0 && buffer_size != signal_.size()) {
-        signal_.resize(buffer_size);
-    }
+    set_length(buffer_size);
 
     signal_[0] = 0;
 }
@@ -122,6 +127,7 @@ float Normalizer::pop() {
     return e;
 }
 
+//TODO use mod instead?
 u32 Normalizer::unread_size() const {
     if (rd_ < wr_) return wr_ - rd_;
     else return (n_ - rd_) + wr_;

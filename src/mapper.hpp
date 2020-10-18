@@ -29,6 +29,7 @@
 #include "bwa_index.hpp"
 #include "normalizer.hpp"
 #include "event_detector.hpp"
+#include "event_profiler.hpp"
 #include "pore_model.hpp"
 #include "seed_tracker.hpp"
 #include "read_buffer.hpp"
@@ -62,10 +63,13 @@ class Mapper {
         float evt_timeout;
         float chunk_timeout;
 
-        std::string bwa_prefix, idx_preset;
+        std::string bwa_prefix;
+        std::string idx_preset;
 
         SeedTracker::Params seed_prms;
+        Normalizer::Params norm_prms;
         EventDetector::Params event_prms;
+        EventProfiler::Params evt_prof_prms;
 
         #ifdef DEBUG_OUT
         std::string dbg_prefix;
@@ -201,6 +205,7 @@ class Mapper {
 
 
     EventDetector evdt_;
+    EventProfiler evt_prof_;
     Normalizer norm_;
     SeedTracker seed_tracker_;
     ReadBuffer read_;
