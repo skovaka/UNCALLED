@@ -147,8 +147,8 @@ class Conf {
             GET_TOML_EXTERN(subconf, u32, min_active_reads, map_ord_prms);
         }
 
-        if (conf.contains("fast5_params")) {
-            const auto subconf = toml::find(conf, "fast5_params");
+        if (conf.contains("fast5_reader")) {
+            const auto subconf = toml::find(conf, "fast5_reader");
 
             GET_TOML_EXTERN(subconf, u32, max_buffer, fast5_prms);
             GET_TOML_EXTERN(subconf, u32, max_reads, fast5_prms);

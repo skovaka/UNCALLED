@@ -30,6 +30,10 @@
 #include <chrono>
 #include <cassert>
 
+#ifdef PYBIND
+#include "pybind11/pybind11.h"
+#endif
+
 #ifdef DEBUG_ALL
 #define DEBUG_SEEDS
 #define DEBUG_PATHS

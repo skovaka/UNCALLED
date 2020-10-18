@@ -1,8 +1,15 @@
 #include <cmath>
 #include "normalizer.hpp"
 
-Normalizer::Normalizer() 
-    : signal_(6000), //TODO need to set
+const Normalizer::Params Normalizer::PRMS_DEF = {
+    len : 6000,
+    tgt_mean : 90.20827,
+    tgt_stdv : 12.83266
+};
+
+Normalizer::Normalizer(Params p) 
+    : PRMS(p),
+      signal_(p.len), //TODO need to set
       mean_(0),
       varsum_(0),
       n_(0),
@@ -12,13 +19,13 @@ Normalizer::Normalizer()
       is_empty_(true) {
 }
 
-Normalizer::Normalizer(float tgt_mean, float tgt_stdv) :
-    tgt_mean_(tgt_mean),
-    tgt_stdv_(tgt_stdv) {}
+Normalizer::Normalizer(float tgt_mean, float tgt_stdv) : Normalizer(PRMS_DEF) {
+    set_target(tgt_mean, tgt_stdv);
+}
 
-void Normalizer::set_target(float tgt_mean, float tgt_stdv) {
-    tgt_mean_ = tgt_mean;
-    tgt_stdv_ = tgt_stdv; 
+void Normalizer::set_target(float mean, float stdv) {
+    PRMS.tgt_mean = mean;
+    PRMS.tgt_stdv = stdv;
 }
 
 void Normalizer::set_signal(const std::vector<float> &signal) {

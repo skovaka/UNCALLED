@@ -10,8 +10,18 @@
 
 class Normalizer {
     public:
+    typedef struct Params {
+        u32 len;
+        float tgt_mean;
+        float tgt_stdv;
+    } Params;
 
-    Normalizer();
+    static Params const PRMS_DEF;
+
+    Params PRMS;
+
+    Normalizer() : Normalizer(PRMS_DEF) {};
+    Normalizer(Params p);
     Normalizer(float tgt_mean, float tgt_stdv);
 
     void set_target(float tgt_mean, float tgt_stdv);
