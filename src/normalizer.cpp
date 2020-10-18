@@ -98,17 +98,17 @@ float Normalizer::get_stdv() const {
 }
 
 float Normalizer::get_scale() const {
-    return tgt_stdv_ / get_stdv();
+    return PRMS.tgt_stdv / get_stdv();
 }
 
 float Normalizer::get_shift(float scale) const {
     if (scale == 0) scale = get_scale();
-    return tgt_mean_ - scale * mean_;
+    return PRMS.tgt_mean - scale * mean_;
 }
 
 float Normalizer::at(u32 i) const {
-    float scale = tgt_stdv_ / sqrt(varsum_ / n_);
-    float shift = tgt_mean_ - scale * mean_;
+    float scale = PRMS.tgt_stdv / sqrt(varsum_ / n_);
+    float shift = PRMS.tgt_mean - scale * mean_;
     return scale * signal_[i] + shift;
 }
 
