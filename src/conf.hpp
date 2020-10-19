@@ -211,7 +211,7 @@ class Conf {
 
         if (conf.contains("event_profiler")) {
             const auto subconf = toml::find(conf, "event_profiler");
-            GET_TOML_EXTERN(subconf, u32, n, evt_prof_prms);
+            GET_TOML_EXTERN(subconf, u32, win_len, evt_prof_prms);
             GET_TOML_EXTERN(subconf, float, win_stdv_min, evt_prof_prms);
             GET_TOML_EXTERN(subconf, float, win_stdv_range, evt_prof_prms);
             GET_TOML_EXTERN(subconf, float, win_mean_range, evt_prof_prms);
@@ -245,6 +245,9 @@ class Conf {
     GET_SET_EXTERN(RealtimeParams::ActiveChs, realtime_prms, active_chs)
     GET_SET_EXTERN(RealtimeParams::Mode, realtime_prms, realtime_mode)
 
+    GET_SET_EXTERN(u32, evt_prof_prms, win_len)
+    GET_SET_EXTERN(float, evt_prof_prms, win_stdv_min)
+    
     GET_SET_EXTERN(std::string, mapper_prms, bwa_prefix)
     GET_SET_EXTERN(std::string, mapper_prms, idx_preset)
     GET_SET_EXTERN(u32, mapper_prms, max_events)

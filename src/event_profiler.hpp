@@ -14,7 +14,7 @@ class EventProfiler {
 
     public: 
     typedef struct Params {
-        u32 n;
+        u32 win_len;
         float win_stdv_min;
         float win_stdv_range;
         float win_mean_range;
@@ -27,7 +27,7 @@ class EventProfiler {
     EventProfiler() : PRMS(PRMS_DEF) {};
 
     EventProfiler(Params p) : PRMS(p) {
-        window_.set_length(PRMS.n);
+        window_.set_length(PRMS.win_len);
     }
 
     void reset() {
@@ -48,7 +48,7 @@ class EventProfiler {
 
         //TODO store midpoint
         //need to decide between "radius" or enforce odd
-        if (window_.unread_size() >= PRMS.n / 2) {
+        if (window_.unread_size() >= PRMS.win_len / 2) {
 
             //TODO reverse-normalize thresholds
             //float win_mean = norm_scale_ * window_.get_mean() + norm_shift_;

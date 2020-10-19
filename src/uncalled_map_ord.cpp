@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
 
 void load_conf(int argc, char** argv, Conf &conf) {
     int opt;
-    std::string flagstr = "C:t:n:r:R:c:l:";
+    std::string flagstr = "C:t:n:r:R:c:l:s:w:";
 
     #ifdef DEBUG_OUT
     flagstr += "D:";
@@ -76,7 +76,8 @@ void load_conf(int argc, char** argv, Conf &conf) {
             FLAG_TO_CONF('R', atoi, max_active_reads)
             FLAG_TO_CONF('c', atoi, max_chunks)
             FLAG_TO_CONF('l', std::string, read_list)
-
+            FLAG_TO_CONF('s', atof, win_stdv_min)
+            FLAG_TO_CONF('w', atof, win_len)
             #ifdef DEBUG_OUT
             FLAG_TO_CONF('D', std::string, dbg_prefix);
             #endif
