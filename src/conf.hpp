@@ -65,6 +65,7 @@ class Conf {
 
     Mapper::Params &mapper_prms = Mapper::PRMS;
     EventDetector::Params &event_prms = mapper_prms.event_prms;
+    EventProfiler::Params &evt_prof_prms = mapper_prms.evt_prof_prms;
     SeedTracker::Params &seed_prms = mapper_prms.seed_prms;
 
     ReadBuffer::Params &read_prms = ReadBuffer::PRMS;
@@ -206,6 +207,14 @@ class Conf {
             GET_TOML_EXTERN(subconf, float, peak_height, event_prms);
             GET_TOML_EXTERN(subconf, u32, window_length1, event_prms);
             GET_TOML_EXTERN(subconf, u32, window_length2, event_prms);
+        }
+
+        if (conf.contains("event_profiler")) {
+            const auto subconf = toml::find(conf, "event_profiler");
+            GET_TOML_EXTERN(subconf, u32, n, evt_prof_prms);
+            GET_TOML_EXTERN(subconf, float, win_stdv_min, evt_prof_prms);
+            GET_TOML_EXTERN(subconf, float, win_stdv_range, evt_prof_prms);
+            GET_TOML_EXTERN(subconf, float, win_mean_range, evt_prof_prms);
         }
 
     }

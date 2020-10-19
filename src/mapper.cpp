@@ -310,14 +310,11 @@ u16 Mapper::process_chunk() {
             //#ifdef DEBUG_EVENTS
             //events_.push_back(evdt_.get_event());
             //#endif
-            
-            //auto evt = evt_prof_.add_event(evdt_.get_event());
-            //if () {
-            //}
+            //
+            auto evt = evt_prof_.next_event(evdt_.get_event());
+            if (evt.length == 0) continue;
 
-            auto mean = evdt_.get_mean();
-
-            if (!norm_.push(mean)) {
+            if (!norm_.push(evt.mean)) {
 
                 u32 nskip = norm_.skip_unread(nevents);
                 skip_events(nskip);
@@ -326,13 +323,14 @@ u16 Mapper::process_chunk() {
                           << read_.get_id() << " "
                           << nskip << "\n";
 
-                if (!norm_.push(mean)) {
+                if (!norm_.push(evt.mean)) {
                     map_time_ += map_timer_.lap();
 
                     chunk_mtx_.unlock();
                     return nevents;
                 }
             }
+
             nevents++;
         }
     }

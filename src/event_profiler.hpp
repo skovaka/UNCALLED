@@ -32,6 +32,7 @@ class EventProfiler {
 
     void reset() {
         window_.reset();
+        events_.clear();
     }
 
     void set_norm(float scale, float shift) {
@@ -39,8 +40,11 @@ class EventProfiler {
         norm_shift_ = shift;
     }
 
-    bool add_event(Event e) {
+    Event next_event(Event e) {
         window_.push(e.mean);
+        events_.push_back(e);
+
+        Event evt_out{0,0,0,0};
 
         //TODO store midpoint
         //need to decide between "radius" or enforce odd
@@ -48,17 +52,18 @@ class EventProfiler {
 
             //TODO reverse-normalize thresholds
             //float win_mean = norm_scale_ * window_.get_mean() + norm_shift_;
-            float win_stdv = norm_scale_ * window_.get_stdv() + norm_shift_;
+            //float win_stdv = norm_scale_ * window_.get_stdv() + norm_shift_;
+            float win_stdv = window_.get_stdv();
             
             //TODO dynamic range bounds?
-            if (win_stdv < PRMS.win_stdv_min) {
-                return false;
+            if (win_stdv >= PRMS.win_stdv_min) {
+                evt_out = events_.front();
             }
+            events_.pop_front();
+            window_.pop();
         }
 
-        events_.push_back(e);
-
-        return true;
+        return evt_out;
     }
 
     Event pop_event() {
