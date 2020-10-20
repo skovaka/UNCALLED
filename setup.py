@@ -84,6 +84,7 @@ uncalled = Extension(
     "_uncalled",
 
     sources = [
+       "src/event_profiler.cpp", 
        "src/pybinder.cpp",
        "src/client_sim.cpp",
        "src/fast5_reader.cpp",

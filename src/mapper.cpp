@@ -870,9 +870,11 @@ void Mapper::dbg_open_all() {
             << "length\t"
             << "mean\t"
             << "stdv\t"
-            << "scale\t"
-            << "shift\t"
-            << "mask\n";
+            << "norm_scale\t"
+            << "norm_shift\t"
+            << "win_mean\t"
+            << "win_stdv\t"
+            << "win_mask\n";
         #endif
 
         dbg_opened_ = true;

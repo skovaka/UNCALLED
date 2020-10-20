@@ -144,6 +144,10 @@ class DebugParser:
         self.events = list()
         self.norms = list()
 
+        self.win_means = list()
+        self.win_stdvs = list()
+        self.mask = list()
+
         self.max_samp = None
 
         e = 0
@@ -155,8 +159,9 @@ class DebugParser:
                 continue
                 
             tabs = line.split()
-            st,ln = map(int, tabs[:2])
-            mn,sd,sc,sh = map(float, tabs[2:])
+            st,ln,mask = map(int, tabs[:2] + tabs[-1:])
+            mn,sd,norm_sc,norm_sh,win_mn,win_sd = map(float, tabs[2:-1])
+
             
             #Set template start if samp provied
             if (self.tmplst_samp is not None and
@@ -173,7 +178,11 @@ class DebugParser:
                 self.max_samp = st+ln
 
             self.events.append( (st,ln,mn,sd) )
-            self.norms.append( (sc,sh) )
+            self.norms.append( (norm_sc,norm_sh) )
+
+            self.win_means.append(win_mn)
+            self.win_stdvs.append(win_sd)
+            self.mask.append(mask)
 
             e += 1
 
@@ -187,6 +196,10 @@ class DebugParser:
             self.max_samp = st+ln
 
         self.evts_loaded = True
+
+        self.win_means = np.array(self.win_means)
+        self.win_stdvs = np.array(self.win_stdvs)
+        self.mask = np.array(self.mask)
 
         return True
 
