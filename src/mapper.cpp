@@ -198,6 +198,7 @@ void Mapper::new_read(ReadBuffer &r) {
     read_.clear();//TODO: probably shouldn't auto erase previous read
     read_.swap(r);
     reset();
+    dbg_open_all();
 }
 
 
@@ -228,6 +229,10 @@ void Mapper::reset() {
     wait_time_ = 0;
 
     dbg_close_all();
+
+    #ifdef DEBUG_EVENTS
+    dbg_events_.clear();
+    #endif
 
     #ifdef DEBUG_CONFIDENCE
     confident_mapped_ = false;
@@ -298,6 +303,7 @@ u16 Mapper::process_chunk() {
         !chunk_mtx_.try_lock()) return 0; 
 
     if (read_.chunk_count() == 1) {
+        dbg_open_all();
         read_.loc_.set_float(Paf::Tag::QUEUE_TIME, map_timer_.lap());
     }
 
@@ -307,14 +313,21 @@ u16 Mapper::process_chunk() {
     for (u32 i = 0; i < read_.chunk_.size(); i++) {
         if (evdt_.add_sample(read_.chunk_[i])) {
 
-            //#ifdef DEBUG_EVENTS
-            //events_.push_back(evdt_.get_event());
-            //#endif
-            //
-            auto evt = evt_prof_.next_event(evdt_.get_event());
-            if (evt.length == 0) continue;
+            //Add event to profiler
+            //Returns true if next event is not masked
+            evt_prof_.add_event(evdt_.get_event());
+            
+            #ifdef DEBUG_EVENTS
+            if (evt_prof_.is_full()) {
+                dbg_events_.emplace_back(evt_prof_.anno_event());
+            }
+            #endif
 
-            if (!norm_.push(evt.mean)) {
+            if (!evt_prof_.event_ready()) continue;
+
+            auto evt_mean = evt_prof_.next_mean();
+
+            if (!norm_.push(evt_mean)) {
 
                 u32 nskip = norm_.skip_unread(nevents);
                 skip_events(nskip);
@@ -323,7 +336,7 @@ u16 Mapper::process_chunk() {
                           << read_.get_id() << " "
                           << nskip << "\n";
 
-                if (!norm_.push(evt.mean)) {
+                if (!norm_.push(evt_mean)) {
                     map_time_ += map_timer_.lap();
 
                     chunk_mtx_.unlock();
@@ -335,6 +348,7 @@ u16 Mapper::process_chunk() {
         }
     }
 
+    dbg_events_out();
 
     read_.chunk_.clear();
 
@@ -414,9 +428,6 @@ bool Mapper::map_next() {
         return true;
     }
 
-    dbg_open_all();
-
-    dbg_events_out();
 
     float event = norm_.pop();
 
@@ -860,7 +871,8 @@ void Mapper::dbg_open_all() {
             << "mean\t"
             << "stdv\t"
             << "scale\t"
-            << "shift\n";
+            << "shift\t"
+            << "mask\n";
         #endif
 
         dbg_opened_ = true;
@@ -903,16 +915,23 @@ void Mapper::dbg_close_all() {
 
 void Mapper::dbg_events_out() {
     #ifdef DEBUG_EVENTS
-    assert(!events_.empty());
-    auto &e = events_.front();
-    events_out_ 
-        << e.start << "\t"
-        << e.length << "\t"
-        << e.mean << "\t"
-        << e.stdv << "\t"
-        << norm_.get_scale() << "\t"
-        << norm_.get_shift() << "\n";
-    events_.pop_front();
+    while(!dbg_events_.empty()) {
+        auto e = dbg_events_.front();
+        //auto evt = std::get<0>(dbg_events_.front());
+        //auto mask = std::get<1>(dbg_events_.front());
+        events_out_ 
+            << e.evt.start << "\t"
+            << e.evt.length << "\t"
+            << e.evt.mean << "\t"
+            << e.evt.stdv << "\t"
+            << norm_.get_scale() << "\t"
+            << norm_.get_shift() << "\t"
+            << e.win_mean << "\t"
+            << e.win_stdv << "\t"
+            << e.mask << "\n";
+        dbg_events_.pop_front();
+    }
+
     events_out_.flush();
     #endif
 }

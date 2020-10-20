@@ -4,17 +4,32 @@
 #include "event_detector.hpp"
 #include "normalizer.hpp"
 
+typedef struct {
+    Event evt;
+    float win_mean;
+    float win_stdv;
+    u32 mask;
+} AnnoEvent;
+
 class EventProfiler {
 
     private:
     float norm_scale_{1}, 
           norm_shift_{0};
-    Normalizer window_;
+
+    Event next_evt_{0};
+    float win_mean_, win_stdv_;
+
     std::deque<Event> events_;
+    Normalizer window_;
+
+    bool next_mask_{false}, is_full_{false};
+    u32 to_mask_;
+    const u32 WIN_MID;
 
     public: 
     typedef struct Params {
-        u32 win_len;
+        u32 win_len, slop;
         float win_stdv_min;
         float win_stdv_range;
         float win_mean_range;
@@ -24,15 +39,21 @@ class EventProfiler {
 
     Params PRMS;
 
-    EventProfiler() : PRMS(PRMS_DEF) {};
+    EventProfiler() : EventProfiler(PRMS_DEF) {};
 
-    EventProfiler(Params p) : PRMS(p) {
+    EventProfiler(Params p) : 
+        WIN_MID(p.win_len / 2),
+        PRMS(p) {
         window_.set_length(PRMS.win_len);
     }
 
     void reset() {
         window_.reset();
         events_.clear();
+        next_evt_ = {0};
+        is_full_ = false;
+        //next_mask_ = false;
+        to_mask_ = 0;
     }
 
     void set_norm(float scale, float shift) {
@@ -40,36 +61,55 @@ class EventProfiler {
         norm_shift_ = shift;
     }
 
-    Event next_event(Event e) {
+    bool add_event(Event e) {
         window_.push(e.mean);
         events_.push_back(e);
 
-        Event evt_out{0,0,0,0};
+        if (window_.unread_size() <= WIN_MID) return false;
 
-        //TODO store midpoint
-        //need to decide between "radius" or enforce odd
-        if (window_.unread_size() >= PRMS.win_len / 2) {
-
-            //TODO reverse-normalize thresholds
-            //float win_mean = norm_scale_ * window_.get_mean() + norm_shift_;
-            //float win_stdv = norm_scale_ * window_.get_stdv() + norm_shift_;
-            float win_stdv = window_.get_stdv();
-            
-            //TODO dynamic range bounds?
-            if (win_stdv >= PRMS.win_stdv_min) {
-                evt_out = events_.front();
-            }
-            events_.pop_front();
-            window_.pop();
+        //float win_stdv = norm_scale_ * window_.get_stdv() + norm_shift_;
+        win_mean_ = window_.get_mean();
+        win_stdv_ = window_.get_stdv();
+        if (win_stdv_ < PRMS.win_stdv_min) {
+            to_mask_ = PRMS.win_len-1;
+        } else if (to_mask_ > 0) {
+            to_mask_--;
         }
 
-        return evt_out;
+        //TODO dynamic range bounds?
+
+        if (window_.full()) {
+            next_evt_ = events_.front();
+            events_.pop_front();
+            window_.pop();
+            is_full_ = true;
+        }
+        //window_.pop();
+
+        return event_ready();
     }
 
-    Event pop_event() {
-        Event e = events_.front();
-        events_.pop_front();
-        return e;
+    //TODO store midpoint
+    //need to decide between "radius" or enforce odd
+    bool is_full() {
+        return is_full_;
+    }
+
+    bool event_ready() {
+        return is_full_ && to_mask_ == 0;
+    }
+
+    AnnoEvent anno_event() {
+        return {
+            next_evt_, 
+            win_mean_, 
+            win_stdv_, 
+            event_ready()
+        };
+    }
+
+    float next_mean() {
+        return next_evt_.mean;
     }
 
     //#ifdef PYBIND

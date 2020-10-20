@@ -252,7 +252,7 @@ class Mapper {
 
     #ifdef DEBUG_EVENTS
     std::ofstream events_out_;
-    std::deque<Event> events_;
+    std::deque<AnnoEvent> dbg_events_;
     void dbg_events_open();
     #endif
 
