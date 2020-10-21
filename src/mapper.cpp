@@ -626,7 +626,7 @@ bool Mapper::map_next() {
 
         #ifdef DEBUG_CONFIDENCE
         if (!confident_mapped_) {
-            read_.loc_.set_int(Paf::Tag::CONFIDENT_EVENT, event_i_);
+            read_.loc_.set_int(Paf::Tag::CONFIDENT_EVENT, evt_prof_.mask_idx_map_[event_i_]);
             confident_mapped_ = true;
             #endif
 
@@ -963,7 +963,7 @@ void Mapper::dbg_seeds_out(const PathBuffer &path, u32 clust, u64 ref_end, u32 e
                << ((rf_st + path.move_count() + KLEN) - 1) << "\t"
 
                //name field
-               << evt_end << ":"
+               << evt_prof_.mask_idx_map_[evt_end] << ":"
                << path.id_ << ":"
                << clust << "\t"
 
@@ -979,15 +979,16 @@ void Mapper::dbg_paths_out() {
     for (u32 i = 0; i < prev_size_; i++) {
         auto &p = prev_paths_[i];
 
+        u32 evt = evt_prof_.mask_idx_map_[event_i_];
 
-        paths_out_ << event_i_ << ":" 
+        paths_out_ << evt << ":" 
                    << p.id_ << "\t";
 
         if (p.parent_ < PRMS.max_paths) {
-            paths_out_ << (event_i_-1) << ":" 
+            paths_out_ << evt_prof_.mask_idx_map_[event_i_-1] << ":" 
                        << p.parent_ << "\t";
         } else {
-            paths_out_ << event_i_ << ":" 
+            paths_out_ << evt << ":" 
                        << p.id_ << "\t";
         }
 

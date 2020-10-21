@@ -23,6 +23,8 @@ class EventProfiler {
     std::deque<Event> events_;
     Normalizer window_;
 
+    u32 total_count_{0};
+
     bool next_mask_{false}, is_full_{false};
     u32 to_mask_;
     const u32 WIN_MID;
@@ -39,6 +41,8 @@ class EventProfiler {
 
     Params PRMS;
 
+    std::vector<u32> mask_idx_map_;
+
     EventProfiler() : EventProfiler(PRMS_DEF) {};
 
     EventProfiler(Params p) : 
@@ -52,8 +56,11 @@ class EventProfiler {
         events_.clear();
         next_evt_ = {0};
         is_full_ = false;
-        //next_mask_ = false;
         to_mask_ = 0;
+        
+        //TODO only in debug mode?
+        mask_idx_map_.clear();
+        total_count_ = 0;
     }
 
     void set_norm(float scale, float shift) {
@@ -64,6 +71,7 @@ class EventProfiler {
     bool add_event(Event e) {
         window_.push(e.mean);
         events_.push_back(e);
+        
 
         if (window_.unread_size() <= WIN_MID) return false;
 
@@ -83,6 +91,12 @@ class EventProfiler {
             events_.pop_front();
             window_.pop();
             is_full_ = true;
+
+            //TODO only in debug mode?
+            if (to_mask_ == 0) {
+                mask_idx_map_.push_back(total_count_);
+            }
+            total_count_ += 1;//TODO only in debug mode?
         }
         //window_.pop();
 
