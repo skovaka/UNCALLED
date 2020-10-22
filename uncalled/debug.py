@@ -60,6 +60,9 @@ class DebugParser:
         self.max_clust_len = None
         self.max_clust_ref = None #TODO name span?
 
+        self.conf_pbs = dict()
+        self.dots = set()
+
         self.evts_loaded = False
         if load_events:
             self.evts_in = open(prefix + self.rid + "_events.tsv")
@@ -105,7 +108,8 @@ class DebugParser:
                 self.chunk_evt_bounds.append(evt)
 
             if chunk < self.chunk_st: continue
-            if self.chunk_en is not None and chunk >= self.chunk_en: break
+            if self.chunk_en is not None and chunk >= self.chunk_en: 
+                break
             
             self.events.append( (st,ln,mn,sd) )
             self.norms.append( (norm_sc,norm_sh) )
@@ -122,8 +126,8 @@ class DebugParser:
 
             evt += 1
 
-            if self.samp_en:
-                break
+            #if self.samp_en:
+            #    break
 
         if self.max_evt is None or self.max_evt >= evt: 
             self.max_evt = evt
@@ -177,6 +181,7 @@ class DebugParser:
 
             if clust.id == self.conf_cid:
                 conf_clust = clust
+                self.conf_pbs[(evt,pb)] = st
 
             if clust > self.max_clust:
                 self.max_clust = clust
@@ -245,23 +250,36 @@ class DebugParser:
         for line in self.paths_in:
             tabs = line.split()
             path_id   =       tabs[C['id']]
-            parent    =       tabs[C['parent']]
-            fm_start  =   int(tabs[C['fm_start']])
-            fm_len    =   int(tabs[C['fm_len']])
-            kmer      =       tabs[C['kmer']]
-            full_len  =   int(tabs[C['full_len']])
-            seed_prob = float(tabs[C['seed_prob']])
-            moves     =       tabs[C['moves']]
-            evt, buf_id = map(int, path_id.split(':'))
+            evt, pb = map(int, path_id.split(':'))
+
+            ref_st = self.conf_pbs.get((evt,pb), None)
+            if ref_st is None: continue
+            moves = [bool(c=='1') for c in tabs[C['moves']]]
+
+            evts = np.arange(evt-len(moves), evt) + 1
+            refs = ref_st + np.cumsum(moves)
+
+            if not self.conf_clust.fwd:
+                refs = reversed(refs)
+
+            for e,r in zip(evts,refs):
+                self.dots.add((e,r))
+
+            #parent    =       tabs[C['parent']]
+            #fm_start  =   int(tabs[C['fm_start']])
+            #fm_len    =   int(tabs[C['fm_len']])
+            #kmer      =       tabs[C['kmer']]
+            #full_len  =   int(tabs[C['full_len']])
+            #seed_prob = float(tabs[C['seed_prob']])
 
             #print(path_id,parent,fm_start,fm_len,kmer,full_len,seed_prob,moves)
 
-            #Store number of paths at each event position
-            while len(path_counts) - 1 < evt:
-                path_counts.append(0)
-            path_counts[-1] += 1
+        #    #Store number of paths at each event position
+        #    while len(path_counts) - 1 < evt:
+        #        path_counts.append(0)
+        #    path_counts[-1] += 1
 
-        self.paths_loaded = True
+        #self.paths_loaded = True
 
         return True
 
