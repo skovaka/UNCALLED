@@ -29,6 +29,7 @@ class DebugParser:
         #(conf_evt is where mapping would normally end)
         self.conf_cid = paf.tags.get('sc', (None,)*2)[0]
         self.conf_evt = paf.tags.get('ce', (None,)*2)[0]
+        self.conf_samp = None
 
         self.chunk_st = chunk_start
         self.samp_st = self.chunk_st * SAMPLE_RATE
@@ -58,10 +59,12 @@ class DebugParser:
         self.max_clust = None
 
         self.max_clust_len = None
+        self.min_clust_ref = None #TODO name span?
         self.max_clust_ref = None #TODO name span?
 
         self.conf_pbs = dict()
         self.dots = set()
+        self.conf_ref_bounds = None
 
         self.evts_loaded = False
         if load_events:
@@ -106,6 +109,11 @@ class DebugParser:
                 chunk += 1
                 next_chunk_samp += CHUNK_LEN
                 self.chunk_evt_bounds.append(evt)
+
+            if (self.conf_evt is not None and 
+                self.conf_samp is None and 
+                evt == self.conf_evt):
+                self.conf_samp = st
 
             if chunk < self.chunk_st: continue
             if self.chunk_en is not None and chunk >= self.chunk_en: 
@@ -181,7 +189,10 @@ class DebugParser:
 
             if clust.id == self.conf_cid:
                 conf_clust = clust
-                self.conf_pbs[(evt,pb)] = st
+                if clust.fwd:
+                    self.conf_pbs[(evt,pb)] = st
+                else:
+                    self.conf_pbs[(evt,pb)] = -en
 
             if clust > self.max_clust:
                 self.max_clust = clust
@@ -204,6 +215,7 @@ class DebugParser:
         self.conf_idx = np.searchsorted(cc.evts, self.conf_evt, side='right')-1
         self.conf_len = cc.lens[self.conf_idx]
 
+
         #TODO use cc.evrf_ratio(e,r)
         evt_span = self.conf_evt - cc.evt_st
 
@@ -214,20 +226,22 @@ class DebugParser:
         self.max_idx = np.searchsorted(cc.evts, self.max_evt, side='right')-1
 
         if cc.fwd:
-            rst = cc.rsts[0]
+            rst = cc.rsts[0] - SEED_LEN
             ren = cc.rens[self.max_idx]+1
         else:
-            rst = cc.rsts[self.max_idx]
-            ren = cc.rens[0]+1
+            rst = -cc.rsts[0] - SEED_LEN
+            ren = -cc.rens[self.max_idx]-1
+            #rst = cc.rsts[self.max_idx]
+            #ren = cc.rens[0]+1
 
         ref_span = ren-rst
-        self.evrf_ratio = evt_span / ref_span
+        self.evrf_ratio = (self.max_evt) / ref_span
 
         #self.max_clust_len = int(np.round(self.max_evt / self.evrf_ratio))
         self.max_clust_len = cc.lens[self.max_idx]
 
-        self.min_ref = rst
-        self.max_clust_ref = rst+int(np.round(self.max_evt / self.evrf_ratio))
+        self.min_clust_ref = rst
+        self.max_clust_ref = rst + (self.max_evt / self.evrf_ratio)
 
     #finds clusters that should expire
     #by the end of loaded events
@@ -254,16 +268,20 @@ class DebugParser:
 
             ref_st = self.conf_pbs.get((evt,pb), None)
             if ref_st is None: continue
+
             moves = [bool(c=='1') for c in tabs[C['moves']]]
 
+            #if not self.conf_clust.fwd:
+            #    moves = np.flip(moves)
+                #refs = reversed(-refs)
+
             evts = np.arange(evt-len(moves), evt) + 1
+            #refs = np.cumsum(moves)
             refs = ref_st + np.cumsum(moves)
 
-            if not self.conf_clust.fwd:
-                refs = reversed(refs)
-
             for e,r in zip(evts,refs):
-                self.dots.add((e,r))
+                if e < self.max_evt:
+                    self.dots.add((e,r))
 
             #parent    =       tabs[C['parent']]
             #fm_start  =   int(tabs[C['fm_start']])
@@ -293,7 +311,7 @@ class SeedCluster:
         self.id = cid
         self.rf = rf
         self.evts = [evt]
-        self.blocks = [(st, en)]
+        self.blocks = [(st, en)] #TODO only use rsts?
         self.gains = [en-st]
 
         self.rsts = [st] #TODO consider strand
@@ -316,7 +334,6 @@ class SeedCluster:
         #        ))
         #    return True
         #return False
-
 
     def add_gain(self, gain):
         self.gains.append(gain)
@@ -363,12 +380,17 @@ class SeedCluster:
         return (self.evts[j] - self.evt_st+1) / self.lens[i]
 
     def __str__(self):
-        return "%s\t%d\t%d\t%d\t%d" % (
-                self.rf,
+        MAX_REF = 22
+        if len(self.rf) < MAX_REF:
+            ref = self.rf
+        else:
+            ref = self.rf[:MAX_REF] + "."
+
+        return "%s:%d-%d (%s)" % (
+                ref,
                 self.blocks[0][0],
                 self.blocks[-1][1],
-                self.id,
-                len(self))
+                "+" if self.fwd else "-")
 
 
     #TODO bind confidence to len
