@@ -5,6 +5,7 @@
 #include "self_align_ref.hpp"
 #include "realtime_pool.hpp"
 #include "client_sim.hpp"
+#include "model_r94.inl"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -46,6 +47,26 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Normalizer> norm(m, "Normalizer");
     Normalizer::pybind_defs(norm);
 
+    py::class_< PoreModel<KLEN> > model(m, "PoreModel");
+    PoreModel<KLEN>::pybind_defs(model);
+    m.attr("pmodel_r94_template") = py::cast(pmodel_r94_template);
+    m.attr("pmodel_r94_complement") = py::cast(pmodel_r94_complement);
+    //py::object py_pmodel_r94_template = py::cast(
+    //(model_r94_means_stdvs, false);
+    //pmodel_r94_complement(model_r94_means_stdvs, true);
+
     m.def("self_align", &self_align);
+
+    //BP operation functions
+    m.def("kmer_count",    &kmer_count<KLEN>);
+    m.def("str_to_kmer",   &str_to_kmer<KLEN>);
+    m.def("kmer_comp",     &kmer_comp<KLEN>);
+    m.def("kmer_revcomp",  &kmer_revcomp<KLEN>);
+    m.def("kmer_head",     &kmer_head<KLEN>);
+    m.def("kmer_base",     &kmer_base<KLEN>);
+    m.def("kmer_to_str",   &kmer_to_str<KLEN>);
+    m.def("seq_to_kmers",  &seq_to_kmers<KLEN>);
+    m.def("kmer_neighbor", &kmer_neighbor<KLEN>);
+
 }
 

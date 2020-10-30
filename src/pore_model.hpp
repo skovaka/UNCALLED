@@ -45,8 +45,6 @@ class PoreModel {
     u16 kmer_count_;
     bool loaded_, complement_;
 
-    public:
-
     void init_stdv() {
         model_stdv_ = 0;
 
@@ -62,6 +60,8 @@ class PoreModel {
         lv_vars_x2_[k] = 2 * stdv * stdv;
         lognorm_denoms_[k] = log(sqrt(M_PI * lv_vars_x2_[k]));
     }
+
+    public:
 
     PoreModel() 
         :  loaded_(false) {
@@ -164,7 +164,8 @@ class PoreModel {
         return (-pow(samp - lv_means_[kmer], 2) / lv_vars_x2_[kmer]) - lognorm_denoms_[kmer];
     }
 
-    float match_prob(const Event &evt, u16 kmer) const {
+    //TODO should be able to overload
+    float match_prob_evt(const Event &evt, u16 kmer) const {
         return match_prob(evt.mean, kmer);
     }
 
@@ -183,6 +184,19 @@ class PoreModel {
     bool is_loaded() const {
         return loaded_;
     }
+
+    #ifdef PYBIND
+
+    #define PY_PORE_MODEL_METH(P) c.def(#P, &PoreModel<KLEN>::P);
+
+    static void pybind_defs(pybind11::class_<PoreModel<KLEN>> &c) {
+        PY_PORE_MODEL_METH(match_prob);
+        PY_PORE_MODEL_METH(get_means_mean);
+        PY_PORE_MODEL_METH(get_means_stdv);
+        PY_PORE_MODEL_METH(get_mean);
+    }
+
+    #endif
 };
 
 #endif

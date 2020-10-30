@@ -161,6 +161,8 @@ class Mapper {
         u8 move_count() const;
         u8 stay_count() const;
 
+        float prob_head() const;
+
         void free_buffers();
         void print() const;
 

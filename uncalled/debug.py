@@ -5,6 +5,8 @@ import numpy as np
 import argparse
 import bisect
 from scipy.stats import linregress
+from file_read_backwards import FileReadBackwards
+from collections import defaultdict
 
 SEED_LEN = 22
 MIN_CLUST = 25
@@ -63,7 +65,8 @@ class DebugParser:
         self.max_clust_ref = None #TODO name span?
 
         self.conf_pbs = dict()
-        self.dots = set()
+        self.dots = defaultdict(int)
+        self.seed_kmers = dict()
         self.conf_ref_bounds = None
 
         self.evts_loaded = False
@@ -79,7 +82,8 @@ class DebugParser:
         #TODO: paths
         self.paths_loaded = False
         if load_paths:
-            self.paths_in  = open(prefix + self.rid + "_paths.tsv")
+            #self.paths_in  = open(prefix + self.rid + "_paths.tsv")
+            self.paths_fname = prefix + self.rid + "_paths.tsv"
             self.parse_paths()
 
     def parse_events(self, incl_norm=True):
@@ -190,8 +194,10 @@ class DebugParser:
             if clust.id == self.conf_cid:
                 conf_clust = clust
                 if clust.fwd:
+                    #self.conf_pbs[(evt,pb)] = en
                     self.conf_pbs[(evt,pb)] = st
                 else:
+                    #self.conf_pbs[(evt,pb)] = -st
                     self.conf_pbs[(evt,pb)] = -en
 
             if clust > self.max_clust:
@@ -258,35 +264,52 @@ class DebugParser:
 
         path_counts = list()
 
-        head_tabs = self.paths_in.readline().split()
+        paths_fwd = open(self.paths_fname)
+        head_tabs = paths_fwd.readline().split()
         C = {head_tabs[i] : i for i in range(len(head_tabs))}
 
-        for line in self.paths_in:
-            tabs = line.split()
-            path_id   =       tabs[C['id']]
-            evt, pb = map(int, path_id.split(':'))
+        #paths_fwd.close()
+        #paths_rev = FileReadBackwards(self.paths_fname)
+        #for line in paths_rev:
 
-            ref_st = self.conf_pbs.get((evt,pb), None)
+        for line in paths_fwd:
+            tabs = line.split()
+            if tabs[0] == head_tabs[0]: continue
+            path_id  = tuple(map(int, tabs[C['id']].split(':')))
+
+            ref_st = self.conf_pbs.get(path_id, None)
             if ref_st is None: continue
+
+            evt, pb = path_id
 
             moves = [bool(c=='1') for c in tabs[C['moves']]]
 
-            #if not self.conf_clust.fwd:
-            #    moves = np.flip(moves)
-                #refs = reversed(-refs)
+            if (evt < self.min_evt or 
+                evt >= self.max_evt or
+                not self.evt_mask[evt-len(moves)]): continue
+
+            #parent = tuple(map(int, tabs[C['parent']].split(':')))
+            #coord = (evt,ref_en)
+            #prob = float(tabs[C['match_prob']])
+            #self.dots[coord] = min(prob, self.dots[coord])
+            #ref_prev = ref_en - moves[0]
+            #self.conf_pbs[parent] = ref_prev
 
             evts = np.arange(evt-len(moves), evt) + 1
-            #refs = np.cumsum(moves)
-            refs = ref_st + np.cumsum(moves)
+            refs = ref_st + np.cumsum(np.flip(moves))
+
+            #evts = [evt]
+            #refs = [refs[-1]]
 
             for e,r in zip(evts,refs):
                 if e < self.max_evt:
-                    self.dots.add((e,r))
+                    self.dots[(e,r)] = True
 
-            #parent    =       tabs[C['parent']]
+            kmer      =       tabs[C['kmer']]
+            self.seed_kmers[(evt, refs[-1])] = kmer
+
             #fm_start  =   int(tabs[C['fm_start']])
             #fm_len    =   int(tabs[C['fm_len']])
-            #kmer      =       tabs[C['kmer']]
             #full_len  =   int(tabs[C['full_len']])
             #seed_prob = float(tabs[C['seed_prob']])
 

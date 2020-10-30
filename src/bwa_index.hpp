@@ -176,6 +176,35 @@ class BwaIndex {
         return index_->seq_len;
     }
 
+    int get_rid(u64 sa_loc) {
+        return bns_pos2rid(bns_, sa_loc);
+    }
+
+    std::pair<int, u32> get_ref_coord(u64 sa_loc) {
+        int rid = get_rid(sa_loc);
+        return {
+            rid, 
+            sa_loc - bns_->anns[rid].offset
+        };
+    }
+
+    std::string get_ref_name(int rid) {
+        return std::string(bns_->anns[rid].name);
+    }
+
+    u64 get_ref_len(int rid) {
+        return bns_->anns[rid].len;
+    }
+
+    u64 get_sa_loc(const std::string &name, u64 coord) {
+        for (int i = 0; i < bns_->n_seqs; i++) {
+            if (strcmp(bns_->anns[i].name, name.c_str()) == 0) {
+                return bns_->anns[i].offset + coord;
+            }
+        }
+        return 0;
+    }
+
     u64 translate_loc(u64 sa_loc, std::string &ref_name, u64 &ref_loc) const {
         i32 rid = bns_pos2rid(bns_, sa_loc);
         if (rid < 0) return 0;
@@ -246,6 +275,11 @@ class BwaIndex {
         PY_BWA_INDEX_METH(coord_to_sa);
         PY_BWA_INDEX_METH(pacseq_loaded);
         PY_BWA_INDEX_METH(get_base);
+        PY_BWA_INDEX_METH(get_rid);
+        PY_BWA_INDEX_METH(get_sa_loc);
+        PY_BWA_INDEX_METH(get_ref_coord);
+        PY_BWA_INDEX_METH(get_ref_name);
+        PY_BWA_INDEX_METH(get_ref_len);
     }
 
     #endif

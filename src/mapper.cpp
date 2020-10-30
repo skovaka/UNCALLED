@@ -796,6 +796,11 @@ u8 Mapper::PathBuffer::stay_count() const {
     //return path_type_counts_[EVENT_MOVE];
 }
 
+float Mapper::PathBuffer::prob_head() const {
+    return prob_sums_[length_] - prob_sums_[length_-1];
+
+}
+
 u8 Mapper::PathBuffer::move_count() const {
     return __builtin_popcount(event_moves_);
     //return path_type_counts_[EVENT_MOVE];
@@ -859,7 +864,7 @@ void Mapper::dbg_open_all() {
             << "fm_len\t"
             << "kmer\t"
             << "full_len\t"
-            << "seed_prob\t"
+            << "match_prob\t"
             << "moves\n";
         #endif
 
@@ -943,12 +948,14 @@ void Mapper::dbg_seeds_out(const PathBuffer &path, u32 clust, u64 ref_end, u32 e
 
     //TODO de-duplicate code
     //should be storing SA coordinate anyway
+    
+    //TODO clearly deliniate fm_coord, sa_coord(fw/rv), pacseq_coord, ann_coord
 
     bool fwd = ref_end < fmi.size() / 2;
 
     u64 sa_st;
-    if (fwd) sa_st = ref_end - path.move_count() + 1;
-    else     sa_st = fmi.size() - (ref_end + KLEN - 1);
+    if (fwd) sa_st = ref_end - (path.move_count() + KLEN);
+    else     sa_st = fmi.size() - ref_end;
 
     std::string rf_name;
     u64 rf_st = 0;
@@ -1004,7 +1011,8 @@ void Mapper::dbg_paths_out() {
 
         paths_out_ 
             << p.total_move_len_ << "\t"
-            << p.seed_prob_ << "\t";
+            << p.prob_head() << "\t";
+
 
         if (p.is_valid()) {
             for (u32 i = 0; i < p.length_; i++) {

@@ -145,5 +145,4 @@ std::vector<u16> seq_to_kmers(u8 *seq, u64 st, u64 en) {
     return ret;
 }
 
-
 #endif
