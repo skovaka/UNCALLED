@@ -235,6 +235,7 @@ class Mapper {
     void dbg_seeds_out(const PathBuffer &path, u32 clust, u64 ref_end, u32 evt_end);
     void dbg_paths_out();
     void dbg_events_out();
+    void dbg_conf_out();
 
     //Debug helper functions and variables
     #ifdef DEBUG_OUT
@@ -259,6 +260,7 @@ class Mapper {
     #endif
 
     #ifdef DEBUG_CONFIDENCE
+    std::ofstream conf_out_;
     bool confident_mapped_;
     #endif
 };

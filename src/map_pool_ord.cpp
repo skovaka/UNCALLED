@@ -71,7 +71,6 @@ std::vector<Paf> MapPoolOrd::update() {
         //Skip the read if the mapper has finished
         //It will be removed from the queue below
         if (pool_.is_read_finished(channels_[i].front())) {
-            //chunk_idx_[i] = channels_[i].front().chunk_count();
             continue;
         }
 

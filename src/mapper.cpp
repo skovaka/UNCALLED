@@ -646,6 +646,8 @@ bool Mapper::map_next() {
         #endif
     }
 
+    dbg_conf_out();
+
     //Update event index
     event_i_++;
 
@@ -664,11 +666,14 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
 
         //Reverse the reference coords so they both go L->R
         //TODO: store in buffer, replace sa_checked
-        u64 ref_en = fmi.size() - fmi.sa(s) + 1;
+        u64 ref_en = fmi.size() - fmi.sa(s) - 1;
 
         //Add seed and store updated seed cluster
-        auto clust = 
-            seed_tracker_.add_seed(ref_en, path.move_count(), event_i_ - path_ended);
+        auto clust = seed_tracker_.add_seed(
+            ref_en, 
+            path.move_count(), 
+            event_i_ - path_ended
+        );
 
         #ifdef DEBUG_SEEDS
         dbg_seeds_out(path, clust.id_, ref_en, event_i_ - path_ended);
@@ -882,6 +887,12 @@ void Mapper::dbg_open_all() {
             << "win_mask\n";
         #endif
 
+        #ifdef DEBUG_CONFIDENCE
+        dbg_open(conf_out_, "_conf.tsv");
+        conf_out_ << "top_conf\t"
+                  << "mean_conf\n";
+        #endif
+
         dbg_opened_ = true;
     }
     #endif
@@ -915,8 +926,22 @@ void Mapper::dbg_close_all() {
         if (events_out_.is_open()) events_out_.close();
         #endif
 
+        #ifdef DEBUG_CONFIDENCE
+        if (conf_out_.is_open()) conf_out_.close();
+        #endif
+
         dbg_opened_ = false;
     }
+    #endif
+}
+
+void Mapper::dbg_conf_out() {
+    #ifdef DEBUG_CONFIDENCE
+    if (seed_tracker_.empty() || seed_tracker_.get_top_conf() == 0) return;
+    conf_out_ << evt_prof_.mask_idx_map_[event_i_] << "\t"
+              << seed_tracker_.get_best().id_ << "\t"
+              << seed_tracker_.get_top_conf() << "\t"
+              << seed_tracker_.get_mean_conf() << "\n";
     #endif
 }
 
@@ -954,8 +979,8 @@ void Mapper::dbg_seeds_out(const PathBuffer &path, u32 clust, u64 ref_end, u32 e
     bool fwd = ref_end < fmi.size() / 2;
 
     u64 sa_st;
-    if (fwd) sa_st = ref_end - (path.move_count() + KLEN);
-    else     sa_st = fmi.size() - ref_end;
+    if (fwd) sa_st = ref_end - path.move_count() - KLEN + 1;
+    else     sa_st = fmi.size() - ref_end - KLEN + 1;
 
     std::string rf_name;
     u64 rf_st = 0;
@@ -967,7 +992,7 @@ void Mapper::dbg_seeds_out(const PathBuffer &path, u32 clust, u64 ref_end, u32 e
 
     seeds_out_ << rf_name << "\t"
                << rf_st << "\t"
-               << ((rf_st + path.move_count() + KLEN) - 1) << "\t"
+               << (rf_st + path.move_count() + KLEN - 1) << "\t"
 
                //name field
                << evt_prof_.mask_idx_map_[evt_end] << ":"

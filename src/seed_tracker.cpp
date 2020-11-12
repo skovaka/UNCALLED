@@ -51,6 +51,7 @@ SeedCluster::SeedCluster(Range ref_st, u32 evt_st)
 //      evt_st_(r.evt_st_),
 //      evt_en_(r.evt_en_),
 //      total_len_(r.total_len_) {}
+//
 
 u8 SeedCluster::update(SeedCluster &new_seed) {
     u8 growth = 0;
@@ -119,6 +120,10 @@ void SeedTracker::reset() {
     all_lens_.clear();
     max_map_ = NULL_ALN;
     len_sum_ = 0;
+}
+
+bool SeedTracker::empty() {
+    return seed_clusters_.empty();
 }
 
 SeedCluster SeedTracker::get_final() {
@@ -208,10 +213,7 @@ const SeedCluster &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
         auto hint = std::next(loc_match);
         seed_clusters_.erase(loc_match);
         ret = seed_clusters_.insert(hint, a);
-    }
-    //TODO: should definitely add else back in
-    //but need to recalibrate seed tracker
-    // else {
+    } else {
 
         all_lens_.insert(new_seed.total_len_);
         len_sum_ += new_seed.total_len_;
@@ -224,7 +226,7 @@ const SeedCluster &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
         new_seed.id_ = static_cast<u32>(seed_clusters_.size());
         #endif
         ret = seed_clusters_.insert(new_seed).first;
-    //}
+    }
 
     return *ret;
 }

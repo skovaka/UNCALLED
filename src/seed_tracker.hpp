@@ -96,6 +96,7 @@ class SeedTracker {
     SeedCluster get_best();
     float get_top_conf();
     float get_mean_conf();
+    bool empty();
 
     void reset();
 
