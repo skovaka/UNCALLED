@@ -13,17 +13,23 @@ MIN_CLUST = 25
 SAMPLE_RATE = 4000
 CHUNK_LEN = 4000
 
+MAX_CHUNK_DEF = 3
+
 class DebugParser:
     CONF_PAD_COEF = 2
 
     def __init__(self, 
                  prefix, 
                  paf, 
-                 chunk_start=0,
-                 chunk_count=None,
+                 min_chunk=None,
+                 max_chunk=None,
+                 min_samp=None,
+                 max_samp=None,
+                 tgt_cid=None,
                  load_seeds=True,
                  load_events=True,
-                 load_paths=True):
+                 load_paths=True,
+                 load_conf=True):
 
         self.rid = paf.qr_name
 
@@ -33,27 +39,51 @@ class DebugParser:
         self.conf_evt = paf.tags.get('ce', (None,)*2)[0]
         self.conf_samp = None
 
-        self.chunk_st = chunk_start
-        self.samp_st = self.chunk_st * SAMPLE_RATE
+        #if self.tgt_cid is None:
+        #    self.tgt_cid = self.conf_cid
 
-        #Set bounds based on argument
-        if chunk_count is not None:
-            self.chunk_en = chunk_start + chunk_count
-            self.samp_en = self.chunk_en * SAMPLE_RATE
-
-        #Set to constant if unmapped
-        elif self.conf_evt is None:
-            self.chunk_en = self.chunk_st + 3 #TODO store const
-            self.samp_en = self.chunk_en * SAMPLE_RATE
-
-        #If mapped, TBD in parse evts
+        if min_samp is None and min_chunk is None:
+            self.min_samp = self.min_chunk = 0
+        elif min_chunk is None:
+            self.min_samp = min_samp
+            self.min_chunk = (min_samp-1) // CHUNK_LEN
+        elif min_samp is None:
+            self.min_samp = self.min_chunk * SAMPLE_RATE
+            self.min_chunk = min_chunk
         else:
-            self.chunk_en = self.samp_en = None
+            self.min_samp = max(min_samp, min_chunk * SAMPLE_RATE)
+            self.min_chunk = max(min_chunk, (min_samp-1) // CHUNK_LEN)
+
+
+        if max_samp is None and max_chunk is None:
+            if self.conf_evt is None:
+                self.max_chunk = MAX_CHUNK_DEF
+                self.max_samp = self.max_chunk*SAMPLE_RATE
+            else:
+                self.max_chunk = self.max_samp = None
+
+        elif max_samp is None:
+            self.max_chunk = max_chunk
+            self.max_samp = max_chunk * SAMPLE_RATE
+
+        elif max_chunk is None:
+            self.max_chunk = max(0, (max_samp-1) // CHUNK_LEN)
+            self.max_samp = max_samp
+
+        else:
+            self.max_chunk = max(max_chunk, (max_samp-1) // CHUNK_LEN)
+            self.max_samp = max(max_samp, self.max_chunk * SAMPLE_RATE)
+
+        print(self.max_chunk, max_chunk, max_samp)
+
+        self.min_evt = 0 if self.min_samp == 0 else None
+        self.max_evt = None
 
         self.chunk_evt_bounds = [0]
 
-        self.min_evt = 0 if chunk_start == 0 else None
-        self.max_evt = None
+        #TODO below should be w/r/t reference coordinates?
+        #allow argument specified
+        #or detect based on confident cluster (or just specify seed cluster)
 
         #TBD in parse_seeds
         self.conf_len = None 
@@ -64,6 +94,7 @@ class DebugParser:
         self.min_clust_ref = None #TODO name span?
         self.max_clust_ref = None #TODO name span?
 
+        #TODO clean these up
         self.conf_pbs = dict()
         self.dots = defaultdict(int)
         self.seed_kmers = dict()
@@ -82,9 +113,13 @@ class DebugParser:
         #TODO: paths
         self.paths_loaded = False
         if load_paths:
-            #self.paths_in  = open(prefix + self.rid + "_paths.tsv")
             self.paths_fname = prefix + self.rid + "_paths.tsv"
             self.parse_paths()
+
+        self.conf_loaded = False
+        if load_conf:
+            self.conf_fname = prefix + self.rid + "_conf.tsv"
+            self.parse_conf()
 
     def parse_events(self, incl_norm=True):
         if self.evts_loaded: return False
@@ -104,23 +139,35 @@ class DebugParser:
         evt = 0
         chunk = 0
         next_chunk_samp = CHUNK_LEN
+
         for line in self.evts_in:
             tabs = line.split()
             st,ln,mask = map(int, tabs[:2] + tabs[-1:])
             mn,sd,norm_sc,norm_sh,win_mn,win_sd = map(float, tabs[2:-1])
+            en = st+ln
 
             if st >= next_chunk_samp:
                 chunk += 1
                 next_chunk_samp += CHUNK_LEN
                 self.chunk_evt_bounds.append(evt)
 
-            if (self.conf_evt is not None and 
-                self.conf_samp is None and 
-                evt == self.conf_evt):
+            if evt == self.conf_evt:
                 self.conf_samp = st
 
-            if chunk < self.chunk_st: continue
-            if self.chunk_en is not None and chunk >= self.chunk_en: 
+                if self.max_samp is None:
+                    self.max_samp = (chunk+1)*CHUNK_LEN-1
+                    self.max_chunk = chunk
+
+            if en < self.min_samp: 
+                evt += 1
+                continue
+
+            if self.min_evt is None:
+                print(en, self.min_samp)
+                self.min_evt = evt
+                print(self.min_evt, "MIN")
+
+            if self.max_samp is not None and st > self.max_samp: 
                 break
             
             self.events.append( (st,ln,mn,sd) )
@@ -133,17 +180,14 @@ class DebugParser:
             if self.evt_mask[-1]:
                 self.evt_mask_map.append(evt)
 
-            if self.chunk_en is None and self.conf_evt == evt:
-                self.chunk_en = chunk+1
-
             evt += 1
-
-            #if self.samp_en:
-            #    break
 
         if self.max_evt is None or self.max_evt >= evt: 
             self.max_evt = evt
-            self.samp_en = st+ln
+
+        if self.max_samp is None:
+            self.max_samp = st+ln
+            self.max_chunk = (self.max_samp-1) // CHUNK_LEN
 
         self.evts_loaded = True
 
@@ -198,16 +242,21 @@ class DebugParser:
                     self.conf_pbs[(evt,pb)] = st
                 else:
                     #self.conf_pbs[(evt,pb)] = -st
-                    self.conf_pbs[(evt,pb)] = -en
+                    self.conf_pbs[(evt,pb)] = -en + 1
 
             if clust > self.max_clust:
                 self.max_clust = clust
 
+        self.mapped = conf_clust is not None
+
         #Handle unmapped reads
         #TODO: mark them more explicitly
-        if conf_clust == None:
-            conf_clust = self.max_clust
-            self.conf_evt = conf_clust.evts[-1]
+        if not self.mapped:
+            if self.max_clust is not None:
+                conf_clust = self.max_clust
+                self.conf_evt = conf_clust.evts[-1]
+            else:
+                self.conf_evt = self.max_evt
 
         self._set_conf_clust(conf_clust)
         self._parse_expired(clust_ids)
@@ -218,9 +267,11 @@ class DebugParser:
     #sets confident cluster related vars
     def _set_conf_clust(self, cc):
         self.conf_clust = cc
+
+        if cc is None: return
+
         self.conf_idx = np.searchsorted(cc.evts, self.conf_evt, side='right')-1
         self.conf_len = cc.lens[self.conf_idx]
-
 
         #TODO use cc.evrf_ratio(e,r)
         evt_span = self.conf_evt - cc.evt_st
@@ -229,21 +280,23 @@ class DebugParser:
             max_max_evt = self.conf_evt + (evt_span * self.CONF_PAD_COEF)
             self.max_evt = int(np.round(min(cc.evt_en+1, max_max_evt)))
 
+        #TODO rename min/max_clust_ref
+        self.min_idx = np.searchsorted(cc.evts, self.min_evt, side='left')
         self.max_idx = np.searchsorted(cc.evts, self.max_evt, side='right')-1
 
         if cc.fwd:
-            rst = cc.rsts[0] - SEED_LEN
+            rst = cc.rsts[self.min_idx] - SEED_LEN
             ren = cc.rens[self.max_idx]+1
         else:
-            rst = -cc.rsts[0] - SEED_LEN
+            rst = -cc.rsts[self.min_idx] - SEED_LEN
             ren = -cc.rens[self.max_idx]-1
-            #rst = cc.rsts[self.max_idx]
-            #ren = cc.rens[0]+1
 
         ref_span = ren-rst
-        self.evrf_ratio = (self.max_evt) / ref_span
+        if ref_span > 0:
+            self.evrf_ratio = (self.max_evt) / ref_span
+        else:
+            self.evrf_ratio = 1
 
-        #self.max_clust_len = int(np.round(self.max_evt / self.evrf_ratio))
         self.max_clust_len = cc.lens[self.max_idx]
 
         self.min_clust_ref = rst
@@ -257,7 +310,6 @@ class DebugParser:
             if c.expired(self.max_evt):
                 self.clusts_exp.append(c)
                 del self.clusts[cid]
-
 
     def parse_paths(self):
         if self.paths_loaded: return False
@@ -284,25 +336,19 @@ class DebugParser:
 
             moves = [bool(c=='1') for c in tabs[C['moves']]]
 
-            if (evt < self.min_evt or 
-                evt >= self.max_evt or
-                not self.evt_mask[evt-len(moves)]): continue
+            if evt < self.min_evt or evt >= self.max_evt: 
+                continue
 
-            #parent = tuple(map(int, tabs[C['parent']].split(':')))
-            #coord = (evt,ref_en)
-            #prob = float(tabs[C['match_prob']])
-            #self.dots[coord] = min(prob, self.dots[coord])
-            #ref_prev = ref_en - moves[0]
-            #self.conf_pbs[parent] = ref_prev
+            e = evt-self.min_evt
 
-            evts = np.arange(evt-len(moves), evt) + 1
+            if not self.evt_mask[e-len(moves)]: 
+                continue
+
+            evts = np.arange(e-len(moves), e) + 1
             refs = ref_st + np.cumsum(np.flip(moves))
 
-            #evts = [evt]
-            #refs = [refs[-1]]
-
             for e,r in zip(evts,refs):
-                if e < self.max_evt:
+                if e >= 0: 
                     self.dots[(e,r)] = True
 
             kmer      =       tabs[C['kmer']]
@@ -323,6 +369,25 @@ class DebugParser:
         #self.paths_loaded = True
 
         return True
+
+    def parse_conf(self):
+        if self.conf_loaded: return False
+
+        self.conf_evts = list()
+        self.conf_clusts = list()
+        self.conf_tops = list()
+        self.conf_means = list()
+
+        conf_in = open(self.conf_fname)
+        conf_in.readline()
+
+        for line in conf_in:
+            evt,clust,top,mean = line.split()
+            self.conf_evts.append(int(evt))
+            self.conf_clusts.append(int(clust))
+            self.conf_tops.append(float(top))
+            self.conf_means.append(float(mean))
+            
 
 class SeedCluster:
     EXPIRE_COEF = 5.5
