@@ -7,20 +7,36 @@ import bisect
 from scipy.stats import linregress
 from file_read_backwards import FileReadBackwards
 from collections import defaultdict
+import re
 
 SEED_LEN = 22
 MIN_CLUST = 25
 SAMPLE_RATE = 4000
 CHUNK_LEN = 4000
 
+#Guppy basecalled event stride and kmer length
+BCE_STRIDE = 5
+BCE_K = 4
+
 MAX_CHUNK_DEF = 3
+
+#Cigar parsing
+CIG_OPS_STR = "MIDNSHP=X"
+CIG_RE = re.compile("(\d+)(["+CIG_OPS_STR+"])")
+CIG_OPS = set(CIG_OPS_STR)
+CIG_INCR_ALL = {'M','=', 'X'}
+CIG_INCR_RD = CIG_INCR_ALL | {'I','S'}
+CIG_INCR_RF = CIG_INCR_ALL | {'D','N'}
 
 class DebugParser:
     CONF_PAD_COEF = 2
 
     def __init__(self, 
-                 prefix, 
-                 paf, 
+                 debug_prefix, 
+                 unc_paf, 
+                 mm2_paf=None,
+                 bce_moves=None,
+                 bwa_index=None,
                  min_chunk=None,
                  max_chunk=None,
                  min_samp=None,
@@ -31,13 +47,17 @@ class DebugParser:
                  load_paths=True,
                  load_conf=True):
 
-        self.rid = paf.qr_name
+        self.rid = unc_paf.qr_name
 
         #Cofident seed cluster ID, confident event, and reference length
         #(conf_evt is where mapping would normally end)
-        self.conf_cid = paf.tags.get('sc', (None,)*2)[0]
-        self.conf_evt = paf.tags.get('ce', (None,)*2)[0]
+        self.conf_cid = unc_paf.tags.get('sc', (None,)*2)[0]
+        self.conf_evt = unc_paf.tags.get('ce', (None,)*2)[0]
         self.conf_samp = None
+
+        self.mm2_paf = mm2_paf
+
+        self.idx = bwa_index
 
         #if self.tgt_cid is None:
         #    self.tgt_cid = self.conf_cid
@@ -61,20 +81,15 @@ class DebugParser:
                 self.max_samp = self.max_chunk*SAMPLE_RATE
             else:
                 self.max_chunk = self.max_samp = None
-
         elif max_samp is None:
             self.max_chunk = max_chunk
             self.max_samp = max_chunk * SAMPLE_RATE
-
         elif max_chunk is None:
             self.max_chunk = max(0, (max_samp-1) // CHUNK_LEN)
             self.max_samp = max_samp
-
         else:
             self.max_chunk = max(max_chunk, (max_samp-1) // CHUNK_LEN)
             self.max_samp = max(max_samp, self.max_chunk * SAMPLE_RATE)
-
-        print(self.max_chunk, max_chunk, max_samp)
 
         self.min_evt = 0 if self.min_samp == 0 else None
         self.max_evt = None
@@ -102,23 +117,27 @@ class DebugParser:
 
         self.evts_loaded = False
         if load_events:
-            self.evts_in = open(prefix + self.rid + "_events.tsv")
+            self.evts_in = open(debug_prefix + self.rid + "_events.tsv")
             self.parse_events()
 
         self.seeds_loaded = False
         if load_seeds:
-            self.seeds_in  = open(prefix + self.rid + "_seeds.bed")
+            self.seeds_in  = open(debug_prefix + self.rid + "_seeds.bed")
             self.parse_seeds()
+
+        self.bc_loaded = False
+        if mm2_paf is not None and bce_moves is not None:
+            self.parse_bc_aln(bce_moves)
 
         #TODO: paths
         self.paths_loaded = False
         if load_paths:
-            self.paths_fname = prefix + self.rid + "_paths.tsv"
+            self.paths_fname = debug_prefix + self.rid + "_paths.tsv"
             self.parse_paths()
 
         self.conf_loaded = False
         if load_conf:
-            self.conf_fname = prefix + self.rid + "_conf.tsv"
+            self.conf_fname = debug_prefix + self.rid + "_conf.tsv"
             self.parse_conf()
 
     def parse_events(self, incl_norm=True):
@@ -197,6 +216,10 @@ class DebugParser:
         self.evt_mask_map = np.array(self.evt_mask_map)
 
         return True
+    
+    def normed_event(self, e):
+        scale,shift = self.norms[e]
+        return scale*self.events[e][2]+shift
 
     def parse_seeds(self, expire_coef=None):
         if self.seeds_loaded: return False
@@ -345,19 +368,19 @@ class DebugParser:
                 continue
 
             evts = np.arange(e-len(moves), e) + 1
-            refs = ref_st + np.cumsum(np.flip(moves))
+            refs = ref_st + (np.cumsum(np.flip(moves)) - 1)
 
             for e,r in zip(evts,refs):
                 if e >= 0: 
                     self.dots[(e,r)] = True
 
-            kmer      =       tabs[C['kmer']]
-            self.seed_kmers[(evt, refs[-1])] = kmer
+            kmer       =       tabs[C['kmer']]
+            match_prob = float(tabs[C['match_prob']])
+            self.seed_kmers[(e, refs[-1])] = (kmer, match_prob)
 
             #fm_start  =   int(tabs[C['fm_start']])
             #fm_len    =   int(tabs[C['fm_len']])
             #full_len  =   int(tabs[C['full_len']])
-            #seed_prob = float(tabs[C['seed_prob']])
 
             #print(path_id,parent,fm_start,fm_len,kmer,full_len,seed_prob,moves)
 
@@ -388,6 +411,84 @@ class DebugParser:
             self.conf_tops.append(float(top))
             self.conf_means.append(float(mean))
             
+
+    def parse_bc_aln(self, bce_moves):
+        #List of ref coords for each query (read) cord
+        qr_to_rfs = self._cig_query_to_refs(self.mm2_paf)
+
+        #basecalled event start, end, and stride
+        bce_samp_st, bce_moves_pac = bce_moves
+            
+        bce_samp_en = bce_samp_st + len(bce_moves) * BCE_STRIDE
+
+        bce_st = 0
+        bce_en = int((self.max_samp-bce_samp_st+1) // BCE_STRIDE)
+        bce_moves = np.unpackbits(bce_moves_pac)[bce_st:bce_en]
+
+        #Read coord of each basecalled event
+        bce_qrs = np.cumsum(bce_moves)
+        i = np.searchsorted(bce_qrs, self.mm2_paf.qr_st)
+        
+        #bce_evts = list()
+        bce_samps = list()
+        bce_refs = list()
+
+        samp = bce_samp_st
+        for qr in bce_qrs:
+            if samp >= self.min_samp:
+                for rf in qr_to_rfs[qr]:
+                    bce_samps.append(samp)
+                    bce_refs.append(rf)
+
+            samp += BCE_STRIDE
+
+        self.bce_samps = np.array(bce_samps)
+        self.bce_refs = np.array(bce_refs) - BCE_K + 1
+
+        #ax.step(
+        #    bce_samps, bce_refs, 
+        #    where='post', color='blue', 
+        #    linewidth=1.5, alpha=0.25, 
+        #    zorder=4
+        #)
+
+        ##return bce_samps, bce_refs
+        #if len(bce_samps) > 0:
+        #    return bce_samps, bce_refs
+        #else:
+        #    return None,None
+
+    def _cig_query_to_refs(self, paf):
+        cig = paf.tags.get('cg', (None,)*2)[0]
+        if cig is None: return None
+
+        qr_rfs = defaultdict(list)
+
+
+        qr_i = paf.qr_st
+        rf_i = 0#paf.rf_st
+
+        cig_ops = CIG_RE.findall(cig)
+
+        if not paf.is_fwd:
+            cig_ops = reversed(cig_ops)
+
+        for l,c in cig_ops:
+            l = int(l)
+            incr_qr = c in CIG_INCR_RD
+            incr_rf = c in CIG_INCR_RF
+            qr_j = qr_i + (l if incr_qr else 1)
+            rf_j = rf_i + (l if incr_rf else 1)
+            for qr,rf in zip(range(qr_i, qr_j), range(rf_i, rf_j)):
+                qr_rfs[qr].append(rf)
+
+            if incr_qr:
+                qr_i = qr_j 
+
+            if incr_rf:
+                rf_i = rf_j 
+
+        return qr_rfs
 
 class SeedCluster:
     EXPIRE_COEF = 5.5

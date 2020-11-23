@@ -232,7 +232,15 @@ class Mapper {
     //All will be empty if no DEBUG_* macros are defined
     void dbg_open_all();
     void dbg_close_all();
-    void dbg_seeds_out(const PathBuffer &path, u32 clust, u64 ref_end, u32 evt_end);
+
+    void dbg_seeds_out(
+        const PathBuffer &path, 
+        u32 clust, 
+        u32 evt_end, 
+        u64 sa_start, 
+        u32 ref_len
+    );
+
     void dbg_paths_out();
     void dbg_events_out();
     void dbg_conf_out();

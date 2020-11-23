@@ -30,6 +30,7 @@
 #include <cstring>
 #include <bwa/bwa.h>
 #include <bwa/utils.h>
+#include <pdqsort.h>
 #include "util.hpp"
 #include "bp.hpp"
 #include "range.hpp"
@@ -226,7 +227,7 @@ class BwaIndex {
         return seqs;
     }
 
-    u64 coord_to_sa(std::string name, u64 coord) {
+    u64 coord_to_pacseq(std::string name, u64 coord) {
         i32 i;
         for (i = 0; i < bns_->n_seqs; i++) {
             if (strcmp(name.c_str(), bns_->anns[i].name) == 0)
@@ -240,8 +241,8 @@ class BwaIndex {
     }
 
     std::vector<u16> get_kmers(std::string nm, u64 st, u64 en) {
-        u64 sti = coord_to_sa(nm, st),
-            eni = coord_to_sa(nm, en);
+        u64 sti = coord_to_pacseq(nm, st),
+            eni = coord_to_pacseq(nm, en);
         return get_kmers(sti, eni);
     }
 
@@ -251,6 +252,90 @@ class BwaIndex {
 
     u8 get_base(u64 i) {
         return (pacseq_[i>>2] >> ( ((3^i)&3) << 1 )) & 3;
+    }
+
+    using FwdRevCoords = std::pair< std::vector<u64>, std::vector<u64> >;
+
+    //Returns all FM index coordinates which translate into reference 
+    //coordinates that overlap the specified range
+    FwdRevCoords range_to_fms(std::string ref_name, u64 start, u64 end) {
+
+        std::vector<u64> fwd_fms, rev_fms;
+
+        auto ref_len = size() / 2;
+
+        u32 slop = static_cast<int>( ceil(log(ref_len) / log(4)) );
+
+        u64 pac_min = coord_to_pacseq(ref_name, start),
+            pac_max = pac_min + (end - start) - 1;
+
+        u64 fwd_st;
+        if (ref_len - pac_max > slop) {
+            fwd_st = pac_max + slop;
+        } else {
+            fwd_st = ref_len - 1;
+        }
+
+        Range r = get_base_range(get_base(fwd_st));
+        for (u64 i = fwd_st-1; i >= pac_max && i <= fwd_st; i--) {
+            r = get_neighbor(r, get_base(i));
+        }
+
+        u64 sa_loc = 0;
+        if (r.length() == 1) {
+            sa_loc = sa(r.start_);
+
+        } else {
+            for (u64 f = r.start_; f <= r.end_; f++) {
+                sa_loc = sa(f);
+                if (sa_loc == pac_max) {
+                    r = Range(f,f);
+                    break;
+                }
+            }
+        }
+
+        fwd_fms.push_back(r.start_);
+        for (u64 i = pac_max-1; i >= pac_min && i < pac_max; i--) {
+            r = get_neighbor(r, get_base(i));
+            fwd_fms.push_back(r.start_);
+        }
+
+        u64 rev_st;
+        if (pac_min > slop) {
+            rev_st = pac_min - slop;
+        } else {
+            rev_st = 0;
+        }
+
+        r = get_base_range(BASE_COMP_B[get_base(rev_st)]);
+        for (u64 i = rev_st+1; i <= pac_min; i++) {
+            r = get_neighbor(r, BASE_COMP_B[get_base(i)]);
+        }
+
+        if (r.length() == 1) {
+            sa_loc = size() - sa(r.start_);
+
+        } else {
+            for (u64 f = r.start_; f <= r.end_; f++) {
+                sa_loc = size() - sa(f) - 1;
+                if (sa_loc == pac_min) {
+                    r = Range(f,f);
+                    break;
+                }
+            }
+        }
+
+        rev_fms.push_back(r.start_);
+        for (u64 i = pac_min+1; i <= pac_max; i++) {
+            r = get_neighbor(r, BASE_COMP_B[get_base(i)]);
+            rev_fms.push_back(r.start_);
+        }
+
+        pdqsort(fwd_fms.begin(), fwd_fms.end());
+        pdqsort(rev_fms.begin(), rev_fms.end());
+
+        return FwdRevCoords(fwd_fms, rev_fms);
     }
 
     #ifdef PYBIND
@@ -272,7 +357,7 @@ class BwaIndex {
         PY_BWA_INDEX_METH(size);
         PY_BWA_INDEX_METH(translate_loc);
         PY_BWA_INDEX_METH(get_seqs);
-        PY_BWA_INDEX_METH(coord_to_sa);
+        PY_BWA_INDEX_METH(coord_to_pacseq);
         PY_BWA_INDEX_METH(pacseq_loaded);
         PY_BWA_INDEX_METH(get_base);
         PY_BWA_INDEX_METH(get_rid);
@@ -280,6 +365,7 @@ class BwaIndex {
         PY_BWA_INDEX_METH(get_ref_coord);
         PY_BWA_INDEX_METH(get_ref_name);
         PY_BWA_INDEX_METH(get_ref_len);
+        PY_BWA_INDEX_METH(range_to_fms);
     }
 
     #endif

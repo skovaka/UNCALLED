@@ -51,9 +51,6 @@ PYBIND11_MODULE(_uncalled, m) {
     PoreModel<KLEN>::pybind_defs(model);
     m.attr("pmodel_r94_template") = py::cast(pmodel_r94_template);
     m.attr("pmodel_r94_complement") = py::cast(pmodel_r94_complement);
-    //py::object py_pmodel_r94_template = py::cast(
-    //(model_r94_means_stdvs, false);
-    //pmodel_r94_complement(model_r94_means_stdvs, true);
 
     m.def("self_align", &self_align);
 

@@ -664,19 +664,29 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
 
     for (u64 s = path.fm_range_.start_; s <= path.fm_range_.end_; s++) {
 
-        //Reverse the reference coords so they both go L->R
         //TODO: store in buffer, replace sa_checked
-        u64 ref_en = fmi.size() - fmi.sa(s) - 1;
+        //
+        //Reverse the reference coords so they both go L->R
+        u64 sa_end = fmi.size() - fmi.sa(s);//TODO no minus?
+
+        u32 ref_len = path.move_count() + KLEN - 1;
+        u64 sa_start = sa_end - ref_len + 1;
 
         //Add seed and store updated seed cluster
         auto clust = seed_tracker_.add_seed(
-            ref_en, 
+            sa_end, 
             path.move_count(), 
             event_i_ - path_ended
         );
 
         #ifdef DEBUG_SEEDS
-        dbg_seeds_out(path, clust.id_, ref_en, event_i_ - path_ended);
+        dbg_seeds_out(
+            path, 
+            clust.id_, 
+            event_i_ - path_ended, 
+            sa_start, 
+            ref_len
+        );
         #endif
     }
 }
@@ -942,6 +952,8 @@ void Mapper::dbg_conf_out() {
               << seed_tracker_.get_best().id_ << "\t"
               << seed_tracker_.get_top_conf() << "\t"
               << seed_tracker_.get_mean_conf() << "\n";
+
+    conf_out_.flush();
     #endif
 }
 
@@ -968,7 +980,12 @@ void Mapper::dbg_events_out() {
     #endif
 }
 
-void Mapper::dbg_seeds_out(const PathBuffer &path, u32 clust, u64 ref_end, u32 evt_end) {
+void Mapper::dbg_seeds_out(
+        const PathBuffer &path, 
+        u32 clust, 
+        u32 evt_end,
+        u64 sa_start, 
+        u32 ref_len) {
     #ifdef DEBUG_SEEDS
 
     //TODO de-duplicate code
@@ -976,23 +993,31 @@ void Mapper::dbg_seeds_out(const PathBuffer &path, u32 clust, u64 ref_end, u32 e
     
     //TODO clearly deliniate fm_coord, sa_coord(fw/rv), pacseq_coord, ann_coord
 
-    bool fwd = ref_end < fmi.size() / 2;
+    bool fwd = sa_start < (fmi.size() / 2);
 
-    u64 sa_st;
-    if (fwd) sa_st = ref_end - path.move_count() - KLEN + 1;
-    else     sa_st = fmi.size() - ref_end - KLEN + 1;
+    //TODO change sa_ to clarify unstranded
+    u32 sa_half;
+    if (fwd) {
+        sa_half = sa_start;
+    } else {
+        sa_half = fmi.size() - (sa_start + ref_len - 1);
+    }
 
     std::string rf_name;
-    u64 rf_st = 0;
-    fmi.translate_loc(sa_st, rf_name, rf_st);
+    u64 ref_st = 0;
+    fmi.translate_loc(sa_half, rf_name, ref_st);
 
-    if (rf_st > fmi.size()) {
-        rf_st = 0;
+    if (ref_st == 0) {
+        std::cerr << rf_name << "\t"
+                  << sa_start << "\t"
+                  << sa_half << "\t"
+                  << static_cast<int>(path.type_head()) << "\t"
+                  << static_cast<int>(path.type_tail()) << "\n";
     }
 
     seeds_out_ << rf_name << "\t"
-               << rf_st << "\t"
-               << (rf_st + path.move_count() + KLEN - 1) << "\t"
+               << ref_st << "\t"
+               << (ref_st + ref_len) << "\t"
 
                //name field
                << evt_prof_.mask_idx_map_[evt_end] << ":"
