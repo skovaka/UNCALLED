@@ -47,6 +47,8 @@ Optional arguments:
 
 Note that this command will use a previously built BWA index if all the required files exist with the specified prefix. Otherwise, a new BWA index will be automatically built. 
 
+We recommend applying repeat masking your reference if it contains eukaryotic sequences. See [masking](masking/) for more details.
+
 ## Fast5 Mapping
 
 **Example:**
@@ -231,7 +233,7 @@ UNCALLED is a work in progress. Many parameters exist that are not documented he
 
 ## Release notes
 
-- v2.2: added event profiler which masks out pore stalls, and compile-time debug options
+- v2.2: added event profiler which masks out pore stalls, and added compile-time debug options
 - v2.1: updated ReadUntil client for latest MinKNOW version, made `uncalled index` automatically build the BWA index, added hdf5 submodule, further automated installation by auto-building hdf5, switched to using setuptools, moved submodules to submods/
 - v2.0: released the ReadUntil simulator `uncalled sim`, which can predict how much enrichment UNCALLED could provide on a given reference, using a control and UNCALLED run as a template. Also CHANGED THE FORMAT OF CERTAIN ARGUMENTS. Index prefix and fast5 list are now positional, and some flags have changed names. See below for details.
 - v1.2: fixed indexing for particularly large or small reference
