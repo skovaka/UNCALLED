@@ -12,29 +12,23 @@ Also supports standalone signal mapping of fast5 reads
 
 Read the [preprint on BioRxiv](https://www.biorxiv.org/content/10.1101/2020.02.03.931923v1)
 
-## Release notes
-
-- v2.1: updated ReadUntil client for latest MinKNOW version, made `uncalled index` automatically build the BWA index, added hdf5 submodule, further automated installation by auto-building hdf5, switched to using setuptools, moved submodules to submods/
-- v2.0: released the ReadUntil simulator `uncalled sim`, which can predict how much enrichment UNCALLED could provide on a given reference, using a control and UNCALLED run as a template. Also CHANGED THE FORMAT OF CERTAIN ARGUMENTS. Index prefix and fast5 list are now positional, and some flags have changed names. See below for details.
-- v1.2: fixed indexing for particularly large or small reference
-- v1.1: added support for altering chunk size
-- v1.0: pre-print release
-
 ## Installation
+
+```
+pip3 install git+https://github.com/skovaka/UNCALLED.git@dev --user
+```
+
+OR
 
 ```
 > git clone --recursive https://github.com/skovaka/UNCALLED.git
 > cd UNCALLED
-> python setup.py install
+> python3 setup.py install --user
 ```
 
-Most dependecies included via submodules, so be sure to clone with `git --recursive`
+Requires python >= 3.6, read-until == 3.0.0, pybind11 >= 2.5.0, and GCC >= 4.8.1 (note: python modules will be automatically installed by setup.py)
 
-UNCALLED for ReadUntil sequenecing requires the [ONT ReadUntil API](https://github.com/nanoporetech/read_until_api), which is provided as a submodule in [submods/read_until_api](submods/read_until_api). This must be installed in the same python environment as UNCALLED.
-
-UNCALLED must be installed into a python environment. To install without root privileges use the `--user` or `--prefix=<local-dir>` flag when installing, or use a tool such as [virtualenv](https://virtualenv.pypa.io) or [anaconda](https://www.anaconda.com).
-
-Requires python >= 3.6, numpy>=1.12.0, pybind11 >= 2.5.0, and GCC >= 4.8.1 (note: python modules will be automatically installed by setup.py)
+Other dependecies are included via submodules, so be sure to clone with `git --recursive`
 
 We recommend running on a Linux machine. UNCALLED has been successfully installed and run on Mac computers, but real-time ReadUntil has not been tested on a Mac. Installing UNCALLED has not been attempted on Windows.
 
@@ -89,7 +83,7 @@ See [example/](example/) for a simple read and reference example.
 **Example:**
 
 ```
-> /opt/ont/minknow/ont-python/bin/uncalled realtime E.coli --port 8000 -t 16 --enrich -c 3 > uncalled_out.paf 
+> uncalled realtime E.coli --port 8000 -t 16 --enrich -c 3 > uncalled_out.paf 
 Starting client
 Starting mappers
 Mapping
@@ -101,18 +95,9 @@ d9acafe3-23dd-4a0f-83db-efe299ee59a4 1355 *     *     *     *      *      *     
 8a6ec472-a289-4c50-9a75-589d7c21ef99 451  98 369 + Escherichia_coli 4765434 3421845 3422097 56 253 255 ch:i:490 st:i:29456 mt:f:79.419411 wt:f:8.551202 kp:f:0.097424
 ```
 
-You must install UNCALLED into the MinKNOW enrironment. If HDF5 is not installed in the root filesystem, you may have to specify the library and include directory by running `setup.py build_ext` prior to installation: 
+We recommend that you try mapping fast5s via `uncalled map` before real-time enrichment, as runtime issues involving hdf5 libraries could come up if UNCALLED is not installed properly.
 
-```
-sudo /opt/ont/minknow/ont-python/bin/python setup.py build_ext --library-dirs /path/to/hdf5/lib --include-dirs /path/to/hdf5/include
-sudo /opt/ont/minknow/ont-python/bin/python setup.py install
-```
-
-The above commands assume your MinKNOW python environment is located at `/opt/ont/minknow/ont-python`.
-
-We recommend that you try mapping fast5s with the MinKNOW installation via `uncalled map` before real-time enrichment, as runtime issues involving hdf5 libraries could come up if UNCALLED is not installed properly.
-
-The command can be run at any time before or during a sequencing run, although if you want to chagne the chunk size you must run the commend *before* startin the run (see below). Reads will not be ejected until after the first mux scan finishes.
+The command can generally be run at any time before or during a sequencing run, although an error may occur if UNCALLED is run before any sequencing run has been started in the current MinKNOW session. If this is occurs, you can start UNCALLED during the first max scan. If you want to change the chunk size you must run the commend *before* starting the run (see below). 
 
 Arguments:
 
@@ -243,3 +228,12 @@ UNCALLED currently only supports reads sequenced with r9.4 chemistry.
 ## Undocumented Features
 
 UNCALLED is a work in progress. Many parameters exist that are not documented here, but can be seen on the command line help information. Most users should leave these unchanged. They may be removed in future versions, or be replaced with hyperparameters that adjust the accuracy and speed of UNCALLED.
+
+## Release notes
+
+- v2.2: added event profiler which masks out pore stalls, and compile-time debug options
+- v2.1: updated ReadUntil client for latest MinKNOW version, made `uncalled index` automatically build the BWA index, added hdf5 submodule, further automated installation by auto-building hdf5, switched to using setuptools, moved submodules to submods/
+- v2.0: released the ReadUntil simulator `uncalled sim`, which can predict how much enrichment UNCALLED could provide on a given reference, using a control and UNCALLED run as a template. Also CHANGED THE FORMAT OF CERTAIN ARGUMENTS. Index prefix and fast5 list are now positional, and some flags have changed names. See below for details.
+- v1.2: fixed indexing for particularly large or small reference
+- v1.1: added support for altering chunk size
+- v1.0: pre-print release

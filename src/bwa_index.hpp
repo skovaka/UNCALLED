@@ -282,16 +282,11 @@ class BwaIndex {
         }
 
         u64 sa_loc = 0;
-        if (r.length() == 1) {
-            sa_loc = sa(r.start_);
-
-        } else {
-            for (u64 f = r.start_; f <= r.end_; f++) {
-                sa_loc = sa(f);
-                if (sa_loc == pac_max) {
-                    r = Range(f,f);
-                    break;
-                }
+        for (u64 f = r.start_; f <= r.end_; f++) {
+            sa_loc = sa(f);
+            if (sa_loc == pac_max) {
+                r = Range(f,f);
+                break;
             }
         }
 
@@ -313,16 +308,11 @@ class BwaIndex {
             r = get_neighbor(r, BASE_COMP_B[get_base(i)]);
         }
 
-        if (r.length() == 1) {
-            sa_loc = size() - sa(r.start_);
-
-        } else {
-            for (u64 f = r.start_; f <= r.end_; f++) {
-                sa_loc = size() - sa(f) - 1;
-                if (sa_loc == pac_min) {
-                    r = Range(f,f);
-                    break;
-                }
+        for (u64 f = r.start_; f <= r.end_; f++) {
+            sa_loc = size() - sa(f);
+            if (sa_loc == pac_min) {
+                r = Range(f,f);
+                break;
             }
         }
 
@@ -332,10 +322,10 @@ class BwaIndex {
             rev_fms.push_back(r.start_);
         }
 
-        pdqsort(fwd_fms.begin(), fwd_fms.end());
-        pdqsort(rev_fms.begin(), rev_fms.end());
+        //pdqsort(fwd_fms.begin(), fwd_fms.end());
+        //pdqsort(rev_fms.begin(), rev_fms.end());
 
-        return FwdRevCoords(fwd_fms, rev_fms);
+        return FwdRevCoords(rev_fms, fwd_fms);
     }
 
     #ifdef PYBIND

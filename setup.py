@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 
-__version__ = "2.1"
+__version__ = "2.2"
 
 ROOT_DIR = os.getcwd()
 
@@ -14,7 +14,6 @@ SUBMODS = [
     "fast5", 
     "hdf5", 
     "pdqsort", 
-    "read_until_api", 
     "toml11"
 ]
 

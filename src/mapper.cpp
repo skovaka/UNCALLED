@@ -667,7 +667,7 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         //TODO: store in buffer, replace sa_checked
         //
         //Reverse the reference coords so they both go L->R
-        u64 sa_end = fmi.size() - fmi.sa(s);//TODO no minus?
+        u64 sa_end = fmi.size() - fmi.sa(s);
 
         u32 ref_len = path.move_count() + KLEN - 1;
         u64 sa_start = sa_end - ref_len + 1;

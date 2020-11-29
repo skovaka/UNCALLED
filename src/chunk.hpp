@@ -64,6 +64,7 @@ class Chunk {
         PY_CHUNK_METH(size);
         PY_CHUNK_RPROP(channel);
         PY_CHUNK_RPROP(number);
+        PY_CHUNK_RPROP(id);
     }
 
     #endif
