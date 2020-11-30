@@ -207,8 +207,6 @@ def realtime_cmd(conf, args):
         chunk_times = [time.time() for c in range(conf.num_channels)]
         unblocked = [None for c in range(conf.num_channels)]
 
-        #client.log("Processing reads")
-
         if conf.duration == None or conf.duration == 0:
             end_time = float("inf")
         else:
