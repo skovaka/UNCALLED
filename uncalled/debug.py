@@ -42,6 +42,7 @@ class DebugParser:
                  min_samp=None,
                  max_samp=None,
                  tgt_cid=None,
+                 max_path_fm=0,
                  load_seeds=True,
                  load_events=True,
                  load_paths=True,
@@ -106,12 +107,21 @@ class DebugParser:
         self.max_clust = None
 
         self.max_clust_len = None
-        self.min_clust_ref = None #TODO name span?
-        self.max_clust_ref = None #TODO name span?
+
+        if mm2_paf is not None:
+            self.ref_name = mm2_paf.rf_name
+            if mm2_paf.is_fwd:
+                self.min_ref = mm2_paf.rf_st
+            else:
+                self.min_ref = -mm2_paf.rf_en
+        else:
+            self.min_ref = None
+        self.max_ref = None
 
         #TODO clean these up
         self.conf_pbs = dict()
-        self.dots = defaultdict(int)
+        self.conf_dots = set()
+        self.path_lens = defaultdict(int)
         self.seed_kmers = dict()
         self.conf_ref_bounds = None
 
@@ -128,6 +138,30 @@ class DebugParser:
         self.bc_loaded = False
         if mm2_paf is not None and bce_moves is not None:
             self.parse_bc_aln(bce_moves)
+
+        self.max_path_fm = max_path_fm
+        if max_path_fm > 0:
+            if self.idx is None:
+                sys.stderr.write("Error: must include BWA index to include paths with FM overlaps\n")
+                sys.exit(1)
+
+            if self.conf_clust.fwd:
+                st = self.min_ref
+                en = self.max_ref
+            else:
+                st = -self.max_ref
+                en = -self.min_ref
+
+            fwd_fms, rev_fms = self.idx.range_to_fms(
+                    self.ref_name, st, en
+            )
+            fms = fwd_fms if self.mm2_paf.is_fwd else rev_fms
+
+            self.fm_to_ref = {fms[i] : i for i in range(len(fms))}
+            self.range_fms = np.sort(fms)
+
+        else:
+            self.fwd_fms = self.rev_fms = None
 
         #TODO: paths
         self.paths_loaded = False
@@ -322,8 +356,13 @@ class DebugParser:
 
         self.max_clust_len = cc.lens[self.max_idx]
 
-        self.min_clust_ref = rst
-        self.max_clust_ref = rst + (self.max_evt / self.evrf_ratio)
+        if self.min_ref is None:
+            self.min_ref = rst
+        if self.max_ref is None:
+            self.max_ref = ren
+        if self.ref_name is None:
+            self.ref_name = cc.ref
+
 
     #finds clusters that should expire
     #by the end of loaded events
@@ -333,6 +372,10 @@ class DebugParser:
             if c.expired(self.max_evt):
                 self.clusts_exp.append(c)
                 del self.clusts[cid]
+
+    def _parse_moves(self, moves):
+        return np.flip()
+
 
     def parse_paths(self):
         if self.paths_loaded: return False
@@ -353,10 +396,12 @@ class DebugParser:
             path_id  = tuple(map(int, tabs[C['id']].split(':')))
 
             ref_st = self.conf_pbs.get(path_id, None)
-            if ref_st is None: continue
+
+            is_conf = ref_st is not None
+
+            if not is_conf and self.max_path_fm == 0: continue
 
             evt, pb = path_id
-
             moves = [bool(c=='1') for c in tabs[C['moves']]]
 
             if evt < self.min_evt or evt >= self.max_evt: 
@@ -368,19 +413,39 @@ class DebugParser:
                 continue
 
             evts = np.arange(e-len(moves), e) + 1
-            refs = ref_st + (np.cumsum(np.flip(moves)) - 1)
 
-            for e,r in zip(evts,refs):
-                if e >= 0: 
-                    self.dots[(e,r)] = True
+            if not is_conf:
+                fm_len    =   int(tabs[C['fm_len']])
 
-            kmer       =       tabs[C['kmer']]
-            match_prob = float(tabs[C['match_prob']])
-            self.seed_kmers[(e, refs[-1])] = (kmer, match_prob)
+                if fm_len > self.max_path_fm: continue
 
-            #fm_start  =   int(tabs[C['fm_start']])
-            #fm_len    =   int(tabs[C['fm_len']])
-            #full_len  =   int(tabs[C['full_len']])
+                fm_start  =   int(tabs[C['fm_start']])
+                full_len  =   int(tabs[C['full_len']])
+
+                i = np.searchsorted(self.range_fms, fm_start)
+
+                while i < len(self.range_fms) and self.range_fms[i] < fm_start+fm_len: 
+                    ref_en = self.fm_to_ref[self.range_fms[i]]
+                    refs = ref_en - np.sum(moves) + np.cumsum(np.flip(moves)) - 3
+
+                    print(ref_en, path_id)
+
+                    for e,r in zip(evts,refs):
+                        if e < 0: continue
+                        self.path_lens[(e,r)] = max(self.path_lens[(e,r)], np.log2(fm_len))
+                    i += 1
+
+            else:
+                refs = ref_st + (np.cumsum(np.flip(moves)) - 1)
+
+                for e,r in zip(evts,refs):
+                    if e < 0: continue
+                    self.conf_dots.add( (e,r) )
+
+            #kmer       =       tabs[C['kmer']]
+            #match_prob = float(tabs[C['match_prob']])
+            #self.seed_kmers[(e, refs[-1])] = (kmer, match_prob)
+
 
             #print(path_id,parent,fm_start,fm_len,kmer,full_len,seed_prob,moves)
 
@@ -444,26 +509,14 @@ class DebugParser:
 
         self.bce_samps = np.array(bce_samps)
         self.bce_refs = np.array(bce_refs) - BCE_K + 1
+        self.max_ref = self.min_ref + max(bce_refs)
 
-        #ax.step(
-        #    bce_samps, bce_refs, 
-        #    where='post', color='blue', 
-        #    linewidth=1.5, alpha=0.25, 
-        #    zorder=4
-        #)
-
-        ##return bce_samps, bce_refs
-        #if len(bce_samps) > 0:
-        #    return bce_samps, bce_refs
-        #else:
-        #    return None,None
 
     def _cig_query_to_refs(self, paf):
         cig = paf.tags.get('cg', (None,)*2)[0]
         if cig is None: return None
 
         qr_rfs = defaultdict(list)
-
 
         qr_i = paf.qr_st
         rf_i = 0#paf.rf_st
