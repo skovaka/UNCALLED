@@ -15,7 +15,7 @@ Read the [preprint on BioRxiv](https://www.biorxiv.org/content/10.1101/2020.02.0
 ## Installation
 
 ```
-pip3 install git+https://github.com/skovaka/UNCALLED.git --user
+> pip3 install git+https://github.com/skovaka/UNCALLED.git --user
 ```
 
 OR
