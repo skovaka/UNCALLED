@@ -26,7 +26,7 @@ OR
 > python3 setup.py install --user
 ```
 
-Requires python >= 3.6, read-until == 3.0.0, pybind11 >= 2.5.0, and GCC >= 4.8.1 (note: python modules will be automatically installed by setup.py)
+Requires python >= 3.6, read-until == 3.0.0, pybind11 >= 2.5.0, and GCC >= 4.8.1 (all except GCC are automatically downloaded and installed)
 
 Other dependecies are included via submodules, so be sure to clone with `git --recursive`
 
@@ -46,6 +46,8 @@ Optional arguments:
 
 
 Note that this command will use a previously built BWA index if all the required files exist with the specified prefix. Otherwise, a new BWA index will be automatically built. 
+
+We recommend applying repeat masking your reference if it contains eukaryotic sequences. See [masking](masking/) for more details.
 
 ## Fast5 Mapping
 
@@ -95,9 +97,9 @@ d9acafe3-23dd-4a0f-83db-efe299ee59a4 1355 *     *     *     *      *      *     
 8a6ec472-a289-4c50-9a75-589d7c21ef99 451  98 369 + Escherichia_coli 4765434 3421845 3422097 56 253 255 ch:i:490 st:i:29456 mt:f:79.419411 wt:f:8.551202 kp:f:0.097424
 ```
 
-We recommend that you try mapping fast5s via `uncalled map` before real-time enrichment, as runtime issues involving hdf5 libraries could come up if UNCALLED is not installed properly.
+We recommend that you try mapping fast5s via `uncalled map` before real-time enrichment, as runtime issues could occur if UNCALLED is not installed properly.
 
-The command can generally be run at any time before or during a sequencing run, although an error may occur if UNCALLED is run before any sequencing run has been started in the current MinKNOW session. If this is occurs, you can start UNCALLED during the first max scan. If you want to change the chunk size you must run the commend *before* starting the run (see below). 
+The command can generally be run at any time before or during a sequencing run, although an error may occur if UNCALLED is run before any sequencing run has been started in the current MinKNOW session. If this is happens you should start UNCALLED after the run begins, ideally during the first mux scan. If you want to change the chunk size you must run the commend *before* starting the run (see below). 
 
 Arguments:
 
@@ -231,7 +233,7 @@ UNCALLED is a work in progress. Many parameters exist that are not documented he
 
 ## Release notes
 
-- v2.2: added event profiler which masks out pore stalls, and compile-time debug options
+- v2.2: added event profiler which masks out pore stalls, and added compile-time debug options
 - v2.1: updated ReadUntil client for latest MinKNOW version, made `uncalled index` automatically build the BWA index, added hdf5 submodule, further automated installation by auto-building hdf5, switched to using setuptools, moved submodules to submods/
 - v2.0: released the ReadUntil simulator `uncalled sim`, which can predict how much enrichment UNCALLED could provide on a given reference, using a control and UNCALLED run as a template. Also CHANGED THE FORMAT OF CERTAIN ARGUMENTS. Index prefix and fast5 list are now positional, and some flags have changed names. See below for details.
 - v1.2: fixed indexing for particularly large or small reference
