@@ -375,10 +375,12 @@ bool Mapper::chunk_mapped() {
 bool Mapper::map_chunk() {
     wait_time_ += map_timer_.lap();
 
-    if (reset_ || chunk_timer_.get() > PRMS.chunk_timeout) {
+    if (reset_ || 
+        chunk_timer_.get() > PRMS.chunk_timeout ||
+        event_i_ >= PRMS.max_events) {
+
         set_failed();
         read_.loc_.set_ended();
-        //std::cerr << "# END timer or reset\n";
         return true;
 
     } else if (norm_.empty() && 
@@ -1006,14 +1008,6 @@ void Mapper::dbg_seeds_out(
     std::string rf_name;
     u64 ref_st = 0;
     fmi.translate_loc(sa_half, rf_name, ref_st);
-
-    if (ref_st == 0) {
-        std::cerr << rf_name << "\t"
-                  << sa_start << "\t"
-                  << sa_half << "\t"
-                  << static_cast<int>(path.type_head()) << "\t"
-                  << static_cast<int>(path.type_tail()) << "\n";
-    }
 
     seeds_out_ << rf_name << "\t"
                << ref_st << "\t"

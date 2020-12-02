@@ -63,7 +63,6 @@ std::vector<Paf> MapPoolOrd::update() {
 
     channels_empty_ = true;
 
-
     for (u32 i = 0; i < channels_.size(); i++) {
         if (channels_[i].empty()) continue;
         channels_empty_ = false;
@@ -74,10 +73,11 @@ std::vector<Paf> MapPoolOrd::update() {
             continue;
         }
 
+
         //Get next chunk
         ReadBuffer &r = channels_[i].front();
         Chunk chunk = r.get_chunk(chunk_idx_[i]);
-        
+
         //Try adding to pool
         //If sucessfful, move to next chunk
         if (pool_.try_add_chunk(chunk)) {
