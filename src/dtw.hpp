@@ -6,23 +6,38 @@
 #include <cfloat>
 #include "util.hpp"
 
-enum DTWSubSeq {NONE, ROW, COL};
+enum class DTWSubSeq {NONE, ROW, COL};
+typedef struct {
+    DTWSubSeq subseq;
+    float dw, hw, vw;
+} DTWParams;
+
+const DTWParams 
+    DTW_EVENT_GLOB = {
+        DTWSubSeq::NONE, 2, 1, 100
+    }, DTW_EVENT_QSUB = {
+        DTWSubSeq::COL, 2, 1, 100
+    }, DTW_EVENT_RSUB = {
+        DTWSubSeq::ROW, 2, 1, 100
+    }, DTW_RAW_QSUB = {
+        DTWSubSeq::COL, 10, 1, 1000
+    }, DTW_RAW_RSUB = {
+        DTWSubSeq::ROW, 10, 1, 1000
+    }, DTW_RAW_GLOB = {
+        DTWSubSeq::NONE, 10, 1, 1000
+    };
 
 
-template < class RowT, class ColT, typename Func >
+template < class ColT, class RowT, typename Func >
 class DTW {
     public:
 
-    typedef struct {
-        DTWSubSeq subseq;
-        float dw, hw, vw;
-        const Func &fn;
-    } Prms;
-
-    DTW(const std::vector<RowT> &row_vals,
-        const std::vector<ColT> &col_vals,   
-        const Prms &p) : 
-        prms(p),
+    DTW(const std::vector<ColT> &col_vals,   
+        const std::vector<RowT> &row_vals,
+        const DTWParams &p,
+        const Func &fn) : 
+        PRMS(p),
+        fn_(fn),
         rvals_(row_vals),
         cvals_(col_vals) {
 
@@ -33,25 +48,16 @@ class DTW {
         traceback();
     }
 
-    DTW(const std::vector<RowT> &row_vals,
-        const std::vector<ColT> &col_vals,   
-        DTWSubSeq subseq,
-        float dw, 
-        float hw, 
-        float vw,
-        const Func &fn) :
-        DTW ( row_vals, col_vals, {subseq,dw,hw,vw,fn} ) {}
-
     void compute_matrix() {
         u64 k = 0;
         float cost, ds, hs, vs;
         for (u64 i = 0; i < rvals_.size(); i++) {
             for (u64 j = 0; j < cvals_.size(); j++) {
 
-                cost = prms.fn(rvals_[i], cvals_[j]);
-                ds = dscore(i,j) + (prms.dw * cost);
-                hs = hscore(i,j) + (prms.hw * cost);
-                vs = vscore(i,j) + (prms.vw * cost);
+                cost = fn_(rvals_[i], cvals_[j]);
+                ds = dscore(i,j) + (PRMS.dw * cost);
+                hs = hscore(i,j) + (PRMS.hw * cost);
+                vs = vscore(i,j) + (PRMS.vw * cost);
 
                 if (ds <= hs && ds <= vs) {
                     mat_[k] = ds;
@@ -70,7 +76,7 @@ class DTW {
     void traceback() {
         u64 i = rvals_.size()-1, j = cvals_.size()-1;
 
-        switch (prms.subseq) {
+        switch (PRMS.subseq) {
             case DTWSubSeq::ROW:
                 for (u64 k = 0; k < rvals_.size(); k++) {
                     if (mat_[k*cvals_.size() + j] < mat_[i*cvals_.size() + j]) { 
@@ -91,11 +97,11 @@ class DTW {
 
         score_sum_ = mat_[i*cvals_.size() + j];
 
-        path_.push_back(std::pair<u64, u64>(i, j));
+        path_.push_back(std::pair<u64, u64>(j, i));
 
         u64 k = i*cvals_.size() + j;
-        while(!(i == 0 || prms.subseq == DTWSubSeq::ROW) ||
-              !(j == 0 || prms.subseq == DTWSubSeq::COL)) {
+        while(!(i == 0 || PRMS.subseq == DTWSubSeq::ROW) ||
+              !(j == 0 || PRMS.subseq == DTWSubSeq::COL)) {
 
             if (i == 0 || bcrumbs_[k] == Move::H) {
                 k--;
@@ -109,7 +115,7 @@ class DTW {
                 j--;
             }
 
-            path_.push_back(std::pair<u64, u64>(i, j));
+            path_.push_back(std::pair<u64, u64>(j, i));
         }
     }
 
@@ -132,7 +138,7 @@ class DTW {
                 << p->second << "\t"
                 << rvals_[p->first] << "\t"
                 << cvals_[p->second] << "\t"
-                << prms.fn(rvals_[p->first], cvals_[p->second]) << "\t"
+                << fn_(rvals_[p->first], cvals_[p->second]) << "\t"
                 << "\n";
         }
     } 
@@ -141,7 +147,8 @@ class DTW {
     enum Move {D, H, V}; //Horizontal, vertical, diagonal
     static constexpr float MAX_COST = FLT_MAX / 2.0;
 
-    const Prms prms;
+    const DTWParams PRMS;
+    const Func &fn_;
 
     const std::vector<RowT> &rvals_;
     const std::vector<ColT> &cvals_;
@@ -153,24 +160,76 @@ class DTW {
 
     inline float hscore(u64 i, u64 j) {
         if (j > 0) return mat_[cvals_.size()*i + j-1];
-        else if (prms.subseq == DTWSubSeq::ROW) return 0;
+        else if (PRMS.subseq == DTWSubSeq::ROW) return 0;
         return MAX_COST;
     }
 
     inline float vscore(u64 i, u64 j) {
         if (i > 0) return mat_[cvals_.size()*(i-1) + j];
-        else if (prms.subseq == DTWSubSeq::COL) return 0;
+        else if (PRMS.subseq == DTWSubSeq::COL) return 0;
         else return MAX_COST;
     }
 
     inline float dscore(u64 i, u64 j) {
         if (j > 0 && i > 0) return mat_[cvals_.size()*(i-1) + j-1];
         else if ((j == i) || 
-                 (i == 0 && prms.subseq == DTWSubSeq::COL) || 
-                 (j == 0 && prms.subseq == DTWSubSeq::ROW)) return 0;
+                 (i == 0 && PRMS.subseq == DTWSubSeq::COL) || 
+                 (j == 0 && PRMS.subseq == DTWSubSeq::ROW)) return 0;
         return MAX_COST;
     }
+
+    #ifdef PYBIND
+    
+    static void pybind_defs(pybind11::class_<DTW> &c) {
+    }
+    #endif
 };
 
+float dtwcost_r94p(u16 k, float e) {
+    return -pmodel_r94_template.match_prob(e,k);
+}
+class DTWr94p : public DTW<float, u16, decltype(dtwcost_r94p)> {
+    public:
+    DTWr94p(const std::vector<float> &means,
+            const std::vector<u16> &kmers,
+            const DTWParams &prms) 
+        : DTW(means, kmers, prms, dtwcost_r94p) {}
+
+    #ifdef PYBIND
+    #define PY_DTW_R94P_METH(P) c.def(#P, &DTWr94p::P);
+    static void pybind_defs(pybind11::class_<DTWr94p> &c) {
+        c.def(pybind11::init<const std::vector<float>&, 
+                             const std::vector<u16>&,
+                             const DTWParams&>());
+        PY_DTW_R94P_METH(get_path)
+        PY_DTW_R94P_METH(score)
+        PY_DTW_R94P_METH(mean_score)
+    }
+    #endif
+    
+};
+
+float dtwcost_r94d(u16 k, float e) {
+    return abs(e-pmodel_r94_template.get_mean(k));
+}
+class DTWr94d : public DTW<float, u16, decltype(dtwcost_r94d)> {
+    public:
+    DTWr94d(const std::vector<float> &means,
+            const std::vector<u16> &kmers,
+            const DTWParams &prms) 
+        : DTW(means, kmers, prms, dtwcost_r94d) {}
+
+    #ifdef PYBIND
+    #define PY_DTW_R94D_METH(P) c.def(#P, &DTWr94d::P);
+    static void pybind_defs(pybind11::class_<DTWr94d> &c) {
+        c.def(pybind11::init<const std::vector<float>&, 
+                             const std::vector<u16>&,
+                             const DTWParams&>());
+        PY_DTW_R94D_METH(get_path)
+        PY_DTW_R94D_METH(score)
+        PY_DTW_R94D_METH(mean_score)
+    }
+    #endif
+};
 
 #endif

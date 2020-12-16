@@ -2,18 +2,20 @@
 #include <math.h>
 #include <unordered_map>
 
+#include "event_profiler.hpp"
 #include "normalizer.hpp"
+#include "model_r94.inl"
 #include "pore_model.hpp"
 #include "fast5_reader.hpp"
 #include "bwa_index.hpp"
 #include "dtw.hpp"
 
-const std::string CONF_DIR(std::getenv("UNCALLED_CONF")),
-                  DEF_MODEL = CONF_DIR + "/r94_5mers.txt",
-                  DEF_CONF = CONF_DIR + "/defaults.toml";
-
-//bool load_conf(int argc, char** argv, Conf &conf);
+//const std::string CONF_DIR(std::getenv("UNCALLED_CONF")),
+//                  DEF_MODEL = CONF_DIR + "/r94_5mers.txt",
+//                  DEF_CONF = CONF_DIR + "/defaults.toml";
 //
+//bool load_conf(int argc, char** argv, Conf &conf);
+
 
 typedef struct {
     std::string rd_name, rf_name;
@@ -69,17 +71,14 @@ int main(int argc, char** argv) {
         out_prefix = std::string(argv[4]);
     }
 
-    const PoreModel<KLEN> model(DEF_MODEL, false);
+    auto model = pmodel_r94_template;
 
-    auto costfn = [&model](float e, u16 k) {return -model.match_prob(e,k);};
-    //auto costfn = [&model](float e, u16 k) {return abs(e-model.get_mean(k));};
-
-    DTW<float, u16, decltype(costfn)>::Prms dtwp = {
+    DTWParams dtwp = {
         DTWSubSeq::NONE, //substr
-        1,1,1,          //d,v,h
-        costfn};         //fn
+        1,1,1};         //d,v,h
 
     EventDetector evdt;
+    EventProfiler evpr;
 
     BwaIndex<KLEN> idx(index_prefix);
     idx.load_pacseq();
@@ -134,10 +133,16 @@ int main(int argc, char** argv) {
 
         //Create events if needed
         if (create_events) {
-            norm.set_signal(evdt.get_means(signal));
-            //std::cout << "scale=" << norm.get_scale() << "\t"
-            //          << "shift=" << norm.get_shift() << "\n";
-            //continue;
+            auto events = evdt.get_events(signal);
+            auto mask = evpr.get_full_mask(events);
+            signal.clear();
+
+            for (u32 i = 0; i < events.size(); i++) {
+                if (mask[i]) signal.push_back(events[i].mean);
+            }
+            
+            norm.set_signal(signal);
+
         } else {
             norm.set_signal(signal);
         }
@@ -148,12 +153,13 @@ int main(int argc, char** argv) {
         while (!norm.empty()) signal.push_back(norm.pop());
 
         //Takes up too much space :(
-        if (signal.size() > 500000) {
-            return 1;
+        if (signal.size() > 50000) {
+            std::cerr << "Skipping " << read.get_id() << "\n";
+            continue;
         }
 
 
-        DTW<float, u16, decltype(costfn)> dtw(signal, kmers, dtwp);
+        DTWr94d dtw(kmers, signal, dtwp);
 
         if (!out_prefix.empty()) {
             std::string path_fname = out_prefix+read.get_id()+".txt";

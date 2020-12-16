@@ -126,34 +126,48 @@ class EventProfiler {
         return next_evt_.mean;
     }
 
-    //#ifdef PYBIND
+    std::vector<bool> get_full_mask(const std::vector<Event> &events) {
+        std::vector<bool> mask;
+        mask.reserve(events.size());
 
-    //#define PY_CHUNK_METH(P) c.def(#P, &Chunk::P);
-    //#define PY_CHUNK_PROP(P) c.def_property(#P, &Chunk::get_##P, &Chunk::set_##P);
-    //#define PY_CHUNK_RPROP(P) c.def_property_readonly(#P, &Chunk::get_##P);
+        reset();
+        for (auto &e : events) {
+            add_event(e);
+            if (is_full()) {
+                mask.push_back(to_mask_ == 0);
+            }
+        }
+        
+        while (mask.size() < events.size()) {
+            if (to_mask_ == 0) {
+                mask.push_back(true);
+            } else {
+                mask.push_back(false);
+                to_mask_--;
+            }
+        }
 
-    //static void pybind_defs(pybind11::class_<Chunk> &c) {
-    //    c.def(pybind11::init<
-    //        const std::string &, //id, 
-    //        u16, u32, u64, //channel, number, start
-    //        const std::string &, //dtype
-    //        const std::string & //raw_str
-    //    >());
-    //    c.def(pybind11::init<
-    //        const std::string &, //id, 
-    //        u16, u32, u64, //channel, number, start
-    //        const std::vector<float> &, //raw_data, 
-    //        u32, u32 //raw_st, raw_len
-    //    >());
-    //    PY_CHUNK_METH(pop);
-    //    PY_CHUNK_METH(swap);
-    //    PY_CHUNK_METH(empty);
-    //    PY_CHUNK_METH(print);
-    //    PY_CHUNK_METH(size);
-    //    PY_CHUNK_RPROP(channel);
-    //    PY_CHUNK_RPROP(number);
-    //}
+        return mask;
+    }
+
+    #ifdef PYBIND
+
+    #define PY_EVENT_PROFILER_METH(P) c.def(#P, &EventProfiler::P);
+    #define PY_EVENT_PROFILER_PROP(P) c.def_property(#P, &EventProfiler::get_##P, &EventProfiler::set_##P);
+    #define PY_EVENT_PROFILER_RPROP(P) c.def_property_readonly(#P, &EventProfiler::get_##P);
+
+    static void pybind_defs(pybind11::class_<EventProfiler> &c) {
+        c.def(pybind11::init());
+        PY_EVENT_PROFILER_METH(reset)
+        PY_EVENT_PROFILER_METH(set_norm)
+        PY_EVENT_PROFILER_METH(add_event)
+        PY_EVENT_PROFILER_METH(is_full)
+        PY_EVENT_PROFILER_METH(event_ready)
+        PY_EVENT_PROFILER_METH(anno_event)
+        PY_EVENT_PROFILER_METH(next_mean)
+        PY_EVENT_PROFILER_METH(get_full_mask)
+    }
+    #endif
 
 };
-
 #endif

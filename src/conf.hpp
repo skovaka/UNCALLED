@@ -64,6 +64,7 @@ class Conf {
     u16 threads;
 
     Mapper::Params &mapper_prms = Mapper::PRMS;
+    Normalizer::Params &norm_prms = mapper_prms.norm_prms;
     EventDetector::Params &event_prms = mapper_prms.event_prms;
     EventProfiler::Params &evt_prof_prms = mapper_prms.evt_prof_prms;
     SeedTracker::Params &seed_prms = mapper_prms.seed_prms;
@@ -180,7 +181,6 @@ class Conf {
             GET_TOML_EXTERN(float, min_seed_prob, mapper_prms);
             GET_TOML_EXTERN(std::string, bwa_prefix, mapper_prms);
             GET_TOML_EXTERN(std::string, idx_preset, mapper_prms);
-            GET_TOML_EXTERN(u32, evt_buffer_len, mapper_prms);
             GET_TOML_EXTERN(u16, evt_batch_size, mapper_prms);
             GET_TOML_EXTERN(float, evt_timeout, mapper_prms);
             GET_TOML_EXTERN(float, chunk_timeout, mapper_prms);
@@ -196,6 +196,13 @@ class Conf {
             GET_TOML_EXTERN(float, min_mean_conf,seed_prms);
             GET_TOML_EXTERN(float, min_top_conf, seed_prms);
             GET_TOML_EXTERN(u32, min_map_len, seed_prms);
+        }
+
+        if (conf.contains("normalizer")) {
+            const auto subconf = toml::find(conf, "normalizer");
+            GET_TOML_EXTERN(u32, len, norm_prms);
+            GET_TOML_EXTERN(float, tgt_mean, norm_prms);
+            GET_TOML_EXTERN(float, tgt_stdv, norm_prms);
         }
 
         if (conf.contains("event_detector")) {

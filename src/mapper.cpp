@@ -35,7 +35,6 @@ Mapper::Params Mapper::PRMS {
     max_events      : 30000,
     max_stay_frac   : 0.5,
     min_seed_prob   : -3.75,
-    evt_buffer_len  : 6000,
     evt_batch_size  : 5,
     evt_timeout     : 10.0,
     chunk_timeout   : 4000.0,
@@ -66,6 +65,7 @@ u32 Mapper::PATH_TAIL_MOVE = 0;
 Mapper::Mapper() :
     evdt_(PRMS.event_prms),
     evt_prof_(PRMS.evt_prof_prms),
+    norm_(PRMS.norm_prms),
     seed_tracker_(PRMS.seed_prms),
     state_(State::INACTIVE) {
 

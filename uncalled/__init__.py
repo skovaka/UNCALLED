@@ -1,5 +1,3 @@
 from _uncalled import *
-#from uncalled.minknow_client import Client
-from uncalled import index, pafstats, sim_utils, args, debug
+from uncalled import index, pafstats, sim_utils, args, debug, minknow_client
 
-#TODO further flatten module structure, then fix uncalled script

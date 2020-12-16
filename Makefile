@@ -23,7 +23,7 @@ _COMMON_OBJS=mapper.o seed_tracker.o range.o event_detector.o normalizer.o chunk
 _MAP_ORD_OBJS=$(_COMMON_OBJS) realtime_pool.o map_pool_ord.o uncalled_map_ord.o 
 _MAP_OBJS=$(_COMMON_OBJS) map_pool.o uncalled_map.o 
 _SIM_OBJS=$(_COMMON_OBJS) realtime_pool.o client_sim.o uncalled_sim.o 
-_DTW_OBJS=dtw_test.o fast5_reader.o read_buffer.o normalizer.o chunk.o event_detector.o range.o
+_DTW_OBJS=dtw_test.o fast5_reader.o read_buffer.o normalizer.o chunk.o event_detector.o range.o event_profiler.o
 
 _ALL_OBJS=$(_COMMON_OBJS) realtime_pool.o map_pool.o uncalled_map.o uncalled_map_ord.o client_sim.o uncalled_sim.o dtw_test.o
 

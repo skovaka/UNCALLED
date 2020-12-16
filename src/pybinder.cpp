@@ -6,6 +6,7 @@
 #include "realtime_pool.hpp"
 #include "client_sim.hpp"
 #include "model_r94.inl"
+#include "dtw.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -44,6 +45,9 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<EventDetector> event_detector(m, "EventDetector");
     EventDetector::pybind_defs(event_detector, event);
 
+    py::class_<EventProfiler>  event_profiler(m, "EventProfiler");
+    EventProfiler::pybind_defs(event_profiler);
+
     py::class_<Normalizer> norm(m, "Normalizer");
     Normalizer::pybind_defs(norm);
 
@@ -65,5 +69,24 @@ PYBIND11_MODULE(_uncalled, m) {
     m.def("seq_to_kmers",  &seq_to_kmers<KLEN>);
     m.def("kmer_neighbor", &kmer_neighbor<KLEN>);
 
+    //py::class_<DTW> dtw(m, "DTW");
+    //DTW::pybind_defs(dtw);
+
+    py::class_<DTWr94p> dtw_r94p(m, "DTWr94p");
+    DTWr94p::pybind_defs(dtw_r94p);
+
+    py::class_<DTWr94d> dtw_r94d(m, "DTWr94d");
+    DTWr94d::pybind_defs(dtw_r94d);
+
+    py::class_<DTWParams>dtwp(m, "DTWParams");
+    dtwp.def_readwrite("dw", &DTWParams::dw);
+    dtwp.def_readwrite("hw", &DTWParams::hw);
+    dtwp.def_readwrite("vw", &DTWParams::vw);
+    m.attr("DTW_EVENT_GLOB") = py::cast(DTW_EVENT_GLOB);
+    m.attr("DTW_RAW_GLOB") = py::cast(DTW_RAW_GLOB);
+    m.attr("DTW_EVENT_QSUB") = py::cast(DTW_EVENT_QSUB);
+    m.attr("DTW_EVENT_RSUB") = py::cast(DTW_EVENT_RSUB);
+    m.attr("DTW_RAW_QSUB") = py::cast(DTW_EVENT_QSUB);
+    m.attr("DTW_RAW_RSUB") = py::cast(DTW_EVENT_RSUB);
 }
 

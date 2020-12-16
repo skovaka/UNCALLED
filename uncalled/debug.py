@@ -115,7 +115,7 @@ class DebugParser:
             else:
                 self.min_ref = -mm2_paf.rf_en
         else:
-            self.min_ref = None
+            self.min_ref = self.ref_name = None
         self.max_ref = None
 
         #TODO clean these up
@@ -140,12 +140,17 @@ class DebugParser:
             self.parse_bc_aln(bce_moves)
 
         self.max_path_fm = max_path_fm
+        #TODO handle
         if max_path_fm > 0:
             if self.idx is None:
                 sys.stderr.write("Error: must include BWA index to include paths with FM overlaps\n")
                 sys.exit(1)
 
-            if self.conf_clust.fwd:
+            #if self.conf_clust.fwd:
+            fwd =  (mm2_paf is not None and mm2_paf.is_fwd or
+                    mm2_paf is None and self.conf_clust.fwd)
+
+            if fwd:
                 st = self.min_ref
                 en = self.max_ref
             else:
@@ -155,7 +160,7 @@ class DebugParser:
             fwd_fms, rev_fms = self.idx.range_to_fms(
                     self.ref_name, st, en
             )
-            fms = fwd_fms if self.mm2_paf.is_fwd else rev_fms
+            fms = fwd_fms if fwd else rev_fms
 
             self.fm_to_ref = {fms[i] : i for i in range(len(fms))}
             self.range_fms = np.sort(fms)
@@ -216,9 +221,7 @@ class DebugParser:
                 continue
 
             if self.min_evt is None:
-                print(en, self.min_samp)
                 self.min_evt = evt
-                print(self.min_evt, "MIN")
 
             if self.max_samp is not None and st > self.max_samp: 
                 break
@@ -238,7 +241,7 @@ class DebugParser:
         if self.max_evt is None or self.max_evt >= evt: 
             self.max_evt = evt
 
-        if self.max_samp is None:
+        if self.max_samp is None or st+ln < self.max_samp:
             self.max_samp = st+ln
             self.max_chunk = (self.max_samp-1) // CHUNK_LEN
 
@@ -361,7 +364,7 @@ class DebugParser:
         if self.max_ref is None:
             self.max_ref = ren
         if self.ref_name is None:
-            self.ref_name = cc.ref
+            self.ref_name = cc.rf
 
 
     #finds clusters that should expire
@@ -510,6 +513,8 @@ class DebugParser:
         self.bce_samps = np.array(bce_samps)
         self.bce_refs = np.array(bce_refs) - BCE_K + 1
         self.max_ref = self.min_ref + max(bce_refs)
+        
+        self.bc_loaded = True
 
 
     def _cig_query_to_refs(self, paf):

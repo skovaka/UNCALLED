@@ -58,7 +58,6 @@ class Mapper {
         float min_seed_prob;
 
         //realtime only
-        u32 evt_buffer_len;
         u16 evt_batch_size;
         float evt_timeout;
         float chunk_timeout;
