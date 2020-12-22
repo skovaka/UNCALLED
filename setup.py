@@ -136,7 +136,12 @@ setup(
 
     setup_requires=[
         'pybind11>=2.5.0', 
-        'read-until==3.0.0'
+        'read-until==3.0.0',
+    ],
+    install_requires=[
+        'numpy==1.17.4',
+        'scipy>=1',
+        'file_read_backwards>=2'
     ],
 
     packages=find_packages(),
