@@ -14,6 +14,31 @@ Read the [preprint on BioRxiv](https://www.biorxiv.org/content/10.1101/2020.02.0
 
 ## Installation
 
+### Docker
+
+To build a Docker container image for this project,
+
+``` bash
+git clone --recursive https://github.com/skovaka/UNCALLED.git
+cd UNCALLED
+docker build -t uncalled:latest .
+```
+
+This will build an ubuntu image for you with a copy of this repo in `/opt/UNCALLED`. To start an interactive session, run
+
+``` bash
+docker run --rm -it uncalled bash
+```
+
+To add your own data, you can mount it as a volume somewhere in the container:
+
+``` bash
+docker run --rm -it -v /path/to/host/data:/data uncalled bash
+```
+
+### Native
+
+
 ```
 > pip3 install git+https://github.com/skovaka/UNCALLED.git --user
 ```
