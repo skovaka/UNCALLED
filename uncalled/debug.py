@@ -4,8 +4,6 @@ import sys, os
 import numpy as np
 import argparse
 import bisect
-from scipy.stats import linregress
-from file_read_backwards import FileReadBackwards
 from collections import defaultdict
 import re
 
@@ -385,10 +383,6 @@ class DebugParser:
         paths_fwd = open(self.paths_fname)
         head_tabs = paths_fwd.readline().split()
         C = {head_tabs[i] : i for i in range(len(head_tabs))}
-
-        #paths_fwd.close()
-        #paths_rev = FileReadBackwards(self.paths_fname)
-        #for line in paths_rev:
 
         for line in paths_fwd:
             tabs = line.split()
