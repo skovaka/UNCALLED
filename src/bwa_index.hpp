@@ -165,6 +165,10 @@ class BwaIndex {
         return kmer_ranges_[kmer];
     }
 
+    u64 get_kmer_count(u16 kmer) const {
+        return kmer_ranges_[kmer].length();
+    }
+
     Range get_base_range(u8 base) const {
         return Range(index_->L2[base], index_->L2[base+1]);
     }
@@ -342,6 +346,7 @@ class BwaIndex {
         PY_BWA_INDEX_METH(destroy);
         PY_BWA_INDEX_METH(get_neighbor);
         PY_BWA_INDEX_METH(get_kmer_range);
+        PY_BWA_INDEX_METH(get_kmer_count);
         PY_BWA_INDEX_METH(get_base_range);
         PY_BWA_INDEX_METH(sa);
         PY_BWA_INDEX_METH(size);
@@ -356,6 +361,8 @@ class BwaIndex {
         PY_BWA_INDEX_METH(get_ref_name);
         PY_BWA_INDEX_METH(get_ref_len);
         PY_BWA_INDEX_METH(range_to_fms);
+        c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(u64, u64)> (&BwaIndex::get_kmers) );
+        c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(std::string, u64, u64)> (&BwaIndex::get_kmers) );
     }
 
     #endif

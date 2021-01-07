@@ -64,6 +64,7 @@ class Mapper {
 
         std::string bwa_prefix;
         std::string idx_preset;
+        std::string model_path;
 
         SeedTracker::Params seed_prms;
         Normalizer::Params norm_prms;

@@ -40,6 +40,7 @@ Mapper::Params Mapper::PRMS {
     chunk_timeout   : 4000.0,
     bwa_prefix      : "",
     idx_preset      : "default",
+    model_path      : "",
     seed_prms       : SeedTracker::PRMS_DEF,
     norm_prms       : Normalizer::PRMS_DEF,
     event_prms      : EventDetector::PRMS_DEF,
@@ -108,6 +109,10 @@ Mapper::~Mapper() {
 void Mapper::load_static() {
 
     if (fmi.is_loaded()) return;
+
+    if (!PRMS.model_path.empty()) {
+        model = PoreModel<KLEN>(PRMS.model_path, true);
+    }
 
     fmi.load_index(PRMS.bwa_prefix);
     if (!fmi.is_loaded()) {
@@ -648,7 +653,7 @@ bool Mapper::map_next() {
         #endif
     }
 
-    dbg_conf_out();
+    //dbg_conf_out();
 
     //Update event index
     event_i_++;
@@ -899,11 +904,11 @@ void Mapper::dbg_open_all() {
             << "win_mask\n";
         #endif
 
-        #ifdef DEBUG_CONFIDENCE
-        dbg_open(conf_out_, "_conf.tsv");
-        conf_out_ << "top_conf\t"
-                  << "mean_conf\n";
-        #endif
+        //#ifdef DEBUG_CONFIDENCE
+        //dbg_open(conf_out_, "_conf.tsv");
+        //conf_out_ << "top_conf\t"
+        //          << "mean_conf\n";
+        //#endif
 
         dbg_opened_ = true;
     }
@@ -938,26 +943,26 @@ void Mapper::dbg_close_all() {
         if (events_out_.is_open()) events_out_.close();
         #endif
 
-        #ifdef DEBUG_CONFIDENCE
-        if (conf_out_.is_open()) conf_out_.close();
-        #endif
+        ///#ifdef DEBUG_CONFIDENCE
+        ///if (conf_out_.is_open()) conf_out_.close();
+        ///#endif
 
         dbg_opened_ = false;
     }
     #endif
 }
 
-void Mapper::dbg_conf_out() {
-    #ifdef DEBUG_CONFIDENCE
-    if (seed_tracker_.empty() || seed_tracker_.get_top_conf() == 0) return;
-    conf_out_ << evt_prof_.mask_idx_map_[event_i_] << "\t"
-              << seed_tracker_.get_best().id_ << "\t"
-              << seed_tracker_.get_top_conf() << "\t"
-              << seed_tracker_.get_mean_conf() << "\n";
-
-    conf_out_.flush();
-    #endif
-}
+//void Mapper::dbg_conf_out() {
+//    #ifdef DEBUG_CONFIDENCE
+//    if (seed_tracker_.empty() || seed_tracker_.get_top_conf() == 0) return;
+//    conf_out_ << evt_prof_.mask_idx_map_[event_i_] << "\t"
+//              << seed_tracker_.get_best().id_ << "\t"
+//              << seed_tracker_.get_top_conf() << "\t"
+//              << seed_tracker_.get_mean_conf() << "\n";
+//
+//    conf_out_.flush();
+//    #endif
+//}
 
 void Mapper::dbg_events_out() {
     #ifdef DEBUG_EVENTS

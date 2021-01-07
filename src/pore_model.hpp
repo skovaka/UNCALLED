@@ -105,7 +105,7 @@ class PoreModel {
     //TODO: clean up IO
     //maybe load from toml and/or header file
     //make scripts for model to toml and header?
-    PoreModel(std::string model_fname, bool cmpl) : PoreModel () {
+    PoreModel(const std::string &model_fname, bool cmpl) : PoreModel () {
 
         std::ifstream model_in(model_fname);
 
@@ -190,6 +190,7 @@ class PoreModel {
     #define PY_PORE_MODEL_METH(P) c.def(#P, &PoreModel<KLEN>::P);
 
     static void pybind_defs(pybind11::class_<PoreModel<KLEN>> &c) {
+        c.def(pybind11::init<const std::string &, bool>());
         PY_PORE_MODEL_METH(match_prob);
         PY_PORE_MODEL_METH(get_means_mean);
         PY_PORE_MODEL_METH(get_means_stdv);
