@@ -393,10 +393,6 @@ class DebugParser:
         head_tabs = paths_fwd.readline().split()
         C = {head_tabs[i] : i for i in range(len(head_tabs))}
 
-        #paths_fwd.close()
-        #paths_rev = FileReadBackwards(self.paths_fname)
-        #for line in paths_rev:
-
         for line in paths_fwd:
             tabs = line.split()
             if tabs[0] == head_tabs[0]: continue
