@@ -4,8 +4,6 @@ import sys, os
 import numpy as np
 import argparse
 import bisect
-from scipy.stats import linregress
-from file_read_backwards import FileReadBackwards
 from collections import defaultdict
 import re
 
@@ -315,8 +313,12 @@ class DebugParser:
             if self.max_clust is not None:
                 conf_clust = self.max_clust
                 self.conf_evt = conf_clust.evts[-1]
+                print("tHERE", self.max_evt)
             else:
                 self.conf_evt = self.max_evt
+                print("HERE", self.max_evt)
+        else:
+            print("MAPPED?")
 
         self._set_conf_clust(conf_clust)
         self._parse_expired(clust_ids)
@@ -329,6 +331,8 @@ class DebugParser:
         self.conf_clust = cc
 
         if cc is None: return
+
+        print(cc.evts, self.conf_evt)
 
         self.conf_idx = np.searchsorted(cc.evts, self.conf_evt, side='right')-1
         self.conf_len = cc.lens[self.conf_idx]
