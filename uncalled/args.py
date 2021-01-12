@@ -303,4 +303,4 @@ def load_conf(argv):
             if hasattr(conf, a):
                 setattr(conf, a, v)
 
-    return conf, args
+    return parser, conf, args

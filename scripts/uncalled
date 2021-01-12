@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # MIT License
 #
@@ -22,8 +22,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-#TODO try to improve module names
-#from uncalled import *
 import sys                         
 import os
 import argparse
@@ -34,8 +32,6 @@ import subprocess
 import traceback
 import uncalled as unc
 import numpy as np
-
-#from uncalled import mapping, index, pafstats, minknow_client, sim_utils, args
 
 MAX_SLEEP = 0.01
 
@@ -87,7 +83,7 @@ def fast5_path(fname):
 
     path = os.path.abspath(fname)
     if not os.path.isfile(path):
-        sys.stderr.write("Warning: \"%s\" is not a fast5 file.\n")
+        sys.stderr.write("Warning: \"%s\" is not a fast5 file.\n" % fname)
         return None
 
     return path
@@ -95,6 +91,11 @@ def fast5_path(fname):
 def load_fast5s(fast5s, recursive):
     for path in fast5s:
         path = path.strip()
+
+        if not os.path.exists(path):
+            sys.stderr.write("Error: \"%s\" does not exist\n" % path)
+            sys.exit(1)
+
         isdir = os.path.isdir(path)
 
         #Recursive directory search 
@@ -109,7 +110,7 @@ def load_fast5s(fast5s, recursive):
                 yield fast5_path(os.path.join(path, fname))
 
         #Read fast5 name directly
-        elif path.endswith("fast5"):
+        elif path.endswith(".fast5"):
             yield fast5_path(path)
 
         #Read fast5 filenames from text file
@@ -332,7 +333,7 @@ def list_ports_cmd(args):
 if __name__ == "__main__":
     
 
-    conf, args = unc.args.load_conf(sys.argv)
+    parser, conf, args = unc.args.load_conf(sys.argv)
 
     if args.subcmd == "index":
         index_cmd(args)

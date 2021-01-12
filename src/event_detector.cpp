@@ -21,7 +21,6 @@ const EventDetector::Params EventDetector::PRMS_DEF = {
     threshold2     : 9.0,
     peak_height    : 0.2,
 
-    //TODO need to adjust once calibration figured out
     min_mean       : 0,
     max_mean       : 200
 };

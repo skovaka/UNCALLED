@@ -83,8 +83,8 @@ uncalled = Extension(
     "_uncalled",
 
     sources = [
-       "src/event_profiler.cpp", 
        "src/pybinder.cpp",
+       "src/event_profiler.cpp", 
        "src/client_sim.cpp",
        "src/fast5_reader.cpp",
        "src/mapper.cpp",
@@ -100,7 +100,7 @@ uncalled = Extension(
     ],
 
     include_dirs = [
-        "./submods", #TODO: consistent incl paths?
+        "./submods",
         "./submods/hdf5/include", 
         "./submods/fast5/include",
         "./submods/pdqsort",
@@ -109,11 +109,14 @@ uncalled = Extension(
     ],
 
     library_dirs = [
-        "./submods/bwa", 
-        "./submods/hdf5/lib"
+        "./submods/bwa"
     ],
+    
+    extra_objects = [                 
+        "./submods/hdf5/lib/libhdf5.a"
+    ],                                
 
-    libraries = ["bwa", "hdf5", "z", "dl", "m"],
+    libraries = ["bwa", "z", "dl", "m"],
 
     extra_compile_args = ["-std=c++11", "-O3"],
 
