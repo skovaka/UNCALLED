@@ -223,6 +223,7 @@ void Mapper::reset() {
     last_chunk_ = false;
     state_ = State::MAPPING;
     norm_.skip_unread();
+    //norm_.reset();
 
     seed_tracker_.reset();
     evdt_.reset();
