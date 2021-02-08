@@ -25,6 +25,9 @@
 #include <exception>
 #include "mapper.hpp"
 #include "model_r94.inl"
+#include "model_r94_rna.inl"
+
+bool IS_RNA = true;
 
 Mapper::Params Mapper::PRMS {
     seed_len        : 22,
@@ -54,7 +57,8 @@ Mapper::Params Mapper::PRMS {
 BwaIndex<KLEN> Mapper::fmi;
 std::vector<float> Mapper::prob_threshes_;
 
-PoreModel<KLEN> Mapper::model = pmodel_r94_complement;
+//PoreModel<KLEN> Mapper::model = pmodel_r94_complement;
+PoreModel<KLEN> Mapper::model = pmodel_r94_rna_template;
 
 const std::array<u8,Mapper::EVENT_TYPES.size()> Mapper::EVENT_TYPES = {
     Mapper::EVENT_STAY,
@@ -675,7 +679,13 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         //TODO: store in buffer, replace sa_checked
         //
         //Reverse the reference coords so they both go L->R
-        u64 sa_end = fmi.size() - fmi.sa(s);
+
+        u64 sa_end;
+        //if (IS_RNA) {
+         //   sa_end = fmi.sa(s);
+        //} else {
+            sa_end = fmi.size() - fmi.sa(s);
+        //}
 
         u32 ref_len = path.move_count() + KLEN - 1;
         u64 sa_start = sa_end - ref_len + 1;
@@ -706,11 +716,13 @@ u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
 }                  
 
 void Mapper::set_ref_loc(const SeedCluster &seeds) {
-    bool fwd = seeds.ref_st_ < fmi.size() / 2;
+
+    bool flip = seeds.ref_st_ >= fmi.size() / 2;
+    bool fwd = (flip && IS_RNA) || (!flip && !IS_RNA);
 
     u64 sa_st;
-    if (fwd) sa_st = seeds.ref_st_;
-    else      sa_st = fmi.size() - (seeds.ref_en_.end_ + KLEN - 1);
+    if (flip) sa_st = fmi.size() - (seeds.ref_en_.end_ + KLEN - 1);
+    else sa_st = seeds.ref_st_;
     
     std::string rf_name;
     u64 rd_st = event_to_bp(seeds.evt_st_ - PRMS.seed_len),
@@ -888,6 +900,7 @@ void Mapper::dbg_open_all() {
             << "kmer\t"
             << "full_len\t"
             << "match_prob\t"
+            << "seed_prob\t"
             << "moves\n";
         #endif
 
@@ -999,17 +1012,23 @@ void Mapper::dbg_seeds_out(
     //TODO de-duplicate code
     //should be storing SA coordinate anyway
     
-    //TODO clearly deliniate fm_coord, sa_coord(fw/rv), pacseq_coord, ann_coord
+    u64 sa_st;
 
-    bool fwd = sa_start < (fmi.size() / 2);
+    bool flip = sa_start >= fmi.size() / 2;
+    bool fwd = (flip && IS_RNA) || (!flip && !IS_RNA);
 
-    //TODO change sa_ to clarify unstranded
     u32 sa_half;
-    if (fwd) {
-        sa_half = sa_start;
-    } else {
-        sa_half = fmi.size() - (sa_start + ref_len - 1);
-    }
+    if (flip) sa_half = fmi.size() - (sa_start + ref_len - 1);
+    else sa_half = sa_start;
+
+    //bool fwd = sa_start < (fmi.size() / 2);
+
+    ////TODO change sa_ to clarify unstranded
+    //if (fwd) {
+    //    sa_half = sa_start;
+    //} else {
+    //    sa_half = fmi.size() - (sa_start + ref_len - 1);
+    //}
 
     std::string rf_name;
     u64 ref_st = 0;
@@ -1061,7 +1080,8 @@ void Mapper::dbg_paths_out() {
 
         paths_out_ 
             << p.total_move_len_ << "\t"
-            << p.prob_head() << "\t";
+            << p.prob_head() << "\t"
+            << p.seed_prob_ << "\t";
 
 
         if (p.is_valid()) {

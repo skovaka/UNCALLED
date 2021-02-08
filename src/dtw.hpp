@@ -5,6 +5,7 @@
 #include <iostream>
 #include <cfloat>
 #include "util.hpp"
+#include "model_r94_rna.inl"
 
 enum class DTWSubSeq {NONE, ROW, COL};
 typedef struct {
@@ -25,6 +26,8 @@ const DTWParams
         DTWSubSeq::ROW, 10, 1, 1000
     }, DTW_RAW_GLOB = {
         DTWSubSeq::NONE, 10, 1, 1000
+    }, DTW_GLOB = {
+        DTWSubSeq::NONE, 1, 1, 1
     };
 
 
@@ -54,7 +57,7 @@ class DTW {
         for (u64 i = 0; i < rvals_.size(); i++) {
             for (u64 j = 0; j < cvals_.size(); j++) {
 
-                cost = fn_(rvals_[i], cvals_[j]);
+                cost = fn_(cvals_[j], rvals_[i]);
                 ds = dscore(i,j) + (PRMS.dw * cost);
                 hs = hscore(i,j) + (PRMS.hw * cost);
                 vs = vscore(i,j) + (PRMS.vw * cost);
@@ -185,10 +188,35 @@ class DTW {
     #endif
 };
 
-float dtwcost_r94p(u16 k, float e) {
+typedef float RawKmerCmp(float, u16);
+
+float dtwcost_r94d_rna(float e, u16 k) {
+    return abs(e-pmodel_r94_rna_template.get_mean(k));
+}
+class DTWr94dRNA : public DTW<float, u16, RawKmerCmp> {
+    public:
+    DTWr94dRNA(const std::vector<float> &means,
+            const std::vector<u16> &kmers,
+            const DTWParams &prms) 
+        : DTW(means, kmers, prms, dtwcost_r94d_rna) {}
+
+    #ifdef PYBIND
+    #define PY_DTW_D_METH(P) c.def(#P, &DTWr94dRNA::P);
+    static void pybind_defs(pybind11::class_<DTWr94dRNA> &c) {
+        c.def(pybind11::init<const std::vector<float>&, 
+                             const std::vector<u16>&,
+                             const DTWParams&>());
+        PY_DTW_D_METH(get_path)
+        PY_DTW_D_METH(score)
+        PY_DTW_D_METH(mean_score)
+    }
+    #endif
+};
+
+float dtwcost_r94p(float e, u16 k) {
     return -pmodel_r94_template.match_prob(e,k);
 }
-class DTWr94p : public DTW<float, u16, decltype(dtwcost_r94p)> {
+class DTWr94p : public DTW<float, u16, RawKmerCmp> {
     public:
     DTWr94p(const std::vector<float> &means,
             const std::vector<u16> &kmers,
@@ -209,10 +237,11 @@ class DTWr94p : public DTW<float, u16, decltype(dtwcost_r94p)> {
     
 };
 
-float dtwcost_r94d(u16 k, float e) {
+
+float dtwcost_r94d(float e, u16 k) {
     return abs(e-pmodel_r94_template.get_mean(k));
 }
-class DTWr94d : public DTW<float, u16, decltype(dtwcost_r94d)> {
+class DTWr94d : public DTW<float, u16, RawKmerCmp> {
     public:
     DTWr94d(const std::vector<float> &means,
             const std::vector<u16> &kmers,

@@ -9,11 +9,18 @@ import re
 
 SEED_LEN = 22
 MIN_CLUST = 25
-SAMPLE_RATE = 4000
 CHUNK_LEN = 4000
 
+IS_RNA = True
+
+if IS_RNA:
+    SAMPLE_RATE = 3012
+    BCE_STRIDE = 10
+else:
+    SAMPLE_RATE = 4000
+    BCE_STRIDE = 5
+
 #Guppy basecalled event stride and kmer length
-BCE_STRIDE = 5
 BCE_K = 4
 
 MAX_CHUNK_DEF = 3
@@ -25,6 +32,11 @@ CIG_OPS = set(CIG_OPS_STR)
 CIG_INCR_ALL = {'M','=', 'X'}
 CIG_INCR_RD = CIG_INCR_ALL | {'I','S'}
 CIG_INCR_RF = CIG_INCR_ALL | {'D','N'}
+
+BASES = "ACGT"
+
+def coords_inverted(fwd):
+    return not (fwd or IS_RNA) or (fwd and IS_RNA)
 
 class DebugParser:
     CONF_PAD_COEF = 2
@@ -108,12 +120,19 @@ class DebugParser:
 
         if mm2_paf is not None:
             self.ref_name = mm2_paf.rf_name
-            if mm2_paf.is_fwd:
-                self.min_ref = mm2_paf.rf_st
-            else:
+            self.fwd = mm2_paf.is_fwd
+
+            self.inv_coords = coords_inverted(mm2_paf.is_fwd)
+            if self.inv_coords:
                 self.min_ref = -mm2_paf.rf_en
+            else:
+                self.min_ref = mm2_paf.rf_st
+
         else:
-            self.min_ref = self.ref_name = None
+            self.inv_coords = None
+            self.min_ref = None
+            self.ref_name = None
+
         self.max_ref = None
 
         #TODO clean these up
@@ -137,31 +156,75 @@ class DebugParser:
         if mm2_paf is not None and bce_moves is not None:
             self.parse_bc_aln(bce_moves)
 
+        #TODO: could look at path bufs, but need to specify coords
+        #also can store max cluster, but need to store cids
+        self.empty = self.mm2_paf is None and self.conf_clust is None
+        if self.empty:
+            return
+
         self.max_path_fm = max_path_fm
-        #TODO handle
         if max_path_fm > 0:
             if self.idx is None:
                 sys.stderr.write("Error: must include BWA index to include paths with FM overlaps\n")
                 sys.exit(1)
 
-            #if self.conf_clust.fwd:
-            fwd =  (mm2_paf is not None and mm2_paf.is_fwd or
-                    mm2_paf is None and self.conf_clust.fwd)
+            #fwd =  (mm2_paf is not None and mm2_paf.is_fwd or
+            #        mm2_paf is None and self.max_clust.fwd)
 
-            if fwd:
+            #inv = coords_inverted(fwd)
+            if not self.inv_coords:
                 st = self.min_ref
                 en = self.max_ref
             else:
                 st = -self.max_ref
                 en = -self.min_ref
 
+            ############
+            #sa_st = self.idx.get_sa_loc(self.ref_name, st)
+
+            #seq = ""
+            #for i in range(en-st+1):
+            #    c = BASES[self.idx.get_base(sa_st+i)]
+            #    print(i, c)
+            #    seq = seq + c
+
+            #print(seq)
+            ############
+
             fwd_fms, rev_fms = self.idx.range_to_fms(
-                    self.ref_name, st, en
+                    self.ref_name, st, en+1
             )
-            fms = fwd_fms if fwd else rev_fms
+            #fms = fwd_fms if fwd else rev_fms
+            fms = fwd_fms if not self.inv_coords else rev_fms
+
+            #print(fms)
 
             self.fm_to_ref = {fms[i] : i for i in range(len(fms))}
-            self.range_fms = np.sort(fms)
+
+            fm_ord = np.argsort(fms)
+            if self.bc_loaded:
+                #print(len(fms), self.bce_refs[-1]-self.bce_refs[0], self.bce_refs[0])
+
+                evt = np.searchsorted(self.evt_ens, self.bce_samps[0])
+                evt_range = range(0, len(self.events))
+                ref_range = range(self.bce_refs[0], self.bce_refs[-1]+1)
+
+                self.range_fm_evts = [set() for r in range(len(fms))]
+
+                for bce_s,bce_r in zip(self.bce_samps, self.bce_refs):
+                    while evt in evt_range and self.evt_ens[evt] < bce_s:
+                        evt += 1
+                    if evt > len(self.evt_ens): break
+
+                    N = 1
+                    for e in range(evt-N, evt+N+1):
+                        for r in range(bce_r-N, bce_r+N+1):
+                            if e in evt_range and r in ref_range:
+                                self.range_fm_evts[r+3].add(e)
+
+                self.range_fm_evts = np.array(self.range_fm_evts)[fm_ord]
+
+            self.range_fms = np.array(fms)[fm_ord]
 
         else:
             self.fwd_fms = self.rev_fms = None
@@ -245,6 +308,9 @@ class DebugParser:
 
         self.evts_loaded = True
 
+        self.evt_sts,self.evt_lns,self.evt_mns,self.evt_sds = map(np.array, zip(*self.events))
+        self.evt_ens = self.evt_sts + self.evt_lns
+
         self.win_means = np.array(self.win_means)
         self.win_stdvs = np.array(self.win_stdvs)
         self.evt_mask = np.array(self.evt_mask)
@@ -295,7 +361,7 @@ class DebugParser:
 
             if clust.id == self.conf_cid:
                 conf_clust = clust
-                if clust.fwd:
+                if not coords_inverted(clust.fwd):
                     #self.conf_pbs[(evt,pb)] = en
                     self.conf_pbs[(evt,pb)] = st
                 else:
@@ -310,15 +376,11 @@ class DebugParser:
         #Handle unmapped reads
         #TODO: mark them more explicitly
         if not self.mapped:
-            if self.max_clust is not None:
-                conf_clust = self.max_clust
-                self.conf_evt = conf_clust.evts[-1]
-                print("tHERE", self.max_evt)
-            else:
+                #conf_clust = self.max_clust
+                #self.conf_evt = len(self.events)-1
+            #else:
+            if self.max_clust is None:
                 self.conf_evt = self.max_evt
-                print("HERE", self.max_evt)
-        else:
-            print("MAPPED?")
 
         self._set_conf_clust(conf_clust)
         self._parse_expired(clust_ids)
@@ -330,9 +392,10 @@ class DebugParser:
     def _set_conf_clust(self, cc):
         self.conf_clust = cc
 
-        if cc is None: return
+        if cc is None: 
+            self.plot_conf = False
+            return
 
-        print(cc.evts, self.conf_evt)
 
         self.conf_idx = np.searchsorted(cc.evts, self.conf_evt, side='right')-1
         self.conf_len = cc.lens[self.conf_idx]
@@ -348,27 +411,34 @@ class DebugParser:
         self.min_idx = np.searchsorted(cc.evts, self.min_evt, side='left')
         self.max_idx = np.searchsorted(cc.evts, self.max_evt, side='right')-1
 
-        if cc.fwd:
+        if not coords_inverted(cc.fwd):
             rst = cc.rsts[self.min_idx] - SEED_LEN
             ren = cc.rens[self.max_idx]+1
         else:
             rst = -cc.rsts[self.min_idx] - SEED_LEN
             ren = -cc.rens[self.max_idx]-1
 
-        ref_span = ren-rst
-        if ref_span > 0:
-            self.evrf_ratio = (self.max_evt) / ref_span
-        else:
-            self.evrf_ratio = 1
+        #ref_span = ren-rst
+        #if ref_span > 0:
+        #    self.evrf_ratio = (self.max_evt) / ref_span
+        #else:
+        #    self.evrf_ratio = 1
 
         self.max_clust_len = cc.lens[self.max_idx]
 
-        if self.min_ref is None:
+        if self.mm2_paf is not None:
+            mst,men = self.mm2_paf.ext_ref()
+            self.plot_conf = self.ref_name == cc.rf and max(rst,mst) < min(ren,men)
+        else:
+            self.plot_conf = True
+            self.fwd = cc.fwd
             self.min_ref = rst
-        if self.max_ref is None:
             self.max_ref = ren
-        if self.ref_name is None:
             self.ref_name = cc.rf
+            self.inv_coords = coords_inverted(cc.fwd)
+            #if self.min_ref is None:
+            #if self.max_ref is None:
+            #if self.ref_name is None:
 
 
     #finds clusters that should expire
@@ -389,11 +459,11 @@ class DebugParser:
 
         path_counts = list()
 
-        paths_fwd = open(self.paths_fname)
-        head_tabs = paths_fwd.readline().split()
+        paths = open(self.paths_fname)
+        head_tabs = paths.readline().split()
         C = {head_tabs[i] : i for i in range(len(head_tabs))}
 
-        for line in paths_fwd:
+        for line in paths:
             tabs = line.split()
             if tabs[0] == head_tabs[0]: continue
             path_id  = tuple(map(int, tabs[C['id']].split(':')))
@@ -410,12 +480,12 @@ class DebugParser:
             if evt < self.min_evt or evt >= self.max_evt: 
                 continue
 
-            e = evt-self.min_evt
+            evt = evt-self.min_evt
 
-            if not self.evt_mask[e-len(moves)]: 
+            if not self.evt_mask[evt-len(moves)]: 
                 continue
 
-            evts = np.arange(e-len(moves), e) + 1
+            evts = np.arange(evt-len(moves), evt) + 1
 
             if not is_conf:
                 fm_len    =   int(tabs[C['fm_len']])
@@ -428,14 +498,23 @@ class DebugParser:
                 i = np.searchsorted(self.range_fms, fm_start)
 
                 while i < len(self.range_fms) and self.range_fms[i] < fm_start+fm_len: 
-                    ref_en = self.fm_to_ref[self.range_fms[i]]
-                    refs = ref_en - np.sum(moves) + np.cumsum(np.flip(moves)) - 3
+                    if not self.bc_loaded or evt in self.range_fm_evts[i]:
+                        ref_en = self.fm_to_ref[self.range_fms[i]] - 3
 
-                    print(ref_en, path_id)
+                        print("%d:%d" % path_id)
 
-                    for e,r in zip(evts,refs):
-                        if e < 0: continue
-                        self.path_lens[(e,r)] = max(self.path_lens[(e,r)], np.log2(fm_len))
+                        #refs = ref_en - np.sum(moves) + np.cumsum(np.flip(moves)) - 3
+
+                        p = (evt,ref_en)
+                        self.path_lens[(evt,ref_en)] = min(
+                                np.log2(fm_len), self.path_lens.get(p, np.inf)
+                        )
+
+                        #self.path_lens[(evt,ref_en)] = min(self.path_lens[(evt,ref_en)], np.log2(fm_len))
+
+                        #for e,r in zip(evts,refs):
+                        #    if e < 0: continue
+                        #    self.path_lens[(e,r)] = min(self.path_lens[(e,r)], np.log2(fm_len))
                     i += 1
 
             else:
@@ -481,6 +560,7 @@ class DebugParser:
             
 
     def parse_bc_aln(self, bce_moves):
+
         #List of ref coords for each query (read) cord
         qr_to_rfs = self._cig_query_to_refs(self.mm2_paf)
 
@@ -523,12 +603,16 @@ class DebugParser:
 
         qr_rfs = defaultdict(list)
 
-        qr_i = paf.qr_st
+        if IS_RNA:
+            qr_i = paf.qr_len - paf.qr_en 
+        else:
+            qr_i = paf.qr_st
+
         rf_i = 0#paf.rf_st
 
         cig_ops = CIG_RE.findall(cig)
 
-        if not paf.is_fwd:
+        if coords_inverted(paf.is_fwd):
             cig_ops = reversed(cig_ops)
 
         for l,c in cig_ops:
@@ -537,8 +621,11 @@ class DebugParser:
             incr_rf = c in CIG_INCR_RF
             qr_j = qr_i + (l if incr_qr else 1)
             rf_j = rf_i + (l if incr_rf else 1)
-            for qr,rf in zip(range(qr_i, qr_j), range(rf_i, rf_j)):
-                qr_rfs[qr].append(rf)
+            if c == "M":
+                for qr,rf in zip(range(qr_i, qr_j), range(rf_i, rf_j)):
+                    qr_rfs[qr].append(rf)
+            #for qr,rf in zip(range(qr_i, qr_j), range(rf_i, rf_j)):
+            #    qr_rfs[qr].append(rf)
 
             if incr_qr:
                 qr_i = qr_j 
@@ -567,6 +654,10 @@ class SeedCluster:
         self.lens = [self.gains[0]]
         self.fwd = fwd
         self.exp_evt = None
+
+        #if IS_RNA:
+        #    self.fwd = not fwd
+
 
     def expired(self, evt=None):
         return False #

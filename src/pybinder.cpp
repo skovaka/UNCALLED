@@ -41,6 +41,7 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Fast5Reader> fast5_reader(m, "Fast5Reader");
     Fast5Reader::pybind_defs(fast5_reader);
 
+
     py::class_<Event> event(m, "Event");
     py::class_<EventDetector> event_detector(m, "EventDetector");
     EventDetector::pybind_defs(event_detector, event);
@@ -55,6 +56,8 @@ PYBIND11_MODULE(_uncalled, m) {
     PoreModel<KLEN>::pybind_defs(model);
     m.attr("pmodel_r94_template") = py::cast(pmodel_r94_template);
     m.attr("pmodel_r94_complement") = py::cast(pmodel_r94_complement);
+    m.attr("pmodel_r94_rna_template") = py::cast(pmodel_r94_rna_template);
+    m.attr("pmodel_r94_rna_complement") = py::cast(pmodel_r94_rna_complement);
 
     m.def("self_align", &self_align);
 
@@ -78,12 +81,16 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<DTWr94d> dtw_r94d(m, "DTWr94d");
     DTWr94d::pybind_defs(dtw_r94d);
 
+    py::class_<DTWr94dRNA> dtw_r94dRNA(m, "DTWr94dRNA");
+    DTWr94dRNA::pybind_defs(dtw_r94dRNA);
+
     py::class_<DTWParams>dtwp(m, "DTWParams");
     dtwp.def_readwrite("dw", &DTWParams::dw);
     dtwp.def_readwrite("hw", &DTWParams::hw);
     dtwp.def_readwrite("vw", &DTWParams::vw);
     m.attr("DTW_EVENT_GLOB") = py::cast(DTW_EVENT_GLOB);
     m.attr("DTW_RAW_GLOB") = py::cast(DTW_RAW_GLOB);
+    m.attr("DTW_GLOB") = py::cast(DTW_GLOB);
     m.attr("DTW_EVENT_QSUB") = py::cast(DTW_EVENT_QSUB);
     m.attr("DTW_EVENT_RSUB") = py::cast(DTW_EVENT_RSUB);
     m.attr("DTW_RAW_QSUB") = py::cast(DTW_EVENT_QSUB);

@@ -41,9 +41,6 @@ BWA_SUFFS = [AMB_SUFF, ANN_SUFF, BWT_SUFF, PAC_SUFF, SA_SUFF]
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-MODEL_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers.txt")
-CONF_DEFAULTS = os.path.join(ROOT_DIR, "conf/defaults.toml")
-
 def power_fn(xmax, ymin, ymax, exp, N=100):
     dt = 1.0/N
     t = np.arange(0, 1+dt, dt)
@@ -51,7 +48,7 @@ def power_fn(xmax, ymin, ymax, exp, N=100):
     return t*xmax, (t**exp) * (ymax-ymin) + ymin
 
 class IndexParameterizer:
-    MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_threshs.txt")
+    MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_rna_threshs.txt")
 
     def __init__(self, args):
         self.out_fname = args.bwa_prefix + UNCL_SUFF
