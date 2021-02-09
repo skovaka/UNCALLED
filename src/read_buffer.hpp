@@ -142,7 +142,7 @@ class ReadBuffer {
     //TODO private outside Fast5Reader (friend?)
     ReadBuffer();
     ReadBuffer(const std::string &filename);
-    ReadBuffer(const hdf5_tools::File &file, const std::string &raw_path, const std::string &ch_path);
+    ReadBuffer(const hdf5_tools::File &file, const std::string &raw_path, const std::string &ch_path, const std::string &seg_path);
     
     ReadBuffer(Chunk &first_chunk);
 

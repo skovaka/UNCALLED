@@ -197,7 +197,8 @@ void ReadBuffer::clear() {
 
 ReadBuffer::ReadBuffer(const hdf5_tools::File &file, 
                        const std::string &raw_path, 
-                       const std::string &ch_path) {
+                       const std::string &ch_path, 
+                       const std::string &seg_path) {
 
     for (auto a : file.get_attr_map(raw_path)) {
         if (a.first == "read_id") {
@@ -222,6 +223,14 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file,
         }
     }
 
+    u32 samp_st = 0;
+    for (auto a : file.get_attr_map(seg_path)) {
+        if (a.first == "first_sample_template") {
+            samp_st = atoi(a.second.c_str());
+        }
+    }
+
+
     std::string sig_path = raw_path + "/Signal";
     std::vector<i16> int_data; 
     file.read(sig_path, int_data);
@@ -236,8 +245,12 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file,
     //full_signal_.reserve(int_data.size());
 
     //full_signal_.assign(int_data.begin(), int_data.end());
-    for (u16 raw : int_data) {
-		float calibrated = (cal_range * raw / cal_digit) + cal_offset;
+    //for (u16 raw : int_data) {
+    for (u64 i = 0; i < samp_st; i++) {
+        full_signal_.push_back(60); //DUMB
+    }
+    for (u64 i = samp_st; i < int_data.size(); i++) {
+		float calibrated = (cal_range * int_data[i] / cal_digit) + cal_offset;
         full_signal_.push_back(calibrated);
     }
 

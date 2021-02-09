@@ -197,7 +197,7 @@ u32 Fast5Reader::fill_buffer() {
         }
         if (read_paths_.empty()) break;
 
-        std::string raw_path, ch_path;
+        std::string raw_path, ch_path, seg_path;
 
         switch (open_fmt_) {
             case Format::SINGLE:
@@ -207,6 +207,7 @@ u32 Fast5Reader::fill_buffer() {
             case Format::MULTI:
                 raw_path = read_paths_.front() + FMT_RAW_PATHS[open_fmt_],
                 ch_path =  read_paths_.front() + FMT_CH_PATHS[open_fmt_];
+                seg_path = read_paths_.front() + "/Analyses/Segmentation_000/Summary/segmentation";
                 break;
             default:
                 std::cerr << "Error: unrecognized fast5 format\n";
@@ -218,7 +219,7 @@ u32 Fast5Reader::fill_buffer() {
         //            ch_path =  read_paths_.front() + FMT_CH_PATHS[open_fmt_];
         read_paths_.pop_front();
 
-        buffered_reads_.emplace_back(open_fast5_, raw_path, ch_path);
+        buffered_reads_.emplace_back(open_fast5_, raw_path, ch_path, seg_path);
 
         count++;
         total_buffered_++;
