@@ -11,7 +11,7 @@ SEED_LEN = 22
 MIN_CLUST = 25
 CHUNK_LEN = 4000
 
-IS_RNA = True
+IS_RNA = False#True
 
 if IS_RNA:
     SAMPLE_RATE = 3012
@@ -155,6 +155,8 @@ class DebugParser:
         self.bc_loaded = False
         if mm2_paf is not None and bce_moves is not None:
             self.parse_bc_aln(bce_moves)
+        else:
+            print(mm2_paf, bce_moves)
 
         #TODO: could look at path bufs, but need to specify coords
         #also can store max cluster, but need to store cids
@@ -299,6 +301,10 @@ class DebugParser:
 
             evt += 1
 
+        if len(self.events) == 0:
+            self.evts_loaded = False
+            return False
+
         if self.max_evt is None or self.max_evt >= evt: 
             self.max_evt = evt
 
@@ -411,12 +417,8 @@ class DebugParser:
         self.min_idx = np.searchsorted(cc.evts, self.min_evt, side='left')
         self.max_idx = np.searchsorted(cc.evts, self.max_evt, side='right')-1
 
-        if not coords_inverted(cc.fwd):
-            rst = cc.rsts[self.min_idx] - SEED_LEN
-            ren = cc.rens[self.max_idx]+1
-        else:
-            rst = -cc.rsts[self.min_idx] - SEED_LEN
-            ren = -cc.rens[self.max_idx]-1
+        rst = cc.rsts[self.min_idx] - SEED_LEN
+        ren = cc.rens[self.max_idx]+1
 
         #ref_span = ren-rst
         #if ref_span > 0:
@@ -428,12 +430,22 @@ class DebugParser:
 
         if self.mm2_paf is not None:
             mst,men = self.mm2_paf.ext_ref()
-            self.plot_conf = self.ref_name == cc.rf and max(rst,mst) < min(ren,men)
+            self.plot_conf = self.ref_name == cc.rf
+            if coords_inverted(cc.fwd):
+                self.plot_conf = self.plot_conf and max(ren,mst) < min(rst,men)
+            else:
+                self.plot_conf = self.plot_conf and max(rst,mst) < min(ren,men)
         else:
             self.plot_conf = True
             self.fwd = cc.fwd
-            self.min_ref = rst
-            self.max_ref = ren
+
+            if coords_inverted(cc.fwd):
+                self.min_ref = -rst
+                self.max_ref = -ren
+            else:
+                self.min_ref = rst
+                self.max_ref = ren
+
             self.ref_name = cc.rf
             self.inv_coords = coords_inverted(cc.fwd)
             #if self.min_ref is None:
@@ -498,10 +510,12 @@ class DebugParser:
                 i = np.searchsorted(self.range_fms, fm_start)
 
                 while i < len(self.range_fms) and self.range_fms[i] < fm_start+fm_len: 
+                    #if True:#not self.bc_loaded or evt in self.range_fm_evts[i]:
                     if not self.bc_loaded or evt in self.range_fm_evts[i]:
                         ref_en = self.fm_to_ref[self.range_fms[i]] - 3
 
-                        print("%d:%d" % path_id)
+                        #print("%d:%d\t%d\t%d" % (evt,pb,ref_en,fm_len))
+                        print("%d:%d" % (evt,pb))
 
                         #refs = ref_en - np.sum(moves) + np.cumsum(np.flip(moves)) - 3
 
@@ -621,9 +635,9 @@ class DebugParser:
             incr_rf = c in CIG_INCR_RF
             qr_j = qr_i + (l if incr_qr else 1)
             rf_j = rf_i + (l if incr_rf else 1)
-            if c == "M":
-                for qr,rf in zip(range(qr_i, qr_j), range(rf_i, rf_j)):
-                    qr_rfs[qr].append(rf)
+            #if c == "M":
+            for qr,rf in zip(range(qr_i, qr_j), range(rf_i, rf_j)):
+                qr_rfs[qr].append(rf)
             #for qr,rf in zip(range(qr_i, qr_j), range(rf_i, rf_j)):
             #    qr_rfs[qr].append(rf)
 

@@ -27,7 +27,6 @@
 #include "model_r94.inl"
 #include "model_r94_rna.inl"
 
-bool IS_RNA = true;
 
 Mapper::Params Mapper::PRMS {
     seed_len        : 22,
@@ -57,8 +56,9 @@ Mapper::Params Mapper::PRMS {
 BwaIndex<KLEN> Mapper::fmi;
 std::vector<float> Mapper::prob_threshes_;
 
-//PoreModel<KLEN> Mapper::model = pmodel_r94_complement;
-PoreModel<KLEN> Mapper::model = pmodel_r94_rna_template;
+bool IS_RNA = false;
+PoreModel<KLEN> Mapper::model = IS_RNA ? pmodel_r94_rna_template : pmodel_r94_complement;
+
 
 const std::array<u8,Mapper::EVENT_TYPES.size()> Mapper::EVENT_TYPES = {
     Mapper::EVENT_STAY,

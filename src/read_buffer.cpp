@@ -224,12 +224,14 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file,
     }
 
     u32 samp_st = 0;
-    for (auto a : file.get_attr_map(seg_path)) {
-        if (a.first == "first_sample_template") {
-            samp_st = atoi(a.second.c_str());
+
+    if (!seg_path.empty()) {
+        for (auto a : file.get_attr_map(seg_path)) {
+            if (a.first == "first_sample_template") {
+                samp_st = atoi(a.second.c_str());
+            }
         }
     }
-
 
     std::string sig_path = raw_path + "/Signal";
     std::vector<i16> int_data; 
