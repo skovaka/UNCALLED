@@ -207,7 +207,7 @@ u32 Fast5Reader::fill_buffer() {
             case Format::MULTI:
                 raw_path = read_paths_.front() + FMT_RAW_PATHS[open_fmt_],
                 ch_path =  read_paths_.front() + FMT_CH_PATHS[open_fmt_];
-                //seg_path = read_paths_.front() + "/Analyses/Segmentation_000/Summary/segmentation";
+                seg_path = read_paths_.front() + "/Analyses/Segmentation_000/Summary/segmentation";
                 break;
             default:
                 std::cerr << "Error: unrecognized fast5 format\n";
