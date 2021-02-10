@@ -56,7 +56,7 @@ Mapper::Params Mapper::PRMS {
 BwaIndex<KLEN> Mapper::fmi;
 std::vector<float> Mapper::prob_threshes_;
 
-bool IS_RNA = false;
+bool IS_RNA = true;
 PoreModel<KLEN> Mapper::model = IS_RNA ? pmodel_r94_rna_template : pmodel_r94_complement;
 
 

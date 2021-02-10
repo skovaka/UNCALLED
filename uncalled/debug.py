@@ -155,8 +155,6 @@ class DebugParser:
         self.bc_loaded = False
         if mm2_paf is not None and bce_moves is not None:
             self.parse_bc_aln(bce_moves)
-        else:
-            print(mm2_paf, bce_moves)
 
         #TODO: could look at path bufs, but need to specify coords
         #also can store max cluster, but need to store cids
@@ -510,8 +508,8 @@ class DebugParser:
                 i = np.searchsorted(self.range_fms, fm_start)
 
                 while i < len(self.range_fms) and self.range_fms[i] < fm_start+fm_len: 
-                    #if True:#not self.bc_loaded or evt in self.range_fm_evts[i]:
-                    if not self.bc_loaded or evt in self.range_fm_evts[i]:
+                    if True:#not self.bc_loaded or evt in self.range_fm_evts[i]:
+                    #if not self.bc_loaded or evt in self.range_fm_evts[i]:
                         ref_en = self.fm_to_ref[self.range_fms[i]] - 3
 
                         #print("%d:%d\t%d\t%d" % (evt,pb,ref_en,fm_len))
