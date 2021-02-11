@@ -7,7 +7,8 @@
 #ifndef _INCL_EVENT_DETECTOR
 #define _INCL_EVENT_DETECTOR
 
-#include <fast5.hpp>
+//#include "fast5.hpp"
+#include <vector>
 #include "util.hpp"
 
 #ifdef PYBIND

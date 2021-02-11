@@ -27,7 +27,8 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
-#include <fast5/hdf5_tools.hpp>
+//#include <fast5/hdf5_tools.hpp>
+#include "hdf5_tools.hpp"
 #include "util.hpp"
 #include "chunk.hpp"
 

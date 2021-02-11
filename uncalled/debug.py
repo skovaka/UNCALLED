@@ -620,12 +620,13 @@ class DebugParser:
         else:
             qr_i = paf.qr_st
 
-        rf_i = 0#paf.rf_st
 
         cig_ops = CIG_RE.findall(cig)
 
         if coords_inverted(paf.is_fwd):
             cig_ops = reversed(cig_ops)
+
+        rf_i = 0
 
         for l,c in cig_ops:
             l = int(l)

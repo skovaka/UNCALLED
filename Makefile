@@ -10,7 +10,7 @@ BWA_LIB=-L./submods/bwa $(LIBBWA)
 BWA_INCLUDE=-I./submods/bwa
 
 LIBS=$(HDF5_LIB) $(BWA_LIB) -lstdc++ -lz -ldl -pthread -lm 
-INCLUDE=-I submods/ -I submods/toml11 -I submods/fast5/include -I submods/pybind11/include -I submods/pdqsort $(HDF5_INCLUDE) $(BWA_INCLUDE)
+INCLUDE=-I submods/ -I submods/toml11 -I submods/pybind11/include -I submods/pdqsort $(HDF5_INCLUDE) $(BWA_INCLUDE)
 
 SRC=src
 BUILD=build
