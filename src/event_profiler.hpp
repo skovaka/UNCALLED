@@ -1,6 +1,7 @@
 #ifndef _INCL_EVENT_PROFILER
 #define _INCL_EVENT_PROFILER
 
+#include <deque>
 #include "event_detector.hpp"
 #include "normalizer.hpp"
 

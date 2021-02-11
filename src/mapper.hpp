@@ -26,6 +26,7 @@
 
 #include <iostream>
 #include <vector>
+#include <mutex>
 #include "bwa_index.hpp"
 #include "normalizer.hpp"
 #include "event_detector.hpp"
