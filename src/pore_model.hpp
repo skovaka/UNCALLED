@@ -27,6 +27,9 @@
 #include <array>
 #include <utility>
 #include <cmath>
+#include <functional>
+#include <cfloat>
+#include <algorithm>
 #include "event_detector.hpp"
 #include "util.hpp"
 #include "bp.hpp"
@@ -40,7 +43,7 @@ template<KmerLen KLEN>
 class PoreModel {
 
     private:
-    std::vector<float> lv_means_, lv_vars_x2_, lognorm_denoms_;
+    std::vector<float> lv_means_, lv_stdvs_, lv_vars_x2_, lognorm_denoms_;
     float model_mean_, model_stdv_;
     u16 kmer_count_;
     bool loaded_, complement_;
@@ -57,6 +60,7 @@ class PoreModel {
 
     void init_kmer(u16 k, float mean, float stdv) {
         lv_means_[k] = mean;
+        lv_stdvs_[k] = stdv;
         lv_vars_x2_[k] = 2 * stdv * stdv;
         lognorm_denoms_[k] = log(sqrt(M_PI * lv_vars_x2_[k]));
     }
@@ -69,6 +73,7 @@ class PoreModel {
         kmer_count_ = kmer_count<KLEN>();
 
         lv_means_.resize(kmer_count_);
+        lv_stdvs_.resize(kmer_count_);
         lv_vars_x2_.resize(kmer_count_);
         lognorm_denoms_.resize(kmer_count_);
     }
@@ -130,11 +135,6 @@ class PoreModel {
 
             model_in >> kmer_str >> lv_mean >> lv_stdv; 
 
-            std::cerr << "setting "
-                      << kmer_str << " "
-                      << lv_mean << " "
-                      << lv_stdv << "\n";
-
             //Get unique ID for the kmer
             kmer = str_to_kmer<KLEN>(kmer_str);
 
@@ -169,6 +169,18 @@ class PoreModel {
         return match_prob(evt.mean, kmer);
     }
 
+    float match_diff(float samp, u16 kmer) const {
+        return std::abs(samp - lv_means_[kmer]);
+    }
+
+    std::vector<float> match_probs(std::vector<float> means, std::vector<u16> kmers) const {
+        std::vector<float> probs(means.size());
+        for (u32 i = 0; i < means.size(); i++) {
+            probs[i] = match_prob(means[i], kmers[i]);
+        }
+        return probs;
+    }
+
     float get_means_mean() const {
         return model_mean_;
     }
@@ -181,9 +193,84 @@ class PoreModel {
         return lv_means_[kmer];
     }
 
+    float get_stdv(u16 kmer) const {
+        return lv_stdvs_[kmer];
+    }
+
     bool is_loaded() const {
         return loaded_;
     }
+
+    void calc_roc(std::vector<float> means, std::vector<u16> kmers, u32 n_threshs, bool prob_score) {
+
+        float min_score = FLT_MAX,
+              max_score = 0;
+        std::vector<float> tp_scores(kmers.size());
+        for (u64 i = 0; i < means.size(); i++) {
+            if (prob_score) tp_scores[i] = -match_prob(means[i], kmers[i]);
+            else tp_scores[i] = match_diff(means[i], kmers[i]);
+            min_score = std::min(min_score, tp_scores[i]);
+            max_score = std::max(max_score, tp_scores[i]);
+        }
+
+        //
+        //float min_score = tp_scores[0];
+        //float max_score = tp_scores[static_cast<u32>(tp_scores.size()*0.99)];
+        //
+        std::sort(tp_scores.begin(), tp_scores.end());
+
+        u64 dt = tp_scores.size() / (n_threshs-1);
+
+        std::vector<float> threshs;
+        for (u64 t = 0; t < tp_scores.size(); t += dt) {
+            threshs.push_back(tp_scores[t]);
+        }
+        threshs.push_back(tp_scores.back());
+
+        //float thresh = min_score, 
+        //      dt = (max_score-min_score) / n_threshs;
+        //for (u64 t = 0; t < n_threshs; t++) {
+        //    threshs[t] = thresh;
+        //    thresh += dt;
+        //}
+
+        std::vector<u64> tp_counts, fp_counts;
+        tp_counts.resize(threshs.size());
+        fp_counts.resize(threshs.size());
+
+        u64 tpr_denom = 0,//means.size();
+            fpr_denom = 0;
+
+        for (u16 k = 0; k < kmer_count_; k++) {
+            for (u64 i = 0; i < means.size(); i++) {
+                bool is_true = kmers[i] == k;
+                auto &tgt = is_true ? tp_counts : fp_counts;
+
+                float score;
+                if (prob_score) score = -match_prob(means[i], k);
+                else score = match_diff(means[i], k);
+
+                for (u64 t = 0; t < threshs.size(); t++) {
+                    tgt[t] += score <= threshs[t];
+                }
+
+                if (is_true) tpr_denom += 1;
+                else fpr_denom += 1;
+            }
+        }
+        
+        std::cout << "thresh\ttpr\tfpr\tmean_matches\n";
+        for (u64 t = 0; t < threshs.size(); t++) {
+            std::cout << threshs[t] << "\t"
+                      << (static_cast<float>(tp_counts[t]) / tpr_denom) << "\t"
+                      << (static_cast<float>(fp_counts[t]) / fpr_denom) << "\t"
+                      << (static_cast<float>(fp_counts[t]+tp_counts[t]) / means.size()) << "\n";
+        }
+    }
+
+    //void calc_roc_diff(std::vector<u16> kmers, std::vector<float> means, std::vector<float> threshs) {
+    //    calc_roc(kmers, means, threshs, &PoreModel<KLEN>::match_diff);
+    //}
 
     #ifdef PYBIND
 
@@ -192,9 +279,12 @@ class PoreModel {
     static void pybind_defs(pybind11::class_<PoreModel<KLEN>> &c) {
         c.def(pybind11::init<const std::string &, bool>());
         PY_PORE_MODEL_METH(match_prob);
+        PY_PORE_MODEL_METH(match_probs);
         PY_PORE_MODEL_METH(get_means_mean);
         PY_PORE_MODEL_METH(get_means_stdv);
         PY_PORE_MODEL_METH(get_mean);
+        PY_PORE_MODEL_METH(get_stdv);
+        PY_PORE_MODEL_METH(calc_roc);
     }
 
     #endif

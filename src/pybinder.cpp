@@ -6,6 +6,7 @@
 #include "realtime_pool.hpp"
 #include "client_sim.hpp"
 #include "model_r94.inl"
+#include "model_r94_rna.inl"
 #include "dtw.hpp"
 
 namespace py = pybind11;
@@ -74,15 +75,24 @@ PYBIND11_MODULE(_uncalled, m) {
 
     //py::class_<DTW> dtw(m, "DTW");
     //DTW::pybind_defs(dtw);
+    
+    py::class_<DTWp> dtw_p(m, "DTWp");
+    DTWp::pybind_defs(dtw_p);
 
-    py::class_<DTWr94p> dtw_r94p(m, "DTWr94p");
-    DTWr94p::pybind_defs(dtw_r94p);
+    py::class_<DTWd> dtw_d(m, "DTWd");
+    DTWd::pybind_defs(dtw_d);
 
-    py::class_<DTWr94d> dtw_r94d(m, "DTWr94d");
-    DTWr94d::pybind_defs(dtw_r94d);
+    //py::class_<DTWr94p> dtw_r94p(m, "DTWr94p");
+    //DTWr94p::pybind_defs(dtw_r94p);
 
-    py::class_<DTWr94dRNA> dtw_r94dRNA(m, "DTWr94dRNA");
-    DTWr94dRNA::pybind_defs(dtw_r94dRNA);
+    //py::class_<DTWr94d> dtw_r94d(m, "DTWr94d");
+    //DTWr94d::pybind_defs(dtw_r94d);
+
+    //py::class_<DTWr94pRNA> dtw_r94pRNA(m, "DTWr94pRNA");
+    //DTWr94pRNA::pybind_defs(dtw_r94pRNA);
+
+    //py::class_<DTWr94dRNA> dtw_r94dRNA(m, "DTWr94dRNA");
+    //DTWr94dRNA::pybind_defs(dtw_r94dRNA);
 
     py::class_<DTWParams>dtwp(m, "DTWParams");
     dtwp.def_readwrite("dw", &DTWParams::dw);

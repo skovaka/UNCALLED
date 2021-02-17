@@ -159,7 +159,7 @@ int main(int argc, char** argv) {
         }
 
 
-        DTWr94d dtw(signal, kmers, dtwp);
+        DTWd dtw(signal, kmers, model, dtwp);
 
         if (!out_prefix.empty()) {
             std::string path_fname = out_prefix+read.get_id()+".txt";

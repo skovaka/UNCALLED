@@ -5,11 +5,7 @@
 #include <iostream>
 #include <cfloat>
 #include "util.hpp"
-#include "pore_model.hpp"
-
-//TODO don't duplicate klen
-//probably should just set constant, or declare elsewhere
-const KmerLen DTW_KLEN = KmerLen::k5;
+#include "model_r94_rna.inl"
 
 enum class DTWSubSeq {NONE, ROW, COL};
 typedef struct {
@@ -35,15 +31,16 @@ const DTWParams
     };
 
 
-class DTWp {
+template < class ColT, class RowT, typename Func >
+class DTW {
     public:
 
-    DTWp(const std::vector<float> &col_vals,   
-        const std::vector<u16> &row_vals,
-        const PoreModel<DTW_KLEN> &model,
-        const DTWParams &p) : 
+    DTW(const std::vector<ColT> &col_vals,   
+        const std::vector<RowT> &row_vals,
+        const DTWParams &p,
+        const Func &fn) : 
         PRMS(p),
-        model_(model),
+        fn_(fn),
         rvals_(row_vals),
         cvals_(col_vals) {
 
@@ -60,7 +57,7 @@ class DTWp {
         for (u64 i = 0; i < rvals_.size(); i++) {
             for (u64 j = 0; j < cvals_.size(); j++) {
 
-                cost = costfn(cvals_[j], rvals_[i]);
+                cost = fn_(cvals_[j], rvals_[i]);
                 ds = dscore(i,j) + (PRMS.dw * cost);
                 hs = hscore(i,j) + (PRMS.hw * cost);
                 vs = vscore(i,j) + (PRMS.vw * cost);
@@ -137,35 +134,32 @@ class DTWp {
         return score_sum_ / path_.size();
     }
 
+    //friend std::ostream &operator<< (std::ostream &out, const DTW &a);
     void print_path(std::ostream &out) {
         for (auto p = path_.rbegin(); p != path_.rend(); p++) {
             out << p->first << "\t"
                 << p->second << "\t"
                 << rvals_[p->first] << "\t"
                 << cvals_[p->second] << "\t"
-                << costfn(cvals_[p->second], rvals_[p->first]) << "\t"
+                << fn_(rvals_[p->first], cvals_[p->second]) << "\t"
                 << "\n";
         }
     } 
 
-    protected:
+    private:
     enum Move {D, H, V}; //Horizontal, vertical, diagonal
     static constexpr float MAX_COST = FLT_MAX / 2.0;
 
     const DTWParams PRMS;
-    const PoreModel<DTW_KLEN> model_;
+    const Func &fn_;
 
-    const std::vector<u16> &rvals_;
-    const std::vector<float> &cvals_;
+    const std::vector<RowT> &rvals_;
+    const std::vector<ColT> &cvals_;
 
     std::vector<float> mat_;
     std::vector<Move> bcrumbs_;
     std::vector< std::pair<u64, u64> > path_;
     float score_sum_;
-
-    float costfn(float pA, u16 kmer) {
-        return -model_.match_prob(pA,kmer);
-    }
 
     inline float hscore(u64 i, u64 j) {
         if (j > 0) return mat_[cvals_.size()*i + j-1];
@@ -187,42 +181,30 @@ class DTWp {
         return MAX_COST;
     }
 
-    public:
-
     #ifdef PYBIND
-    #define PY_DTW_P_METH(P) c.def(#P, &DTWp::P);
-    static void pybind_defs(pybind11::class_<DTWp> &c) {
-        c.def(pybind11::init<const std::vector<float>&, 
-                             const std::vector<u16>&,
-                             const PoreModel<DTW_KLEN>,
-                             const DTWParams&>());
-        PY_DTW_P_METH(get_path)
-        PY_DTW_P_METH(score)
-        PY_DTW_P_METH(mean_score)
+    
+    static void pybind_defs(pybind11::class_<DTW> &c) {
     }
     #endif
 };
 
-class DTWd : public DTWp {
-    public: 
-    DTWd(const std::vector<float> &col_vals,   
-        const std::vector<u16> &row_vals,
-        const PoreModel<DTW_KLEN> &model,
-        const DTWParams &prms) 
-        : DTWp(col_vals, row_vals, model, prms) {}
+typedef float RawKmerCmp(float, u16);
 
-    private:
-    float costfn(float pA, u16 kmer) {
-        return abs(pA-model_.get_mean(kmer));
-    }
-
+float dtwcost_r94d_rna(float e, u16 k) {
+    return abs(e-pmodel_r94_rna_template.get_mean(k));
+}
+class DTWr94dRNA : public DTW<float, u16, RawKmerCmp> {
     public:
+    DTWr94dRNA(const std::vector<float> &means,
+            const std::vector<u16> &kmers,
+            const DTWParams &prms) 
+        : DTW(means, kmers, prms, dtwcost_r94d_rna) {}
+
     #ifdef PYBIND
-    #define PY_DTW_D_METH(P) c.def(#P, &DTWd::P);
-    static void pybind_defs(pybind11::class_<DTWd> &c) {
+    #define PY_DTW_D_METH(P) c.def(#P, &DTWr94dRNA::P);
+    static void pybind_defs(pybind11::class_<DTWr94dRNA> &c) {
         c.def(pybind11::init<const std::vector<float>&, 
                              const std::vector<u16>&,
-                             const PoreModel<DTW_KLEN>,
                              const DTWParams&>());
         PY_DTW_D_METH(get_path)
         PY_DTW_D_METH(score)
@@ -231,5 +213,75 @@ class DTWd : public DTWp {
     #endif
 };
 
+float dtwcost_r94p_rna(float e, u16 k) {
+    return -pmodel_r94_rna_template.match_prob(e,k);
+}
+class DTWr94pRNA : public DTW<float, u16, RawKmerCmp> {
+    public:
+    DTWr94pRNA(const std::vector<float> &means,
+            const std::vector<u16> &kmers,
+            const DTWParams &prms) 
+        : DTW(means, kmers, prms, dtwcost_r94p_rna) {}
+
+    #ifdef PYBIND
+    #define PY_DTW_D_RNA_METH(P) c.def(#P, &DTWr94pRNA::P);
+    static void pybind_defs(pybind11::class_<DTWr94pRNA> &c) {
+        c.def(pybind11::init<const std::vector<float>&, 
+                             const std::vector<u16>&,
+                             const DTWParams&>());
+        PY_DTW_D_RNA_METH(get_path)
+        PY_DTW_D_RNA_METH(score)
+        PY_DTW_D_RNA_METH(mean_score)
+    }
+    #endif
+};
+
+float dtwcost_r94p(float e, u16 k) {
+    return -pmodel_r94_template.match_prob(e,k);
+}
+class DTWr94p : public DTW<float, u16, RawKmerCmp> {
+    public:
+    DTWr94p(const std::vector<float> &means,
+            const std::vector<u16> &kmers,
+            const DTWParams &prms) 
+        : DTW(means, kmers, prms, dtwcost_r94p) {}
+
+    #ifdef PYBIND
+    #define PY_DTW_R94P_METH(P) c.def(#P, &DTWr94p::P);
+    static void pybind_defs(pybind11::class_<DTWr94p> &c) {
+        c.def(pybind11::init<const std::vector<float>&, 
+                             const std::vector<u16>&,
+                             const DTWParams&>());
+        PY_DTW_R94P_METH(get_path)
+        PY_DTW_R94P_METH(score)
+        PY_DTW_R94P_METH(mean_score)
+    }
+    #endif
+    
+};
+
+
+float dtwcost_r94d(float e, u16 k) {
+    return abs(e-pmodel_r94_template.get_mean(k));
+}
+class DTWr94d : public DTW<float, u16, RawKmerCmp> {
+    public:
+    DTWr94d(const std::vector<float> &means,
+            const std::vector<u16> &kmers,
+            const DTWParams &prms) 
+        : DTW(means, kmers, prms, dtwcost_r94d) {}
+
+    #ifdef PYBIND
+    #define PY_DTW_R94D_METH(P) c.def(#P, &DTWr94d::P);
+    static void pybind_defs(pybind11::class_<DTWr94d> &c) {
+        c.def(pybind11::init<const std::vector<float>&, 
+                             const std::vector<u16>&,
+                             const DTWParams&>());
+        PY_DTW_R94D_METH(get_path)
+        PY_DTW_R94D_METH(score)
+        PY_DTW_R94D_METH(mean_score)
+    }
+    #endif
+};
 
 #endif

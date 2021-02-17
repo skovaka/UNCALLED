@@ -24,6 +24,15 @@
 #ifndef _INCL_READ_BUFFER
 #define _INCL_READ_BUFFER
 
+/*TODO 
+ * Refactor into Paf and SigBuffer
+ * Paf replaces python Paf
+ *      seprate from bufs, maybe depends on them
+ * SigBuffer stores signal, time, channel, read num, etc
+ *      static link to sample rate, chunk len?
+ *      merge with Chunk, don't duplicate data
+*/
+
 #include <string>
 #include <vector>
 #include <unordered_set>
