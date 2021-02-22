@@ -38,6 +38,7 @@ Mapper::Params Mapper::PRMS {
     evt_batch_size  : 5,
     evt_timeout     : 10.0,
     chunk_timeout   : 4000.0,
+    skip_chunks     : 0,
     bwa_prefix      : "",
     idx_preset      : "default",
     model_path      : "",
@@ -316,6 +317,8 @@ u16 Mapper::process_chunk() {
     wait_time_ += map_timer_.lap();
 
     u16 nevents = 0;
+    //if (read_.chunk_count() > PRMS.skip_chunks) {
+
     for (u32 i = 0; i < read_.chunk_.size(); i++) {
         if (evdt_.add_sample(read_.chunk_[i])) {
 
@@ -329,7 +332,8 @@ u16 Mapper::process_chunk() {
             }
             #endif
 
-            if (!evt_prof_.event_ready()) continue;
+            if (!evt_prof_.event_ready() || 
+                read_.chunk_count() <= PRMS.skip_chunks) continue;
 
             auto evt_mean = evt_prof_.next_mean();
 
@@ -353,6 +357,7 @@ u16 Mapper::process_chunk() {
             nevents++;
         }
     }
+    //}
 
     dbg_events_out();
 
@@ -702,7 +707,7 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
 
 u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
     //TODO store bp_per_samp
-    return (evt_i * evdt_.mean_event_len() * ReadBuffer::PRMS.bp_per_samp()) + last*(KLEN - 1);
+    return (evt_i * evdt_.mean_event_len() * ReadBuffer::PRMS.bp_per_samp()) + last*(KLEN - 1) + (PRMS.skip_chunks * ReadBuffer::PRMS.chunk_time * ReadBuffer::PRMS.sample_rate * ReadBuffer::PRMS.bp_per_samp());
 }                  
 
 void Mapper::set_ref_loc(const SeedCluster &seeds) {

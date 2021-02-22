@@ -185,6 +185,7 @@ class Conf {
             GET_TOML_EXTERN(u16, evt_batch_size, mapper_prms);
             GET_TOML_EXTERN(float, evt_timeout, mapper_prms);
             GET_TOML_EXTERN(float, chunk_timeout, mapper_prms);
+            GET_TOML_EXTERN(u32, skip_chunks, mapper_prms);
 
             #ifdef DEBUG_OUT
             GET_TOML_EXTERN(std::string, dbg_prefix, mapper_prms);
@@ -261,6 +262,7 @@ class Conf {
     GET_SET_EXTERN(std::string, mapper_prms, model_path)
     GET_SET_EXTERN(u32, mapper_prms, max_events)
     GET_SET_EXTERN(u32, mapper_prms, seed_len);
+    GET_SET_EXTERN(u32, mapper_prms, skip_chunks);
 
     #ifdef DEBUG_OUT
     GET_SET_EXTERN(std::string, mapper_prms, dbg_prefix)
@@ -306,6 +308,7 @@ class Conf {
         DEFPRP(max_events)
         DEFPRP(seed_len);
         DEFPRP(chunk_time)
+        DEFPRP(skip_chunks)
 
         #ifdef DEBUG_OUT
         DEFPRP(dbg_prefix)

@@ -139,11 +139,6 @@ class ClientSim {
             while (!active_bounds_.empty() && intv_time(t) >= active_bounds_.front()) {
                 active_bounds_.pop_front();
                 active_ = !active_;
-                std::cerr << "switch "
-                          << active_ << " "
-                          << channel_ << " "
-                          << intv_ << " "
-                          << t << "\n";
             }
 
             return active_;
@@ -287,6 +282,14 @@ class ClientSim {
         }
 
         bool start(u32 t) {
+            
+            //Sometimes reads_ ends up empty but not intvs_
+            //due to rounding errors in sim_util prep.
+            //In that case, this sets the channel to dead.
+            if (reads_.empty()) {
+                intvs_.clear();
+            }
+
             if (!is_dead()) {
                 extra_gap_ = 0;
                 intvs_[0].start(t);

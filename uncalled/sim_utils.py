@@ -413,7 +413,7 @@ def load_sim(client, conf):
                 extra.append(ctl_reads[tgt:])
         else:
             if e >= len(extra):
-                sys.stderr.write("Not enough reads? maybe should haved checked earlier\n")
+                sys.stderr.write("Not enough reads\n")
                 sys.exit(1)
 
             new_reads = ctl_reads
@@ -427,8 +427,9 @@ def load_sim(client, conf):
                     e += 1
 
             if len(new_reads) < tgt:
-                sys.stderr.write("Not enough reads? again? not sure I should be here\n")
+                sys.stderr.write("Not enough reads\n")
                 sys.exit(1)
+
 
         sim_reads[unc.chodr[i]-1] = new_reads
 

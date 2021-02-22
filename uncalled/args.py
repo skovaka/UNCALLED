@@ -170,6 +170,11 @@ def add_ru_opts(p, conf):
             type=float, default=1, required=False, 
             help="Length of chunks in seconds"
     )
+    p.add_argument(
+            "--skip-chunks", 
+            type=int, default=0, required=False, 
+            help="Skip the first N chunks (experimental)"
+    )
 
     modes = p.add_mutually_exclusive_group(required=True)
     modes.add_argument(

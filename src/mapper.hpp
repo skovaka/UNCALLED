@@ -61,6 +61,7 @@ class Mapper {
         u16 evt_batch_size;
         float evt_timeout;
         float chunk_timeout;
+        u32 skip_chunks;
 
         std::string bwa_prefix;
         std::string idx_preset;
