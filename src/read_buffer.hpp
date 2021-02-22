@@ -28,9 +28,14 @@
  * Refactor into Paf and SigBuffer
  * Paf replaces python Paf
  *      seprate from bufs, maybe depends on them
+ *      put cigar (+cs string) parsing here
  * SigBuffer stores signal, time, channel, read num, etc
  *      static link to sample rate, chunk len?
  *      merge with Chunk, don't duplicate data
+ * 
+ * Fast5Read : SigBuffer subclass?
+ *      keep fast5 parsing stuff seperate
+ *      optionally load bc data (moves)
 */
 
 #include <string>
@@ -165,6 +170,10 @@ class ReadBuffer {
     u16 get_channel() const;
     const std::vector<float> &get_raw() const {return full_signal_;}
 
+    float operator[](u32 i) {
+        return full_signal_[i];
+    }
+
     bool add_chunk(Chunk &c);
     Chunk &&pop_chunk();
     void swap(ReadBuffer &r);
@@ -199,6 +208,9 @@ class ReadBuffer {
         PY_READ_RPROP(channel);
         PY_READ_RPROP(raw);
 
+        c.def("__len__", &ReadBuffer::size);
+        c.def("__getitem__", &ReadBuffer::operator[]);
+
         pybind11::class_<Params> p(c, "Params");
         PY_READ_PRM(num_channels);
         PY_READ_PRM(bp_per_sec);
@@ -213,12 +225,12 @@ class ReadBuffer {
     u16 channel_idx_;
     std::string id_;
     u32 number_;
-    u64 start_sample_, raw_len_;
-    std::vector<float> full_signal_, chunk_;
-    u16 chunk_count_;
-    bool chunk_processed_;
+    u64 start_sample_, raw_len_; //TODO no raw len
+    std::vector<float> full_signal_, chunk_; //TODO store one
+    u16 chunk_count_; //TODO derive from chunk_len?
+    bool chunk_processed_; //TODO move to mapper?
 
-    Paf loc_;
+    Paf loc_; //TODO move to mapper
 
     friend bool operator< (const ReadBuffer &r1, const ReadBuffer &r2);
 };

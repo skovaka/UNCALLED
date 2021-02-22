@@ -64,12 +64,16 @@ class Fast5Reader {
 
     Fast5Reader();
     Fast5Reader(const Params &p);
+    Fast5Reader(const std::vector<std::string> &fast5s, const std::vector<std::string> &reads = {}, const Params &p=PRMS_DEF);
 
     Fast5Reader(u32 max_reads, u32 max_buffer=100);
     Fast5Reader(const std::string &fast5_list, 
                 const std::string &read_list="",
                 u32 max_reads=0, u32 max_buffer=100);
 
+
+    static constexpr const char *_DOC_add_fast5 {
+    };
     void add_fast5(const std::string &fast5_path);
 
     bool load_fast5_list(const std::string &fname);
@@ -90,7 +94,7 @@ class Fast5Reader {
 
     #ifdef PYBIND
 
-    #define PY_FAST5_METH(N) c.def(#N, &Fast5Reader::N);
+    #define PY_FAST5_METH(N,D) c.def(#N, &Fast5Reader::N, D);
     #define PY_FAST5_PRM(P) p.def_readwrite(#P, &Fast5Reader::Params::P);
 
     static void pybind_defs(pybind11::class_<Fast5Reader> &c) {
@@ -99,19 +103,36 @@ class Fast5Reader {
         c.def(pybind11::init<Params>());
         c.def(pybind11::init<u32, u32>());
         c.def(pybind11::init<
+                const std::string &>());
+        c.def(pybind11::init<
+                const std::string &, 
+                const std::string &>());
+        c.def(pybind11::init<
                 const std::string &, 
                 const std::string &, 
                 u32, u32>());
+        c.def(pybind11::init<
+                const std::vector<std::string> &,
+                const std::vector<std::string> &,
+                const Params &>());
+        c.def(pybind11::init<
+                const std::vector<std::string> &, 
+                const std::vector<std::string> &
+        >());
+        c.def(pybind11::init<
+                const std::vector<std::string> &
+        >());
 
-        PY_FAST5_METH(add_fast5);
-        PY_FAST5_METH(load_fast5_list);
-        PY_FAST5_METH(add_read);
-        PY_FAST5_METH(load_read_list);
-        PY_FAST5_METH(pop_read);
-        PY_FAST5_METH(buffer_size);
-        PY_FAST5_METH(fill_buffer);
-        PY_FAST5_METH(all_buffered);
-        PY_FAST5_METH(empty);
+        
+        PY_FAST5_METH(add_fast5, "Adds a fast5 filename to the list of files to load. Should be called before popping any reads");
+        PY_FAST5_METH(load_fast5_list, "Loads a list of fast5 filenames from a text file containing one path per line");
+        PY_FAST5_METH(add_read, "Adds a read ID to the read filter");
+        PY_FAST5_METH(load_read_list, "Loads a list of read IDs from a text file to add to the read filter");
+        PY_FAST5_METH(pop_read, "");
+        PY_FAST5_METH(buffer_size, "");
+        PY_FAST5_METH(fill_buffer, "");
+        PY_FAST5_METH(all_buffered, "");
+        PY_FAST5_METH(empty, "");
 
         pybind11::class_<Params> p(c, "Params");
         PY_FAST5_PRM(fast5_list);

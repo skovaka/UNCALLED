@@ -65,6 +65,15 @@ Fast5Reader::Fast5Reader(const std::string &fast5_list,
     if (!PRMS.read_list.empty()) load_read_list(PRMS.read_list);
 }
 
+Fast5Reader::Fast5Reader(const std::vector<std::string> &fast5s, const std::vector<std::string> &reads, const Params &p) : Fast5Reader(p) {
+    for (auto &fname : fast5s) {
+        add_fast5(fname);
+    }
+    for (auto &id : reads) {
+        add_read(id);
+    }
+}
+
 Fast5Reader::Fast5Reader(u32 max_reads, u32 max_buffer) 
     : Fast5Reader("","",max_reads,max_buffer) {}
 

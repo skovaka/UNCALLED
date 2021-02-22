@@ -58,18 +58,37 @@ class EventDetector {
 
     void set_calibration(float offset, float range, float digitisation);
 
+    #ifdef DEBUG_EVDT
+    struct Debug {
+        std::vector<float> tstat1s, tstat2s;
+        std::vector<u32> peak1_idxs, peak2_idxs;
+        void reset() {
+            tstat1s.clear();
+            tstat2s.clear();
+            peak1_idxs.clear();
+            peak2_idxs.clear();
+        }
+    };
+    Debug dbg_;
+
+    Debug get_dbg() const {
+        return dbg_;
+    }
+    #endif
+
     #ifdef PYBIND
 
-    #define PY_EVTD_METH(P) d.def(#P, &EventDetector::P);
-    #define PY_EVTD_PRM(P) p.def_readwrite(#P, &EventDetector::Params::P);
-    #define PY_EVT_VAL(P) e.def_readwrite(#P, &Event::P);
+    #define PY_EVTD_METH(P) evdt.def(#P, &EventDetector::P);
+    #define PY_EVTD_PRM(P) prms.def_readwrite(#P, &EventDetector::Params::P);
+    #define PY_EVT_VAL(P) evt.def_readwrite(#P, &Event::P);
+    #define PY_DBG_VAL(P) dbg.def_readonly(#P, &Debug::P);
 
     static void pybind_defs(
-            pybind11::class_<EventDetector> &d,
-            pybind11::class_<Event> &e) {
+            pybind11::class_<EventDetector> &evdt,
+            pybind11::class_<Event> &evt) {
 
-        d.def(pybind11::init<Params>());
-        d.def(pybind11::init());
+        evdt.def(pybind11::init<Params>());
+        evdt.def(pybind11::init());
         PY_EVTD_METH(reset);
         PY_EVTD_METH(add_sample);
         PY_EVTD_METH(get_event);
@@ -78,11 +97,11 @@ class EventDetector {
         PY_EVTD_METH(get_means);
         PY_EVTD_METH(mean_event_len);
 
-        d.def_readonly_static("PRMS_DEF", &EventDetector::PRMS_DEF);
+        evdt.def_readonly_static("PRMS_DEF", &EventDetector::PRMS_DEF);
 
-        pybind11::class_<Params> p(d, "Params");
-        p.def(pybind11::init());
-        p.def(pybind11::init<Params>());
+        pybind11::class_<Params> prms(evdt, "Params");
+        prms.def(pybind11::init());
+        prms.def(pybind11::init<Params>());
         PY_EVTD_PRM(window_length1);
         PY_EVTD_PRM(window_length2);
         PY_EVTD_PRM(threshold1);
@@ -95,6 +114,16 @@ class EventDetector {
         PY_EVT_VAL(stdv);
         PY_EVT_VAL(start);
         PY_EVT_VAL(length);
+
+        #ifdef DEBUG_EVDT
+        evdt.def_readonly("dbg", &EventDetector::dbg_);
+        pybind11::class_<Debug> dbg(evdt, "Debug");
+        PY_DBG_VAL(tstat1s)
+        PY_DBG_VAL(tstat2s)
+        PY_DBG_VAL(peak1_idxs)
+        PY_DBG_VAL(peak2_idxs)
+        #endif
+
     }
 
     #endif

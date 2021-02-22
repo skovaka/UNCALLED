@@ -53,6 +53,7 @@ void EventDetector::reset() {
     len_sum_ = 0;
     total_events_ = 0;
 
+    //TODO store defaults elsewhere
     short_detector = {
         .DEF_PEAK_POS = -1,
         .DEF_PEAK_VAL = FLT_MAX,
@@ -74,6 +75,10 @@ void EventDetector::reset() {
         .peak_value = FLT_MAX,
         .valid_peak = false
     };
+
+    #ifdef DEBUG_EVDT
+    dbg_.reset();
+    #endif
 }
 
 u32 EventDetector::get_buf_mid() {
@@ -100,6 +105,15 @@ bool EventDetector::add_sample(float s) {
 
     bool p1 = peak_detect(tstat1, short_detector),
          p2 = peak_detect(tstat2, long_detector);
+
+    #ifdef DEBUG_EVDT
+    if (buf_mid < t) {
+        if (p1) dbg_.peak1_idxs.push_back(buf_mid);
+        if (p2) dbg_.peak2_idxs.push_back(buf_mid);
+        dbg_.tstat1s.push_back(tstat1);
+        dbg_.tstat2s.push_back(tstat2);
+    }
+    #endif
 
     if (p1 || p2) {
         create_event(buf_mid-PRMS.window_length1+1);
