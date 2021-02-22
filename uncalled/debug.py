@@ -602,6 +602,10 @@ class DebugParser:
 
             samp += BCE_STRIDE
 
+        if len(bce_samps) == 0:
+            self.bc_loaded = False
+            return
+
         self.bce_samps = np.array(bce_samps)
         self.bce_refs = np.array(bce_refs) - BCE_K + 1
         self.max_ref = self.min_ref + max(bce_refs)
