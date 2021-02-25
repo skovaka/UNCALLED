@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
         //Normalizer norm(model.get_means_mean(), model.get_means_stdv());
 
         //Get raw signal
-        auto &full_raw = read.get_raw();
+        auto &full_raw = read.get_signal();
         std::vector<float> signal;
         if (q.rd_st != 0 || q.rd_en != 0) {
             u32 en = q.rd_en == 0 ? read.size() : q.rd_en;

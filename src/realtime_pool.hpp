@@ -40,8 +40,8 @@ class RealtimePool {
 
     RealtimePool(Conf &conf);
     
-    bool add_chunk(Chunk &chunk);
-    bool try_add_chunk(Chunk &chunk);
+    bool add_chunk(ReadBuffer &chunk);
+    bool try_add_chunk(ReadBuffer &chunk);
     void end_read(u16 ch, u32 number);
     bool is_read_finished(const ReadBuffer &r);
 
@@ -122,7 +122,7 @@ class RealtimePool {
         float mtx_time_;
     };
 
-    void buffer_chunk(Chunk &c);
+    void buffer_chunk(ReadBuffer &c);
 
     bool stopped_;
 
@@ -131,7 +131,7 @@ class RealtimePool {
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;
     std::vector<MapperThread> threads_;
-    std::vector<Chunk> chunk_buffer_;
+    std::vector<ReadBuffer> chunk_buffer_;
 
     std::vector<u16> buffer_queue_, out_chs_, active_queue_;
     //std::deque<u16> ;

@@ -27,7 +27,6 @@
 #include <unordered_map>
 #include <deque>
 #include "util.hpp"
-#include "chunk.hpp"
 #include "read_buffer.hpp" 
 #include "fast5_reader.hpp" 
 #include "conf.hpp" 
@@ -37,7 +36,7 @@ class ClientSim {
     ClientSim(Conf &c);
 
     bool run();
-    std::vector< std::pair<u16, Chunk> > get_read_chunks();
+    std::vector< std::pair<u16, ReadBuffer> > get_read_chunks();
     void stop_receiving_read(u16 channel, u32 number);
     u32 unblock_read(u16 channel, u32 number);
     bool is_running();
@@ -184,7 +183,7 @@ class ClientSim {
     class SimRead {
         //private:
         public:
-        std::vector<Chunk> chunks_;
+        std::vector<ReadBuffer> chunks_;
         u8 c_;
         u32 start_, end_, duration_, number_;
 
@@ -196,7 +195,7 @@ class ClientSim {
             number_(0) {}
 
         void load_read(const ReadBuffer &read, u32 offs) {
-            duration_ = read.get_duration();
+            duration_ = read.size();
             read.get_chunks(chunks_, false, offs);
             number_ = read.get_number();
         }
@@ -226,7 +225,7 @@ class ClientSim {
             return number_;
         }
 
-        Chunk pop_chunk() {
+        ReadBuffer pop_chunk() {
             assert(c_ < chunks_.size());
             return chunks_[c_++];
         }
@@ -344,7 +343,7 @@ class ClientSim {
             return reads_[r_].chunk_ready(t);
         }
 
-        Chunk next_chunk(u32 t) {
+        ReadBuffer next_chunk(u32 t) {
             assert(chunk_ready(t));
             return reads_[r_].pop_chunk();
         }

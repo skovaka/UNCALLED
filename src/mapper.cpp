@@ -198,7 +198,7 @@ Paf Mapper::map_read() {
 
     map_timer_.reset();
 
-    norm_.set_signal(evdt_.get_means(read_.full_signal_));
+    norm_.set_signal(evdt_.get_means(read_.get_signal()));
 
     while (!map_next()) {}
 
@@ -208,24 +208,18 @@ Paf Mapper::map_read() {
 }
 
 void Mapper::new_read(ReadBuffer &r) {
-    read_.clear();//TODO: probably shouldn't auto erase previous read
-    read_.swap(r);
+    if (prev_unfinished(r.get_number())) {
+        std::cerr << "Error: possibly lost read '" << read_.id_ << "'\n";
+    }
+
+    read_ = r;
+    chunk_processed_ = false;
     out_ = Paf(r.get_id(), r.get_channel(), r.get_start());
     
     reset();
     dbg_open_all();
 }
 
-
-void Mapper::new_read(Chunk &chunk) {
-    if (prev_unfinished(chunk.get_number())) {
-        std::cerr << "Error: possibly lost read '" << read_.id_ << "'\n";
-    }
-
-    read_ = ReadBuffer(chunk);
-    out_ = Paf(chunk.get_id(), chunk.get_channel(), chunk.get_start());
-    reset();
-}
 
 void Mapper::reset() {
     prev_size_ = 0;
@@ -282,14 +276,14 @@ bool Mapper::is_resetting() {
 }
 
 bool Mapper::is_chunk_processed() const {
-    return read_.chunk_processed_;
+    return chunk_processed_;
 }
 
 Mapper::State Mapper::get_state() const {
     return state_;
 }
 
-bool Mapper::add_chunk(Chunk &chunk) {
+bool Mapper::add_chunk(ReadBuffer &chunk) {
     if (!chunk_mtx_.try_lock()) return false;
 
     if (!is_chunk_processed() || finished() || reset_) { 
@@ -298,6 +292,7 @@ bool Mapper::add_chunk(Chunk &chunk) {
     }
 
     if (read_.chunks_maxed()) {
+        std::cerr << read_.get_id() << " FAIL 1\n";
 
         set_failed();
         chunk.clear();
@@ -306,8 +301,9 @@ bool Mapper::add_chunk(Chunk &chunk) {
         return true;
     }
 
-    bool added = read_.add_chunk(chunk);
+    bool added = read_.add_next_chunk(chunk);
     if (added) {
+        chunk_processed_ = false;
         chunk_timer_.reset();
     }
 
@@ -316,7 +312,7 @@ bool Mapper::add_chunk(Chunk &chunk) {
 }
 
 u16 Mapper::process_chunk() {
-    if (read_.chunk_processed_ || reset_ || 
+    if (chunk_processed_ || reset_ || 
         !chunk_mtx_.try_lock()) return 0; 
 
     if (read_.chunk_count() == 1) {
@@ -327,8 +323,8 @@ u16 Mapper::process_chunk() {
     wait_time_ += map_timer_.lap();
 
     u16 nevents = 0;
-    for (u32 i = 0; i < read_.chunk_.size(); i++) {
-        if (evdt_.add_sample(read_.chunk_[i])) {
+    for (u32 i = 0; i < read_.size(); i++) {
+        if (evdt_.add_sample(read_[i])) {
 
             //Add event to profiler
             //Returns true if next event is not masked
@@ -367,9 +363,9 @@ u16 Mapper::process_chunk() {
 
     dbg_events_out();
 
-    read_.chunk_.clear();
+    read_.clear(); //TODO: this seems weird
 
-    read_.chunk_processed_ = true;
+    chunk_processed_ = true;
 
     map_time_ += map_timer_.lap();
 
@@ -386,7 +382,7 @@ void Mapper::set_failed() {
 }
 
 bool Mapper::chunk_mapped() {
-    return read_.chunk_processed_ && norm_.empty();
+    return chunk_processed_ && norm_.empty();
 }
 
 bool Mapper::map_chunk() {
@@ -396,18 +392,22 @@ bool Mapper::map_chunk() {
         chunk_timer_.get() > PRMS.chunk_timeout ||
         event_i_ >= PRMS.max_events) {
 
+        std::cerr << read_.get_id() << " FAIL 3\n";
         set_failed();
         out_.set_ended();
         return true;
 
     } else if (norm_.empty() && 
-               read_.chunk_processed_ && 
+               chunk_processed_ && 
                read_.chunks_maxed()) {
 
         chunk_mtx_.lock();
 
-        if (norm_.empty() && read_.chunk_processed_) {
+        if (norm_.empty() && chunk_processed_) {
             set_failed();
+
+            std::cerr << read_.get_id() << " FAIL 2\n";
+
             chunk_mtx_.unlock();
             return true;
         }

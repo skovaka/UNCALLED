@@ -218,8 +218,8 @@ bool ClientSim::run() {
     return true;
 }
 
-std::vector< std::pair<u16, Chunk> > ClientSim::get_read_chunks() {
-    std::vector< std::pair<u16, Chunk> > ret; //TODO rename chunks?
+std::vector< std::pair<u16, ReadBuffer> > ClientSim::get_read_chunks() {
+    std::vector< std::pair<u16, ReadBuffer> > ret; //TODO rename chunks?
 
     if (!is_running_) {
         return ret;
@@ -263,7 +263,7 @@ std::vector< std::pair<u16, Chunk> > ClientSim::get_read_chunks() {
         intvs_ended = false;
 
         while (ch.chunk_ready(time)) {
-            ret.push_back( std::pair<u16, Chunk>(c+1, ch.next_chunk(time)));
+            ret.emplace_back(c+1, ch.next_chunk(time));
         }
     }
 

@@ -100,14 +100,13 @@ class Mapper {
     u16 get_max_events() const;
 
     void new_read(ReadBuffer &r);
-    void new_read(Chunk &c);
     void reset();
     void set_failed();
 
     Paf map_read();
 
     void skip_events(u32 n);
-    bool add_chunk(Chunk &chunk);
+    bool add_chunk(ReadBuffer &chunk);
 
     u32 event_to_bp(u32 evt_i, bool last=false) const;
 
@@ -215,7 +214,7 @@ class Mapper {
 
     //u16 channel_;
     //u32 read_num_;
-    bool last_chunk_, reset_;//, processing_, adding_;
+    bool chunk_processed_, last_chunk_, reset_;//, processing_, adding_;
     State state_;
     std::vector<float> kmer_probs_;
     std::vector<PathBuffer> prev_paths_, next_paths_;

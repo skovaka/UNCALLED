@@ -73,10 +73,11 @@ std::vector<Paf> MapPoolOrd::update() {
             continue;
         }
 
-
         //Get next chunk
         ReadBuffer &r = channels_[i].front();
-        Chunk chunk = r.get_chunk(chunk_idx_[i]);
+        auto chunk = r.get_chunk(chunk_idx_[i]);
+
+        std::cerr << i << "\t" << r.size() << "\t" << chunk.size() << "\n";
 
         //Try adding to pool
         //If sucessfful, move to next chunk

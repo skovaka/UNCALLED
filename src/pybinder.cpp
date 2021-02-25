@@ -32,9 +32,6 @@ PYBIND11_MODULE(_uncalled, m) {
 
     py::class_<BwaIndex<KLEN>> bwa_index(m, "BwaIndex");
     BwaIndex<KLEN>::pybind_defs(bwa_index);
-
-    py::class_<Chunk> chunk(m, "Chunk");
-    Chunk::pybind_defs(chunk);
     
     py::class_<ReadBuffer> read_buffer(m, "ReadBuffer");
     ReadBuffer::pybind_defs(read_buffer);

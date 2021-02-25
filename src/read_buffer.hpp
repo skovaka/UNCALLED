@@ -44,7 +44,6 @@
 //#include <fast5/hdf5_tools.hpp>
 #include "hdf5_tools.hpp"
 #include "util.hpp"
-#include "chunk.hpp"
 
 #ifdef PYBIND
 #include <pybind11/pybind11.h>
@@ -72,43 +71,77 @@ class ReadBuffer {
 
     static Params PRMS;
 
-    //TODO private outside Fast5Reader (friend?)
     ReadBuffer();
-    ReadBuffer(const std::string &filename);
+    ReadBuffer(const std::string &id, u16 channel, u32 number, u64 start_time, 
+          const std::string &dtype, const std::string &raw_str);
+    ReadBuffer(const std::string &id, u16 channel, u32 number, u64 start_time, 
+          const std::vector<float> &raw_data, u32 raw_st, u32 raw_len);
+
+    //TODO move to subclass, maybe friend to fast5reader?
     ReadBuffer(const hdf5_tools::File &file, const std::string &raw_path, const std::string &ch_path, const std::string &seg_path="");
     
-    ReadBuffer(Chunk &first_chunk);
 
+    //Returns true if buffer contains a single chunk
+    bool single_chunk() const;
+
+    //Returns true if no signal is in buffer
     bool empty() const;
-    std::string get_id() const {return id_;}
-    u64 get_start() const;
-    u64 get_end() const;
-    u64 get_duration() const;
-    u32 size() const {return full_signal_.size();}
+
+    //Returns read ID (name)
+    std::string get_id() const;
+
+    //Returns channel number and index 
     u16 get_channel() const;
-    const std::vector<float> &get_raw() const {return full_signal_;}
-
-    float operator[](u32 i) {
-        return full_signal_[i];
-    }
-
-    bool add_chunk(Chunk &c);
-    Chunk &&pop_chunk();
-    void swap(ReadBuffer &r);
-    void clear();
-    void set_raw_len(u64 raw_len_);
-
-    u32 chunk_count() const;
-    bool chunks_maxed() const ;
-    Chunk get_chunk(u32 i) const;
-
-    u32 get_chunks(std::vector<Chunk> &chunk_queue, bool real_start=true, u32 offs=0) const;
-    void set_channel(u16 ch) {channel_idx_ = ch-1;}
+    void set_channel(u16 ch); //{channel_idx_ = ch-1;}
     u16 get_channel_idx() const;
 
-    u32 get_number() const {
-        return number_;
-    }
+    u32 get_number() const; //{return number_;}
+
+    //Returns start sample of read
+    u64 get_start() const;
+
+    //Sets the start sample
+    void set_start(u64 start);
+
+    //Returns last known sample of read
+    u64 get_end() const;
+
+    //Returns size of buffered signal in samples
+    u64 size() const;
+    
+    //Returns total known size of read
+    //equal to size() if !single_chunk()
+    u64 full_duration() const; 
+    void set_full_duration(u64 raw_len_); //_raw_len
+
+    //Returns the signal buffer
+    const std::vector<float> &get_signal() const; //{return full_signal_;}
+
+    //Returns sample at specified index
+    float &operator[](u32 i);// {return full_signal_[i];}
+
+    void swap(ReadBuffer &r);
+
+    void clear();
+
+    //Returns number of chunks loaded in buffer
+    u32 chunk_count() const;
+
+    //Returns true if the maximal number of chunks are in the buffer
+    bool chunks_maxed() const ;
+
+    //Returns the ith chunk in the buffer
+    //only relavent if !single_chunk()
+    ReadBuffer get_chunk(u32 i) const;
+
+    //TODO make simulator just read from ReadBuffer
+    //only relavent if !single_chunk()
+    u32 get_chunks(std::vector<ReadBuffer> &chunk_queue, bool real_start=true, u32 offs=0) const;
+
+    //Updates the read chunk
+    //only relevent if single_chunk() == true
+    //replaces something...
+    bool add_next_chunk(ReadBuffer &r);
 
     #ifdef PYBIND
 
@@ -140,13 +173,13 @@ class ReadBuffer {
     #endif
 
     //Source source_;
-    u16 channel_idx_;
     std::string id_;
+    u16 channel_idx_;
     u32 number_;
-    u64 start_sample_, raw_len_; //TODO no raw len
-    std::vector<float> full_signal_, chunk_; //TODO store one
+    u64 start_sample_, full_duration_; //TODO no raw len
+    std::vector<float> signal_; //TODO store one
     u16 chunk_count_; //TODO derive from chunk_len?
-    bool chunk_processed_; //TODO move to mapper?
+    bool single_chunk_;
 
     friend bool operator< (const ReadBuffer &r1, const ReadBuffer &r2);
 };

@@ -58,8 +58,8 @@ std::vector<Paf> MapPool::update() {
             if (fast5s_.empty()) { 
                 threads_[i].finished_ = true;
             } else {
-                ReadBuffer r = fast5s_.pop_read();
-                threads_[i].next_read_.swap(r);
+                ReadBuffer read = fast5s_.pop_read();
+                threads_[i].next_read_ = read;
                 threads_[i].in_buffered_ = true;
             }
         }

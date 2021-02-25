@@ -92,7 +92,6 @@ uncalled = Extension(
        "src/map_pool.cpp",
        "src/event_detector.cpp", 
        "src/read_buffer.cpp",
-       "src/chunk.cpp",
        "src/realtime_pool.cpp",
        "src/seed_tracker.cpp", 
        "src/normalizer.cpp", 

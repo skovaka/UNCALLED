@@ -58,20 +58,17 @@ RealtimePool::RealtimePool(Conf &conf) :
     srand(time(NULL));
 }
 
-void RealtimePool::buffer_chunk(Chunk &c) {
+void RealtimePool::buffer_chunk(ReadBuffer &c) {
     u16 ch = c.get_channel_idx();
     if (chunk_buffer_[ch].empty()) {
         buffer_queue_.push_back(ch);
-    } else {
-        //TODO: handle backlog (probably reset paths?)
-        chunk_buffer_[ch].clear();
-    }
-    chunk_buffer_[ch].swap(c);
+    } //TODO: else handle backlog (probably reset paths?)
+    chunk_buffer_[ch] = c;
 }
 
 
 //Add chunk to master buffer
-bool RealtimePool::add_chunk(Chunk &c) {
+bool RealtimePool::add_chunk(ReadBuffer &c) {
     u16 ch = c.get_channel_idx();
 
     //Check if previous read is still aligning
@@ -109,7 +106,7 @@ bool RealtimePool::is_read_finished(const ReadBuffer &r) {
             mappers_[ch].get_read().get_number() == r.get_number());
 }
 
-bool RealtimePool::try_add_chunk(Chunk &c) {
+bool RealtimePool::try_add_chunk(ReadBuffer &c) {
     u16 ch = c.get_channel_idx();
 
     //Chunk is empty if all read chunks were output
@@ -176,7 +173,7 @@ std::vector<MapResult> RealtimePool::update() {
     //Buffer queue should be ordered in "ord" mode
     for (u16 i = buffer_queue_.size()-1; i < buffer_queue_.size(); i--) {
         u16 ch = buffer_queue_[i];//TODO: store chunks in queue
-        Chunk &c = chunk_buffer_[ch];
+        auto &c = chunk_buffer_[ch];
 
         bool added = false;
 

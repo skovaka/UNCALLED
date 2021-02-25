@@ -69,16 +69,16 @@ int main(int argc, char** argv) {
         }
 
         for (auto &r : sim.get_read_chunks()) {
-            Chunk &ch = r.second;
-            if (unblocked[ch.get_channel_idx()] == ch.get_number()) {
+            auto &chunk = r.second;
+            if (unblocked[chunk.get_channel_idx()] == chunk.get_number()) {
                 std::cout << "# recieved chunk from " 
-                          << ch.get_id() 
+                          << chunk.get_id() 
                           << " after unblocking\n";
                 continue;
-            } else if (pool.add_chunk(ch)) {
-                chunk_times[ch.get_channel_idx()] = t.get();
+            } else if (pool.add_chunk(chunk)) {
+                chunk_times[chunk.get_channel_idx()] = t.get();
             } else {
-                std::cerr << "Error: failed to add chunk from " << ch.get_id() << std::endl;
+                std::cerr << "Error: failed to add chunk from " << chunk.get_id() << std::endl;
             }
         }
 
