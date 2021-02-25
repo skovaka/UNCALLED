@@ -18,7 +18,7 @@ BIN=bin
 LIB=lib
 #INCLUDE=include
 
-_COMMON_OBJS=mapper.o seed_tracker.o range.o event_detector.o normalizer.o chunk.o read_buffer.o fast5_reader.o event_profiler.o #sync_out.o
+_COMMON_OBJS=mapper.o seed_tracker.o range.o event_detector.o normalizer.o chunk.o read_buffer.o fast5_reader.o event_profiler.o paf.o
 
 _MAP_ORD_OBJS=$(_COMMON_OBJS) realtime_pool.o map_pool_ord.o uncalled_map_ord.o 
 _MAP_OBJS=$(_COMMON_OBJS) map_pool.o uncalled_map.o 

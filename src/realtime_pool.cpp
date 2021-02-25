@@ -160,7 +160,7 @@ std::vector<MapResult> RealtimePool::update() {
             //Loop over alignments
             for (auto ch : out_chs_) {
                 ReadBuffer &r = mappers_[ch].get_read();
-                ret.emplace_back(r.get_channel(), r.number_, r.loc_);
+                ret.emplace_back(r.get_channel(), r.number_, mappers_[ch].get_paf());
 
                 //TODO rename set_inactive?
                 mappers_[ch].deactivate();

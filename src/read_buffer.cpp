@@ -31,142 +31,6 @@ ReadBuffer::Params ReadBuffer::PRMS = {
     max_chunks   : 1000000,
 };
 
-const std::string Paf::PAF_TAGS[] = {
-    "mt", //MAP_TIME
-    "wt", //WAIT_TIME
-    "qt", //QUEUE_TIME
-    "rt", //RECEIVE_TIME
-    "ch", //CHANNEL
-    "ej", //UNBLOCK
-    "st", //START_TIME
-    "mx", //IN_SCAN
-    "tr", //TOP_RATIO
-    "mr", //MEAN_RATIO
-    "en", //ENDED
-    "kp", //KEEP
-    "dl", //DELAY
-    "sc", //SEED_CLUSTER
-    "ce"  //CONFIDENT_EVENT
-};
-
-Paf::Paf() 
-    : is_mapped_(false),
-      ended_(false),
-      rd_name_(""),
-      rf_name_(""),
-      rd_st_(0),
-      rd_en_(0),
-      rd_len_(0),
-      rf_st_(0),
-      rf_en_(0),
-      rf_len_(0),
-      fwd_(false),
-      matches_(0) {}
-
-Paf::Paf(const std::string &rd_name, u16 channel, u64 start_sample)
-    : is_mapped_(false),
-      ended_(false),
-      rd_name_(rd_name),
-      rf_name_(""),
-      rd_st_(0),
-      rd_en_(0),
-      rd_len_(0),
-      rf_st_(0),
-      rf_en_(0),
-      rf_len_(0),
-      fwd_(false),
-      matches_(0) {
-    
-    set_int(Tag::CHANNEL, channel);
-    set_int(Tag::READ_START, start_sample);
-}
-
-bool Paf::is_mapped() const {
-    return is_mapped_;
-}
-
-bool Paf::is_ended() const {
-    return ended_;
-}
-
-void Paf::print_paf() const {
-    std::cout << rd_name_ << "\t"
-       << rd_len_ << "\t";
-    if (is_mapped_) {
-       std::cout 
-           << rd_st_ << "\t"
-           << rd_en_ << "\t"
-           << (fwd_ ? '+' : '-') << "\t"
-           << rf_name_ << "\t"
-           << rf_len_ << "\t"
-           << rf_st_ << "\t"
-           << rf_en_ << "\t"
-           << matches_ << "\t"
-           << (rf_en_ - rf_st_ + 1) << "\t"
-           << 255;
-    } else {
-        std::cout << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "*" << "\t"
-           << "255";
-    }
-
-    for (auto t : int_tags_) { 
-        std::cout << std::fixed << "\t" << PAF_TAGS[t.first] << ":i:" << t.second;
-    }
-    for (auto t : float_tags_) { 
-        std::cout << std::fixed << "\t" << PAF_TAGS[t.first] << ":f:" << t.second;
-    }
-    for (auto t : str_tags_) { 
-        std::cout << "\t" << PAF_TAGS[t.first] << ":Z:" << t.second;
-    }
-
-    std::cout << "\n";
-}
-
-void Paf::set_read_len(u64 rd_len) {
-    rd_len_ = rd_len;
-}
-
-void Paf::set_ended() {
-    ended_ = true;
-    //set_int(Tag::ENDED, 1);
-}
-
-void Paf::set_mapped(u64 rd_st, u64 rd_en,
-                          std::string rf_name,
-                          u64 rf_st, u64 rf_en, u64 rf_len,
-                          bool fwd, u16 matches) {
-    is_mapped_ = true;
-    rd_st_ = rd_st;
-    rd_en_ = rd_en;
-    rf_name_ = rf_name;
-    rf_st_ = rf_st;
-    rf_en_ = rf_en;
-    rf_len_ = rf_len;
-    fwd_ = fwd;
-    matches_ = matches;
-}
-
-void Paf::set_int(Tag t, int v) {
-    int_tags_.emplace_back(t, v);
-}
-
-void Paf::set_float(Tag t, float v) {
-    float_tags_.emplace_back(t, v);
-}
-
-void Paf::set_str(Tag t, std::string v) {
-    str_tags_.emplace_back(t, v);
-}
-
-
 ReadBuffer::ReadBuffer() {
     chunk_count_ = 0;
     
@@ -184,7 +48,6 @@ void ReadBuffer::swap(ReadBuffer &r) {
     std::swap(chunk_, r.chunk_);
     std::swap(chunk_count_, r.chunk_count_);
     std::swap(chunk_processed_, r.chunk_processed_);
-    std::swap(loc_, r.loc_);
 }
 
 void ReadBuffer::clear() {
@@ -192,7 +55,6 @@ void ReadBuffer::clear() {
     full_signal_.clear();
     chunk_.clear();
     chunk_count_ = 0;
-    loc_ = Paf();
 }
 
 ReadBuffer::ReadBuffer(const hdf5_tools::File &file, 
@@ -256,7 +118,6 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file,
         full_signal_.push_back(calibrated);
     }
 
-    loc_ = Paf(id_, get_channel(), start_sample_);
     set_raw_len(full_signal_.size());
 }
 
@@ -268,16 +129,13 @@ ReadBuffer::ReadBuffer(Chunk &first_chunk)
       number_(first_chunk.get_number()),
       start_sample_(first_chunk.get_start()),
       chunk_count_(1),
-      chunk_processed_(false),
-      loc_(id_, channel_idx_+1, start_sample_) {
-    //loc_.set_int(Paf::Tag::RECEIVE_TIME, PARAMS.get_time());//TODO: FIX
+      chunk_processed_(false) {
     set_raw_len(first_chunk.size());
     first_chunk.pop(chunk_);
 }
 
 void ReadBuffer::set_raw_len(u64 raw_len) {
     raw_len_ = raw_len;
-    loc_.set_read_len(raw_len_ * PRMS.bp_per_samp());
 }
 
 bool ReadBuffer::add_chunk(Chunk &c) {

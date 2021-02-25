@@ -34,6 +34,7 @@
 #include "pore_model.hpp"
 #include "seed_tracker.hpp"
 #include "read_buffer.hpp"
+#include "paf.hpp"
 
 const KmerLen KLEN = KmerLen::k5;
 
@@ -75,7 +76,6 @@ class Mapper {
         #ifdef DEBUG_OUT
         std::string dbg_prefix;
         #endif
-
     } Params;
 
     static Params PRMS;
@@ -126,9 +126,8 @@ class Mapper {
 
     bool finished() const;
     ReadBuffer &get_read();
+    Paf get_paf() const;
     void deactivate();
-
-    private:
 
     static const u8 EVENT_MOVE = 1,
                     EVENT_STAY = 0;
@@ -212,6 +211,7 @@ class Mapper {
     Normalizer norm_;
     SeedTracker seed_tracker_;
     ReadBuffer read_;
+    Paf out_;
 
     //u16 channel_;
     //u32 read_num_;
@@ -272,6 +272,39 @@ class Mapper {
     std::ofstream conf_out_;
     bool confident_mapped_;
     #endif
+
+    #ifdef PYBIND
+
+    #define PY_MAP_METH(N,D) c.def(#N, &Mapper::N, D);
+    #define PY_MAP_PRM(P) c.def_readwrite(#P, &Mapper::Params::P);
+    #define PY_PATHBUF_PRM(P) p.def_readonly(#P, &Mapper::Params::P);
+
+    static void pybind_defs(pybind11::class_<Mapper> &c, pybind11::class_<PathBuffer> &p) {
+
+        c.def(pybind11::init());
+        
+        //PY_MAP_METH(add_fast5,
+        //    "Adds a fast5 filename to the list of files to load. "
+        //);
+
+
+        //PY_MAP_METH(add_read, "Adds a read ID to the read filter");
+        //PY_MAP_METH(load_read_list, "Loads a list of read IDs from a text file to add to the read filter");
+        //PY_MAP_METH(pop_read, "");
+        //PY_MAP_METH(buffer_size, "");
+        //PY_MAP_METH(fill_buffer, "");
+        //PY_MAP_METH(all_buffered, "");
+        //PY_MAP_METH(empty, "");
+
+        //pybind11::class_<Params> p(c, "Params");
+        //PY_MAP_PRM(fast5_list);
+        //PY_MAP_PRM(read_list);
+        //PY_MAP_PRM(max_reads);
+        //PY_MAP_PRM(max_buffer);
+    }
+
+    #endif
+
 };
 
 

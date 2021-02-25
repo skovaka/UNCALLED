@@ -56,7 +56,7 @@ Mapper::Params Mapper::PRMS {
 BwaIndex<KLEN> Mapper::fmi;
 std::vector<float> Mapper::prob_threshes_;
 
-bool IS_RNA = true;
+bool IS_RNA = false;
 PoreModel<KLEN> Mapper::model = IS_RNA ? pmodel_r94_rna_template : pmodel_r94_complement;
 
 
@@ -184,13 +184,17 @@ ReadBuffer &Mapper::get_read() {
     return read_;
 }
 
+Paf Mapper::get_paf() const {
+    return out_;
+}
+
 void Mapper::deactivate() {
     state_ = State::INACTIVE;
     reset_ = false;
 }
 
 Paf Mapper::map_read() {
-    if (read_.loc_.is_mapped()) return read_.loc_;
+    if (out_.is_mapped()) return out_;
 
     map_timer_.reset();
 
@@ -198,14 +202,16 @@ Paf Mapper::map_read() {
 
     while (!map_next()) {}
 
-    read_.loc_.set_float(Paf::Tag::MAP_TIME, map_timer_.get());
+    out_.set_float(Paf::Tag::MAP_TIME, map_timer_.get());
 
-    return read_.loc_;
+    return out_;
 }
 
 void Mapper::new_read(ReadBuffer &r) {
     read_.clear();//TODO: probably shouldn't auto erase previous read
     read_.swap(r);
+    out_ = Paf(r.get_id(), r.get_channel(), r.get_start());
+    
     reset();
     dbg_open_all();
 }
@@ -217,6 +223,7 @@ void Mapper::new_read(Chunk &chunk) {
     }
 
     read_ = ReadBuffer(chunk);
+    out_ = Paf(chunk.get_id(), chunk.get_channel(), chunk.get_start());
     reset();
 }
 
@@ -314,7 +321,7 @@ u16 Mapper::process_chunk() {
 
     if (read_.chunk_count() == 1) {
         dbg_open_all();
-        read_.loc_.set_float(Paf::Tag::QUEUE_TIME, map_timer_.lap());
+        out_.set_float(Paf::Tag::QUEUE_TIME, map_timer_.lap());
     }
 
     wait_time_ += map_timer_.lap();
@@ -374,8 +381,8 @@ void Mapper::set_failed() {
     state_ = State::FAILURE;
     reset_ = false;
 
-    read_.loc_.set_float(Paf::Tag::MAP_TIME, map_time_);
-    read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
+    out_.set_float(Paf::Tag::MAP_TIME, map_time_);
+    out_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
 }
 
 bool Mapper::chunk_mapped() {
@@ -390,7 +397,7 @@ bool Mapper::map_chunk() {
         event_i_ >= PRMS.max_events) {
 
         set_failed();
-        read_.loc_.set_ended();
+        out_.set_ended();
         return true;
 
     } else if (norm_.empty() && 
@@ -418,8 +425,8 @@ bool Mapper::map_chunk() {
 
     for (u16 i = 0; i < nevents && !norm_.empty(); i++) {
         if (map_next()) {
-            read_.loc_.set_float(Paf::Tag::MAP_TIME, map_time_+map_timer_.get());
-            read_.loc_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
+            out_.set_float(Paf::Tag::MAP_TIME, map_time_+map_timer_.get());
+            out_.set_float(Paf::Tag::WAIT_TIME, wait_time_);
             norm_.skip_unread();
             return true;
         }
@@ -638,13 +645,13 @@ bool Mapper::map_next() {
 
         #ifdef DEBUG_CONFIDENCE
         if (!confident_mapped_) {
-            read_.loc_.set_int(Paf::Tag::CONFIDENT_EVENT, evt_prof_.mask_idx_map_[event_i_]);
+            out_.set_int(Paf::Tag::CONFIDENT_EVENT, evt_prof_.mask_idx_map_[event_i_]);
             confident_mapped_ = true;
             #endif
 
             
             #ifdef DEBUG_SEEDS
-            read_.loc_.set_int(Paf::Tag::SEED_CLUSTER, sc.id_);
+            out_.set_int(Paf::Tag::SEED_CLUSTER, sc.id_);
             #endif
 
 
@@ -670,22 +677,13 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
 
     if (!path.is_seed_valid(path_ended)) return;
 
-    //TODO: store actual SA coords?
-    //avoid checking multiple times!
-    path.sa_checked_ = true;
-
     for (u64 s = path.fm_range_.start_; s <= path.fm_range_.end_; s++) {
 
         //TODO: store in buffer, replace sa_checked
-        //
         //Reverse the reference coords so they both go L->R
 
         u64 sa_end;
-        //if (IS_RNA) {
-         //   sa_end = fmi.sa(s);
-        //} else {
             sa_end = fmi.size() - fmi.sa(s);
-        //}
 
         u32 ref_len = path.move_count() + KLEN - 1;
         u64 sa_start = sa_end - ref_len + 1;
@@ -707,6 +705,10 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         );
         #endif
     }
+
+    //TODO: store actual SA coords?
+    //avoid checking multiple times!
+    path.sa_checked_ = true;
 }
 
 
@@ -734,9 +736,8 @@ void Mapper::set_ref_loc(const SeedCluster &seeds) {
 
     u16 match_count = seeds.total_len_ + KLEN - 1;
 
-    read_.loc_.set_read_len(rd_len);
-    read_.loc_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, fwd, match_count);
-
+    out_.set_read_len(rd_len);
+    out_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, fwd, match_count);
 }
 
 #ifdef DEBUG_OUT

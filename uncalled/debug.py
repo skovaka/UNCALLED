@@ -203,8 +203,6 @@ class DebugParser:
 
             fm_ord = np.argsort(fms)
             if self.bc_loaded:
-                #print(len(fms), self.bce_refs[-1]-self.bce_refs[0], self.bce_refs[0])
-
                 evt = np.searchsorted(self.evt_ens, self.bce_samps[0])
                 evt_range = range(0, len(self.events))
                 ref_range = range(self.bce_refs[0], self.bce_refs[-1]+1)
@@ -463,6 +461,9 @@ class DebugParser:
     def _parse_moves(self, moves):
         return np.flip()
 
+    def parse_paths_new(self):
+        all_paths = pd.read_csv(self.paths_name, '\t')
+        events = all_paths["id"].str.split(":", n=1, expand=True)
 
     def parse_paths(self):
         if self.paths_loaded: return False

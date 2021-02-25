@@ -96,6 +96,7 @@ uncalled = Extension(
        "src/realtime_pool.cpp",
        "src/seed_tracker.cpp", 
        "src/normalizer.cpp", 
+       "src/paf.cpp", 
        "src/range.cpp"
     ],
 
@@ -120,7 +121,7 @@ uncalled = Extension(
 
     extra_compile_args = ["-std=c++11", "-O3"],
 
-    define_macros = [("PYBIND", None)]
+    define_macros = [("PYBIND", None)]#, ("PYDEBUG", None)]
 )
 
 setup(
