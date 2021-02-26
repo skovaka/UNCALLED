@@ -25,22 +25,22 @@
 #include <chrono>
 #include "fast5_reader.hpp"
 
-const Fast5Reader::Params Fast5Reader::PRMS_DEF = {
+
+const typename Fast5Reader::Params Fast5Reader::PRMS_DEF = {
     fast5_list : "",
     read_list  : "",
     max_reads  : 0,
     max_buffer : 100
 };
 
-const std::string Fast5Reader::FMT_RAW_PATHS[] = {
-    "/Raw",      //MULTI
-    "/Raw/Reads" //SINGLE
-};
+const std::string 
+    MULTI_RAW_PATH   = "/Raw", 
+    MULTI_CH_PATH  = "/channel_id",
 
-const std::string Fast5Reader::FMT_CH_PATHS[] = {
-    "/channel_id",                //MULTI
-    "/UniqueGlobalKey/channel_id" //SINGLE
-};
+    SINGLE_RAW_PATH  = "/Raw/Reads",
+    SINGLE_CH_PATH = "/UniqueGlobalKey/channel_id",
+
+    ANALYSIS_PATH    = "/Analyses";
 
 Fast5Reader::Fast5Reader() : 
     Fast5Reader(PRMS_DEF) {}
@@ -153,7 +153,9 @@ bool Fast5Reader::open_next() {
     std::string path;
     switch (open_fmt_) {
     case Format::SINGLE:
-        path = FMT_RAW_PATHS[Format::SINGLE];
+
+        //TODO put in function, store attr map?
+        path = SINGLE_RAW_PATH;
         for (const std::string &read : open_fast5_.list_group(path)) {
             std::string read_id = "";
             for (auto a : open_fast5_.get_attr_map(path+"/"+read)) {
@@ -174,7 +176,9 @@ bool Fast5Reader::open_next() {
         }
         return true;
 
+    //TODO put in function
     case Format::MULTI:
+        path = MULTI_RAW_PATH;
         for (const std::string &read : open_fast5_.list_group("/")) {
             std::string id = read.substr(read.find('_')+1);
             if (read_filter_.empty() || read_filter_.count(id) > 0) {
@@ -206,17 +210,18 @@ u32 Fast5Reader::fill_buffer() {
         }
         if (read_paths_.empty()) break;
 
-        std::string raw_path, ch_path, seg_path = "";
+        std::string raw_path, ch_path, anl_path;
 
         switch (open_fmt_) {
             case Format::SINGLE:
-                raw_path = FMT_RAW_PATHS[open_fmt_] + read_paths_.front();
-                ch_path = FMT_CH_PATHS[open_fmt_];
+                raw_path = SINGLE_RAW_PATH + read_paths_.front();
+                ch_path = SINGLE_CH_PATH;
+                anl_path = ANALYSIS_PATH;
                 break;
             case Format::MULTI:
-                raw_path = read_paths_.front() + FMT_RAW_PATHS[open_fmt_],
-                ch_path =  read_paths_.front() + FMT_CH_PATHS[open_fmt_];
-                //seg_path = read_paths_.front() + "/Analyses/Segmentation_000/Summary/segmentation";
+                raw_path = read_paths_.front() + MULTI_RAW_PATH;
+                ch_path =  read_paths_.front() + MULTI_CH_PATH;
+                anl_path = read_paths_.front() + ANALYSIS_PATH;
                 break;
             default:
                 std::cerr << "Error: unrecognized fast5 format\n";
@@ -224,11 +229,9 @@ u32 Fast5Reader::fill_buffer() {
                 return count;
         }
 
-        //std::string raw_path = read_paths_.front() + FMT_RAW_PATHS[open_fmt_],
-        //            ch_path =  read_paths_.front() + FMT_CH_PATHS[open_fmt_];
         read_paths_.pop_front();
 
-        buffered_reads_.emplace_back(open_fast5_, raw_path, ch_path, seg_path);
+        buffered_reads_.emplace_back(open_fast5_, raw_path, ch_path, anl_path);
 
         count++;
         total_buffered_++;
@@ -242,12 +245,12 @@ bool Fast5Reader::all_buffered() {
            (!read_filter_.empty() && total_buffered_ >= read_filter_.size());
 }
 
-ReadBuffer Fast5Reader::pop_read() {
+Fast5Read Fast5Reader::pop_read() {
     if (buffer_size() == 0) { 
         fill_buffer();
     }
     //TODO: swap to speed up?
-    ReadBuffer r = buffered_reads_.front();
+    auto r = buffered_reads_.front();
     buffered_reads_.pop_front();
     return r;
 }

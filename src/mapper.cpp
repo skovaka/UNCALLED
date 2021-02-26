@@ -292,7 +292,6 @@ bool Mapper::add_chunk(ReadBuffer &chunk) {
     }
 
     if (read_.chunks_maxed()) {
-        std::cerr << read_.get_id() << " FAIL 1\n";
 
         set_failed();
         chunk.clear();
@@ -315,7 +314,7 @@ u16 Mapper::process_chunk() {
     if (chunk_processed_ || reset_ || 
         !chunk_mtx_.try_lock()) return 0; 
 
-    if (read_.chunk_count() == 1) {
+    if (read_.get_chunk_count() == 1) {
         dbg_open_all();
         out_.set_float(Paf::Tag::QUEUE_TIME, map_timer_.lap());
     }
@@ -344,10 +343,6 @@ u16 Mapper::process_chunk() {
 
                 u32 nskip = norm_.skip_unread(nevents);
                 skip_events(nskip);
-
-                std::cerr << "#SKIP "
-                          << read_.get_id() << " "
-                          << nskip << "\n";
 
                 if (!norm_.push(evt_mean)) {
                     map_time_ += map_timer_.lap();
@@ -392,7 +387,6 @@ bool Mapper::map_chunk() {
         chunk_timer_.get() > PRMS.chunk_timeout ||
         event_i_ >= PRMS.max_events) {
 
-        std::cerr << read_.get_id() << " FAIL 3\n";
         set_failed();
         out_.set_ended();
         return true;
@@ -405,8 +399,6 @@ bool Mapper::map_chunk() {
 
         if (norm_.empty() && chunk_processed_) {
             set_failed();
-
-            std::cerr << read_.get_id() << " FAIL 2\n";
 
             chunk_mtx_.unlock();
             return true;

@@ -48,7 +48,7 @@ void MapPoolOrd::add_read(const std::string &id) {
 void MapPoolOrd::load_fast5s() {
     std::cerr << "Loading fast5s\n";
     while(!fast5s_.empty()) {
-        ReadBuffer read = fast5s_.pop_read();
+        ReadBuffer read = static_cast<ReadBuffer>(fast5s_.pop_read());
         channels_[read.get_channel_idx()].push_back(read);
     }
 
@@ -76,8 +76,6 @@ std::vector<Paf> MapPoolOrd::update() {
         //Get next chunk
         ReadBuffer &r = channels_[i].front();
         auto chunk = r.get_chunk(chunk_idx_[i]);
-
-        std::cerr << i << "\t" << r.size() << "\t" << chunk.size() << "\n";
 
         //Try adding to pool
         //If sucessfful, move to next chunk

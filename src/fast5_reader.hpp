@@ -28,7 +28,7 @@
 #include <vector>
 #include <deque>
 #include <unordered_set>
-#include "read_buffer.hpp"
+#include "fast5_read.hpp"
 #include "util.hpp"
 
 #ifdef PYBIND
@@ -82,7 +82,7 @@ class Fast5Reader {
 
     bool load_read_list(const std::string &fname);
 
-    ReadBuffer pop_read();
+    Fast5Read pop_read();
  
     u32 buffer_size();
  
@@ -92,25 +92,35 @@ class Fast5Reader {
  
     bool empty();
 
+    private:
+    Params PRMS;
+
+    enum class Format {MULTI=0, SINGLE=1, UNKNOWN};
+
+    bool open_next();
+
+    u32 max_buffer_, total_buffered_, max_reads_;
+
+    std::deque<std::string> fast5_list_;
+    std::unordered_set<std::string> read_filter_;
+
+    hdf5_tools::File open_fast5_;
+    Format open_fmt_;
+    std::deque<std::string> read_paths_;
+
+    std::deque<Fast5Read> buffered_reads_;
+
     #ifdef PYBIND
 
-    #define PY_FAST5_METH(N,D) c.def(#N, &Fast5Reader::N, D);
-    #define PY_FAST5_PRM(P) p.def_readwrite(#P, &Fast5Reader::Params::P);
+    #define PY_FAST5_READER_METH(N,D) c.def(#N, &Fast5Reader::N, D);
+    #define PY_FAST5_READER_PRM(P) p.def_readwrite(#P, &Fast5Reader::Params::P);
+
+    public:
 
     static void pybind_defs(pybind11::class_<Fast5Reader> &c) {
 
         c.def(pybind11::init());
         c.def(pybind11::init<Params>());
-        c.def(pybind11::init<u32, u32>());
-        c.def(pybind11::init<
-                const std::string &>());
-        c.def(pybind11::init<
-                const std::string &, 
-                const std::string &>());
-        c.def(pybind11::init<
-                const std::string &, 
-                const std::string &, 
-                u32, u32>());
         c.def(pybind11::init<
                 const std::vector<std::string> &,
                 const std::vector<std::string> &,
@@ -124,43 +134,24 @@ class Fast5Reader {
         >());
 
         
-        PY_FAST5_METH(add_fast5, "Adds a fast5 filename to the list of files to load. Should be called before popping any reads");
-        PY_FAST5_METH(load_fast5_list, "Loads a list of fast5 filenames from a text file containing one path per line");
-        PY_FAST5_METH(add_read, "Adds a read ID to the read filter");
-        PY_FAST5_METH(load_read_list, "Loads a list of read IDs from a text file to add to the read filter");
-        PY_FAST5_METH(pop_read, "");
-        PY_FAST5_METH(buffer_size, "");
-        PY_FAST5_METH(fill_buffer, "");
-        PY_FAST5_METH(all_buffered, "");
-        PY_FAST5_METH(empty, "");
+        PY_FAST5_READER_METH(add_fast5, "Adds a fast5 filename to the list of files to load. Should be called before popping any reads");
+        PY_FAST5_READER_METH(load_fast5_list, "Loads a list of fast5 filenames from a text file containing one path per line");
+        PY_FAST5_READER_METH(add_read, "Adds a read ID to the read filter");
+        PY_FAST5_READER_METH(load_read_list, "Loads a list of read IDs from a text file to add to the read filter");
+        PY_FAST5_READER_METH(pop_read, "");
+        PY_FAST5_READER_METH(buffer_size, "");
+        PY_FAST5_READER_METH(fill_buffer, "");
+        PY_FAST5_READER_METH(all_buffered, "");
+        PY_FAST5_READER_METH(empty, "");
 
         pybind11::class_<Params> p(c, "Params");
-        PY_FAST5_PRM(fast5_list);
-        PY_FAST5_PRM(read_list);
-        PY_FAST5_PRM(max_reads);
-        PY_FAST5_PRM(max_buffer);
+        PY_FAST5_READER_PRM(fast5_list);
+        PY_FAST5_READER_PRM(read_list);
+        PY_FAST5_READER_PRM(max_reads);
+        PY_FAST5_READER_PRM(max_buffer);
     }
 
     #endif
-
-    private:
-    Params PRMS;
-
-    enum Format {MULTI, SINGLE, UNKNOWN};
-    static const std::string FMT_RAW_PATHS[], FMT_CH_PATHS[];
-
-    bool open_next();
-
-    u32 max_buffer_, total_buffered_, max_reads_;
-
-    std::deque<std::string> fast5_list_;
-    std::unordered_set<std::string> read_filter_;
-
-    hdf5_tools::File open_fast5_;
-    Format open_fmt_;
-    std::deque<std::string> read_paths_;
-
-    std::deque<ReadBuffer> buffered_reads_;
 };
 
 #endif

@@ -25,17 +25,12 @@
 #define _INCL_READ_BUFFER
 
 /*TODO 
- * Refactor into Paf and SigBuffer
- * Paf replaces python Paf
- *      seprate from bufs, maybe depends on them
- *      put cigar (+cs string) parsing here
- * SigBuffer stores signal, time, channel, read num, etc
- *      static link to sample rate, chunk len?
- *      merge with Chunk, don't duplicate data
- * 
- * Fast5Read : SigBuffer subclass?
- *      keep fast5 parsing stuff seperate
- *      optionally load bc data (moves)
+ * need stronger distinction between full read with chunks at offsets
+ * vs rolling chunk input from live mode
+ * vs simulated chunks (which we could avoid copying)
+ * basically need to reconcile realtime, client_sim, and map_ord
+ *
+ * ALSO need to write Fast5Read subclass, which for sure reps a full read
 */
 
 #include <string>
@@ -48,7 +43,6 @@
 #ifdef PYBIND
 #include <pybind11/pybind11.h>
 #endif
-
 
 class ReadBuffer {
     public:
@@ -78,14 +72,8 @@ class ReadBuffer {
           const std::vector<float> &raw_data, u32 raw_st, u32 raw_len);
 
     //TODO move to subclass, maybe friend to fast5reader?
-    ReadBuffer(const hdf5_tools::File &file, const std::string &raw_path, const std::string &ch_path, const std::string &seg_path="");
+    //ReadBuffer(const hdf5_tools::File &file, const std::string &raw_path, const std::string &ch_path, const std::string &seg_path="");
     
-
-    //Returns true if buffer contains a single chunk
-    bool single_chunk() const;
-
-    //Returns true if no signal is in buffer
-    bool empty() const;
 
     //Returns read ID (name)
     std::string get_id() const;
@@ -110,37 +98,40 @@ class ReadBuffer {
     u64 size() const;
     
     //Returns total known size of read
-    //equal to size() if !single_chunk()
-    u64 full_duration() const; 
-    void set_full_duration(u64 raw_len_); //_raw_len
+    //if chunk_count()==1 
+    u64 get_full_duration() const; 
+    void set_full_duration(u64 raw_len_); 
 
     //Returns the signal buffer
-    const std::vector<float> &get_signal() const; //{return full_signal_;}
+    const std::vector<float> &get_signal() const;
 
     //Returns sample at specified index
-    float &operator[](u32 i);// {return full_signal_[i];}
+    float &operator[](u32 i);
 
     void swap(ReadBuffer &r);
 
+    //Clears the signal buffer
     void clear();
+    
+    //Returns true if no signal is in buffer
+    bool empty() const;
 
     //Returns number of chunks loaded in buffer
-    u32 chunk_count() const;
+    u32 get_chunk_count() const;
 
     //Returns true if the maximal number of chunks are in the buffer
     bool chunks_maxed() const ;
 
     //Returns the ith chunk in the buffer
-    //only relavent if !single_chunk()
+    //only used if chunk_count() > 1
     ReadBuffer get_chunk(u32 i) const;
 
     //TODO make simulator just read from ReadBuffer
-    //only relavent if !single_chunk()
+    //only used if chunk_count() > 1
     u32 get_chunks(std::vector<ReadBuffer> &chunk_queue, bool real_start=true, u32 offs=0) const;
 
     //Updates the read chunk
-    //only relevent if single_chunk() == true
-    //replaces something...
+    //only used if chunk_count() == 1
     bool add_next_chunk(ReadBuffer &r);
 
     #ifdef PYBIND
@@ -151,13 +142,13 @@ class ReadBuffer {
 
     static void pybind_defs(pybind11::class_<ReadBuffer> &c) {
         PY_READ_METH(empty);
-        PY_READ_METH(size); //TODO bind to __len__ ?
         PY_READ_RPROP(id);
         PY_READ_RPROP(start);
         PY_READ_RPROP(end);
-        PY_READ_RPROP(duration);
+        PY_READ_RPROP(full_duration);
         PY_READ_RPROP(channel);
-        PY_READ_RPROP(raw);
+        PY_READ_RPROP(number);
+        PY_READ_RPROP(signal);
 
         c.def("__len__", &ReadBuffer::size);
         c.def("__getitem__", &ReadBuffer::operator[]);

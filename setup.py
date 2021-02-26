@@ -4,6 +4,15 @@ import os
 import subprocess
 import sys
 
+#TODO need to make sure pybind11 already installed?
+#might be relevent: https://github.com/oslocyclotronlab/ompy/pull/160
+try:
+    from pybind11.setup_helpers import Pybind11Extension, ParallelCompile
+    ParallelCompile("NPY_NUM_BUILD_JOBS", default=8).install()
+except:
+    from setuptools import Extension as Pybind11Extension
+
+
 __version__ = "2.2"
 
 ROOT_DIR = os.getcwd()
@@ -25,6 +34,7 @@ class get_pybind_include(object):
 
     def __str__(self):
         import pybind11
+        from pybind11.setup_helpers import Pybind11Extension
         return pybind11.get_include()
 
 class pre_build(build_ext):
@@ -79,7 +89,7 @@ class pre_build(build_ext):
 
         build_ext.run(self)
 
-uncalled = Extension(
+uncalled = Pybind11Extension(
     "_uncalled",
 
     sources = [
@@ -138,7 +148,7 @@ setup(
     python_requires=">=3.6",
 
     setup_requires=[
-        'pybind11>=2.5.0', 
+        'pybind11>=2.6.0', 
         'read-until==3.0.0'
     ],
 
