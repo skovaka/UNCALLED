@@ -29,15 +29,11 @@
  * vs rolling chunk input from live mode
  * vs simulated chunks (which we could avoid copying)
  * basically need to reconcile realtime, client_sim, and map_ord
- *
- * ALSO need to write Fast5Read subclass, which for sure reps a full read
 */
 
 #include <string>
 #include <vector>
 #include <unordered_set>
-//#include <fast5/hdf5_tools.hpp>
-#include "hdf5_tools.hpp"
 #include "util.hpp"
 
 #ifdef PYBIND
@@ -53,6 +49,7 @@ class ReadBuffer {
         float sample_rate;
         float chunk_time;
         u32 max_chunks;
+        u32 sample_start;
 
         float bp_per_samp() {
             return bp_per_sec / sample_rate;
@@ -66,14 +63,11 @@ class ReadBuffer {
     static Params PRMS;
 
     ReadBuffer();
+
     ReadBuffer(const std::string &id, u16 channel, u32 number, u64 start_time, 
           const std::string &dtype, const std::string &raw_str);
     ReadBuffer(const std::string &id, u16 channel, u32 number, u64 start_time, 
           const std::vector<float> &raw_data, u32 raw_st, u32 raw_len);
-
-    //TODO move to subclass, maybe friend to fast5reader?
-    //ReadBuffer(const hdf5_tools::File &file, const std::string &raw_path, const std::string &ch_path, const std::string &seg_path="");
-    
 
     //Returns read ID (name)
     std::string get_id() const;
@@ -141,6 +135,7 @@ class ReadBuffer {
     #define PY_READ_PRM(P) p.def_readwrite(#P, &ReadBuffer::Params::P);
 
     static void pybind_defs(pybind11::class_<ReadBuffer> &c) {
+        c.def(pybind11::init<ReadBuffer>());
         PY_READ_METH(empty);
         PY_READ_RPROP(id);
         PY_READ_RPROP(start);

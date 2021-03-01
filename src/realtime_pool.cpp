@@ -41,6 +41,8 @@ RealtimePool::RealtimePool(Conf &conf) :
     PRMS(conf.realtime_prms),
     stopped_(false) {
 
+    conf.export_static();
+
     for (u16 t = 0; t < conf.threads; t++) {
         threads_.emplace_back(mappers_);
     }

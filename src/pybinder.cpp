@@ -36,7 +36,7 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<ReadBuffer> read_buffer(m, "ReadBuffer");
     ReadBuffer::pybind_defs(read_buffer);
     
-    py::class_<Fast5Read> fast5_read(m, "Fast5Read");
+    py::class_<Fast5Read, ReadBuffer> fast5_read(m, "Fast5Read");
     Fast5Read::pybind_defs(fast5_read);
 
     py::class_<Fast5Reader> fast5_reader(m, "Fast5Reader");

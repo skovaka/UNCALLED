@@ -21,6 +21,7 @@
  * SOFTWARE.
  */
 
+#include <iostream>
 #include "read_buffer.hpp"
 
 ReadBuffer::Params ReadBuffer::PRMS = {
@@ -31,74 +32,9 @@ ReadBuffer::Params ReadBuffer::PRMS = {
     max_chunks   : 1000000,
 };
 
+//TODO why do I need this
 ReadBuffer::ReadBuffer() {
-    chunk_count_ = 0;
-    
 }
-
-//ReadBuffer::ReadBuffer(const hdf5_tools::File &file, 
-//                       const std::string &raw_path, 
-//                       const std::string &ch_path, 
-//                       const std::string &seg_path) {
-//
-//    for (auto a : file.get_attr_map(raw_path)) {
-//        if (a.first == "read_id") {
-//            id_ = a.second;
-//        } else if (a.first == "read_number") {
-//            number_ = atoi(a.second.c_str());
-//        } else if (a.first == "start_time") {
-//            start_sample_ = atoi(a.second.c_str());
-//        }
-//    }
-//
-//	float cal_digit = 1, cal_range = 1, cal_offset = 0;
-//    for (auto a : file.get_attr_map(ch_path)) {
-//        if (a.first == "channel_number") {
-//            channel_idx_ = atoi(a.second.c_str()) - 1;
-//        } else if (a.first == "digitisation") {
-//            cal_digit = atof(a.second.c_str());
-//        } else if (a.first == "range") {
-//            cal_range = atof(a.second.c_str());
-//        } else if (a.first == "offset") {
-//            cal_offset = atof(a.second.c_str());
-//        }
-//    }
-//
-//    u32 samp_st = 0;
-//
-//    if (!seg_path.empty()) {
-//        for (auto a : file.get_attr_map(seg_path)) {
-//            if (a.first == "first_sample_template") {
-//                samp_st = atoi(a.second.c_str());
-//            }
-//        }
-//    }
-//
-//    std::string sig_path = raw_path + "/Signal";
-//    std::vector<i16> int_data; 
-//    file.read(sig_path, int_data);
-//
-//    chunk_count_ = (int_data.size() / PRMS.chunk_len()) + (int_data.size() % PRMS.chunk_len() != 0);
-//
-//    if (chunk_count_ > PRMS.max_chunks) {
-//        chunk_count_ = PRMS.max_chunks;
-//        int_data.resize(chunk_count_ * PRMS.chunk_len());
-//    }
-//
-//    //signal_.reserve(int_data.size());
-//
-//    //signal_.assign(int_data.begin(), int_data.end());
-//    //for (u16 raw : int_data) {
-//    for (u64 i = 0; i < samp_st; i++) {
-//        signal_.push_back(60); //DUMB
-//    }
-//    for (u64 i = samp_st; i < int_data.size(); i++) {
-//		float calibrated = (cal_range * int_data[i] / cal_digit) + cal_offset;
-//        signal_.push_back(calibrated);
-//    }
-//
-//    full_duration_ = signal_.size();
-//}
 
 ReadBuffer::ReadBuffer(const std::string &id, u16 channel, u32 number, u64 start_time, const std::string &dtype, const std::string &raw_str)
     : id_(id),

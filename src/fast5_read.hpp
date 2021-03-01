@@ -21,8 +21,7 @@
  * SOFTWARE.
  */
 
-#include <thread>
-//#include "fast5_reader.hpp"
+#include "hdf5_tools.hpp"
 #include "read_buffer.hpp"
 
 const std::string
@@ -66,21 +65,28 @@ class Fast5Read : public ReadBuffer {
         if (!anl_path.empty() && file.group_exists(anl_path)) {
             bc_loaded_ = true;
 
+            //Template start from guppy segmentation
             std::string seg_path = anl_path + GUPPY_SEG_SMRY_PATH;
             for (auto a : file.get_attr_map(seg_path)) {
                 if (a.first == "first_sample_template") {
                     template_start_ = atoi(a.second.c_str());
                 }
             }
-
+    
+            //Guppy BaseCalled Event constant length (stride)
             auto bc_attrs = file.get_attr_map(anl_path + GUPPY_BC_SMRY_PATH);
             bce_stride_ = atoi(bc_attrs["block_stride"].c_str());
 
+            //Read guppy bce moves
             std::string bc_move_path = anl_path + GUPPY_BC_MOVE_PATH;
             file.read(bc_move_path, moves_);
+
         } else {
             bc_loaded_ = false;
         }
+
+        //TODO clean up constructors
+        //don't use inheritance
 
         std::string sig_path = raw_path + "/Signal";
         std::vector<i16> int_data; 
@@ -140,8 +146,9 @@ class Fast5Read : public ReadBuffer {
 
     public:
 
-    static void pybind_defs(pybind11::class_<Fast5Read> &c) {
+    static void pybind_defs(pybind11::class_<Fast5Read, ReadBuffer> &c) {
 
+        //c.def(pybind11::init<ReadBuffer>());
         PY_FAST5_READ_RPROP(bc_loaded, "True if basecalling data loaded");
         PY_FAST5_READ_RPROP(moves, "Guppy BC event moves");
         PY_FAST5_READ_RPROP(bce_stride, "Guppy BC event length");

@@ -153,12 +153,13 @@ class EventProfiler {
 
     #ifdef PYBIND
 
-    #define PY_EVENT_PROFILER_METH(P) c.def(#P, &EventProfiler::P);
-    #define PY_EVENT_PROFILER_PROP(P) c.def_property(#P, &EventProfiler::get_##P, &EventProfiler::set_##P);
-    #define PY_EVENT_PROFILER_RPROP(P) c.def_property_readonly(#P, &EventProfiler::get_##P);
+    #define PY_EVENT_PROFILER_METH(P) evpr.def(#P, &EventProfiler::P);
+    #define PY_EVENT_PROFILER_PROP(P) evpr.def_property(#P, &EventProfiler::get_##P, &EventProfiler::set_##P);
+    #define PY_EVENT_PROFILER_RPROP(P) evpr.def_property_readonly(#P, &EventProfiler::get_##P);
+    #define PY_ANNO_EVENT_VAL(P) ann.def_readonly(#P, &AnnoEvent::P);
 
-    static void pybind_defs(pybind11::class_<EventProfiler> &c) {
-        c.def(pybind11::init());
+    static void pybind_defs(pybind11::class_<EventProfiler> &evpr) {
+        evpr.def(pybind11::init());
         PY_EVENT_PROFILER_METH(reset)
         PY_EVENT_PROFILER_METH(set_norm)
         PY_EVENT_PROFILER_METH(add_event)
@@ -167,6 +168,13 @@ class EventProfiler {
         PY_EVENT_PROFILER_METH(anno_event)
         PY_EVENT_PROFILER_METH(next_mean)
         PY_EVENT_PROFILER_METH(get_full_mask)
+
+        pybind11::class_<AnnoEvent> ann(evpr, "AnnoEvent");
+        PY_ANNO_EVENT_VAL(evt)
+        PY_ANNO_EVENT_VAL(win_mean)
+        PY_ANNO_EVENT_VAL(win_stdv)
+        PY_ANNO_EVENT_VAL(mask)
+
     }
     #endif
 

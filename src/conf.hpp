@@ -63,13 +63,18 @@ class Conf {
     Mode mode;
     u16 threads;
 
-    Mapper::Params &mapper_prms = Mapper::PRMS;
-    Normalizer::Params &norm_prms = mapper_prms.norm_prms;
-    EventDetector::Params &event_prms = mapper_prms.event_prms;
-    EventProfiler::Params &evt_prof_prms = mapper_prms.evt_prof_prms;
-    SeedTracker::Params &seed_prms = mapper_prms.seed_prms;
+    Mapper::Params mapper_prms = Mapper::PRMS;
+    ReadBuffer::Params read_prms = ReadBuffer::PRMS;
 
-    ReadBuffer::Params &read_prms = ReadBuffer::PRMS;
+    //Normalizer::Params &norm_prms = mapper_prms.norm_prms;
+    //EventDetector::Params &event_prms = mapper_prms.event_prms;
+    //EventProfiler::Params &evt_prof_prms = mapper_prms.evt_prof_prms;
+    //SeedTracker::Params &seed_prms = mapper_prms.seed_prms;
+
+    Normalizer::Params norm_prms = Normalizer::PRMS_DEF;
+    EventDetector::Params event_prms = EventDetector::PRMS_DEF;
+    EventProfiler::Params evt_prof_prms = EventProfiler::PRMS_DEF;
+    SeedTracker::Params seed_prms = SeedTracker::PRMS_DEF;
 
     Fast5Reader::Params fast5_prms = Fast5Reader::PRMS_DEF;
     static constexpr Fast5Reader::Docstrs fast5_docs = Fast5Reader::DOCSTRS;
@@ -93,6 +98,16 @@ class Conf {
         default:
             break;
         }
+    }
+
+    void export_static() {
+        mapper_prms.norm_prms = norm_prms;
+        mapper_prms.event_prms = event_prms;
+        mapper_prms.evt_prof_prms = evt_prof_prms;
+        mapper_prms.seed_prms = seed_prms;
+
+        Mapper::PRMS = mapper_prms;
+        ReadBuffer::PRMS = read_prms;
     }
 
     void load_toml(const std::string &fname) {
@@ -283,7 +298,13 @@ class Conf {
 
     GET_SET_EXTERN(u32, map_ord_prms, min_active_reads);
 
-    
+    EventDetector::Params &get_event_prms() {
+        return event_prms;
+    }
+
+    void set_event_prms(const EventDetector::Params &p) {
+        event_prms = p;
+    }
 
     #ifdef PYBIND
     #define DEFPRP(P) c.def_property(#P, &Conf::get_##P, &Conf::set_##P);
@@ -297,6 +318,10 @@ class Conf {
         c.def(pybind11::init<const std::string &>())
          .def(pybind11::init())
          .def("load_toml", &Conf::load_toml);
+
+        //TODO expose all parameter sets (within hpp files and here)
+        //maybe replace a lot of this get/set nonsense
+        c.def_readwrite("event_prms", &Conf::event_prms);
 
         DEFPRP(threads)
 
