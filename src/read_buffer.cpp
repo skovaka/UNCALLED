@@ -29,10 +29,12 @@ ReadBuffer::Params ReadBuffer::PRMS = {
     bp_per_sec   : 450,
     sample_rate  : 4000,
     chunk_time   : 1.0,
+    start_chunk  : 0,
     max_chunks   : 1000000,
+    seq_fwd      : true,
+    skip_notempl : false
 };
 
-//TODO why do I need this
 ReadBuffer::ReadBuffer() {
 }
 

@@ -32,11 +32,10 @@
 #include "event_detector.hpp"
 #include "event_profiler.hpp"
 #include "pore_model.hpp"
+#include "models.inl"
 #include "seed_tracker.hpp"
 #include "read_buffer.hpp"
 #include "paf.hpp"
-
-const KmerLen KLEN = KmerLen::k5;
 
 //#define DEBUG_TIME
 //#define DEBUG_SEEDS
@@ -66,12 +65,12 @@ class Mapper {
 
         std::string bwa_prefix;
         std::string idx_preset;
-        std::string model_path;
+        std::string pore_model;
 
-        SeedTracker::Params seed_prms;
-        Normalizer::Params norm_prms;
-        EventDetector::Params event_prms;
-        EventProfiler::Params evt_prof_prms;
+        SeedTracker::Params seed_tracker;
+        Normalizer::Params normalizer;
+        EventDetector::Params event_detector;
+        EventProfiler::Params event_profiler;
 
         #ifdef DEBUG_OUT
         std::string dbg_prefix;
@@ -274,19 +273,22 @@ class Mapper {
 
     #ifdef PYBIND
 
-    #define PY_MAP_METH(N,D) c.def(#N, &Mapper::N, D);
-    #define PY_MAP_PRM(P) c.def_readwrite(#P, &Mapper::Params::P);
-    #define PY_PATHBUF_PRM(P) p.def_readonly(#P, &Mapper::Params::P);
+    #define PY_MAPPER_METH(N,D) map.def(#N, &Mapper::N, D);
+    #define PY_MAPPER_PRM(P) prm.def_readwrite(#P, &Mapper::Params::P);
+    #define PY_PATHBUF_PRM(P) path.def_readonly(#P, &Mapper::Params::P);
 
-    static void pybind_defs(pybind11::class_<Mapper> &c, pybind11::class_<PathBuffer> &p) {
+    public:
 
-        c.def(pybind11::init());
+    static void pybind_defs(pybind11::class_<Mapper> &map) {
+
+        map.def(pybind11::init());
         
         //PY_MAP_METH(add_fast5,
         //    "Adds a fast5 filename to the list of files to load. "
         //);
 
 
+        pybind11::class_<PathBuffer> path(map, "PathBuffer");
         //PY_MAP_METH(add_read, "Adds a read ID to the read filter");
         //PY_MAP_METH(load_read_list, "Loads a list of read IDs from a text file to add to the read filter");
         //PY_MAP_METH(pop_read, "");
@@ -295,11 +297,29 @@ class Mapper {
         //PY_MAP_METH(all_buffered, "");
         //PY_MAP_METH(empty, "");
 
-        //pybind11::class_<Params> p(c, "Params");
-        //PY_MAP_PRM(fast5_list);
-        //PY_MAP_PRM(read_list);
-        //PY_MAP_PRM(max_reads);
-        //PY_MAP_PRM(max_buffer);
+        pybind11::class_<Params> prm(map, "Params");
+        PY_MAPPER_PRM(seed_len)
+        PY_MAPPER_PRM(min_rep_len)
+        PY_MAPPER_PRM(max_rep_copy)
+        PY_MAPPER_PRM(max_paths)
+        PY_MAPPER_PRM(max_consec_stay)
+        PY_MAPPER_PRM(max_events)
+        PY_MAPPER_PRM(max_stay_frac)
+        PY_MAPPER_PRM(min_seed_prob)
+        PY_MAPPER_PRM(evt_batch_size)
+        PY_MAPPER_PRM(evt_timeout)
+        PY_MAPPER_PRM(chunk_timeout)
+        PY_MAPPER_PRM(bwa_prefix)
+        PY_MAPPER_PRM(idx_preset)
+        PY_MAPPER_PRM(model_path)
+        PY_MAPPER_PRM(seed_tracker)
+        PY_MAPPER_PRM(normalizer)
+        PY_MAPPER_PRM(event_detector)
+        PY_MAPPER_PRM(event_profiler)
+
+        #ifdef DEBUG_OUT
+        PY_MAPPER_PRM(dbg_prefix)
+        #endif
     }
 
     #endif

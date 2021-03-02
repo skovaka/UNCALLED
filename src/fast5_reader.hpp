@@ -42,8 +42,21 @@ class Fast5Reader {
         std::string fast5_list;
         std::string read_list;
         u32 max_reads, max_buffer;
+        bool load_bc;
     } Params;
     static Params const PRMS_DEF;
+
+    struct ParamMeta {
+        const char *name, *docstr;
+        const void *ptr;
+    };
+
+    //static constexpr std::array<ParamMeta,4> PARAM_META {{
+    //    {"fast5_list", "File containing a list of paths to fast5 files, one per line.", (void*)(&Params::fast5_list)},
+    //    {"read_list", "File containing a list of read IDs. Only these reads will be loaded if specified.", (void*)(&Params::read_list>)},
+    //    {"max_reads", "Maximum number of reads to load", (void*)(&Params::max_reads>)},
+    //    {"max_buffer", "Maximum number of reads to store in memory", (void*)(&Params::max_buffer)}
+    //}};
 
     typedef struct {
         const char *fast5_list, *read_list, *max_reads, *max_buffer;
@@ -115,6 +128,11 @@ class Fast5Reader {
     #define PY_FAST5_READER_METH(N,D) c.def(#N, &Fast5Reader::N, D);
     #define PY_FAST5_READER_PRM(P) p.def_readwrite(#P, &Fast5Reader::Params::P);
 
+    template <typename C, typename D, typename X>
+    static void DPRM(X c, const char *name, D C:: *pm) {
+        c.def_readwrite(name, pm);
+    }
+
     public:
 
     static void pybind_defs(pybind11::class_<Fast5Reader> &c) {
@@ -145,7 +163,10 @@ class Fast5Reader {
         PY_FAST5_READER_METH(empty, "");
 
         pybind11::class_<Params> p(c, "Params");
-        PY_FAST5_READER_PRM(fast5_list);
+        //p.def_readwrite(PARAM_META[0], &Fast5Reader::Params::P);
+
+        DPRM(p, "fast5_list", &Fast5Reader::Params::fast5_list);
+        //PY_FAST5_READER_PRM(fast5_list);
         PY_FAST5_READER_PRM(read_list);
         PY_FAST5_READER_PRM(max_reads);
         PY_FAST5_READER_PRM(max_buffer);

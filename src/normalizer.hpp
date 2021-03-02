@@ -10,11 +10,11 @@
 
 class Normalizer {
     public:
-    typedef struct Params {
+    struct Params {
         u32 len;
         float tgt_mean;
         float tgt_stdv;
-    } Params;
+    };
 
     static Params const PRMS_DEF;
 
@@ -48,6 +48,9 @@ class Normalizer {
     #ifdef PYBIND
 
     #define PY_NORM_METH(P) c.def(#P, &Normalizer::P);
+    #define PY_NORM_PRM(P) p.def_readwrite(#P, &Normalizer::Params::P);
+
+    public:
 
     static void pybind_defs(pybind11::class_<Normalizer> &c) {
         c.def(pybind11::init());
@@ -66,6 +69,12 @@ class Normalizer {
         PY_NORM_METH(reset);
         PY_NORM_METH(empty);
         PY_NORM_METH(full);
+
+        pybind11::class_<Params> p(c, "Params");
+        PY_NORM_PRM(len)
+        PY_NORM_PRM(tgt_mean)
+        PY_NORM_PRM(tgt_stdv)
+
     }
 
     #endif

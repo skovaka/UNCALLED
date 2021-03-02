@@ -27,8 +27,8 @@
 #include "map_pool_ord.hpp"
 
 MapPoolOrd::MapPoolOrd(Conf &conf)
-    : PRMS(conf.map_ord_prms),
-      fast5s_(conf.fast5_prms),
+    : PRMS(conf.map_pool_ord),
+      fast5s_(conf.fast5_reader),
       pool_(conf),
       channels_empty_(false) {
 

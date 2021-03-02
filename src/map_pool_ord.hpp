@@ -58,6 +58,22 @@ class MapPoolOrd {
     std::vector<u32> chunk_idx_;
 
     bool channels_empty_;
+
+    #ifdef PYBIND
+
+    #define PY_MAP_ORD_METH(P) c.def(#P, &MapPoolOrd::P);
+    #define PY_MAP_ORD_PRM(P) p.def_readonly(#P, &MapOrdParams::P);
+
+    public:
+
+    static void pybind_defs(pybind11::class_<MapPoolOrd> &c) {
+        c.def(pybind11::init<Conf &>());
+
+        pybind11::class_<MapOrdParams> p(c, "Params");
+        PY_MAP_ORD_PRM(min_active_reads)
+    }
+
+    #endif
 };
 
 

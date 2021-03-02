@@ -44,13 +44,13 @@ int main(int argc, char** argv) {
 
 #define FLAG_TO_CONF(C, T, F) { \
     case C: \
-        conf.set_##F(T(optarg)); \
+        conf.F = T(optarg); \
         break; \
 }
 
 #define POSITIONAL_TO_CONF(T, F) {\
     if (i < argc) { \
-        conf.set_##F(T(argv[i])); \
+        conf.F = T(argv[i]); \
         i++; \
     } else { \
         std::cerr << "Error: must specify flag " << #F << "\n"; \
@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
 
 void load_conf(int argc, char** argv, Conf &conf) {
     int opt;
-    std::string flagstr = "C:t:n:r:R:c:l:s:w:p:";
+    std::string flagstr = "C:t:n:c:l:s:w:p:Sr";
 
     #ifdef DEBUG_OUT
     flagstr += "D:";
@@ -71,21 +71,28 @@ void load_conf(int argc, char** argv, Conf &conf) {
         switch(opt) {  
 
             FLAG_TO_CONF('t', atoi, threads)
-            FLAG_TO_CONF('n', atoi, max_reads)
-            FLAG_TO_CONF('r', atoi, min_active_reads)
-            FLAG_TO_CONF('R', atoi, max_active_reads)
-            FLAG_TO_CONF('c', atoi, max_chunks)
-            FLAG_TO_CONF('l', std::string, read_list)
-            FLAG_TO_CONF('s', atof, win_stdv_min)
-            FLAG_TO_CONF('w', atof, win_len)
-            FLAG_TO_CONF('p', std::string, idx_preset)
+            FLAG_TO_CONF('n', atoi, fast5_reader.max_reads)
+            FLAG_TO_CONF('c', atoi, read_buffer.max_chunks)
+            FLAG_TO_CONF('l', std::string, fast5_reader.read_list)
+            FLAG_TO_CONF('p', std::string, mapper.idx_preset)
+
             #ifdef DEBUG_OUT
-            FLAG_TO_CONF('D', std::string, dbg_prefix);
+            FLAG_TO_CONF('D', std::string, mapper.dbg_prefix);
             #endif
 
             case 'C':
             std::cerr << "Conf: " << optarg << "\n";
             conf.load_toml(std::string(optarg));
+            break;
+
+            case 'r':
+            std::cerr << "Setting RNA parameters\n";
+            conf.set_r94_rna();
+            break;
+
+            case 'S':
+            conf.fast5_reader.load_bc = true;
+            conf.read_buffer.skip_notempl = true;
             break;
 
             case ':':  
@@ -102,6 +109,6 @@ void load_conf(int argc, char** argv, Conf &conf) {
     //parse positionals
     int i = optind;
 
-    POSITIONAL_TO_CONF(std::string, bwa_prefix)
-    POSITIONAL_TO_CONF(std::string, fast5_list)
+    POSITIONAL_TO_CONF(std::string, mapper.bwa_prefix)
+    POSITIONAL_TO_CONF(std::string, fast5_reader.fast5_list)
 }

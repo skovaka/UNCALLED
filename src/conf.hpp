@@ -63,25 +63,19 @@ class Conf {
     Mode mode;
     u16 threads;
 
-    Mapper::Params mapper_prms = Mapper::PRMS;
-    ReadBuffer::Params read_prms = ReadBuffer::PRMS;
+    Mapper::Params        mapper         = Mapper::PRMS;
+    ReadBuffer::Params    read_buffer    = ReadBuffer::PRMS;
+    Normalizer::Params    normalizer     = Normalizer::PRMS_DEF;
+    EventDetector::Params event_detector = EventDetector::PRMS_DEF;
+    EventProfiler::Params event_profiler = EventProfiler::PRMS_DEF;
+    SeedTracker::Params   seed_tracker   = SeedTracker::PRMS_DEF;
+    Fast5Reader::Params   fast5_reader   = Fast5Reader::PRMS_DEF;
 
-    //Normalizer::Params &norm_prms = mapper_prms.norm_prms;
-    //EventDetector::Params &event_prms = mapper_prms.event_prms;
-    //EventProfiler::Params &evt_prof_prms = mapper_prms.evt_prof_prms;
-    //SeedTracker::Params &seed_prms = mapper_prms.seed_prms;
+    RealtimeParams        realtime       = REALTIME_PRMS_DEF;
+    SimParams             client_sim     = SIM_PRMS_DEF;
+    MapOrdParams          map_pool_ord   = MAP_ORD_PRMS_DEF;
 
-    Normalizer::Params norm_prms = Normalizer::PRMS_DEF;
-    EventDetector::Params event_prms = EventDetector::PRMS_DEF;
-    EventProfiler::Params evt_prof_prms = EventProfiler::PRMS_DEF;
-    SeedTracker::Params seed_prms = SeedTracker::PRMS_DEF;
-
-    Fast5Reader::Params fast5_prms = Fast5Reader::PRMS_DEF;
     static constexpr Fast5Reader::Docstrs fast5_docs = Fast5Reader::DOCSTRS;
-
-    RealtimeParams realtime_prms = REALTIME_PRMS_DEF;
-    SimParams sim_prms = SIM_PRMS_DEF;
-    MapOrdParams map_ord_prms = MAP_ORD_PRMS_DEF;
 
     Conf() : mode(Mode::UNDEF), threads(1) {}
 
@@ -91,8 +85,8 @@ class Conf {
         switch (mode) {
 
         case Mode::MAP_ORD:
-            mapper_prms.chunk_timeout = FLT_MAX;
-            mapper_prms.evt_timeout = FLT_MAX;
+            mapper.chunk_timeout = FLT_MAX;
+            mapper.evt_timeout = FLT_MAX;
             break;
 
         default:
@@ -100,14 +94,31 @@ class Conf {
         }
     }
 
-    void export_static() {
-        mapper_prms.norm_prms = norm_prms;
-        mapper_prms.event_prms = event_prms;
-        mapper_prms.evt_prof_prms = evt_prof_prms;
-        mapper_prms.seed_prms = seed_prms;
+    void set_r94_rna() {
+        read_buffer.sample_rate = 3012;
+        read_buffer.bp_per_sec  = 70;
+        read_buffer.chunk_time  = 1.0;
+        read_buffer.max_chunks  = 20;
+        read_buffer.seq_fwd     = false;
 
-        Mapper::PRMS = mapper_prms;
-        ReadBuffer::PRMS = read_prms;
+        mapper.pore_model    = "r94_rna_templ";
+        mapper.min_seed_prob = -3.0;
+        mapper.max_paths     = 50000;
+
+        event_detector.window_length1 = 7;
+        event_detector.window_length2 = 12;
+        event_detector.threshold1     = 2.8;
+        event_detector.threshold2     = 18.0;
+    }
+
+    void export_static() {
+        mapper.normalizer = normalizer;
+        mapper.event_detector = event_detector;
+        mapper.event_profiler = event_profiler;
+        mapper.seed_tracker = seed_tracker;
+
+        Mapper::PRMS = mapper;
+        ReadBuffer::PRMS = read_buffer;
     }
 
     void load_toml(const std::string &fname) {
@@ -120,16 +131,16 @@ class Conf {
 
         if (conf.contains("realtime")) {
             const auto subconf = toml::find(conf, "realtime");
-            GET_TOML_EXTERN(std::string, host, realtime_prms);
-            GET_TOML_EXTERN(u16, port, realtime_prms);
-            GET_TOML_EXTERN(float, duration, realtime_prms);
-            GET_TOML_EXTERN(u32, max_active_reads, realtime_prms);
+            GET_TOML_EXTERN(std::string, host, realtime);
+            GET_TOML_EXTERN(u16, port, realtime);
+            GET_TOML_EXTERN(float, duration, realtime);
+            GET_TOML_EXTERN(u32, max_active_reads, realtime);
 
             if (subconf.contains("realtime_mode")) {
                 std::string mode_str = toml::find<std::string>(subconf, "realtime_mode");
                 for (u8 i = 0; i != (u8) RealtimeParams::Mode::NUM; i++) {
                     if (mode_str == MODE_STRS[i]) {
-                        realtime_prms.realtime_mode = (RealtimeParams::Mode) i;
+                        realtime.realtime_mode = (RealtimeParams::Mode) i;
                         break;
                     }
                 }
@@ -139,7 +150,7 @@ class Conf {
                 std::string mode_str = toml::find<std::string>(subconf, "active_chs");
                 for (u8 i = 0; i != (u8) RealtimeParams::ActiveChs::NUM; i++) {
                     if (mode_str == ACTIVE_STRS[i]) {
-                        realtime_prms.active_chs = (RealtimeParams::ActiveChs) i;
+                        realtime.active_chs = (RealtimeParams::ActiveChs) i;
                         break;
                     }
                 }
@@ -149,95 +160,98 @@ class Conf {
         //TODO rename subsection
         if (conf.contains("simulator")) {
             const auto subconf = toml::find(conf, "simulator");
-            GET_TOML_EXTERN(std::string, ctl_seqsum, sim_prms);
-            GET_TOML_EXTERN(std::string, unc_seqsum, sim_prms);
-            GET_TOML_EXTERN(std::string, unc_paf, sim_prms);
-            GET_TOML_EXTERN(float, sim_speed, sim_prms);
-            GET_TOML_EXTERN(float, scan_time, sim_prms);
-            GET_TOML_EXTERN(float, scan_intv_time, sim_prms);
-            GET_TOML_EXTERN(float, ej_time, sim_prms);
-            GET_TOML_EXTERN(u32, min_ch_reads, sim_prms);
+            GET_TOML_EXTERN(std::string, ctl_seqsum, client_sim);
+            GET_TOML_EXTERN(std::string, unc_seqsum, client_sim);
+            GET_TOML_EXTERN(std::string, unc_paf, client_sim);
+            GET_TOML_EXTERN(float, sim_speed, client_sim);
+            GET_TOML_EXTERN(float, scan_time, client_sim);
+            GET_TOML_EXTERN(float, scan_intv_time, client_sim);
+            GET_TOML_EXTERN(float, ej_time, client_sim);
+            GET_TOML_EXTERN(u32, min_ch_reads, client_sim);
         }
 
-        if (conf.contains("map_ord")) {
-            const auto subconf = toml::find(conf, "map_ord");
-            GET_TOML_EXTERN(u32, min_active_reads, map_ord_prms);
+        if (conf.contains("map_pool_ord")) {
+            const auto subconf = toml::find(conf, "map_pool_ord");
+            GET_TOML_EXTERN(u32, min_active_reads, map_pool_ord);
         }
 
         if (conf.contains("fast5_reader")) {
             const auto subconf = toml::find(conf, "fast5_reader");
 
-            GET_TOML_EXTERN(u32, max_buffer, fast5_prms);
-            GET_TOML_EXTERN(u32, max_reads, fast5_prms);
-            GET_TOML_EXTERN(std::string, fast5_list, fast5_prms);
-            GET_TOML_EXTERN(std::string, read_list, fast5_prms);
+            GET_TOML_EXTERN(u32, max_buffer, fast5_reader);
+            GET_TOML_EXTERN(u32, max_reads, fast5_reader);
+            GET_TOML_EXTERN(std::string, fast5_list, fast5_reader);
+            GET_TOML_EXTERN(std::string, read_list, fast5_reader);
+            GET_TOML_EXTERN(bool, load_bc,  fast5_reader)
         }
 
-        if (conf.contains("reads")) {
-            const auto subconf = toml::find(conf, "reads");
+        if (conf.contains("read_buffer")) {
+            const auto subconf = toml::find(conf, "read_buffer");
 
-            GET_TOML_EXTERN(u32, max_chunks,   read_prms);
-            GET_TOML_EXTERN(u16, bp_per_sec,   read_prms);
-            GET_TOML_EXTERN(u16, sample_rate,  read_prms);
-            GET_TOML_EXTERN(float, chunk_time, read_prms);
-            GET_TOML_EXTERN(u16, num_channels, read_prms);
+            GET_TOML_EXTERN(u32, start_chunk,  read_buffer)
+            GET_TOML_EXTERN(u32, max_chunks,   read_buffer);
+            GET_TOML_EXTERN(u16, bp_per_sec,   read_buffer);
+            GET_TOML_EXTERN(u16, sample_rate,  read_buffer);
+            GET_TOML_EXTERN(float, chunk_time, read_buffer);
+            GET_TOML_EXTERN(u16, num_channels, read_buffer);
+            GET_TOML_EXTERN(bool, skip_notempl,  read_buffer)
         }
 
         if (conf.contains("mapper")) {
             const auto subconf = toml::find(conf, "mapper");
 
-            GET_TOML_EXTERN(u32, seed_len, mapper_prms);
-            GET_TOML_EXTERN(u32, min_rep_len, mapper_prms);
-            GET_TOML_EXTERN(u32, max_rep_copy, mapper_prms);
-            GET_TOML_EXTERN(u32, max_paths, mapper_prms);
-            GET_TOML_EXTERN(u32, max_consec_stay, mapper_prms);
-            GET_TOML_EXTERN(u32, max_events, mapper_prms);
-            GET_TOML_EXTERN(float, max_stay_frac, mapper_prms);
-            GET_TOML_EXTERN(float, min_seed_prob, mapper_prms);
-            GET_TOML_EXTERN(std::string, bwa_prefix, mapper_prms);
-            GET_TOML_EXTERN(std::string, idx_preset, mapper_prms);
-            GET_TOML_EXTERN(std::string, model_path, mapper_prms);
-            GET_TOML_EXTERN(u16, evt_batch_size, mapper_prms);
-            GET_TOML_EXTERN(float, evt_timeout, mapper_prms);
-            GET_TOML_EXTERN(float, chunk_timeout, mapper_prms);
+            GET_TOML_EXTERN(u32, seed_len, mapper);
+            GET_TOML_EXTERN(u32, min_rep_len, mapper);
+            GET_TOML_EXTERN(u32, max_rep_copy, mapper);
+            GET_TOML_EXTERN(u32, max_paths, mapper);
+            GET_TOML_EXTERN(u32, max_consec_stay, mapper);
+            GET_TOML_EXTERN(u32, max_events, mapper);
+            GET_TOML_EXTERN(float, max_stay_frac, mapper);
+            GET_TOML_EXTERN(float, min_seed_prob, mapper);
+            GET_TOML_EXTERN(std::string, bwa_prefix, mapper);
+            GET_TOML_EXTERN(std::string, idx_preset, mapper);
+            GET_TOML_EXTERN(std::string, pore_model, mapper);
+            GET_TOML_EXTERN(u16, evt_batch_size, mapper);
+            GET_TOML_EXTERN(float, evt_timeout, mapper);
+            GET_TOML_EXTERN(float, chunk_timeout, mapper);
 
             #ifdef DEBUG_OUT
-            GET_TOML_EXTERN(std::string, dbg_prefix, mapper_prms);
+            GET_TOML_EXTERN(std::string, dbg_prefix, mapper);
             #endif
         }
 
         if (conf.contains("seed_tracker")) {
             const auto subconf = toml::find(conf, "seed_tracker");
 
-            GET_TOML_EXTERN(float, min_mean_conf,seed_prms);
-            GET_TOML_EXTERN(float, min_top_conf, seed_prms);
-            GET_TOML_EXTERN(u32, min_map_len, seed_prms);
+            GET_TOML_EXTERN(float, min_mean_conf,seed_tracker);
+            GET_TOML_EXTERN(float, min_top_conf, seed_tracker);
+            GET_TOML_EXTERN(u32, min_map_len, seed_tracker);
         }
 
         if (conf.contains("normalizer")) {
             const auto subconf = toml::find(conf, "normalizer");
-            GET_TOML_EXTERN(u32, len, norm_prms);
-            GET_TOML_EXTERN(float, tgt_mean, norm_prms);
-            GET_TOML_EXTERN(float, tgt_stdv, norm_prms);
+            GET_TOML_EXTERN(u32, len, normalizer);
+            GET_TOML_EXTERN(float, tgt_mean, normalizer);
+            GET_TOML_EXTERN(float, tgt_stdv, normalizer);
         }
 
         if (conf.contains("event_detector")) {
             const auto subconf = toml::find(conf, "event_detector");
-            GET_TOML_EXTERN(float, min_mean, event_prms);
-            GET_TOML_EXTERN(float, max_mean, event_prms);
-            GET_TOML_EXTERN(float, threshold1, event_prms);
-            GET_TOML_EXTERN(float, threshold2, event_prms);
-            GET_TOML_EXTERN(float, peak_height, event_prms);
-            GET_TOML_EXTERN(u32, window_length1, event_prms);
-            GET_TOML_EXTERN(u32, window_length2, event_prms);
+            GET_TOML_EXTERN(float, min_mean, event_detector);
+            GET_TOML_EXTERN(float, max_mean, event_detector);
+            GET_TOML_EXTERN(float, threshold1, event_detector);
+            GET_TOML_EXTERN(float, threshold2, event_detector);
+            GET_TOML_EXTERN(float, peak_height, event_detector);
+            GET_TOML_EXTERN(u32, window_length1, event_detector);
+            GET_TOML_EXTERN(u32, window_length2, event_detector);
         }
 
         if (conf.contains("event_profiler")) {
             const auto subconf = toml::find(conf, "event_profiler");
-            GET_TOML_EXTERN(u32, win_len, evt_prof_prms);
-            GET_TOML_EXTERN(float, win_stdv_min, evt_prof_prms);
-            GET_TOML_EXTERN(float, win_stdv_range, evt_prof_prms);
-            GET_TOML_EXTERN(float, win_mean_range, evt_prof_prms);
+            GET_TOML_EXTERN(u32, win_len, event_profiler);
+            GET_TOML_EXTERN(float, win_stdv_min, event_profiler);
+            GET_TOML_EXTERN(float, win_stdv_range, event_profiler);
+            GET_TOML_EXTERN(float, win_mean_range, event_profiler);
         }
 
     }
@@ -256,54 +270,55 @@ class Conf {
         void set_##N(const T &v) { C##_prms.N = v; } \
         static const char * doc_##N() { return C##_docs.N; }
 
-    GET_SET_DOC(fast5, std::string, fast5_list)
-    GET_SET_DOC(fast5, std::string, read_list)
-    GET_SET_DOC(fast5, u32, max_reads)
-    GET_SET_DOC(fast5, u32, max_buffer)
+    GET_SET_EXTERN(std::string, fast5_reader, fast5_list)
+    GET_SET_EXTERN(std::string, fast5_reader, read_list)
+    GET_SET_EXTERN(u32, fast5_reader, max_reads)
+    GET_SET_EXTERN(u32, fast5_reader, max_buffer)
 
-    GET_SET_EXTERN(std::string, realtime_prms, host)
-    GET_SET_EXTERN(u16, realtime_prms, port)
-    GET_SET_EXTERN(float, realtime_prms, duration)
-    GET_SET_EXTERN(u32, realtime_prms, max_active_reads)
-    GET_SET_EXTERN(RealtimeParams::ActiveChs, realtime_prms, active_chs)
-    GET_SET_EXTERN(RealtimeParams::Mode, realtime_prms, realtime_mode)
+    GET_SET_EXTERN(std::string, realtime, host)
+    GET_SET_EXTERN(u16, realtime, port)
+    GET_SET_EXTERN(float, realtime, duration)
+    GET_SET_EXTERN(u32, realtime, max_active_reads)
+    GET_SET_EXTERN(RealtimeParams::ActiveChs, realtime, active_chs)
+    GET_SET_EXTERN(RealtimeParams::Mode, realtime, realtime_mode)
 
-    GET_SET_EXTERN(u32, evt_prof_prms, win_len)
-    GET_SET_EXTERN(float, evt_prof_prms, win_stdv_min)
+    GET_SET_EXTERN(u32, event_profiler, win_len)
+    GET_SET_EXTERN(float, event_profiler, win_stdv_min)
     
-    GET_SET_EXTERN(std::string, mapper_prms, bwa_prefix)
-    GET_SET_EXTERN(std::string, mapper_prms, idx_preset)
-    GET_SET_EXTERN(std::string, mapper_prms, model_path)
-    GET_SET_EXTERN(u32, mapper_prms, max_events)
-    GET_SET_EXTERN(u32, mapper_prms, seed_len);
+    GET_SET_EXTERN(std::string, mapper, bwa_prefix)
+    GET_SET_EXTERN(std::string, mapper, idx_preset)
+    GET_SET_EXTERN(std::string, mapper, pore_model)
+    GET_SET_EXTERN(u32, mapper, max_events)
+    GET_SET_EXTERN(u32, mapper, seed_len);
 
     #ifdef DEBUG_OUT
-    GET_SET_EXTERN(std::string, mapper_prms, dbg_prefix)
+    GET_SET_EXTERN(std::string, mapper, dbg_prefix)
     #endif
 
-    GET_SET_EXTERN(u16,   read_prms, num_channels);
-    GET_SET_EXTERN(u32,   read_prms, max_chunks)
-    GET_SET_EXTERN(float, read_prms, chunk_time);
-    GET_SET_EXTERN(float, read_prms, sample_rate);
+    GET_SET_EXTERN(u16,   read_buffer, num_channels);
+    GET_SET_EXTERN(u32,   read_buffer, start_chunk)
+    GET_SET_EXTERN(u32,   read_buffer, max_chunks)
+    GET_SET_EXTERN(float, read_buffer, chunk_time);
+    GET_SET_EXTERN(float, read_buffer, sample_rate);
 
 
-    GET_SET_EXTERN(std::string, sim_prms, ctl_seqsum);
-    GET_SET_EXTERN(std::string, sim_prms, unc_seqsum);
-    GET_SET_EXTERN(std::string, sim_prms, unc_paf);
-    GET_SET_EXTERN(float, sim_prms, sim_speed);
-    GET_SET_EXTERN(float, sim_prms, scan_time);
-    GET_SET_EXTERN(float, sim_prms, scan_intv_time);
-    GET_SET_EXTERN(float, sim_prms, ej_time);
-    GET_SET_EXTERN(u32, sim_prms, min_ch_reads);
+    GET_SET_EXTERN(std::string, client_sim, ctl_seqsum);
+    GET_SET_EXTERN(std::string, client_sim, unc_seqsum);
+    GET_SET_EXTERN(std::string, client_sim, unc_paf);
+    GET_SET_EXTERN(float, client_sim, sim_speed);
+    GET_SET_EXTERN(float, client_sim, scan_time);
+    GET_SET_EXTERN(float, client_sim, scan_intv_time);
+    GET_SET_EXTERN(float, client_sim, ej_time);
+    GET_SET_EXTERN(u32, client_sim, min_ch_reads);
 
-    GET_SET_EXTERN(u32, map_ord_prms, min_active_reads);
+    GET_SET_EXTERN(u32, map_pool_ord, min_active_reads);
 
-    EventDetector::Params &get_event_prms() {
-        return event_prms;
+    EventDetector::Params &get_event_detector_prms() {
+        return event_detector;
     }
 
-    void set_event_prms(const EventDetector::Params &p) {
-        event_prms = p;
+    void set_event_detector(const EventDetector::Params &p) {
+        event_detector = p;
     }
 
     #ifdef PYBIND
@@ -314,20 +329,34 @@ class Conf {
                 &Conf::set_##P, \
                 Conf::doc_##P());
 
+    #define PY_CONF_VAL(P) c.def_readwrite(#P, &Conf::P);
+
     static void pybind_defs(pybind11::class_<Conf> &c) {
         c.def(pybind11::init<const std::string &>())
          .def(pybind11::init())
          .def("load_toml", &Conf::load_toml);
 
+        constexpr auto name = "event_detector";
+
         //TODO expose all parameter sets (within hpp files and here)
         //maybe replace a lot of this get/set nonsense
-        c.def_readwrite("event_prms", &Conf::event_prms);
+        c.def_readwrite(name, &Conf::event_detector);
+        PY_CONF_VAL(mapper)
+        PY_CONF_VAL(read_buffer)
+        PY_CONF_VAL(normalizer) 
+        PY_CONF_VAL(event_detector)
+        PY_CONF_VAL(event_profiler)
+        PY_CONF_VAL(seed_tracker)
+        PY_CONF_VAL(fast5_reader) 
+        PY_CONF_VAL(realtime) 
+        PY_CONF_VAL(client_sim)
+        PY_CONF_VAL(map_pool_ord)
 
         DEFPRP(threads)
 
         DEFPRP(bwa_prefix)
         DEFPRP(idx_preset)
-        DEFPRP(model_path);
+        DEFPRP(pore_model);
         DEFPRP(max_events)
         DEFPRP(seed_len);
         DEFPRP(chunk_time)
@@ -336,10 +365,10 @@ class Conf {
         DEFPRP(dbg_prefix)
         #endif
 
-        DEFPRP_DOC(fast5_list)
-        DEFPRP_DOC(read_list)
-        DEFPRP_DOC(max_reads)
-        DEFPRP_DOC(max_buffer)
+        DEFPRP(fast5_list)//_DOC
+        DEFPRP(read_list) //_DOC
+        DEFPRP(max_reads) //_DOC
+        DEFPRP(max_buffer)//_DOC
 
         DEFPRP(host)
         DEFPRP(port)

@@ -24,8 +24,8 @@
 #include "client_sim.hpp"
 
 ClientSim::ClientSim(Conf &conf) :
-      PRMS(conf.sim_prms),
-      fast5s_(conf.fast5_prms),
+      PRMS(conf.client_sim),
+      fast5s_(conf.fast5_reader),
       scan_start_(0),
       is_running_(false),
       in_scan_(false) {

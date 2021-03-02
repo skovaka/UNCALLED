@@ -39,17 +39,17 @@ int main(int argc, char** argv) {
 
 #define FLAG_TO_CONF(C, T, F) { \
     case C: \
-        conf.set_##F(T(optarg)); \
+        conf.F = T(optarg); \
         break; \
 }
 
 #define POSITIONAL_TO_CONF(T, F) {\
     if (i < argc) { \
-        conf.set_##F(T(argv[i])); \
+        conf.F = T(argv[i]); \
         i++; \
     } else { \
-        std::cerr << "Error: must specify " << #F << "\n"; \
-        return false; \
+        std::cerr << "Error: must specify flag " << #F << "\n"; \
+        abort(); \
     } \
 }
 
@@ -66,11 +66,11 @@ bool load_conf(int argc, char** argv, Conf &conf) {
         switch(opt) {  
 
             FLAG_TO_CONF('t', atoi, threads)
-            FLAG_TO_CONF('n', atoi, max_reads)
-            FLAG_TO_CONF('l', std::string, read_list)
+            FLAG_TO_CONF('n', atoi, fast5_reader.max_reads)
+            FLAG_TO_CONF('l', std::string, fast5_reader.read_list)
 
             #ifdef DEBUG_OUT
-            FLAG_TO_CONF('D', std::string, dbg_prefix);
+            FLAG_TO_CONF('D', std::string, mapper.dbg_prefix);
             #endif
 
             case ':':  
@@ -87,8 +87,8 @@ bool load_conf(int argc, char** argv, Conf &conf) {
     //parse positionals
     int i = optind;
 
-    POSITIONAL_TO_CONF(std::string, bwa_prefix)
-    POSITIONAL_TO_CONF(std::string, fast5_list)
+    POSITIONAL_TO_CONF(std::string, mapper.bwa_prefix)
+    POSITIONAL_TO_CONF(std::string, fast5_reader.fast5_list)
 
     return true;
 }

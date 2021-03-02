@@ -48,8 +48,11 @@ class ReadBuffer {
         float bp_per_sec;
         float sample_rate;
         float chunk_time;
+        u32 start_chunk;
         u32 max_chunks;
-        u32 sample_start;
+        bool seq_fwd; //If true reads start at 5', end at 3' (DNA)
+                      //If false start=3', end=5' (RNA)
+        bool skip_notempl;
 
         float bp_per_samp() {
             return bp_per_sec / sample_rate;
@@ -153,7 +156,10 @@ class ReadBuffer {
         PY_READ_PRM(bp_per_sec);
         PY_READ_PRM(sample_rate);
         PY_READ_PRM(chunk_time);
+        PY_READ_PRM(start_chunk);
         PY_READ_PRM(max_chunks);
+        PY_READ_PRM(load_bc);
+        PY_READ_PRM(skip_notempl);
     }
 
     #endif

@@ -94,6 +94,18 @@ class Fast5Read : public ReadBuffer {
 
         chunk_count_ = (int_data.size() / PRMS.chunk_len()) + (int_data.size() % PRMS.chunk_len() != 0);
 
+        u32 start_sample = PRMS.start_chunk * PRMS.chunk_len();
+
+        if (PRMS.skip_notempl && start_sample < template_start_) {
+            start_sample = template_start_;
+        }
+
+        if (int_data.size() <= start_sample) {
+            int_data.clear();
+        } else {
+            int_data = std::vector<i16>(&int_data[start_sample], &int_data[int_data.size()]);
+        }
+
         if (chunk_count_ > PRMS.max_chunks) {
             chunk_count_ = PRMS.max_chunks;
             int_data.resize(chunk_count_ * PRMS.chunk_len());
@@ -107,11 +119,6 @@ class Fast5Read : public ReadBuffer {
         for (u16 raw : int_data) {
             float calibrated = (cal_range * raw / cal_digit) + cal_offset;
             signal_.push_back(calibrated);
-        }
-
-        //TODO THIS IS DUMB
-        for (u64 i = 0; i < template_start_; i++) {
-            signal_[i] = 60; 
         }
 
         full_duration_ = signal_.size();

@@ -106,6 +106,24 @@ class SeedTracker {
     bool check_map_conf(u32 seed_len, float mean_len, float second_len);
 
     void print(std::ostream &out, u16 max_out);
+
+    #ifdef PYBIND
+
+    #define PY_SEED_TRACKER_METH(P) c.def(#P, &SeedTracker::P);
+    #define PY_SEED_TRACKER_RPROP(P) c.def_property_readonly(#P, &SeedTracker::get_##P);
+    #define PY_SEED_TRACKER_PRM(P) p.def_readwrite(#P, &SeedTracker::Params::P);
+
+    static void pybind_defs(pybind11::class_<SeedTracker> &c) {
+        c.def(pybind11::init());
+        c.def(pybind11::init<Params>());
+        PY_SEED_TRACKER_METH(empty);
+
+        pybind11::class_<Params> p(c, "Params");
+        PY_SEED_TRACKER_PRM(min_map_len)
+        PY_SEED_TRACKER_PRM(min_mean_conf)
+        PY_SEED_TRACKER_PRM(min_top_conf)
+    }
+    #endif
 };
 
 

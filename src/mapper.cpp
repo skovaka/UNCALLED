@@ -24,8 +24,6 @@
 #include <pdqsort.h>
 #include <exception>
 #include "mapper.hpp"
-#include "model_r94.inl"
-#include "model_r94_rna.inl"
 
 
 Mapper::Params Mapper::PRMS {
@@ -42,11 +40,11 @@ Mapper::Params Mapper::PRMS {
     chunk_timeout   : 4000.0,
     bwa_prefix      : "",
     idx_preset      : "default",
-    model_path      : "",
-    seed_prms       : SeedTracker::PRMS_DEF,
-    norm_prms       : Normalizer::PRMS_DEF,
-    event_prms      : EventDetector::PRMS_DEF,
-    evt_prof_prms : EventProfiler::PRMS_DEF
+    pore_model      : "r94_dna_compl",
+    seed_tracker    : SeedTracker::PRMS_DEF,
+    normalizer      : Normalizer::PRMS_DEF,
+    event_detector  : EventDetector::PRMS_DEF,
+    event_profiler  : EventProfiler::PRMS_DEF
 
     #ifdef DEBUG_OUT
     , dbg_prefix : "dbg_"
@@ -56,8 +54,7 @@ Mapper::Params Mapper::PRMS {
 BwaIndex<KLEN> Mapper::fmi;
 std::vector<float> Mapper::prob_threshes_;
 
-bool IS_RNA = false;
-PoreModel<KLEN> Mapper::model = IS_RNA ? pmodel_r94_rna_template : pmodel_r94_complement;
+PoreModel<KLEN> Mapper::model;// = IS_RNA ? pmodel_r94_rna_templ : pmodel_r94_dna_compl;
 
 
 const std::array<u8,Mapper::EVENT_TYPES.size()> Mapper::EVENT_TYPES = {
@@ -68,10 +65,10 @@ u32 Mapper::PATH_MASK = 0;
 u32 Mapper::PATH_TAIL_MOVE = 0;
 
 Mapper::Mapper() :
-    evdt_(PRMS.event_prms),
-    evt_prof_(PRMS.evt_prof_prms),
-    norm_(PRMS.norm_prms),
-    seed_tracker_(PRMS.seed_prms),
+    evdt_(PRMS.event_detector),
+    evt_prof_(PRMS.event_profiler),
+    norm_(PRMS.normalizer),
+    seed_tracker_(PRMS.seed_tracker),
     state_(State::INACTIVE) {
 
     load_static();
@@ -114,8 +111,11 @@ void Mapper::load_static() {
 
     if (fmi.is_loaded()) return;
 
-    if (!PRMS.model_path.empty()) {
-        model = PoreModel<KLEN>(PRMS.model_path, true);
+    auto m = PORE_MODELS.find(PRMS.pore_model);
+    if (m != PORE_MODELS.end()) {
+        model = m->second;
+    } else {
+        model = PoreModel<KLEN>(PRMS.pore_model, true);
     }
 
     fmi.load_index(PRMS.bwa_prefix);
@@ -712,7 +712,7 @@ u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
 void Mapper::set_ref_loc(const SeedCluster &seeds) {
 
     bool flip = seeds.ref_st_ >= fmi.size() / 2;
-    bool fwd = (flip && IS_RNA) || (!flip && !IS_RNA);
+    bool fwd = (!flip && read_.PRMS.seq_fwd) || (flip && !read_.PRMS.seq_fwd);
 
     u64 sa_st;
     if (flip) sa_st = fmi.size() - (seeds.ref_en_.end_ + KLEN - 1);
@@ -1008,7 +1008,7 @@ void Mapper::dbg_seeds_out(
     u64 sa_st;
 
     bool flip = sa_start >= fmi.size() / 2;
-    bool fwd = (flip && IS_RNA) || (!flip && !IS_RNA);
+    bool fwd = (!flip && read_.PRMS.seq_fwd) || (flip && !read_.PRMS.seq_fwd);
 
     u32 sa_half;
     if (flip) sa_half = fmi.size() - (sa_start + ref_len - 1);

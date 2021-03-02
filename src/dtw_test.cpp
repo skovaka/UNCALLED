@@ -4,8 +4,7 @@
 
 #include "event_profiler.hpp"
 #include "normalizer.hpp"
-#include "model_r94.inl"
-#include "pore_model.hpp"
+#include "models.inl"
 #include "fast5_reader.hpp"
 #include "bwa_index.hpp"
 #include "dtw.hpp"
@@ -57,8 +56,6 @@ std::unordered_map<std::string, Query>
     return queries;
 }
 
-const KmerLen KLEN = KmerLen::k5;
-
 int main(int argc, char** argv) {
     Timer t;
 
@@ -71,7 +68,7 @@ int main(int argc, char** argv) {
         out_prefix = std::string(argv[4]);
     }
 
-    auto model = pmodel_r94_template;
+    auto model = pmodel_r94_dna_templ;
 
     DTWParams dtwp = {
         DTWSubSeq::NONE, //substr

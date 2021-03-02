@@ -26,7 +26,7 @@
 #include "map_pool.hpp"
 
 MapPool::MapPool(Conf &conf)
-    : fast5s_(conf.fast5_prms) {
+    : fast5s_(conf.fast5_reader) {
 
     threads_ = std::vector<MapperThread>(conf.threads);
 

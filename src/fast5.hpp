@@ -540,19 +540,19 @@ struct Basecall_Events_Pack
 }; // struct Basecall_Events_Pack
 
 //
-// This struct represents a template-to-complement
+// This struct represents a template-to-compl
 // match that is emitted by ONT's 2D basecaller
 //
 struct Basecall_Alignment_Entry
 {
     long long template_index;
-    long long complement_index;
+    long long compl_index;
     std::array< char, MAX_K_LEN > kmer;
     std::string get_kmer() const { return array_to_string(kmer); }
     friend bool operator == (Basecall_Alignment_Entry const & lhs, Basecall_Alignment_Entry const & rhs)
     {
         return lhs.template_index == rhs.template_index
-            and lhs.complement_index == rhs.complement_index
+            and lhs.compl_index == rhs.compl_index
             and lhs.kmer == rhs.kmer;
     }
     static hdf5_tools::Compound_Map const & compound_map()
@@ -562,7 +562,7 @@ struct Basecall_Alignment_Entry
         if (not inited)
         {
             m.add_member("template", &Basecall_Alignment_Entry::template_index);
-            m.add_member("complement", &Basecall_Alignment_Entry::complement_index);
+            m.add_member("compl", &Basecall_Alignment_Entry::compl_index);
             m.add_member("kmer", &Basecall_Alignment_Entry::kmer);
             inited = true;
         }
@@ -574,36 +574,36 @@ struct Basecall_Alignment_Pack
 {
     Bit_Packer::Code_Type template_step;
     Bit_Packer::Code_Params_Type template_step_params;
-    Bit_Packer::Code_Type complement_step;
-    Bit_Packer::Code_Params_Type complement_step_params;
+    Bit_Packer::Code_Type compl_step;
+    Bit_Packer::Code_Params_Type compl_step_params;
     Huffman_Packer::Code_Type move;
     Huffman_Packer::Code_Params_Type move_params;
     unsigned template_index_start;
-    unsigned complement_index_start;
+    unsigned compl_index_start;
     unsigned kmer_size;
     //
     void read(hdf5_tools::File const & f, std::string const & p)
     {
         f.read(p + "/Template_Step", template_step);
         template_step_params = f.get_attr_map(p + "/Template_Step");
-        f.read(p + "/Complement_Step", complement_step);
-        complement_step_params = f.get_attr_map(p + "/Complement_Step");
+        f.read(p + "/Complement_Step", compl_step);
+        compl_step_params = f.get_attr_map(p + "/Complement_Step");
         f.read(p + "/Move", move);
         move_params = f.get_attr_map(p + "/Move");
         f.read(p + "/template_index_start", template_index_start);
-        f.read(p + "/complement_index_start", complement_index_start);
+        f.read(p + "/compl_index_start", compl_index_start);
         f.read(p + "/kmer_size", kmer_size);
     }
     void write(hdf5_tools::File const & f, std::string const & p) const
     {
         f.write_dataset(p + "/Template_Step", template_step);
         f.add_attr_map(p + "/Template_Step", template_step_params);
-        f.write_dataset(p + "/Complement_Step", complement_step);
-        f.add_attr_map(p + "/Complement_Step", complement_step_params);
+        f.write_dataset(p + "/Complement_Step", compl_step);
+        f.add_attr_map(p + "/Complement_Step", compl_step_params);
         f.write_dataset(p + "/Move", move);
         f.add_attr_map(p + "/Move", move_params);
         f.write_attribute(p + "/template_index_start", template_index_start);
-        f.write_attribute(p + "/complement_index_start", complement_index_start);
+        f.write_attribute(p + "/compl_index_start", compl_index_start);
         f.write_attribute(p + "/kmer_size", kmer_size);
     }
 };
@@ -2277,7 +2277,7 @@ private:
         std::array< int, 2 > next_index = {{ -1, -1 }};
         std::array< int, 2 > delta = {{ 1, -1 }};
         auto get_idx = [&] (unsigned i, unsigned k) {
-            return k == 0? al[i].template_index : al[i].complement_index;
+            return k == 0? al[i].template_index : al[i].compl_index;
         };
         unsigned pos = 0;
         for (unsigned i = 0; i < al.size(); ++i)
@@ -2331,13 +2331,13 @@ private:
         if (start_index[1] < 0)
         {
             LOG_THROW
-                << "no complement events";
+                << "no compl events";
         }
         al_pack.template_index_start = start_index[0];
-        al_pack.complement_index_start = start_index[1];
+        al_pack.compl_index_start = start_index[1];
         al_pack.kmer_size = al[0].get_kmer().size();
         std::tie(al_pack.template_step, al_pack.template_step_params) = bit_packer().encode(step_v[0], 1);
-        std::tie(al_pack.complement_step, al_pack.complement_step_params) = bit_packer().encode(step_v[1], 1);
+        std::tie(al_pack.compl_step, al_pack.compl_step_params) = bit_packer().encode(step_v[1], 1);
         std::tie(al_pack.move, al_pack.move_params) = ev_move_coder().encode(mv, false);
         return al_pack;
     } // pack_al()
@@ -2348,7 +2348,7 @@ private:
         std::vector< Basecall_Alignment_Entry > al;
         std::array< std::vector< uint8_t >, 2 > step_v =
             {{ bit_packer().decode< uint8_t >(al_pack.template_step, al_pack.template_step_params),
-               bit_packer().decode< uint8_t >(al_pack.complement_step, al_pack.complement_step_params) }};
+               bit_packer().decode< uint8_t >(al_pack.compl_step, al_pack.compl_step_params) }};
         auto mv = ev_move_coder().decode< int8_t >(al_pack.move, al_pack.move_params);
         if (step_v[1].size() != step_v[0].size()
             or mv.size() != step_v[0].size())
@@ -2359,7 +2359,7 @@ private:
                 << " mv_size=" << mv.size();
         }
         al.resize(step_v[0].size());
-        std::array< unsigned, 2 > crt_index = {{ al_pack.template_index_start, al_pack.complement_index_start }};
+        std::array< unsigned, 2 > crt_index = {{ al_pack.template_index_start, al_pack.compl_index_start }};
         std::array< int, 2 > delta = {{ 1, -1 }};
         auto pos = 0;
         auto set_idx = [&] (unsigned i, unsigned k, int val) {
@@ -2369,7 +2369,7 @@ private:
             }
             else
             {
-                al[i].complement_index = val;
+                al[i].compl_index = val;
             }
         };
         for (unsigned i = 0; i < step_v[0].size(); ++i)
@@ -2446,7 +2446,7 @@ private:
     static std::string strand_name(unsigned st)
     {
         static const std::array< std::string, 3 > _strand_name =
-            {{ "template", "complement", "2D" }};
+            {{ "template", "compl", "2D" }};
         return _strand_name.at(st);
     }
     static std::string basecall_strand_subgroup(unsigned st)

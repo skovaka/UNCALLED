@@ -30,7 +30,8 @@ const typename Fast5Reader::Params Fast5Reader::PRMS_DEF = {
     fast5_list : "",
     read_list  : "",
     max_reads  : 0,
-    max_buffer : 100
+    max_buffer : 100,
+    load_bc    : false
 };
 
 const std::string 
@@ -227,6 +228,10 @@ u32 Fast5Reader::fill_buffer() {
                 std::cerr << "Error: unrecognized fast5 format\n";
                 read_paths_.pop_front();
                 return count;
+        }
+
+        if (!PRMS.load_bc) {
+            anl_path = "";
         }
 
         read_paths_.pop_front();

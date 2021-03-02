@@ -46,7 +46,7 @@ class PoreModel {
     std::vector<float> lv_means_, lv_stdvs_, lv_vars_x2_, lognorm_denoms_;
     float model_mean_, model_stdv_;
     u16 kmer_count_;
-    bool loaded_, complement_;
+    bool loaded_, compl_;
 
     void init_stdv() {
         model_stdv_ = 0;
@@ -113,6 +113,11 @@ class PoreModel {
     PoreModel(const std::string &model_fname, bool cmpl) : PoreModel () {
 
         std::ifstream model_in(model_fname);
+
+        if (!model_in.is_open()) {
+            std::cerr << "Error: failed to open pore model file\n";
+            throw std::runtime_error("Failed to open file");
+        }
 
         std::string _;
         std::getline(model_in, _);

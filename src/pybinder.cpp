@@ -4,6 +4,7 @@
 #include "map_pool.hpp"
 #include "self_align_ref.hpp"
 #include "realtime_pool.hpp"
+#include "map_pool_ord.hpp"
 #include "client_sim.hpp"
 #include "model_r94.inl"
 #include "model_r94_rna.inl"
@@ -18,8 +19,17 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Conf> conf(m, "Conf");
     Conf::pybind_defs(conf);
 
+    py::class_<Mapper> mapper(m, "Mapper");
+    Mapper::pybind_defs(mapper);
+
     py::class_<MapPool> map_pool(m, "MapPool");
     MapPool::pybind_defs(map_pool);
+
+    py::class_<MapPoolOrd> map_pool_ord(m, "MapPoolOrd");
+    MapPoolOrd::pybind_defs(map_pool_ord);
+
+    py::class_<SeedTracker> seed_tracker(m, "SeedTracker");
+    SeedTracker::pybind_defs(seed_tracker);
 
     py::class_<RealtimePool> realtime_pool(m, "RealtimePool");
     RealtimePool::pybind_defs(realtime_pool);
@@ -55,10 +65,10 @@ PYBIND11_MODULE(_uncalled, m) {
 
     py::class_< PoreModel<KLEN> > model(m, "PoreModel");
     PoreModel<KLEN>::pybind_defs(model);
-    m.attr("pmodel_r94_template") = py::cast(pmodel_r94_template);
-    m.attr("pmodel_r94_complement") = py::cast(pmodel_r94_complement);
-    m.attr("pmodel_r94_rna_template") = py::cast(pmodel_r94_rna_template);
-    m.attr("pmodel_r94_rna_complement") = py::cast(pmodel_r94_rna_complement);
+    m.attr("pmodel_r94_templ") = py::cast(pmodel_r94_templ);
+    m.attr("pmodel_r94_compl") = py::cast(pmodel_r94_compl);
+    m.attr("pmodel_r94_rna_templ") = py::cast(pmodel_r94_rna_templ);
+    m.attr("pmodel_r94_rna_compl") = py::cast(pmodel_r94_rna_compl);
 
     m.def("self_align", &self_align);
 

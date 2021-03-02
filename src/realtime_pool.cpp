@@ -38,7 +38,7 @@
 //};
 
 RealtimePool::RealtimePool(Conf &conf) :
-    PRMS(conf.realtime_prms),
+    PRMS(conf.realtime),
     stopped_(false) {
 
     conf.export_static();
