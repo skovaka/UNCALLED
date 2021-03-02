@@ -6,8 +6,7 @@
 #include "realtime_pool.hpp"
 #include "map_pool_ord.hpp"
 #include "client_sim.hpp"
-#include "model_r94.inl"
-#include "model_r94_rna.inl"
+#include "models.inl"
 #include "dtw.hpp"
 
 namespace py = pybind11;
@@ -65,10 +64,11 @@ PYBIND11_MODULE(_uncalled, m) {
 
     py::class_< PoreModel<KLEN> > model(m, "PoreModel");
     PoreModel<KLEN>::pybind_defs(model);
-    m.attr("pmodel_r94_templ") = py::cast(pmodel_r94_templ);
-    m.attr("pmodel_r94_compl") = py::cast(pmodel_r94_compl);
-    m.attr("pmodel_r94_rna_templ") = py::cast(pmodel_r94_rna_templ);
-    m.attr("pmodel_r94_rna_compl") = py::cast(pmodel_r94_rna_compl);
+    m.attr("PORE_MODELS") = py::cast(PORE_MODELS);
+    //m.attr("pmodel_r94_dna_templ") = py::cast(pmodel_r94_dna_templ);
+    //m.attr("pmodel_r94_dna_compl") = py::cast(pmodel_r94_dna_compl);
+    //m.attr("pmodel_r94_rna_templ") = py::cast(pmodel_r94_rna_templ);
+    //m.attr("pmodel_r94_rna_compl") = py::cast(pmodel_r94_rna_compl);
 
     m.def("self_align", &self_align);
 

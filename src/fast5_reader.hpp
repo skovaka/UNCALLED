@@ -165,11 +165,12 @@ class Fast5Reader {
         pybind11::class_<Params> p(c, "Params");
         //p.def_readwrite(PARAM_META[0], &Fast5Reader::Params::P);
 
-        DPRM(p, "fast5_list", &Fast5Reader::Params::fast5_list);
-        //PY_FAST5_READER_PRM(fast5_list);
+        //DPRM(p, "fast5_list", &Fast5Reader::Params::fast5_list);
+        PY_FAST5_READER_PRM(fast5_list);
         PY_FAST5_READER_PRM(read_list);
         PY_FAST5_READER_PRM(max_reads);
         PY_FAST5_READER_PRM(max_buffer);
+        PY_FAST5_READER_PRM(load_bc);
     }
 
     #endif

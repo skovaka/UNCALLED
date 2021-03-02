@@ -28,6 +28,8 @@
 MapPool::MapPool(Conf &conf)
     : fast5s_(conf.fast5_reader) {
 
+    conf.export_static();
+    
     threads_ = std::vector<MapperThread>(conf.threads);
 
     //fast5s_.fill_buffer();

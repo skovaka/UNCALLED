@@ -85,13 +85,16 @@ class Conf {
         switch (mode) {
 
         case Mode::MAP_ORD:
-            mapper.chunk_timeout = FLT_MAX;
-            mapper.evt_timeout = FLT_MAX;
             break;
 
         default:
             break;
         }
+    }
+
+    void set_mode_map_ord() {
+        mapper.chunk_timeout = FLT_MAX;
+        mapper.evt_timeout = FLT_MAX;
     }
 
     void set_r94_rna() {
@@ -322,6 +325,7 @@ class Conf {
     }
 
     #ifdef PYBIND
+    #define DEF_METH(P, D) c.def(#P, &Conf::P, D);
     #define DEFPRP(P) c.def_property(#P, &Conf::get_##P, &Conf::set_##P);
     #define DEFPRP_DOC(P) c.def_property( \
                 #P, \
@@ -338,6 +342,10 @@ class Conf {
 
         constexpr auto name = "event_detector";
 
+        DEF_METH(set_r94_rna, "Sets parameters for RNA sequencing")
+        DEF_METH(set_mode_map_ord, "Sets parameters for map_ord")
+        DEF_METH(export_static, "Sets static parameters for ReadBuffer and Mapper")
+
         //TODO expose all parameter sets (within hpp files and here)
         //maybe replace a lot of this get/set nonsense
         c.def_readwrite(name, &Conf::event_detector);
@@ -351,6 +359,8 @@ class Conf {
         PY_CONF_VAL(realtime) 
         PY_CONF_VAL(client_sim)
         PY_CONF_VAL(map_pool_ord)
+
+        c.def_readwrite("mode", &Conf::mode);
 
         DEFPRP(threads)
 
@@ -391,6 +401,16 @@ class Conf {
         DEFPRP(scan_intv_time)
         DEFPRP(ej_time)
         DEFPRP(min_ch_reads)
+
+        #define PY_CONF_MODE(P) m.value(#P, Conf::Mode::P);
+
+        
+        pybind11::enum_<Conf::Mode> m(c, "Mode");
+        PY_CONF_MODE(MAP);
+        PY_CONF_MODE(REALTIME);
+        PY_CONF_MODE(SIM);
+        PY_CONF_MODE(MAP_ORD);
+        m.export_values();
     }
     #endif
 };

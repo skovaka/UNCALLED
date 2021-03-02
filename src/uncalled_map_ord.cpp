@@ -16,6 +16,8 @@ int main(int argc, char** argv) {
 
     Timer t;
 
+    std::cerr << "Loading fast5s\n";
+
     pool.load_fast5s();
 
     u64 MAX_SLEEP = 100;

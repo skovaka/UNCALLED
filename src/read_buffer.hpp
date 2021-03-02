@@ -158,7 +158,7 @@ class ReadBuffer {
         PY_READ_PRM(chunk_time);
         PY_READ_PRM(start_chunk);
         PY_READ_PRM(max_chunks);
-        PY_READ_PRM(load_bc);
+        PY_READ_PRM(seq_fwd);
         PY_READ_PRM(skip_notempl);
     }
 

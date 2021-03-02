@@ -47,13 +47,16 @@ class MapPoolOrd {
     void stop();
     bool running();
 
+    //Fast5Read &get_read(u16 channel);
+    //Mapper &get_mapper(u16 channel);
+
     private:
     Fast5Reader fast5s_;
     RealtimePool pool_;
 
     u32 active_tgt_;
 
-    using ChQueue = std::deque<ReadBuffer>;
+    using ChQueue = std::deque<Fast5Read>;
     std::vector<ChQueue> channels_;
     std::vector<u32> chunk_idx_;
 
@@ -66,8 +69,19 @@ class MapPoolOrd {
 
     public:
 
+    #ifdef PYDEBUG
+    //Fast5Read &get_read(u16 channel;)
+    #endif
+
     static void pybind_defs(pybind11::class_<MapPoolOrd> &c) {
         c.def(pybind11::init<Conf &>());
+
+        PY_MAP_ORD_METH(add_fast5)
+        PY_MAP_ORD_METH(add_read)
+        PY_MAP_ORD_METH(load_fast5s)
+        PY_MAP_ORD_METH(update)
+        PY_MAP_ORD_METH(stop)
+        PY_MAP_ORD_METH(running)
 
         pybind11::class_<MapOrdParams> p(c, "Params");
         PY_MAP_ORD_PRM(min_active_reads)

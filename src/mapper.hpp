@@ -311,7 +311,7 @@ class Mapper {
         PY_MAPPER_PRM(chunk_timeout)
         PY_MAPPER_PRM(bwa_prefix)
         PY_MAPPER_PRM(idx_preset)
-        PY_MAPPER_PRM(model_path)
+        PY_MAPPER_PRM(pore_model)
         PY_MAPPER_PRM(seed_tracker)
         PY_MAPPER_PRM(normalizer)
         PY_MAPPER_PRM(event_detector)
