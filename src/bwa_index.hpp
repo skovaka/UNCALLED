@@ -85,6 +85,12 @@ class SubSeq {
 //From submods/bwa/bwtindex.c
 #define BWA_BLOCK_SIZE 10000000
 
+struct RefLoc {
+    std::string ref_name;
+    u64 ref_len, start, end;
+    bool fwd;
+};
+
 template <KmerLen KLEN>
 class BwaIndex {
     public:
@@ -210,14 +216,38 @@ class BwaIndex {
         return 0;
     }
 
-    u64 translate_loc(u64 sa_loc, std::string &ref_name, u64 &ref_loc) const {
-        i32 rid = bns_pos2rid(bns_, sa_loc);
-        if (rid < 0) return 0;
+    //auto ref_loc = fmi.translate_loc(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
+    RefLoc translate_loc(u64 sa_start, u64 sa_end, bool read_fwd) const {
 
-        ref_name = std::string(bns_->anns[rid].name);
-        ref_loc = sa_loc - bns_->anns[rid].offset;
-        return bns_->anns[rid].len;
+        bool flip = sa_start >= size() / 2;
+
+        u64 pac_st; //TODO rename
+        if (flip) pac_st = size() - sa_end + 1;
+        else pac_st = sa_start;
+
+        i32 rid = bns_pos2rid(bns_, pac_st);
+        //if (rid < 0) return {};
+        assert(rid >= 0);
+
+        RefLoc ret {
+            ref_name : std::string(bns_->anns[rid].name),
+            ref_len  : static_cast<u64>(bns_->anns[rid].len),
+            start    : pac_st - bns_->anns[rid].offset,
+            end      : ret.start + (sa_end-sa_start),
+            fwd      : (!flip && read_fwd) || (flip && !read_fwd)
+        };
+
+        return ret;
     }
+
+    //u64 translate_loc(u64 sa_loc, std::string &ref_name, u64 &ref_loc) const {
+    //    i32 rid = bns_pos2rid(bns_, sa_loc);
+    //    if (rid < 0) return 0;
+
+    //    ref_name = std::string(bns_->anns[rid].name);
+    //    ref_loc = sa_loc - bns_->anns[rid].offset;
+    //    return bns_->anns[rid].len;
+    //}
 
     std::vector< std::pair<std::string, u64> > get_seqs() const {
         std::vector< std::pair<std::string, u64> > seqs;

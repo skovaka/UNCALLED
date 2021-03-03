@@ -222,7 +222,7 @@ const SeedCluster &SeedTracker::add_seed(u64 ref_en, u32 ref_len, u32 evt_st) {
             max_map_ = new_seed;
         }
 
-        #ifdef DEBUG_SEEDS
+        #ifdef PYDEBUG
         new_seed.id_ = static_cast<u32>(seed_clusters_.size());
         #endif
         ret = seed_clusters_.insert(new_seed).first;

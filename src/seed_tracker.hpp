@@ -47,7 +47,7 @@ class SeedCluster {
         evt_en_,
         total_len_;
 
-    #ifdef DEBUG_SEEDS
+    #ifdef PYDEBUG
     u32 id_;
     #endif
 

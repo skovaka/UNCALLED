@@ -180,13 +180,13 @@ class Mapper {
 
         bool sa_checked_;
 
-        #ifdef DEBUG_OUT
+        #ifdef PYDEBUG
         static u32 count_;
         u32 id_, parent_;
         #endif
 
         static void reset_count() {
-        #ifdef DEBUG_OUT
+        #ifdef PYDEBUG
             count_ = 0;
         #endif
         }
@@ -280,10 +280,22 @@ class Mapper {
     public:
 
     #ifdef PYDEBUG
+    //stores name,start,end,strand, event, path_buf, cluster
+    using DbgSeed = std::tuple<std::string, u64, u64, bool, u32, u32, u32>;
+
+    void dbg_add_seed(
+        const PathBuffer &path, 
+        u32 clust, 
+        u32 evt_end, 
+        u64 sa_start, 
+        u32 ref_len
+    );
+
     struct Debug {
         std::vector<Event> events;
         std::vector<EvtProf> evt_profs;
         std::vector<float> proc_signal;
+        std::vector<DbgSeed> seeds;
     };
     Debug dbg_;
     #endif
@@ -301,6 +313,7 @@ class Mapper {
         PY_MAPPER_DBG(events)
         PY_MAPPER_DBG(evt_profs)
         PY_MAPPER_DBG(proc_signal)
+        PY_MAPPER_DBG(seeds)
         #endif
 
         pybind11::class_<PathBuffer> path(map, "PathBuffer");

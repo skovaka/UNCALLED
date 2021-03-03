@@ -704,6 +704,21 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
             event_i_ - path_ended
         );
 
+        #ifdef PYDEBUG
+
+        auto loc = fmi.translate_loc(sa_start, sa_start+ref_len, read_.PRMS.seq_fwd);
+        auto evt = evt_prof_.mask_idx_map_[event_i_-path_ended];
+        dbg_.seeds.emplace_back(
+                loc.ref_name, 
+                loc.start, 
+                loc.end, 
+                loc.fwd,
+                evt, 
+                path.id_, 
+                clust.id_
+        );
+        #endif
+
         #ifdef DEBUG_SEEDS
         dbg_seeds_out(
             path, 
@@ -727,29 +742,20 @@ u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
 }                  
 
 void Mapper::set_ref_loc(const SeedCluster &seeds) {
-
-    bool flip = seeds.ref_st_ >= fmi.size() / 2;
-    bool fwd = (!flip && read_.PRMS.seq_fwd) || (flip && !read_.PRMS.seq_fwd);
-
-    u64 sa_st;
-    if (flip) sa_st = fmi.size() - (seeds.ref_en_.end_ + KLEN - 1);
-    else sa_st = seeds.ref_st_;
+    auto loc = fmi.translate_loc(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
     
-    std::string rf_name;
     u64 rd_st = event_to_bp(seeds.evt_st_ - PRMS.seed_len),
         rd_en = event_to_bp(seeds.evt_en_, true),
-        rd_len = event_to_bp(event_i_, true),
-        rf_st = 0,
-        rf_len = fmi.translate_loc(sa_st, rf_name, rf_st), //sets rf_st
-        rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_ + KLEN);
+        rd_len = event_to_bp(event_i_, true);
 
     u16 match_count = seeds.total_len_ + KLEN - 1;
 
     out_.set_read_len(rd_len);
-    out_.set_mapped(rd_st, rd_en, rf_name, rf_st, rf_en, rf_len, fwd, match_count);
+    //TODO clean this up
+    out_.set_mapped(rd_st, rd_en, loc.ref_name, loc.start, loc.end, loc.ref_len, loc.fwd, match_count);
 }
 
-#ifdef DEBUG_OUT
+#ifdef PYDEBUG
 u32 Mapper::PathBuffer::count_ = 0;
 #endif
 
@@ -757,7 +763,7 @@ Mapper::PathBuffer::PathBuffer()
     : length_(0),
       prob_sums_(new float[PRMS.seed_len+1]) {
 
-    #ifdef DEBUG_OUT
+    #ifdef PYDEBUG
     id_ = count_++;
     #endif
 }
@@ -788,7 +794,7 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
     prob_sums_[0] = 0;
     prob_sums_[1] = prob;
 
-    #ifdef DEBUG_OUT
+    #ifdef PYDEBUG
     parent_ = PRMS.max_paths;
     #endif
 }
@@ -823,7 +829,7 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
         seed_prob_ = prob_sums_[length_] / length_;
     }
 
-    #ifdef DEBUG_OUT
+    #ifdef PYDEBUG
     parent_ = p.id_;
     #endif
 }
@@ -1021,6 +1027,8 @@ void Mapper::dbg_seeds_out(
 
     //TODO de-duplicate code
     //should be storing SA coordinate anyway
+
+    auto loc = fmi.translate_loc(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
     
     u64 sa_st;
 
