@@ -68,7 +68,6 @@ void RealtimePool::buffer_chunk(ReadBuffer &c) {
     chunk_buffer_[ch] = c;
 }
 
-
 //Add chunk to master buffer
 bool RealtimePool::add_chunk(ReadBuffer &c) {
     u16 ch = c.get_channel_idx();
@@ -102,45 +101,6 @@ bool RealtimePool::add_chunk(ReadBuffer &c) {
     return false;
 }
 
-bool RealtimePool::is_read_finished(const ReadBuffer &r) {
-    u16 ch = r.get_channel_idx();
-    return (mappers_[ch].finished() && 
-            mappers_[ch].get_read().get_number() == r.get_number());
-}
-
-bool RealtimePool::try_add_chunk(ReadBuffer &c) {
-    u16 ch = c.get_channel_idx();
-
-    //Chunk is empty if all read chunks were output
-    if (c.empty()) {
-
-        //Give up if previous chunk done mapping
-        if (mappers_[ch].chunk_mapped() && !mappers_[ch].finished()) {
-            mappers_[ch].request_reset();
-        }
-        return false;
-    }
-
-    //Start new read if mapper inactive
-    if (mappers_[ch].get_state() == Mapper::State::INACTIVE) {
-        mappers_[ch].new_read(c);
-        active_queue_.push_back(ch);
-        return true;
-
-    } else if (mappers_[ch].get_read().number_ == c.get_number()) {
-
-        //Don't add if previous chunk is still mapping
-        if (!mappers_[ch].chunk_mapped()) {
-            return false;
-        }
-
-        return mappers_[ch].add_chunk(c);
-    }
-
-    return false;
-}
-
-//TODO: make sure update is the same
 std::vector<MapResult> RealtimePool::update() {
 
     std::vector< u16 > read_counts(threads_.size(), 0);
@@ -263,11 +223,6 @@ u32 RealtimePool::active_count() const {
     return active_count_;
 }
 
-//void u32 ReadBuffer::end_read(u16 ch, u32 number) {
-//    ch--;
-//    if (!mappers_[ch].finished() && mappers_[ch].get_read()
-//}
-
 bool RealtimePool::all_finished() {
     if (!buffer_queue_.empty()) return false;
 
@@ -289,6 +244,10 @@ void RealtimePool::stop_all() {
         active_queue_.clear();
         buffer_queue_.clear();
     }
+}
+
+Mapper &RealtimePool::get_mapper(u16 channel) {
+    return mappers_[channel-1];
 }
 
 u16 RealtimePool::MapperThread::num_threads = 0;

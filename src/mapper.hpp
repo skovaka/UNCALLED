@@ -132,7 +132,6 @@ class Mapper {
     static const std::array<u8,2> EVENT_TYPES;
     static std::array<u32,EVENT_TYPES.size()> EVENT_ADDS;
     static u32 PATH_MASK, PATH_TAIL_MOVE;
-    //static u32 PATH_MASK;TODO popcount instead of store?
 
     class PathBuffer {
         public:
@@ -276,8 +275,18 @@ class Mapper {
     #define PY_MAPPER_METH(N,D) map.def(#N, &Mapper::N, D);
     #define PY_MAPPER_PRM(P) prm.def_readwrite(#P, &Mapper::Params::P);
     #define PY_PATHBUF_PRM(P) path.def_readonly(#P, &Mapper::Params::P);
+    #define PY_MAPPER_DBG(P) dbg.def_readonly(#P, &Mapper::Debug::P);
 
     public:
+
+    #ifdef PYDEBUG
+    struct Debug {
+        std::vector<Event> events;
+        std::vector<EvtProf> evt_profs;
+        std::vector<float> proc_signal;
+    };
+    Debug dbg_;
+    #endif
 
     static void pybind_defs(pybind11::class_<Mapper> &map) {
 
@@ -287,6 +296,12 @@ class Mapper {
         //    "Adds a fast5 filename to the list of files to load. "
         //);
 
+        #ifdef PYDEBUG
+        pybind11::class_<Debug> dbg(map, "Debug");
+        PY_MAPPER_DBG(events)
+        PY_MAPPER_DBG(evt_profs)
+        PY_MAPPER_DBG(proc_signal)
+        #endif
 
         pybind11::class_<PathBuffer> path(map, "PathBuffer");
         //PY_MAP_METH(add_read, "Adds a read ID to the read filter");

@@ -78,6 +78,10 @@ class EventDetector {
 
     #ifdef PYBIND
 
+    #ifdef PYDEBUG
+    std::vector<Event> dbg_events_;
+    #endif
+
     #define PY_EVTD_METH(P) evdt.def(#P, &EventDetector::P);
     #define PY_EVTD_PRM(P) prms.def_readwrite(#P, &EventDetector::Params::P);
     #define PY_EVT_VAL(P) evt.def_readwrite(#P, &Event::P);

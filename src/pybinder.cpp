@@ -24,14 +24,14 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<MapPool> map_pool(m, "MapPool");
     MapPool::pybind_defs(map_pool);
 
-    py::class_<MapPoolOrd> map_pool_ord(m, "MapPoolOrd");
-    MapPoolOrd::pybind_defs(map_pool_ord);
-
     py::class_<SeedTracker> seed_tracker(m, "SeedTracker");
     SeedTracker::pybind_defs(seed_tracker);
 
     py::class_<RealtimePool> realtime_pool(m, "RealtimePool");
     RealtimePool::pybind_defs(realtime_pool);
+
+    py::class_<MapPoolOrd, RealtimePool> map_pool_ord(m, "MapPoolOrd");
+    MapPoolOrd::pybind_defs(map_pool_ord);
 
     py::class_<ClientSim> client_sim(m, "ClientSim");
     ClientSim::pybind_defs(client_sim);

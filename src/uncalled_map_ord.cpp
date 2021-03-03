@@ -9,6 +9,7 @@ int main(int argc, char** argv) {
     std::cerr << "Loading conf\n";
 
     Conf conf(Conf::Mode::MAP_ORD);
+    conf.set_mode_map_ord();
 
     load_conf(argc, argv, conf);
 
@@ -29,8 +30,8 @@ int main(int argc, char** argv) {
 
     while (pool.running()) {
         u64 t0 = t.get();
-        for (Paf p : pool.update()) {
-            p.print_paf();
+        for (auto p : pool.update()) {
+            std::get<2>(p).print_paf();
         }
         u64 dt = t.get() - t0;
         if (dt < MAX_SLEEP) usleep(1000*(MAX_SLEEP - dt));

@@ -241,6 +241,10 @@ void Mapper::reset() {
 
     dbg_close_all();
 
+    #ifdef PYDEBUG
+    dbg_ = {};
+    #endif
+
     #ifdef DEBUG_EVENTS
     dbg_events_.clear();
     #endif
@@ -324,10 +328,19 @@ u16 Mapper::process_chunk() {
     u16 nevents = 0;
     for (u32 i = 0; i < read_.size(); i++) {
         if (evdt_.add_sample(read_[i])) {
+            #ifdef PYDEBUG
+            dbg_.events.push_back(evdt_.get_event());
+            #endif
 
             //Add event to profiler
             //Returns true if next event is not masked
             evt_prof_.add_event(evdt_.get_event());
+
+            #ifdef PYDEBUG
+            if (evt_prof_.is_full()) {
+                dbg_.evt_profs.push_back(evt_prof_.get_prof());
+            }
+            #endif
             
             #ifdef DEBUG_EVENTS
             if (evt_prof_.is_full()) {
@@ -441,6 +454,10 @@ bool Mapper::map_next() {
 
 
     float event = norm_.pop();
+
+    #ifdef PYDEBUG
+    dbg_.proc_signal.push_back(event);
+    #endif
 
     //TODO: store kmer_probs_ in static array
     for (u16 kmer = 0; kmer < kmer_probs_.size(); kmer++) {

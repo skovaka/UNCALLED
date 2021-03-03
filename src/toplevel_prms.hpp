@@ -35,6 +35,7 @@ typedef struct {
     u16 port;
     float duration;
 
+    u32 min_active_reads;
     u32 max_active_reads;
 } RealtimeParams;
 
@@ -44,6 +45,7 @@ const RealtimeParams REALTIME_PRMS_DEF = {
     host             : "127.0.0.1",
     port             : 8000,
     duration         : 72,
+    min_active_reads : 0,
     max_active_reads : 512
 };
 

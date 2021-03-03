@@ -12,6 +12,12 @@ typedef struct {
     u32 mask;
 } AnnoEvent;
 
+typedef struct {
+    float win_mean;
+    float win_stdv;
+    bool mask;
+} EvtProf;
+
 class EventProfiler {
 
     private:
@@ -114,6 +120,14 @@ class EventProfiler {
         return is_full_ && to_mask_ == 0;
     }
 
+    EvtProf get_prof() {
+        return {
+            win_mean_, 
+            win_stdv_,
+            event_ready()
+        };
+    }
+
     AnnoEvent anno_event() {
         return {
             next_evt_, 
@@ -159,6 +173,8 @@ class EventProfiler {
     #define PY_EVENT_PROFILER_PRM(P) prm.def_readonly(#P, &EventProfiler::Params::P);
     #define PY_ANNO_EVENT_VAL(P) ann.def_readonly(#P, &AnnoEvent::P);
 
+    #define PY_EVT_PROF_VAL(P) ep.def_readonly(#P, &EvtProf::P);
+
     static void pybind_defs(pybind11::class_<EventProfiler> &evpr) {
         evpr.def(pybind11::init());
         PY_EVENT_PROFILER_METH(reset)
@@ -167,6 +183,7 @@ class EventProfiler {
         PY_EVENT_PROFILER_METH(is_full)
         PY_EVENT_PROFILER_METH(event_ready)
         PY_EVENT_PROFILER_METH(anno_event)
+        PY_EVENT_PROFILER_METH(get_prof)
         PY_EVENT_PROFILER_METH(next_mean)
         PY_EVENT_PROFILER_METH(get_full_mask)
 
@@ -175,6 +192,11 @@ class EventProfiler {
         PY_ANNO_EVENT_VAL(win_mean)
         PY_ANNO_EVENT_VAL(win_stdv)
         PY_ANNO_EVENT_VAL(mask)
+
+        pybind11::class_<EvtProf> ep(evpr, "EvtProf");
+        PY_EVT_PROF_VAL(win_mean)
+        PY_EVT_PROF_VAL(win_stdv)
+        PY_EVT_PROF_VAL(mask)
 
         pybind11::class_<Params> prm(evpr, "Params");
         PY_EVENT_PROFILER_PRM(win_len)

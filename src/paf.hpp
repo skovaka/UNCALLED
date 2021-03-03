@@ -74,6 +74,7 @@ class Paf {
 
     #ifdef PYBIND
     #define PY_PAF_METH(P) c.def(#P, &Paf::P);
+    #define PY_PAF_RPROP(P) c.def_property_readonly(#P, &Paf::get_##P);
     #define PY_PAF_TAG(P) t.value(#P, Paf::Tag::P);
 
     static void pybind_defs(pybind11::class_<Paf> &c) {
@@ -84,6 +85,7 @@ class Paf {
         PY_PAF_METH(set_int);
         PY_PAF_METH(set_float);
         PY_PAF_METH(set_str);
+        PY_PAF_RPROP(rd_name);
 
         pybind11::enum_<Paf::Tag> t(c, "Tag");
         PY_PAF_TAG(MAP_TIME);
