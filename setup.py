@@ -100,6 +100,7 @@ uncalled = Pybind11Extension(
        "src/mapper.cpp",
        "src/self_align_ref.cpp",
        "src/map_pool.cpp",
+       "src/map_pool_ord.cpp",
        "src/event_detector.cpp", 
        "src/read_buffer.cpp",
        "src/realtime_pool.cpp",
@@ -130,7 +131,7 @@ uncalled = Pybind11Extension(
 
     extra_compile_args = ["-std=c++11", "-O3"],
 
-    define_macros = [("PYBIND", None)]#, ("PYDEBUG", None)]
+    define_macros = [("PYBIND", None), ("PYDEBUG", None)]
 )
 
 setup(

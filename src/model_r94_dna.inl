@@ -1031,9 +1031,9 @@ const std::vector<float> model_r94_means_stdvs = {
 };
 
 const PoreModel<KmerLen::k5> 
-    pmodel_r94_template(model_r94_means_stdvs, false);
+    pmodel_r94_dna_templ(model_r94_means_stdvs, false);
 
 const PoreModel<KmerLen::k5> 
-    pmodel_r94_complement(model_r94_means_stdvs, true);
+    pmodel_r94_dna_compl(model_r94_means_stdvs, true);
 
 #endif
