@@ -328,6 +328,7 @@ u16 Mapper::process_chunk() {
     u16 nevents = 0;
     for (u32 i = 0; i < read_.size(); i++) {
         if (evdt_.add_sample(read_[i])) {
+
             #ifdef PYDEBUG
             dbg_.events.push_back(evdt_.get_event());
             #endif
@@ -643,8 +644,13 @@ bool Mapper::map_next() {
         }
     }
 
+    #ifdef PYDEBUG
+    dbg_.paths.insert(dbg_.paths.end(), next_paths_.begin(), next_path);
+    #endif
+
     prev_size_ = next_path - next_paths_.begin();
     prev_paths_.swap(next_paths_);
+
 
     dbg_paths_out();
 
@@ -696,9 +702,9 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         );
 
         #ifdef PYDEBUG
-
         auto loc = fmi.translate_loc(sa_start, sa_start+ref_len, read_.PRMS.seq_fwd);
         auto evt = evt_prof_.mask_idx_map_[event_i_-path_ended];
+
         dbg_.seeds.emplace_back(
                 loc.ref_name, 
                 loc.start, 

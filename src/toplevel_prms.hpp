@@ -28,7 +28,7 @@ typedef struct {
     enum class ActiveChs {FULL, EVEN, ODD, NUM};
     ActiveChs active_chs;
 
-    enum class Mode {DEPLETE, ENRICH, NUM};
+    enum class Mode {DEPLETE, ENRICH, SELECTIVE, NUM};
     Mode realtime_mode;
 
     std::string host;

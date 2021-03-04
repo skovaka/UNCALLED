@@ -295,6 +295,7 @@ class Mapper {
         std::vector<EvtProf> evt_profs;
         std::vector<float> proc_signal;
         std::vector<DbgSeed> seeds;
+        std::vector<PathBuffer> paths;
         u32 conf_evt, conf_clust;
     };
     Debug dbg_;
@@ -303,19 +304,15 @@ class Mapper {
     static void pybind_defs(pybind11::class_<Mapper> &map) {
 
         map.def(pybind11::init());
-        
-        //PY_MAP_METH(add_fast5,
-        //    "Adds a fast5 filename to the list of files to load. "
-        //);
 
         #ifdef PYDEBUG
         #define PY_MAPPER_DBG(P) dbg.def_readonly(#P, &Mapper::Debug::P);
-
         pybind11::class_<Debug> dbg(map, "Debug");
         PY_MAPPER_DBG(events)
         PY_MAPPER_DBG(evt_profs)
         PY_MAPPER_DBG(proc_signal)
         PY_MAPPER_DBG(seeds)
+        PY_MAPPER_DBG(paths)
         PY_MAPPER_DBG(conf_evt)
         PY_MAPPER_DBG(conf_clust)
         #endif
