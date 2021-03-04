@@ -652,19 +652,10 @@ bool Mapper::map_next() {
 
     if (sc.is_valid()) {
 
-        #ifdef DEBUG_CONFIDENCE
-        if (!confident_mapped_) {
-            out_.set_int(Paf::Tag::CONFIDENT_EVENT, evt_prof_.mask_idx_map_[event_i_]);
-            confident_mapped_ = true;
-            #endif
-
-            
-            #ifdef DEBUG_SEEDS
-            out_.set_int(Paf::Tag::SEED_CLUSTER, sc.id_);
-            #endif
-
-
-        #ifdef DEBUG_CONFIDENCE
+        #ifdef PYDEBUG
+        if (dbg_.conf_evt == 0) {
+            dbg_.conf_evt = event_i_;
+            dbg_.conf_clust = sc.id_;
         }
         #else
 

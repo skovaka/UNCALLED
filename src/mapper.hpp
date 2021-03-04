@@ -275,12 +275,11 @@ class Mapper {
     #define PY_MAPPER_METH(N,D) map.def(#N, &Mapper::N, D);
     #define PY_MAPPER_PRM(P) prm.def_readwrite(#P, &Mapper::Params::P);
     #define PY_PATHBUF_PRM(P) path.def_readonly(#P, &Mapper::Params::P);
-    #define PY_MAPPER_DBG(P) dbg.def_readonly(#P, &Mapper::Debug::P);
 
     public:
 
     #ifdef PYDEBUG
-    //stores name,start,end,strand, event, path_buf, cluster
+    //stores name, start, end, strand, event, path_buf, cluster
     using DbgSeed = std::tuple<std::string, u64, u64, bool, u32, u32, u32>;
 
     void dbg_add_seed(
@@ -296,6 +295,7 @@ class Mapper {
         std::vector<EvtProf> evt_profs;
         std::vector<float> proc_signal;
         std::vector<DbgSeed> seeds;
+        u32 conf_evt, conf_clust;
     };
     Debug dbg_;
     #endif
@@ -309,11 +309,15 @@ class Mapper {
         //);
 
         #ifdef PYDEBUG
+        #define PY_MAPPER_DBG(P) dbg.def_readonly(#P, &Mapper::Debug::P);
+
         pybind11::class_<Debug> dbg(map, "Debug");
         PY_MAPPER_DBG(events)
         PY_MAPPER_DBG(evt_profs)
         PY_MAPPER_DBG(proc_signal)
         PY_MAPPER_DBG(seeds)
+        PY_MAPPER_DBG(conf_evt)
+        PY_MAPPER_DBG(conf_clust)
         #endif
 
         pybind11::class_<PathBuffer> path(map, "PathBuffer");
