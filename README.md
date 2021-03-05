@@ -4,13 +4,17 @@ A **U**tility for **N**anopore **C**urrent **Al**ignment to **L**arge **E**xpans
 
 ![UNCALLED logo](uncalled_logo_small.png "UNCALLED logo")
 
-A streaming algorithm for mapping raw nanopore signal to DNA references
+A read mapper which rapidly aligns raw nanopore signal to DNA references
 
-Enables real-time enrichment or depletion on Oxford Nanopore Technologies (ONT) MinION runs via ReadUntil
+Enables software-based targeted sequenceing on Oxford Nanopore (ONT) MinION or GridION [via ReadUntil](https://nanoporetech.com/about-us/news/towards-real-time-targeting-enrichment-or-other-sampling-nanopore-sequencing-devices)
 
-Also supports standalone signal mapping of fast5 reads
+Also includes a simulator which can be used to predict how much enrichment could be achieved on a given reference using raw signal data from previous nanopore runs.
 
-Read the [preprint on BioRxiv](https://www.biorxiv.org/content/10.1101/2020.02.03.931923v1)
+[
+**Targeted nanopore sequencing by real-time mapping of raw electrical signal with UNCALLED** \
+Sam Kovaka, Yunfan Fan, Bohan Ni, Winston Timp, Michael C. Schatz \
+Nature Biotechnology (2020)
+](https://www.nature.com/articles/s41587-020-0731-9)
 
 ## Installation
 
