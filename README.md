@@ -28,7 +28,7 @@ OR
 
 Requires python >= 3.6, read-until == 3.0.0, pybind11 >= 2.5.0, and GCC >= 4.8.1 (all except GCC are automatically downloaded and installed)
 
-Other dependecies are included via submodules, so be sure to clone with `git --recursive`
+Other dependencies are included via submodules, so be sure to clone with `git --recursive`
 
 We recommend running on a Linux machine. UNCALLED has been successfully installed and run on Mac computers, but real-time ReadUntil has not been tested on a Mac. Installing UNCALLED has not been attempted on Windows.
 
@@ -99,7 +99,7 @@ d9acafe3-23dd-4a0f-83db-efe299ee59a4 1355 *     *     *     *      *      *     
 
 We recommend that you try mapping fast5s via `uncalled map` before real-time enrichment, as runtime issues could occur if UNCALLED is not installed properly.
 
-The command can generally be run at any time before or during a sequencing run, although an error may occur if UNCALLED is run before any sequencing run has been started in the current MinKNOW session. If this is happens you should start UNCALLED after the run begins, ideally during the first mux scan. If you want to change the chunk size you must run the commend *before* starting the run (see below). 
+The command can generally be run at any time before or during a sequencing run, although an error may occur if UNCALLED is run before any sequencing run has been started in the current MinKNOW session. If this is happens you should start UNCALLED after the run begins, ideally during the first mux scan. If you want to change the chunk size you must run the command *before* starting the run (see below). 
 
 Arguments:
 
@@ -118,7 +118,7 @@ Note exactly one of `--deplete` or `--enrich` must be specified
 
 ### Altering Chunk Size
 
-The ReadUntil API recieves signal is "chunks", which by default are one second's worth of signal. This can be changed using the `--chunk-size` parameter. Note that `--max-chunks-proc` should also be changed to compensate for changes to chunks size. *If the chunk size is changed, you must start running UNCALLED before sequencing begins.* UNCALLED is unable change the chunk size mid-seqencing-run. In general reducing the chunk size should improve enrichment, although [previous work](http://dx.doi.org/10.1101/2020.02.03.926956) has found that the API becomes unreliable with chunks sizes less than 0.4 seconds. We have not thoroughly tested this feature, and recommend using the default 1 second chunk size for most cases. In the future this default size may be reduced.
+The ReadUntil API receives signal is "chunks", which by default are one second's worth of signal. This can be changed using the `--chunk-size` parameter. Note that `--max-chunks-proc` should also be changed to compensate for changes to chunk sizes. *If the chunk size is changed, you must start running UNCALLED before sequencing begins.* UNCALLED is unable to change the chunk size mid-seqencing-run. In general reducing the chunk size should improve enrichment, although [previous work](http://dx.doi.org/10.1101/2020.02.03.926956) has found that the API becomes unreliable with chunks sizes less than 0.4 seconds. We have not thoroughly tested this feature, and recommend using the default 1 second chunk size for most cases. In the future this default size may be reduced.
 
 ## Simulator
 
@@ -135,7 +135,7 @@ cnt_on_bp       33.145022
 cnt_total_bp    8271.651331
 ```
 
-The simulator simulates a real-time run using data from two real runs: one control run and one UNCALLED run. Reads are simulated from the control run, and the pattern of channel activity of modeled after the control run. The simulator outputs a PAF file similar to the realtime mode, which can be interperted using scripts found in [sim_scripts/](sim_scripts/).
+The simulator simulates a real-time run using data from two real runs: one control run and one UNCALLED run. Reads are simulated from the control run, and the pattern of channel activity of modeled after the control run. The simulator outputs a PAF file similar to the real-time mode, which can be interperted using scripts found in [sim_scripts/](sim_scripts/).
 
 Example files which can be used as template UNCALLED sequencing summary and PAF files for the simulator can be found [here](http://labshare.cshl.edu/shares/schatzlab/www-data/UNCALLED/simulator_files/). The control reads/sequencing summary can be from any sequencing run of your sample of interest, and it does not have to match the sample used in the provided examples.
 
@@ -182,7 +182,7 @@ Both modes include the following custom attributes in each PAF entry:
 
 ### pafstats
 
-We have included a functionality called `uncalled pafstats` which computes speed statistcs from a PAF file output by UNCALLED. Accuracy statistics can also be included if provided a ground truth PAF file, for example based on minimap2 alignments of basecalled reads. There is also an option to output the original UNCALLED PAF annotated with comparisions to the ground truth.
+We have included a functionality called `uncalled pafstats` which computes speed statistics from a PAF file output by UNCALLED. Accuracy statistics can also be included if provided a ground truth PAF file, for example based on minimap2 alignments of basecalled reads. There is also an option to output the original UNCALLED PAF annotated with comparisons to the ground truth.
 
 **Example:**
 ```
@@ -206,7 +206,7 @@ Accuracy statistics:
 - FP: false positive - percent infile reads that do not overlap reference read locations
 - TN: true negative - percent of reads which were not aligned in reference or infile
 - FN: false negative - percent of reads which were aligned in the reference but not in the infile
-- NA: not aligned/not applicable - percent of reads aligned in infile but not in reference. Could be considered a false positive, but the truth is unkown.
+- NA: not aligned/not applicable - percent of reads aligned in infile but not in reference. Could be considered a false positive, but the truth is unknown.
 
 ## Practical Considerations
 
@@ -219,11 +219,11 @@ Note that enrichment necessitates a quick decision as to whether or not a read m
 UNCALLED currently does not support large (> ~1Gbp) or highly repetitive references. 
 The speed and mapping rate both progressively drop as references become larger and more repetitive. 
 Bacterial genomes or small collections of divergent bacterial genomes typically work well. 
-Small segments of eukaryotic genomes can also be used, however the presence of any repetitvie elements will harm the performance. 
+Small segments of eukaryotic genomes can also be used, however the presence of any repetitve elements will harm the performance. 
 Collections of highly similar genomes wil not work well, as conserved sequences introduce repeats.
-See [masking](masking/) for repeat masking scripts and guidlines.
+See [masking](masking/) for repeat masking scripts and guidelines.
 
-ReadUntil works best with longer reads. Maximize your read lengths for best results. You may also need to perform a nuclease flush and reloading to achive the highest yield of on-target bases.
+ReadUntil works best with longer reads. Maximize your read lengths for best results. You may also need to perform a nuclease flush and reloading to achieve the highest yield of on-target bases.
 
 UNCALLED currently only supports reads sequenced with r9.4 chemistry.
 
