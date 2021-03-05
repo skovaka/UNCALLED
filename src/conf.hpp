@@ -38,8 +38,10 @@
 
 #define INDEX_SUFF ".uncl"
 
-const std::string ACTIVE_STRS[] = {"full", "even", "odd"};
-const std::string MODE_STRS[] = {"deplete", "enrich"};
+//const std::string ACTIVE_STRS[] = {"full", "even", "odd"};
+//const std::string MODE_STRS[] = {"deplete", "enrich"};
+const std::array<std::string,3> ACTIVE_STRS {"full", "even", "odd"};
+const std::array<std::string,3> MODE_STRS {"deplete", "enrich", "selective"};
 
 #define GET_SET(T, N) T get_##N() { return N; } \
                       void set_##N(const T &v) { N = v; }
@@ -110,9 +112,17 @@ class Conf {
             GET_TOML_EXTERN(float, duration, realtime_prms);
             GET_TOML_EXTERN(u32, max_active_reads, realtime_prms);
 
+            //GET_TOML_EXTERN(SelectiveParams, selective_tgts, realtime_prms);
+            GET_TOML_EXTERN(RefTargets, enrich_tgts , realtime_prms);
+            GET_TOML_EXTERN(RefTargets, deplete_tgts, realtime_prms);
+            GET_TOML_EXTERN(RefTargets, fwd_tgts, realtime_prms);
+            GET_TOML_EXTERN(RefTargets, rev_tgts, realtime_prms);
+        
+
             if (subconf.contains("realtime_mode")) {
                 std::string mode_str = toml::find<std::string>(subconf, "realtime_mode");
-                for (u8 i = 0; i != (u8) RealtimeParams::Mode::NUM; i++) {
+                //for (u8 i = 0; i != (u8) RealtimeParams::Mode::NUM; i++) {
+                for (u8 i = 0; i < MODE_STRS.size(); i++) {
                     if (mode_str == MODE_STRS[i]) {
                         realtime_prms.realtime_mode = (RealtimeParams::Mode) i;
                         break;
@@ -122,7 +132,8 @@ class Conf {
 
             if (subconf.contains("active_chs")) {
                 std::string mode_str = toml::find<std::string>(subconf, "active_chs");
-                for (u8 i = 0; i != (u8) RealtimeParams::ActiveChs::NUM; i++) {
+                //for (u8 i = 0; i != (u8) RealtimeParams::ActiveChs::NUM; i++) {
+                for (u8 i = 0; i < ACTIVE_STRS.size(); i++) {
                     if (mode_str == ACTIVE_STRS[i]) {
                         realtime_prms.active_chs = (RealtimeParams::ActiveChs) i;
                         break;

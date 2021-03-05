@@ -125,7 +125,12 @@ class Mapper {
     u32 prev_unfinished(u32 next_number) const;
 
     bool finished() const;
+
     ReadBuffer &get_read();
+    u32 get_rid() {
+        return rid_out_;
+    }
+
     void deactivate();
 
     private:
@@ -225,6 +230,8 @@ class Mapper {
         chunk_i_;
     Timer chunk_timer_, map_timer_;
     float map_time_, wait_time_;
+
+    u32 rid_out_;
 
     std::mutex chunk_mtx_;
 

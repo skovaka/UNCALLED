@@ -717,12 +717,15 @@ void Mapper::set_ref_loc(const SeedCluster &seeds) {
     if (fwd) sa_st = seeds.ref_st_;
     else      sa_st = fmi.size() - (seeds.ref_en_.end_ + KLEN - 1);
     
-    std::string rf_name;
+    //std::string rf_name;
     u64 rd_st = event_to_bp(seeds.evt_st_ - PRMS.seed_len),
         rd_en = event_to_bp(seeds.evt_en_, true),
-        rd_len = event_to_bp(event_i_, true),
-        rf_st = 0,
-        rf_len = fmi.translate_loc(sa_st, rf_name, rf_st), //sets rf_st
+        rd_len = event_to_bp(event_i_, true);
+
+    rid_out_ = fmi.get_ref_id(sa_st);
+    std::string rf_name = fmi.get_ref_name(rid_out_);
+    u64 rf_st = sa_st - fmi.get_ref_offset(rid_out_),
+        rf_len = fmi.get_ref_len(rid_out_),
         rf_en = rf_st + (seeds.ref_en_.end_ - seeds.ref_st_ + KLEN);
 
     u16 match_count = seeds.total_len_ + KLEN - 1;

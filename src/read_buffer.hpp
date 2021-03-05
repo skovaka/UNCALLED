@@ -74,8 +74,16 @@ class Paf {
     void set_float(Tag t, float v);
     void set_str(Tag t, std::string v);
 
-    std::string get_rd_name() {
+    std::string get_rd_name() const {
         return rd_name_;
+    }
+
+    std::string get_rf_name() const {
+        return rf_name_;
+    }
+
+    bool is_fwd() const {
+        return fwd_;
     }
 
     #ifdef PYBIND

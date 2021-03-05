@@ -44,8 +44,10 @@ int main(int argc, char** argv) {
         u16 channel;
         u32 number;
         Paf paf;
+        bool keep;
         for (MapResult m : pool.update()) {
-            std::tie(channel, number, paf) = m;
+            std::tie(channel, number, paf, keep) = m;
+            //TODO interperate keep
             float map_time = (t.get() - chunk_times[channel-1])/1000;
 
             if (paf.is_ended()) {

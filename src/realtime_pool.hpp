@@ -30,7 +30,8 @@
 #include "mapper.hpp"
 #include "conf.hpp"
 
-using MapResult = std::tuple<u16, u32, Paf>;
+//TODO create struct, auto cast to tuple?
+using MapResult = std::tuple<u16, u32, Paf, bool>;
 
 class RealtimePool {
     public:
@@ -121,12 +122,24 @@ class RealtimePool {
 
         float mtx_time_;
     };
+    
+    //TODO move to different module?
+    enum class MapAction {
+        ENRICH,  //Keep if mapped (=)
+        DEPLETE, //Eject if mapped (*)
+        FWD,     //Keep if mapped on + strand, eject otherwise (+)
+        REV      //Keep if mapped on - strand, eject otherwise (-_
+    };
+    void set_targets(const RefTargets &tgts, MapAction action);
 
     void buffer_chunk(Chunk &c);
+    bool should_keep(u32 rid, const Paf &paf);
 
     bool stopped_;
 
     u32 active_count_;
+
+    std::vector<MapAction> tgt_actions_;
 
     //List of mappers - one for each channel
     std::vector<Mapper> mappers_;

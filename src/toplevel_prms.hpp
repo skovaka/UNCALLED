@@ -24,23 +24,42 @@
 #ifndef _INCL_TOPLEVEL_PRMS 
 #define _INCL_TOPLEVEL_PRMS
 
-typedef struct {
+//using SelectiveParams = std::vector<std::string>;
+using RefTargets = std::vector<std::string>;
+
+struct RealtimeParams {
     enum class ActiveChs {FULL, EVEN, ODD, NUM};
     ActiveChs active_chs;
 
-    enum class Mode {DEPLETE, ENRICH, NUM};
+    enum class Mode {DEPLETE, ENRICH, SELECTIVE, NUM};
     Mode realtime_mode;
+    RefTargets enrich_tgts,
+               deplete_tgts,
+               fwd_tgts,
+               rev_tgts;
+    //SelectiveParams selective_tgts;
+    //
 
     std::string host;
     u16 port;
     float duration;
 
     u32 max_active_reads;
-} RealtimeParams;
+
+    static const char TGT_ENRICH='=',
+                      TGT_DEPLETE='*', 
+                      TGT_FWD='+', 
+                      TGT_REV='-';
+};
 
 const RealtimeParams REALTIME_PRMS_DEF = {
     active_chs       : RealtimeParams::ActiveChs::FULL,
     realtime_mode    : RealtimeParams::Mode::ENRICH,
+    //selective_tgts   : {},
+    enrich_tgts      : {},
+    deplete_tgts     : {},
+    fwd_tgts         : {},
+    rev_tgts         : {},
     host             : "127.0.0.1",
     port             : 8000,
     duration         : 72,

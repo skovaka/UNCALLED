@@ -55,7 +55,85 @@ RealtimePool::RealtimePool(Conf &conf) :
         threads_[t].start();
     }
 
+    //Fill read until actions
+    if (PRMS.realtime_mode == RealtimeParams::Mode::SELECTIVE) {
+
+        std::vector<bool> seq_set(Mapper::fmi.seq_count(), false);
+        u32 set_count = 0;
+        bool targets_valid = true;
+
+        tgt_actions_.resize(Mapper::fmi.seq_count());
+
+        set_targets(PRMS.enrich_tgts, MapAction::ENRICH);
+        set_targets(PRMS.deplete_tgts, MapAction::DEPLETE);
+        set_targets(PRMS.fwd_tgts, MapAction::FWD);
+        set_targets(PRMS.rev_tgts, MapAction::REV);
+
+        /*
+        for (auto &tgt : PRMS.selective_tgts) {
+            u32 seqid = Mapper::fmi.get_seq_id(tgt.first);
+
+            std::cerr << tgt.first << "\t"
+                      << tgt.second << "\n";
+
+            if (seq_set[seqid]) {
+                std::cerr << "Error: reference sequence \"" << tgt.first
+                          << "\" appears multiple times in selective targets\n";
+                targets_valid = false;
+                continue;
+            }
+
+            seq_set[seqid] = true;
+            set_count += 1;
+
+            char c;
+            if (tgt.second.size() == 1) {
+                c = tgt.second[0];
+            } else {
+                c = '\0';
+            }
+
+            switch(c) {
+                case RealtimeParams::TGT_ENRICH:
+                    tgt_actions_[seqid] = MapAction::ENRICH;
+                    break;
+                case RealtimeParams::TGT_DEPLETE:
+                    tgt_actions_[seqid] = MapAction::DEPLETE;
+                    break;
+                case RealtimeParams::TGT_FWD:
+                    tgt_actions_[seqid] = MapAction::FWD;
+                    break;
+                case RealtimeParams::TGT_REV:
+                    tgt_actions_[seqid] = MapAction::REV;
+                    break;
+
+                default:
+                    std::cerr << "Error: unrecognized action \"" << c 
+                              << "\" for sequence \"" << tgt.first
+                              << "\" in selective targets\n";
+                    targets_valid = false;
+                    break;
+        }
+
+        if (set_count != tgt_actions_.size()) {
+            targets_valid = false;
+            //TODO output missing
+        }
+
+        if (!targets_valid) {
+            throw std::invalid_argument("Invalid selective targets");
+        }
+        }*/
+    }
+
     srand(time(NULL));
+}
+
+void RealtimePool::set_targets(const RefTargets &tgts, MapAction action) {
+    for (auto &seq_name : tgts) {
+        u32 seq_id = Mapper::fmi.get_seq_id(seq_name);
+        tgt_actions_[seq_id] = action;
+    }
 }
 
 void RealtimePool::buffer_chunk(Chunk &c) {
@@ -141,6 +219,26 @@ bool RealtimePool::try_add_chunk(Chunk &c) {
     return false;
 }
 
+bool RealtimePool::should_keep(u32 rid, const Paf &paf) {
+    bool mapped = paf.is_mapped();
+    switch (tgt_actions_[rid]) {
+        case MapAction::ENRICH:
+        return mapped;
+
+        case MapAction::DEPLETE:
+        return !mapped;
+
+        case MapAction::FWD:
+        return mapped && paf.is_fwd();
+
+        case MapAction::REV:
+        return mapped && !paf.is_fwd();
+    }
+
+    std::cerr << "UH OH\n";
+    return false;
+}
+
 //TODO: make sure update is the same
 std::vector<MapResult> RealtimePool::update() {
 
@@ -160,7 +258,19 @@ std::vector<MapResult> RealtimePool::update() {
             //Loop over alignments
             for (auto ch : out_chs_) {
                 ReadBuffer &r = mappers_[ch].get_read();
-                ret.emplace_back(r.get_channel(), r.number_, r.loc_);
+
+                u32 rid = mappers_[ch].get_rid();
+                bool keep = should_keep(rid, r.loc_);
+                u32 act = static_cast<u32>(tgt_actions_[rid]);
+
+                //std::cerr << rid << "\tm="
+                //          << r.loc_.is_mapped() << "\tf="
+                //          << r.loc_.is_fwd() << "\tk="
+                //          << keep << "\ta="
+                //          << act << "\t"
+                //          << r.loc_.get_rf_name() << "\n";
+
+                ret.emplace_back(r.get_channel(), r.number_, r.loc_, keep);
 
                 //TODO rename set_inactive?
                 mappers_[ch].deactivate();

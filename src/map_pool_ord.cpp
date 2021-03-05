@@ -86,9 +86,11 @@ std::vector<Paf> MapPoolOrd::update() {
     }
 
     //Get mapping results
-    for (const MapResult &m : pool_.update()) {
+    for (const auto &m : pool_.update()) {
         u16 i = std::get<0>(m)-1;
         u32 nm = std::get<1>(m);
+        auto paf = std::get<2>(m);
+        bool keep = std::get<3>(m);
 
         //Remove read from channel queue
         if (!channels_[i].empty() && 
@@ -98,7 +100,10 @@ std::vector<Paf> MapPoolOrd::update() {
                 chunk_idx_[i] = 0;
         }
 
-        ret.push_back(std::get<2>(m));
+        if (keep) paf.set_int(Paf::KEEP, 1);
+        else paf.set_int(Paf::EJECT, 1);
+
+        ret.push_back(paf);
     }
 
     //TODO: option to stop when lower than target

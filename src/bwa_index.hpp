@@ -31,6 +31,7 @@
 #include <bwa/bwa.h>
 #include <bwa/utils.h>
 #include <pdqsort.h>
+#include <unordered_map>
 #include "util.hpp"
 #include "bp.hpp"
 #include "range.hpp"
@@ -121,14 +122,21 @@ class BwaIndex {
         bwt_restore_sa(sa_fname.c_str(), index_);
         bns_ = bns_restore(prefix.c_str());
 
+        //Store k-mer FM index ranges
         for (u16 k = 0; k < kmer_ranges_.size(); k++) {
-
             Range r = get_base_range(kmer_head<KLEN>(k));
             for (u8 i = 1; i < KLEN; i++) {
                 r = get_neighbor(r, kmer_base<KLEN>(k, i));
             }
-
             kmer_ranges_[k] = r;
+        }
+
+        //Store sequence names and ids
+        for (i32 i = 0; i < bns_->n_seqs; i++) {
+            bntann1_t ann = bns_->anns[i];
+            std::string name = std::string(ann.name);
+            seq_names_.push_back(ann.name);
+            seq_ids_[ann.name] = static_cast<u32>(i);
         }
 
         loaded_ = true;
@@ -193,14 +201,6 @@ class BwaIndex {
         };
     }
 
-    std::string get_ref_name(int rid) {
-        return std::string(bns_->anns[rid].name);
-    }
-
-    u64 get_ref_len(int rid) {
-        return bns_->anns[rid].len;
-    }
-
     u64 get_sa_loc(const std::string &name, u64 coord) {
         for (int i = 0; i < bns_->n_seqs; i++) {
             if (strcmp(bns_->anns[i].name, name.c_str()) == 0) {
@@ -210,13 +210,35 @@ class BwaIndex {
         return 0;
     }
 
-    u64 translate_loc(u64 sa_loc, std::string &ref_name, u64 &ref_loc) const {
-        i32 rid = bns_pos2rid(bns_, sa_loc);
-        if (rid < 0) return 0;
+    u32 get_ref_id(u64 sa_loc) {
+        auto rid = bns_pos2rid(bns_, sa_loc);
+        assert(rid >= 0);
+        return static_cast<u32>(rid);
+    }
 
-        ref_name = std::string(bns_->anns[rid].name);
-        ref_loc = sa_loc - bns_->anns[rid].offset;
+    std::string get_ref_name(u32 rid) {
+        return std::string(bns_->anns[rid].name);
+    }
+
+    u64 get_ref_len(u32 rid) {
         return bns_->anns[rid].len;
+    }
+
+    i64 get_ref_offset(u32 rid) {
+        return bns_->anns[rid].offset;
+    }
+
+    u64 translate_loc(u64 sa_loc, std::string &ref_name, u64 &ref_loc) const {
+        //i32 rid = bns_pos2rid(bns_, sa_loc);
+        //ref_name = std::string(bns_->anns[rid].name);
+        //ref_loc = sa_loc - bns_->anns[rid].offset;
+        //
+        //return bns_->anns[rid].len;
+        //
+        u32 rid = get_ref_id(sa_loc);
+        ref_name = get_ref_len(rid);
+        ref_loc = sa_loc - get_ref_offset(rid);
+        return get_ref_len(rid);
     }
 
     std::vector< std::pair<std::string, u64> > get_seqs() const {
@@ -229,6 +251,18 @@ class BwaIndex {
         }
 
         return seqs;
+    }
+
+    std::string get_seq_name(u32 i) {
+        return seq_names_[i];
+    }
+
+    u32 get_seq_id(const std::string &name) {
+        return seq_ids_[name];
+    }
+
+    u32 seq_count() {
+        return seq_ids_.size();
     }
 
     u64 coord_to_pacseq(std::string name, u64 coord) {
@@ -373,6 +407,8 @@ class BwaIndex {
     u8 *pacseq_;
     KmerLen klen_;
     std::vector<Range> kmer_ranges_;
+    std::vector<std::string> seq_names_;
+    std::unordered_map<std::string, u32> seq_ids_;
     bool loaded_;
 };
 
