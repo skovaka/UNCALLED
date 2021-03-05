@@ -187,6 +187,11 @@ def add_ru_opts(p, conf):
             const=unc.RealtimePool.ENRICH, dest='realtime_mode', 
             help="Will eject reads that don't align to index"
     )
+    modes.add_argument(
+            "-S", "--selective", action='store_const',
+            const=unc.RealtimePool.SELECTIVE, dest='realtime_mode', 
+            help="Will eject reads that don't align to index"
+    )
 
     active = p.add_mutually_exclusive_group()
     active.add_argument(
@@ -295,6 +300,11 @@ def add_map_opts(p, conf):
             help="Will give up on a read after this many events have been processed"
     )
 
+    p.add_argument(
+            "-C", "--conf", 
+            type=str, default=None, 
+            help="Custom configuration TOML file containing UNCALLED parameters"
+    )
 def load_conf(argv):
     conf = unc.Conf()
     parser = get_parser(conf)
@@ -307,5 +317,8 @@ def load_conf(argv):
         if (not a.startswith("_")):
             if hasattr(conf, a):
                 setattr(conf, a, v)
+
+    if hasattr(args, "conf"):
+        conf.load_toml(args.conf)
 
     return parser, conf, args

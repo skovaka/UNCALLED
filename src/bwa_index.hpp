@@ -210,21 +210,21 @@ class BwaIndex {
         return 0;
     }
 
-    u32 get_ref_id(u64 sa_loc) {
+    u32 get_ref_id(u64 sa_loc) const {
         auto rid = bns_pos2rid(bns_, sa_loc);
         assert(rid >= 0);
         return static_cast<u32>(rid);
     }
 
-    std::string get_ref_name(u32 rid) {
+    std::string get_ref_name(u32 rid) const {
         return std::string(bns_->anns[rid].name);
     }
 
-    u64 get_ref_len(u32 rid) {
+    u64 get_ref_len(u32 rid) const {
         return bns_->anns[rid].len;
     }
 
-    i64 get_ref_offset(u32 rid) {
+    i64 get_ref_offset(u32 rid) const {
         return bns_->anns[rid].offset;
     }
 

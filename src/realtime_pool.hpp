@@ -80,6 +80,7 @@ class RealtimePool {
         pybind11::enum_<RealtimeParams::Mode> m(c, "RealtimeMode");
         PY_REALTIME_MODE(DEPLETE);
         PY_REALTIME_MODE(ENRICH);
+        PY_REALTIME_MODE(SELECTIVE);
         m.export_values();
 
         pybind11::enum_<RealtimeParams::ActiveChs> a(c, "ActiveChs");

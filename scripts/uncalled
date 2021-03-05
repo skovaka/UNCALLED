@@ -216,13 +216,14 @@ def realtime_cmd(conf, args):
         while client.is_running:
             t0 = time.time()
 
-            for ch, nm, paf in pool.update():
+            for ch, nm, paf, keep in pool.update():
                 t = time.time()-chunk_times[ch-1]
                 if paf.is_ended():
                     paf.set_float(unc.Paf.ENDED, t)
                     client.stop_receiving_read(ch, nm)
 
-                elif (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
+                #elif (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
+                elif not keep:
 
                     if sim or client.should_eject():
                         paf.set_float(unc.Paf.EJECT, t)
