@@ -1,6 +1,6 @@
 # Overview
 
-This directory contains scripts for targeting insertions by creating a reference containg sequences that flank insertion sites, and a configuration file that tells UNCALLED to only keep a read if the strand they map to indicates that the read will overlap the insertion. 
+This directory contains scripts for targeting insertions by creating a reference containg sequences that flank insertion sites, and a configuration file that tells UNCALLED to only keep a read if the strand it maps to indicates that the read will overlap the insertion. 
 
 **Requires:** uncalled, bedtools, samtools
 
@@ -23,7 +23,7 @@ Arguments:
 **Note two new (and required) flags:** **--selective**, which indicates mixed enrichment and depletion, and **--conf** which lets you input the config file output by the above script.
 
 # Example
-Here is an example simulation from some random reads I have. Note I'm not really targeting an insertion, and my flanking region size is way too large. I just chose these reads and targets for testing.
+Here is an example simulation I ran to test this system. Note I'm not really targeting an insertion, and my flanking region size is way too large. I just chose these reads and targets for testing.
 
 ## Inputs
 Reference genome and BED file containing a single insertion site
@@ -36,7 +36,7 @@ L.monocytogenes.fasta
 $ grep ">" REF_FILES/L.monocytogenes.fasta
 >Listeria_monocytogenes_complete_genome 2.992Mb
 
-$ cat tgt.bed # Note BED start/end are the same to indicate insert coord
+$ cat tgt.bed 
 Listeria_monocytogenes_complete_genome  300000  300000  ins_test
 ```
 
