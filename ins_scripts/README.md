@@ -1,4 +1,31 @@
-##Inputs
+# Overview
+
+This directory contains scripts for targeting insertions by creating a reference containg sequences that flank insertion sites, and a configuration file that tells UNCALLED to only keep a read if the strand they map to indicates that the read will overlap the insertion. 
+
+**Requires:** uncalled, bedtools, samtools
+
+## Usage
+
+**Creating reference/config file:** 
+
+`./create_ins_ref.sh <INSERTION_SITE_BED> <FLANK_LENGTH> <GENOME_FASTA> <OUT_PREFIX>`
+
+Arguments:
+* **INSERTION_SITE_BED**: BED file containing one insertion site per line. The start and end should be the same. The name field is required, and each name MUST be unique.
+* **FLANK_LENGTH**: target flanking sequence length. Should probably be between 5-20Kbp, depending on expected read lenghts.
+* **GENOME_FASTA**: reference genome to pull the flanking sequences from. Coordinates should match up with BED file.
+* **OUT_PREFIX**: reference file name will be <OUT_PREFIX>.fa, config file will be <OUT_PREFIX>.toml
+
+**Running simulator/realtime:** 
+
+`uncalled <sim/realtime> --selective --conf <OUT_PREFIX>.toml <OUT_PREFIX>.fa <...>`
+
+**Note two new (and required) flags:** **--selective**, which indicates mixed enrichment and depletion, and **--conf** which lets you input the config file output by the above script.
+
+# Example
+Here is an example simulation from some random reads I have. Note I'm not really targeting an insertion, and my flanking region size is way too large. I just chose these reads and targets for testing.
+
+## Inputs
 Reference genome and BED file containing a single insertion site
 
 Note that the name field is required, and must be unique if you include multiple sites.
@@ -13,7 +40,7 @@ $ cat tgt.bed # Note BED start/end are the same to indicate insert coord
 Listeria_monocytogenes_complete_genome  300000  300000  ins_test
 ```
 
-##Create the reference and config file
+## Create the reference and config file
 Using a flank length of 100Kbp, which is much larger than you would ever want but it's easier for 
 
 ```
@@ -40,7 +67,7 @@ rev_tgts = [
 ]
 ```
 
-##Index the reference and run simulator
+## Index the reference and run simulator
 
 Note: you should probably do repeat masking before indexing for human
 
