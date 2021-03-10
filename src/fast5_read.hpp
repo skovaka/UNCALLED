@@ -21,6 +21,7 @@
  * SOFTWARE.
  */
 
+#include <algorithm>
 #include "hdf5_tools.hpp"
 #include "read_buffer.hpp"
 
@@ -37,41 +38,29 @@ class Fast5Read : public ReadBuffer {
               const std::string &ch_path, 
               const std::string &anl_path) {
 
-        for (auto a : file.get_attr_map(raw_path)) {
-            if (a.first == "read_id") {
-                id_ = a.second;
-            } else if (a.first == "read_number") {
-                number_ = atoi(a.second.c_str());
-            } else if (a.first == "start_time") {
-                start_sample_ = atoi(a.second.c_str());
-            }
-        }
+        //Get read ID (name), number, and start_time
+        auto raw_attrs = file.get_attr_map(raw_path);
+        id_ = raw_attrs["read_id"];
+        number_ = atoi(raw_attrs["read_number"].c_str());
+        start_sample_ = atoi(raw_attrs["start_time"].c_str());
 
-        float cal_digit = 1, cal_range = 1, cal_offset = 0;
-        for (auto a : file.get_attr_map(ch_path)) {
-            if (a.first == "channel_number") {
-                channel_idx_ = atoi(a.second.c_str()) - 1;
-            } else if (a.first == "digitisation") {
-                cal_digit = atof(a.second.c_str());
-            } else if (a.first == "range") {
-                cal_range = atof(a.second.c_str());
-            } else if (a.first == "offset") {
-                cal_offset = atof(a.second.c_str());
-            }
-        }
+        //Get read channel
+        auto ch_attrs = file.get_attr_map(ch_path);
+        channel_idx_ = atoi(ch_attrs["channel_number"].c_str()) - 1;
 
-        template_start_ = 0;
+        //And callibration data
+        float cal_digit = atof(ch_attrs["digitisation"].c_str()),
+              cal_range = atof(ch_attrs["range"].c_str()),
+              cal_offset = atof(ch_attrs["offset"].c_str());
 
+        //Load BC data if path exists
         if (!anl_path.empty() && file.group_exists(anl_path)) {
             bc_loaded_ = true;
 
             //Template start from guppy segmentation
             std::string seg_path = anl_path + GUPPY_SEG_SMRY_PATH;
-            for (auto a : file.get_attr_map(seg_path)) {
-                if (a.first == "first_sample_template") {
-                    template_start_ = atoi(a.second.c_str());
-                }
-            }
+            auto seg_attrs = file.get_attr_map(seg_path);
+            template_start_ = atoi(seg_attrs["first_sample_template"].c_str());
     
             //Guppy BaseCalled Event constant length (stride)
             auto bc_attrs = file.get_attr_map(anl_path + GUPPY_BC_SMRY_PATH);
@@ -83,45 +72,50 @@ class Fast5Read : public ReadBuffer {
 
         } else {
             bc_loaded_ = false;
+            template_start_ = 0;
         }
-
-        //TODO clean up constructors
-        //don't use inheritance
 
         std::string sig_path = raw_path + "/Signal";
         std::vector<i16> int_data; 
         file.read(sig_path, int_data);
 
-        chunk_count_ = (int_data.size() / PRMS.chunk_len()) + (int_data.size() % PRMS.chunk_len() != 0);
+        u32 raw_len = static_cast<u32>(int_data.size());
 
-        u32 start_sample = PRMS.start_chunk * PRMS.chunk_len();
-
-        if (PRMS.skip_notempl && start_sample < template_start_) {
-            start_sample = template_start_;
+        //Determine min sample
+        u32 min_sample = std::min(PRMS.start_chunk * PRMS.chunk_len(), raw_len);
+        if (PRMS.skip_notempl && min_sample < template_start_) {
+            min_sample = template_start_;
         }
+        start_sample_ += min_sample; //Update global sample start
 
-        if (int_data.size() <= start_sample) {
-            int_data.clear();
-        } else {
-            int_data = std::vector<i16>(&int_data[start_sample], &int_data[int_data.size()]);
-        }
+        //Set read length
+        u32 max_sample = std::min(min_sample + (PRMS.max_chunks * PRMS.chunk_len()), raw_len);
+        full_duration_ = max_sample-min_sample;
+        chunk_count_ = (full_duration_ / PRMS.chunk_len()) + (full_duration_ % PRMS.chunk_len() != 0);
 
-        if (chunk_count_ > PRMS.max_chunks) {
-            chunk_count_ = PRMS.max_chunks;
-            int_data.resize(chunk_count_ * PRMS.chunk_len());
-        }
-
-        //signal_.reserve(int_data.size());
-
-        //signal_.assign(int_data.begin(), int_data.end());
-
-        //for (u64 i = template_start_; i < int_data.size(); i++) {
-        for (u16 raw : int_data) {
-            float calibrated = (cal_range * raw / cal_digit) + cal_offset;
+        //Fill in calibrated signal
+        signal_.reserve(full_duration_);
+        for (u32 i = min_sample; i < max_sample; i++) {
+            float calibrated = (cal_range * int_data[i] / cal_digit) + cal_offset;
             signal_.push_back(calibrated);
         }
+        assert(full_duration_ == signal_.size());
 
-        full_duration_ = signal_.size();
+        //Trim BC moves
+
+        if (bc_loaded_) {
+            u32 min_bce = 0;
+            if (min_sample > template_start_) {
+                min_bce = (min_sample - template_start_) / bce_stride_;
+            }
+
+            u32 max_bce = (max_sample - template_start_ + 1) / bce_stride_;
+
+            if (max_bce - min_bce < moves_.size()) {
+                moves_ = std::vector<u8>(&moves_[min_bce], &moves_[max_bce-1]);
+            }
+        }
+
     }
 
     u32 get_template_start() const {

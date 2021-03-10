@@ -56,6 +56,7 @@ class EventProfiler {
         WIN_MID(p.win_len / 2),
         PRMS(p) {
         window_.set_length(PRMS.win_len);
+        reset();
     }
 
     void reset() {
@@ -106,6 +107,7 @@ class EventProfiler {
             total_count_ += 1;//TODO only in debug mode?
         }
         //window_.pop();
+        //
 
         return event_ready();
     }
@@ -177,6 +179,7 @@ class EventProfiler {
 
     static void pybind_defs(pybind11::class_<EventProfiler> &evpr) {
         evpr.def(pybind11::init());
+        evpr.def(pybind11::init<Params>());
         PY_EVENT_PROFILER_METH(reset)
         PY_EVENT_PROFILER_METH(set_norm)
         PY_EVENT_PROFILER_METH(add_event)

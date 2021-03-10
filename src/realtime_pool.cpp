@@ -43,6 +43,9 @@ RealtimePool::RealtimePool(Conf &conf) :
 
     conf.export_static();
 
+    std::cout << "RTP " << conf.read_buffer.seq_fwd
+              << "\t" << ReadBuffer::PRMS.seq_fwd << "\n";
+
     for (u16 t = 0; t < conf.threads; t++) {
         threads_.emplace_back(mappers_);
     }

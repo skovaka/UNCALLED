@@ -270,15 +270,8 @@ class Mapper {
     bool confident_mapped_;
     #endif
 
-    #ifdef PYBIND
-
-    #define PY_MAPPER_METH(N,D) map.def(#N, &Mapper::N, D);
-    #define PY_MAPPER_PRM(P) prm.def_readwrite(#P, &Mapper::Params::P);
-    #define PY_PATHBUF_PRM(P) path.def_readonly(#P, &Mapper::Params::P);
-
-    public:
-
     #ifdef PYDEBUG
+    public:
     //stores name, start, end, strand, event, path_buf, cluster
     using DbgSeed = std::tuple<std::string, u64, u64, bool, u32, u32, u32>;
 
@@ -300,6 +293,14 @@ class Mapper {
     };
     Debug dbg_;
     #endif
+
+    #ifdef PYBIND
+
+    #define PY_MAPPER_METH(N,D) map.def(#N, &Mapper::N, D);
+    #define PY_MAPPER_PRM(P) prm.def_readwrite(#P, &Mapper::Params::P);
+    #define PY_PATHBUF_PRM(P) path.def_readonly(#P, &Mapper::Params::P);
+
+    public:
 
     static void pybind_defs(pybind11::class_<Mapper> &map) {
 

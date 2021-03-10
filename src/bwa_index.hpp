@@ -226,8 +226,8 @@ class BwaIndex {
         else pac_st = sa_start;
 
         i32 rid = bns_pos2rid(bns_, pac_st);
-        //if (rid < 0) return {};
-        assert(rid >= 0);
+        if (rid < 0) return {};
+        //assert(rid >= 0);
 
         RefLoc ret {
             ref_name : std::string(bns_->anns[rid].name),

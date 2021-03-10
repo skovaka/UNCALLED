@@ -106,7 +106,7 @@ class Conf {
 
         mapper.pore_model    = "r94_rna_templ";
         mapper.min_seed_prob = -3.0;
-        mapper.max_paths     = 50000;
+        mapper.max_paths     = 10000;
 
         event_detector.window_length1 = 7;
         event_detector.window_length2 = 12;
@@ -137,6 +137,7 @@ class Conf {
             GET_TOML_EXTERN(std::string, host, realtime);
             GET_TOML_EXTERN(u16, port, realtime);
             GET_TOML_EXTERN(float, duration, realtime);
+            GET_TOML_EXTERN(u32, min_active_reads, realtime);
             GET_TOML_EXTERN(u32, max_active_reads, realtime);
 
             if (subconf.contains("realtime_mode")) {

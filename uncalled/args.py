@@ -289,6 +289,16 @@ def add_map_opts(p, conf):
             type=float, default=1, required=False, 
             help="Length of chunks in seconds"
     )
+    p.add_argument(
+            "--conf", 
+            type=str, default=None, required=False, 
+            help="Config file"
+    )
+    p.add_argument(
+            "--rna", 
+            action="store_true",
+            help="Will use RNA parameters if set"
+    )
 
     #TODO move to different parser set
     p.add_argument(
@@ -301,6 +311,13 @@ def load_conf(argv):
     conf = unc.Conf()
     parser = get_parser(conf)
     args = parser.parse_args()
+
+    if getattr(args,"conf",None) is not None:
+        conf.load_toml(args.conf)
+
+    if getattr(args,"rna",False):
+        conf.set_r94_rna()
+
 
     for a, v in vars(args).items():
         if v == None:

@@ -688,11 +688,10 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         //TODO: store in buffer, replace sa_checked
         //Reverse the reference coords so they both go L->R
 
-        u64 sa_end;
-            sa_end = fmi.size() - fmi.sa(s);
+        u64 sa_end = fmi.size() - fmi.sa(s);
 
         u32 ref_len = path.move_count() + KLEN - 1;
-        u64 sa_start = sa_end - ref_len + 1;
+        u64 sa_start = sa_end - ref_len;// + 1;
 
         //Add seed and store updated seed cluster
         auto clust = seed_tracker_.add_seed(
@@ -1035,15 +1034,6 @@ void Mapper::dbg_seeds_out(
     u32 sa_half;
     if (flip) sa_half = fmi.size() - (sa_start + ref_len - 1);
     else sa_half = sa_start;
-
-    //bool fwd = sa_start < (fmi.size() / 2);
-
-    ////TODO change sa_ to clarify unstranded
-    //if (fwd) {
-    //    sa_half = sa_start;
-    //} else {
-    //    sa_half = fmi.size() - (sa_start + ref_len - 1);
-    //}
 
     std::string rf_name;
     u64 ref_st = 0;
