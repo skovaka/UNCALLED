@@ -37,6 +37,13 @@
 #include "read_buffer.hpp"
 #include "paf.hpp"
 
+#ifdef PYBIND
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/numpy.h>
+
+#endif
+
 //#define DEBUG_TIME
 //#define DEBUG_SEEDS
 
@@ -158,6 +165,8 @@ class Mapper {
         u8 move_count() const;
         u8 stay_count() const;
 
+        std::vector<bool> get_moves() const;
+
         float prob_head() const;
 
         void free_buffers();
@@ -180,9 +189,10 @@ class Mapper {
 
         bool sa_checked_;
 
+
         #ifdef PYDEBUG
         static u32 count_;
-        u32 id_, parent_;
+        u32 evt_, id_, parent_;
         #endif
 
         static void reset_count() {
@@ -273,7 +283,22 @@ class Mapper {
     #ifdef PYDEBUG
     public:
     //stores name, start, end, strand, event, path_buf, cluster
-    using DbgSeed = std::tuple<std::string, u64, u64, bool, u32, u32, u32>;
+    //using DbgSeed = std::tuple<std::string, u64, u64, bool, u32, u32, u32>;
+
+    struct DbgSeed {
+        u32 Chromosome;
+        u64 Start, End;
+        bool Fwd;
+        u32 Event, Path, Cluster;
+    };
+
+    //stores , fm_start, fm_len, kmer, full_len, match_prob, seed_prob, moves
+    using DbgPath = std::tuple<
+        u32,u32,u32,u32,  //event, id, parent_evt, parent_id
+        u64,u32,u16,u32,  //fm_start, fm_len, kmer, full_len
+        float,float,      //match_prob, seed_prob
+        std::vector<bool> //moves
+    >;
 
     void dbg_add_seed(
         const PathBuffer &path, 
@@ -298,7 +323,7 @@ class Mapper {
 
     #define PY_MAPPER_METH(N,D) map.def(#N, &Mapper::N, D);
     #define PY_MAPPER_PRM(P) prm.def_readwrite(#P, &Mapper::Params::P);
-    #define PY_PATHBUF_PRM(P) path.def_readonly(#P, &Mapper::Params::P);
+    #define PY_PATHBUF_PRM(P) path.def_readonly(#P, &Mapper::PathBuffer::P);
 
     public:
 
@@ -308,17 +333,49 @@ class Mapper {
 
         #ifdef PYDEBUG
         #define PY_MAPPER_DBG(P) dbg.def_readonly(#P, &Mapper::Debug::P);
+
+        #define PY_DBG_ARRAY(T, P) dbg.def_property_readonly(#P, [](Mapper::Debug &d) \
+             -> py::array_t<T> {return py::array_t<T>(d.P.size(), d.P.data());});                                                                         
+
         pybind11::class_<Debug> dbg(map, "Debug");
         PY_MAPPER_DBG(events)
         PY_MAPPER_DBG(evt_profs)
         PY_MAPPER_DBG(proc_signal)
-        PY_MAPPER_DBG(seeds)
+        //PY_MAPPER_DBG(seeds)
+        //PY_DBG_ARRAY(DbgSeed, seeds);
+        dbg.def_property_readonly("seeds", [](Mapper::Debug &d) -> pybind11::array_t<DbgSeed> {
+             return pybind11::array_t<DbgSeed>(d.seeds.size(), d.seeds.data());
+        });
+
         PY_MAPPER_DBG(paths)
         PY_MAPPER_DBG(conf_evt)
         PY_MAPPER_DBG(conf_clust)
+
+        PYBIND11_NUMPY_DTYPE(DbgSeed, Chromosome, Start, End, Fwd, Event, Path, Cluster);
         #endif
 
+        //event, id, parent_evt, parent_id
+        //fm_start, fm_len, kmer, full_len
+        //match_prob, seed_prob
+        //moves
         pybind11::class_<PathBuffer> path(map, "PathBuffer");
+        path.def_readonly("event", &Mapper::PathBuffer::evt_);
+        path.def_readonly("id", &Mapper::PathBuffer::id_);
+        path.def_readonly("parent", &Mapper::PathBuffer::parent_);
+        path.def_readonly("kmer", &Mapper::PathBuffer::kmer_);
+        path.def_readonly("total_move_len", &Mapper::PathBuffer::total_move_len_);
+        path.def_readonly("seed_prob", &Mapper::PathBuffer::seed_prob_);
+        path.def_property_readonly("match_prob", &Mapper::PathBuffer::prob_head);
+        path.def_property_readonly("moves", &Mapper::PathBuffer::get_moves);
+        path.def_property_readonly("fm_start", 
+                [](Mapper::PathBuffer &p) -> u64 {return p.fm_range_.start_;}
+        );
+        path.def_property_readonly("fm_end", 
+                [](Mapper::PathBuffer &p) -> u64 {return p.fm_range_.end_;}
+        );
+
+        //path.def_readonly("fm_len", &Mapper::PathBuffer::parent_);
+
         //PY_MAP_METH(add_read, "Adds a read ID to the read filter");
         //PY_MAP_METH(load_read_list, "Loads a list of read IDs from a text file to add to the read filter");
         //PY_MAP_METH(pop_read, "");

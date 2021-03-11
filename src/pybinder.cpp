@@ -1,6 +1,7 @@
 #include <iostream>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/numpy.h>
 #include "map_pool.hpp"
 #include "self_align_ref.hpp"
 #include "realtime_pool.hpp"

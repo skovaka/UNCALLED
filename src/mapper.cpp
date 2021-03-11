@@ -496,6 +496,10 @@ bool Mapper::map_next() {
                                   prev_kmer, 
                                   kmer_probs_[prev_kmer], 
                                   EVENT_STAY);
+            #ifdef PYDEBUG
+            next_path->evt_ = event_i_;
+            #endif
+
             child_found = true;
 
             if (++next_path == next_paths_.end()) {
@@ -522,6 +526,9 @@ bool Mapper::map_next() {
                                   next_kmer, 
                                   kmer_probs_[next_kmer], 
                                   EVENT_MOVE);
+            #ifdef PYDEBUG
+            next_path->evt_ = event_i_;
+            #endif
 
             child_found = true;
 
@@ -574,6 +581,9 @@ bool Mapper::map_next() {
                     next_path->make_source(source_range,
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
+                    #ifdef PYDEBUG
+                    next_path->evt_ = event_i_;
+                    #endif
                     next_path++;
                 }                                    
 
@@ -615,6 +625,9 @@ bool Mapper::map_next() {
                     next_path->make_source(source_range,
                                            source_kmer,
                                            kmer_probs_[source_kmer]);
+                    #ifdef PYDEBUG
+                    next_path->evt_ = event_i_;
+                    #endif
                     next_path++;
                 }
             }
@@ -637,6 +650,9 @@ bool Mapper::map_next() {
 
             //TODO: don't write to prob buffer here to speed up source loop
             next_path->make_source(next_range, kmer, kmer_probs_[kmer]);
+            #ifdef PYDEBUG
+            next_path->evt_ = event_i_;
+            #endif
             next_path++;
 
         } else {
@@ -690,9 +706,6 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
 
         u64 sa_end = fmi.size() - fmi.sa(s);
 
-        u32 ref_len = path.move_count() + KLEN - 1;
-        u64 sa_start = sa_end - ref_len;// + 1;
-
         //Add seed and store updated seed cluster
         auto clust = seed_tracker_.add_seed(
             sa_end, 
@@ -701,18 +714,21 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         );
 
         #ifdef PYDEBUG
+        u32 ref_len = path.move_count() + KLEN - 1;
+        u64 sa_start = sa_end - ref_len;// + 1;
+
         auto loc = fmi.translate_loc(sa_start, sa_start+ref_len, read_.PRMS.seq_fwd);
         auto evt = evt_prof_.mask_idx_map_[event_i_-path_ended];
 
-        dbg_.seeds.emplace_back(
-                loc.ref_name, 
+        dbg_.seeds.push_back({
+                loc.ref_id, 
                 loc.start, 
                 loc.end, 
                 loc.fwd,
                 evt, 
                 path.id_, 
                 clust.id_
-        );
+        });
         #endif
 
         #ifdef DEBUG_SEEDS
@@ -841,6 +857,14 @@ bool Mapper::PathBuffer::is_valid() const {
 u8 Mapper::PathBuffer::stay_count() const {
     return length_ - move_count();
     //return path_type_counts_[EVENT_MOVE];
+}
+
+std::vector<bool> Mapper::PathBuffer::get_moves() const { 
+    std::vector<bool> ret(length_);
+    for (u32 i = 0; i < length_; i++) {
+        ret[i] = (event_moves_ >> i) & 1;
+    }
+    return ret;
 }
 
 float Mapper::PathBuffer::prob_head() const {

@@ -86,6 +86,7 @@ class SubSeq {
 #define BWA_BLOCK_SIZE 10000000
 
 struct RefLoc {
+    u32 ref_id;
     std::string ref_name;
     u64 ref_len, start, end;
     bool fwd;
@@ -187,23 +188,23 @@ class BwaIndex {
         return index_->seq_len;
     }
 
-    int get_rid(u64 sa_loc) {
-        return bns_pos2rid(bns_, sa_loc);
+    u32 get_rid(u64 sa_loc) const {
+        return static_cast<u32>(bns_pos2rid(bns_, sa_loc));
     }
 
-    std::pair<int, u32> get_ref_coord(u64 sa_loc) {
-        int rid = get_rid(sa_loc);
+    std::string get_ref_name(u32 rid) const {
+        return bns_->anns[rid].name;
+    }
+
+    std::pair<u32, u32> get_ref_coord(u64 sa_loc) {
+        auto rid = get_rid(sa_loc);
         return {
             rid, 
             sa_loc - bns_->anns[rid].offset
         };
     }
 
-    std::string get_ref_name(int rid) {
-        return std::string(bns_->anns[rid].name);
-    }
-
-    u64 get_ref_len(int rid) {
+    u64 get_ref_len(u32 rid) const {
         return bns_->anns[rid].len;
     }
 
@@ -215,6 +216,7 @@ class BwaIndex {
         }
         return 0;
     }
+
 
     //auto ref_loc = fmi.translate_loc(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
     RefLoc translate_loc(u64 sa_start, u64 sa_end, bool read_fwd) const {
@@ -230,6 +232,7 @@ class BwaIndex {
         //assert(rid >= 0);
 
         RefLoc ret {
+            ref_id   : static_cast<u32>(rid),
             ref_name : std::string(bns_->anns[rid].name),
             ref_len  : static_cast<u64>(bns_->anns[rid].len),
             start    : pac_st - bns_->anns[rid].offset,
