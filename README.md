@@ -244,7 +244,7 @@ See [masking](masking/) for repeat masking scripts and guidelines.
 
 ReadUntil works best with longer reads. Maximize your read lengths for best results. You may also need to perform a nuclease flush and reloading to achieve the highest yield of on-target bases.
 
-UNCALLED currently only supports reads sequenced with r9.4 chemistry.
+UNCALLED currently only supports reads sequenced with r9.4.1/r9.4 chemistry.
 
 ## Release notes
 
