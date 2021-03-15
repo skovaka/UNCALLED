@@ -51,6 +51,7 @@
 //rematch "params" python module
 #define INDEX_SUFF ".uncl"
 
+
 class Mapper {
     public:
 
@@ -140,6 +141,26 @@ class Mapper {
     static std::array<u32,EVENT_TYPES.size()> EVENT_ADDS;
     static u32 PATH_MASK, PATH_TAIL_MOVE;
 
+    //std::vector<bool> Mapper::unpack_moves(u64 moves, u8 length);
+
+
+    using moves_t = u32;
+    using moves_u8_t = std::array<u8,4>;
+    static constexpr u8 U8_BITS = 8;
+
+	static std::vector<bool> unpack_moves(u64 moves, u8 length);
+
+    //static moves_u8_t moves_to_u8(moves_t moves) {
+    //    moves_u8_t ret{0};
+    //    for (size_t i = 0; i < ret.size(); i++) {
+    //        for (size_t j = 0; j < U8_BITS; j++) {
+    //            size_t k = U8_BITS * i + j;
+    //            ret[i] |= ((moves >> k) & 1);
+    //        }
+    //    }
+    //    return ret;
+    //}
+
     class PathBuffer {
         public:
 
@@ -178,9 +199,9 @@ class Mapper {
 
         //u8 stay_count_, move_count_;
         //u8 path_type_counts_[EVENT_TYPES.size()];
-        u32 event_moves_;
+        moves_t event_moves_;
 
-        u16 total_move_len_;
+        u16 total_moves_;
 
         u16 kmer_;
 
@@ -286,19 +307,28 @@ class Mapper {
     //using DbgSeed = std::tuple<std::string, u64, u64, bool, u32, u32, u32>;
 
     struct DbgSeed {
-        u32 Chromosome;
-        u64 Start, End;
+        i32 Chromosome;
+        i64 Start, End;
         bool Fwd;
         u32 Event, Path, Cluster;
     };
 
+    struct DbgPath {
+        u32 event, id, parent_event, parent_id;
+        u64 fm_start, fm_end;
+        u16 kmer;
+        u32 length, total_moves;
+        float match_prob, seed_prob;
+        moves_t moves_pac;
+    };
+
     //stores , fm_start, fm_len, kmer, full_len, match_prob, seed_prob, moves
-    using DbgPath = std::tuple<
-        u32,u32,u32,u32,  //event, id, parent_evt, parent_id
-        u64,u32,u16,u32,  //fm_start, fm_len, kmer, full_len
-        float,float,      //match_prob, seed_prob
-        std::vector<bool> //moves
-    >;
+    //using DbgPath = std::tuple<
+    //    u32,u32,u32,u32,  //event, id, parent_evt, parent_id
+    //    u64,u32,u16,u32,  //fm_start, fm_len, kmer, full_len
+    //    float,float,      //match_prob, seed_prob
+    //    std::vector<bool> //moves
+    //>;
 
     void dbg_add_seed(
         const PathBuffer &path, 
@@ -313,7 +343,7 @@ class Mapper {
         std::vector<EvtProf> evt_profs;
         std::vector<float> proc_signal;
         std::vector<DbgSeed> seeds;
-        std::vector<PathBuffer> paths;
+        std::vector<DbgPath> paths;
         u32 conf_evt, conf_clust;
     };
     Debug dbg_;
@@ -343,15 +373,23 @@ class Mapper {
         PY_MAPPER_DBG(proc_signal)
         //PY_MAPPER_DBG(seeds)
         //PY_DBG_ARRAY(DbgSeed, seeds);
+        
         dbg.def_property_readonly("seeds", [](Mapper::Debug &d) -> pybind11::array_t<DbgSeed> {
              return pybind11::array_t<DbgSeed>(d.seeds.size(), d.seeds.data());
         });
+        dbg.def_property_readonly("paths", [](Mapper::Debug &d) -> pybind11::array_t<DbgPath> {
+             return pybind11::array_t<DbgPath>(d.paths.size(), d.paths.data());
+        });
 
-        PY_MAPPER_DBG(paths)
         PY_MAPPER_DBG(conf_evt)
         PY_MAPPER_DBG(conf_clust)
 
+        //map.def_static("moves_to_u8", Mapper::moves_to_u8);
+        map.def_static("unpack_moves", Mapper::unpack_moves);
+
         PYBIND11_NUMPY_DTYPE(DbgSeed, Chromosome, Start, End, Fwd, Event, Path, Cluster);
+        PYBIND11_NUMPY_DTYPE(DbgPath, event, id, parent_event, parent_id, fm_start, fm_end, kmer, length, total_moves, match_prob, seed_prob, moves_pac);
+
         #endif
 
         //event, id, parent_evt, parent_id
@@ -363,7 +401,7 @@ class Mapper {
         path.def_readonly("id", &Mapper::PathBuffer::id_);
         path.def_readonly("parent", &Mapper::PathBuffer::parent_);
         path.def_readonly("kmer", &Mapper::PathBuffer::kmer_);
-        path.def_readonly("total_move_len", &Mapper::PathBuffer::total_move_len_);
+        path.def_readonly("total_moves", &Mapper::PathBuffer::total_moves_);
         path.def_readonly("seed_prob", &Mapper::PathBuffer::seed_prob_);
         path.def_property_readonly("match_prob", &Mapper::PathBuffer::prob_head);
         path.def_property_readonly("moves", &Mapper::PathBuffer::get_moves);

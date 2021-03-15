@@ -13,8 +13,18 @@
 namespace py = pybind11;
 using namespace pybind11::literals;
 
+std::vector<bool> unpack_moves(u64 moves, u8 length) {
+    std::vector<bool> ret(length);
+    for (u32 i = 0; i < length; i++) {
+        ret[i] = (moves >> i) & 1;
+    }
+    return ret;
+}
+
 PYBIND11_MODULE(_uncalled, m) {
     m.doc() = R"pbdoc(UNCALLED: a Utility for Nanopore Current ALignment to Large Expanses of DNA)pbdoc";
+
+
 
     py::class_<Conf> conf(m, "Conf");
     Conf::pybind_defs(conf);
@@ -83,6 +93,8 @@ PYBIND11_MODULE(_uncalled, m) {
     m.def("kmer_to_str",   &kmer_to_str<KLEN>);
     m.def("seq_to_kmers",  &seq_to_kmers<KLEN>);
     m.def("kmer_neighbor", &kmer_neighbor<KLEN>);
+
+    m.def("unpack_moves", &unpack_moves);
 
     //py::class_<DTW> dtw(m, "DTW");
     //DTW::pybind_defs(dtw);

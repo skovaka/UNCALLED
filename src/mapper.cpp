@@ -193,6 +193,7 @@ void Mapper::deactivate() {
     reset_ = false;
 }
 
+
 Paf Mapper::map_read() {
     if (out_.is_mapped()) return out_;
 
@@ -486,7 +487,7 @@ bool Mapper::map_next() {
 
         evpr_thresh = get_prob_thresh(prev_range.length());
 
-        //evpr_thresh = PRMS.get_path_thresh(prev_path.total_move_len_);
+        //evpr_thresh = PRMS.get_path_thresh(prev_path.total_moves_);
 
         if (prev_path.consec_stays_ < PRMS.max_consec_stay && 
             kmer_probs_[prev_kmer] >= evpr_thresh) {
@@ -660,13 +661,40 @@ bool Mapper::map_next() {
         }
     }
 
-    #ifdef PYDEBUG
-    dbg_.paths.insert(dbg_.paths.end(), next_paths_.begin(), next_path);
-    #endif
+    //#ifdef PYDEBUG
+    //dbg_.paths.insert(dbg_.paths.end(), next_paths_.begin(), next_path);
+    //#endif
 
     prev_size_ = next_path - next_paths_.begin();
     prev_paths_.swap(next_paths_);
 
+    #ifdef PYDEBUG
+    for (u32 i = 0; i < prev_size_; i++) {
+        auto &p = prev_paths_[i];
+		u32 p_id, p_evt;
+        if (p.parent_ < PRMS.max_paths) {
+			p_id = p.parent_;
+            p_evt = evt_prof_.mask_idx_map_[event_i_-1];
+        } else {
+			p_id = p.id_;
+            p_evt = evt_prof_.mask_idx_map_[event_i_];
+        }
+        dbg_.paths.push_back({
+            event        : evt_prof_.mask_idx_map_[event_i_],
+            id           : p.id_,
+            parent_event : p_evt,
+            parent_id    : p_id,
+            fm_start     : p.fm_range_.start_,
+            fm_end       : p.fm_range_.end_,
+            kmer         : p.kmer_,
+            length       : p.length_,
+            total_moves  : p.total_moves_,
+            match_prob   : p.prob_head(),
+            seed_prob    : p.seed_prob_,
+            moves_pac    : p.event_moves_
+        });
+    }
+    #endif
 
     dbg_paths_out();
 
@@ -721,13 +749,13 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         auto evt = evt_prof_.mask_idx_map_[event_i_-path_ended];
 
         dbg_.seeds.push_back({
-                loc.ref_id, 
-                loc.start, 
-                loc.end, 
-                loc.fwd,
-                evt, 
-                path.id_, 
-                clust.id_
+            Chromosome : loc.ref_id, 
+            Start      : static_cast<i64>(loc.start), 
+            End        : static_cast<i64>(loc.end), 
+            Fwd        : loc.fwd,
+            Event      : evt, 
+            Path       : path.id_, 
+            Cluster    : clust.id_
         });
         #endif
 
@@ -767,6 +795,14 @@ void Mapper::set_ref_loc(const SeedCluster &seeds) {
     out_.set_mapped(rd_st, rd_en, loc.ref_name, loc.start, loc.end, loc.ref_len, loc.fwd, match_count);
 }
 
+std::vector<bool> Mapper::unpack_moves(u64 moves, u8 length) {
+    std::vector<bool> ret(length);
+    for (u32 i = 0; i < length; i++) {
+        ret[i] = (moves >> i) & 1;
+    }
+    return ret;
+}
+
 #ifdef PYDEBUG
 u32 Mapper::PathBuffer::count_ = 0;
 #endif
@@ -800,7 +836,7 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
 
     //path_type_counts_[EVENT_MOVE] = 1;
     //path_type_counts_[EVENT_STAY] = 0;
-    total_move_len_ = 1;
+    total_moves_ = 1;
 
     //TODO: don't write this here to speed up source loop
     prob_sums_[0] = 0;
@@ -827,7 +863,7 @@ void Mapper::PathBuffer::make_child(PathBuffer &p,
     event_moves_ = ((p.event_moves_ << 1) | move) & PATH_MASK;
     consec_stays_ = (p.consec_stays_ + stay) * stay;
 
-    total_move_len_ = p.total_move_len_ + move;
+    total_moves_ = p.total_moves_ + move;
 
     if (p.length_ == PRMS.seed_len) {
         std::memcpy(prob_sums_, &(p.prob_sums_[1]), PRMS.seed_len * sizeof(float));
@@ -1108,7 +1144,7 @@ void Mapper::dbg_paths_out() {
         }
 
         paths_out_ 
-            << p.total_move_len_ << "\t"
+            << p.total_moves_ << "\t"
             << p.prob_head() << "\t"
             << p.seed_prob_ << "\t";
 

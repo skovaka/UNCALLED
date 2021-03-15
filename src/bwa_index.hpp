@@ -86,7 +86,7 @@ class SubSeq {
 #define BWA_BLOCK_SIZE 10000000
 
 struct RefLoc {
-    u32 ref_id;
+    i32 ref_id;
     std::string ref_name;
     u64 ref_len, start, end;
     bool fwd;
@@ -188,16 +188,25 @@ class BwaIndex {
         return index_->seq_len;
     }
 
-    u32 get_rid(u64 sa_loc) const {
-        return static_cast<u32>(bns_pos2rid(bns_, sa_loc));
+    i32 get_ref_id(const std::string &ref_name) {
+        for (int i = 0; i < bns_->n_seqs; i++) {
+            if (strcmp(bns_->anns[i].name, ref_name.c_str()) == 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    i32 get_ref_id(u64 sa_loc) {
+        return bns_pos2rid(bns_, sa_loc);
     }
 
     std::string get_ref_name(u32 rid) const {
         return bns_->anns[rid].name;
     }
 
-    std::pair<u32, u32> get_ref_coord(u64 sa_loc) {
-        auto rid = get_rid(sa_loc);
+    std::pair<u32, i32> get_ref_coord(u64 sa_loc) {
+        auto rid = get_ref_id(sa_loc);
         return {
             rid, 
             sa_loc - bns_->anns[rid].offset
@@ -232,7 +241,7 @@ class BwaIndex {
         //assert(rid >= 0);
 
         RefLoc ret {
-            ref_id   : static_cast<u32>(rid),
+            ref_id   : rid,
             ref_name : std::string(bns_->anns[rid].name),
             ref_len  : static_cast<u64>(bns_->anns[rid].len),
             start    : pac_st - bns_->anns[rid].offset,
@@ -277,7 +286,7 @@ class BwaIndex {
         return pacseq_ != NULL;
     }
 
-    std::vector<u16> get_kmers(std::string nm, u64 st, u64 en) {
+    std::vector<u16> get_kmers(const std::string &nm, u64 st, u64 en) {
         u64 sti = coord_to_pacseq(nm, st),
             eni = coord_to_pacseq(nm, en);
         return get_kmers(sti, eni);
@@ -388,14 +397,15 @@ class BwaIndex {
         PY_BWA_INDEX_METH(coord_to_pacseq);
         PY_BWA_INDEX_METH(pacseq_loaded);
         PY_BWA_INDEX_METH(get_base);
-        PY_BWA_INDEX_METH(get_rid);
         PY_BWA_INDEX_METH(get_sa_loc);
         PY_BWA_INDEX_METH(get_ref_coord);
         PY_BWA_INDEX_METH(get_ref_name);
         PY_BWA_INDEX_METH(get_ref_len);
         PY_BWA_INDEX_METH(range_to_fms);
+        c.def("get_ref_id", static_cast< i32 (BwaIndex::*)(u64)> (&BwaIndex::get_ref_id) );
+        c.def("get_ref_id", static_cast< i32 (BwaIndex::*)(const std::string &)> (&BwaIndex::get_ref_id) );
         c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(u64, u64)> (&BwaIndex::get_kmers) );
-        c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(std::string, u64, u64)> (&BwaIndex::get_kmers) );
+        c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(const std::string &, u64, u64)> (&BwaIndex::get_kmers) );
     }
 
     #endif
