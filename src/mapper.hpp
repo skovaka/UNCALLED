@@ -307,10 +307,10 @@ class Mapper {
     //using DbgSeed = std::tuple<std::string, u64, u64, bool, u32, u32, u32>;
 
     struct DbgSeed {
-        i32 Chromosome;
-        i64 Start, End;
-        bool Fwd;
-        u32 Event, Path, Cluster;
+        i32 ref_id;
+        i64 start, end;
+        bool fwd;
+        u32 event, path, cluster;
     };
 
     struct DbgPath {
@@ -321,14 +321,6 @@ class Mapper {
         float match_prob, seed_prob;
         moves_t moves_pac;
     };
-
-    //stores , fm_start, fm_len, kmer, full_len, match_prob, seed_prob, moves
-    //using DbgPath = std::tuple<
-    //    u32,u32,u32,u32,  //event, id, parent_evt, parent_id
-    //    u64,u32,u16,u32,  //fm_start, fm_len, kmer, full_len
-    //    float,float,      //match_prob, seed_prob
-    //    std::vector<bool> //moves
-    //>;
 
     void dbg_add_seed(
         const PathBuffer &path, 
@@ -387,7 +379,7 @@ class Mapper {
         //map.def_static("moves_to_u8", Mapper::moves_to_u8);
         map.def_static("unpack_moves", Mapper::unpack_moves);
 
-        PYBIND11_NUMPY_DTYPE(DbgSeed, Chromosome, Start, End, Fwd, Event, Path, Cluster);
+        PYBIND11_NUMPY_DTYPE(DbgSeed, ref_id, start, end, fwd, event, path, cluster);
         PYBIND11_NUMPY_DTYPE(DbgPath, event, id, parent_event, parent_id, fm_start, fm_end, kmer, length, total_moves, match_prob, seed_prob, moves_pac);
 
         #endif

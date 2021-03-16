@@ -47,6 +47,7 @@ class DTWp {
         rvals_(row_vals),
         cvals_(col_vals) {
 
+
         mat_.resize(rvals_.size() * cvals_.size());
         bcrumbs_.resize(mat_.size());
 

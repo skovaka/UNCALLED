@@ -749,13 +749,13 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         auto evt = evt_prof_.mask_idx_map_[event_i_-path_ended];
 
         dbg_.seeds.push_back({
-            Chromosome : loc.ref_id, 
-            Start      : static_cast<i64>(loc.start), 
-            End        : static_cast<i64>(loc.end), 
-            Fwd        : loc.fwd,
-            Event      : evt, 
-            Path       : path.id_, 
-            Cluster    : clust.id_
+            ref_id  : loc.ref_id, 
+            start   : static_cast<i64>(loc.start), 
+            end     : static_cast<i64>(loc.end), 
+            fwd     : loc.fwd,
+            event   : evt, 
+            path    : path.id_, 
+            cluster : clust.id_
         });
         #endif
 
