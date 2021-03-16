@@ -680,18 +680,17 @@ bool Mapper::map_next() {
             p_evt = evt_prof_.mask_idx_map_[event_i_];
         }
         dbg_.paths.push_back({
-            event        : evt_prof_.mask_idx_map_[event_i_],
-            id           : p.id_,
-            parent_event : p_evt,
-            parent_id    : p_id,
-            fm_start     : p.fm_range_.start_,
-            fm_end       : p.fm_range_.end_,
-            kmer         : p.kmer_,
-            length       : p.length_,
-            total_moves  : p.total_moves_,
-            match_prob   : p.prob_head(),
-            seed_prob    : p.seed_prob_,
-            moves_pac    : p.event_moves_
+            event       : event_i_,
+            id          : p.id_,
+            parent      : p.parent_ < PRMS.max_paths ? p.parent_ : p.id_,
+            fm_start    : p.fm_range_.start_,
+            fm_length   : p.fm_range_.length(),
+            kmer        : p.kmer_,
+            length      : p.length_,
+            total_moves : p.total_moves_,
+            match_prob  : p.prob_head(),
+            seed_prob   : p.seed_prob_,
+            moves_pac   : p.event_moves_
         });
     }
     #endif
@@ -746,14 +745,13 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         u64 sa_start = sa_end - ref_len;// + 1;
 
         auto loc = fmi.translate_loc(sa_start, sa_start+ref_len, read_.PRMS.seq_fwd);
-        auto evt = evt_prof_.mask_idx_map_[event_i_-path_ended];
 
         dbg_.seeds.push_back({
             ref_id  : loc.ref_id, 
             start   : static_cast<i64>(loc.start), 
             end     : static_cast<i64>(loc.end), 
             fwd     : loc.fwd,
-            event   : evt, 
+            event   : event_i_-path_ended, 
             path    : path.id_, 
             cluster : clust.id_
         });

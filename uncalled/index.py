@@ -52,7 +52,7 @@ class IndexParameterizer:
     MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_threshs.txt")
 
     def __init__(self, args):
-        self.out_fname = args.bwa_prefix + UNCL_SUFF
+        self.out_fname = args.conf.bwa_prefix + UNCL_SUFF
 
         self.pck1 = args.matchpr1
         self.pck2 = args.matchpr2
@@ -64,7 +64,7 @@ class IndexParameterizer:
 
     def calc_map_stats(self, args):
 
-        ann_in = open(args.bwa_prefix + ANN_SUFF)
+        ann_in = open(args.conf.bwa_prefix + ANN_SUFF)
         header = ann_in.readline()
         ref_len = int(header.split()[0])
         ann_in.close()
@@ -77,7 +77,7 @@ class IndexParameterizer:
         else:
             sample_dist = args.max_sample_dist
 
-        fmlens = unc.self_align(args.bwa_prefix, sample_dist)
+        fmlens = unc.self_align(args.conf.bwa_prefix, sample_dist)
         path_kfmlens = [p[args.kmer_len-1:] if len(p) >= args.kmer_len else [1] for p in fmlens]
 
         max_pathlen = 0

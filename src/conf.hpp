@@ -184,8 +184,8 @@ class Conf {
 
             GET_TOML_EXTERN(u32, max_buffer, fast5_reader);
             GET_TOML_EXTERN(u32, max_reads, fast5_reader);
-            GET_TOML_EXTERN(std::string, fast5_list, fast5_reader);
-            GET_TOML_EXTERN(std::string, read_list, fast5_reader);
+            GET_TOML_EXTERN(std::vector<std::string>, fast5_list, fast5_reader);
+            GET_TOML_EXTERN(std::vector<std::string>, read_filter, fast5_reader);
             GET_TOML_EXTERN(bool, load_bc,  fast5_reader)
         }
 
@@ -274,8 +274,8 @@ class Conf {
         void set_##N(const T &v) { C##_prms.N = v; } \
         static const char * doc_##N() { return C##_docs.N; }
 
-    GET_SET_EXTERN(std::string, fast5_reader, fast5_list)
-    GET_SET_EXTERN(std::string, fast5_reader, read_list)
+    GET_SET_EXTERN(std::vector<std::string>, fast5_reader, fast5_list)
+    GET_SET_EXTERN(std::vector<std::string>, fast5_reader, read_filter)
     GET_SET_EXTERN(u32, fast5_reader, max_reads)
     GET_SET_EXTERN(u32, fast5_reader, max_buffer)
 
@@ -377,7 +377,7 @@ class Conf {
         #endif
 
         DEFPRP(fast5_list)//_DOC
-        DEFPRP(read_list) //_DOC
+        DEFPRP(read_filter) //_DOC
         DEFPRP(max_reads) //_DOC
         DEFPRP(max_buffer)//_DOC
 

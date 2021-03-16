@@ -39,8 +39,8 @@ class Fast5Reader {
     public:
 
     typedef struct {
-        std::string fast5_list;
-        std::string read_list;
+        std::vector<std::string> fast5_list;
+        std::vector<std::string> read_filter;
         u32 max_reads, max_buffer;
         bool load_bc;
     } Params;
@@ -53,18 +53,18 @@ class Fast5Reader {
 
     //static constexpr std::array<ParamMeta,4> PARAM_META {{
     //    {"fast5_list", "File containing a list of paths to fast5 files, one per line.", (void*)(&Params::fast5_list)},
-    //    {"read_list", "File containing a list of read IDs. Only these reads will be loaded if specified.", (void*)(&Params::read_list>)},
+    //    {"read_filter", "File containing a list of read IDs. Only these reads will be loaded if specified.", (void*)(&Params::read_filter>)},
     //    {"max_reads", "Maximum number of reads to load", (void*)(&Params::max_reads>)},
     //    {"max_buffer", "Maximum number of reads to store in memory", (void*)(&Params::max_buffer)}
     //}};
 
     typedef struct {
-        const char *fast5_list, *read_list, *max_reads, *max_buffer;
+        const char *fast5_list, *read_filter, *max_reads, *max_buffer;
     } Docstrs;
     static constexpr Docstrs DOCSTRS = {
         fast5_list : 
             "File containing a list of paths to fast5 files, one per line.",
-        read_list : 
+        read_filter : 
             "File containing a list of read IDs. Only these reads will be loaded if specified.",
         max_reads : 
             "Maximum number of reads to load.",
@@ -79,10 +79,8 @@ class Fast5Reader {
     Fast5Reader(const Params &p);
     Fast5Reader(const std::vector<std::string> &fast5s, const std::vector<std::string> &reads = {}, const Params &p=PRMS_DEF);
 
-    Fast5Reader(u32 max_reads, u32 max_buffer=100);
     Fast5Reader(const std::string &fast5_list, 
-                const std::string &read_list="",
-                u32 max_reads=0, u32 max_buffer=100);
+                const std::string &read_filter="");
 
 
     static constexpr const char *_DOC_add_fast5 {
@@ -93,7 +91,7 @@ class Fast5Reader {
 
     bool add_read(const std::string &read_id);
 
-    bool load_read_list(const std::string &fname);
+    bool load_read_filter(const std::string &fname);
 
     Fast5Read pop_read();
  
@@ -155,7 +153,7 @@ class Fast5Reader {
         PY_FAST5_READER_METH(add_fast5, "Adds a fast5 filename to the list of files to load. Should be called before popping any reads");
         PY_FAST5_READER_METH(load_fast5_list, "Loads a list of fast5 filenames from a text file containing one path per line");
         PY_FAST5_READER_METH(add_read, "Adds a read ID to the read filter");
-        PY_FAST5_READER_METH(load_read_list, "Loads a list of read IDs from a text file to add to the read filter");
+        PY_FAST5_READER_METH(load_read_filter, "Loads a list of read IDs from a text file to add to the read filter");
         PY_FAST5_READER_METH(pop_read, "");
         PY_FAST5_READER_METH(buffer_size, "");
         PY_FAST5_READER_METH(fill_buffer, "");
@@ -167,7 +165,7 @@ class Fast5Reader {
 
         //DPRM(p, "fast5_list", &Fast5Reader::Params::fast5_list);
         PY_FAST5_READER_PRM(fast5_list);
-        PY_FAST5_READER_PRM(read_list);
+        PY_FAST5_READER_PRM(read_filter);
         PY_FAST5_READER_PRM(max_reads);
         PY_FAST5_READER_PRM(max_buffer);
         PY_FAST5_READER_PRM(load_bc);

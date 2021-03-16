@@ -314,8 +314,8 @@ class Mapper {
     };
 
     struct DbgPath {
-        u32 event, id, parent_event, parent_id;
-        u64 fm_start, fm_end;
+        u32 event, id, parent;
+        u64 fm_start, fm_length;
         u16 kmer;
         u32 length, total_moves;
         float match_prob, seed_prob;
@@ -376,11 +376,11 @@ class Mapper {
         PY_MAPPER_DBG(conf_evt)
         PY_MAPPER_DBG(conf_clust)
 
+        PYBIND11_NUMPY_DTYPE(DbgPath, event, id, parent, fm_start, fm_length, kmer, length, total_moves, match_prob, seed_prob, moves_pac);
+        PYBIND11_NUMPY_DTYPE(DbgSeed, ref_id, start, end, fwd, event, path, cluster);
         //map.def_static("moves_to_u8", Mapper::moves_to_u8);
         map.def_static("unpack_moves", Mapper::unpack_moves);
 
-        PYBIND11_NUMPY_DTYPE(DbgSeed, ref_id, start, end, fwd, event, path, cluster);
-        PYBIND11_NUMPY_DTYPE(DbgPath, event, id, parent_event, parent_id, fm_start, fm_end, kmer, length, total_moves, match_prob, seed_prob, moves_pac);
 
         #endif
 

@@ -27,8 +27,8 @@
 
 
 const typename Fast5Reader::Params Fast5Reader::PRMS_DEF = {
-    fast5_list : "",
-    read_list  : "",
+    fast5_list : {},
+    read_filter  : {},
     max_reads  : 0,
     max_buffer : 100,
     load_bc    : false
@@ -49,24 +49,27 @@ Fast5Reader::Fast5Reader() :
 Fast5Reader::Fast5Reader(const Params &p) : PRMS(p) {
     total_buffered_ = 0;
 
-    if (!PRMS.read_list.empty()) load_read_list(PRMS.read_list);
-    if (!PRMS.fast5_list.empty()) load_fast5_list(PRMS.fast5_list);
+    for (auto &fname : p.fast5_list) {
+        add_fast5(fname);
+    }
+    for (auto &id : p.read_filter) {
+        add_read(id);
+    }
 }
 
 Fast5Reader::Fast5Reader(const std::string &fast5_list, 
-                         const std::string &read_list,
-                         u32 max_reads, u32 max_buffer) 
-    : PRMS({fast5_list, 
-            read_list, 
-            max_reads, 
-            max_buffer}) {
+                         const std::string &read_filter)
+    : Fast5Reader() {
 
     total_buffered_ = 0;
-    if (!PRMS.fast5_list.empty()) load_fast5_list(PRMS.fast5_list);
-    if (!PRMS.read_list.empty()) load_read_list(PRMS.read_list);
+    if (!PRMS.fast5_list.empty()) load_fast5_list(fast5_list);
+    if (!PRMS.read_filter.empty()) load_read_filter(read_filter);
 }
 
-Fast5Reader::Fast5Reader(const std::vector<std::string> &fast5s, const std::vector<std::string> &reads, const Params &p) : Fast5Reader(p) {
+Fast5Reader::Fast5Reader(
+        const std::vector<std::string> &fast5s, 
+        const std::vector<std::string> &reads, 
+        const Params &p) : Fast5Reader(p) {
     for (auto &fname : fast5s) {
         add_fast5(fname);
     }
@@ -74,9 +77,6 @@ Fast5Reader::Fast5Reader(const std::vector<std::string> &fast5s, const std::vect
         add_read(id);
     }
 }
-
-Fast5Reader::Fast5Reader(u32 max_reads, u32 max_buffer) 
-    : Fast5Reader("","",max_reads,max_buffer) {}
 
 void Fast5Reader::add_fast5(const std::string &fast5_path) {
     fast5_list_.push_back(fast5_path);
@@ -108,7 +108,7 @@ bool Fast5Reader::add_read(const std::string &read_id) {
     return true;
 }
 
-bool Fast5Reader::load_read_list(const std::string &fname) {
+bool Fast5Reader::load_read_filter(const std::string &fname) {
     std::ifstream read_file(fname);
 
     if (!read_file.is_open()) {
@@ -140,6 +140,7 @@ bool Fast5Reader::open_next() {
 
     open_fast5_.open(fast5_list_.front());
     fast5_list_.pop_front();
+
 
     open_fmt_ = Format::UNKNOWN;
     for (const std::string &s : open_fast5_.list_group("/")) {
@@ -207,9 +208,12 @@ u32 Fast5Reader::fill_buffer() {
         }
 
         while (read_paths_.empty()) {
-            if(!open_next()) break;
+            if(!open_next()) { 
+                break;
+            }
         }
         if (read_paths_.empty()) break;
+
 
         std::string raw_path, ch_path, anl_path;
 
@@ -254,6 +258,7 @@ Fast5Read Fast5Reader::pop_read() {
     if (buffer_size() == 0) { 
         fill_buffer();
     }
+
     //TODO: swap to speed up?
     auto r = buffered_reads_.front();
     buffered_reads_.pop_front();

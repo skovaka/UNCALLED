@@ -273,6 +273,10 @@ class PoreModel {
         }
     }
 
+    u32 get_kmer_count() const {
+        return kmer_count_;
+    }
+
     //void calc_roc_diff(std::vector<u16> kmers, std::vector<float> means, std::vector<float> threshs) {
     //    calc_roc(kmers, means, threshs, &PoreModel<KLEN>::match_diff);
     //}
@@ -290,6 +294,7 @@ class PoreModel {
         PY_PORE_MODEL_METH(get_mean);
         PY_PORE_MODEL_METH(get_stdv);
         PY_PORE_MODEL_METH(calc_roc);
+        c.def_property_readonly("kmer_count", &PoreModel::get_kmer_count);
     }
 
     #endif
