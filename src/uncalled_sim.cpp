@@ -150,7 +150,13 @@ bool load_conf(int argc, char** argv, Conf &conf) {
     int i = optind;
 
     POSITIONAL_TO_CONF(std::string, mapper.bwa_prefix)
-    POSITIONAL_TO_CONF(std::string, fast5_reader.fast5_list)
+    if (i < argc) { 
+        conf.fast5_reader.load_fast5_list(std::string(argv[i])); 
+        i++; 
+    } else { 
+        std::cerr << "Error: must specify fast5_list\n"; \
+        abort(); 
+    } 
 
     return true;
 }

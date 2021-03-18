@@ -67,7 +67,11 @@ bool load_conf(int argc, char** argv, Conf &conf) {
 
             FLAG_TO_CONF('t', atoi, threads)
             FLAG_TO_CONF('n', atoi, fast5_reader.max_reads)
-            FLAG_TO_CONF('l', std::string, fast5_reader.read_list)
+            //FLAG_TO_CONF('l', std::string, fast5_reader.read_filter)
+
+            case 'l':
+            conf.fast5_reader.load_read_filter(std::string(optarg));
+            break;
 
             #ifdef DEBUG_OUT
             FLAG_TO_CONF('D', std::string, mapper.dbg_prefix);
@@ -88,7 +92,13 @@ bool load_conf(int argc, char** argv, Conf &conf) {
     int i = optind;
 
     POSITIONAL_TO_CONF(std::string, mapper.bwa_prefix)
-    POSITIONAL_TO_CONF(std::string, fast5_reader.fast5_list)
+    if (i < argc) { 
+        conf.fast5_reader.load_fast5_list(std::string(argv[i])); 
+        i++; 
+    } else { 
+        std::cerr << "Error: must specify fast5_list\n"; \
+        abort(); 
+    } 
 
     return true;
 }

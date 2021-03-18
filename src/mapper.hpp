@@ -365,54 +365,28 @@ class Mapper {
         PY_MAPPER_DBG(proc_signal)
         //PY_MAPPER_DBG(seeds)
         //PY_DBG_ARRAY(DbgSeed, seeds);
+
+        PY_MAPPER_DBG(conf_evt)
+        PY_MAPPER_DBG(conf_clust)
         
         dbg.def_property_readonly("seeds", [](Mapper::Debug &d) -> pybind11::array_t<DbgSeed> {
              return pybind11::array_t<DbgSeed>(d.seeds.size(), d.seeds.data());
         });
+
         dbg.def_property_readonly("paths", [](Mapper::Debug &d) -> pybind11::array_t<DbgPath> {
              return pybind11::array_t<DbgPath>(d.paths.size(), d.paths.data());
         });
 
-        PY_MAPPER_DBG(conf_evt)
-        PY_MAPPER_DBG(conf_clust)
-
-        PYBIND11_NUMPY_DTYPE(DbgPath, event, id, parent, fm_start, fm_length, kmer, length, total_moves, match_prob, seed_prob, moves_pac);
         PYBIND11_NUMPY_DTYPE(DbgSeed, ref_id, start, end, fwd, event, path, cluster);
+        PYBIND11_NUMPY_DTYPE(DbgPath, event, id, parent, fm_start, fm_length, kmer, 
+                             length, total_moves, match_prob, seed_prob, moves_pac);
+
+
         //map.def_static("moves_to_u8", Mapper::moves_to_u8);
         map.def_static("unpack_moves", Mapper::unpack_moves);
 
 
         #endif
-
-        //event, id, parent_evt, parent_id
-        //fm_start, fm_len, kmer, full_len
-        //match_prob, seed_prob
-        //moves
-        pybind11::class_<PathBuffer> path(map, "PathBuffer");
-        path.def_readonly("event", &Mapper::PathBuffer::evt_);
-        path.def_readonly("id", &Mapper::PathBuffer::id_);
-        path.def_readonly("parent", &Mapper::PathBuffer::parent_);
-        path.def_readonly("kmer", &Mapper::PathBuffer::kmer_);
-        path.def_readonly("total_moves", &Mapper::PathBuffer::total_moves_);
-        path.def_readonly("seed_prob", &Mapper::PathBuffer::seed_prob_);
-        path.def_property_readonly("match_prob", &Mapper::PathBuffer::prob_head);
-        path.def_property_readonly("moves", &Mapper::PathBuffer::get_moves);
-        path.def_property_readonly("fm_start", 
-                [](Mapper::PathBuffer &p) -> u64 {return p.fm_range_.start_;}
-        );
-        path.def_property_readonly("fm_end", 
-                [](Mapper::PathBuffer &p) -> u64 {return p.fm_range_.end_;}
-        );
-
-        //path.def_readonly("fm_len", &Mapper::PathBuffer::parent_);
-
-        //PY_MAP_METH(add_read, "Adds a read ID to the read filter");
-        //PY_MAP_METH(load_read_list, "Loads a list of read IDs from a text file to add to the read filter");
-        //PY_MAP_METH(pop_read, "");
-        //PY_MAP_METH(buffer_size, "");
-        //PY_MAP_METH(fill_buffer, "");
-        //PY_MAP_METH(all_buffered, "");
-        //PY_MAP_METH(empty, "");
 
         pybind11::class_<Params> prm(map, "Params");
         PY_MAPPER_PRM(seed_len)

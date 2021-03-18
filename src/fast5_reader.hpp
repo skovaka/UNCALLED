@@ -43,6 +43,32 @@ class Fast5Reader {
         std::vector<std::string> read_filter;
         u32 max_reads, max_buffer;
         bool load_bc;
+
+        bool load_fast5_list(const std::string &filename) {
+            std::ifstream list_file(filename);
+            if (!list_file.is_open()) {
+                std::cerr << "Error: failed to open fast5 list \"" << filename << "\".\n";
+                return false;
+            }
+            std::string fast5_name;
+            while (getline(list_file, fast5_name)) {
+                fast5_list.push_back(fast5_name);
+            }
+            return true;
+        }
+
+        bool load_read_filter(const std::string &filename) {
+            std::ifstream list_file(filename);
+            if (!list_file.is_open()) {
+                std::cerr << "Error: failed to open read filter \"" << filename << "\".\n";
+                return false;
+            }
+            std::string read_id;
+            while (getline(list_file, read_id)) {
+                read_filter.push_back(read_id);
+            }
+            return true;
+        }
     } Params;
     static Params const PRMS_DEF;
 

@@ -62,8 +62,6 @@ class ArgParser:
             description="Rapidly maps raw nanopore signal to DNA references"):
 
         self.conf = conf
-        print("CONF ", conf)
-
         self.parser = argparse.ArgumentParser(
                 description="Rapidly maps raw nanopore signal to DNA references", 
                 formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -324,6 +322,11 @@ class ArgParser:
         )
 
         #TODO move to different parser set
+        p.add_argument(
+                "-o", "--out-prefix",
+                type=str, default=None, required=False, 
+                help="Output prefix"
+        )
         p.add_argument(
                 "--mm2", 
                 type=str, default=None, required=False, 
