@@ -38,6 +38,10 @@ const DTWParams
 class DTWp {
     public:
 
+    struct Trace {
+        u64 qry, ref;
+    };
+
     DTWp(const std::vector<float> &col_vals,   
         const std::vector<u16> &row_vals,
         const PoreModel<DTW_KLEN> &model,
@@ -46,7 +50,6 @@ class DTWp {
         model_(model),
         rvals_(row_vals),
         cvals_(col_vals) {
-
 
         mat_.resize(rvals_.size() * cvals_.size());
         bcrumbs_.resize(mat_.size());
@@ -104,7 +107,7 @@ class DTWp {
 
         score_sum_ = mat_[i*cvals_.size() + j];
 
-        path_.push_back(std::pair<u64, u64>(j, i));
+        path_.push_back({j, i});
 
         u64 k = i*cvals_.size() + j;
         while(!(i == 0 || PRMS.subseq == DTWSubSeq::ROW) ||
@@ -122,11 +125,11 @@ class DTWp {
                 j--;
             }
 
-            path_.push_back(std::pair<u64, u64>(j, i));
+            path_.push_back({j, i});
         }
     }
 
-    std::vector< std::pair<u64, u64> > get_path() {
+    std::vector<Trace> get_path() {
         return path_;
     }
 
@@ -137,17 +140,6 @@ class DTWp {
     float mean_score() {
         return score_sum_ / path_.size();
     }
-
-    void print_path(std::ostream &out) {
-        for (auto p = path_.rbegin(); p != path_.rend(); p++) {
-            out << p->first << "\t"
-                << p->second << "\t"
-                << rvals_[p->first] << "\t"
-                << cvals_[p->second] << "\t"
-                << costfn(cvals_[p->second], rvals_[p->first]) << "\t"
-                << "\n";
-        }
-    } 
 
     protected:
     enum Move {D, H, V}; //Horizontal, vertical, diagonal
@@ -161,7 +153,7 @@ class DTWp {
 
     std::vector<float> mat_;
     std::vector<Move> bcrumbs_;
-    std::vector< std::pair<u64, u64> > path_;
+    std::vector<Trace> path_;
     float score_sum_;
 
     float costfn(float pA, u16 kmer) {
@@ -200,6 +192,10 @@ class DTWp {
         PY_DTW_P_METH(get_path)
         PY_DTW_P_METH(score)
         PY_DTW_P_METH(mean_score)
+        c.def_property_readonly("path", [](DTWp &d) -> pybind11::array_t<Trace> {
+             return pybind11::array_t<Trace>(d.path_.size(), d.path_.data());
+        });
+        PYBIND11_NUMPY_DTYPE(Trace, qry, ref);
     }
     #endif
 };
