@@ -47,7 +47,7 @@ Mapper::Params Mapper::PRMS {
     event_profiler  : EventProfiler::PRMS_DEF
 
     #ifdef DEBUG_OUT
-    , dbg_prefix : "dbg_"
+    , meta_prefix : "meta_"
     #endif
 };
 
@@ -98,7 +98,7 @@ Mapper::Mapper() :
 Mapper::Mapper(const Mapper &m) : Mapper() {}
 
 Mapper::~Mapper() {
-    dbg_close_all();
+    meta_close_all();
 
     for (u32 i = 0; i < next_paths_.size(); i++) {
         next_paths_[i].free_buffers();
@@ -218,7 +218,7 @@ void Mapper::new_read(ReadBuffer &r) {
     out_ = Paf(r.get_id(), r.get_channel(), r.get_start());
     
     reset();
-    dbg_open_all();
+    meta_open_all();
 }
 
 
@@ -240,14 +240,14 @@ void Mapper::reset() {
     map_time_ = 0;
     wait_time_ = 0;
 
-    dbg_close_all();
+    meta_close_all();
 
     #ifdef PYDEBUG
-    dbg_ = {};
+    meta_ = {};
     #endif
 
     #ifdef DEBUG_EVENTS
-    dbg_events_.clear();
+    meta_events_.clear();
     #endif
 
     #ifdef DEBUG_CONFIDENCE
@@ -320,7 +320,7 @@ u16 Mapper::process_chunk() {
         !chunk_mtx_.try_lock()) return 0; 
 
     if (read_.get_chunk_count() == 1) {
-        dbg_open_all();
+        meta_open_all();
         out_.set_float(Paf::Tag::QUEUE_TIME, map_timer_.lap());
     }
 
@@ -331,7 +331,7 @@ u16 Mapper::process_chunk() {
         if (evdt_.add_sample(read_[i])) {
 
             #ifdef PYDEBUG
-            dbg_.events.push_back(evdt_.get_event());
+            meta_.events.push_back(evdt_.get_event());
             #endif
 
             //Add event to profiler
@@ -340,13 +340,13 @@ u16 Mapper::process_chunk() {
 
             #ifdef PYDEBUG
             if (evt_prof_.is_full()) {
-                dbg_.evt_profs.push_back(evt_prof_.get_prof());
+                meta_.evt_profs.push_back(evt_prof_.get_prof());
             }
             #endif
             
             #ifdef DEBUG_EVENTS
             if (evt_prof_.is_full()) {
-                dbg_events_.emplace_back(evt_prof_.anno_event());
+                meta_events_.emplace_back(evt_prof_.anno_event());
             }
             #endif
 
@@ -371,7 +371,7 @@ u16 Mapper::process_chunk() {
         }
     }
 
-    dbg_events_out();
+    meta_events_out();
 
     read_.clear(); //TODO: this seems weird
 
@@ -458,7 +458,7 @@ bool Mapper::map_next() {
     float event = norm_.pop();
 
     #ifdef PYDEBUG
-    dbg_.proc_signal.push_back(event);
+    meta_.proc_signal.push_back(event);
     #endif
 
     //TODO: store kmer_probs_ in static array
@@ -662,7 +662,7 @@ bool Mapper::map_next() {
     }
 
     //#ifdef PYDEBUG
-    //dbg_.paths.insert(dbg_.paths.end(), next_paths_.begin(), next_path);
+    //meta_.paths.insert(meta_.paths.end(), next_paths_.begin(), next_path);
     //#endif
 
     prev_size_ = next_path - next_paths_.begin();
@@ -679,7 +679,7 @@ bool Mapper::map_next() {
 			p_id = p.id_;
             p_evt = evt_prof_.mask_idx_map_[event_i_];
         }
-        dbg_.paths.push_back({
+        meta_.paths.push_back({
             event       : event_i_,
             id          : p.id_,
             parent      : p.parent_ < PRMS.max_paths ? p.parent_ : p.id_,
@@ -695,16 +695,16 @@ bool Mapper::map_next() {
     }
     #endif
 
-    dbg_paths_out();
+    meta_paths_out();
 
     SeedCluster sc = seed_tracker_.get_final();
 
     if (sc.is_valid()) {
 
         #ifdef PYDEBUG
-        if (dbg_.conf_evt == 0) {
-            dbg_.conf_evt = event_i_;
-            dbg_.conf_clust = sc.id_;
+        if (meta_.conf_evt == 0) {
+            meta_.conf_evt = event_i_;
+            meta_.conf_clust = sc.id_;
         }
         #else
 
@@ -714,7 +714,7 @@ bool Mapper::map_next() {
         #endif
     }
 
-    //dbg_conf_out();
+    //meta_conf_out();
 
     //Update event index
     event_i_++;
@@ -746,7 +746,7 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
 
         auto loc = fmi.translate_loc(sa_start, sa_start+ref_len, read_.PRMS.seq_fwd);
 
-        dbg_.seeds.push_back({
+        meta_.seeds.push_back({
             ref_id  : loc.ref_id, 
             start   : static_cast<i64>(loc.start), 
             end     : static_cast<i64>(loc.end), 
@@ -758,7 +758,7 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         #endif
 
         #ifdef DEBUG_SEEDS
-        dbg_seeds_out(
+        meta_seeds_out(
             path, 
             clust.id_, 
             event_i_ - path_ended, 
@@ -952,16 +952,16 @@ bool operator< (const Mapper::PathBuffer &p1,
             p1.seed_prob_ < p2.seed_prob_);
 }
 
-void Mapper::dbg_open_all() {
+void Mapper::meta_open_all() {
     #ifdef DEBUG_OUT
-    if (!dbg_opened_) {
+    if (!meta_opened_) {
 
         #ifdef DEBUG_SEEDS
-        dbg_open(seeds_out_, "_seeds.bed");
+        meta_open(seeds_out_, "_seeds.bed");
         #endif
 
         #ifdef DEBUG_PATHS
-        dbg_open(paths_out_, "_paths.tsv");
+        meta_open(paths_out_, "_paths.tsv");
         paths_out_ 
             << "id\t"
             << "parent\t"
@@ -975,7 +975,7 @@ void Mapper::dbg_open_all() {
         #endif
 
         #ifdef DEBUG_EVENTS
-        dbg_open(events_out_, "_events.tsv");
+        meta_open(events_out_, "_events.tsv");
         events_out_ 
             << "start\t"
             << "length\t"
@@ -989,22 +989,22 @@ void Mapper::dbg_open_all() {
         #endif
 
         //#ifdef DEBUG_CONFIDENCE
-        //dbg_open(conf_out_, "_conf.tsv");
+        //meta_open(conf_out_, "_conf.tsv");
         //conf_out_ << "top_conf\t"
         //          << "mean_conf\n";
         //#endif
 
-        dbg_opened_ = true;
+        meta_opened_ = true;
     }
     #endif
 }
 
 #ifdef DEBUG_OUT
-void Mapper::dbg_open(std::ofstream &out, const std::string &suffix) {
+void Mapper::meta_open(std::ofstream &out, const std::string &suffix) {
     if (out.is_open()) {
         out.close();
     }
-    std::string fname = PRMS.dbg_prefix + read_.get_id() + suffix;
+    std::string fname = PRMS.meta_prefix + read_.get_id() + suffix;
     out.open(fname);
     if (!out.is_open()) {
         throw std::invalid_argument("failed to open \"" + fname + "\"\n");
@@ -1012,9 +1012,9 @@ void Mapper::dbg_open(std::ofstream &out, const std::string &suffix) {
 }
 #endif
 
-void Mapper::dbg_close_all() {
+void Mapper::meta_close_all() {
     #ifdef DEBUG_OUT
-    if (dbg_opened_) {
+    if (meta_opened_) {
         #ifdef DEBUG_SEEDS
         if (seeds_out_.is_open()) seeds_out_.close();
         #endif
@@ -1031,12 +1031,12 @@ void Mapper::dbg_close_all() {
         ///if (conf_out_.is_open()) conf_out_.close();
         ///#endif
 
-        dbg_opened_ = false;
+        meta_opened_ = false;
     }
     #endif
 }
 
-//void Mapper::dbg_conf_out() {
+//void Mapper::meta_conf_out() {
 //    #ifdef DEBUG_CONFIDENCE
 //    if (seed_tracker_.empty() || seed_tracker_.get_top_conf() == 0) return;
 //    conf_out_ << evt_prof_.mask_idx_map_[event_i_] << "\t"
@@ -1048,12 +1048,12 @@ void Mapper::dbg_close_all() {
 //    #endif
 //}
 
-void Mapper::dbg_events_out() {
+void Mapper::meta_events_out() {
     #ifdef DEBUG_EVENTS
-    while(!dbg_events_.empty()) {
-        auto e = dbg_events_.front();
-        //auto evt = std::get<0>(dbg_events_.front());
-        //auto mask = std::get<1>(dbg_events_.front());
+    while(!meta_events_.empty()) {
+        auto e = meta_events_.front();
+        //auto evt = std::get<0>(meta_events_.front());
+        //auto mask = std::get<1>(meta_events_.front());
         events_out_ 
             << e.evt.start << "\t"
             << e.evt.length << "\t"
@@ -1064,14 +1064,14 @@ void Mapper::dbg_events_out() {
             << e.win_mean << "\t"
             << e.win_stdv << "\t"
             << e.mask << "\n";
-        dbg_events_.pop_front();
+        meta_events_.pop_front();
     }
 
     events_out_.flush();
     #endif
 }
 
-void Mapper::dbg_seeds_out(
+void Mapper::meta_seeds_out(
         const PathBuffer &path, 
         u32 clust, 
         u32 evt_end,
@@ -1113,7 +1113,7 @@ void Mapper::dbg_seeds_out(
 
 }
 
-void Mapper::dbg_paths_out() {
+void Mapper::meta_paths_out() {
     #ifdef DEBUG_PATHS
     for (u32 i = 0; i < prev_size_; i++) {
         auto &p = prev_paths_[i];

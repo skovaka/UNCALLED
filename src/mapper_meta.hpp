@@ -52,88 +52,8 @@
 #define INDEX_SUFF ".uncl"
 
 
-class Mapper {
+class MapperMeta : public Mapper {
     public:
-
-    typedef struct {
-        //standard mapping
-        u32 seed_len;
-        u32 min_rep_len;
-        u32 max_rep_copy;
-        u32 max_paths;
-        u32 max_consec_stay;
-        u32 max_events;
-        float max_stay_frac;
-        float min_seed_prob;
-
-        //realtime only
-        u16 evt_batch_size;
-        float evt_timeout;
-        float chunk_timeout;
-
-        std::string bwa_prefix;
-        std::string idx_preset;
-        std::string pore_model;
-
-        SeedTracker::Params seed_tracker;
-        Normalizer::Params normalizer;
-        EventDetector::Params event_detector;
-        EventProfiler::Params event_profiler;
-
-        #ifdef DEBUG_OUT
-        std::string meta_prefix;
-        #endif
-    } Params;
-
-    static Params PRMS;
-
-    //TODO PRIVATIZE
-    static BwaIndex<KLEN> fmi;
-    static PoreModel<KLEN> model;
-    static std::vector<float> prob_threshes_;
-
-    static void load_static();
-    static inline u64 get_fm_bin(u64 fmlen);
-
-    enum class State { INACTIVE, MAPPING, SUCCESS, FAILURE };
-
-    Mapper();
-    Mapper(const Mapper &m);
-
-    ~Mapper();
-
-    float get_prob_thresh(u64 fmlen) const;
-    float get_source_prob() const;
-    u16 get_max_events() const;
-
-    void new_read(ReadBuffer &r);
-    void reset();
-    void set_failed();
-
-    Paf map_read();
-
-    void skip_events(u32 n);
-    bool add_chunk(ReadBuffer &chunk);
-
-    u32 event_to_bp(u32 evt_i, bool last=false) const;
-
-    u32 events_mapped() const {return event_i_;}
-
-    u16 process_chunk();
-    bool chunk_mapped();
-    bool map_chunk();
-    bool is_chunk_processed() const;
-    void request_reset();
-    void end_reset();
-    bool is_resetting();
-    State get_state() const;
-
-    u32 prev_unfinished(u32 next_number) const;
-
-    bool finished() const;
-    ReadBuffer &get_read();
-    Paf get_paf() const;
-    void deactivate();
 
     static const u8 EVENT_MOVE = 1,
                     EVENT_STAY = 0;
@@ -141,93 +61,13 @@ class Mapper {
     static std::array<u32,EVENT_TYPES.size()> EVENT_ADDS;
     static u32 PATH_MASK, PATH_TAIL_MOVE;
 
-    //std::vector<bool> Mapper::unpack_moves(u64 moves, u8 length);
-
-
     using moves_t = u32;
     using moves_u8_t = std::array<u8,4>;
     static constexpr u8 U8_BITS = 8;
 
 	static std::vector<bool> unpack_moves(u64 moves, u8 length);
 
-    //static moves_u8_t moves_to_u8(moves_t moves) {
-    //    moves_u8_t ret{0};
-    //    for (size_t i = 0; i < ret.size(); i++) {
-    //        for (size_t j = 0; j < U8_BITS; j++) {
-    //            size_t k = U8_BITS * i + j;
-    //            ret[i] |= ((moves >> k) & 1);
-    //        }
-    //    }
-    //    return ret;
-    //}
-
-    class PathBuffer {
-        public:
-
-        PathBuffer();
-        PathBuffer(const PathBuffer &p);
-
-        void make_source(Range &range, 
-                         u16 kmer, 
-                         float prob);
-
-        void make_child(PathBuffer &p, 
-                        Range &range, 
-                        u16 kmer, 
-                        float prob, 
-                        u8 event_type);
-
-        void invalidate();
-        bool is_valid() const;
-        bool is_seed_valid(bool has_children) const;
-
-        u8 type_head() const;
-        u8 type_tail() const;
-        u8 move_count() const;
-        u8 stay_count() const;
-
-        std::vector<bool> get_moves() const;
-
-        float prob_head() const;
-
-        void free_buffers();
-        void print() const;
-
-        Range fm_range_;
-        u8 length_,
-           consec_stays_;
-
-        //u8 stay_count_, move_count_;
-        //u8 path_type_counts_[EVENT_TYPES.size()];
-        moves_t event_moves_;
-
-        u16 total_moves_;
-
-        u16 kmer_;
-
-        float seed_prob_;
-        float *prob_sums_;
-
-        bool sa_checked_;
-
-
-        #ifdef PYDEBUG
-        static u32 count_;
-        u32 evt_, id_, parent_;
-        #endif
-
-        static void reset_count() {
-        #ifdef PYDEBUG
-            count_ = 0;
-        #endif
-        }
-    };
-
-    friend bool operator< (const PathBuffer &p1, const PathBuffer &p2);
-
     private:
-
-    bool map_next();
 
     void update_seeds(PathBuffer &p, bool has_children);
 
@@ -257,7 +97,7 @@ class Mapper {
     std::mutex chunk_mtx_;
 
 
-    //Meta output functions
+    //Debug output functions
     //All will be empty if no DEBUG_* macros are defined
     void meta_open_all();
     void meta_close_all();
@@ -274,7 +114,7 @@ class Mapper {
     void meta_events_out();
     void meta_conf_out();
 
-    //Meta helper functions and variables
+    //Debug helper functions and variables
     #ifdef DEBUG_OUT
     void meta_open(std::ofstream &out, const std::string &suffix);
     bool meta_opened_;
@@ -330,7 +170,7 @@ class Mapper {
         u32 ref_len
     );
 
-    struct Meta {
+    struct Debug {
         std::vector<Event> events;
         std::vector<EvtProf> evt_profs;
         std::vector<float> proc_signal;
@@ -338,7 +178,7 @@ class Mapper {
         std::vector<MetaPath> paths;
         u32 conf_evt, conf_clust;
     };
-    Meta meta_;
+    Debug meta_;
     #endif
 
     #ifdef PYBIND
@@ -354,12 +194,12 @@ class Mapper {
         map.def(pybind11::init());
 
         #ifdef PYDEBUG
-        #define PY_MAPPER_DBG(P) meta.def_readonly(#P, &Mapper::Meta::P);
+        #define PY_MAPPER_DBG(P) meta.def_readonly(#P, &Mapper::Debug::P);
 
-        #define PY_DBG_ARRAY(T, P) meta.def_property_readonly(#P, [](Mapper::Meta &d) \
+        #define PY_DBG_ARRAY(T, P) meta.def_property_readonly(#P, [](Mapper::Debug &d) \
              -> py::array_t<T> {return py::array_t<T>(d.P.size(), d.P.data());});                                                                         
 
-        pybind11::class_<Meta> meta(map, "Meta");
+        pybind11::class_<Debug> meta(map, "Debug");
         PY_MAPPER_DBG(events)
         PY_MAPPER_DBG(evt_profs)
         PY_MAPPER_DBG(proc_signal)
@@ -367,11 +207,11 @@ class Mapper {
         PY_MAPPER_DBG(conf_evt)
         PY_MAPPER_DBG(conf_clust)
         
-        meta.def_property_readonly("seeds", [](Mapper::Meta &d) -> pybind11::array_t<MetaSeed> {
+        meta.def_property_readonly("seeds", [](Mapper::Debug &d) -> pybind11::array_t<MetaSeed> {
              return pybind11::array_t<MetaSeed>(d.seeds.size(), d.seeds.data());
         });
 
-        meta.def_property_readonly("paths", [](Mapper::Meta &d) -> pybind11::array_t<MetaPath> {
+        meta.def_property_readonly("paths", [](Mapper::Debug &d) -> pybind11::array_t<MetaPath> {
              return pybind11::array_t<MetaPath>(d.paths.size(), d.paths.data());
         });
 

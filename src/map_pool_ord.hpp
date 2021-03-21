@@ -65,10 +65,10 @@ class MapPoolOrd : public RealtimePool {
     std::vector<u32> chunk_idx_;
 
     #ifdef PYDEBUG
-    Mapper::Debug get_dbg(u16 channel) {
-        return mappers_[channel-1].dbg_;
+    Mapper::Meta get_meta(u16 channel) {
+        return mappers_[channel-1].meta_;
     }
-    std::vector<bool> dbg_hold_;
+    std::vector<bool> meta_hold_;
     #endif
 
 
@@ -94,7 +94,7 @@ class MapPoolOrd : public RealtimePool {
         PY_MAP_ORD_METH(end_read);
 
         #ifdef PYDEBUG
-        PY_MAP_ORD_METH(get_dbg)
+        PY_MAP_ORD_METH(get_meta)
         #endif
 
         //pybind11::class_<MapOrdParams> p(c, "Params");

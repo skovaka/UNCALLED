@@ -38,7 +38,7 @@ MapPoolOrd::MapPoolOrd(Conf &conf) :
     chunk_idx_.resize(conf.get_num_channels());
 
     #ifdef PYDEBUG
-    dbg_hold_.resize(conf.get_num_channels(), 0);
+    meta_hold_.resize(conf.get_num_channels(), 0);
     #endif
 }
 
@@ -71,7 +71,7 @@ std::vector<MapResult> MapPoolOrd::update() {
         channels_empty_ = false;
 
         #ifdef PYDEBUG
-        if (dbg_hold_[i]) continue;
+        if (meta_hold_[i]) continue;
         #endif
 
         //Skip the read if the mapper has finished
@@ -101,7 +101,7 @@ std::vector<MapResult> MapPoolOrd::update() {
         #ifndef PYDEBUG
         end_read(channel);
         #else
-        dbg_hold_[channel-1] = true;
+        meta_hold_[channel-1] = true;
         #endif
     }
 
@@ -118,7 +118,7 @@ void MapPoolOrd::end_read(u16 channel) {
     channels_[channel-1].pop_front();
     chunk_idx_[channel-1] = 0;
     #ifdef PYDEBUG
-    dbg_hold_[channel-1] = false;
+    meta_hold_[channel-1] = false;
     #endif
 }
 
@@ -141,7 +141,7 @@ bool MapPoolOrd::try_add_chunk(ReadBuffer &chunk) {
 
         //TODO probably dont need
         #ifdef PYDEBUG
-        if (dbg_hold_[ch]) return false;
+        if (meta_hold_[ch]) return false;
         #endif
 
         //Give up if previous chunk done mapping
