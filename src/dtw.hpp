@@ -141,15 +141,16 @@ class DTWp {
         return score_sum_ / path_.size();
     }
 
-    protected:
+    //protected:
+    public:
     enum Move {D, H, V}; //Horizontal, vertical, diagonal
     static constexpr float MAX_COST = FLT_MAX / 2.0;
 
     const DTWParams PRMS;
     const PoreModel<DTW_KLEN> model_;
 
-    const std::vector<u16> &rvals_;
-    const std::vector<float> &cvals_;
+    const std::vector<u16> rvals_;
+    const std::vector<float> cvals_;
 
     std::vector<float> mat_;
     std::vector<Move> bcrumbs_;
@@ -192,6 +193,14 @@ class DTWp {
         PY_DTW_P_METH(get_path)
         PY_DTW_P_METH(score)
         PY_DTW_P_METH(mean_score)
+
+        c.def_property_readonly("mat", [](DTWp &d) -> pybind11::array_t<float> {
+             return pybind11::array_t<float>(
+                     {d.rvals_.size(), d.cvals_.size()},
+                     d.mat_.data()
+                     );
+        });
+
         c.def_property_readonly("path", [](DTWp &d) -> pybind11::array_t<Trace> {
              return pybind11::array_t<Trace>(d.path_.size(), d.path_.data());
         });
@@ -216,7 +225,7 @@ class DTWd : public DTWp {
     public:
     #ifdef PYBIND
     #define PY_DTW_D_METH(P) c.def(#P, &DTWd::P);
-    static void pybind_defs(pybind11::class_<DTWd> &c) {
+    static void pybind_defs(pybind11::class_<DTWd, DTWp> &c) {
         c.def(pybind11::init<const std::vector<float>&, 
                              const std::vector<u16>&,
                              const PoreModel<DTW_KLEN>,

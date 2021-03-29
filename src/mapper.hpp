@@ -41,7 +41,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
-
 #endif
 
 //#define DEBUG_TIME
@@ -306,6 +305,14 @@ class Mapper {
     //stores name, start, end, strand, event, path_buf, cluster
     //using MetaSeed = std::tuple<std::string, u64, u64, bool, u32, u32, u32>;
 
+    struct MetaEvent {
+        u32 start, length;
+        float mean, stdv;
+        float prof_stdv, prof_mean;
+        bool mask;
+        float norm_sig;
+    };
+
     struct MetaSeed {
         i32 ref_id;
         i64 start, end;
@@ -331,8 +338,9 @@ class Mapper {
     );
 
     struct Meta {
-        std::vector<Event> events;
-        std::vector<EvtProf> evt_profs;
+        std::vector<MetaEvent> events;
+        std::vector<u32> event_idxs;
+        //std::vector<EvtProf> evt_profs;
         std::vector<float> proc_signal;
         std::vector<MetaSeed> seeds;
         std::vector<MetaPath> paths;
@@ -360,12 +368,20 @@ class Mapper {
              -> py::array_t<T> {return py::array_t<T>(d.P.size(), d.P.data());});                                                                         
 
         pybind11::class_<Meta> meta(map, "Meta");
-        PY_MAPPER_DBG(events)
-        PY_MAPPER_DBG(evt_profs)
-        PY_MAPPER_DBG(proc_signal)
+        //PY_MAPPER_DBG(events)
+        //PY_MAPPER_DBG(evt_profs)
+        //PY_MAPPER_DBG(proc_signal)
 
         PY_MAPPER_DBG(conf_evt)
         PY_MAPPER_DBG(conf_clust)
+
+        meta.def_property_readonly("masked_event_idxs", [](Mapper::Meta &d) -> pybind11::array_t<u32> {
+             return pybind11::array_t<u32>(d.event_idxs.size(), d.event_idxs.data());
+        });
+
+        meta.def_property_readonly("events", [](Mapper::Meta &d) -> pybind11::array_t<MetaEvent> {
+             return pybind11::array_t<MetaEvent>(d.events.size(), d.events.data());
+        });
         
         meta.def_property_readonly("seeds", [](Mapper::Meta &d) -> pybind11::array_t<MetaSeed> {
              return pybind11::array_t<MetaSeed>(d.seeds.size(), d.seeds.data());
@@ -375,7 +391,10 @@ class Mapper {
              return pybind11::array_t<MetaPath>(d.paths.size(), d.paths.data());
         });
 
+        PYBIND11_NUMPY_DTYPE(MetaEvent, start, length, mean, stdv, prof_stdv, prof_mean, mask, norm_sig);
+
         PYBIND11_NUMPY_DTYPE(MetaSeed, ref_id, start, end, fwd, event, path, cluster);
+
         PYBIND11_NUMPY_DTYPE(MetaPath, event, id, parent, fm_start, fm_length, kmer, 
                              length, total_moves, match_prob, seed_prob, moves_pac);
 

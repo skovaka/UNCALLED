@@ -8,6 +8,7 @@
 #include "fast5_reader.hpp"
 #include "bwa_index.hpp"
 #include "dtw.hpp"
+#include "dtw_banded.hpp"
 
 //const std::string CONF_DIR(std::getenv("UNCALLED_CONF")),
 //                  DEF_MODEL = CONF_DIR + "/r94_5mers.txt",
@@ -70,9 +71,9 @@ int main(int argc, char** argv) {
 
     auto model = pmodel_r94_dna_templ;
 
-    DTWParams dtwp = {
-        DTWSubSeq::NONE, //substr
-        1,1,1};         //d,v,h
+    auto dtwp = DTW_RAW_GLOB;
+    dtwp.dw = dtwp.vw = dtwp.hw = 1;
+    //1,1,1};         //d,v,h
 
     EventDetector evdt;
     EventProfiler evpr;
@@ -87,11 +88,10 @@ int main(int argc, char** argv) {
 
     auto queries = load_queries(query_fname, fast5s);
 
-
     while (!fast5s.empty()) {
         //Get next read and corrasponding query
-        ReadBuffer read = fast5s.pop_read();
-        //std::cout << read.get_id() << "\t";
+        auto read = fast5s.pop_read();
+        //std::cout << read.get_id() << "\n";
         //std::cerr << "aligning " << read.get_id() << "\n";
         //std::cerr.flush();
 
@@ -155,22 +155,34 @@ int main(int argc, char** argv) {
             continue;
         }
 
+        u32 band_width = 400;
 
-        DTWd dtw(signal, kmers, model, dtwp);
-
-        if (!out_prefix.empty()) {
-            std::string path_fname = out_prefix+read.get_id()+".txt";
-            std::ofstream out(path_fname);
-            dtw.print_path(out);
-            out.close();
+        std::vector<bool> rmoves;
+        for (size_t i = 0; i < signal.size()+kmers.size(); i++) {
+            rmoves.push_back((i % 3) == 0);
         }
+
+        //BandedDTW dtw(signal, kmers, rmoves, band_width, model);
+        DTWp dtw(signal, kmers, model, dtwp);
+
+        //if (!out_prefix.empty()) {
+        //    std::string path_fname = out_prefix+read.get_id()+".txt";
+        //    std::ofstream out(path_fname);
+        //    for (auto &t : dtw.get_path()) {
+        //        out << t.ref << "\t" << t.qry << "\n";
+        //    }
+        //    out.close();
+        //}
 
         std::cout << read.get_id() << "\t"
                   << dtw.mean_score() << "\t"
                   << (t.lap()/1000) << "\n";
         std::cout.flush();
 
+
     }
+
+    idx.destroy();
 
     return 0;
 }

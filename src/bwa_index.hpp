@@ -160,6 +160,9 @@ class BwaIndex {
         if (bns_ != NULL) { 
             bns_destroy(bns_);
         }
+        if (pacseq_loaded()) {
+            free(pacseq_);
+        }
     }
 
     Range get_neighbor(Range r1, u8 base) const {

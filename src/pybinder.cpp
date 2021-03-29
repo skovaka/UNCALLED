@@ -9,6 +9,7 @@
 #include "client_sim.hpp"
 #include "models.inl"
 #include "dtw.hpp"
+#include "dtw_banded.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -98,11 +99,14 @@ PYBIND11_MODULE(_uncalled, m) {
 
     //py::class_<DTW> dtw(m, "DTW");
     //DTW::pybind_defs(dtw);
+
+    py::class_<BandedDTW> banded_dtw(m, "BandedDTW");
+    BandedDTW::pybind_defs(banded_dtw);
     
     py::class_<DTWp> dtw_p(m, "DTWp");
     DTWp::pybind_defs(dtw_p);
 
-    py::class_<DTWd> dtw_d(m, "DTWd");
+    py::class_<DTWd, DTWp> dtw_d(m, "DTWd");
     DTWd::pybind_defs(dtw_d);
 
     //py::class_<DTWr94p> dtw_r94p(m, "DTWr94p");

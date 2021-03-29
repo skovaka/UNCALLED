@@ -331,7 +331,13 @@ u16 Mapper::process_chunk() {
         if (evdt_.add_sample(read_[i])) {
 
             #ifdef PYDEBUG
-            meta_.events.push_back(evdt_.get_event());
+            const auto &evt = evdt_.get_event();
+            meta_.events.push_back({
+                    evt.start, evt.length, 
+                    evt.mean, evt.stdv,
+                    0,0,0,0
+            });
+            //meta_.events.push_back(evdt_.get_event());
             #endif
 
             //Add event to profiler
@@ -339,18 +345,19 @@ u16 Mapper::process_chunk() {
             evt_prof_.add_event(evdt_.get_event());
 
             #ifdef PYDEBUG
+            u32 evt_i = evt_prof_.get_event_count()-1;
             if (evt_prof_.is_full()) {
-                meta_.evt_profs.push_back(evt_prof_.get_prof());
-            }
-            #endif
-            
-            #ifdef DEBUG_EVENTS
-            if (evt_prof_.is_full()) {
-                meta_events_.emplace_back(evt_prof_.anno_event());
+                meta_.events[evt_i].prof_mean = evt_prof_.get_win_mean();
+                meta_.events[evt_i].prof_stdv = evt_prof_.get_win_stdv();
+                meta_.events[evt_i].mask = evt_prof_.event_ready();
             }
             #endif
 
             if (!evt_prof_.event_ready()) continue;
+
+            #ifdef PYDEBUG
+            meta_.event_idxs.push_back(evt_i);
+            #endif
 
             auto evt_mean = evt_prof_.next_mean();
 
@@ -454,11 +461,10 @@ bool Mapper::map_next() {
         return true;
     }
 
-
     float event = norm_.pop();
 
     #ifdef PYDEBUG
-    meta_.proc_signal.push_back(event);
+    meta_.events[meta_.event_idxs[event_i_]].norm_sig = event;
     #endif
 
     //TODO: store kmer_probs_ in static array

@@ -30,7 +30,7 @@ class EventProfiler {
     std::deque<Event> events_;
     Normalizer window_;
 
-    u32 total_count_{0};
+    u32 event_count_{0};
 
     bool next_mask_{false}, is_full_{false};
     u32 to_mask_;
@@ -68,7 +68,7 @@ class EventProfiler {
         
         //TODO only in debug mode?
         mask_idx_map_.clear();
-        total_count_ = 0;
+        event_count_ = 0;
     }
 
     void set_norm(float scale, float shift) {
@@ -102,14 +102,18 @@ class EventProfiler {
 
             //TODO only in debug mode?
             if (to_mask_ == 0) {
-                mask_idx_map_.push_back(total_count_);
+                mask_idx_map_.push_back(event_count_);
             }
-            total_count_ += 1;//TODO only in debug mode?
+            event_count_ += 1;//TODO only in debug mode?
         }
         //window_.pop();
         //
 
         return event_ready();
+    }
+
+    u32 get_event_count() const {
+        return event_count_;
     }
 
     //TODO store midpoint
@@ -165,6 +169,14 @@ class EventProfiler {
         }
 
         return mask;
+    }
+
+    float get_win_mean() const {
+        return win_mean_;
+    }
+
+    float get_win_stdv() const {
+        return win_stdv_;
     }
 
     #ifdef PYBIND

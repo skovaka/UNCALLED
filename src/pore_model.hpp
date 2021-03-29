@@ -34,6 +34,12 @@
 #include "util.hpp"
 #include "bp.hpp"
 
+#ifdef PYBIND
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/numpy.h>
+#endif
+
 typedef struct {
     KmerLen k;
     std::vector<float> means_stdvs;
@@ -291,8 +297,10 @@ class PoreModel {
         PY_PORE_MODEL_METH(match_probs);
         PY_PORE_MODEL_METH(get_means_mean);
         PY_PORE_MODEL_METH(get_means_stdv);
-        PY_PORE_MODEL_METH(get_mean);
-        PY_PORE_MODEL_METH(get_stdv);
+        c.def("get_mean", pybind11::vectorize(&PoreModel<KLEN>::get_mean));
+        c.def("get_stdv", pybind11::vectorize(&PoreModel<KLEN>::get_mean));
+        //PY_PORE_MODEL_METH(get_mean);
+        //PY_PORE_MODEL_METH(get_stdv);
         PY_PORE_MODEL_METH(calc_roc);
         c.def_property_readonly("kmer_count", &PoreModel::get_kmer_count);
     }
