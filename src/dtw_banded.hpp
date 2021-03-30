@@ -13,55 +13,62 @@ const KmerLen DTWB_KLEN = KmerLen::k5;
 
 class BandedDTW {
     public:
-    struct Trace {
-        u64 qry, ref;
+
+    struct Coord {
+        i32 qry,ref; //quer, reference
     };
+
+    //using 
 
     //protected:
     public:
     enum Move {D, H, V}; //Horizontal, vertical, diagonal
     static constexpr float MAX_COST = FLT_MAX / 2.0;
 
+    const std::vector<float> qry_vals_;
+    const std::vector<u16> ref_vals_;
+
     const PoreModel<DTWB_KLEN> model_;
 
-    const std::vector<u16> ref_vals_;
-    const std::vector<float> qry_vals_;
+    i32 band_width_;
 
-    i32 band_width_, band_count_;
-
-    std::vector< std::pair<i32,i32> > ll_;
+    //std::vector< std::pair<i32,i32> > ll_;
     std::vector<float> mat_;
+    std::vector<Coord> ll_;
     std::vector<Move> bcrumbs_;
-    std::vector<Trace> path_;
+    std::vector<Coord> path_;
     float score_sum_;
 
     public:
-    BandedDTW(const std::vector<float> &col_vals,   
-         const std::vector<u16> &row_vals,
-         const std::vector<bool> &rmoves,
-         u32 band_width,
-         const PoreModel<DTWB_KLEN> &model) :
-             model_(model),
-             ref_vals_(row_vals),
-             qry_vals_(col_vals),
-             band_width_(band_width),
-             //band_count_(rmoves.size()) {
-             band_count_(ref_len() + qry_len()) {
+    BandedDTW(const std::vector<float> &qry_vals,   
+              const std::vector<u16> &ref_vals,
+              const PoreModel<DTWB_KLEN> &model,
+              u32 band_width) :
+            qry_vals_(qry_vals),
+            ref_vals_(ref_vals),
+            model_(model),
+            band_width_(band_width) {}
 
-        mat_.resize(band_width_ * band_count_);
-        bcrumbs_.resize(mat_.size());
+    BandedDTW(const std::vector<float> &qry_vals,   
+              const std::vector<u16> &ref_vals,
+              const PoreModel<DTWB_KLEN> &model,
+              u32 band_width,
+              const std::vector<Coord> &ll) :
+                BandedDTW(qry_vals, ref_vals, model, band_width) {
 
-        //std::cout << qry_len() << "\t" << ref_len() << " LEN\n";
+        ll_ = ll;
 
-        Timer t;
-
-        init_mat(rmoves);
+        init_mat();
         //std::cout << "Init: " << t.lap() << "\n";
-        compute_matrix();          
+        fill_mat();          
         //std::cout << "Fill: " << t.lap() << "\n";
         traceback();
-        //std::cout << "Trace: " << t.lap() << "\n";
+        //std::cout << "Coord: " << t.lap() << "\n";
+    }
 
+
+    u32 band_count() const {
+        return ref_size() + qry_size();
     }
 
     template <typename T>
@@ -69,42 +76,36 @@ class BandedDTW {
         return static_cast<u32>(i) >= 0 && static_cast<u32>(i) < v.size();
     }
 
-    i32 ref_len() const {
+    i32 ref_size() const {
         return static_cast<i32>(ref_vals_.size());
     }
 
-    i32 qry_len() const {
+    i32 qry_size() const {
         return static_cast<i32>(qry_vals_.size());
     }
 
-    void init_mat(const std::vector<bool> &rmoves) {
-        u32 shift = band_width_/2;
-        i32 i = shift, j = -shift;
-        for (auto move_right : rmoves) {
-            //std::cout << ll_.size() << "\t" 
-            //          << (i-band_width_) << "," << (j+band_width_) << "\t" << i << "," << j << "\n";
-            ll_.push_back({i,j});
-            i += not move_right;
-            j += move_right;
-        }
-
+    //void init_mat(const std::vector<bool> &rmoves) {
+    void init_mat() {
         //Set first two bands to inf
         //Maybe could work around, but might not matter for streaming
+        mat_.resize(band_width_ * band_count());
+        bcrumbs_.resize(mat_.size());
+
+        //Set origin (0,0) to 0
         auto k0 = 0, k1 = band_width_;
         for (; k0 < band_width_; k0++) {
             mat_[k0] = mat_[k1++] = MAX_COST;
         }
 
-        //Set origin (0,0) to 0
-        i32 orig = -ll_[0].second;
+        i32 orig = -ll_[0].ref;
         mat_[orig] = 0;
     }
 
     i32 band_ref_end(u32 band) {
-        return ll_[band].second + band_width_;
+        return ll_[band].ref + band_width_;
     }
 
-    u32 band_start(size_t band) {
+    i32 band_start(size_t band) {
         return band_width_ * band;
     }
 
@@ -119,11 +120,11 @@ class BandedDTW {
             d, diag_min, diag_max;
     };
 
-    void compute_matrix() {
+    void fill_mat() {
 
-        for (size_t band = 2; band < band_count_; band++) {
-            i32 i = ll_[band].first,
-                j = ll_[band].second;
+        for (size_t band = 2; band < band_count(); band++) {
+            i32 q = ll_[band].qry,
+                r = ll_[band].ref;
 
             u32 band_start = band * band_width_,
                 band_end = band_start + band_width_;
@@ -132,19 +133,19 @@ class BandedDTW {
             i32 aband  = band - 1, 
                 astart = aband * band_width_,
                 aend   = astart + band_width_,
-                ak     = astart + (j - ll_[aband].second - 1);
+                ak     = astart + (r - ll_[aband].ref - 1);
 
             //diagonal band coordinates
             i32 dband  = band - 2, 
                 dstart = dband * band_width_,
                 dend   = dstart + band_width_,
-                dk     = dstart + (j - ll_[dband].second - 1);
+                dk     = dstart + (r - ll_[dband].ref - 1);
 
             for (size_t k = band_start; k < band_end; k++) {
 
                 //TODO can I compute starting locaiton from ll_?
-                if (in_range(i, qry_vals_) && in_range(j, ref_vals_)) {
-                    float cost = costfn(qry_vals_[i], ref_vals_[j]);
+                if (in_range(q, qry_vals_) && in_range(r, ref_vals_)) {
+                    float cost = costfn(qry_vals_[q], ref_vals_[r]);
                     float ds,hs,vs;
 
                     if (ak >= astart && ak <= aend) { 
@@ -175,8 +176,8 @@ class BandedDTW {
                     mat_[k] = MAX_COST;
                 }
 
-                i -= 1;
-                j += 1;
+                q -= 1;
+                r += 1;
                 ak += 1;
                 dk += 1;
             }
@@ -194,17 +195,17 @@ class BandedDTW {
 
     void traceback() {
         score_sum_ = MAX_COST;
-        i32 path_band = band_count_, path_k = band_width_;
-        for (size_t band = band_count_-1; band > 0; band--) {
+        i32 path_band = band_count(), path_k = band_width_;
+        for (size_t band = band_count()-1; band > 0; band--) {
     
             //Find index with last ref coordinate
             //stop search if not in band
-            auto offs = ref_len() - ll_[band].second - 1;
+            auto offs = ref_size() - ll_[band].ref - 1;
             //std::cout << offs << " AH\n";
             if (offs >= band_width_) break;
 
             auto k = band_coord(band, offs);
-            //std::cout << ll_[band].first-offs << " " << ll_[band].second+offs << " " << mat_[k] << " AH\n";
+            //std::cout << ll_[band].qry-offs << " " << ll_[band].second+offs << " " << mat_[k] << " AH\n";
 
             if (mat_[k] < score_sum_) {
                 path_band = band;
@@ -221,7 +222,7 @@ class BandedDTW {
 
             auto offs = path_k - band_start(path_band);
             //std::cout << path_band << " " << path_k << " " << offs << "\n";
-            path_.push_back({path_ll.first-offs, path_ll.second+offs});
+            path_.push_back({path_ll.qry-offs, path_ll.ref+offs});
 
             i32 shift = 0;
 
@@ -229,18 +230,18 @@ class BandedDTW {
             case Move::D:
                 path_band -= 2;
                 next_ll = ll_[path_band];
-                shift = 2 * band_width_ + (next_ll.second - path_ll.second + 1);
+                shift = 2 * band_width_ + (next_ll.ref - path_ll.ref + 1);
                 break;
 
             case Move::H:
                 path_band -= 1;
                 next_ll = ll_[path_band];
-                shift = band_width_ + (next_ll.second - path_ll.second + 1);
+                shift = band_width_ + (next_ll.ref - path_ll.ref + 1);
                 break;
             case Move::V:
                 path_band -= 1;
                 next_ll = ll_[path_band];
-                shift = band_width_ + (next_ll.second - path_ll.second);
+                shift = band_width_ + (next_ll.ref - path_ll.ref);
                 break;
             }
             //std::cout << path_band << "\t"
@@ -252,7 +253,7 @@ class BandedDTW {
         path_.push_back({0,0});
     }
 
-    std::vector<Trace> get_path() {
+    std::vector<Coord> get_path() {
         return path_;
     }
 
@@ -278,19 +279,74 @@ class BandedDTW {
     static void pybind_defs(pybind11::class_<BandedDTW> &c) {
         c.def(pybind11::init<const std::vector<float>&, 
                              const std::vector<u16>&,
-                             const std::vector<bool>&,
+                             const PoreModel<DTWB_KLEN>&,
                              u32,
-                             const PoreModel<DTWB_KLEN> &>());
+                             const std::vector<Coord>&>());
         PY_BANDED_DTW_METH(get_path)
         PY_BANDED_DTW_METH(score)
         PY_BANDED_DTW_METH(mean_score)
         c.def_readonly("ll", &BandedDTW::ll_);
         PY_BANDED_DTW_METH(mean_score)
 
-        c.def_property_readonly("path", [](BandedDTW &d) -> pybind11::array_t<Trace> {
-             return pybind11::array_t<Trace>(d.path_.size(), d.path_.data());
+        c.def_property_readonly("path", [](BandedDTW &d) -> pybind11::array_t<Coord> {
+             return pybind11::array_t<Coord>(d.path_.size(), d.path_.data());
         });
-        PYBIND11_NUMPY_DTYPE(Trace, qry, ref);
+        PYBIND11_NUMPY_DTYPE(Coord, qry, ref);
+    }
+    #endif
+};
+
+class StaticBDTW : public BandedDTW {
+
+    public:
+
+    float band_center_;
+
+    StaticBDTW(const std::vector<float> &qry_vals,   
+           const std::vector<u16> &ref_vals,
+           const PoreModel<DTWB_KLEN> &model,
+           u32 band_width,
+           float band_center=0.5) : 
+            BandedDTW(qry_vals, ref_vals, model, band_width) {
+        band_center_ = band_center;
+
+        init_mat();
+        fill_mat();
+        traceback();
+    }
+
+    void init_mat() {
+        auto slope = static_cast<float>(ref_size()) / qry_size();
+        auto shift = static_cast<i32>(band_width_ * band_center_);
+        i32 q = 0, r = 0;
+
+        //std::cout << qry_size() << "\t" << ref_size() << " SIZE\n";
+        //std::cout << slope << "\t" << shift << " SLOPE\n";
+
+        for (size_t i = 0; i < band_count(); i++) {
+            ll_.push_back({q+shift,r-shift});
+            //std::cout << q << "\t" << r  << "\n";
+
+            float down_dist  = std::abs( (r - slope * (q+1)) ),
+                  right_dist = std::abs( ((r+1) - slope * q) );
+            if (down_dist < right_dist) q += 1;
+            else r += 1;
+        }
+
+        //std::cout << ll_.front().qry << "\t"
+        //          << ll_.front().ref << "\n"
+        //          << ll_.back().qry << "\t"
+        //          << ll_.back().ref << "\n";
+
+        BandedDTW::init_mat();
+    }
+
+    #ifdef PYBIND
+    static void pybind_defs(pybind11::class_<StaticBDTW, BandedDTW> &c) {
+        c.def(pybind11::init<const std::vector<float>&, 
+                             const std::vector<u16>&,
+                             const PoreModel<DTWB_KLEN> &,
+                             u32, float>());
     }
     #endif
 };

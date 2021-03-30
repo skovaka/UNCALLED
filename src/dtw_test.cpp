@@ -157,13 +157,19 @@ int main(int argc, char** argv) {
 
         u32 band_width = 400;
 
-        std::vector<bool> rmoves;
+        u32 shift = band_width/2;
+        i32 qry = shift, ref = -shift;
+        std::vector<BandedDTW::Coord> ll;
         for (size_t i = 0; i < signal.size()+kmers.size(); i++) {
-            rmoves.push_back((i % 3) == 0);
+            ll.push_back({qry,ref});
+            bool move_right = (i % 3) == 0;
+            qry += !move_right;
+            ref += move_right;
         }
 
-        //BandedDTW dtw(signal, kmers, rmoves, band_width, model);
-        DTWp dtw(signal, kmers, model, dtwp);
+        StaticBDTW dtw(signal, kmers, model, 100, 0.5);
+        //BandedDTW dtw(signal, kmers, model, band_width, ll);
+        //DTWp dtw(signal, kmers, model, dtwp);
 
         //if (!out_prefix.empty()) {
         //    std::string path_fname = out_prefix+read.get_id()+".txt";

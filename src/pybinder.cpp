@@ -102,6 +102,9 @@ PYBIND11_MODULE(_uncalled, m) {
 
     py::class_<BandedDTW> banded_dtw(m, "BandedDTW");
     BandedDTW::pybind_defs(banded_dtw);
+
+    py::class_<StaticBDTW, BandedDTW> static_bdtw(m, "StaticBDTW");
+    StaticBDTW::pybind_defs(static_bdtw);
     
     py::class_<DTWp> dtw_p(m, "DTWp");
     DTWp::pybind_defs(dtw_p);
