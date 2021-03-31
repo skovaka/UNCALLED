@@ -34,7 +34,7 @@ class PafEntry:
             self.is_fwd=self.rf_name=self.rf_len=self.rf_st=self.rf_en=self.match_num=self.aln_len=self.qual=None
 
         self.tags = dict() if tags==None else tags 
-        for k,t,v in (s.split(":") for s in tabs[12:]):
+        for k,t,v in (s.split(":",2) for s in tabs[12:]):
             if t == 'f':
                 v = float(v)
             elif t == 'i':

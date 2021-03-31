@@ -151,25 +151,16 @@ int main(int argc, char** argv) {
 
         //Takes up too much space :(
         if (signal.size() > 50000) {
-            std::cerr << "Skipping " << read.get_id() << "\n";
+            //std::cerr << "Skipping " << read.get_id() << "\n";
             continue;
         }
 
-        u32 band_width = 400;
+        auto band_width = static_cast<i32>(signal.size() * 0.05);
 
-        u32 shift = band_width/2;
-        i32 qry = shift, ref = -shift;
-        std::vector<BandedDTW::Coord> ll;
-        for (size_t i = 0; i < signal.size()+kmers.size(); i++) {
-            ll.push_back({qry,ref});
-            bool move_right = (i % 3) == 0;
-            qry += !move_right;
-            ref += move_right;
-        }
+        StaticBDTW dtw(signal, kmers, model, band_width, 0.5);
+        //DTWd dtw(signal, kmers, model, DTW_GLOB);
 
-        StaticBDTW dtw(signal, kmers, model, 100, 0.5);
-        //BandedDTW dtw(signal, kmers, model, band_width, ll);
-        //DTWp dtw(signal, kmers, model, dtwp);
+        auto v = dtw.get_flat_mat();
 
         //if (!out_prefix.empty()) {
         //    std::string path_fname = out_prefix+read.get_id()+".txt";
@@ -182,6 +173,7 @@ int main(int argc, char** argv) {
 
         std::cout << read.get_id() << "\t"
                   << dtw.mean_score() << "\t"
+                  << dtw.path_.size() << "\t"
                   << (t.lap()/1000) << "\n";
         std::cout.flush();
 

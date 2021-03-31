@@ -37,20 +37,23 @@ MAX_SLEEP = 0.01
 
 def index_cmd(args):
 
-    if args.bwa_prefix == None:
-        args.bwa_prefix = args.fasta_filename
+    if len(args.conf.bwa_prefix) == 0:
+        print(args.conf.bwa_prefix, "=", args.fasta_filename)
+        args.conf.bwa_prefix = args.fasta_filename
+    else:
+        print(args.conf.bwa_prefix)
 
     bwa_built = True
 
     for suff in unc.index.BWA_SUFFS:
-        if not os.path.exists(args.bwa_prefix + suff):
+        if not os.path.exists(args.conf.bwa_prefix + suff):
             bwa_built = False
             break
 
     if bwa_built:
-        sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % args.bwa_prefix)
+        sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % args.conf.bwa_prefix)
     else:
-        unc.BwaIndex.create(args.fasta_filename, args.bwa_prefix)
+        unc.BwaIndex.create(args.fasta_filename, args.conf.bwa_prefix)
 
     sys.stderr.write("Initializing parameter search\n")
     p = unc.index.IndexParameterizer(args)
@@ -124,7 +127,9 @@ def assert_exists(fname):
         sys.stderr.write("Error: '%s' does not exist\n" % fname)
         sys.exit(1)
 
-def map_cmd(conf, args):
+def map_cmd(args):
+
+    conf = args.conf
 
     assert_exists(conf.bwa_prefix + ".bwt")
     assert_exists(conf.bwa_prefix + ".uncl")
@@ -132,8 +137,8 @@ def map_cmd(conf, args):
     #for fname in open(conf.fast5_list):
     #    assert_exists(fname.strip())
 
-    if len(conf.read_list) > 0:
-        assert_exists(conf.read_list)
+    #if len(conf.read_fi) > 0:
+    #    assert_exists(conf.read_list)
 
     sys.stderr.flush()
 
@@ -166,10 +171,12 @@ def map_cmd(conf, args):
     sys.stderr.write("Finishing\n")
     mapper.stop()
 
-def realtime_cmd(conf, args):
+def realtime_cmd(args):
 
     #TODO replace with conf mode
     sim = args.subcmd == "sim"
+
+    conf = args.conf
 
     assert_exists(conf.bwa_prefix + ".bwt")
     assert_exists(conf.bwa_prefix + ".uncl")
@@ -331,20 +338,18 @@ def list_ports_cmd(args):
 
 
 if __name__ == "__main__":
-    
-
-    parser, conf, args = unc.args.load_conf(sys.argv)
+    args = unc.args.ArgParser()
 
     if args.subcmd == "index":
         index_cmd(args)
     elif args.subcmd == "map":
-        map_cmd(conf, args)
+        map_cmd(args)
     elif args.subcmd in {"sim", "realtime"}:
-        realtime_cmd(conf, args)
+        realtime_cmd(args)
     elif args.subcmd == "list-ports":
         list_ports_cmd(args)
     elif args.subcmd == "pafstats":
         unc.pafstats.run(args)
     else:
-        parser.print_help()
+        args.parser.print_help()
         

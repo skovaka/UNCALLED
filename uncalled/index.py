@@ -48,8 +48,8 @@ def power_fn(xmax, ymin, ymax, exp, N=100):
     return t*xmax, (t**exp) * (ymax-ymin) + ymin
 
 class IndexParameterizer:
-    #MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_rna_threshs.txt")
-    MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_threshs.txt")
+    MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_rna_threshs.txt")
+    #MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_threshs.txt")
 
     def __init__(self, args):
         self.out_fname = args.conf.bwa_prefix + UNCL_SUFF
@@ -77,6 +77,7 @@ class IndexParameterizer:
         else:
             sample_dist = args.max_sample_dist
 
+        print(args.conf.bwa_prefix)
         fmlens = unc.self_align(args.conf.bwa_prefix, sample_dist)
         path_kfmlens = [p[args.kmer_len-1:] if len(p) >= args.kmer_len else [1] for p in fmlens]
 

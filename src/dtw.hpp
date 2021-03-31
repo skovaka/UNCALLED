@@ -42,16 +42,16 @@ class DTWp {
         u64 qry, ref;
     };
 
-    DTWp(const std::vector<float> &col_vals,   
-        const std::vector<u16> &row_vals,
+    DTWp(const std::vector<float> &qry_vals,   
+        const std::vector<u16> &ref_vals,
         const PoreModel<DTW_KLEN> &model,
         const DTWParams &p) : 
         PRMS(p),
         model_(model),
-        rvals_(row_vals),
-        cvals_(col_vals) {
+        ref_vals_(ref_vals),
+        qry_vals_(qry_vals) {
 
-        mat_.resize(rvals_.size() * cvals_.size());
+        mat_.resize(ref_vals_.size() * qry_vals_.size());
         bcrumbs_.resize(mat_.size());
 
         compute_matrix();          
@@ -61,43 +61,45 @@ class DTWp {
     void compute_matrix() {
         u64 k = 0;
         float cost, ds, hs, vs;
-        for (u64 i = 0; i < rvals_.size(); i++) {
-            for (u64 j = 0; j < cvals_.size(); j++) {
+        for (u64 r = 0; r < ref_vals_.size(); r++) {
+            for (u64 q = 0; q < qry_vals_.size(); q++) {
 
-                cost = costfn(cvals_[j], rvals_[i]);
-                ds = dscore(i,j) + (PRMS.dw * cost);
-                hs = hscore(i,j) + (PRMS.hw * cost);
-                vs = vscore(i,j) + (PRMS.vw * cost);
+                cost = costfn(qry_vals_[q], ref_vals_[r]);
+                ds = dscore(r,q) + (PRMS.dw * cost);
+                hs = hscore(r,q) + (PRMS.hw * cost);
+                vs = vscore(r,q) + (PRMS.vw * cost);
 
                 if (ds <= hs && ds <= vs) {
                     mat_[k] = ds;
-                    bcrumbs_[k++] = Move::D;
+                    bcrumbs_[k] = Move::D;
                 } else if (hs <= vs) {
                     mat_[k] = hs;
-                    bcrumbs_[k++] = Move::H;
+                    bcrumbs_[k] = Move::H;
                 } else {
                     mat_[k] = vs;
-                    bcrumbs_[k++] = Move::V;
+                    bcrumbs_[k] = Move::V;
                 }
+
+                k++;
             }
         }
     }
 
     void traceback() {
-        u64 i = rvals_.size()-1, j = cvals_.size()-1;
+        u64 r = ref_vals_.size()-1, q = qry_vals_.size()-1;
 
         switch (PRMS.subseq) {
             case DTWSubSeq::ROW:
-                for (u64 k = 0; k < rvals_.size(); k++) {
-                    if (mat_[k*cvals_.size() + j] < mat_[i*cvals_.size() + j]) { 
-                        i = k;
+                for (u64 k = 0; k < ref_vals_.size(); k++) {
+                    if (mat_[k*qry_vals_.size() + q] < mat_[r*qry_vals_.size() + q]) { 
+                        r = k;
                     }
                 }
                 break;
             case DTWSubSeq::COL:
-                for (u64 k = 0; k < cvals_.size(); k++) {
-                    if (mat_[i*cvals_.size() + k] < mat_[i*cvals_.size() + j]) {
-                        j = k;
+                for (u64 k = 0; k < qry_vals_.size(); k++) {
+                    if (mat_[r*qry_vals_.size() + k] < mat_[r*qry_vals_.size() + q]) {
+                        q = k;
                     }
                 }
                 break;
@@ -105,27 +107,27 @@ class DTWp {
                 break;
         }
 
-        score_sum_ = mat_[i*cvals_.size() + j];
+        score_sum_ = mat_[r*qry_vals_.size() + q];
 
-        path_.push_back({j, i});
+        path_.push_back({q, r});
 
-        u64 k = i*cvals_.size() + j;
-        while(!(i == 0 || PRMS.subseq == DTWSubSeq::ROW) ||
-              !(j == 0 || PRMS.subseq == DTWSubSeq::COL)) {
+        u64 k = r*qry_vals_.size() + q;
+        while(!(r == 0 || PRMS.subseq == DTWSubSeq::ROW) ||
+              !(q == 0 || PRMS.subseq == DTWSubSeq::COL)) {
 
-            if (i == 0 || bcrumbs_[k] == Move::H) {
+            if (r == 0 || bcrumbs_[k] == Move::H) {
                 k--;
-                j--;
-            } else if (j == 0 || bcrumbs_[k] == Move::V) {
-                k -= cvals_.size();
-                i--;
+                q--;
+            } else if (q == 0 || bcrumbs_[k] == Move::V) {
+                k -= qry_vals_.size();
+                r--;
             } else {
-                k -= cvals_.size() + 1;
-                i--;
-                j--;
+                k -= qry_vals_.size() + 1;
+                r--;
+                q--;
             }
 
-            path_.push_back({j, i});
+            path_.push_back({q, r});
         }
     }
 
@@ -149,8 +151,8 @@ class DTWp {
     const DTWParams PRMS;
     const PoreModel<DTW_KLEN> model_;
 
-    const std::vector<u16> rvals_;
-    const std::vector<float> cvals_;
+    const std::vector<u16> ref_vals_;
+    const std::vector<float> qry_vals_;
 
     std::vector<float> mat_;
     std::vector<Move> bcrumbs_;
@@ -158,26 +160,27 @@ class DTWp {
     float score_sum_;
 
     float costfn(float pA, u16 kmer) {
-        return -model_.match_prob(pA,kmer);
+        return abs(pA-model_.get_mean(kmer));
+        //return -model_.match_prob(pA,kmer);
     }
 
-    inline float hscore(u64 i, u64 j) {
-        if (j > 0) return mat_[cvals_.size()*i + j-1];
+    inline float hscore(u64 r, u64 q) {
+        if (q > 0) return mat_[qry_vals_.size()*r + q-1];
         else if (PRMS.subseq == DTWSubSeq::ROW) return 0;
         return MAX_COST;
     }
 
-    inline float vscore(u64 i, u64 j) {
-        if (i > 0) return mat_[cvals_.size()*(i-1) + j];
+    inline float vscore(u64 r, u64 q) {
+        if (r > 0) return mat_[qry_vals_.size()*(r-1) + q];
         else if (PRMS.subseq == DTWSubSeq::COL) return 0;
         else return MAX_COST;
     }
 
-    inline float dscore(u64 i, u64 j) {
-        if (j > 0 && i > 0) return mat_[cvals_.size()*(i-1) + j-1];
-        else if ((j == i) || 
-                 (i == 0 && PRMS.subseq == DTWSubSeq::COL) || 
-                 (j == 0 && PRMS.subseq == DTWSubSeq::ROW)) return 0;
+    inline float dscore(u64 r, u64 q) {
+        if (q > 0 && r > 0) return mat_[qry_vals_.size()*(r-1) + q-1];
+        else if ((q == r) || 
+                 (r == 0 && PRMS.subseq == DTWSubSeq::COL) || 
+                 (q == 0 && PRMS.subseq == DTWSubSeq::ROW)) return 0;
         return MAX_COST;
     }
 
@@ -196,7 +199,7 @@ class DTWp {
 
         c.def_property_readonly("mat", [](DTWp &d) -> pybind11::array_t<float> {
              return pybind11::array_t<float>(
-                     {d.rvals_.size(), d.cvals_.size()},
+                     {d.ref_vals_.size(), d.qry_vals_.size()},
                      d.mat_.data()
                      );
         });
@@ -211,11 +214,11 @@ class DTWp {
 
 class DTWd : public DTWp {
     public: 
-    DTWd(const std::vector<float> &col_vals,   
-        const std::vector<u16> &row_vals,
+    DTWd(const std::vector<float> &qry_vals,   
+        const std::vector<u16> &ref_vals,
         const PoreModel<DTW_KLEN> &model,
         const DTWParams &prms) 
-        : DTWp(col_vals, row_vals, model, prms) {}
+        : DTWp(qry_vals, ref_vals, model, prms) {}
 
     private:
     float costfn(float pA, u16 kmer) {
