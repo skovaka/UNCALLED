@@ -31,7 +31,7 @@
 #include <cassert>
 
 #ifdef PYBIND
-#include "pybind11/pybind11.h"
+#include <pybind11/pybind11.h>
 #endif
 
 #ifdef DEBUG_ALL

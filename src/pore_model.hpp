@@ -293,12 +293,14 @@ class PoreModel {
 
     static void pybind_defs(pybind11::class_<PoreModel<KLEN>> &c) {
         c.def(pybind11::init<const std::string &, bool>());
-        PY_PORE_MODEL_METH(match_prob);
+        //PY_PORE_MODEL_METH(match_prob);
         PY_PORE_MODEL_METH(match_probs);
         PY_PORE_MODEL_METH(get_means_mean);
         PY_PORE_MODEL_METH(get_means_stdv);
+        c.def("match_prob", pybind11::vectorize(&PoreModel<KLEN>::match_prob));
+        c.def("match_diff", pybind11::vectorize(&PoreModel<KLEN>::match_diff));
         c.def("get_mean", pybind11::vectorize(&PoreModel<KLEN>::get_mean));
-        c.def("get_stdv", pybind11::vectorize(&PoreModel<KLEN>::get_mean));
+        c.def("get_stdv", pybind11::vectorize(&PoreModel<KLEN>::get_stdv));
         //PY_PORE_MODEL_METH(get_mean);
         //PY_PORE_MODEL_METH(get_stdv);
         PY_PORE_MODEL_METH(calc_roc);

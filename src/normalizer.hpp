@@ -6,6 +6,8 @@
 
 #ifdef PYBIND
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/numpy.h>
 #endif
 
 class Normalizer {
@@ -58,12 +60,14 @@ class Normalizer {
 
         PY_NORM_METH(set_target);
         PY_NORM_METH(set_signal);
+        PY_NORM_METH(set_length);
         PY_NORM_METH(get_mean);
         PY_NORM_METH(get_stdv);
         PY_NORM_METH(get_scale);
         PY_NORM_METH(get_shift);
         PY_NORM_METH(pop);
-        PY_NORM_METH(push);
+        //PY_NORM_METH(push);
+        c.def("push", pybind11::vectorize(&Normalizer::push));
         PY_NORM_METH(skip_unread);
         PY_NORM_METH(unread_size);
         PY_NORM_METH(reset);

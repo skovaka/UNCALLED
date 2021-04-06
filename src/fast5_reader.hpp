@@ -150,7 +150,7 @@ class Fast5Reader {
     #ifdef PYBIND
 
     #define PY_FAST5_READER_METH(N,D) c.def(#N, &Fast5Reader::N, D);
-    #define PY_FAST5_READER_PRM(P) p.def_readwrite(#P, &Fast5Reader::Params::P);
+    #define PY_FAST5_READER_PRM(P, D) p.def_readwrite(#P, &Fast5Reader::Params::P, D);
 
     template <typename C, typename D, typename X>
     static void DPRM(X c, const char *name, D C:: *pm) {
@@ -190,11 +190,12 @@ class Fast5Reader {
         //p.def_readwrite(PARAM_META[0], &Fast5Reader::Params::P);
 
         //DPRM(p, "fast5_list", &Fast5Reader::Params::fast5_list);
-        PY_FAST5_READER_PRM(fast5_list);
-        PY_FAST5_READER_PRM(read_filter);
-        PY_FAST5_READER_PRM(max_reads);
-        PY_FAST5_READER_PRM(max_buffer);
-        PY_FAST5_READER_PRM(load_bc);
+        PY_FAST5_READER_PRM(fast5_list, "File containing a list of paths to fast5 files, one per line.");
+        PY_FAST5_READER_PRM(read_filter, "File containing a list of read IDs. Only these reads will be loaded if specified.");
+        PY_FAST5_READER_PRM(max_reads, "Maximum number of reads to load.");
+        PY_FAST5_READER_PRM(max_buffer, "Maximum number of reads to store in memory.");
+        PY_FAST5_READER_PRM(load_bc, "Will load basecaller data if present");
+            
     }
 
     #endif
