@@ -39,49 +39,6 @@
 #include <pybind11/pybind11.h>
 #endif
 
-template <KmerLen KLEN>
-class SubSeq {
-    public:
-    SubSeq(const u8 *pacseq, u64 st, u64 en) :
-        pacseq_(pacseq),
-        st_(st),
-        en_(en),
-        size_(en_-st_-KLEN) {}
-
-    u16 operator[](u64 i) {
-        i += st_;
-        u64 pst = i >> 2;
-        u32 comb = *((u32 *) &pacseq_[pst]);
-        u8 shift = i & 3;
-        return (u16) ( (comb >> ((16-KLEN)<<1)) & KMASK(KLEN) );
-    }
-
-    u64 size() {
-        return size_;
-    }
-
-    std::string to_str() {
-        std::string str(size_, 'N');
-        u64 pst = st_ >> 2,
-            pen = ((en_) >> 2)+1;
-        u8 bst = (st_&3), ben;
-        u64 i = 0;
-        for (u64 j = pst; j < pen; j++) {
-            ben = j == pen-1 ? (en_&3) : 4;
-            for (u8 k = bst; k < ben; k++) {
-                str[i++] = BASE_CHARS[(pacseq_[j] >> ((k^3) << 1) ) & 3];
-            }
-            bst = 0;
-        }
-        return str;
-    }
-
-    private:
-    const u8 *pacseq_;
-    u64 st_, en_, pst_, pen_, bst_, ben_,
-        size_;
-};
-
 //From submods/bwa/bwtindex.c
 #define BWA_BLOCK_SIZE 10000000
 
@@ -376,6 +333,50 @@ class BwaIndex {
 
         return FwdRevCoords(rev_fms, fwd_fms);
     }
+
+    class KmerSlice {
+        public:
+        KmerSlice(const u8 *pacseq, u64 st, u64 en) :
+            pacseq_(pacseq),
+            st_(st),
+            en_(en),
+            size_(en_-st_-KLEN) {}
+
+        u16 operator[](u64 i) {
+            i += st_;
+            u64 pst = i >> 2;
+            u32 comb = *((u32 *) &pacseq_[pst]);
+            u8 shift = i & 3;
+            return (u16) ( (comb >> ((16-KLEN)<<1)) & KMER_MASK );
+        }
+
+        u64 size() {
+            return size_;
+        }
+
+        std::string to_str() {
+            std::string str(size_, 'N');
+            u64 pst = st_ >> 2,
+                pen = ((en_) >> 2)+1;
+            u8 bst = (st_&3), ben;
+            u64 i = 0;
+            for (u64 j = pst; j < pen; j++) {
+                ben = j == pen-1 ? (en_&3) : 4;
+                for (u8 k = bst; k < ben; k++) {
+                    str[i++] = BASE_CHARS[(pacseq_[j] >> ((k^3) << 1) ) & 3];
+                }
+                bst = 0;
+            }
+            return str;
+        }
+
+        private:
+        const u8 *pacseq_;
+        u64 st_, en_, pst_, pen_, bst_, ben_,
+            size_;
+    };
+
+    //KmerSlice get_kmers
 
     #ifdef PYBIND
 

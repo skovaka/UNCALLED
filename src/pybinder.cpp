@@ -26,7 +26,6 @@ PYBIND11_MODULE(_uncalled, m) {
     m.doc() = R"pbdoc(UNCALLED: a Utility for Nanopore Current ALignment to Large Expanses of DNA)pbdoc";
 
 
-
     py::class_<Conf> conf(m, "Conf");
     Conf::pybind_defs(conf);
 
@@ -56,13 +55,14 @@ PYBIND11_MODULE(_uncalled, m) {
     
     py::class_<ReadBuffer> read_buffer(m, "ReadBuffer");
     ReadBuffer::pybind_defs(read_buffer);
+
+    py::class_<ReadBufferBC, ReadBuffer> read_buffer_bc(m, "ReadBufferBC");
+    ReadBufferBC::pybind_defs(read_buffer_bc);
     
-    py::class_<Fast5Read, ReadBuffer> fast5_read(m, "Fast5Read");
-    Fast5Read::pybind_defs(fast5_read);
+    py::class_<Fast5Read, ReadBufferBC> fast5_read(m, "Fast5Read");
 
     py::class_<Fast5Reader> fast5_reader(m, "Fast5Reader");
     Fast5Reader::pybind_defs(fast5_reader);
-
 
     py::class_<Event> event(m, "Event");
     py::class_<EventDetector> event_detector(m, "EventDetector");
@@ -87,9 +87,10 @@ PYBIND11_MODULE(_uncalled, m) {
     //BP operation functions
     m.def("kmer_count",    &kmer_count<KLEN>);
     m.def("str_to_kmer",   &str_to_kmer<KLEN>);
-    m.def("kmer_comp",     &kmer_comp<KLEN>);
-    m.def("kmer_revcomp",  &kmer_revcomp<KLEN>);
-    m.def("kmer_head",     &kmer_head<KLEN>);
+    m.def("kmer_rev",      pybind11::vectorize(&kmer_rev<KLEN>));
+    m.def("kmer_comp",     pybind11::vectorize(&kmer_comp<KLEN>));
+    m.def("kmer_revcomp",  pybind11::vectorize(&kmer_revcomp<KLEN>));
+    m.def("kmer_head",     pybind11::vectorize(&kmer_head<KLEN>));
     m.def("kmer_base",     &kmer_base<KLEN>);
     m.def("kmer_to_str",   &kmer_to_str<KLEN>);
     m.def("seq_to_kmers",  &seq_to_kmers<KLEN>);

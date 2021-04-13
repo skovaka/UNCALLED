@@ -55,10 +55,19 @@ const char BASE_COMP_C[]
 
 const u8 BASE_COMP_B[] {3, 2, 1, 0};
 
+//Binary k-mer representaiton
+using kmer_t = u16;
 
+//Pore model k-mer length
+constexpr u8 KMER_LEN = 5;
+
+//k-mer bitmask
+constexpr kmer_t KMER_MASK = (1 << (2*KMER_LEN)) - 1;
+
+//TODO eliminate
 enum KmerLen {k2=2, k3=3, k4=4, k5=5};
 
-#define KMASK(k) ( (1 << (2*k)) - 1 )
+//#define KMER_MASK(k) ( (1 << (2*k)) - 1 )
 
 template <KmerLen k>
 inline u16 kmer_count() {
@@ -76,16 +85,20 @@ u16 str_to_kmer(std::string kmer, u64 offset=0) {
 
 template <KmerLen k>
 u16 kmer_comp(u16 kmer) {
-    return kmer ^ KMASK((u8) k);
+    return kmer ^ KMER_MASK;
+}
+
+template <KmerLen k>
+u16 kmer_rev(u16 kmer) {
+    kmer = ( (kmer >> 2 & 0x3333) | (kmer & 0x3333) << 2 );
+    kmer = ( (kmer >> 4 & 0x0F0F) | (kmer & 0x0F0F) << 4 );
+    kmer = ( (kmer >> 8 & 0x00FF) | (kmer & 0x00FF) << 8 );
+    return kmer >> (2 * (8 - k));
 }
 
 template <KmerLen k>
 u16 kmer_revcomp(u16 kmer) {
-    u16 r = ~kmer;
-    r = ( (r >> 2 & 0x3333) | (r & 0x3333) << 2 );
-    r = ( (r >> 4 & 0x0F0F) | (r & 0x0F0F) << 4 );
-    r = ( (r >> 8 & 0x00FF) | (r & 0x00FF) << 8 );
-    return r >> (2 * (8 - k));
+    return kmer_rev<k>(~kmer);
 }
 
 template <KmerLen KLEN>
@@ -105,7 +118,7 @@ u8 kmer_head(u16 kmer) {
 
 template <KmerLen k>
 u16 kmer_neighbor(u16 kmer, u8 i) {
-    return ((kmer << 2) & KMASK(k)) | i; 
+    return ((kmer << 2) & KMER_MASK) | i; 
 }
 
 template <KmerLen k>

@@ -30,7 +30,7 @@ const std::string
     GUPPY_BC_MOVE_PATH = "/Basecall_1D_000/BaseCalled_template/Move",
     GUPPY_BC_SMRY_PATH = "/Basecall_1D_000/Summary/basecall_1d_template";
 
-class Fast5Read : public ReadBufferBC {
+class PyFast5Read : public ReadBufferBC {
     public:
 
     Fast5Read(const hdf5_tools::File &file, 
