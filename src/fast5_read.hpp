@@ -97,6 +97,7 @@ class Fast5Read : public ReadBufferBC {
         //Fill in calibrated signal
         signal_.reserve(full_duration_);
         for (u32 i = min_sample; i < max_sample; i++) {
+            //TODO this is wrong? add offset before scaling
             float calibrated = (cal_range * int_data[i] / cal_digit) + cal_offset;
             signal_.push_back(calibrated);
         }

@@ -21,6 +21,9 @@
  * SOFTWARE.
  */
 
+#ifndef READ_BUFFER_BC
+#define READ_BUFFER_BC
+
 #include <algorithm>
 #include "hdf5_tools.hpp"
 #include "read_buffer.hpp"
@@ -70,3 +73,5 @@ class ReadBufferBC : public ReadBuffer {
 
     #endif
 };
+
+#endif
