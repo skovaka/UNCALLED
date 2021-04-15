@@ -90,12 +90,10 @@ class Fast5PyRead : public ReadBufferBC {
         auto raw_slice = raw_data.attr("__getitem__")
                          (py::slice(min_sample, max_sample, 1));
 
-        //auto raw_buf = py::buffer(raw_data.attr("__getitem__")(py::tuple()));
         auto raw_buf = py::buffer(raw_slice);
         auto raw_info = raw_buf.request();
         auto raw_arr = static_cast<u16 *>(raw_info.ptr);
 
-        //for (size_t i = min_sample; i < max_sample; i++) {
         for (size_t i = 0; i < raw_info.shape[0]; i++) {
             //TODO this is wrong? add offset before scaling
             signal_.push_back(cal_scale * (raw_arr[i] + cal_offset));

@@ -35,10 +35,15 @@
 #include <pybind11/pybind11.h>
 #endif
 
+/* Fast5Iter and Fast5Dict extend Fast5Reader
+ * 
+
+*/
+
 class Fast5Reader {
     public:
 
-    typedef struct {
+    struct Params {
         std::vector<std::string> fast5_list;
         std::vector<std::string> read_filter;
         u32 max_reads, max_buffer;
@@ -69,81 +74,72 @@ class Fast5Reader {
             }
             return true;
         }
-    } Params;
+    };
     static Params const PRMS_DEF;
-
-    struct ParamMeta {
-        const char *name, *docstr;
-        const void *ptr;
-    };
-
-    //static constexpr std::array<ParamMeta,4> PARAM_META {{
-    //    {"fast5_list", "File containing a list of paths to fast5 files, one per line.", (void*)(&Params::fast5_list)},
-    //    {"read_filter", "File containing a list of read IDs. Only these reads will be loaded if specified.", (void*)(&Params::read_filter>)},
-    //    {"max_reads", "Maximum number of reads to load", (void*)(&Params::max_reads>)},
-    //    {"max_buffer", "Maximum number of reads to store in memory", (void*)(&Params::max_buffer)}
-    //}};
-
-    typedef struct {
-        const char *fast5_list, *read_filter, *max_reads, *max_buffer;
-    } Docstrs;
-    static constexpr Docstrs DOCSTRS = {
-        fast5_list : 
-            "File containing a list of paths to fast5 files, one per line.",
-        read_filter : 
-            "File containing a list of read IDs. Only these reads will be loaded if specified.",
-        max_reads : 
-            "Maximum number of reads to load.",
-        max_buffer : 
-            "Maximum number of reads to store in memory."
-    };
-
-
-    //TODO: remove reduntant constructors
 
     Fast5Reader();
     Fast5Reader(const Params &p);
     Fast5Reader(const std::vector<std::string> &fast5s, const std::vector<std::string> &reads = {}, const Params &p=PRMS_DEF);
-
     Fast5Reader(const std::string &fast5_list, 
                 const std::string &read_filter="");
 
 
-    static constexpr const char *_DOC_add_fast5 {
-    };
     void add_fast5(const std::string &fast5_path);
 
     bool load_fast5_list(const std::string &fname);
 
+    //Iter
     bool add_read(const std::string &read_id);
 
+    //Iter
     bool load_read_filter(const std::string &fname);
 
+    //Iter
+    //also rename next_read()
     Fast5Read pop_read();
  
-    u32 buffer_size();
- 
-    u32 fill_buffer();
- 
-    bool all_buffered();
- 
+    //Iter
     bool empty();
 
-    private:
+    protected:
     Params PRMS;
 
     enum class Format {MULTI=0, SINGLE=1, UNKNOWN};
 
-    bool open_next();
+    //Change to open_file(u32 i)
+    //bool open_next();
+    bool open_fast5(u32 i);
 
-    u32 max_buffer_, total_buffered_, max_reads_;
+    Fast5Read::Paths get_subpaths(const std::string &base);
+ 
+    //Iter
+    bool all_buffered();
+ 
+    //Iter
+    u32 fill_buffer();
+ 
+    //Iter
+    u32 buffer_size();
 
-    std::deque<std::string> fast5_list_;
-    std::unordered_set<std::string> read_filter_;
+    //Iter
+    //TODO overload/extend open_fast5
+    bool load_read_paths();
 
-    hdf5_tools::File open_fast5_;
-    Format open_fmt_;
+    std::vector<std::string> fast5_list_;
+    hdf5_tools::File fast5_file_; //rename fast5_file_
+    std::vector<std::string> root_ls_;
+    Format fast5_fmt_; //rename file_fmt_
+
     std::deque<std::string> read_paths_;
+
+    //Iter
+    u32 fast5_idx_,
+        max_buffer_, 
+        total_buffered_, 
+        max_reads_;
+
+    //Iter
+    std::unordered_set<std::string> read_filter_;
 
     std::deque<Fast5Read> buffered_reads_;
 
@@ -200,5 +196,9 @@ class Fast5Reader {
 
     #endif
 };
+
+//class Fast5Iter : public Fast5Reader {
+//    
+//}
 
 #endif

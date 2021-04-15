@@ -47,8 +47,6 @@ MapPool::MapPool(Conf &conf)
 std::vector<Paf> MapPool::update() {
     std::vector<Paf> ret;
 
-    fast5s_.fill_buffer();
-
     for (u32 i = 0; i < threads_.size(); i++) {
         if (threads_[i].out_buffered_) {
             ret.push_back(threads_[i].paf_out_);

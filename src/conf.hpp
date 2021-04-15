@@ -75,8 +75,6 @@ class Conf {
     SimParams             client_sim     = SIM_PRMS_DEF;
     MapOrdParams          map_pool_ord   = MAP_ORD_PRMS_DEF;
 
-    static constexpr Fast5Reader::Docstrs fast5_docs = Fast5Reader::DOCSTRS;
-
     Conf() : mode(Mode::UNDEF), threads(1) {}
 
     Conf(Mode m) : Conf() {

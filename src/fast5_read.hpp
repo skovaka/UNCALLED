@@ -33,19 +33,24 @@ const std::string
 class Fast5Read : public ReadBufferBC {
     public:
 
+    struct Paths {
+        std::string raw, channel, analysis;
+    };
+
     Fast5Read(const hdf5_tools::File &file, 
-              const std::string &raw_path, 
-              const std::string &ch_path, 
-              const std::string &anl_path) {
+              const Paths &paths) {
+              //const std::string &raw_path, 
+              //const std::string &ch_path, 
+              //const std::string &anl_path) {
 
         //Get read ID (name), number, and start_time
-        auto raw_attrs = file.get_attr_map(raw_path);
+        auto raw_attrs = file.get_attr_map(paths.raw);
         id_ = raw_attrs["read_id"];
         number_ = atoi(raw_attrs["read_number"].c_str());
         start_sample_ = atoi(raw_attrs["start_time"].c_str());
 
         //Get read channel
-        auto ch_attrs = file.get_attr_map(ch_path);
+        auto ch_attrs = file.get_attr_map(paths.channel);
         channel_idx_ = atoi(ch_attrs["channel_number"].c_str()) - 1;
 
         //And callibration data
@@ -54,20 +59,20 @@ class Fast5Read : public ReadBufferBC {
               cal_offset = atof(ch_attrs["offset"].c_str());
 
         //Load BC data if path exists
-        if (!anl_path.empty() && file.group_exists(anl_path)) {
+        if (!paths.analysis.empty() && file.group_exists(paths.analysis)) {
             bc_loaded_ = true;
 
             //Template start from guppy segmentation
-            std::string seg_path = anl_path + GUPPY_SEG_SMRY_PATH;
+            std::string seg_path = paths.analysis + GUPPY_SEG_SMRY_PATH;
             auto seg_attrs = file.get_attr_map(seg_path);
             template_start_ = atoi(seg_attrs["first_sample_template"].c_str());
     
             //Guppy BaseCalled Event constant length (stride)
-            auto bc_attrs = file.get_attr_map(anl_path + GUPPY_BC_SMRY_PATH);
+            auto bc_attrs = file.get_attr_map(paths.analysis + GUPPY_BC_SMRY_PATH);
             bce_stride_ = atoi(bc_attrs["block_stride"].c_str());
 
             //Read guppy bce moves
-            std::string bc_move_path = anl_path + GUPPY_BC_MOVE_PATH;
+            std::string bc_move_path = paths.analysis + GUPPY_BC_MOVE_PATH;
             file.read(bc_move_path, moves_);
 
         } else {
@@ -75,7 +80,7 @@ class Fast5Read : public ReadBufferBC {
             template_start_ = 0;
         }
 
-        std::string sig_path = raw_path + "/Signal";
+        std::string sig_path = paths.raw + "/Signal";
         std::vector<i16> int_data; 
         file.read(sig_path, int_data);
 
