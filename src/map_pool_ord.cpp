@@ -52,8 +52,8 @@ void MapPoolOrd::add_read(const std::string &id) {
 
 void MapPoolOrd::load_fast5s() {
     while(!fast5s_.empty()) {
-        //ReadBuffer read = static_cast<ReadBuffer>(fast5s_.pop_read());
-        auto read = fast5s_.pop_read();
+        //ReadBuffer read = static_cast<ReadBuffer>(fast5s_.next_read());
+        auto read = fast5s_.next_read();
         channels_[read.get_channel_idx()].push_back(read);
     }
 

@@ -36,7 +36,7 @@ MapPool::MapPool(Conf &conf)
 
     for (u32 i = 0; i < threads_.size(); i++) {
         //if (!fast5s_.empty()) {
-        //    ReadBuffer r = fast5s_.pop_read();
+        //    ReadBuffer r = fast5s_.next_read();
         //    threads_[i].next_read_.swap(r);
         //    threads_[i].in_buffered_ = true;
         //}
@@ -58,7 +58,7 @@ std::vector<Paf> MapPool::update() {
             if (fast5s_.empty()) { 
                 threads_[i].finished_ = true;
             } else {
-                ReadBuffer read = fast5s_.pop_read();
+                ReadBuffer read = fast5s_.next_read();
                 threads_[i].next_read_ = read;
                 threads_[i].in_buffered_ = true;
             }

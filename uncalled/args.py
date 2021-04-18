@@ -47,10 +47,10 @@ class ArgParser:
             "Simulate real-time targeted sequencing.", 
             ["bwa", "sim", "map", "ru"],
         ),
-        #"pafstats" : (
-        #    "Computes speed and accuracy of UNCALLED mappings.",
-        #    ["pafstats"]
-        #)
+        "pafstats" : (
+            "Computes speed and accuracy of UNCALLED mappings.",
+            ["pafstats"]
+        )
     }
 
     OPTS_FORMAT = "add_%s_opts"
@@ -334,3 +334,24 @@ class ArgParser:
         )
 
 
+    def add_pafstats_opts(self, p):
+        p.add_argument(
+            "infile", 
+            type=str, 
+            help="PAF file output by UNCALLED"
+        )
+        p.add_argument(
+            "-n", "--max-reads", 
+            required=False, type=int, default=None, 
+            help="Will only look at first n reads if specified"
+        )
+        p.add_argument(
+            "-r", "--ref-paf", 
+            required=False, type=str, default=None, 
+            help="Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA."
+        )
+        p.add_argument(
+            "-a", "--annotate", 
+            action='store_true', 
+            help="Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag"
+        )

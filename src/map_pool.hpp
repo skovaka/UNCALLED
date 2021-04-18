@@ -55,7 +55,7 @@ class MapPool {
     #endif
 
     private:
-    Fast5Reader fast5s_;
+    Fast5Iter fast5s_;
 
     class MapperThread {
         public:

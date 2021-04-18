@@ -166,7 +166,7 @@ void ClientSim::add_fast5(const std::string &fname) {
 void ClientSim::load_fast5s() {
     u32 n = 0;
     while(!fast5s_.empty()) {
-        ReadBuffer read = fast5s_.pop_read();
+        ReadBuffer read = fast5s_.next_read();
         ReadLoc r = read_locs[read.get_id()];
 
         read.set_channel(r.ch);

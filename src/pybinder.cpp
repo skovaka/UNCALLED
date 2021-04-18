@@ -65,8 +65,14 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Fast5PyRead, ReadBufferBC> fast5_py_read(m, "Fast5PyRead");
     Fast5PyRead::pybind_defs(fast5_py_read);
 
-    py::class_<Fast5Reader> fast5_reader(m, "Fast5Reader");
+    py::class_<Fast5Reader> fast5_reader(m, "_Fast5Reader");
     Fast5Reader::pybind_defs(fast5_reader);
+
+    py::class_<Fast5Iter, Fast5Reader> fast5_iter(m, "_Fast5Iter");
+    Fast5Iter::pybind_defs(fast5_iter);
+
+    py::class_<Fast5Dict, Fast5Reader> fast5_dict(m, "_Fast5Dict");
+    Fast5Dict::pybind_defs(fast5_dict);
 
     py::class_<Event> event(m, "Event");
     py::class_<EventDetector> event_detector(m, "EventDetector");

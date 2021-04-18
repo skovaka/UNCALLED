@@ -351,7 +351,7 @@ class ClientSim {
     friend bool operator< (const SimRead &r1, const SimRead &r2);
 
     SimParams PRMS;
-    Fast5Reader fast5s_;
+    Fast5Iter fast5s_;
     float time_coef_; //TODO: make const?
     u32 ej_time_, ej_delay_, scan_time_, scan_start_; //start_samp_, end_samp_, 
 

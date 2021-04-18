@@ -26,7 +26,7 @@ typedef struct {
 
 std::unordered_map<std::string, Query> 
     load_queries(const std::string &fname, 
-                 Fast5Reader &fast5s) {
+                 Fast5Iter &fast5s) {
 
     std::unordered_map<std::string, Query> queries;
 
@@ -69,6 +69,13 @@ int main(int argc, char** argv) {
         out_prefix = std::string(argv[4]);
     }
 
+    Fast5Dict fast5s_test;
+    fast5s_test.load_index(fast5_fname);
+    auto rd = fast5s_test[query_fname];
+    std::cout << rd.get_id() << "\t" << rd.size() << " READ\n";
+
+    if (false) {
+
     auto model = pmodel_r94_dna_templ;
 
     auto dtwp = DTW_RAW_GLOB;
@@ -81,17 +88,18 @@ int main(int argc, char** argv) {
     BwaIndex<KLEN> idx(index_prefix);
     idx.load_pacseq();
 
-    Fast5Reader fast5s;
+    Fast5Iter fast5s;
     fast5s.add_fast5(fast5_fname);
 
     bool create_events = true;
 
     auto queries = load_queries(query_fname, fast5s);
 
+    std::cout << fast5s.empty() << "\n";
     while (!fast5s.empty()) {
         //Get next read and corrasponding query
-        auto read = fast5s.pop_read();
-        //std::cout << read.get_id() << "\n";
+        auto read = fast5s.next_read();
+        std::cout << read.get_id() << "\n";
         //std::cerr << "aligning " << read.get_id() << "\n";
         //std::cerr.flush();
 
@@ -181,6 +189,8 @@ int main(int argc, char** argv) {
     }
 
     idx.destroy();
+
+    }//end if false
 
     return 0;
 }

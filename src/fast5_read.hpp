@@ -37,6 +37,8 @@ class Fast5Read : public ReadBufferBC {
         std::string raw, channel, analysis;
     };
 
+    Fast5Read() : ReadBufferBC() {}
+
     Fast5Read(const hdf5_tools::File &file, 
               const Paths &paths) {
               //const std::string &raw_path, 

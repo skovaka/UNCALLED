@@ -157,11 +157,6 @@ def paf_ref_compare(qry, ref, ret_qry=True, check_locs=True, ext=1.5):
 
     return tp, tn, fp, fn, fp_unmap
 
-def add_opts(parser):
-    parser.add_argument("infile", type=str, help="PAF file output by UNCALLED")
-    parser.add_argument("-n", "--max-reads", required=False, type=int, default=None, help="Will only look at first n reads if specified")
-    parser.add_argument("-r", "--ref-paf", required=False, type=str, default=None, help="Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA.")
-    parser.add_argument("-a", "--annotate", action='store_true', help="Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag")
 
 def run(args):
     locs = [p for p in parse_paf(args.infile, args.max_reads)]

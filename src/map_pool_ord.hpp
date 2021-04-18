@@ -55,7 +55,7 @@ class MapPoolOrd : public RealtimePool {
     bool try_add_chunk(ReadBuffer &chunk);
     bool is_read_finished(const ReadBuffer &r);
 
-    Fast5Reader fast5s_;
+    Fast5Iter fast5s_;
     //RealtimePool pool_;
 
     u32 active_tgt_;
