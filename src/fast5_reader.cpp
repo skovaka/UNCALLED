@@ -67,10 +67,6 @@ bool Fast5Reader::open_fast5(u32 i) {
     //if (fast5_list_.empty()) return false;
     if (i >= fast5_list_.size()) return false;
 
-    //fast5_file_.open(fast5_list_.front());
-    //fast5_list_.pop_front();
-    //
-
     fast5_file_.open(fast5_list_[i]);
 
     fmt_ = Format::UNKNOWN;
@@ -110,10 +106,12 @@ Fast5Read::Paths Fast5Reader::get_subpaths(const std::string &path) {
 
 Fast5Iter::Fast5Iter() : Fast5Reader() {
     total_buffered_ = 0;
+    fast5_idx_ = 0;
 }
 
 Fast5Iter::Fast5Iter(const Params &p) : Fast5Reader(p) {
     total_buffered_ = 0;
+    fast5_idx_ = 0;
 
     for (auto &fname : p.fast5_list) {
         add_fast5(fname);
@@ -272,15 +270,13 @@ u32 Fast5Iter::buffer_size() {
     return buffered_reads_.size();
 }
 
-Fast5Dict::Fast5Dict() : Fast5Reader() {
-    fast5_idx_ = -1;
-}
+Fast5Dict::Fast5Dict() : Fast5Dict(PRMS_DEF) {}
 
 Fast5Dict::Fast5Dict(const Params &p) : Fast5Reader(p) {
     fast5_idx_ = -1;
 }
 
-Fast5Dict::Fast5Dict(Fast5ReadMap fast5_map, const Params &p) {
+Fast5Dict::Fast5Dict(Fast5ReadMap fast5_map, const Params &p) : Fast5Dict(p) {
     for (auto fast5_reads : fast5_map) {
         auto i = add_fast5(fast5_reads.first);
         for (auto &read : fast5_reads.second) {
@@ -308,7 +304,6 @@ bool Fast5Dict::load_index(const std::string &filename) {
         if (itr == fast5_idxs.end()) {
             i = add_fast5(fast5);
             fast5_idxs[fast5] = i;
-            std::cout << "Add " << fast5 << "\n";
         } else {
             i = itr->second;
         }
@@ -324,7 +319,6 @@ void Fast5Dict::add_read(const std::string &read_id, u32 fast5_idx) {
 }
 
 Fast5Read Fast5Dict::operator[](const std::string &read_id) {
-    std::cout << fast5_idx_ << "\n";
 
     auto itr = reads_.find(read_id);
     if (itr == reads_.end()) {

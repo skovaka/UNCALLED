@@ -4,7 +4,8 @@ import glob
 import numpy as np
 import pandas as pd
 import os
-from _uncalled import _Fast5Dict
+from _uncalled import _Fast5Dict, _Fast5Iter
+import uncalled as unc
 
 def fast5_glob(root, recursive):
     suffix = "*.fast5"
@@ -13,7 +14,7 @@ def fast5_glob(root, recursive):
     return glob.iglob(os.path.join(root, suffix), recursive=recursive)
 
 class Fast5Dict(_Fast5Dict):
-    def __init__(self, seqsum, root_dir=".", recursive=False):
+    def __init__(self, root_dir=".", seqsum=None, recursive=False, conf=unc.Conf()):
 
         fast5_paths = {
             os.path.basename(path) : path
@@ -29,9 +30,13 @@ class Fast5Dict(_Fast5Dict):
             for fast5,rows in groups.items()
         }
 
-        print(groups)
+        print(conf.fast5_reader.load_bc)
 
-        _Fast5Dict.__init__(self, groups)
+        _Fast5Dict.__init__(self, groups, conf.fast5_reader)
+
+class Fast5Iter(_Fast5Iter):
+    def __init__(self, params):
+        _Fast5Iter.__init__(self, params)
 
 if __name__ == "__main__":
     import argparse

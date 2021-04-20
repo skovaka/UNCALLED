@@ -117,6 +117,7 @@ class Fast5Reader {
 
     static void pybind_defs(pybind11::class_<Fast5Reader> &c) {
 
+        PY_FAST5_READER_METH(add_fast5, "Adds fast5 filename");
 
         pybind11::class_<Params> p(c, "Params");
         //p.def_readwrite(PARAM_META[0], &Fast5Reader::Params::P);
@@ -229,6 +230,7 @@ class Fast5Dict : public Fast5Reader {
     static void pybind_defs(pybind11::class_<Fast5Dict, Fast5Reader> &c) {
 
         c.def(pybind11::init());
+        c.def(pybind11::init<Fast5ReadMap, Params>());
         c.def(pybind11::init<Fast5ReadMap>());
         
         PY_FAST5_DICT_METH(load_index, "");
