@@ -107,6 +107,9 @@ class PafEntry:
 
 
 def parse_paf(infile, max_load=None):
+    if max_load == 0:
+        max_load = None
+
     if isinstance(infile, str):
         infile = open(infile)
     c = 0
