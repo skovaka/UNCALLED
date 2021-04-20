@@ -35,41 +35,41 @@ import numpy as np
 
 MAX_SLEEP = 0.01
 
-def index_cmd(args):
+def index_cmd(conf):
 
-    if len(args.conf.bwa_prefix) == 0:
-        print(args.conf.bwa_prefix, "=", args.fasta_filename)
-        args.conf.bwa_prefix = args.fasta_filename
+    if len(conf.bwa_prefix) == 0:
+        print(conf.bwa_prefix, "=", conf.fasta_filename)
+        conf.bwa_prefix = conf.fasta_filename
     else:
-        print(args.conf.bwa_prefix)
+        print(conf.bwa_prefix)
 
     bwa_built = True
 
     for suff in unc.index.BWA_SUFFS:
-        if not os.path.exists(args.conf.bwa_prefix + suff):
+        if not os.path.exists(conf.bwa_prefix + suff):
             bwa_built = False
             break
 
     if bwa_built:
-        sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % args.conf.bwa_prefix)
+        sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % conf.bwa_prefix)
     else:
-        unc.BwaIndex.create(args.fasta_filename, args.conf.bwa_prefix)
+        unc.BwaIndex.create(conf.fasta_filename, conf.bwa_prefix)
 
     sys.stderr.write("Initializing parameter search\n")
-    p = unc.index.IndexParameterizer(args)
+    p = unc.index.IndexParameterizer(conf)
 
     p.add_preset("default", tgt_speed=115)
 
-    if args.probs != None:
-        for tgt in args.probs.split(","):
+    if conf.probs != None:
+        for tgt in conf.probs.split(","):
             sys.stderr.write("Writing 'prob_%s' parameters\n" % tgt)
             try:
                 p.add_preset("prob_%s" % tgt, tgt_prob=float(tgt))
             except Exception as e:
                 sys.stderr.write("Failed to add 'prob_%s'\n" % tgt)
 
-    if args.speeds != None:
-        for tgt in args.speeds.split(","):
+    if conf.speeds != None:
+        for tgt in conf.speeds.split(","):
             sys.stderr.write("Writing 'speed_%s' parameters\n" % tgt)
             try:
                 p.add_preset("speed_%s" % tgt, tgt_speed=float(tgt))
@@ -127,9 +127,7 @@ def assert_exists(fname):
         sys.stderr.write("Error: '%s' does not exist\n" % fname)
         sys.exit(1)
 
-def map_cmd(args):
-
-    conf = args.conf
+def map_cmd(conf):
 
     assert_exists(conf.bwa_prefix + ".bwt")
     assert_exists(conf.bwa_prefix + ".uncl")
@@ -145,7 +143,7 @@ def map_cmd(args):
     mapper = unc.MapPool(conf)
 
     sys.stderr.write("Loading fast5s\n")
-    for fast5 in load_fast5s(args.fast5s, args.recursive):
+    for fast5 in load_fast5s(conf.fast5s, conf.recursive):
         if fast5 != None:
             mapper.add_fast5(fast5)
 
@@ -171,12 +169,10 @@ def map_cmd(args):
     sys.stderr.write("Finishing\n")
     mapper.stop()
 
-def realtime_cmd(args):
+def realtime_cmd(conf):
 
     #TODO replace with conf mode
-    sim = args.subcmd == "sim"
-
-    conf = args.conf
+    sim = conf.subcmd == "sim"
 
     assert_exists(conf.bwa_prefix + ".bwt")
     assert_exists(conf.bwa_prefix + ".uncl")
@@ -189,7 +185,7 @@ def realtime_cmd(args):
             client = unc.ClientSim(conf)
             unc.sim_utils.load_sim(client, conf)
 
-            for fast5 in load_fast5s(args.fast5s, args.recursive):
+            for fast5 in load_fast5s(conf.fast5s, conf.recursive):
                 if fast5 != None:
                     client.add_fast5(fast5)
 
@@ -306,18 +302,18 @@ def realtime_cmd(args):
     if pool != None:
         pool.stop_all()
 
-def sim_cmd(args):
+def sim_cmd(conf):
     unc.sim_utils.load_sim()
 
 #TODO fix
-def list_ports_cmd(args):
+def list_ports_cmd(conf):
     log_re = re.compile("^([0-9\-]+ [0-9:]+).+ :.+instance_started.+")
     port_re = re.compile("grpc_port = (\d+)")
     device_re = re.compile("(device_id|instance) = ([^\s,]+)")
 
-    fnames = os.listdir(args.log_dir)
+    fnames = os.listdir(conf.log_dir)
     log_fnames = list(sorted( (f for f in fnames if f.startswith("mk_manager_svc")) ))
-    latest_log = os.path.join(args.log_dir, log_fnames[-1])
+    latest_log = os.path.join(conf.log_dir, log_fnames[-1])
 
     for line in open(latest_log):
         lm = log_re.match(line)
@@ -336,20 +332,20 @@ def list_ports_cmd(args):
         sys.stdout.write("%s (%s): %s\n" % (device, timestamp, port))
 
 
-
 if __name__ == "__main__":
     args = unc.args.ArgParser()
+    conf = args.conf
 
-    if args.subcmd == "index":
-        index_cmd(args)
-    elif args.subcmd == "map":
-        map_cmd(args)
-    elif args.subcmd in {"sim", "realtime"}:
-        realtime_cmd(args)
-    elif args.subcmd == "list-ports":
-        list_ports_cmd(args)
-    elif args.subcmd == "pafstats":
-        unc.pafstats.run(args)
+    if conf.subcmd == "index":
+        index_cmd(conf)
+    elif conf.subcmd == "map":
+        map_cmd(conf)
+    elif conf.subcmd in {"sim", "realtime"}:
+        realtime_cmd(conf)
+    elif conf.subcmd == "list-ports":
+        list_ports_cmd(conf)
+    elif conf.subcmd == "pafstats":
+        unc.pafstats.run(conf)
     else:
         args.parser.print_help()
         

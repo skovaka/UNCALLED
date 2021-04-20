@@ -51,44 +51,44 @@ class IndexParameterizer:
     MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_rna_threshs.txt")
     #MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_threshs.txt")
 
-    def __init__(self, args):
-        self.out_fname = args.conf.bwa_prefix + UNCL_SUFF
+    def __init__(self, conf):
+        self.out_fname = conf.bwa_prefix + UNCL_SUFF
 
-        self.pck1 = args.matchpr1
-        self.pck2 = args.matchpr2
+        self.pck1 = conf.matchpr1
+        self.pck2 = conf.matchpr2
 
-        self.calc_map_stats(args)
+        self.calc_map_stats(conf)
         self.get_model_threshs()
 
         self.functions = dict()
 
-    def calc_map_stats(self, args):
+    def calc_map_stats(self, conf):
 
-        ann_in = open(args.conf.bwa_prefix + ANN_SUFF)
+        ann_in = open(conf.bwa_prefix + ANN_SUFF)
         header = ann_in.readline()
         ref_len = int(header.split()[0])
         ann_in.close()
 
-        approx_samps = ref_len / args.max_sample_dist
-        if approx_samps < args.min_samples:
-            sample_dist = int(np.ceil(ref_len/args.min_samples))
-        elif approx_samps > args.max_samples:
-            sample_dist = int(np.floor(ref_len/args.max_samples))
+        approx_samps = ref_len / conf.max_sample_dist
+        if approx_samps < conf.min_samples:
+            sample_dist = int(np.ceil(ref_len/conf.min_samples))
+        elif approx_samps > conf.max_samples:
+            sample_dist = int(np.floor(ref_len/conf.max_samples))
         else:
-            sample_dist = args.max_sample_dist
+            sample_dist = conf.max_sample_dist
 
-        print(args.conf.bwa_prefix)
-        fmlens = unc.self_align(args.conf.bwa_prefix, sample_dist)
-        path_kfmlens = [p[args.kmer_len-1:] if len(p) >= args.kmer_len else [1] for p in fmlens]
+        print(conf.bwa_prefix)
+        fmlens = unc.self_align(conf.bwa_prefix, sample_dist)
+        path_kfmlens = [p[conf.kmer_len-1:] if len(p) >= conf.kmer_len else [1] for p in fmlens]
 
         max_pathlen = 0
-        all_pathlens = [len(p) for p in path_kfmlens if len(p) <= args.max_replen]
+        all_pathlens = [len(p) for p in path_kfmlens if len(p) <= conf.max_replen]
         gt1_counts = np.zeros(max(all_pathlens))
         for l in all_pathlens:
             for i in range(l):
                 gt1_counts[i] += 1
 
-        max_pathlen = np.flatnonzero(gt1_counts / len(all_pathlens) <= args.pathlen_percentile)[0]
+        max_pathlen = np.flatnonzero(gt1_counts / len(all_pathlens) <= conf.pathlen_percentile)[0]
         max_fmexp = int(np.log2(max([p[0] for p in path_kfmlens])))+1
         fm_path_mat = np.zeros((max_fmexp, max_pathlen))
 

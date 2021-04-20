@@ -97,12 +97,12 @@ class ArgParser:
 
             if not a.startswith("_"):
                 #Store argument in C++ Conf object if applicable present
-                if v is not None and hasattr(self.conf, a):
+                if v is not None or not hasattr(self.conf, a): # and hasattr(self.conf, a):
                     setattr(self.conf, a, v)
 
                 #Otherwise store within python
-                else:
-                    setattr(self, a, v) 
+                #else:
+                #    setattr(self, a, v) 
 
 
     def add_index_opts(self, p):
