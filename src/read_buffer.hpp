@@ -133,33 +133,33 @@ class ReadBuffer {
 
     #ifdef PYBIND
 
-    #define PY_READ_METH(P) c.def(#P, &ReadBuffer::P);
-    #define PY_READ_RPROP(P) c.def_property_readonly(#P, &ReadBuffer::get_##P);
-    #define PY_READ_PRM(P) p.def_readwrite(#P, &ReadBuffer::Params::P);
+    #define PY_READ_METH(P, D) c.def(#P, &ReadBuffer::P, D);
+    #define PY_READ_RPROP(P, D) c.def_property_readonly(#P, &ReadBuffer::get_##P, D);
+    #define PY_READ_PRM(P, D) p.def_readwrite(#P, &ReadBuffer::Params::P, D);
 
     static void pybind_defs(pybind11::class_<ReadBuffer> &c) {
         c.def(pybind11::init<ReadBuffer>());
-        PY_READ_METH(empty);
-        PY_READ_RPROP(id);
-        PY_READ_RPROP(start);
-        PY_READ_RPROP(end);
-        PY_READ_RPROP(full_duration);
-        PY_READ_RPROP(channel);
-        PY_READ_RPROP(number);
-        PY_READ_RPROP(signal);
+        PY_READ_METH(empty, "");
+        PY_READ_RPROP(id, "");
+        PY_READ_RPROP(start, "");
+        PY_READ_RPROP(end, "");
+        PY_READ_RPROP(full_duration, "");
+        PY_READ_RPROP(channel, "");
+        PY_READ_RPROP(number, "");
+        PY_READ_RPROP(signal, "");
 
         c.def("__len__", &ReadBuffer::size);
         c.def("__getitem__", &ReadBuffer::operator[]);
 
         pybind11::class_<Params> p(c, "Params");
-        PY_READ_PRM(num_channels);
-        PY_READ_PRM(bp_per_sec);
-        PY_READ_PRM(sample_rate);
-        PY_READ_PRM(chunk_time);
-        PY_READ_PRM(start_chunk);
-        PY_READ_PRM(max_chunks);
-        PY_READ_PRM(seq_fwd);
-        PY_READ_PRM(skip_notempl);
+        PY_READ_PRM(num_channels, "Number of channels on device");
+        PY_READ_PRM(bp_per_sec, "Expected bases sequenced per second");
+        PY_READ_PRM(sample_rate, "Number of raw samples per second");
+        PY_READ_PRM(chunk_time, "");
+        PY_READ_PRM(start_chunk, "");
+        PY_READ_PRM(max_chunks, "");
+        PY_READ_PRM(seq_fwd, "");
+        PY_READ_PRM(skip_notempl, "");
     }
 
     #endif

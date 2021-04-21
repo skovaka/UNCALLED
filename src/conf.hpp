@@ -360,8 +360,7 @@ class Conf {
         PY_CONF_VAL(map_pool_ord)
 
         c.def_readwrite("mode", &Conf::mode);
-
-        DEFPRP(threads)
+        c.def_readwrite("threads", &Conf::threads, "Number of threads to use");
 
         DEFPRP(bwa_prefix)
         DEFPRP(idx_preset)

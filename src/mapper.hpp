@@ -352,7 +352,7 @@ class Mapper {
     #ifdef PYBIND
 
     #define PY_MAPPER_METH(N,D) map.def(#N, &Mapper::N, D);
-    #define PY_MAPPER_PRM(P) prm.def_readwrite(#P, &Mapper::Params::P);
+    #define PY_MAPPER_PRM(P,D) prm.def_readwrite(#P, &Mapper::Params::P, D);
     #define PY_PATHBUF_PRM(P) path.def_readonly(#P, &Mapper::PathBuffer::P);
 
     public:
@@ -406,24 +406,24 @@ class Mapper {
         #endif
 
         pybind11::class_<Params> prm(map, "Params");
-        PY_MAPPER_PRM(seed_len)
-        PY_MAPPER_PRM(min_rep_len)
-        PY_MAPPER_PRM(max_rep_copy)
-        PY_MAPPER_PRM(max_paths)
-        PY_MAPPER_PRM(max_consec_stay)
-        PY_MAPPER_PRM(max_events)
-        PY_MAPPER_PRM(max_stay_frac)
-        PY_MAPPER_PRM(min_seed_prob)
-        PY_MAPPER_PRM(evt_batch_size)
-        PY_MAPPER_PRM(evt_timeout)
-        PY_MAPPER_PRM(chunk_timeout)
-        PY_MAPPER_PRM(bwa_prefix)
-        PY_MAPPER_PRM(idx_preset)
-        PY_MAPPER_PRM(pore_model)
-        PY_MAPPER_PRM(seed_tracker)
-        PY_MAPPER_PRM(normalizer)
-        PY_MAPPER_PRM(event_detector)
-        PY_MAPPER_PRM(event_profiler)
+        PY_MAPPER_PRM(seed_len, "")
+        PY_MAPPER_PRM(min_rep_len, "")
+        PY_MAPPER_PRM(max_rep_copy, "")
+        PY_MAPPER_PRM(max_paths, "")
+        PY_MAPPER_PRM(max_consec_stay, "")
+        PY_MAPPER_PRM(max_events, "")
+        PY_MAPPER_PRM(max_stay_frac, "")
+        PY_MAPPER_PRM(min_seed_prob, "")
+        PY_MAPPER_PRM(evt_batch_size, "")
+        PY_MAPPER_PRM(evt_timeout, "")
+        PY_MAPPER_PRM(chunk_timeout, "")
+        PY_MAPPER_PRM(bwa_prefix, "BWA prefix to map to. Must be processed by \"uncalled index\".")
+        PY_MAPPER_PRM(idx_preset, "Index parameters to use")
+        PY_MAPPER_PRM(pore_model, "")
+        PY_MAPPER_PRM(seed_tracker, "")
+        PY_MAPPER_PRM(normalizer, "")
+        PY_MAPPER_PRM(event_detector, "")
+        PY_MAPPER_PRM(event_profiler, "")
     }
 
     #endif

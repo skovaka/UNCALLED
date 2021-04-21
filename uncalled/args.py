@@ -27,59 +27,46 @@ import os
 import argparse
 import numpy as np
 import uncalled as unc
+import toml
+
+def flag_to_var(flag):
+    return flag.strip("-").replace("-","_")
 
 class ArgParser:
 
     BWA_OPTS = (
-        ("bwa_prefix", {
-            "type" : str, 
-            "help" : "BWA prefix to mapping to. Must be processed by \"uncalled index\"."
-        }),
-        ("-p", "--idx-preset", {
-            "type" : str, 
-            "default" : unc.Conf().idx_preset, 
-            "help" : "Mapping mode"
-        }),
+        ("bwa_prefix", "mapper"),
+        (("-p", "--idx-preset"), "mapper"),
     )
 
     FAST5_OPTS = (
         ("fast5s", {
             "nargs" : '+', 
             "type" : str, 
-            "help" : "Reads to map. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
+            "help" : "Reads to map. Can be a directory which will be searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
         }),
-        ("-r", "--recursive", {
-            "action" : "store_true"
+        (("-r", "--recursive"), {
+            "action" : "store_true",
+            "help" : "Will perform recursive directory search for fast5 files if specified",
         }),
-        ("-l", "--read-list", {
+        (("-l", "--read-list"), {
             "type" : str, 
             "default" : None, 
-            #"help" : unc.Conf.read_list.__doc__
+            "help" : "List of read IDs, either comma separated or path to text file containing one read ID per line. Will only map these reads if specified"
         }),
-        ("-n", "--max-reads", {
-            "type" : int,
-            "default" : None, 
-            "help" : unc.Conf.max_reads.__doc__
-        }),
+        (("-n", "--max-reads"), "fast5_reader")
     )
 
     MAP_OPTS = (
-        ("-t", "--threads", {
-            "type" : int, 
-            "default" : unc.Conf().threads, 
-            "help" : "Number of threads to use for mapping"
-        }),
-        ("--num-channels", {
-            "type" : int, 
-            "default" : unc.Conf().num_channels, 
-            "help" : "Number of channels used in sequencing. If provided will use unique mapper for each channel. Useful for streaming normalization simulation."
-        }),
-        ("-e", "--max-events", {
+        (("-t", "--threads"), None),
+        ("--num-channels", "read_buffer"),
+
+        (("-e", "--max-events"), {
             "type" : int, 
             "default" : unc.Conf().max_events, 
             "help" : "Will give up on a read after this many events have been processed"
         }),
-        ("-c", "--max-chunks", {
+        (("-c", "--max-chunks"), {
             "type" : int, 
             "default" : unc.Conf().max_chunks, 
             "required" : True, 
@@ -103,7 +90,7 @@ class ArgParser:
         }),
 
         #TODO move to different parser set
-        ("-o", "--out-prefix", {
+        (("-o", "--out-prefix"), {
             "type" : str, 
             "default" : None, 
             "required" : False, 
@@ -123,7 +110,7 @@ class ArgParser:
             "type" : str, 
             "help" : "Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
         }),
-        ("-r", "--recursive", {
+        (("-r", "--recursive"), {
             "action" : "store_true"
         }),
         ("--ctl-seqsum", {
@@ -171,12 +158,12 @@ class ArgParser:
             "type" : str, 
             "help" : "FASTA file to index"
         }),
-        ("-o", "--bwa-prefix", {
+        (("-o", "--bwa-prefix"), {
             "type" : str, 
             "default" : None, 
             "help" : "Index output prefix. Will use input fasta filename by default"
         }),
-        ("-s", "--max-sample-dist", {
+        (("-s", "--max-sample-dist"), {
             "type" : int, 
             "default" : 100, 
             "help" : "Maximum average sampling distance between reference alignments."
@@ -191,27 +178,27 @@ class ArgParser:
             "default" : 1000000, 
             "help" : "Maximum number of alignments to produce (approximate, due to deterministically random start locations}),"
         }),
-        ("-k", "--kmer-len", {
+        (("-k", "--kmer-len"), {
             "type" : int, 
             "default" : 5,
             "help" : "Model k-mer length"
         }),
-        ("-1", "--matchpr1", {
+        (("-1", "--matchpr1"), {
             "type" : float, 
             "default" : 0.6334, 
             "help" : "Minimum event match probability"
         }),
-        ("-2", "--matchpr2", {
+        (("-2", "--matchpr2"), {
             "type" : float, 
             "default" : 0.9838, 
             "help" : "Maximum event match probability"
         }),
-        ("-f", "--pathlen-percentile", {
+        (("-f", "--pathlen-percentile"), {
             "type" : float, 
             "default" : 0.05, 
             "help" : ""
         }),
-        ("-m", "--max-replen", {
+        (("-m", "--max-replen"), {
             "type" : int, 
             "default" : 100, 
             "help" : ""
@@ -234,19 +221,19 @@ class ArgParser:
             "type" : str, 
             "help" : "PAF file output by UNCALLED"
         }),
-        ("-n", "--max-reads", {
+        (("-n", "--max-reads"), {
             "required" : False, 
             "type" : int, 
             "default" : None, 
             "help" : "Will only look at first n reads if specified"
         }),
-        ("-r", "--ref-paf", {
+        (("-r", "--ref-paf"), {
             "required" : False, 
             "type" : str, 
             "default" : None, 
             "help" : "Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA."
         }),
-        ("-a", "--annotate", {
+        (("-a", "--annotate"), {
             "action" : 'store_true', 
             "help" : "Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag"
         }),
@@ -256,27 +243,22 @@ class ArgParser:
         "index" : (
             "Builds the UNCALLED index of a FASTA reference", 
             INDEX_OPTS
-            #["index"]
         ),
         "map" : (
             "Map fast5 files to a DNA reference",
             BWA_OPTS + FAST5_OPTS + MAP_OPTS
-            #["bwa", "fast5", "map"]
         ),
         "realtime" : (
             "Perform real-time targeted (ReadUntil) sequencing",
             BWA_OPTS + MAP_OPTS + REALTIME_OPTS #TODO ADD RU OPTS!!
-            #["bwa", "map", "ru", "realtime"],
         ),
         "sim" : (
             "Simulate real-time targeted sequencing.", 
             BWA_OPTS + SIM_OPTS + MAP_OPTS #TODO ADD RU OPTS!!
-            #["bwa", "sim", "map", "ru"],
         ),
         "pafstats" : (
             "Computes speed and accuracy of UNCALLED mappings.",
             PAFSTATS_OPTS
-            #["pafstats"]
         )
     }
 
@@ -302,9 +284,34 @@ class ArgParser:
                     formatter_class=argparse.ArgumentDefaultsHelpFormatter
             )
             for opt in opts:
-                args = opt[:-1]
-                kwargs = opt[-1]
-                arg = sp.add_argument(*args, **kwargs)
+                flags = opt[0]
+                if type(flags) == str:
+                    flags = (flags,)
+
+                if type(opt[1]) == dict:
+                    kwargs = opt[1]
+                else:
+                    if opt[1] is None:
+                        group = self.conf
+                    else:
+                        group = getattr(self.conf, opt[1])
+
+                    if len(opt) == 3:
+                        param_name = opt[2]
+                    else:
+                        param_name = flag_to_var(flags[-1])
+
+                    default = getattr(group, param_name)
+                    doc = getattr(type(group), param_name).__doc__
+                    kwargs = {
+                        "default" : default,
+                        "type"    : type(default),
+                        "help"    : doc
+                    }
+
+                print(subcmd, flags, kwargs)
+
+                arg = sp.add_argument(*flags, **kwargs)
 
         self.parse_args(argv)
 
