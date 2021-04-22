@@ -155,11 +155,11 @@ class ReadBuffer {
         PY_READ_PRM(num_channels, "Number of channels on device");
         PY_READ_PRM(bp_per_sec, "Expected bases sequenced per second");
         PY_READ_PRM(sample_rate, "Number of raw samples per second");
-        PY_READ_PRM(chunk_time, "");
-        PY_READ_PRM(start_chunk, "");
-        PY_READ_PRM(max_chunks, "");
-        PY_READ_PRM(seq_fwd, "");
-        PY_READ_PRM(skip_notempl, "");
+        PY_READ_PRM(chunk_time, "Chunk length in seconds");
+        PY_READ_PRM(start_chunk, "First chunk to load");
+        PY_READ_PRM(max_chunks, "Will give up on a read after this many chunks have been processed.");
+        PY_READ_PRM(seq_fwd, "If true indicates that the signal moves 5' -> 3'");
+        PY_READ_PRM(skip_notempl, "If true will skip pre-template-start if basecaller data is loaded");
     }
 
     #endif

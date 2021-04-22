@@ -30,13 +30,19 @@ class Fast5Dict(_Fast5Dict):
             for fast5,rows in groups.items()
         }
 
-        print(conf.fast5_reader.load_bc)
-
         _Fast5Dict.__init__(self, groups, conf.fast5_reader)
 
 class Fast5Iter(_Fast5Iter):
     def __init__(self, params):
         _Fast5Iter.__init__(self, params)
+
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        if self.empty():
+            raise StopIteration
+        return self.next_read()
 
 if __name__ == "__main__":
     import argparse

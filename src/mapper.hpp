@@ -411,7 +411,7 @@ class Mapper {
         PY_MAPPER_PRM(max_rep_copy, "")
         PY_MAPPER_PRM(max_paths, "")
         PY_MAPPER_PRM(max_consec_stay, "")
-        PY_MAPPER_PRM(max_events, "")
+        PY_MAPPER_PRM(max_events, "Will give up on a read after this many events have been processed")
         PY_MAPPER_PRM(max_stay_frac, "")
         PY_MAPPER_PRM(min_seed_prob, "")
         PY_MAPPER_PRM(evt_batch_size, "")

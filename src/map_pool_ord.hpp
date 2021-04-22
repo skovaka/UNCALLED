@@ -93,12 +93,12 @@ class MapPoolOrd : public RealtimePool {
         PY_MAP_ORD_METH(get_read);
         PY_MAP_ORD_METH(end_read);
 
+        pybind11::class_<MapOrdParams> p(c, "MapOrdParams");
+        PY_MAP_ORD_PRM(min_active_reads);
+
         #ifdef PYDEBUG
         PY_MAP_ORD_METH(get_meta)
         #endif
-
-        //pybind11::class_<MapOrdParams> p(c, "Params");
-        //PY_MAP_ORD_PRM(min_active_reads)
     }
 
     #endif

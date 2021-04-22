@@ -332,35 +332,40 @@ class Conf {
                 &Conf::set_##P, \
                 Conf::doc_##P());
 
-    #define PY_CONF_VAL(P) c.def_readwrite(#P, &Conf::P);
+        
+    static std::vector<std::string> _PARAM_GROUPS, _GLOBAL_PARAMS;
 
     static void pybind_defs(pybind11::class_<Conf> &c) {
         c.def(pybind11::init<const std::string &>())
          .def(pybind11::init())
          .def("load_toml", &Conf::load_toml);
 
-        constexpr auto name = "event_detector";
-
         DEF_METH(set_r94_rna, "Sets parameters for RNA sequencing")
         DEF_METH(set_mode_map_ord, "Sets parameters for map_ord")
         DEF_METH(export_static, "Sets static parameters for ReadBuffer and Mapper")
 
-        //TODO expose all parameter sets (within hpp files and here)
-        //maybe replace a lot of this get/set nonsense
-        c.def_readwrite(name, &Conf::event_detector);
-        PY_CONF_VAL(mapper)
-        PY_CONF_VAL(read_buffer)
-        PY_CONF_VAL(normalizer) 
-        PY_CONF_VAL(event_detector)
-        PY_CONF_VAL(event_profiler)
-        PY_CONF_VAL(seed_tracker)
-        PY_CONF_VAL(fast5_reader) 
-        PY_CONF_VAL(realtime) 
-        PY_CONF_VAL(client_sim)
-        PY_CONF_VAL(map_pool_ord)
+        #define CONF_ATTR(P, D, V) \
+            c.def_readwrite(#P, &Conf::P, D); \
+            V.push_back(std::string(#P));
+        #define CONF_GROUP(P, D) CONF_ATTR(P, D, _PARAM_GROUPS)
+        #define CONF_GLOBAL(P, D) CONF_ATTR(P, D, _GLOBAL_PARAMS)
 
-        c.def_readwrite("mode", &Conf::mode);
-        c.def_readwrite("threads", &Conf::threads, "Number of threads to use");
+        CONF_GLOBAL(threads, "Number of threads to use")
+
+        CONF_GROUP(mapper, "Mapper parameters")
+        CONF_GROUP(read_buffer, "ReadBuffer parameters")
+
+        CONF_GROUP(normalizer, "") 
+        CONF_GROUP(event_detector, "")
+        CONF_GROUP(event_profiler, "")
+        CONF_GROUP(seed_tracker, "")
+        CONF_GROUP(fast5_reader, "") 
+        CONF_GROUP(realtime, "") 
+        CONF_GROUP(client_sim, "")
+        CONF_GROUP(map_pool_ord, "")
+
+        c.def_readonly_static("_PARAM_GROUPS", &Conf::_PARAM_GROUPS);
+        c.def_readonly_static("_GLOBAL_PARAMS", &Conf::_GLOBAL_PARAMS);
 
         DEFPRP(bwa_prefix)
         DEFPRP(idx_preset)
@@ -408,7 +413,7 @@ class Conf {
         PY_CONF_MODE(REALTIME);
         PY_CONF_MODE(SIM);
         PY_CONF_MODE(MAP_ORD);
-        m.export_values();
+        //m.export_values();
     }
     #endif
 };

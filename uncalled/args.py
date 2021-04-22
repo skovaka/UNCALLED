@@ -28,75 +28,131 @@ import argparse
 import numpy as np
 import uncalled as unc
 import toml
+import inspect
 
 def flag_to_var(flag):
     return flag.strip("-").replace("-","_")
 
+def is_public(name):
+    print(name)
+    return not name.startswith("_")
+
+TOML_TYPES = {int, float, str, list}
+
+def param_valid(name, val):
+    return (not name.startswith("_") and
+            type(val) in TOML_TYPES and
+            (not hasattr(val, "__len__") or len(val) > 0))
+
+def conf_to_toml(conf, filename=None):
+    out = dict()
+
+    for param in conf._GLOBAL_PARAMS:
+        val = getattr(conf,param)
+        if param_valid(param, val):
+            out[param] = val
+
+    for param, val in vars(conf).items():
+        if param_valid(param, val):
+            out[param] = val
+
+    for group_name in conf._PARAM_GROUPS:
+        group = getattr(conf, group_name)
+        out[group_name] = dict()
+        for param in dir(group):
+            val = getattr(group,param)
+            if param_valid(param, val):
+                out[group_name][param] = val
+
+    if filename is None:
+        return toml.dumps(out)
+    else:
+        return toml.dump(out, filename)
+
+def toml_to_conf(filename, conf):
+    toml_dict = toml.load(filename)
+
+    for name, val in toml_dict.items():
+        if isinstance(val, dict):
+            group = getattr(conf, name, None)
+            if group is None:
+                group = dict()
+                setattr(conf, name, group)
+            for param, param_val in val.items():
+                group[param] = param_val
+        else:
+            setattr(conf, name, val)
+    
+    return conf
+
 class ArgParser:
 
+    class Groups:
+        GLOBAL   = unc.Conf
+        MAPPER   = unc.Conf.mapper
+        READ     = unc.Conf.read_buffer
+        NORM     = unc.Conf.normalizer
+        EVENT    = unc.Conf.event_detector
+        PROFILER = unc.Conf.event_profiler
+        SEED     = unc.Conf.seed_tracker
+        FAST5    = unc.Conf.fast5_reader
+        REALTIME = unc.Conf.realtime
+
+    class Opt:
+        def __init__(self, args, group=None, kw={}, param=None):
+            self.args = args if type(args) == tuple else (args,)
+            self.group = group
+            self.kw = kw
+            self.param = param
+
     BWA_OPTS = (
-        ("bwa_prefix", "mapper"),
-        (("-p", "--idx-preset"), "mapper"),
+        Opt("bwa_prefix", Groups.MAPPER),
+        Opt(("-p", "--idx-preset"), Groups.MAPPER),
     )
 
     FAST5_OPTS = (
-        ("fast5s", {
+        Opt("fast5s", kw={
             "nargs" : '+', 
             "type" : str, 
             "help" : "Reads to map. Can be a directory which will be searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
         }),
-        (("-r", "--recursive"), {
+        Opt(("-r", "--recursive"), kw={
             "action" : "store_true",
             "help" : "Will perform recursive directory search for fast5 files if specified",
         }),
-        (("-l", "--read-list"), {
+        Opt(("-l", "--read-list"), kw={
             "type" : str, 
             "default" : None, 
             "help" : "List of read IDs, either comma separated or path to text file containing one read ID per line. Will only map these reads if specified"
         }),
-        (("-n", "--max-reads"), "fast5_reader")
+        Opt(("-n", "--max-reads"), Groups.FAST5)
     )
 
     MAP_OPTS = (
-        (("-t", "--threads"), None),
-        ("--num-channels", "read_buffer"),
-
-        (("-e", "--max-events"), {
-            "type" : int, 
-            "default" : unc.Conf().max_events, 
-            "help" : "Will give up on a read after this many events have been processed"
-        }),
-        (("-c", "--max-chunks"), {
-            "type" : int, 
-            "default" : unc.Conf().max_chunks, 
-            "required" : True, 
-            "help" : "Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set"
-        }),
-        ("--chunk-time", {
-            "type" : float, 
-            "default" : 1, 
-            "required" : False, 
-            "help" : "Length of chunks in seconds"
-        }),
-        ("--conf", {
+        Opt(("-t", "--threads"), Groups.GLOBAL),
+        Opt("--num-channels", Groups.READ),
+        Opt(("-e", "--max-events"), Groups.MAPPER),
+        Opt(("-c", "--max-chunks"), Groups.READ),
+        Opt("--chunk-time", Groups.READ),
+        Opt("--conf", kw={
             "type" : str, 
             "default" : None, 
             "required" : False, 
             "help" : "Config file"
         }),
-        ("--rna", {
+        Opt("--rna", kw={
             "action" : "store_true",
             "help" : "Will use RNA parameters if set"
         }),
 
         #TODO move to different parser set
-        (("-o", "--out-prefix"), {
+        Opt(("-o", "--out-prefix"), kw={
             "type" : str, 
             "default" : None, 
             "required" : False, 
             "help" : "Output prefix"
         }),
-        ("--mm2", {
+        Opt("--mm2", kw={
             "type" : str, 
             "default" : None, 
             "required" : False, 
@@ -105,30 +161,30 @@ class ArgParser:
     ) #end MAP_OPTS
 
     SIM_OPTS = (
-        ("fast5s", {
+        Opt("fast5s", kw={
             "nargs" : '+', 
             "type" : str, 
             "help" : "Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
         }),
-        (("-r", "--recursive"), {
+        Opt(("-r", "--recursive"), kw={
             "action" : "store_true"
         }),
-        ("--ctl-seqsum", {
+        Opt("--ctl-seqsum", kw={
             "type" : str, 
             "required" : True, 
             "help" : ""
         }),
-        ("--unc-seqsum", {
+        Opt("--unc-seqsum", kw={
             "type" : str, 
             "required" : True, 
             "help" : ""
         }),
-        ("--unc-paf", {
+        Opt("--unc-paf", kw={
             "type" : str, 
             "required" : True, 
             "help" : ""
         }),
-        ("--sim-speed", {
+        Opt("--sim-speed", kw={
             "type" : float, 
             "default" : unc.Conf().sim_speed, 
             "help" : ""
@@ -136,17 +192,17 @@ class ArgParser:
     )
 
     REALTIME_OPTS = (
-        ("--host", {
+        Opt("--host", kw={
             "type" : str, 
             "default" : unc.Conf().host, 
             "help" : unc.Conf.host.__doc__
         }),
-        ("--port", {
+        Opt("--port", kw={
             "type" : int, 
             "default" : unc.Conf().port, 
             "help" : unc.Conf.port.__doc__
         }),
-        ("--duration", {
+        Opt("--duration", kw={
             "type" : float, 
             "default" : unc.Conf().duration, 
             "help" : unc.Conf.duration.__doc__
@@ -154,61 +210,61 @@ class ArgParser:
     )
 
     INDEX_OPTS = (
-        ("fasta_filename", {
+        Opt("fasta_filename", kw={
             "type" : str, 
             "help" : "FASTA file to index"
         }),
-        (("-o", "--bwa-prefix"), {
+        Opt(("-o", "--bwa-prefix"), kw={
             "type" : str, 
             "default" : None, 
             "help" : "Index output prefix. Will use input fasta filename by default"
         }),
-        (("-s", "--max-sample-dist"), {
+        Opt(("-s", "--max-sample-dist"), kw={
             "type" : int, 
             "default" : 100, 
             "help" : "Maximum average sampling distance between reference alignments."
         }),
-        ("--min-samples", {
+        Opt("--min-samples", kw={
             "type" : int, 
             "default" : 50000, 
             "help" : "Minimum number of alignments to produce (approximate, due to deterministically random start locations}),"
         }),
-        ("--max-samples", {
+        Opt("--max-samples", kw={
             "type" : int, 
             "default" : 1000000, 
             "help" : "Maximum number of alignments to produce (approximate, due to deterministically random start locations}),"
         }),
-        (("-k", "--kmer-len"), {
+        Opt(("-k", "--kmer-len"), kw={
             "type" : int, 
             "default" : 5,
             "help" : "Model k-mer length"
         }),
-        (("-1", "--matchpr1"), {
+        Opt(("-1", "--matchpr1"), kw={
             "type" : float, 
             "default" : 0.6334, 
             "help" : "Minimum event match probability"
         }),
-        (("-2", "--matchpr2"), {
+        Opt(("-2", "--matchpr2"), kw={
             "type" : float, 
             "default" : 0.9838, 
             "help" : "Maximum event match probability"
         }),
-        (("-f", "--pathlen-percentile"), {
+        Opt(("-f", "--pathlen-percentile"), kw={
             "type" : float, 
             "default" : 0.05, 
             "help" : ""
         }),
-        (("-m", "--max-replen"), {
+        Opt(("-m", "--max-replen"), kw={
             "type" : int, 
             "default" : 100, 
             "help" : ""
         }),
-        ("--probs", {
+        Opt("--probs", kw={
             "type" : str, 
             "default" : None, 
             "help" : "Find parameters with specified target probabilites (comma separated}),"
         }),
-        ("--speeds", {
+        Opt("--speeds", kw={
             "type" : str, 
             "default" : None, 
             "help" : "Find parameters with specified speed coefficents (comma separated}),"
@@ -217,23 +273,23 @@ class ArgParser:
 
 
     PAFSTATS_OPTS = (
-        ("infile",  {
+        Opt("infile",  kw={
             "type" : str, 
             "help" : "PAF file output by UNCALLED"
         }),
-        (("-n", "--max-reads"), {
+        Opt(("-n", "--max-reads"), kw={
             "required" : False, 
             "type" : int, 
             "default" : None, 
             "help" : "Will only look at first n reads if specified"
         }),
-        (("-r", "--ref-paf"), {
+        Opt(("-r", "--ref-paf"), kw={
             "required" : False, 
             "type" : str, 
             "default" : None, 
             "help" : "Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA."
         }),
-        (("-a", "--annotate"), {
+        Opt(("-a", "--annotate"), kw={
             "action" : 'store_true', 
             "help" : "Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag"
         }),
@@ -284,22 +340,22 @@ class ArgParser:
                     formatter_class=argparse.ArgumentDefaultsHelpFormatter
             )
             for opt in opts:
-                flags = opt[0]
-                if type(flags) == str:
-                    flags = (flags,)
+                #flags = opt[0]
+                #if type(flags) == str:
+                #    flags = (flags,)
 
-                if type(opt[1]) == dict:
-                    kwargs = opt[1]
+                if opt.group is None:
+                    kwargs = opt.kw
                 else:
-                    if opt[1] is None:
+                    if opt.group != self.Groups.GLOBAL:
+                        group = opt.group.__get__(self.conf, unc.Conf)
+                    else:
                         group = self.conf
-                    else:
-                        group = getattr(self.conf, opt[1])
 
-                    if len(opt) == 3:
-                        param_name = opt[2]
+                    if opt.param is not None:
+                        param_name = opt.param
                     else:
-                        param_name = flag_to_var(flags[-1])
+                        param_name = flag_to_var(opt.args[-1])
 
                     default = getattr(group, param_name)
                     doc = getattr(type(group), param_name).__doc__
@@ -309,9 +365,7 @@ class ArgParser:
                         "help"    : doc
                     }
 
-                print(subcmd, flags, kwargs)
-
-                arg = sp.add_argument(*flags, **kwargs)
+                arg = sp.add_argument(*opt.args, **kwargs)
 
         self.parse_args(argv)
 
@@ -330,13 +384,9 @@ class ArgParser:
         for a, v in vars(args).items():
 
             if not a.startswith("_"):
-                #Store argument in C++ Conf object if applicable present
-                if v is not None or not hasattr(self.conf, a): # and hasattr(self.conf, a):
+                if v is not None or not hasattr(self.conf, a):
                     setattr(self.conf, a, v)
 
-                #Otherwise store within python
-                #else:
-                #    setattr(self, a, v) 
 
     def add_ru_opts(self, p):
         #TODO: selectively enrich or deplete refs in index
