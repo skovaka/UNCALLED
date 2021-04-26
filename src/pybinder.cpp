@@ -7,7 +7,7 @@
 #include "self_align_ref.hpp"
 #include "realtime_pool.hpp"
 #include "map_pool_ord.hpp"
-#include "client_sim.hpp"
+#include "simulator.hpp"
 #include "models.inl"
 #include "dtw.hpp"
 #include "dtw_banded.hpp"
@@ -26,7 +26,7 @@ std::vector<bool> unpack_moves(u64 moves, u8 length) {
 PYBIND11_MODULE(_uncalled, m) {
     m.doc() = R"pbdoc(UNCALLED: a Utility for Nanopore Current ALignment to Large Expanses of DNA)pbdoc";
 
-    py::class_<Conf> conf(m, "Conf", py::dynamic_attr());
+    py::class_<Conf> conf(m, "_Conf");
     Conf::pybind_defs(conf);
 
     py::class_<Mapper> mapper(m, "Mapper");
@@ -44,8 +44,8 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<MapPoolOrd, RealtimePool> map_pool_ord(m, "MapPoolOrd");
     MapPoolOrd::pybind_defs(map_pool_ord);
 
-    py::class_<ClientSim> client_sim(m, "ClientSim");
-    ClientSim::pybind_defs(client_sim);
+    py::class_<Simulator> simulator(m, "Simulator");
+    Simulator::pybind_defs(simulator);
 
     py::class_<Paf> paf(m, "Paf");
     Paf::pybind_defs(paf);

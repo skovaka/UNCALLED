@@ -77,7 +77,7 @@ class MapPoolOrd : public RealtimePool {
     #ifdef PYBIND
 
     #define PY_MAP_ORD_METH(P) c.def(#P, &MapPoolOrd::P);
-    #define PY_MAP_ORD_PRM(P) p.def_readonly(#P, &MapOrdParams::P);
+    #define PY_MAP_ORD_PRM(P) p.def_readwrite(#P, &MapOrdParams::P);
 
     public:
 

@@ -49,8 +49,8 @@ class Normalizer {
 
     #ifdef PYBIND
 
-    #define PY_NORM_METH(P) c.def(#P, &Normalizer::P);
-    #define PY_NORM_PRM(P) p.def_readwrite(#P, &Normalizer::Params::P);
+    #define PY_NORM_METH(P, D) c.def(#P, &Normalizer::P, D);
+    #define PY_NORM_PRM(P, D) p.def_readwrite(#P, &Normalizer::Params::P, D);
 
     public:
 
@@ -58,27 +58,25 @@ class Normalizer {
         c.def(pybind11::init());
         c.def(pybind11::init<float, float>());
 
-        PY_NORM_METH(set_target);
-        PY_NORM_METH(set_signal);
-        PY_NORM_METH(set_length);
-        PY_NORM_METH(get_mean);
-        PY_NORM_METH(get_stdv);
-        PY_NORM_METH(get_scale);
-        PY_NORM_METH(get_shift);
-        PY_NORM_METH(pop);
-        //PY_NORM_METH(push);
-        c.def("push", pybind11::vectorize(&Normalizer::push));
-        PY_NORM_METH(skip_unread);
-        PY_NORM_METH(unread_size);
-        PY_NORM_METH(reset);
-        PY_NORM_METH(empty);
-        PY_NORM_METH(full);
+        PY_NORM_METH(set_target, "Sets target mean and standard deviation");
+        PY_NORM_METH(set_signal, "Sets full signal to normalize");
+        PY_NORM_METH(set_length, "Sets the length of the rolling normalization window");
+        PY_NORM_METH(get_mean, "Returns the mean of the signal in the buffer");
+        PY_NORM_METH(get_stdv, "Return the standard deviation of the signal in the buffer");
+        PY_NORM_METH(get_scale, "Returns the scaling parameter required to normalize the signal in the buffer to the target mean/stdv");
+        PY_NORM_METH(get_shift, "Returns the shift parameter required to normalize the signal in the buffer to the target mean/stdv");
+        PY_NORM_METH(pop, "Returns the next unread normalized signal from the buffer");
+        c.def("push", pybind11::vectorize(&Normalizer::push), "Adds new signal to the buffer");
+        PY_NORM_METH(skip_unread, "Sets all signal in the buffer as read");
+        PY_NORM_METH(unread_size, "Returns number of signals in the buffer which have not been read");
+        PY_NORM_METH(reset, "Empties the buffer (buffer size and target mean/stdv are kept the same");
+        PY_NORM_METH(empty, "Returns true if all signal has been read from the buffer");
+        PY_NORM_METH(full, "Returns true if no more signal can be added without erasing the oldest signal");
 
         pybind11::class_<Params> p(c, "Params");
-        PY_NORM_PRM(len)
-        PY_NORM_PRM(tgt_mean)
-        PY_NORM_PRM(tgt_stdv)
-
+        PY_NORM_PRM(len, "The length of the normalization buffer")
+        PY_NORM_PRM(tgt_mean, "Normalization target mean")
+        PY_NORM_PRM(tgt_stdv, "Normalization target standard deviation")
     }
 
     #endif

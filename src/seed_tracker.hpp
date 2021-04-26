@@ -111,7 +111,7 @@ class SeedTracker {
 
     #define PY_SEED_TRACKER_METH(P) c.def(#P, &SeedTracker::P);
     #define PY_SEED_TRACKER_RPROP(P) c.def_property_readonly(#P, &SeedTracker::get_##P);
-    #define PY_SEED_TRACKER_PRM(P) p.def_readwrite(#P, &SeedTracker::Params::P);
+    #define PY_SEED_TRACKER_PRM(P, D) p.def_readwrite(#P, &SeedTracker::Params::P, D);
 
     static void pybind_defs(pybind11::class_<SeedTracker> &c) {
         c.def(pybind11::init());
@@ -119,9 +119,9 @@ class SeedTracker {
         PY_SEED_TRACKER_METH(empty);
 
         pybind11::class_<Params> p(c, "Params");
-        PY_SEED_TRACKER_PRM(min_map_len)
-        PY_SEED_TRACKER_PRM(min_mean_conf)
-        PY_SEED_TRACKER_PRM(min_top_conf)
+        PY_SEED_TRACKER_PRM(min_map_len, "Minimum seed cluster support")
+        PY_SEED_TRACKER_PRM(min_mean_conf, "Minimum ratio of top seed cluster support and mean cluster support")
+        PY_SEED_TRACKER_PRM(min_top_conf, "Minimum ratio of top seed cluster support and next best cluster support")
     }
     #endif
 };

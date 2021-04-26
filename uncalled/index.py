@@ -27,9 +27,29 @@ import sys
 import os
 import numpy as np
 import argparse
-#from uncalled import mapping, params
 import uncalled as unc
 from bisect import bisect_left, bisect_right
+from typing import NamedTuple
+
+class IndexParams(unc.conf.ParamGroup): pass
+IndexParams._def_params(
+    ("fasta_filename", None, str, "FASTA file to index"),
+    ("bwa_prefix", None, str, "Index output prefix. Will use input fasta filename by default"),
+    ("max_sample_dist", 100, int, "Maximum average sampling distance between reference alignments."),
+    ("min_samples", 50000, int, "Minimum number of alignments to produce (approximate, due to deterministically random start locations),"),
+    ("max_samples", 1000000, int, "Maximum number of alignments to produce (approximate, due to deterministically random start locations),"),
+    ("kmer_len", 5, int, "Model k-mer length"),
+    ("matchpr1", 0.6334, float, "Minimum event match probability"),
+    ("matchpr2", 0.9838, float, "Maximum event match probability"),
+    ("pathlen_percentile", 0.05, float, ""),
+    ("max_replen", 100, int, ""),
+    ("probs", None, str, "Find parameters with specified target probabilites (comma separated)"),
+    ("speeds", None, str, "Find parameters with specified speed coefficents (comma separated)"),
+)
+
+#TODO do this from conf. need to restructure dependencies
+unc.Conf._EXTRA_GROUPS["index"] = IndexParams
+#unc.Conf.index = IndexParams
 
 UNCL_SUFF = ".uncl"
 AMB_SUFF = ".amb"
@@ -48,47 +68,48 @@ def power_fn(xmax, ymin, ymax, exp, N=100):
     return t*xmax, (t**exp) * (ymax-ymin) + ymin
 
 class IndexParameterizer:
-    MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_rna_threshs.txt")
-    #MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_threshs.txt")
+    #MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_rna_threshs.txt")
+    MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_threshs.txt")
 
-    def __init__(self, conf):
-        self.out_fname = conf.bwa_prefix + UNCL_SUFF
+    def __init__(self, params):
+        self.prms = params
 
-        self.pck1 = conf.matchpr1
-        self.pck2 = conf.matchpr2
+        self.out_fname = self.prms.bwa_prefix + UNCL_SUFF
 
-        self.calc_map_stats(conf)
+        self.pck1 = self.prms.matchpr1
+        self.pck2 = self.prms.matchpr2
+
+        self.calc_map_stats()
         self.get_model_threshs()
 
         self.functions = dict()
 
-    def calc_map_stats(self, conf):
+    def calc_map_stats(self):
 
-        ann_in = open(conf.bwa_prefix + ANN_SUFF)
+        ann_in = open(self.prms.bwa_prefix + ANN_SUFF)
         header = ann_in.readline()
         ref_len = int(header.split()[0])
         ann_in.close()
 
-        approx_samps = ref_len / conf.max_sample_dist
-        if approx_samps < conf.min_samples:
-            sample_dist = int(np.ceil(ref_len/conf.min_samples))
-        elif approx_samps > conf.max_samples:
-            sample_dist = int(np.floor(ref_len/conf.max_samples))
+        approx_samps = ref_len / self.prms.max_sample_dist
+        if approx_samps < self.prms.min_samples:
+            sample_dist = int(np.ceil(ref_len/self.prms.min_samples))
+        elif approx_samps > self.prms.max_samples:
+            sample_dist = int(np.floor(ref_len/self.prms.max_samples))
         else:
-            sample_dist = conf.max_sample_dist
+            sample_dist = self.prms.max_sample_dist
 
-        print(conf.bwa_prefix)
-        fmlens = unc.self_align(conf.bwa_prefix, sample_dist)
-        path_kfmlens = [p[conf.kmer_len-1:] if len(p) >= conf.kmer_len else [1] for p in fmlens]
+        fmlens = unc.self_align(self.prms.bwa_prefix, sample_dist)
+        path_kfmlens = [p[self.prms.kmer_len-1:] if len(p) >= self.prms.kmer_len else [1] for p in fmlens]
 
         max_pathlen = 0
-        all_pathlens = [len(p) for p in path_kfmlens if len(p) <= conf.max_replen]
+        all_pathlens = [len(p) for p in path_kfmlens if len(p) <= self.prms.max_replen]
         gt1_counts = np.zeros(max(all_pathlens))
         for l in all_pathlens:
             for i in range(l):
                 gt1_counts[i] += 1
 
-        max_pathlen = np.flatnonzero(gt1_counts / len(all_pathlens) <= conf.pathlen_percentile)[0]
+        max_pathlen = np.flatnonzero(gt1_counts / len(all_pathlens) <= self.prms.pathlen_percentile)[0]
         max_fmexp = int(np.log2(max([p[0] for p in path_kfmlens])))+1
         fm_path_mat = np.zeros((max_fmexp, max_pathlen))
 
@@ -112,7 +133,7 @@ class IndexParameterizer:
 
         self.speed_denom = np.sum(self.loc_fms)
 
-        self.conf_locs = np.arange(np.round(self.fm_locs[0]))
+        self.prms_locs = np.arange(np.round(self.fm_locs[0]))
         self.all_locs = np.arange(max_pathlen)
 
     def get_model_threshs(self, fname=MODEL_THRESHS_FNAME):
@@ -137,7 +158,7 @@ class IndexParameterizer:
         return speed
 
     def get_fn_prob(self, fn_locs, fn_pcks):
-        return np.prod(np.interp(self.conf_locs, fn_locs, fn_pcks))
+        return np.prod(np.interp(self.prms_locs, fn_locs, fn_pcks))
 
     def add_preset(self, name, tgt_prob=None, tgt_speed=None, exp_st=2, init_fac=2, eps=0.00001):
 

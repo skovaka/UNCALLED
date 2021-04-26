@@ -30,6 +30,8 @@
 #include "mapper.hpp"
 #include "conf.hpp"
 
+//TODO refactor into ThreadPool, subclass RealtimePool (and MapPool[Ord])
+
 using MapResult = std::tuple<u16, u32, Paf>;
 
 class RealtimePool {
@@ -105,7 +107,7 @@ class RealtimePool {
     #ifdef PYBIND
 
     #define PY_REALTIME_METH(P) c.def(#P, &RealtimePool::P);
-    #define PY_REALTIME_PRM(P) p.def_readwrite(#P, &RealtimeParams::P);
+    #define PY_REALTIME_PRM(P, D) p.def_readwrite(#P, &RealtimeParams::P, D);
     #define PY_REALTIME_MODE(P) m.value(#P, RealtimeParams::Mode::P);
     #define PY_REALTIME_ACTIVE(P) a.value(#P, RealtimeParams::ActiveChs::P);
 
@@ -120,18 +122,19 @@ class RealtimePool {
         PY_REALTIME_METH(get_mapper);
 
         pybind11::class_<RealtimeParams> p(c, "RealtimeParams");
-        PY_REALTIME_PRM(host);
-        PY_REALTIME_PRM(port);
-        PY_REALTIME_PRM(duration);
-        PY_REALTIME_PRM(max_active_reads);
-        PY_REALTIME_PRM(active_chs);
-        PY_REALTIME_PRM(realtime_mode);
+        PY_REALTIME_PRM(host, "MinKNOW host address");
+        PY_REALTIME_PRM(port, "MinKNOW host port");
+        PY_REALTIME_PRM(duration, "MinKNOW run duration");
+        PY_REALTIME_PRM(max_active_reads, "Maximum number of reads to");
+        PY_REALTIME_PRM(active_chs, "");
+        PY_REALTIME_PRM(realtime_mode, "");
 
+        //TODO don't expose enums to python
+        //deal with in set_mode_... in conf
         pybind11::enum_<RealtimeParams::Mode> m(c, "RealtimeMode");
         PY_REALTIME_MODE(DEPLETE);
         PY_REALTIME_MODE(ENRICH);
         m.export_values();
-
         pybind11::enum_<RealtimeParams::ActiveChs> a(c, "ActiveChs");
         PY_REALTIME_ACTIVE(FULL);
         PY_REALTIME_ACTIVE(EVEN);

@@ -192,11 +192,9 @@ class Fast5Iter : public Fast5Reader {
         
         PY_FAST5_ITER_METH(add_read, "Adds a read ID to the read filter");
         PY_FAST5_ITER_METH(load_read_filter, "Loads a list of read IDs from a text file to add to the read filter");
-        PY_FAST5_ITER_METH(next_read, "");
-        PY_FAST5_ITER_METH(buffer_size, "");
-        PY_FAST5_ITER_METH(fill_buffer, "");
-        PY_FAST5_ITER_METH(all_buffered, "");
-        PY_FAST5_ITER_METH(empty, "");
+        PY_FAST5_ITER_METH(next_read, "Returns the next read");
+        PY_FAST5_ITER_METH(empty, "Returns True if all fast5 reads have been output");
+        PY_FAST5_ITER_METH(buffer_size, "Returns the number of fast5 reads stored in the buffer");
     }
     #endif
     

@@ -1,7 +1,7 @@
 #include <iostream>
 #include <unistd.h>
 #include "conf.hpp"
-#include "client_sim.hpp"
+#include "simulator.hpp"
 #include "realtime_pool.hpp"
 #include "read_buffer.hpp"
 
@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    ClientSim sim(conf);
+    Simulator sim(conf);
 
     std::cerr << "Loading mappers\n";
     RealtimePool pool(conf);

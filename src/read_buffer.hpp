@@ -139,14 +139,14 @@ class ReadBuffer {
 
     static void pybind_defs(pybind11::class_<ReadBuffer> &c) {
         c.def(pybind11::init<ReadBuffer>());
-        PY_READ_METH(empty, "");
-        PY_READ_RPROP(id, "");
-        PY_READ_RPROP(start, "");
-        PY_READ_RPROP(end, "");
-        PY_READ_RPROP(full_duration, "");
-        PY_READ_RPROP(channel, "");
-        PY_READ_RPROP(number, "");
-        PY_READ_RPROP(signal, "");
+        PY_READ_METH(empty, "Returns true if read has no data");
+        PY_READ_RPROP(id, "Read ID (name)");
+        PY_READ_RPROP(start, "Read start sample relative to start of the run");
+        PY_READ_RPROP(end, "Read end sample relative to start of the run");
+        PY_READ_RPROP(full_duration, "Total number of samples in the read");
+        PY_READ_RPROP(channel, "Channel where the read was sequenced");
+        PY_READ_RPROP(number, "Read number");
+        PY_READ_RPROP(signal, "Read signal");
 
         c.def("__len__", &ReadBuffer::size);
         c.def("__getitem__", &ReadBuffer::operator[]);

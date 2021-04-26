@@ -30,80 +30,87 @@ import uncalled as unc
 import toml
 import inspect
 
-def flag_to_var(flag):
-    return flag.strip("-").replace("-","_")
 
-def is_public(name):
-    print(name)
-    return not name.startswith("_")
-
-TOML_TYPES = {int, float, str, list}
-
-def param_valid(name, val):
-    return (not name.startswith("_") and
-            type(val) in TOML_TYPES and
-            (not hasattr(val, "__len__") or len(val) > 0))
-
-def conf_to_toml(conf, filename=None):
-    out = dict()
-
-    for param in conf._GLOBAL_PARAMS:
-        val = getattr(conf,param)
-        if param_valid(param, val):
-            out[param] = val
-
-    for param, val in vars(conf).items():
-        if param_valid(param, val):
-            out[param] = val
-
-    for group_name in conf._PARAM_GROUPS:
-        group = getattr(conf, group_name)
-        out[group_name] = dict()
-        for param in dir(group):
-            val = getattr(group,param)
-            if param_valid(param, val):
-                out[group_name][param] = val
-
-    if filename is None:
-        return toml.dumps(out)
-    else:
-        return toml.dump(out, filename)
-
-def toml_to_conf(filename, conf):
-    toml_dict = toml.load(filename)
-
-    for name, val in toml_dict.items():
-        if isinstance(val, dict):
-            group = getattr(conf, name, None)
-            if group is None:
-                group = dict()
-                setattr(conf, name, group)
-            for param, param_val in val.items():
-                group[param] = param_val
-        else:
-            setattr(conf, name, val)
-    
-    return conf
 
 class ArgParser:
 
     class Groups:
-        GLOBAL   = unc.Conf
-        MAPPER   = unc.Conf.mapper
-        READ     = unc.Conf.read_buffer
-        NORM     = unc.Conf.normalizer
-        EVENT    = unc.Conf.event_detector
-        PROFILER = unc.Conf.event_profiler
-        SEED     = unc.Conf.seed_tracker
-        FAST5    = unc.Conf.fast5_reader
-        REALTIME = unc.Conf.realtime
+        GLOBAL    = ""
+        MAPPER    = "mapper"
+        READ      = "read_buffer"
+        NORM      = "normalizer"
+        EVENT     = "event_detector"
+        PROFILER  = "event_profiler"
+        SEED      = "seed_tracker"
+        FAST5     = "fast5_reader"
+        REALTIME  = "realtime"
+        SIMULATOR = "simulator"
+        INDEX     = "index"
 
     class Opt:
-        def __init__(self, args, group=None, kw={}, param=None):
+        def __init__(self, args, group_name=None, param=None, **kwargs):
             self.args = args if type(args) == tuple else (args,)
-            self.group = group
-            self.kw = kw
+            self.group_name = group_name
+
             self.param = param
+            if self.param is None:
+                for arg in self.args:
+                    if arg.startswith("--") or not arg.startswith("-"):
+                        self.param = arg.strip("-").replace("-","_")
+                        break
+                if self.param is None:
+                    sys.stderr.write("Error: must specify parameter name for flag \"%s\"\n" % self.args)
+                    sys.exit(0)
+
+            self.extra_kw = kwargs
+
+        def get_dest(self, conf):
+            if self.group_name is None:
+                return (conf, self.param)
+            return (conf.get_group(self.group_name), self.param)
+
+        def get_kwargs(self, conf):
+            if self.group_name is None:
+                return self.extra_kw
+
+            group = conf.get_group(self.group_name)
+            #if len(self.group_name) == 0:
+            #    group = conf
+            #else:
+            #    group = getattr(conf, self.group_name)
+
+            if self.param is not None:
+                param_name = self.param
+            else:
+                param_name = flag_to_var(self.args[-1])
+
+            default = getattr(group, param_name)
+            doc = getattr(type(group), param_name).__doc__
+
+            print(self.group_name, hasattr(group, "_types"))
+
+            if hasattr(group, "_types"):
+                _type = getattr(group, "_types")[param_name]
+            else:
+                _type = type(default)
+
+            kwargs = {
+                "default" : default,
+                "type"    : _type,
+                "help"    : doc
+            }
+            kwargs.update(self.extra_kw)
+
+            return kwargs
+
+        def set_val(self, conf, val):
+            if self.group is None or len(self.group) == 0:
+                group = conf
+            else:
+                group = getattr(conf, self.group)
+
+            setattr(group, self.param, val)
+
 
     BWA_OPTS = (
         Opt("bwa_prefix", Groups.MAPPER),
@@ -111,20 +118,20 @@ class ArgParser:
     )
 
     FAST5_OPTS = (
-        Opt("fast5s", kw={
-            "nargs" : '+', 
-            "type" : str, 
-            "help" : "Reads to map. Can be a directory which will be searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
-        }),
-        Opt(("-r", "--recursive"), kw={
-            "action" : "store_true",
-            "help" : "Will perform recursive directory search for fast5 files if specified",
-        }),
-        Opt(("-l", "--read-list"), kw={
-            "type" : str, 
-            "default" : None, 
-            "help" : "List of read IDs, either comma separated or path to text file containing one read ID per line. Will only map these reads if specified"
-        }),
+        Opt("fast5s",
+            nargs = '+', 
+            type = str, 
+            help = "Reads to map. Can be a directory which will be searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
+        ),
+        Opt(("-r", "--recursive"), 
+            action = "store_true",
+            help = "Will perform recursive directory search for fast5 files if specified",
+        ),
+        Opt(("-l", "--read-list"), 
+            type = str, 
+            default = None, 
+            help = "List of read IDs, either comma separated or path to text file containing one read ID per line. Will only map these reads if specified"
+        ),
         Opt(("-n", "--max-reads"), Groups.FAST5)
     )
 
@@ -134,168 +141,93 @@ class ArgParser:
         Opt(("-e", "--max-events"), Groups.MAPPER),
         Opt(("-c", "--max-chunks"), Groups.READ),
         Opt("--chunk-time", Groups.READ),
-        Opt("--conf", kw={
-            "type" : str, 
-            "default" : None, 
-            "required" : False, 
-            "help" : "Config file"
-        }),
-        Opt("--rna", kw={
-            "action" : "store_true",
-            "help" : "Will use RNA parameters if set"
-        }),
+        Opt("--conf", 
+            type = str, 
+            default = None, 
+            required = False, 
+            help = "Config file"
+        ),
+        Opt("--rna", 
+            action = "store_true",
+            help = "Will use RNA parameters if set"
+        ),
 
         #TODO move to different parser set
-        Opt(("-o", "--out-prefix"), kw={
-            "type" : str, 
-            "default" : None, 
-            "required" : False, 
-            "help" : "Output prefix"
-        }),
-        Opt("--mm2", kw={
-            "type" : str, 
-            "default" : None, 
-            "required" : False, 
-            "help" : "Minimap2 PAF file for comparison"
-        }),
+        Opt(("-o", "--out-prefix"), 
+            type = str, 
+            default = None, 
+            required = False, 
+            help = "Output prefix"
+        ),
+        Opt("--mm2", 
+            type = str, 
+            default = None, 
+            required = False, 
+            help = "Minimap2 PAF file for comparison"
+        ),
     ) #end MAP_OPTS
 
     SIM_OPTS = (
-        Opt("fast5s", kw={
-            "nargs" : '+', 
-            "type" : str, 
-            "help" : "Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
-        }),
-        Opt(("-r", "--recursive"), kw={
-            "action" : "store_true"
-        }),
-        Opt("--ctl-seqsum", kw={
-            "type" : str, 
-            "required" : True, 
-            "help" : ""
-        }),
-        Opt("--unc-seqsum", kw={
-            "type" : str, 
-            "required" : True, 
-            "help" : ""
-        }),
-        Opt("--unc-paf", kw={
-            "type" : str, 
-            "required" : True, 
-            "help" : ""
-        }),
-        Opt("--sim-speed", kw={
-            "type" : float, 
-            "default" : unc.Conf().sim_speed, 
-            "help" : ""
-        }),
+        Opt("fast5s", 
+            nargs = '+', 
+            type = str, 
+            help = "Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
+        ),
+        Opt(("-r", "--recursive"), 
+            action = "store_true"
+        ),
+        Opt("--ctl-seqsum", Groups.SIMULATOR),
+        Opt("--unc-seqsum", Groups.SIMULATOR),
+        Opt("--unc-paf", Groups.SIMULATOR),
+        Opt("--sim-speed", Groups.SIMULATOR),
     )
 
     REALTIME_OPTS = (
-        Opt("--host", kw={
-            "type" : str, 
-            "default" : unc.Conf().host, 
-            "help" : unc.Conf.host.__doc__
-        }),
-        Opt("--port", kw={
-            "type" : int, 
-            "default" : unc.Conf().port, 
-            "help" : unc.Conf.port.__doc__
-        }),
-        Opt("--duration", kw={
-            "type" : float, 
-            "default" : unc.Conf().duration, 
-            "help" : unc.Conf.duration.__doc__
-        }),
+        Opt("--host", Groups.REALTIME),
+        Opt("--port", Groups.REALTIME),
+        Opt("--duration", Groups.REALTIME),
     )
 
     INDEX_OPTS = (
-        Opt("fasta_filename", kw={
-            "type" : str, 
-            "help" : "FASTA file to index"
-        }),
-        Opt(("-o", "--bwa-prefix"), kw={
-            "type" : str, 
-            "default" : None, 
-            "help" : "Index output prefix. Will use input fasta filename by default"
-        }),
-        Opt(("-s", "--max-sample-dist"), kw={
-            "type" : int, 
-            "default" : 100, 
-            "help" : "Maximum average sampling distance between reference alignments."
-        }),
-        Opt("--min-samples", kw={
-            "type" : int, 
-            "default" : 50000, 
-            "help" : "Minimum number of alignments to produce (approximate, due to deterministically random start locations}),"
-        }),
-        Opt("--max-samples", kw={
-            "type" : int, 
-            "default" : 1000000, 
-            "help" : "Maximum number of alignments to produce (approximate, due to deterministically random start locations}),"
-        }),
-        Opt(("-k", "--kmer-len"), kw={
-            "type" : int, 
-            "default" : 5,
-            "help" : "Model k-mer length"
-        }),
-        Opt(("-1", "--matchpr1"), kw={
-            "type" : float, 
-            "default" : 0.6334, 
-            "help" : "Minimum event match probability"
-        }),
-        Opt(("-2", "--matchpr2"), kw={
-            "type" : float, 
-            "default" : 0.9838, 
-            "help" : "Maximum event match probability"
-        }),
-        Opt(("-f", "--pathlen-percentile"), kw={
-            "type" : float, 
-            "default" : 0.05, 
-            "help" : ""
-        }),
-        Opt(("-m", "--max-replen"), kw={
-            "type" : int, 
-            "default" : 100, 
-            "help" : ""
-        }),
-        Opt("--probs", kw={
-            "type" : str, 
-            "default" : None, 
-            "help" : "Find parameters with specified target probabilites (comma separated}),"
-        }),
-        Opt("--speeds", kw={
-            "type" : str, 
-            "default" : None, 
-            "help" : "Find parameters with specified speed coefficents (comma separated}),"
-        }),
+        Opt("fasta_filename", Groups.INDEX),
+        Opt(("-o", "--bwa-prefix"), Groups.INDEX),
+        Opt(("-s", "--max-sample-dist"), Groups.INDEX),
+        Opt("--min-samples", Groups.INDEX),
+        Opt("--max-samples", Groups.INDEX),
+        Opt(("-k", "--kmer-len"), Groups.INDEX),
+        Opt(("-1", "--matchpr1"), Groups.INDEX),
+        Opt(("-2", "--matchpr2"), Groups.INDEX),
+        Opt(("-f", "--pathlen-percentile"), Groups.INDEX),
+        Opt(("-m", "--max-replen"), Groups.INDEX),
+        Opt("--probs", Groups.INDEX),
+        Opt("--speeds", Groups.INDEX),
     ) #end INDEX_OPTS
 
 
     PAFSTATS_OPTS = (
-        Opt("infile",  kw={
-            "type" : str, 
-            "help" : "PAF file output by UNCALLED"
-        }),
-        Opt(("-n", "--max-reads"), kw={
-            "required" : False, 
-            "type" : int, 
-            "default" : None, 
-            "help" : "Will only look at first n reads if specified"
-        }),
-        Opt(("-r", "--ref-paf"), kw={
-            "required" : False, 
-            "type" : str, 
-            "default" : None, 
-            "help" : "Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA."
-        }),
-        Opt(("-a", "--annotate"), kw={
-            "action" : 'store_true', 
-            "help" : "Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag"
-        }),
+        Opt("infile",  
+            type = str, 
+            help = "PAF file output by UNCALLED"
+        ),
+        Opt(("-n", "--max-reads"), 
+            required = False, 
+            type = int, 
+            default = None, 
+            help = "Will only look at first n reads if specified"
+        ),
+        Opt(("-r", "--ref-paf"), 
+            required = False, 
+            type = str, 
+            default = None, 
+            help = "Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA."
+        ),
+        Opt(("-a", "--annotate"), 
+            action = 'store_true', 
+            help = "Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag"
+        ),
     ) #end pafstats opts
 
-    DEF_SUBCMDS = {
+    DEFAULT_SUBCMDS = {
         "index" : (
             "Builds the UNCALLED index of a FASTA reference", 
             INDEX_OPTS
@@ -322,17 +254,23 @@ class ArgParser:
 
     def __init__(self, 
             argv=sys.argv[1:],
-            subcmds=DEF_SUBCMDS, 
-            conf=unc.Conf(),
+            subcmds=DEFAULT_SUBCMDS, 
+            conf=None,
             description="Rapidly maps raw nanopore signal to DNA references"):
 
-        self.conf = conf
+        if conf is None:
+            self.conf = unc.Conf()
+        else:
+            self.conf = conf
+
         self.parser = argparse.ArgumentParser(
                 description="Rapidly maps raw nanopore signal to DNA references", 
                 formatter_class=argparse.ArgumentDefaultsHelpFormatter
         )
 
         subparsers = self.parser.add_subparsers(dest="subcmd")
+        
+        self.dests = dict()
 
         for subcmd, (desc, opts) in subcmds.items():
             sp = subparsers.add_parser(
@@ -340,32 +278,8 @@ class ArgParser:
                     formatter_class=argparse.ArgumentDefaultsHelpFormatter
             )
             for opt in opts:
-                #flags = opt[0]
-                #if type(flags) == str:
-                #    flags = (flags,)
-
-                if opt.group is None:
-                    kwargs = opt.kw
-                else:
-                    if opt.group != self.Groups.GLOBAL:
-                        group = opt.group.__get__(self.conf, unc.Conf)
-                    else:
-                        group = self.conf
-
-                    if opt.param is not None:
-                        param_name = opt.param
-                    else:
-                        param_name = flag_to_var(opt.args[-1])
-
-                    default = getattr(group, param_name)
-                    doc = getattr(type(group), param_name).__doc__
-                    kwargs = {
-                        "default" : default,
-                        "type"    : type(default),
-                        "help"    : doc
-                    }
-
-                arg = sp.add_argument(*opt.args, **kwargs)
+                arg = sp.add_argument(*opt.args, **opt.get_kwargs(self.conf))
+                self.dests[arg.dest] = opt.get_dest(self.conf)
 
         self.parse_args(argv)
 
@@ -375,17 +289,23 @@ class ArgParser:
         if hasattr(args, "conf"):
             if getattr(args, "conf") is not None:
                 self.conf.load_toml(args.conf)
-            delattr(args, "conf")
 
         if getattr(args,"rna",False):
             self.conf.set_r94_rna()
-            delattr(args, "rna")
 
-        for a, v in vars(args).items():
+        for name, value in vars(args).items():
 
-            if not a.startswith("_"):
-                if v is not None or not hasattr(self.conf, a):
-                    setattr(self.conf, a, v)
+            if not name.startswith("_"):
+                if name in self.dests:
+                    group, param = self.dests[name]
+                else: #TODO only needed for subcommand, which I should rethink
+                    group = self.conf
+                    param = name
+
+                if value is not None or not hasattr(group, param):
+                    setattr(group, param, value)
+                #if value is not None or not hasattr(self.conf, name):
+                #    setattr(self.conf, name, value)
 
 
     def add_ru_opts(self, p):

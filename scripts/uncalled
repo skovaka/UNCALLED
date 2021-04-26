@@ -37,39 +37,38 @@ MAX_SLEEP = 0.01
 
 def index_cmd(conf):
 
-    if len(conf.bwa_prefix) == 0:
-        print(conf.bwa_prefix, "=", conf.fasta_filename)
-        conf.bwa_prefix = conf.fasta_filename
-    else:
-        print(conf.bwa_prefix)
+    params = conf.index
+
+    if params.bwa_prefix is None or len(params.bwa_prefix) == 0:
+        params.bwa_prefix = params.fasta_filename
 
     bwa_built = True
 
     for suff in unc.index.BWA_SUFFS:
-        if not os.path.exists(conf.bwa_prefix + suff):
+        if not os.path.exists(params.bwa_prefix + suff):
             bwa_built = False
             break
 
     if bwa_built:
-        sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % conf.bwa_prefix)
+        sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % params.bwa_prefix)
     else:
-        unc.BwaIndex.create(conf.fasta_filename, conf.bwa_prefix)
+        unc.BwaIndex.create(params.fasta_filename, params.bwa_prefix)
 
     sys.stderr.write("Initializing parameter search\n")
-    p = unc.index.IndexParameterizer(conf)
+    p = unc.index.IndexParameterizer(params)
 
     p.add_preset("default", tgt_speed=115)
 
-    if conf.probs != None:
-        for tgt in conf.probs.split(","):
+    if params.probs != None:
+        for tgt in params.probs.split(","):
             sys.stderr.write("Writing 'prob_%s' parameters\n" % tgt)
             try:
                 p.add_preset("prob_%s" % tgt, tgt_prob=float(tgt))
             except Exception as e:
                 sys.stderr.write("Failed to add 'prob_%s'\n" % tgt)
 
-    if conf.speeds != None:
-        for tgt in conf.speeds.split(","):
+    if params.speeds != None:
+        for tgt in params.speeds.split(","):
             sys.stderr.write("Writing 'speed_%s' parameters\n" % tgt)
             try:
                 p.add_preset("speed_%s" % tgt, tgt_speed=float(tgt))
@@ -182,7 +181,7 @@ def realtime_cmd(conf):
 
     try:
         if sim:
-            client = unc.ClientSim(conf)
+            client = unc.Simulator(conf)
             unc.sim_utils.load_sim(client, conf)
 
             for fast5 in load_fast5s(conf.fast5s, conf.recursive):
@@ -333,8 +332,10 @@ def list_ports_cmd(conf):
 
 
 if __name__ == "__main__":
-    args = unc.args.ArgParser()
+    args = unc.ArgParser()
     conf = args.conf
+
+    print(conf.to_toml())
 
     if conf.subcmd == "index":
         index_cmd(conf)

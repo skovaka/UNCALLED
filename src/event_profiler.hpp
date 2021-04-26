@@ -38,10 +38,10 @@ class EventProfiler {
 
     public: 
     typedef struct Params {
-        u32 win_len, slop;
+        u32 win_len;
         float win_stdv_min;
-        float win_stdv_range;
-        float win_mean_range;
+        //float win_stdv_range;
+        //float win_mean_range;
     } Params;
 
     static Params const PRMS_DEF;
@@ -184,7 +184,7 @@ class EventProfiler {
     #define PY_EVENT_PROFILER_METH(P) evpr.def(#P, &EventProfiler::P);
     #define PY_EVENT_PROFILER_PROP(P) evpr.def_property(#P, &EventProfiler::get_##P, &EventProfiler::set_##P);
     #define PY_EVENT_PROFILER_RPROP(P) evpr.def_property_readonly(#P, &EventProfiler::get_##P);
-    #define PY_EVENT_PROFILER_PRM(P) prm.def_readonly(#P, &EventProfiler::Params::P);
+    #define PY_EVENT_PROFILER_PRM(P, D) prm.def_readwrite(#P, &EventProfiler::Params::P, D);
     #define PY_ANNO_EVENT_VAL(P) ann.def_readonly(#P, &AnnoEvent::P);
 
     #define PY_EVT_PROF_VAL(P) ep.def_readonly(#P, &EvtProf::P);
@@ -202,23 +202,24 @@ class EventProfiler {
         PY_EVENT_PROFILER_METH(next_mean)
         PY_EVENT_PROFILER_METH(get_full_mask)
 
+        //TODO use numpy records
         pybind11::class_<AnnoEvent> ann(evpr, "AnnoEvent");
         PY_ANNO_EVENT_VAL(evt)
         PY_ANNO_EVENT_VAL(win_mean)
         PY_ANNO_EVENT_VAL(win_stdv)
         PY_ANNO_EVENT_VAL(mask)
 
+        //TODO use numpy records
         pybind11::class_<EvtProf> ep(evpr, "EvtProf");
         PY_EVT_PROF_VAL(win_mean)
         PY_EVT_PROF_VAL(win_stdv)
         PY_EVT_PROF_VAL(mask)
 
         pybind11::class_<Params> prm(evpr, "Params");
-        PY_EVENT_PROFILER_PRM(win_len)
-        PY_EVENT_PROFILER_PRM(slop)
-        PY_EVENT_PROFILER_PRM(win_stdv_min)
-        PY_EVENT_PROFILER_PRM(win_stdv_range)
-        PY_EVENT_PROFILER_PRM(win_mean_range)
+        PY_EVENT_PROFILER_PRM(win_len, "EventProfiler window length")
+        PY_EVENT_PROFILER_PRM(win_stdv_min, "EventProfile window minimum standard deviation")
+        //PY_EVENT_PROFILER_PRM(win_stdv_range, "")
+        //PY_EVENT_PROFILER_PRM(win_mean_range, "")
     }
     #endif
 

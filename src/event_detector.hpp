@@ -82,10 +82,10 @@ class EventDetector {
     std::vector<Event> dbg_events_;
     #endif
 
-    #define PY_EVTD_METH(P) evdt.def(#P, &EventDetector::P);
-    #define PY_EVTD_PRM(P) prms.def_readwrite(#P, &EventDetector::Params::P);
-    #define PY_EVT_VAL(P) evt.def_readwrite(#P, &Event::P);
-    #define PY_DBG_VAL(P) dbg.def_readonly(#P, &Debug::P);
+    #define PY_EVTD_METH(P, D) evdt.def(#P, &EventDetector::P, D);
+    #define PY_EVTD_PRM(P, D) prms.def_readwrite(#P, &EventDetector::Params::P, D);
+    #define PY_EVT_VAL(P, D) evt.def_readwrite(#P, &Event::P, D);
+    #define PY_DBG_VAL(P, D) dbg.def_readonly(#P, &Debug::P, D);
 
     static void pybind_defs(
             pybind11::class_<EventDetector> &evdt,
@@ -93,31 +93,32 @@ class EventDetector {
 
         evdt.def(pybind11::init<Params>());
         evdt.def(pybind11::init());
-        PY_EVTD_METH(reset);
-        PY_EVTD_METH(add_sample);
-        PY_EVTD_METH(get_event);
-        PY_EVTD_METH(get_events);
-        PY_EVTD_METH(get_mean);
-        PY_EVTD_METH(get_means);
-        PY_EVTD_METH(mean_event_len);
+        PY_EVTD_METH(reset, "");
+        PY_EVTD_METH(add_sample, "");
+        PY_EVTD_METH(get_event, "");
+        PY_EVTD_METH(get_events, "");
+        PY_EVTD_METH(get_mean, "");
+        PY_EVTD_METH(get_means, "");
+        PY_EVTD_METH(mean_event_len, "");
 
-        evdt.def_readonly_static("PRMS_DEF", &EventDetector::PRMS_DEF);
+        evdt.def_readonly_static("PRMS_DEF", &EventDetector::PRMS_DEF, "");
 
-        pybind11::class_<Params> prms(evdt, "Params");
-        prms.def(pybind11::init());
-        prms.def(pybind11::init<Params>());
-        PY_EVTD_PRM(window_length1);
-        PY_EVTD_PRM(window_length2);
-        PY_EVTD_PRM(threshold1);
-        PY_EVTD_PRM(threshold2);
-        PY_EVTD_PRM(peak_height);
-        PY_EVTD_PRM(min_mean);
-        PY_EVTD_PRM(max_mean);
+        pybind11::class_<Params> prms(evdt, "Params", "");
+        prms.def(pybind11::init(), "");
+        prms.def(pybind11::init<Params>(), "");
+        PY_EVTD_PRM(window_length1, "EventDetector t-stat window length 1");
+        PY_EVTD_PRM(window_length2, "EventDetector t-stat window length 2");
+        PY_EVTD_PRM(threshold1, "EventDetector t-stat threshold 1");
+        PY_EVTD_PRM(threshold2, "EventDetector t-stat threshold 2");
+        PY_EVTD_PRM(peak_height, "EventDetector peak_height");
+        PY_EVTD_PRM(min_mean, "Minimum mean event pA");
+        PY_EVTD_PRM(max_mean, "Maximum mean event pA");
 
-        PY_EVT_VAL(mean);
-        PY_EVT_VAL(stdv);
-        PY_EVT_VAL(start);
-        PY_EVT_VAL(length);
+        //TODO define as numpy records, pass vectors of events
+        PY_EVT_VAL(mean, "");
+        PY_EVT_VAL(stdv, "");
+        PY_EVT_VAL(start, "");
+        PY_EVT_VAL(length, "");
 
         #ifdef DEBUG_EVDT
         evdt.def_readonly("dbg", &EventDetector::dbg_);

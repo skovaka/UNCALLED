@@ -72,7 +72,7 @@ class Conf {
     Fast5Reader::Params   fast5_reader   = Fast5Reader::PRMS_DEF;
 
     RealtimeParams        realtime       = REALTIME_PRMS_DEF;
-    SimParams             client_sim     = SIM_PRMS_DEF;
+    SimulatorParams             simulator     = SIM_PRMS_DEF;
     MapOrdParams          map_pool_ord   = MAP_ORD_PRMS_DEF;
 
     Conf() : mode(Mode::UNDEF), threads(1) {}
@@ -162,14 +162,13 @@ class Conf {
         //TODO rename subsection
         if (conf.contains("simulator")) {
             const auto subconf = toml::find(conf, "simulator");
-            GET_TOML_EXTERN(std::string, ctl_seqsum, client_sim);
-            GET_TOML_EXTERN(std::string, unc_seqsum, client_sim);
-            GET_TOML_EXTERN(std::string, unc_paf, client_sim);
-            GET_TOML_EXTERN(float, sim_speed, client_sim);
-            GET_TOML_EXTERN(float, scan_time, client_sim);
-            GET_TOML_EXTERN(float, scan_intv_time, client_sim);
-            GET_TOML_EXTERN(float, ej_time, client_sim);
-            GET_TOML_EXTERN(u32, min_ch_reads, client_sim);
+            GET_TOML_EXTERN(std::string, ctl_seqsum, simulator);
+            GET_TOML_EXTERN(std::string, unc_seqsum, simulator);
+            GET_TOML_EXTERN(std::string, unc_paf, simulator);
+            GET_TOML_EXTERN(float, sim_speed, simulator);
+            GET_TOML_EXTERN(float, scan_time, simulator);
+            GET_TOML_EXTERN(float, scan_intv_time, simulator);
+            GET_TOML_EXTERN(float, ej_time, simulator);
         }
 
         if (conf.contains("map_pool_ord")) {
@@ -252,8 +251,6 @@ class Conf {
             const auto subconf = toml::find(conf, "event_profiler");
             GET_TOML_EXTERN(u32, win_len, event_profiler);
             GET_TOML_EXTERN(float, win_stdv_min, event_profiler);
-            GET_TOML_EXTERN(float, win_stdv_range, event_profiler);
-            GET_TOML_EXTERN(float, win_mean_range, event_profiler);
         }
 
     }
@@ -304,14 +301,13 @@ class Conf {
     GET_SET_EXTERN(float, read_buffer, sample_rate);
 
 
-    GET_SET_EXTERN(std::string, client_sim, ctl_seqsum);
-    GET_SET_EXTERN(std::string, client_sim, unc_seqsum);
-    GET_SET_EXTERN(std::string, client_sim, unc_paf);
-    GET_SET_EXTERN(float, client_sim, sim_speed);
-    GET_SET_EXTERN(float, client_sim, scan_time);
-    GET_SET_EXTERN(float, client_sim, scan_intv_time);
-    GET_SET_EXTERN(float, client_sim, ej_time);
-    GET_SET_EXTERN(u32, client_sim, min_ch_reads);
+    GET_SET_EXTERN(std::string, simulator, ctl_seqsum);
+    GET_SET_EXTERN(std::string, simulator, unc_seqsum);
+    GET_SET_EXTERN(std::string, simulator, unc_paf);
+    GET_SET_EXTERN(float, simulator, sim_speed);
+    GET_SET_EXTERN(float, simulator, scan_time);
+    GET_SET_EXTERN(float, simulator, scan_intv_time);
+    GET_SET_EXTERN(float, simulator, ej_time);
 
     GET_SET_EXTERN(u32, map_pool_ord, min_active_reads);
 
@@ -361,7 +357,7 @@ class Conf {
         CONF_GROUP(seed_tracker, "")
         CONF_GROUP(fast5_reader, "") 
         CONF_GROUP(realtime, "") 
-        CONF_GROUP(client_sim, "")
+        CONF_GROUP(simulator, "")
         CONF_GROUP(map_pool_ord, "")
 
         c.def_readonly_static("_PARAM_GROUPS", &Conf::_PARAM_GROUPS);
@@ -403,7 +399,6 @@ class Conf {
         DEFPRP(scan_time)
         DEFPRP(scan_intv_time)
         DEFPRP(ej_time)
-        DEFPRP(min_ch_reads)
 
         #define PY_CONF_MODE(P) m.value(#P, Conf::Mode::P);
 

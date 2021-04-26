@@ -52,10 +52,9 @@ const RealtimeParams REALTIME_PRMS_DEF = {
 typedef struct {
     std::string ctl_seqsum, unc_seqsum, unc_paf;
     float sim_speed, scan_time, scan_intv_time, ej_time;
-    u32 min_ch_reads;
-} SimParams;
+} SimulatorParams;
 
-const SimParams SIM_PRMS_DEF = {
+const SimulatorParams SIM_PRMS_DEF = {
     ctl_seqsum     : "",  
     unc_seqsum     : "",
     unc_paf        : "",
@@ -63,7 +62,6 @@ const SimParams SIM_PRMS_DEF = {
     scan_time      : 10,
     scan_intv_time : 10.0,
     ej_time        : 5400.0,
-    min_ch_reads   : 0 //TODO is this needed?
 };
 
 typedef struct {
