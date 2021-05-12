@@ -87,18 +87,17 @@ class ArgParser:
             default = getattr(group, param_name)
             doc = getattr(type(group), param_name).__doc__
 
-            print(self.group_name, hasattr(group, "_types"))
-
             if hasattr(group, "_types"):
                 _type = getattr(group, "_types")[param_name]
             else:
                 _type = type(default)
 
-            kwargs = {
-                "default" : default,
-                "type"    : _type,
-                "help"    : doc
-            }
+            kwargs = {"help" : doc}
+
+            if _type != bool:
+                kwargs["type"] = _type
+                kwargs["default"] = default
+
             kwargs.update(self.extra_kw)
 
             return kwargs

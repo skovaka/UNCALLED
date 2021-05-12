@@ -38,6 +38,8 @@
 
 #ifdef PYBIND
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/numpy.h>
 #endif
 
 class ReadBuffer {
@@ -146,7 +148,9 @@ class ReadBuffer {
         PY_READ_RPROP(full_duration, "Total number of samples in the read");
         PY_READ_RPROP(channel, "Channel where the read was sequenced");
         PY_READ_RPROP(number, "Read number");
-        PY_READ_RPROP(signal, "Read signal");
+        c.def_property_readonly("signal", [](ReadBuffer &r) -> pybind11::array_t<float> {
+             return pybind11::array_t<float>(r.signal_.size(), r.signal_.data());
+        }, "Read Signal");
 
         c.def("__len__", &ReadBuffer::size);
         c.def("__getitem__", &ReadBuffer::operator[]);

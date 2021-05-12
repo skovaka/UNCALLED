@@ -106,18 +106,24 @@ class PafEntry:
         return s
 
 
-def parse_paf(infile, max_load=None):
-    if max_load == 0:
-        max_load = None
+def parse_paf(infile, ref_name=None, ref_start=None, ref_end=None, max_reads=None, full_overlap=False):
+    if max_reads == 0:
+        max_reads = None
 
     if isinstance(infile, str):
         infile = open(infile)
     c = 0
     for l in infile:
         if l[0] == "#": continue
-        if max_load != None and c >= max_load: break
-        yield PafEntry(l)
-        c += 1
+        if max_reads != None and c >= max_reads: break
+        p = PafEntry(l)
+        if ref_name is None or (
+                p.rf_name == ref_name and (
+                    ref_start is None or ref_end is None or
+                    (full_overlap and p.rf_st <= ref_start and p.rf_en >= ref_end) or
+                    (not full_overlap and max(p.rf_st, ref_start) < min(p.rf_en, ref_end)))):
+            yield p
+            c += 1
 
 def paf_ref_compare(qry, ref, ret_qry=True, check_locs=True, ext=1.5):
     if type(ref) == dict:
@@ -162,7 +168,7 @@ def paf_ref_compare(qry, ref, ret_qry=True, check_locs=True, ext=1.5):
 
 
 def run(args):
-    locs = [p for p in parse_paf(args.infile, args.max_reads)]
+    locs = [p for p in parse_paf(args.infile, max_reads=args.max_reads)]
 
     num_mapped = sum([p.is_mapped for p in locs])
 

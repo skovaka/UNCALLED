@@ -100,7 +100,7 @@ PYBIND11_MODULE(_uncalled, m) {
     m.def("kmer_comp",     pybind11::vectorize(&kmer_comp<KLEN>));
     m.def("kmer_revcomp",  pybind11::vectorize(&kmer_revcomp<KLEN>));
     m.def("kmer_head",     pybind11::vectorize(&kmer_head<KLEN>));
-    m.def("kmer_base",     &kmer_base<KLEN>);
+    m.def("kmer_base",     pybind11::vectorize(&kmer_base<KLEN>));
     m.def("kmer_to_str",   &kmer_to_str<KLEN>);
     m.def("seq_to_kmers",  &seq_to_kmers<KLEN>);
     m.def("kmer_neighbor", &kmer_neighbor<KLEN>);

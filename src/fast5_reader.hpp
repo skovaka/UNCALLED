@@ -34,6 +34,8 @@
 
 #ifdef PYBIND
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/numpy.h>
 #endif
 
 /* Fast5Iter and Fast5Dict extend Fast5Reader
@@ -45,14 +47,14 @@ class Fast5Reader {
     public:
 
     struct Params {
-        std::vector<std::string> fast5_list;
-        std::vector<std::string> read_filter;
+        std::vector<std::string> fast5_files, read_filter;
+        std::string fast5_index;
         u32 max_reads, max_buffer;
-        bool load_bc;
+        bool recursive, load_bc;
 
-        bool load_fast5_list(const std::string &filename) {
-            fast5_list = read_txt_file(filename);
-            return !fast5_list.empty();
+        bool load_fast5_files(const std::string &filename) {
+            fast5_files = read_txt_file(filename);
+            return !fast5_files.empty();
         }
 
         bool load_read_filter(const std::string &filename) {
@@ -67,7 +69,7 @@ class Fast5Reader {
 
     u32 add_fast5(const std::string &fast5_path);
 
-    bool load_fast5_list(const std::string &fname);
+    bool load_fast5_files(const std::string &fname);
 
 
     protected:
@@ -98,7 +100,7 @@ class Fast5Reader {
         return ret;
     }
 
-    std::vector<std::string> fast5_list_;
+    std::vector<std::string> fast5_files_;
     hdf5_tools::File fast5_file_; //rename fast5_file_
     std::vector<std::string> root_ls_;
     Format fmt_; //rename file_fmt_
@@ -122,12 +124,26 @@ class Fast5Reader {
         pybind11::class_<Params> p(c, "Params");
         //p.def_readwrite(PARAM_META[0], &Fast5Reader::Params::P);
 
-        //DPRM(p, "fast5_list", &Fast5Reader::Params::fast5_list);
-        PY_FAST5_READER_PRM(fast5_list, "File containing a list of paths to fast5 files, one per line.");
-        PY_FAST5_READER_PRM(read_filter, "File containing a list of read IDs. Only these reads will be loaded if specified.");
+        //DPRM(p, "fast5_files", &Fast5Reader::Params::fast5_files);
+        PY_FAST5_READER_PRM(fast5_files, 
+                "File containing a list of paths to fast5 files, one per line."
+                "List of paths to any combination of\n"
+                " 1. fast5 files\n"
+                " 2. directories to search for fast5 files (optionally recursive)\n"
+                " 3. text file(s) listing one fast5 file or directory to search per line"
+        );
+                
+        PY_FAST5_READER_PRM(read_filter, "List of read IDs and/or text file(s) containing one read ID per line");
+        PY_FAST5_READER_PRM(fast5_index, 
+            "Filename mapping between read IDs and fast5 files \n"
+            "Can be sequencing summary output by basecaller, "
+            "\"filename_mapping.txt\" from ont_fast5_api, or "
+            "nanopolish \"*.index.readdb\" file"
+        );
         PY_FAST5_READER_PRM(max_reads, "Maximum number of reads to load.");
         PY_FAST5_READER_PRM(max_buffer, "Maximum number of reads to store in memory.");
-        PY_FAST5_READER_PRM(load_bc, "Will load basecaller data if present");
+        PY_FAST5_READER_PRM(load_bc, "Will load basecaller data if true");
+        PY_FAST5_READER_PRM(recursive, "Will search directories recursively for any file ending in \".fast5\" if true");
             
     }
 
@@ -210,10 +226,12 @@ class Fast5Dict : public Fast5Reader {
     Fast5Dict(Fast5ReadMap fast5_map, const Params &p=PRMS_DEF);
     Fast5Dict(const Params &p);
 
-    bool load_index(const std::string &filename); 
     void add_read(const std::string &read_id, u32 fast5_idx); 
+    bool load_index(const std::string &filename);
 
     Fast5Read operator[](const std::string &read_id);
+
+    std::string get_read_file(const std::string &read_id);
 
     private:
     std::unordered_map<std::string, u32> reads_;
@@ -233,6 +251,8 @@ class Fast5Dict : public Fast5Reader {
         
         PY_FAST5_DICT_METH(load_index, "");
         PY_FAST5_DICT_METH(add_read, "");
+        PY_FAST5_DICT_METH(get_read_file, "");
+        //c.def("add_read", pybind11::vectorize(&Fast5Dict::add_read), "");
         c.def("__getitem__", &Fast5Dict::operator[]);
     }
     #endif

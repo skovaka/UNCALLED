@@ -34,7 +34,8 @@ class Normalizer {
     float get_stdv() const;
 
     float get_scale() const;
-    float get_shift(float scale=0) const;
+    float get_shift() const;
+    float get_shift(float scale) const;
 
     float at(u32 i) const;
 
@@ -56,6 +57,7 @@ class Normalizer {
 
     static void pybind_defs(pybind11::class_<Normalizer> &c) {
         c.def(pybind11::init());
+        c.def(pybind11::init<Params>());
         c.def(pybind11::init<float, float>());
 
         PY_NORM_METH(set_target, "Sets target mean and standard deviation");
@@ -64,7 +66,10 @@ class Normalizer {
         PY_NORM_METH(get_mean, "Returns the mean of the signal in the buffer");
         PY_NORM_METH(get_stdv, "Return the standard deviation of the signal in the buffer");
         PY_NORM_METH(get_scale, "Returns the scaling parameter required to normalize the signal in the buffer to the target mean/stdv");
-        PY_NORM_METH(get_shift, "Returns the shift parameter required to normalize the signal in the buffer to the target mean/stdv");
+        //PY_NORM_METH(get_shift, "Returns the shift parameter required to normalize the signal in the buffer to the target mean/stdv");
+
+        c.def("get_shift", static_cast< float (Normalizer::*)() const> (&Normalizer::get_shift) );
+
         PY_NORM_METH(pop, "Returns the next unread normalized signal from the buffer");
         c.def("push", pybind11::vectorize(&Normalizer::push), "Adds new signal to the buffer");
         PY_NORM_METH(skip_unread, "Sets all signal in the buffer as read");

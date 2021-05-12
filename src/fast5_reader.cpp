@@ -26,10 +26,12 @@
 #include "fast5_reader.hpp"
 
 const typename Fast5Reader::Params Fast5Reader::PRMS_DEF = {
-    fast5_list : {},
+    fast5_files : {},
     read_filter  : {},
+    fast5_index : "",
     max_reads  : 0,
     max_buffer : 100,
+    recursive  : false,
     load_bc    : false
 };
 
@@ -49,14 +51,14 @@ Fast5Reader::Fast5Reader() :
 Fast5Reader::Fast5Reader(const Params &p) : PRMS(p) {}
 
 u32 Fast5Reader::add_fast5(const std::string &fast5_path) {
-    u32 i = fast5_list_.size();
-    fast5_list_.push_back(fast5_path);
+    u32 i = fast5_files_.size();
+    fast5_files_.push_back(fast5_path);
     return i;
 }
 
-bool Fast5Reader::load_fast5_list(const std::string &fname) {
-    fast5_list_ = read_txt_file(fname);
-    return !fast5_list_.empty();
+bool Fast5Reader::load_fast5_files(const std::string &fname) {
+    fast5_files_ = read_txt_file(fname);
+    return !fast5_files_.empty();
 }
 
 bool Fast5Reader::open_fast5(u32 i) {
@@ -64,10 +66,10 @@ bool Fast5Reader::open_fast5(u32 i) {
     if (fast5_file_.is_open()) fast5_file_.close();
     read_paths_.clear();
 
-    //if (fast5_list_.empty()) return false;
-    if (i >= fast5_list_.size()) return false;
+    //if (fast5_files_.empty()) return false;
+    if (i >= fast5_files_.size()) return false;
 
-    fast5_file_.open(fast5_list_[i]);
+    fast5_file_.open(fast5_files_[i]);
 
     fmt_ = Format::UNKNOWN;
     if (fast5_file_.group_exists(SINGLE_RAW_PATH)) {
@@ -113,7 +115,7 @@ Fast5Iter::Fast5Iter(const Params &p) : Fast5Reader(p) {
     total_buffered_ = 0;
     fast5_idx_ = 0;
 
-    for (auto &fname : p.fast5_list) {
+    for (auto &fname : p.fast5_files) {
         add_fast5(fname);
     }
     for (auto &id : p.read_filter) {
@@ -121,12 +123,12 @@ Fast5Iter::Fast5Iter(const Params &p) : Fast5Reader(p) {
     }
 }
 
-Fast5Iter::Fast5Iter(const std::string &fast5_list, 
+Fast5Iter::Fast5Iter(const std::string &fast5_files, 
                          const std::string &read_filter)
     : Fast5Iter() {
 
     total_buffered_ = 0;
-    if (!PRMS.fast5_list.empty()) load_fast5_list(fast5_list);
+    if (!PRMS.fast5_files.empty()) load_fast5_files(fast5_files);
     if (!PRMS.read_filter.empty()) load_read_filter(read_filter);
 }
 
@@ -173,7 +175,7 @@ bool Fast5Iter::load_read_filter(const std::string &fname) {
 bool Fast5Iter::empty() {
     return buffered_reads_.empty() && 
            read_paths_.empty() && 
-           (fast5_idx_ >= fast5_list_.size() || all_buffered());
+           (fast5_idx_ >= fast5_files_.size() || all_buffered());
 }
 
 std::string Fast5Reader::get_single_raw_path() {
@@ -226,7 +228,7 @@ u32 Fast5Iter::fill_buffer() {
 
         if (all_buffered())  {
             read_paths_.clear();
-            fast5_list_.clear();
+            fast5_files_.clear();
             break;
         }
 
@@ -274,6 +276,9 @@ Fast5Dict::Fast5Dict() : Fast5Dict(PRMS_DEF) {}
 
 Fast5Dict::Fast5Dict(const Params &p) : Fast5Reader(p) {
     fast5_idx_ = -1;
+    if (!PRMS.fast5_index.empty()) {
+        load_index(PRMS.fast5_index);
+    }
 }
 
 Fast5Dict::Fast5Dict(Fast5ReadMap fast5_map, const Params &p) : Fast5Dict(p) {
@@ -339,4 +344,8 @@ Fast5Read Fast5Dict::operator[](const std::string &read_id) {
     }
 
     return Fast5Read(fast5_file_, get_subpaths(path));
+}
+
+std::string Fast5Dict::get_read_file(const std::string &read_id) {
+    return fast5_files_[reads_[read_id]];
 }

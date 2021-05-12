@@ -106,8 +106,11 @@ float Normalizer::get_scale() const {
     return PRMS.tgt_stdv / get_stdv();
 }
 
+float Normalizer::get_shift() const {
+    return get_shift(get_scale());
+}
+
 float Normalizer::get_shift(float scale) const {
-    if (scale == 0) scale = get_scale();
     return PRMS.tgt_mean - scale * mean_;
 }
 

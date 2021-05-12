@@ -31,7 +31,7 @@ import toml
 from _uncalled import _Conf
 from collections import namedtuple
 
-TOML_TYPES = {int, float, str, list}
+TOML_TYPES = {int, float, str, list, bool}
 
 def param_valid(name, val):
     return (not name.startswith("_") and
@@ -44,6 +44,17 @@ class ParamGroup:
     _types = dict()
     def __init__(self):
         self._values = dict()
+
+    def set(self, **kwargs):
+        for arg, val in kwargs.items():
+            if hasattr(self, arg):
+                setattr(self, arg, val)
+            else:
+                raise RuntimeError("Unknown kwarg \"%s\" for %s" % (arg, type(self)))
+
+    def from_kw(self, **kwargs):
+        self.set(**kwargs)
+        return self
 
     @classmethod
     def _def_params(_class, *params):
@@ -63,6 +74,7 @@ class ParamGroup:
 
         setattr(_class, p.name, property(getter, setter, doc=p.doc))
         _class._types[p.name] = p.type
+
 
 class Conf(_Conf):
     _EXTRA_GROUPS = dict()
