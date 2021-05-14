@@ -74,10 +74,6 @@ class ArgParser:
                 return self.extra_kw
 
             group = conf.get_group(self.group_name)
-            #if len(self.group_name) == 0:
-            #    group = conf
-            #else:
-            #    group = getattr(conf, self.group_name)
 
             if self.param is not None:
                 param_name = self.param
@@ -117,20 +113,10 @@ class ArgParser:
     )
 
     FAST5_OPTS = (
-        Opt("fast5s",
-            nargs = '+', 
-            type = str, 
-            help = "Reads to map. Can be a directory which will be searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
-        ),
-        Opt(("-r", "--recursive"), 
-            action = "store_true",
-            help = "Will perform recursive directory search for fast5 files if specified",
-        ),
-        Opt(("-l", "--read-list"), 
-            type = str, 
-            default = None, 
-            help = "List of read IDs, either comma separated or path to text file containing one read ID per line. Will only map these reads if specified"
-        ),
+        Opt("fast5_files", Groups.FAST5, nargs="+", type=str),
+        Opt(("-r", "--recursive"), Groups.FAST5, action="store_true"),
+        Opt(("-l", "--read-filter"), Groups.FAST5, type=unc.Fast5Reader.parse_read_str),
+        Opt(("-x", "--fast5-index"), Groups.FAST5),
         Opt(("-n", "--max-reads"), Groups.FAST5)
     )
 

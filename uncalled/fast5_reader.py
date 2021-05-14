@@ -6,6 +6,80 @@ import pandas as pd
 import os
 from _uncalled import _Fast5Dict, _Fast5Iter
 import uncalled as unc
+import re
+
+def fast5_path(fname):
+    if fname.startswith("#") or not fname.endswith("fast5"):
+        return None
+
+    path = os.path.abspath(fname)
+    if not os.path.isfile(path):
+        sys.stderr.write("Warning: skipping \"%s\" (not a fast5 file)\n" % fname)
+        return None
+
+    return path
+
+def iter_fast5_fnames(fast5s, recursive):
+    for path in fast5s:
+        path = path.strip()
+
+        if not os.path.exists(path):
+            sys.stderr.write("Error: \"%s\" does not exist\n" % path)
+            sys.exit(1)
+
+        isdir = os.path.isdir(path)
+
+        #Recursive directory search 
+        if isdir and recursive:
+            for root, dirs, files in os.walk(path):
+                for fname in files:
+                    fast5_name = fast5_path(os.path.join(root, fname))
+                    if fast5_name is not None: yield fast5_name
+
+        #Non-recursive directory search 
+        elif isdir and not recursive:
+            for fname in os.listdir(path):
+                fast5_name = fast5_path(os.path.join(path, fname))
+                if fast5_name is not None: yield fast5_name
+
+        #Read fast5 name directly
+        elif path.endswith(".fast5"):
+            fast5_name = fast5_path(path)
+            if fast5_name is not None: yield fast5_name
+
+        #Read fast5 filenames from text file
+        else:
+            with open(path) as infile:
+                for line in infile:
+                    fast5_name = fast5_path(line.strip())
+                    if fast5_name is not None: yield fast5_name
+
+def iter_reads(reads):
+    if type(reads) in (list, tuple):
+        return reads
+
+    if reads is None:
+        return []
+
+    if os.path.exists(reads):
+        #with open(reads) as reads_in:
+        return (l.strip() for l in open(reads))
+        sys.stderr.write("Error: failed to open read filter\n")
+        sys.exit(1)
+
+    return reads.split(",")
+
+def get_fast5_reader(fast5s, recursive, read_filter):
+    reader = unc.Fast5Reader()
+
+    for fast5 in iter_fast5_fnames(fast5s, recursive):
+        reader.add_fast5(fast5)
+
+    for read in iter_reads(read_filter):
+        reader.add_read(read)
+
+    return reader
+
 
 def fast5_glob(root, recursive):
     suffix = "*.fast5"
@@ -20,9 +94,14 @@ class Fast5Reader:
         self.conf = unc.Conf() if conf is None else conf
         self.prms = self.conf.fast5_reader
 
-        if fast5s is not None: self.parse_fast5_paths(fast5s)
-        if index is not None: self.prms.fast5_index = index
-        if reads is not None: self.prms.read_filter = self.parse_read_str(reads)
+        if fast5s is None: 
+            fast5s = self.prms.fast5_files
+        self.parse_fast5_paths(fast5s)
+
+        if reads is not None: 
+            self.prms.read_filter = self.parse_read_str(reads)
+
+        if index     is not None: self.prms.fast5_index = index
         if recursive is not None: self.prms.recursive = recursive
 
         self.indexed = len(self.prms.fast5_index) != 0
@@ -43,9 +122,9 @@ class Fast5Reader:
                 header = 0
 
             elif len(head) == 2:
-                if is_fast5(head[0]) and is_read(head[1]):
+                if self.is_fast5(head[0]) and self.is_read_id(head[1]):
                     names = ["filename", "read_id"]
-                elif is_read(head[0]) and is_fast5(head[1]):
+                elif self.is_read_id(head[0]) and self.is_fast5(head[1]):
                     names = ["read_id", "filename"]
                 header = None
 
@@ -79,7 +158,6 @@ class Fast5Reader:
     @staticmethod
     def parse_read_str(reads):
         """Takes either a comma-separated string of read IDs or a path to a file containing read IDs and returns a list of read IDs"""
-
         if reads is None:
             return []
 
@@ -131,7 +209,7 @@ class Fast5Reader:
                         add_fast5(fast5_name)
 
             #Read fast5 name directly
-            elif is_fast5(path):
+            elif self.is_fast5(path):
                 add_fast5(path)
 
             #Read fast5 filenames from text file

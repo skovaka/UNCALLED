@@ -60,6 +60,7 @@ PYBIND11_MODULE(_uncalled, m) {
     ReadBufferBC::pybind_defs(read_buffer_bc);
     
     py::class_<Fast5Read, ReadBufferBC> fast5_read(m, "Fast5Read");
+    Fast5Read::pybind_defs(fast5_read);
 
     py::class_<Fast5PyRead, ReadBufferBC> fast5_py_read(m, "Fast5PyRead");
     Fast5PyRead::pybind_defs(fast5_py_read);

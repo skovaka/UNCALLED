@@ -141,8 +141,9 @@ def map_cmd(conf):
 
     mapper = unc.MapPool(conf)
 
+    
     sys.stderr.write("Loading fast5s\n")
-    for fast5 in load_fast5s(conf.fast5s, conf.recursive):
+    for fast5 in load_fast5s(conf.fast5_reader.fast5_files, conf.fast5_reader.recursive):
         if fast5 != None:
             mapper.add_fast5(fast5)
 
@@ -334,8 +335,6 @@ def list_ports_cmd(conf):
 if __name__ == "__main__":
     args = unc.ArgParser()
     conf = args.conf
-
-    print(conf.to_toml())
 
     if conf.subcmd == "index":
         index_cmd(conf)

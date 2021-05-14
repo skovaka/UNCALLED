@@ -45,6 +45,8 @@ class Fast5Read : public ReadBufferBC {
               //const std::string &ch_path, 
               //const std::string &anl_path) {
 
+        filename_ = file.file_name();
+
         //Get read ID (name), number, and start_time
         auto raw_attrs = file.get_attr_map(paths.raw);
         id_ = raw_attrs["read_id"];
@@ -127,23 +129,24 @@ class Fast5Read : public ReadBufferBC {
 
     }
 
-    //#ifdef PYBIND
+    protected:
+    std::string filename_;
 
-    //#define PY_FAST5_READ_METH(N,D) c.def(#N, &Fast5Read::N, D);
-    //#define PY_FAST5_READ_RPROP(P,D) c.def_property_readonly(#P, &Fast5Read::get_##P, D);
+    #ifdef PYBIND
 
-    //public:
+    #define PY_FAST5_ATTR(P,D) c.def_readonly(#P, &Fast5Read::P, D);
 
-    //static void pybind_defs(pybind11::class_<Fast5Read, ReadBuffer> &c) {
+    public:
 
-    //    //c.def(pybind11::init<ReadBuffer>());
-    //    PY_FAST5_READ_RPROP(bc_loaded, "True if basecalling data loaded");
-    //    PY_FAST5_READ_RPROP(moves, "Guppy BC event moves");
-    //    PY_FAST5_READ_RPROP(bce_stride, "Guppy BC event length");
-    //    PY_FAST5_READ_RPROP(template_start, "Sample where guppy basecalling starts");
+    static void pybind_defs(pybind11::class_<Fast5Read, ReadBufferBC> &c) {
+
+        c.def_readonly("filename", &Fast5Read::filename_);
+        c.def("__repr__", [](Fast5Read &r) -> std::string {
+            return "<Fast5Read id=" + r.get_id() + ">"; //TODO add channel, number, length
+        });
 
 
-    //}
+    }
 
-    //#endif
+    #endif
 };
