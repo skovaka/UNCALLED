@@ -173,9 +173,9 @@ Exactly one of `--deplete` or `--enrich` must be specified
 
 UNCALLED outputs to stdout in a format similar to [PAF](https://github.com/lh3/miniasm/blob/master/PAF.md). Unmapped reads are output with reference-location-dependent fields replaced with \*s. Lines that begin with "#" are comments that useful for debugging.
 
-Query coordinates, residue matches, and block lengths are estimated assuming 450bp sequenced per second. This estimate can be significantly off depending on the sequencing run. UNCALLED attempts to map a read as early as possible, so the "query end" field corresponds to the leftmost position where UNCALLED was able to confidently map the read. In many cases this may only be 450bp or 900bp into the read, even if the read is many times longer than this. This differs from aligners such as [minimap2](https://github.com/lh3/minimap2), which attempt to map the full length of the read.
+Query coordinates, residue matches, and block lengths are estimated assuming 450bp sequenced per second. This estimate can be significantly off depending on the sequencing run. UNCALLED attempts to map a read as early as possible, so the "query sequence length" and "query end" fields correspond to the leftmost position where UNCALLED was able to confidently map the read. In many cases this may only be 450bp or 900bp into the read, even if the read is many times longer than this. This differs from aligners such as [minimap2](https://github.com/lh3/minimap2), which attempt to map the full length of the read.
 
-For real-time mapping, read lengths are estimated by how much signal UNCALLED received, which does not necessarily correspond to how much signal was actually sequenced.
+The "query sequence length" field currently does not correspond to the actual read length, rather an estimate of the number of bases that UNCALLED attempted to align. In most cases this will be equal to "query end". This may be changed to better reflect the full read length in future versions.
 
 Both modes include the following custom attributes in each PAF entry:
 
