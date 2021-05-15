@@ -18,6 +18,9 @@ Nature Biotechnology (2020)
 
 ## Installation
 
+### Native
+
+
 ```
 > pip3 install git+https://github.com/skovaka/UNCALLED.git --user
 ```
@@ -35,6 +38,28 @@ Requires python >= 3.6, read-until == 3.0.0, pybind11 >= 2.5.0, and GCC >= 4.8.1
 Other dependencies are included via submodules, so be sure to clone with `git --recursive`
 
 We recommend running on a Linux machine. UNCALLED has been successfully installed and run on Mac computers, but real-time ReadUntil has not been tested on a Mac. Installing UNCALLED has not been attempted on Windows.
+
+### Docker
+
+To build a Docker container image for this project,
+
+``` bash
+git clone --recursive https://github.com/skovaka/UNCALLED.git
+cd UNCALLED/docker
+docker build -t uncalled:latest .
+```
+
+This will build an ubuntu image for you with a copy of this repo in `/opt/UNCALLED`. To start an interactive session, run
+
+``` bash
+docker run --rm -it uncalled bash
+```
+
+To add your own data, you can mount it as a volume somewhere in the container:
+
+``` bash
+docker run --rm -it -v /path/to/host/data:/data uncalled bash
+```
 
 ## Indexing
 
