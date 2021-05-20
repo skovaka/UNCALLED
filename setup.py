@@ -94,8 +94,9 @@ uncalled = Pybind11Extension(
 
     sources = [
        "src/pybinder.cpp",
+       "src/conf.cpp",
        "src/event_profiler.cpp", 
-       "src/client_sim.cpp",
+       "src/simulator.cpp",
        "src/fast5_reader.cpp",
        "src/mapper.cpp",
        "src/self_align_ref.cpp",

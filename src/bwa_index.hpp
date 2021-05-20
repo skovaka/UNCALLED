@@ -49,6 +49,10 @@ struct RefLoc {
     bool fwd;
 };
 
+//struct MirrorCoords {
+//    u32
+//};
+
 template <KmerLen KLEN>
 class BwaIndex {
     public:
@@ -140,6 +144,11 @@ class BwaIndex {
         return Range(index_->L2[base], index_->L2[base+1]);
     }
 
+    u64 fm_to_pac(u64 fm) {
+        return size() - bwt_sa(index_, fm);
+    }
+
+    //TODO deprecated
     u64 sa(u64 i) const {
         return bwt_sa(index_, i);
     }
@@ -188,7 +197,9 @@ class BwaIndex {
 
 
     //auto ref_loc = fmi.translate_loc(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
-    RefLoc translate_loc(u64 sa_start, u64 sa_end, bool read_fwd) const {
+    RefLoc pac_to_ref(u64 sa_start, u64 sa_end, bool read_fwd) const {
+
+        //TODO work out sa vs pac vs half whatever
 
         bool flip = sa_start >= size() / 2;
 
@@ -396,7 +407,7 @@ class BwaIndex {
         PY_BWA_INDEX_METH(get_base_range);
         PY_BWA_INDEX_METH(sa);
         PY_BWA_INDEX_METH(size);
-        PY_BWA_INDEX_METH(translate_loc);
+        PY_BWA_INDEX_METH(pac_to_ref);
         PY_BWA_INDEX_METH(get_seqs);
         PY_BWA_INDEX_METH(coord_to_pacseq);
         PY_BWA_INDEX_METH(pacseq_loaded);

@@ -173,9 +173,14 @@ bool Fast5Iter::load_read_filter(const std::string &fname) {
 }
 
 bool Fast5Iter::empty() {
-    return buffered_reads_.empty() && 
-           read_paths_.empty() && 
-           (fast5_idx_ >= fast5_files_.size() || all_buffered());
+    if (buffer_size() > 0) { 
+        return false;
+    }
+    return fill_buffer() == 0;
+
+    //return buffered_reads_.empty() && 
+    //       read_paths_.empty() && 
+    //       (fast5_idx_ >= fast5_files_.size() || all_buffered());
 }
 
 std::string Fast5Reader::get_single_raw_path() {
@@ -226,11 +231,13 @@ u32 Fast5Iter::fill_buffer() {
     //TODO: max total default to max int
     while (buffered_reads_.size() < PRMS.max_buffer) {
 
+
         if (all_buffered())  {
             read_paths_.clear();
             fast5_files_.clear();
             break;
         }
+
 
         //Open fast5s until one is found which contains reads to load
         while (read_paths_.empty()) {
@@ -238,6 +245,7 @@ u32 Fast5Iter::fill_buffer() {
                 break;
             }
         }
+
         if (read_paths_.empty()) break;
 
         auto subpaths = get_subpaths(read_paths_.front());
@@ -258,11 +266,10 @@ bool Fast5Iter::all_buffered() {
 }
 
 Fast5Read Fast5Iter::next_read() {
-    if (buffer_size() == 0) { 
-        fill_buffer();
+    if (empty()) {
+        throw std::runtime_error("Fast5Iter is empty");
     }
 
-    //TODO: swap to speed up?
     auto r = buffered_reads_.front();
     buffered_reads_.pop_front();
     return r;
