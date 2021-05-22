@@ -228,6 +228,11 @@ class Fast5Reader:
     def is_read_id(read_id):
         return re.match("[a-z0-9]+(-[a-z0-9])+", read_id) is not None
 
+    def get_read_file(self, read_id):
+        if not self.indexed:
+            raise RuntimeError("Fast5 index is required to query fast5 filenames")
+        return self._dict.get_read_file(read_id)
+
     def __getitem__(self, read_id):
         if not self.indexed:
             raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")
@@ -295,3 +300,12 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
 
     fast5s = Fast5Dict(args.seqsum, args.root, args.recursive)
+
+Opt = unc.ArgParser.Opt
+FAST5_OPTS = (
+    Opt("fast5_files", "fast5_reader", nargs="+", type=str),
+    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+    Opt(("-l", "--read-filter"), "fast5_reader", type=Fast5Reader.parse_read_str),
+    Opt(("-x", "--fast5-index"), "fast5_reader"),
+    Opt(("-n", "--max-reads"), "fast5_reader")
+)

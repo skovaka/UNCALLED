@@ -26,11 +26,11 @@ from __future__ import division
 import sys                         
 import os
 import numpy as np
-import argparse
 import uncalled as unc
 from bisect import bisect_left, bisect_right
 from typing import NamedTuple
 
+#Index parameter group
 class IndexParams(unc.conf.ParamGroup): pass
 IndexParams._def_params(
     ("fasta_filename", None, str, "FASTA file to index"),
@@ -46,11 +46,31 @@ IndexParams._def_params(
     ("probs", None, str, "Find parameters with specified target probabilites (comma separated)"),
     ("speeds", None, str, "Find parameters with specified speed coefficents (comma separated)"),
 )
-
 #TODO do this from conf. need to restructure dependencies
 unc.Conf._EXTRA_GROUPS["index"] = IndexParams
-#unc.Conf.index = IndexParams
 
+Opt = unc.ArgParser.Opt
+OPTS = (
+    Opt("fasta_filename", "index"),
+    Opt(("-o", "--bwa-prefix"), "index"),
+    Opt(("-s", "--max-sample-dist"), "index"),
+    Opt("--min-samples", "index"),
+    Opt("--max-samples", "index"),
+    Opt(("-k", "--kmer-len"), "index"),
+    Opt(("-1", "--matchpr1"), "index"),
+    Opt(("-2", "--matchpr2"), "index"),
+    Opt(("-f", "--pathlen-percentile"), "index"),
+    Opt(("-m", "--max-replen"), "index"),
+    Opt("--probs", "index"),
+    Opt("--speeds", "index"),
+)
+
+BWA_OPTS = (
+    Opt("bwa_prefix", "mapper"),
+    Opt(("-p", "--idx-preset"), "mapper"),
+)
+
+#TODO move to BwaIndex?
 UNCL_SUFF = ".uncl"
 AMB_SUFF = ".amb"
 ANN_SUFF = ".ann"
@@ -60,6 +80,49 @@ SA_SUFF = ".sa"
 BWA_SUFFS = [AMB_SUFF, ANN_SUFF, BWT_SUFF, PAC_SUFF, SA_SUFF]
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+
+def run(conf):
+    prms = conf.index
+
+    if prms.bwa_prefix is None or len(prms.bwa_prefix) == 0:
+        prms.bwa_prefix = prms.fasta_filename
+
+    bwa_built = True
+
+    for suff in unc.index.BWA_SUFFS:
+        if not os.path.exists(prms.bwa_prefix + suff):
+            bwa_built = False
+            break
+
+    if bwa_built:
+        sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % prms.bwa_prefix)
+    else:
+        unc.BwaIndex.create(prms.fasta_filename, prms.bwa_prefix)
+
+    sys.stderr.write("Initializing parameter search\n")
+    p = unc.index.IndexParameterizer(prms)
+
+    p.add_preset("default", tgt_speed=115)
+
+    if prms.probs != None:
+        for tgt in prms.probs.split(","):
+            sys.stderr.write("Writing 'prob_%s' parameters\n" % tgt)
+            try:
+                p.add_preset("prob_%s" % tgt, tgt_prob=float(tgt))
+            except Exception as e:
+                sys.stderr.write("Failed to add 'prob_%s'\n" % tgt)
+
+    if prms.speeds != None:
+        for tgt in prms.speeds.split(","):
+            sys.stderr.write("Writing 'speed_%s' parameters\n" % tgt)
+            try:
+                p.add_preset("speed_%s" % tgt, tgt_speed=float(tgt))
+            except:
+                sys.stderr.write("Failed to add 'speed_%s'\n" % tgt)
+
+    p.write()
+
+    sys.stderr.write("Done\n")
 
 def power_fn(xmax, ymin, ymax, exp, N=100):
     dt = 1.0/N

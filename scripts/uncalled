@@ -35,50 +35,6 @@ import numpy as np
 
 MAX_SLEEP = 0.01
 
-def index_cmd(conf):
-
-    params = conf.index
-
-    if params.bwa_prefix is None or len(params.bwa_prefix) == 0:
-        params.bwa_prefix = params.fasta_filename
-
-    bwa_built = True
-
-    for suff in unc.index.BWA_SUFFS:
-        if not os.path.exists(params.bwa_prefix + suff):
-            bwa_built = False
-            break
-
-    if bwa_built:
-        sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % params.bwa_prefix)
-    else:
-        unc.BwaIndex.create(params.fasta_filename, params.bwa_prefix)
-
-    sys.stderr.write("Initializing parameter search\n")
-    p = unc.index.IndexParameterizer(params)
-
-    p.add_preset("default", tgt_speed=115)
-
-    if params.probs != None:
-        for tgt in params.probs.split(","):
-            sys.stderr.write("Writing 'prob_%s' parameters\n" % tgt)
-            try:
-                p.add_preset("prob_%s" % tgt, tgt_prob=float(tgt))
-            except Exception as e:
-                sys.stderr.write("Failed to add 'prob_%s'\n" % tgt)
-
-    if params.speeds != None:
-        for tgt in params.speeds.split(","):
-            sys.stderr.write("Writing 'speed_%s' parameters\n" % tgt)
-            try:
-                p.add_preset("speed_%s" % tgt, tgt_speed=float(tgt))
-            except:
-                sys.stderr.write("Failed to add 'speed_%s'\n" % tgt)
-
-    p.write()
-
-    sys.stderr.write("Done\n")
-
 def fast5_path(fname):
     if fname.startswith("#") or not fname.endswith("fast5"):
         return None
@@ -126,185 +82,6 @@ def assert_exists(fname):
         sys.stderr.write("Error: '%s' does not exist\n" % fname)
         sys.exit(1)
 
-def map_cmd(conf):
-
-    assert_exists(conf.bwa_prefix + ".bwt")
-    assert_exists(conf.bwa_prefix + ".uncl")
-
-    #for fname in open(conf.fast5_list):
-    #    assert_exists(fname.strip())
-
-    #if len(conf.read_fi) > 0:
-    #    assert_exists(conf.read_list)
-
-    sys.stderr.flush()
-
-    mapper = unc.MapPool(conf)
-
-    
-    sys.stderr.write("Loading fast5s\n")
-    for fast5 in load_fast5s(conf.fast5_reader.fast5_files, conf.fast5_reader.recursive):
-        if fast5 != None:
-            mapper.add_fast5(fast5)
-
-    sys.stderr.flush()
-
-    sys.stderr.write("Mapping\n")
-    sys.stderr.flush()
-
-    n = 0
-
-    try:
-        while mapper.running():
-            t0 = time.time()
-            for p in mapper.update():
-                p.print_paf()
-                n += 1
-            dt = time.time() - t0;
-            if dt < MAX_SLEEP:
-                time.sleep(MAX_SLEEP - dt);
-    except KeyboardInterrupt:
-        pass
-    
-    sys.stderr.write("Finishing\n")
-    mapper.stop()
-
-def realtime_cmd(conf):
-
-    #TODO replace with conf mode
-    sim = conf.subcmd == "sim"
-
-    assert_exists(conf.bwa_prefix + ".bwt")
-    assert_exists(conf.bwa_prefix + ".uncl")
-
-    pool = None
-    client = None
-
-    try:
-        if sim:
-            client = unc.Simulator(conf)
-            unc.sim_utils.load_sim(client, conf)
-
-            for fast5 in load_fast5s(conf.fast5s, conf.recursive):
-                if fast5 != None:
-                    client.add_fast5(fast5)
-
-            client.load_fast5s()
-
-        else:
-            if not unc.minknow_client.ru_loaded:
-                sys.stderr.write("Error: read_until module not installed. Please install \"read_until_api\" submodule.\n")
-                sys.exit(1)
-            client = unc.minknow_client.Client(conf.host, conf.port, conf.chunk_time, conf.num_channels)
-
-        if not client.run():
-            sys.exit(1)
-
-        deplete = conf.realtime_mode == unc.RealtimePool.DEPLETE
-        even = conf.active_chs == unc.RealtimePool.EVEN #TODO: do within mapper
-
-        if not sim:
-            raw_type = str(client.signal_dtype)
-
-        pool = unc.RealtimePool(conf)
-
-        chunk_times = [time.time() for c in range(conf.num_channels)]
-        unblocked = [None for c in range(conf.num_channels)]
-
-        if conf.duration == None or conf.duration == 0:
-            end_time = float("inf")
-        else:
-            end_time = conf.duration*60*60
-
-        while client.is_running:
-            t0 = time.time()
-
-            for ch, nm, paf in pool.update():
-                t = time.time()-chunk_times[ch-1]
-                if paf.is_ended():
-                    paf.set_float(unc.Paf.ENDED, t)
-                    client.stop_receiving_read(ch, nm)
-
-                elif (paf.is_mapped() and deplete) or not (paf.is_mapped() or deplete):
-
-                    if sim or client.should_eject():
-                        paf.set_float(unc.Paf.EJECT, t)
-                        u = client.unblock_read(ch, nm)
-
-                        if sim:
-                            paf.set_int(unc.Paf.DELAY, u)
-
-                        unblocked[ch-1] = nm
-                    else:
-                        paf.set_float(unc.Paf.IN_SCAN, t)
-                        client.stop_receiving_read(ch, nm)
-
-                else:
-                    paf.set_float(unc.Paf.KEEP, t)
-                    client.stop_receiving_read(ch, nm)
-
-                paf.print_paf()
-
-            if sim:
-                read_batch = client.get_read_chunks()
-                for channel, read in read_batch:
-                    if even and channel % 2 == 1:
-                        client.stop_receiving_read(channel, read.number)
-                    else:
-                        if unblocked[channel-1] == read.number:
-                            sys.stdout.write("# recieved chunk from %s after unblocking\n" % read.id)
-                            continue
-
-                        chunk_times[channel-1] = time.time()
-                        pool.add_chunk(read)
-       
-            else:
-
-                read_batch = client.get_read_chunks(batch_size=client.queue_length)
-                for channel, read in read_batch:
-                    if even and channel % 2 == 1:
-                        client.stop_receiving_read(channel, read.number)
-                    else:
-                        if unblocked[channel-1] == read.number:
-                            sys.stdout.write("# recieved chunk from %s after unblocking\n" % read.id)
-                            continue
-
-                        chunk_times[channel-1] = time.time()
-                        pool.add_chunk(unc.Chunk(read.id, 
-                                                     channel, 
-                                                     read.number,
-                                                     read.chunk_start_sample,
-                                                     raw_type,
-                                                     read.raw_data))
-
-
-            if client.get_runtime() >= end_time:
-                if not sim:
-                    client.reset()
-                client = None
-                break
-
-            dt = time.time() - t0;
-            if dt < MAX_SLEEP:
-                time.sleep(MAX_SLEEP - dt);
-
-    except KeyboardInterrupt:
-        sys.stderr.write("Keyboard interrupt\n")
-
-    except Exception as e:
-        sys.stderr.write(traceback.format_exc())
-
-    #client.log("Finished")
-
-    if client != None and not sim:
-        client.reset()
-
-    if pool != None:
-        pool.stop_all()
-
-def sim_cmd(conf):
-    unc.sim_utils.load_sim()
-
 #TODO fix
 def list_ports_cmd(conf):
     log_re = re.compile("^([0-9\-]+ [0-9:]+).+ :.+instance_started.+")
@@ -333,11 +110,34 @@ def list_ports_cmd(conf):
 
 
 if __name__ == "__main__":
-    args = unc.ArgParser()
+    SUBCMDS = {
+        "index" : (
+            "Builds the UNCALLED index of a FASTA reference", 
+            unc.index.OPTS
+        ),
+        "map" : (
+            "Map fast5 files to a DNA reference",
+            unc.index.BWA_OPTS + unc.fast5.FAST5_OPTS + unc.map.OPTS
+        ),
+        "realtime" : (
+            "Perform real-time targeted (ReadUntil) sequencing",
+            unc.index.BWA_OPTS + unc.map.OPTS + unc.realtime.OPTS #TODO ADD RU OPTS!!
+        ),
+        "sim" : (
+            "Simulate real-time targeted sequencing.", 
+            unc.index.BWA_OPTS + unc.sim.OPTS + unc.map.OPTS #TODO ADD RU OPTS!!
+        ),
+        "pafstats" : (
+            "Computes speed and accuracy of UNCALLED mappings.",
+            unc.pafstats.PAFSTATS_OPTS
+        )
+    }
+
+    args = unc.ArgParser(subcmds=SUBCMDS)
     conf = args.conf
 
     if conf.subcmd == "index":
-        index_cmd(conf)
+        unc.index.run(conf)
     elif conf.subcmd == "map":
         map_cmd(conf)
     elif conf.subcmd in {"sim", "realtime"}:

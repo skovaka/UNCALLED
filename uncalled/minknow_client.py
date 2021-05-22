@@ -12,6 +12,8 @@ try:
 except ImportError:
     ru_loaded = False
 
+#TODO just rename ReadUntilClient, explain extension of the read_until version
+
 if ru_loaded:
 
     MK_ERROR_STATUS = 0

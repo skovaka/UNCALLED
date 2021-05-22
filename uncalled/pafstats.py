@@ -3,7 +3,31 @@
 import sys
 import numpy as np
 import re
-import argparse
+import uncalled as unc
+
+Opt = unc.ArgParser.Opt
+PAFSTATS_OPTS = (
+    Opt("infile",  
+        type = str, 
+        help = "PAF file output by UNCALLED"
+    ),
+    Opt(("-n", "--max-reads"), 
+        required = False, 
+        type = int, 
+        default = None, 
+        help = "Will only look at first n reads if specified"
+    ),
+    Opt(("-r", "--ref-paf"), 
+        required = False, 
+        type = str, 
+        default = None, 
+        help = "Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA."
+    ),
+    Opt(("-a", "--annotate"), 
+        action = 'store_true', 
+        help = "Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag"
+    ),
+) #end pafstats opts
 
 class PafEntry:
     def __init__(self, line, tags=None):
@@ -106,7 +130,7 @@ class PafEntry:
         return s
 
 
-def parse_paf(infile, ref_name=None, ref_start=None, ref_end=None, max_reads=None, full_overlap=False):
+def parse_paf(infile, ref_name=None, ref_start=None, ref_end=None, max_reads=None, read_filter=None, full_overlap=False):
     if max_reads == 0:
         max_reads = None
 
@@ -117,11 +141,12 @@ def parse_paf(infile, ref_name=None, ref_start=None, ref_end=None, max_reads=Non
         if l[0] == "#": continue
         if max_reads != None and c >= max_reads: break
         p = PafEntry(l)
-        if ref_name is None or (
+        if ((ref_name is None or (
                 p.rf_name == ref_name and (
                     ref_start is None or ref_end is None or
                     (full_overlap and p.rf_st <= ref_start and p.rf_en >= ref_end) or
-                    (not full_overlap and max(p.rf_st, ref_start) < min(p.rf_en, ref_end)))):
+                    (not full_overlap and max(p.rf_st, ref_start) < min(p.rf_en, ref_end))))
+            ) and (read_filter is None or p.qr_name in read_filter)):
             yield p
             c += 1
 
@@ -167,18 +192,18 @@ def paf_ref_compare(qry, ref, ret_qry=True, check_locs=True, ext=1.5):
     return tp, tn, fp, fn, fp_unmap
 
 
-def run(args):
-    locs = [p for p in parse_paf(args.infile, max_reads=args.max_reads)]
+def run(conf):
+    locs = [p for p in parse_paf(conf.infile, max_reads=conf.max_reads)]
 
     num_mapped = sum([p.is_mapped for p in locs])
 
-    statsout = sys.stderr if args.annotate else sys.stdout
+    statsout = sys.stderr if conf.annotate else sys.stdout
 
     statsout.write("Summary: %d reads, %d mapped (%.2f%%)\n\n" % (len(locs), num_mapped, 100*num_mapped/len(locs)))
 
-    if args.ref_paf != None:
+    if conf.ref_paf != None:
         statsout.write("Comparing to reference PAF\n")
-        tp, tn, fp, fn, fp_unmap = paf_ref_compare(locs, parse_paf(args.ref_paf))
+        tp, tn, fp, fn, fp_unmap = paf_ref_compare(locs, parse_paf(conf.ref_paf))
         ntp,ntn,nfp,nfn,nfp_unmap = map(len, [tp, tn, fp, fn, fp_unmap])
         n = len(locs)
 
@@ -187,7 +212,7 @@ def run(args):
         statsout.write("F %6.2f %5.2f\n" % (100*(nfp)/n, 100*nfn/n))
         statsout.write("NA: %.2f\n\n" % (100*nfp_unmap/n))
 
-        if args.annotate:
+        if conf.annotate:
             group_labels = [(tp, "tp"), 
                             (tn, "tn"), 
                             (fp, "fp"),
