@@ -76,7 +76,7 @@ class ParamGroup:
         _class._types[p.name] = p.type
 
 
-class Conf(_Conf):
+class Config(_Conf):
     _EXTRA_GROUPS = dict()
 
     def __init__(self, toml=None):
@@ -139,108 +139,81 @@ class Conf(_Conf):
         return getattr(self, group_name)
 
 class ArgParser:
-    class Opt:
-        def __init__(self, args, group_name=None, param=None, **kwargs):
-            self.args = args if type(args) == tuple else (args,)
-            self.group_name = group_name
-
-            self.param = param
-            if self.param is None:
-                for arg in self.args:
-                    if arg.startswith("--") or not arg.startswith("-"):
-                        self.param = arg.strip("-").replace("-","_")
-                        break
-                if self.param is None:
-                    sys.stderr.write("Error: must specify parameter name for flag \"%s\"\n" % self.args)
-                    sys.exit(0)
-
-            self.extra_kw = kwargs
-
-        def get_dest(self, conf):
-            if self.group_name is None:
-                return (conf, self.param)
-            return (conf.get_group(self.group_name), self.param)
-
-        def get_kwargs(self, conf):
-            if self.group_name is None:
-                return self.extra_kw
-
-            group = conf.get_group(self.group_name)
-
-            if self.param is not None:
-                param_name = self.param
-            else:
-                param_name = flag_to_var(self.args[-1])
-
-            default = getattr(group, param_name)
-            doc = getattr(type(group), param_name).__doc__
-
-            if hasattr(group, "_types"):
-                _type = getattr(group, "_types")[param_name]
-            else:
-                _type = type(default)
-
-            kwargs = {"help" : doc}
-
-            if _type != bool:
-                kwargs["type"] = _type
-                kwargs["default"] = default
-
-            kwargs.update(self.extra_kw)
-
-            return kwargs
-
-        def set_val(self, conf, val):
-            if self.group is None or len(self.group) == 0:
-                group = conf
-            else:
-                group = getattr(conf, self.group)
-
-            setattr(group, self.param, val)
-
 
     def __init__(self, 
-            argv=sys.argv[1:],
+            desc="Rapidly maps raw nanopore signal to DNA references",
             subcmds=None, 
-            conf=None,
-            description="Rapidly maps raw nanopore signal to DNA references"):
+            config=None):
 
-        if conf is None:
-            self.conf = unc.Conf()
+        if config is None:
+            self.config = unc.Config()
         else:
-            self.conf = conf
+            self.config = config
+
+        self.dests = dict()
+        self.fns = dict()
 
         self.parser = argparse.ArgumentParser(
-                description=description, 
+                description=desc, 
                 formatter_class=argparse.ArgumentDefaultsHelpFormatter
         )
 
-        subparsers = self.parser.add_subparsers(dest="subcmd")
-        
-        self.dests = dict()
+        self._add_subcmds(self.parser, subcmds)
 
-        for subcmd, (desc, opts) in subcmds.items():
+    def _add_subcmds(self, parser, subcmds):
+        subparsers = parser.add_subparsers()
+        for sc in subcmds:
             sp = subparsers.add_parser(
-                    subcmd, help=desc, 
-                    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+                sc.name, help=sc.desc, 
+                formatter_class=argparse.ArgumentDefaultsHelpFormatter
             )
-            for opt in opts:
-                arg = sp.add_argument(*opt.args, **opt.get_kwargs(self.conf))
-                self.dests[arg.dest] = opt.get_dest(self.conf)
 
-        self.parse_args(argv)
+            if sc.has_opts:
+                sp.set_defaults(_cmd=sc.fn)
+                for o in sc.opts:
+                    if type(o) is Opt:
+                        self._add_opt(sp, o)
+                    elif type(o) is MutexOpts:
+                        self._add_mutex_opts(sp, o)
+            else:
+                self._add_subcmds(subparsers, sc.opts)
 
-    def parse_args(self, argv):
-        self.conf.args = " ".join(argv)
+    def _add_opt(self, parser, opt):
+        arg = parser.add_argument(*opt.args, **opt.get_kwargs(self.config))
+
+        if opt.has_dest:
+            self.dests[arg.dest] = opt.get_dest(self.config)
+
+        if opt.has_fn:
+            self.fns[arg.dest] = opt.fn
+
+    def _add_mutex_opts(self, parser, mutex):
+        group = parser.add_mutually_exclusive_group()
+        for opt in mutex.opts:
+            #opt.extra_kw["dest"] = mutex.dest
+            #print(opt
+            self._add_opt(group, opt)
+
+    def parse_args(self, argv=sys.argv[1:]):
+        self.config.args = " ".join(argv)
 
         args = self.parser.parse_args(argv)
 
-        if hasattr(args, "conf"):
-            if getattr(args, "conf") is not None:
-                self.conf.load_toml(args.conf)
+        cmd = getattr(args, "_cmd", None)
+
+        fns =  getattr(args, "_fns", None)
+        if fns is not None:
+            for fn in fns:
+                print("calling", fn)
+                getattr(self.config, fn)()
+
+        config_toml = getattr(args, "_config_toml", None)
+        if config_toml != None:
+            self.config.load_toml(config_toml)
 
         if getattr(args,"rna",False):
-            self.conf.set_r94_rna()
+            print("NO")
+            self.config.set_r94_rna()
 
         for name, value in vars(args).items():
 
@@ -248,43 +221,114 @@ class ArgParser:
                 if name in self.dests:
                     group, param = self.dests[name]
                 else: #TODO only needed for subcommand, which I should rethink
-                    group = self.conf
+                    print("HERE", name)
+                    group = self.config
                     param = name
 
                 if value is not None or not hasattr(group, param):
                     setattr(group, param, value)
-                #if value is not None or not hasattr(self.conf, name):
-                #    setattr(self.conf, name, value)
+                #if value is not None or not hasattr(self.config, name):
+                #    setattr(self.config, name, value)
+
+        return cmd, self.config
+    
+    def print_help(self):
+        self.parser.print_help()
 
 
-    def add_ru_opts(self, p):
-        #TODO: selectively enrich or deplete refs in index
 
-        modes = p.add_mutually_exclusive_group(required=True)
-        modes.add_argument(
-                "-D", "--deplete", action='store_const', 
-                const=unc.RealtimePool.DEPLETE, dest='realtime_mode', 
-                help="Will eject reads that align to index"
-        )
-        modes.add_argument(
-                "-E", "--enrich", action='store_const',
-                const=unc.RealtimePool.ENRICH, dest='realtime_mode', 
-                help="Will eject reads that don't align to index"
-        )
+class Opt:
+    def __init__(self, args, group_name=None, param=None, fn=None, **kwargs):
+        self.args = args if type(args) == tuple else (args,)
 
-        active = p.add_mutually_exclusive_group()
-        active.add_argument(
-                "--full", action='store_const', 
-                const=unc.RealtimePool.FULL, dest='active_chs',
-                help="Will monitor all pores if set (default)"
-        )
-        active.add_argument(
-                "--even", action='store_const', 
-                const=unc.RealtimePool.EVEN, dest='active_chs', 
-                help="Will only monitor even pores if set"
-        )
-        active.add_argument(
-                "--odd", action='store_const', 
-                const=unc.RealtimePool.ODD, dest='active_chs', 
-                help="Will only monitor odd pores if set")
+        self.group_name = group_name
+        self.param = param
+        self.fn = fn
+        
+        self.has_fn = fn is not None
+        self.has_dest = group_name is not None
+
+        if self.has_fn and self.has_dest:
+            sys.stderr.write("ArgParser Opt fn and dest cannot both be set\n")
+            sys.exit(1)
+
+        if self.param is None:
+            for arg in self.args:
+                if arg.startswith("--") or not arg.startswith("-"):
+                    self.param = arg.strip("-").replace("-","_")
+                    break
+            if self.param is None:
+                sys.stderr.write("Error: must specify parameter name for flag \"%s\"\n" % self.args)
+                sys.exit(0)
+
+        self.extra_kw = kwargs
+
+    def get_dest(self, config):
+        if self.group_name is None:
+            return (config, self.param)
+        return (config.get_group(self.group_name), self.param)
+
+    def get_kwargs(self, config):
+        if self.has_fn:
+            kw = {'dest' : '_fns', 'action' : 'append_const', 'const' : self.fn}
+            kw.update(self.extra_kw)
+            return kw
+
+        elif self.group_name is None:
+            return self.extra_kw
+
+        group = config.get_group(self.group_name)
+
+        if self.param is not None:
+            param_name = self.param
+        else:
+            param_name = flag_to_var(self.args[-1])
+
+        default = getattr(group, param_name)
+        doc = getattr(type(group), param_name).__doc__
+
+        if hasattr(group, "_types"):
+            _type = getattr(group, "_types")[param_name]
+        else:
+            _type = type(default)
+
+        kwargs = {"help" : doc}
+
+        if _type != bool:
+            kwargs["type"] = _type
+            kwargs["default"] = default
+
+        kwargs.update(self.extra_kw)
+
+        return kwargs
+
+    def set_val(self, config, val):
+        if self.group is None or len(self.group) == 0:
+            group = config
+        else:
+            group = getattr(config, self.group)
+
+        setattr(group, self.param, val)
+
+class MutexOpts:
+    def __init__(self, dest, opts, **kwargs):
+        self.dest = dest
+        self.opts = opts
+        self.kwargs = kwargs
+
+
+class Subcmd:
+    def __init__(self, name, desc, opts, fn):
+        self.name = name
+        self.desc = desc
+        self.opts = opts
+        self.fn = fn
+
+        self.has_opts = fn is not None
+
+        if not self.has_opts and not all([type(o) is Subcmd for o in opts]):
+            raise TypeError("Must specify function for subcommand \"%s\" unless all options are of type Subcmd" % name)
+        elif self.has_opts and not all([type(o) in [Opt, MutexOpts] for o in opts]):
+            raise TypeError("Cannot specify function for subcommand \"%s\" unless all options are of type Opt" % name)
+
 

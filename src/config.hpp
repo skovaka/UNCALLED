@@ -54,7 +54,7 @@ const std::string MODE_STRS[] = {"deplete", "enrich"};
         V = toml::find<T>(subconf,N); \
 }
 
-class Conf {
+class Config {
 
     public:
 
@@ -75,9 +75,9 @@ class Conf {
     SimulatorParams             simulator     = SIM_PRMS_DEF;
     MapOrdParams          map_pool_ord   = MAP_ORD_PRMS_DEF;
 
-    Conf() : mode(Mode::UNDEF), threads(1) {}
+    Config() : mode(Mode::UNDEF), threads(1) {}
 
-    Conf(Mode m) : Conf() {
+    Config(Mode m) : Config() {
         mode = m;
 
         switch (mode) {
@@ -123,15 +123,15 @@ class Conf {
     }
 
     void load_toml(const std::string &fname) {
-        const auto conf = toml::parse(fname);
+        const auto config = toml::parse(fname);
 
-        if (conf.contains("global")) {
-            const auto subconf = toml::find(conf, "global");
+        if (config.contains("global")) {
+            const auto subconf = toml::find(config, "global");
             GET_TOML(u16, threads);
         }
 
-        if (conf.contains("realtime")) {
-            const auto subconf = toml::find(conf, "realtime");
+        if (config.contains("realtime")) {
+            const auto subconf = toml::find(config, "realtime");
             GET_TOML_EXTERN(std::string, host, realtime);
             GET_TOML_EXTERN(u16, port, realtime);
             GET_TOML_EXTERN(float, duration, realtime);
@@ -160,8 +160,8 @@ class Conf {
         }
 
         //TODO rename subsection
-        if (conf.contains("simulator")) {
-            const auto subconf = toml::find(conf, "simulator");
+        if (config.contains("simulator")) {
+            const auto subconf = toml::find(config, "simulator");
             GET_TOML_EXTERN(std::string, ctl_seqsum, simulator);
             GET_TOML_EXTERN(std::string, unc_seqsum, simulator);
             GET_TOML_EXTERN(std::string, unc_paf, simulator);
@@ -171,13 +171,13 @@ class Conf {
             GET_TOML_EXTERN(float, ej_time, simulator);
         }
 
-        if (conf.contains("map_pool_ord")) {
-            const auto subconf = toml::find(conf, "map_pool_ord");
+        if (config.contains("map_pool_ord")) {
+            const auto subconf = toml::find(config, "map_pool_ord");
             GET_TOML_EXTERN(u32, min_active_reads, map_pool_ord);
         }
 
-        if (conf.contains("fast5_reader")) {
-            const auto subconf = toml::find(conf, "fast5_reader");
+        if (config.contains("fast5_reader")) {
+            const auto subconf = toml::find(config, "fast5_reader");
 
             GET_TOML_EXTERN(u32, max_buffer, fast5_reader);
             GET_TOML_EXTERN(u32, max_reads, fast5_reader);
@@ -186,8 +186,8 @@ class Conf {
             GET_TOML_EXTERN(bool, load_bc,  fast5_reader)
         }
 
-        if (conf.contains("read_buffer")) {
-            const auto subconf = toml::find(conf, "read_buffer");
+        if (config.contains("read_buffer")) {
+            const auto subconf = toml::find(config, "read_buffer");
 
             GET_TOML_EXTERN(u32, start_chunk,  read_buffer)
             GET_TOML_EXTERN(u32, max_chunks,   read_buffer);
@@ -198,8 +198,8 @@ class Conf {
             GET_TOML_EXTERN(bool, skip_notempl,  read_buffer)
         }
 
-        if (conf.contains("mapper")) {
-            const auto subconf = toml::find(conf, "mapper");
+        if (config.contains("mapper")) {
+            const auto subconf = toml::find(config, "mapper");
 
             GET_TOML_EXTERN(u32, seed_len, mapper);
             GET_TOML_EXTERN(u32, min_rep_len, mapper);
@@ -221,23 +221,23 @@ class Conf {
             #endif
         }
 
-        if (conf.contains("seed_tracker")) {
-            const auto subconf = toml::find(conf, "seed_tracker");
+        if (config.contains("seed_tracker")) {
+            const auto subconf = toml::find(config, "seed_tracker");
 
             GET_TOML_EXTERN(float, min_mean_conf,seed_tracker);
             GET_TOML_EXTERN(float, min_top_conf, seed_tracker);
             GET_TOML_EXTERN(u32, min_map_len, seed_tracker);
         }
 
-        if (conf.contains("normalizer")) {
-            const auto subconf = toml::find(conf, "normalizer");
+        if (config.contains("normalizer")) {
+            const auto subconf = toml::find(config, "normalizer");
             GET_TOML_EXTERN(u32, len, normalizer);
             GET_TOML_EXTERN(float, tgt_mean, normalizer);
             GET_TOML_EXTERN(float, tgt_stdv, normalizer);
         }
 
-        if (conf.contains("event_detector")) {
-            const auto subconf = toml::find(conf, "event_detector");
+        if (config.contains("event_detector")) {
+            const auto subconf = toml::find(config, "event_detector");
             GET_TOML_EXTERN(float, min_mean, event_detector);
             GET_TOML_EXTERN(float, max_mean, event_detector);
             GET_TOML_EXTERN(float, threshold1, event_detector);
@@ -247,15 +247,15 @@ class Conf {
             GET_TOML_EXTERN(u32, window_length2, event_detector);
         }
 
-        if (conf.contains("event_profiler")) {
-            const auto subconf = toml::find(conf, "event_profiler");
+        if (config.contains("event_profiler")) {
+            const auto subconf = toml::find(config, "event_profiler");
             GET_TOML_EXTERN(u32, win_len, event_profiler);
             GET_TOML_EXTERN(float, win_stdv_min, event_profiler);
         }
 
     }
 
-    Conf(const std::string &toml_file) : Conf() {
+    Config(const std::string &toml_file) : Config() {
         load_toml(toml_file);
     }
 
@@ -320,28 +320,28 @@ class Conf {
     }
 
     #ifdef PYBIND
-    #define DEF_METH(P, D) c.def(#P, &Conf::P, D);
-    #define DEFPRP(P) c.def_property(#P, &Conf::get_##P, &Conf::set_##P);
+    #define DEF_METH(P, D) c.def(#P, &Config::P, D);
+    #define DEFPRP(P) c.def_property(#P, &Config::get_##P, &Config::set_##P);
     #define DEFPRP_DOC(P) c.def_property( \
                 #P, \
-                &Conf::get_##P, \
-                &Conf::set_##P, \
-                Conf::doc_##P());
+                &Config::get_##P, \
+                &Config::set_##P, \
+                Config::doc_##P());
 
         
     static std::vector<std::string> _PARAM_GROUPS, _GLOBAL_PARAMS;
 
-    static void pybind_defs(pybind11::class_<Conf> &c) {
+    static void pybind_defs(pybind11::class_<Config> &c) {
         c.def(pybind11::init<const std::string &>())
          .def(pybind11::init())
-         .def("load_toml", &Conf::load_toml);
+         .def("load_toml", &Config::load_toml);
 
         DEF_METH(set_r94_rna, "Sets parameters for RNA sequencing")
         DEF_METH(set_mode_map_ord, "Sets parameters for map_ord")
         DEF_METH(export_static, "Sets static parameters for ReadBuffer and Mapper")
 
         #define CONF_ATTR(P, D, V) \
-            c.def_readwrite(#P, &Conf::P, D); \
+            c.def_readwrite(#P, &Config::P, D); \
             V.push_back(std::string(#P));
         #define CONF_GROUP(P, D) CONF_ATTR(P, D, _PARAM_GROUPS)
         #define CONF_GLOBAL(P, D) CONF_ATTR(P, D, _GLOBAL_PARAMS)
@@ -360,8 +360,8 @@ class Conf {
         CONF_GROUP(simulator, "")
         CONF_GROUP(map_pool_ord, "")
 
-        c.def_readonly_static("_PARAM_GROUPS", &Conf::_PARAM_GROUPS);
-        c.def_readonly_static("_GLOBAL_PARAMS", &Conf::_GLOBAL_PARAMS);
+        c.def_readonly_static("_PARAM_GROUPS", &Config::_PARAM_GROUPS);
+        c.def_readonly_static("_GLOBAL_PARAMS", &Config::_GLOBAL_PARAMS);
 
         DEFPRP(bwa_prefix)
         DEFPRP(idx_preset)
@@ -400,10 +400,10 @@ class Conf {
         DEFPRP(scan_intv_time)
         DEFPRP(ej_time)
 
-        #define PY_CONF_MODE(P) m.value(#P, Conf::Mode::P);
+        #define PY_CONF_MODE(P) m.value(#P, Config::Mode::P);
 
         
-        pybind11::enum_<Conf::Mode> m(c, "Mode");
+        pybind11::enum_<Config::Mode> m(c, "Mode");
         PY_CONF_MODE(MAP);
         PY_CONF_MODE(REALTIME);
         PY_CONF_MODE(SIM);

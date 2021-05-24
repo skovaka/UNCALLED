@@ -37,23 +37,23 @@
 //    max_active_reads = 512
 //};
 
-RealtimePool::RealtimePool(Conf &conf) :
-    PRMS(conf.realtime),
+RealtimePool::RealtimePool(Config &config) :
+    PRMS(config.realtime),
     stopped_(false) {
 
-    conf.export_static();
+    config.export_static();
 
-    for (u16 t = 0; t < conf.threads; t++) {
+    for (u16 t = 0; t < config.threads; t++) {
         threads_.emplace_back(mappers_);
     }
 
-    mappers_.resize(conf.get_num_channels());
-    chunk_buffer_.resize(conf.get_num_channels());
-    buffer_queue_.reserve(conf.get_num_channels());
-    active_queue_.reserve(conf.get_num_channels());
+    mappers_.resize(config.get_num_channels());
+    chunk_buffer_.resize(config.get_num_channels());
+    buffer_queue_.reserve(config.get_num_channels());
+    active_queue_.reserve(config.get_num_channels());
 
 
-    for (u16 t = 0; t < conf.threads; t++) {
+    for (u16 t = 0; t < config.threads; t++) {
         threads_[t].start();
     }
 

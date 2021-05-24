@@ -1,6 +1,6 @@
 #include <iostream>
 #include <unistd.h>
-#include "conf.hpp"
+#include "config.hpp"
 #include "simulator.hpp"
 #include "realtime_pool.hpp"
 #include "read_buffer.hpp"
@@ -9,21 +9,21 @@ const std::string CONF_DIR(std::getenv("UNCALLED_CONF")),
                   DEF_MODEL = CONF_DIR + "/r94_5mers.txt",
                   DEF_CONF = CONF_DIR + "/defaults.toml";
 
-bool load_conf(int argc, char** argv, Conf &conf);
+bool load_conf(int argc, char** argv, Config &config);
 
 int main(int argc, char** argv) {
-    std::cerr << "Loading conf\n";
+    std::cerr << "Loading config\n";
 
-    Conf conf;
+    Config config;
 
-    if (!load_conf(argc, argv, conf)) {
+    if (!load_conf(argc, argv, config)) {
         return 1;
     }
 
-    Simulator sim(conf);
+    Simulator sim(config);
 
     std::cerr << "Loading mappers\n";
-    RealtimePool pool(conf);
+    RealtimePool pool(config);
 
     const u64 MAX_SLEEP = 100;
 
@@ -31,10 +31,10 @@ int main(int argc, char** argv) {
     sim.run();
     Timer t;
 
-    std::vector<float> chunk_times(conf.get_num_channels(), t.get());
-    std::vector<u32> unblocked(conf.get_num_channels(), 0);
+    std::vector<float> chunk_times(config.get_num_channels(), t.get());
+    std::vector<u32> unblocked(config.get_num_channels(), 0);
 
-    bool deplete = conf.get_realtime_mode() == RealtimeParams::Mode::DEPLETE;
+    bool deplete = config.get_realtime_mode() == RealtimeParams::Mode::DEPLETE;
 
     std::cerr << "Starting " << deplete << "\n";
 
@@ -93,13 +93,13 @@ int main(int argc, char** argv) {
 
 #define FLAG_TO_CONF(C, T, F) { \
     case C: \
-        conf.F = T(optarg); \
+        config.F = T(optarg); \
         break; \
 }
 
 #define POSITIONAL_TO_CONF(T, F) {\
     if (i < argc) { \
-        conf.F = T(argv[i]); \
+        config.F = T(argv[i]); \
         i++; \
     } else { \
         std::cerr << "Error: must specify flag " << #F << "\n"; \
@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
     } \
 }
 
-bool load_conf(int argc, char** argv, Conf &conf) {
+bool load_conf(int argc, char** argv, Config &config) {
     int opt;
     std::string flagstr = ":t:c:p:de";
 
@@ -128,11 +128,11 @@ bool load_conf(int argc, char** argv, Conf &conf) {
             #endif
 
             case 'd':
-                conf.set_realtime_mode(RealtimeParams::Mode::DEPLETE);
+                config.set_realtime_mode(RealtimeParams::Mode::DEPLETE);
                 break;
 
             case 'e':
-                conf.set_realtime_mode(RealtimeParams::Mode::ENRICH);
+                config.set_realtime_mode(RealtimeParams::Mode::ENRICH);
                 break;
 
             case ':':  
@@ -151,7 +151,7 @@ bool load_conf(int argc, char** argv, Conf &conf) {
 
     POSITIONAL_TO_CONF(std::string, mapper.bwa_prefix)
     if (i < argc) { 
-        conf.fast5_reader.load_fast5_files(std::string(argv[i])); 
+        config.fast5_reader.load_fast5_files(std::string(argv[i])); 
         i++; 
     } else { 
         std::cerr << "Error: must specify fast5_list\n"; \

@@ -90,9 +90,9 @@ def fast5_glob(root, recursive):
 #TODO make fast5 parameters
 class Fast5Reader:
 
-    def __init__(self, fast5s=None, index=None, reads=None, recursive=None, conf=None):
-        self.conf = unc.Conf() if conf is None else conf
-        self.prms = self.conf.fast5_reader
+    def __init__(self, fast5s=None, index=None, reads=None, recursive=None, config=None):
+        self.config = unc.Config() if config is None else config
+        self.prms = self.config.fast5_reader
 
         if fast5s is None: 
             fast5s = self.prms.fast5_files
@@ -254,7 +254,7 @@ class Fast5Reader:
 
 
 class Fast5Dict(_Fast5Dict):
-    def __init__(self, root_dir=".", seqsum=None, recursive=False, conf=unc.Conf()):
+    def __init__(self, root_dir=".", seqsum=None, recursive=False, config=unc.Config()):
         fast5_paths = {os.path.basename(path) : path for path in iter_fast5_fnames(root_dir, recursive)}
 
         #TODO clean this up with paramters
@@ -276,7 +276,7 @@ class Fast5Dict(_Fast5Dict):
             for fast5,rows in groups.items()
         }
 
-        _Fast5Dict.__init__(self, groups, conf.fast5_reader)
+        _Fast5Dict.__init__(self, groups, config.fast5_reader)
 
 class Fast5Iter(_Fast5Iter):
     def __init__(self, params):
@@ -301,7 +301,7 @@ if __name__ == "__main__":
 
     fast5s = Fast5Dict(args.seqsum, args.root, args.recursive)
 
-Opt = unc.ArgParser.Opt
+Opt = unc.config.Opt
 FAST5_OPTS = (
     Opt("fast5_files", "fast5_reader", nargs="+", type=str),
     Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),

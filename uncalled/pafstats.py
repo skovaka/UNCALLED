@@ -5,8 +5,8 @@ import numpy as np
 import re
 import uncalled as unc
 
-Opt = unc.ArgParser.Opt
-PAFSTATS_OPTS = (
+Opt = unc.config.Opt
+OPTS = (
     Opt("infile",  
         type = str, 
         help = "PAF file output by UNCALLED"
@@ -192,18 +192,18 @@ def paf_ref_compare(qry, ref, ret_qry=True, check_locs=True, ext=1.5):
     return tp, tn, fp, fn, fp_unmap
 
 
-def run(conf):
-    locs = [p for p in parse_paf(conf.infile, max_reads=conf.max_reads)]
+def run(config):
+    locs = [p for p in parse_paf(config.infile, max_reads=config.max_reads)]
 
     num_mapped = sum([p.is_mapped for p in locs])
 
-    statsout = sys.stderr if conf.annotate else sys.stdout
+    statsout = sys.stderr if config.annotate else sys.stdout
 
     statsout.write("Summary: %d reads, %d mapped (%.2f%%)\n\n" % (len(locs), num_mapped, 100*num_mapped/len(locs)))
 
-    if conf.ref_paf != None:
+    if config.ref_paf != None:
         statsout.write("Comparing to reference PAF\n")
-        tp, tn, fp, fn, fp_unmap = paf_ref_compare(locs, parse_paf(conf.ref_paf))
+        tp, tn, fp, fn, fp_unmap = paf_ref_compare(locs, parse_paf(config.ref_paf))
         ntp,ntn,nfp,nfn,nfp_unmap = map(len, [tp, tn, fp, fn, fp_unmap])
         n = len(locs)
 
@@ -212,7 +212,7 @@ def run(conf):
         statsout.write("F %6.2f %5.2f\n" % (100*(nfp)/n, 100*nfn/n))
         statsout.write("NA: %.2f\n\n" % (100*nfp_unmap/n))
 
-        if conf.annotate:
+        if config.annotate:
             group_labels = [(tp, "tp"), 
                             (tn, "tn"), 
                             (fp, "fp"),
@@ -233,3 +233,9 @@ def run(conf):
         statsout.write("BP per sec: %9.2f %9.2f\n" % (np.mean(map_bpps), np.median(map_bpps)))
         statsout.write("BP mapped:  %9.2f %9.2f\n" % (np.mean(map_bp),   np.median(map_bp)))
         statsout.write("MS to map:  %9.2f %9.2f\n" % (np.mean(map_ms),   np.median(map_ms)))
+
+CMD = unc.config.Subcmd(
+    "pafstats",
+    "Computes speed and accuracy of UNCALLED mappings.",
+    OPTS, run
+)

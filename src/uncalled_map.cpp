@@ -3,18 +3,18 @@
 #include <unistd.h>
 #include "map_pool.hpp"
 
-bool load_conf(int argc, char** argv, Conf &conf);
+bool load_conf(int argc, char** argv, Config &config);
 
 int main(int argc, char** argv) {
-    std::cerr << "Loading conf\n";
+    std::cerr << "Loading config\n";
 
-    Conf conf;
+    Config config;
 
-    if (!load_conf(argc, argv, conf)) {
+    if (!load_conf(argc, argv, config)) {
         return 1;
     }
 
-    MapPool pool(conf);
+    MapPool pool(config);
 
     u64 MAX_SLEEP = 100;
 
@@ -39,13 +39,13 @@ int main(int argc, char** argv) {
 
 #define FLAG_TO_CONF(C, T, F) { \
     case C: \
-        conf.F = T(optarg); \
+        config.F = T(optarg); \
         break; \
 }
 
 #define POSITIONAL_TO_CONF(T, F) {\
     if (i < argc) { \
-        conf.F = T(argv[i]); \
+        config.F = T(argv[i]); \
         i++; \
     } else { \
         std::cerr << "Error: must specify flag " << #F << "\n"; \
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
     } \
 }
 
-bool load_conf(int argc, char** argv, Conf &conf) {
+bool load_conf(int argc, char** argv, Config &config) {
     int opt;
     std::string flagstr = ":t:n:l:";
 
@@ -70,7 +70,7 @@ bool load_conf(int argc, char** argv, Conf &conf) {
             //FLAG_TO_CONF('l', std::string, fast5_reader.read_filter)
 
             case 'l':
-            conf.fast5_reader.load_read_filter(std::string(optarg));
+            config.fast5_reader.load_read_filter(std::string(optarg));
             break;
 
             #ifdef DEBUG_OUT
@@ -93,7 +93,7 @@ bool load_conf(int argc, char** argv, Conf &conf) {
 
     POSITIONAL_TO_CONF(std::string, mapper.bwa_prefix)
     if (i < argc) { 
-        conf.fast5_reader.load_fast5_files(std::string(argv[i])); 
+        config.fast5_reader.load_fast5_files(std::string(argv[i])); 
         i++; 
     } else { 
         std::cerr << "Error: must specify fast5_list\n"; \

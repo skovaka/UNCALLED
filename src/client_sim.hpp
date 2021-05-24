@@ -29,11 +29,11 @@
 #include "util.hpp"
 #include "read_buffer.hpp" 
 #include "fast5_reader.hpp" 
-#include "conf.hpp" 
+#include "config.hpp" 
 
 class ClientSim {
     public:
-    ClientSim(Conf &c);
+    ClientSim(Config &c);
 
     bool run();
     std::vector< std::pair<u16, ReadBuffer> > get_read_chunks();
@@ -372,7 +372,7 @@ class ClientSim {
     public:
 
     static void pybind_defs(pybind11::class_<ClientSim> &c) {
-        c.def(pybind11::init<Conf &>());
+        c.def(pybind11::init<Config &>());
         PY_SIM_METH(run);
         PY_SIM_METH(get_runtime);
         PY_SIM_METH(get_read_chunks);

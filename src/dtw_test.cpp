@@ -14,7 +14,7 @@
 //                  DEF_MODEL = CONF_DIR + "/r94_5mers.txt",
 //                  DEF_CONF = CONF_DIR + "/defaults.toml";
 //
-//bool load_conf(int argc, char** argv, Conf &conf);
+//bool load_conf(int argc, char** argv, Config &config);
 
 
 typedef struct {

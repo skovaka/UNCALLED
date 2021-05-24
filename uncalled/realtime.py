@@ -28,20 +28,63 @@ import os
 import numpy as np
 import uncalled as unc
 
-Opt = unc.ArgParser.Opt
-OPTS = (
+Opt = unc.config.Opt
+#def add_ru_opts(self, p):
+#    #TODO: selectively enrich or deplete refs in index
+#
+#    modes = p.add_mutually_exclusive_group(required=True)
+#    modes.add_argument(
+#            "-D", "--deplete", action='store_const', 
+#            const=unc.RealtimePool.DEPLETE, dest='realtime_mode', 
+#            help="Will eject reads that align to index"
+#    )
+#    modes.add_argument(
+#            "-E", "--enrich", action='store_const',
+#            const=unc.RealtimePool.ENRICH, dest='realtime_mode', 
+#            help="Will eject reads that don't align to index"
+#    )
+#
+#    active = p.add_mutually_exclusive_group()
+#    active.add_argument(
+#            "--full", action='store_const', 
+#            const=unc.RealtimePool.FULL, dest='active_chs',
+#            help="Will monitor all pores if set (default)"
+#    )
+#    active.add_argument(
+#            "--even", action='store_const', 
+#            const=unc.RealtimePool.EVEN, dest='active_chs', 
+#            help="Will only monitor even pores if set"
+#    )
+#    active.add_argument(
+#            "--odd", action='store_const', 
+#            const=unc.RealtimePool.ODD, dest='active_chs', 
+#            help="Will only monitor odd pores if set")
+#
+REALTIME_OPTS = (
+    unc.config.MutexOpts("realtime_mode", [
+        Opt(("-D", "--deplete"), fn="set_rt_deplete"),
+        Opt(("-E", "--enrich"), fn="set_rt_enrich"),
+    ]),
+    unc.config.MutexOpts("active_chs", [
+        Opt("--even", fn="set_active_chs_even", help="world"),
+        Opt("--odd", fn="set_active_chs_odd", help="Hello"),
+    ])
+)
+
+OPTS = unc.index.BWA_OPTS + unc.map.MAPPER_OPTS + (
     Opt("--host", "realtime"),
     Opt("--port", "realtime"),
     Opt("--duration", "realtime"),
-)
+) + REALTIME_OPTS
+#TODO ADD RU OPTS!!
 
-def run(conf, client=None):
+def run(config, client=None):
 
-    #TODO replace with conf mode
-    sim = conf.subcmd == "sim"
+    #TODO replace with config mode
+    sim = config.subcmd == "sim"
 
-    assert_exists(conf.bwa_prefix + ".bwt")
-    assert_exists(conf.bwa_prefix + ".uncl")
+    assert_exists(config.bwa_prefix + ".bwt")
+    assert_exists(config.bwa_prefix + ".uncl")
 
     pool = None
     client = None
@@ -49,7 +92,7 @@ def run(conf, client=None):
     #TODO make simulator indisinguishable from client, maybe w/ python wrapper
     if client is None:
         sim = False
-        client = unc.minknow_client.Client(conf.host, conf.port, conf.chunk_time, conf.num_channels)
+        client = unc.minknow_client.Client(config.host, config.port, config.chunk_time, config.num_channels)
     else:
         sim = True
 
@@ -58,21 +101,21 @@ def run(conf, client=None):
             sys.stderr.write("Error: failed to run client\n")
             sys.exit(1)
 
-        deplete = conf.realtime_mode == unc.RealtimePool.DEPLETE
-        even = conf.active_chs == unc.RealtimePool.EVEN #TODO: do within mapper
+        deplete = config.realtime_mode == unc.RealtimePool.DEPLETE
+        even = config.active_chs == unc.RealtimePool.EVEN #TODO: do within mapper
 
         if not sim:
             raw_type = str(client.signal_dtype)
 
-        pool = unc.RealtimePool(conf)
+        pool = unc.RealtimePool(config)
 
-        chunk_times = [time.time() for c in range(conf.num_channels)]
-        unblocked = [None for c in range(conf.num_channels)]
+        chunk_times = [time.time() for c in range(config.num_channels)]
+        unblocked = [None for c in range(config.num_channels)]
 
-        if conf.duration == None or conf.duration == 0:
+        if config.duration == None or config.duration == 0:
             end_time = float("inf")
         else:
-            end_time = conf.duration*60*60
+            end_time = config.duration*60*60
 
         while client.is_running:
             t0 = time.time()
@@ -159,3 +202,10 @@ def run(conf, client=None):
 
     if pool != None:
         pool.stop_all()
+
+
+CMD = unc.config.Subcmd(
+    "realtime",
+    "Perform real-time targeted (ReadUntil) sequencing",
+    OPTS, run
+)

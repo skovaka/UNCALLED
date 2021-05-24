@@ -28,7 +28,7 @@
 #include <vector>
 #include <deque>
 #include "mapper.hpp"
-#include "conf.hpp"
+#include "config.hpp"
 
 //TODO refactor into ThreadPool, subclass RealtimePool (and MapPool[Ord])
 
@@ -40,7 +40,7 @@ class RealtimePool {
     //static Params const PRMS_DEF;
     RealtimeParams PRMS;
 
-    RealtimePool(Conf &conf);
+    RealtimePool(Config &config);
     
     bool add_chunk(ReadBuffer &chunk);
 
@@ -114,7 +114,7 @@ class RealtimePool {
     public:
 
     static void pybind_defs(pybind11::class_<RealtimePool> &c) {
-        c.def(pybind11::init<Conf &>());
+        c.def(pybind11::init<Config &>());
         PY_REALTIME_METH(add_chunk);
         PY_REALTIME_METH(update);
         PY_REALTIME_METH(all_finished);
@@ -130,7 +130,7 @@ class RealtimePool {
         PY_REALTIME_PRM(realtime_mode, "");
 
         //TODO don't expose enums to python
-        //deal with in set_mode_... in conf
+        //deal with in set_mode_... in config
         pybind11::enum_<RealtimeParams::Mode> m(c, "RealtimeMode");
         PY_REALTIME_MODE(DEPLETE);
         PY_REALTIME_MODE(ENRICH);

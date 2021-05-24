@@ -28,7 +28,7 @@
 #include <vector>
 #include <deque>
 #include <unordered_set>
-#include "conf.hpp"
+#include "config.hpp"
 #include "realtime_pool.hpp"
 #include "fast5_reader.hpp"
 
@@ -37,7 +37,7 @@ class MapPoolOrd : public RealtimePool {
 
     //MapOrdParams PRMS;
 
-    MapPoolOrd(Conf &conf);
+    MapPoolOrd(Config &config);
 
     void add_fast5(const std::string &fname);
     void add_read(const std::string &id);
@@ -82,7 +82,7 @@ class MapPoolOrd : public RealtimePool {
     public:
 
     static void pybind_defs(pybind11::class_<MapPoolOrd, RealtimePool> &c) {
-        c.def(pybind11::init<Conf &>());
+        c.def(pybind11::init<Config &>());
 
         PY_MAP_ORD_METH(add_fast5)
         PY_MAP_ORD_METH(add_read)

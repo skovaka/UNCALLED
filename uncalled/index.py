@@ -31,7 +31,7 @@ from bisect import bisect_left, bisect_right
 from typing import NamedTuple
 
 #Index parameter group
-class IndexParams(unc.conf.ParamGroup): pass
+class IndexParams(unc.config.ParamGroup): pass
 IndexParams._def_params(
     ("fasta_filename", None, str, "FASTA file to index"),
     ("bwa_prefix", None, str, "Index output prefix. Will use input fasta filename by default"),
@@ -46,10 +46,10 @@ IndexParams._def_params(
     ("probs", None, str, "Find parameters with specified target probabilites (comma separated)"),
     ("speeds", None, str, "Find parameters with specified speed coefficents (comma separated)"),
 )
-#TODO do this from conf. need to restructure dependencies
-unc.Conf._EXTRA_GROUPS["index"] = IndexParams
+#TODO do this from config. need to restructure dependencies
+unc.Config._EXTRA_GROUPS["index"] = IndexParams
 
-Opt = unc.ArgParser.Opt
+Opt = unc.config.Opt
 OPTS = (
     Opt("fasta_filename", "index"),
     Opt(("-o", "--bwa-prefix"), "index"),
@@ -81,8 +81,8 @@ BWA_SUFFS = [AMB_SUFF, ANN_SUFF, BWT_SUFF, PAC_SUFF, SA_SUFF]
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-def run(conf):
-    prms = conf.index
+def run(config):
+    prms = config.index
 
     if prms.bwa_prefix is None or len(prms.bwa_prefix) == 0:
         prms.bwa_prefix = prms.fasta_filename
@@ -131,8 +131,8 @@ def power_fn(xmax, ymin, ymax, exp, N=100):
     return t*xmax, (t**exp) * (ymax-ymin) + ymin
 
 class IndexParameterizer:
-    #MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_rna_threshs.txt")
-    MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_threshs.txt")
+    #MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "config/r94_5mers_rna_threshs.txt")
+    MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "config/r94_5mers_threshs.txt")
 
     def __init__(self, params):
         self.prms = params
@@ -291,3 +291,7 @@ class IndexParameterizer:
 
         params_out.close()
 
+CMD = unc.config.Subcmd("index", 
+    "Builds the UNCALLED index of a FASTA reference", 
+    OPTS, run
+)

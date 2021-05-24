@@ -26,8 +26,8 @@ std::vector<bool> unpack_moves(u64 moves, u8 length) {
 PYBIND11_MODULE(_uncalled, m) {
     m.doc() = R"pbdoc(UNCALLED: a Utility for Nanopore Current ALignment to Large Expanses of DNA)pbdoc";
 
-    py::class_<Conf> conf(m, "_Conf");
-    Conf::pybind_defs(conf);
+    py::class_<Config> config(m, "_Conf");
+    Config::pybind_defs(config);
 
     py::class_<Mapper> mapper(m, "Mapper");
     Mapper::pybind_defs(mapper);

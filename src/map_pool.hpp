@@ -28,12 +28,12 @@
 #include <vector>
 #include <deque>
 #include <unordered_set>
-#include "conf.hpp"
+#include "config.hpp"
 
 class MapPool {
     public:
 
-    MapPool(Conf &conf);
+    MapPool(Config &config);
 
     std::vector<Paf> update();
 
@@ -45,7 +45,7 @@ class MapPool {
     #define PY_MAP_POOL_METH(P) c.def(#P, &MapPool::P);
 
     static void pybind_defs(pybind11::class_<MapPool> &c) {
-        c.def(pybind11::init<Conf &>());
+        c.def(pybind11::init<Config &>());
         PY_MAP_POOL_METH(update);
         PY_MAP_POOL_METH(running);
         PY_MAP_POOL_METH(add_fast5);

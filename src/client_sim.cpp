@@ -23,20 +23,20 @@
 
 #include "client_sim.hpp"
 
-ClientSim::ClientSim(Conf &conf) :
-      PRMS(conf.client_sim),
-      fast5s_(conf.fast5_reader),
+ClientSim::ClientSim(Config &config) :
+      PRMS(config.client_sim),
+      fast5s_(config.fast5_reader),
       scan_start_(0),
       is_running_(false),
       in_scan_(false) {
 
-    float sample_rate = conf.get_sample_rate();
+    float sample_rate = config.get_sample_rate();
     time_coef_  = sample_rate / 1000;
     ej_time_    = PRMS.ej_time   * sample_rate;
     scan_time_  = PRMS.scan_time * sample_rate;
 
-    channels_.reserve(conf.get_num_channels());
-    for (u32 c = 1; c <= conf.get_num_channels(); c++) {
+    channels_.reserve(config.get_num_channels());
+    for (u32 c = 1; c <= config.get_num_channels(); c++) {
         channels_.emplace_back(c);
     }
 }

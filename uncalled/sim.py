@@ -40,8 +40,8 @@ PROG = " progress "
 SP = '-'*( (NTICKS - len(PROG))//2 - 1)
 PROG_HEADER = '|'+SP+PROG+SP+"|\n"
 
-Opt = unc.ArgParser.Opt
-OPTS = (
+Opt = unc.config.Opt
+OPTS = unc.index.BWA_OPTS + (
     Opt("fast5s", 
         nargs = '+', 
         type = str, 
@@ -54,19 +54,20 @@ OPTS = (
     Opt("--unc-seqsum", "simulator"),
     Opt("--unc-paf",    "simulator"),
     Opt("--sim-speed",  "simulator"),
-)
+) + unc.map.MAPPER_OPTS
 
-def run(conf):
-    client = unc.Simulator(conf)
-    load_sim(client, conf)
 
-    for fast5 in load_fast5s(conf.fast5s, conf.recursive):
+def run(config):
+    client = unc.Simulator(config)
+    load_sim(client, config)
+
+    for fast5 in load_fast5s(config.fast5s, config.recursive):
         if fast5 != None:
             client.add_fast5(fast5)
 
     client.load_fast5s()
 
-    unc.realtime.run(conf, client)
+    unc.realtime.run(config, client)
 
 
 def find_scans(sts,ens,mxs,max_block_gap=1,max_intv_gap=20,min_mux_frac=0.95):
@@ -298,17 +299,17 @@ def sec_to_samp(sec, coef=1.0):
 #    ln_samp = np.round(ln_sec*SAMP_RATE)
 #    out.write("%d\t%d\t%d\n" % (ch, sc, ln_samp))
 
-def load_sim(client, conf):
+def load_sim(client, config):
 
     t0 = time()
 
     sys.stderr.write("Loading UNCALLED PAF............\n")
-    unc = SeqsumProfile(conf.unc_seqsum)
+    unc = SeqsumProfile(config.unc_seqsum)
 
     unc_scans = unc.rm_scans()
     unc.compute_gaps()
 
-    unc.compute_eject_delays(conf.unc_paf)
+    unc.compute_eject_delays(config.unc_paf)
     delays = unc.dls[unc.dls != np.inf]
     DELAY = np.median(delays)
     unc.chsort(np.argsort(unc.chcts))
@@ -342,13 +343,13 @@ def load_sim(client, conf):
 
             #add all full intervals preceding break
             while unc_scans[sc+1] < act_en:
-                itv_en = conf.scan_intv_time
+                itv_en = config.scan_intv_time
 
-                st_samp = sec_to_samp(itv_st-unc_scans[sc], conf.sim_speed)
-                en_samp = sec_to_samp(itv_en, conf.sim_speed)
+                st_samp = sec_to_samp(itv_st-unc_scans[sc], config.sim_speed)
+                en_samp = sec_to_samp(itv_en, config.sim_speed)
                 client.add_intv(ch,sc,st_samp,en_samp)
 
-                #write_itv(itvs_out, ch, sc, itv_st-unc_scans[sc], itv_en, conf.sim_speed)
+                #write_itv(itvs_out, ch, sc, itv_st-unc_scans[sc], itv_en, config.sim_speed)
 
                 itv_st = unc_scans[sc+1]
                 sc += 1
@@ -356,11 +357,11 @@ def load_sim(client, conf):
             #add partial intervals before break
             if itv_st != act_en:
                 #if np.any((glns < ACTIVE_THRESH) & (gsts > itv_st) & (gsts < act_en)):
-                st_samp = sec_to_samp(itv_st-unc_scans[sc], conf.sim_speed)
-                en_samp = sec_to_samp(act_en-unc_scans[sc], conf.sim_speed)
+                st_samp = sec_to_samp(itv_st-unc_scans[sc], config.sim_speed)
+                en_samp = sec_to_samp(act_en-unc_scans[sc], config.sim_speed)
                 client.add_intv(ch,sc,st_samp,en_samp)
 
-                #write_itv(itvs_out, ch, sc, itv_st-unc_scans[sc], act_en-unc_scans[sc], conf.sim_speed)
+                #write_itv(itvs_out, ch, sc, itv_st-unc_scans[sc], act_en-unc_scans[sc], config.sim_speed)
 
             itv_st = act_en + glns[br]
             
@@ -372,13 +373,13 @@ def load_sim(client, conf):
 
         #add intervals between last break and final read
         while sc < len(unc_scans)-1 and unc_scans[sc] < last:
-            itv_en = min(last - unc_scans[sc], conf.scan_intv_time)
+            itv_en = min(last - unc_scans[sc], config.scan_intv_time)
 
-            st_samp = sec_to_samp(itv_st-unc_scans[sc], conf.sim_speed)
-            en_samp = sec_to_samp(itv_en, conf.sim_speed)
+            st_samp = sec_to_samp(itv_st-unc_scans[sc], config.sim_speed)
+            en_samp = sec_to_samp(itv_en, config.sim_speed)
 
             client.add_intv(ch,sc,st_samp,en_samp)
-            #write_itv(itvs_out,ch,sc,itv_st-unc_scans[sc],itv_en, conf.sim_speed)
+            #write_itv(itvs_out,ch,sc,itv_st-unc_scans[sc],itv_en, config.sim_speed)
 
             itv_st = unc_scans[sc+1]
             sc += 1
@@ -405,7 +406,7 @@ def load_sim(client, conf):
     #delays_out.close()
 
     sys.stderr.write("Loading control PAF.............\n")
-    ctl = SeqsumProfile(conf.ctl_seqsum)
+    ctl = SeqsumProfile(config.ctl_seqsum)
     ctl.rm_scans()
     ctl.chsort(np.argsort(ctl.chcts))
 
@@ -414,7 +415,7 @@ def load_sim(client, conf):
 
     #Channels with any reads recieve minimum read count
     min_const = np.zeros(NCHS)
-    min_const[unc.chcts > 0] = conf.min_ch_reads
+    min_const[unc.chcts > 0] = config.min_ch_reads
 
     tgt_total = np.sum(ctl.chcts)
 
@@ -492,3 +493,9 @@ def load_sim(client, conf):
             #reads_out.write("%3d %s %d\n" % (ch, rd, np.round(tm*SAMP_RATE)))
             #reads_out.write("%3d %s %d\n" % (ch, rd, 0))
     #reads_out.close()
+
+CMD = unc.config.Subcmd(
+    "sim",
+    "Simulate real-time targeted sequencing.", 
+    OPTS, run
+)

@@ -28,49 +28,32 @@ import os
 import numpy as np
 import uncalled as unc
 
-Opt = unc.ArgParser.Opt
-OPTS = (
+Opt = unc.config.Opt
+MAPPER_OPTS = (
     Opt(("-t", "--threads"), ""),
     Opt("--num-channels", "read_buffer"),
-    Opt(("-e", "--max-events"), "mapper"),
     Opt(("-c", "--max-chunks"), "read_buffer"),
     Opt("--chunk-time", "read_buffer"),
-    Opt("--conf", 
+    Opt("--config",
         type = str, 
         default = None, 
         required = False, 
-        help = "Config file"
+        help = "Config file",
+        dest = "_config_toml"
     ),
-    Opt("--rna", 
-        action = "store_true",
-        help = "Will use RNA parameters if set"
-    ),
+    Opt("--rna", fn="set_r94_rna")
+)
 
-    #TODO move to different parser set
-    Opt(("-o", "--out-prefix"), 
-        type = str, 
-        default = None, 
-        required = False, 
-        help = "Output prefix"
-    ),
-    Opt("--mm2", 
-        type = str, 
-        default = None, 
-        required = False, 
-        help = "Minimap2 PAF file for comparison"
-    ),
-) #end MAP_OPTS
-
-def run(conf):
-    assert_exists(conf.bwa_prefix + ".bwt")
-    assert_exists(conf.bwa_prefix + ".uncl")
+def run(config):
+    assert_exists(config.bwa_prefix + ".bwt")
+    assert_exists(config.bwa_prefix + ".uncl")
 
     sys.stderr.flush()
 
-    mapper = unc.MapPool(conf)
+    mapper = unc.MapPool(config)
     
     sys.stderr.write("Loading fast5s\n")
-    for fast5 in load_fast5s(conf.fast5_reader.fast5_files, conf.fast5_reader.recursive):
+    for fast5 in load_fast5s(config.fast5_reader.fast5_files, config.fast5_reader.recursive):
         if fast5 != None:
             mapper.add_fast5(fast5)
 
@@ -95,3 +78,11 @@ def run(conf):
     
     sys.stderr.write("Finishing\n")
     mapper.stop()
+
+OPTS = unc.index.BWA_OPTS + unc.fast5.FAST5_OPTS + MAPPER_OPTS
+
+CMD = unc.config.Subcmd(
+    "map", 
+    "Map fast5 files to a DNA reference", 
+    OPTS, run
+)

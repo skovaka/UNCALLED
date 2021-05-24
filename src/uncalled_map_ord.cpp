@@ -3,17 +3,17 @@
 #include <unistd.h>
 #include "map_pool_ord.hpp"
 
-void load_conf(int argc, char** argv, Conf &conf);
+void load_conf(int argc, char** argv, Config &config);
 
 int main(int argc, char** argv) {
-    std::cerr << "Loading conf\n";
+    std::cerr << "Loading config\n";
 
-    Conf conf(Conf::Mode::MAP_ORD);
-    conf.set_mode_map_ord();
+    Config config(Config::Mode::MAP_ORD);
+    config.set_mode_map_ord();
 
-    load_conf(argc, argv, conf);
+    load_conf(argc, argv, config);
 
-    MapPoolOrd pool(conf);
+    MapPoolOrd pool(config);
 
     Timer t;
 
@@ -47,13 +47,13 @@ int main(int argc, char** argv) {
 
 #define FLAG_TO_CONF(C, T, F) { \
     case C: \
-        conf.F = T(optarg); \
+        config.F = T(optarg); \
         break; \
 }
 
 #define POSITIONAL_TO_CONF(T, F) {\
     if (i < argc) { \
-        conf.F = T(argv[i]); \
+        config.F = T(argv[i]); \
         i++; \
     } else { \
         std::cerr << "Error: must specify flag " << #F << "\n"; \
@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
     } \
 }
 
-void load_conf(int argc, char** argv, Conf &conf) {
+void load_conf(int argc, char** argv, Config &config) {
     int opt;
     std::string flagstr = "C:t:n:c:l:s:w:p:Sr";
 
@@ -84,22 +84,22 @@ void load_conf(int argc, char** argv, Conf &conf) {
             #endif
 
             case 'l':
-            conf.fast5_reader.load_read_filter(std::string(optarg));
+            config.fast5_reader.load_read_filter(std::string(optarg));
             break;
    
             case 'C':
-            std::cerr << "Conf: " << optarg << "\n";
-            conf.load_toml(std::string(optarg));
+            std::cerr << "Config: " << optarg << "\n";
+            config.load_toml(std::string(optarg));
             break;
 
             case 'r':
             std::cerr << "Setting RNA parameters\n";
-            conf.set_r94_rna();
+            config.set_r94_rna();
             break;
 
             case 'S':
-            conf.fast5_reader.load_bc = true;
-            conf.read_buffer.skip_notempl = true;
+            config.fast5_reader.load_bc = true;
+            config.read_buffer.skip_notempl = true;
             break;
 
             case ':':  
@@ -119,7 +119,7 @@ void load_conf(int argc, char** argv, Conf &conf) {
     POSITIONAL_TO_CONF(std::string, mapper.bwa_prefix)
     //POSITIONAL_TO_CONF(std::string, fast5_reader.fast5_list)
     if (i < argc) { 
-        conf.fast5_reader.load_fast5_files(std::string(argv[i])); 
+        config.fast5_reader.load_fast5_files(std::string(argv[i])); 
         i++; 
     } else { 
         std::cerr << "Error: must specify fast5_list\n"; \

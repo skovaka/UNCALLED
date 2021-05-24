@@ -26,19 +26,19 @@
 #include "pdqsort.h"
 #include "map_pool_ord.hpp"
 
-MapPoolOrd::MapPoolOrd(Conf &conf) : 
-        RealtimePool(conf),
-        fast5s_(conf.fast5_reader),
+MapPoolOrd::MapPoolOrd(Config &config) : 
+        RealtimePool(config),
+        fast5s_(config.fast5_reader),
         channels_empty_(false) {
 
-    conf.set_mode_map_ord();
-    conf.export_static();
+    config.set_mode_map_ord();
+    config.export_static();
 
-    channels_.resize(conf.get_num_channels());
-    chunk_idx_.resize(conf.get_num_channels());
+    channels_.resize(config.get_num_channels());
+    chunk_idx_.resize(config.get_num_channels());
 
     #ifdef PYDEBUG
-    meta_hold_.resize(conf.get_num_channels(), 0);
+    meta_hold_.resize(config.get_num_channels(), 0);
     #endif
 }
 

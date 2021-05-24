@@ -25,12 +25,12 @@
 #include <chrono>
 #include "map_pool.hpp"
 
-MapPool::MapPool(Conf &conf)
-    : fast5s_(conf.fast5_reader) {
+MapPool::MapPool(Config &config)
+    : fast5s_(config.fast5_reader) {
 
-    conf.export_static();
+    config.export_static();
     
-    threads_ = std::vector<MapperThread>(conf.threads);
+    threads_ = std::vector<MapperThread>(config.threads);
 
     //fast5s_.fill_buffer();
 
