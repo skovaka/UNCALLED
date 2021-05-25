@@ -80,11 +80,7 @@ OPTS = unc.index.BWA_OPTS + unc.map.MAPPER_OPTS + (
 
 def run(config, client=None):
 
-    #TODO replace with config mode
-    sim = config.subcmd == "sim"
-
-    assert_exists(config.bwa_prefix + ".bwt")
-    assert_exists(config.bwa_prefix + ".uncl")
+    unc.index.check_prefix(config.bwa_prefix)
 
     pool = None
     client = None

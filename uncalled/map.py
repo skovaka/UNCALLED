@@ -22,10 +22,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from __future__ import division
-import sys                         
-import os
-import numpy as np
+import sys            
+import time
 import uncalled as unc
 
 Opt = unc.config.Opt
@@ -39,37 +37,30 @@ MAPPER_OPTS = (
         default = None, 
         required = False, 
         help = "Config file",
-        dest = "_config_toml"
+        dest = unc.config.CONFIG_PARAM
     ),
     Opt("--rna", fn="set_r94_rna")
 )
 
 def run(config):
-    assert_exists(config.bwa_prefix + ".bwt")
-    assert_exists(config.bwa_prefix + ".uncl")
+    unc.index.check_prefix(config.bwa_prefix)
 
-    sys.stderr.flush()
-
-    mapper = unc.MapPool(config)
+    mapper = unc.MapPoolOrd(config)
     
     sys.stderr.write("Loading fast5s\n")
-    for fast5 in load_fast5s(config.fast5_reader.fast5_files, config.fast5_reader.recursive):
-        if fast5 != None:
-            mapper.add_fast5(fast5)
-
     sys.stderr.flush()
+    mapper.load_fast5s()
 
     sys.stderr.write("Mapping\n")
     sys.stderr.flush()
 
-    n = 0
-
+    MAX_SLEEP = 0.01
     try:
         while mapper.running():
             t0 = time.time()
-            for p in mapper.update():
-                p.print_paf()
-                n += 1
+            for ch,nm,paf in mapper.update():
+                paf.print_paf()
+
             dt = time.time() - t0;
             if dt < MAX_SLEEP:
                 time.sleep(MAX_SLEEP - dt);
@@ -82,7 +73,6 @@ def run(config):
 OPTS = unc.index.BWA_OPTS + unc.fast5.FAST5_OPTS + MAPPER_OPTS
 
 CMD = unc.config.Subcmd(
-    "map", 
-    "Map fast5 files to a DNA reference", 
+    "map", "Map fast5 files to a DNA reference", 
     OPTS, run
 )

@@ -7,6 +7,12 @@ kmer_model = "models/r94_5mers.txt"
 bwa_prefix = ""
 preset_mode = "default"
 
+#TODO
+#auto generate via python
+#make c++ index params
+#also mm2? 
+#or just make arg parser more more flexible? 
+
 [index]
 max_sample_dist = 100
 min_samples = 50000

@@ -79,6 +79,17 @@ PAC_SUFF = ".pac"
 SA_SUFF = ".sa"
 BWA_SUFFS = [AMB_SUFF, ANN_SUFF, BWT_SUFF, PAC_SUFF, SA_SUFF]
 
+def check_prefix(path, check_uncl=True):
+    suffs = BWA_SUFFS
+    if check_uncl:
+        suffs.append(UNCL_SUFF)
+
+    for suff in suffs:
+        fname = path+suff
+        if not os.path.exists(fname):
+            raise FileNotFoundError("could not find index file \"%s\"" % fname)
+    return True
+
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 def run(config):

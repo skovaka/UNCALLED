@@ -1,4 +1,7 @@
 *.o
 .*.swp
 .*.swo
-build/
+build
+dist
+uncalled/__pycache__
+uncalled.egg-info

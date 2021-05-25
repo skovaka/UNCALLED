@@ -31,6 +31,10 @@ import toml
 from _uncalled import _Conf
 from collections import namedtuple
 
+FAST5_PARAM = "fast5_files"
+CONFIG_PARAM = "config_toml"
+SPECIAL_PARAMS = {FAST5_PARAM, CONFIG_PARAM}
+
 TOML_TYPES = {int, float, str, list, bool}
 
 def param_valid(name, val):
@@ -207,21 +211,17 @@ class ArgParser:
                 print("calling", fn)
                 getattr(self.config, fn)()
 
-        config_toml = getattr(args, "_config_toml", None)
-        if config_toml != None:
+        #TODO use functions with parameters for special opts
+        config_toml = getattr(args, CONFIG_PARAM, None)
+        if config_toml is not None:
             self.config.load_toml(config_toml)
-
-        if getattr(args,"rna",False):
-            print("NO")
-            self.config.set_r94_rna()
 
         for name, value in vars(args).items():
 
-            if not name.startswith("_"):
+            if not name.startswith("_") or name in SPECIAL_PARAMS:
                 if name in self.dests:
                     group, param = self.dests[name]
-                else: #TODO only needed for subcommand, which I should rethink
-                    print("HERE", name)
+                else: 
                     group = self.config
                     param = name
 
@@ -230,12 +230,14 @@ class ArgParser:
                 #if value is not None or not hasattr(self.config, name):
                 #    setattr(self.config, name, value)
 
+        fast5s = getattr(args, FAST5_PARAM, None)
+        if fast5s is not None:
+            self.config.fast5_reader.fast5_files = unc.fast5.parse_fast5_paths(fast5s, self.config.fast5_reader.recursive)
+
         return cmd, self.config
     
     def print_help(self):
         self.parser.print_help()
-
-
 
 class Opt:
     def __init__(self, args, group_name=None, param=None, fn=None, **kwargs):
@@ -315,7 +317,6 @@ class MutexOpts:
         self.dest = dest
         self.opts = opts
         self.kwargs = kwargs
-
 
 class Subcmd:
     def __init__(self, name, desc, opts, fn):

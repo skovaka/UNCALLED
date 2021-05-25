@@ -10,4 +10,4 @@ fi
 
 mkdir index
 uncalled index -o index/example_ref example_ref.fa
-uncalled map index/example_ref fast5_filename.txt
+uncalled map -c 3 index/example_ref fast5_filename.txt

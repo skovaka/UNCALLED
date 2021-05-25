@@ -94,7 +94,7 @@ uncalled = Pybind11Extension(
 
     sources = [
        "src/pybinder.cpp",
-       "src/conf.cpp",
+       "src/config.cpp",
        "src/event_profiler.cpp", 
        "src/simulator.cpp",
        "src/fast5_reader.cpp",
@@ -132,7 +132,7 @@ uncalled = Pybind11Extension(
 
     extra_compile_args = ["-std=c++11", "-O3"],
 
-    define_macros = [("PYBIND", None), ("PYDEBUG", None)]
+    define_macros = [("PYBIND", None)]#, ("PYDEBUG", None)]
 )
 
 setup(
@@ -156,7 +156,10 @@ setup(
 
     packages=find_packages(),
     include_package_data=True,
-    scripts = ['scripts/uncalled'],
+    #scripts = ['scripts/uncalled'],
     ext_modules = [uncalled],
     cmdclass={'build_ext': pre_build},
+    entry_points = {
+        'console_scripts' : ['uncalled=uncalled.__main__:main'],
+    }
 )
