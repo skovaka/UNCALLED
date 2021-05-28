@@ -28,6 +28,7 @@ import argparse
 import numpy as np
 import uncalled as unc
 import toml
+import inspect
 from _uncalled import _Conf
 from collections import namedtuple
 
@@ -145,8 +146,8 @@ class Config(_Conf):
 class ArgParser:
 
     def __init__(self, 
-            desc="Rapidly maps raw nanopore signal to DNA references",
             subcmds=None, 
+            desc="Rapidly maps raw nanopore signal to DNA references",
             config=None):
 
         if config is None:
@@ -166,21 +167,31 @@ class ArgParser:
 
     def _add_subcmds(self, parser, subcmds):
         subparsers = parser.add_subparsers()
-        for sc in subcmds:
+        for module in subcmds:
+
+            name = module.__name__.split(".")[-1]
+
+            main_func = getattr(module, "main", None)
+
+            if main_func is None:
+                desc = module.__doc__
+            else:
+                desc = main_func.__doc__
+
             sp = subparsers.add_parser(
-                sc.name, help=sc.desc, 
+                name, help=desc, 
                 formatter_class=argparse.ArgumentDefaultsHelpFormatter
             )
 
-            if sc.has_opts:
-                sp.set_defaults(_cmd=sc.fn)
-                for o in sc.opts:
+            if main_func is not None:
+                sp.set_defaults(_cmd=main_func)
+                for o in module.OPTS:
                     if type(o) is Opt:
                         self._add_opt(sp, o)
                     elif type(o) is MutexOpts:
                         self._add_mutex_opts(sp, o)
             else:
-                self._add_subcmds(subparsers, sc.opts)
+                self._add_subcmds(sp, module.SUBCMDS)
 
     def _add_opt(self, parser, opt):
         arg = parser.add_argument(*opt.args, **opt.get_kwargs(self.config))
@@ -319,7 +330,7 @@ class MutexOpts:
         self.kwargs = kwargs
 
 class Subcmd:
-    def __init__(self, name, desc, opts, fn):
+    def __init__(self, name, desc, opts, fn=None):
         self.name = name
         self.desc = desc
         self.opts = opts

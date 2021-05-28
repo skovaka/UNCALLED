@@ -24,9 +24,13 @@
 
 import sys            
 import time
-import uncalled as unc
 
-Opt = unc.config.Opt
+from .index import check_prefix
+from .config import Opt, CONFIG_PARAM
+from .index import BWA_OPTS
+from .fast5 import FAST5_OPTS
+from _uncalled import MapPoolOrd
+
 MAPPER_OPTS = (
     Opt(("-t", "--threads"), ""),
     Opt("--num-channels", "read_buffer"),
@@ -37,15 +41,18 @@ MAPPER_OPTS = (
         default = None, 
         required = False, 
         help = "Config file",
-        dest = unc.config.CONFIG_PARAM
+        dest = CONFIG_PARAM
     ),
     Opt("--rna", fn="set_r94_rna")
 )
 
-def run(config):
-    unc.index.check_prefix(config.bwa_prefix)
+OPTS = BWA_OPTS + FAST5_OPTS + MAPPER_OPTS
 
-    mapper = unc.MapPoolOrd(config)
+def main(config):
+    """Map fast5 files to a DNA reference"""
+    check_prefix(config.bwa_prefix)
+
+    mapper = MapPoolOrd(config)
     
     sys.stderr.write("Loading fast5s\n")
     sys.stderr.flush()
@@ -70,9 +77,3 @@ def run(config):
     sys.stderr.write("Finishing\n")
     mapper.stop()
 
-OPTS = unc.index.BWA_OPTS + unc.fast5.FAST5_OPTS + MAPPER_OPTS
-
-CMD = unc.config.Subcmd(
-    "map", "Map fast5 files to a DNA reference", 
-    OPTS, run
-)

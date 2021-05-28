@@ -1,0 +1,15 @@
+Metadata-Version: 2.1
+Name: read-until
+Version: 3.0.0
+Summary: Read Until API
+Home-page: UNKNOWN
+Author: Oxford Nanopore Technologies Ltd
+Author-email: info@nanoporetech.com
+License: UNKNOWN
+Platform: UNKNOWN
+Requires-Dist: numpy (==1.17.4)
+Requires-Dist: minknow-api (>=4.0.4)
+
+UNKNOWN
+
+

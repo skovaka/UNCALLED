@@ -28,7 +28,12 @@ import argparse
 from uncalled.pafstats import parse_paf
 from time import time
 from collections import Counter
-import uncalled as unc
+
+from . import realtime
+from _uncalled import Simulator
+from .config import Opt
+from .index import BWA_OPTS
+from .map import MAPPER_OPTS
 
 SAMP_RATE = 4000
 CHS = np.arange(512)+1
@@ -40,8 +45,7 @@ PROG = " progress "
 SP = '-'*( (NTICKS - len(PROG))//2 - 1)
 PROG_HEADER = '|'+SP+PROG+SP+"|\n"
 
-Opt = unc.config.Opt
-OPTS = unc.index.BWA_OPTS + (
+OPTS = BWA_OPTS + (
     Opt("fast5s", 
         nargs = '+', 
         type = str, 
@@ -54,11 +58,11 @@ OPTS = unc.index.BWA_OPTS + (
     Opt("--unc-seqsum", "simulator"),
     Opt("--unc-paf",    "simulator"),
     Opt("--sim-speed",  "simulator"),
-) + unc.map.MAPPER_OPTS
+) + MAPPER_OPTS
 
-
-def run(config):
-    client = unc.Simulator(config)
+def main(config):
+    """Simulate real-time targeted sequencing."""
+    client = Simulator(config)
     load_sim(client, config)
 
     for fast5 in load_fast5s(config.fast5s, config.recursive):
@@ -67,7 +71,7 @@ def run(config):
 
     client.load_fast5s()
 
-    unc.realtime.run(config, client)
+    realtime.run(config, client)
 
 
 def find_scans(sts,ens,mxs,max_block_gap=1,max_intv_gap=20,min_mux_frac=0.95):
@@ -494,8 +498,3 @@ def load_sim(client, config):
             #reads_out.write("%3d %s %d\n" % (ch, rd, 0))
     #reads_out.close()
 
-CMD = unc.config.Subcmd(
-    "sim",
-    "Simulate real-time targeted sequencing.", 
-    OPTS, run
-)

@@ -32,7 +32,7 @@
 #include <algorithm>
 #include "event_detector.hpp"
 #include "util.hpp"
-#include "bp.hpp"
+#include "nt.hpp"
 
 #ifdef PYBIND
 #include <pybind11/pybind11.h>

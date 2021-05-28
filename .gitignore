@@ -3,5 +3,6 @@
 .*.swo
 build
 dist
+bin
 uncalled/__pycache__
 uncalled.egg-info

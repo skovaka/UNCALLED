@@ -1,0 +1,4 @@
+six>=1.5.2
+
+[protobuf]
+grpcio-tools>=1.33.2

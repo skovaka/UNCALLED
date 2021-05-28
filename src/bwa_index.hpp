@@ -32,7 +32,7 @@
 #include <bwa/utils.h>
 #include <pdqsort.h>
 #include "util.hpp"
-#include "bp.hpp"
+#include "nt.hpp"
 #include "range.hpp"
 
 #ifdef PYBIND

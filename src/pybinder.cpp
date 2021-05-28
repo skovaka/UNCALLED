@@ -95,16 +95,8 @@ PYBIND11_MODULE(_uncalled, m) {
     m.def("self_align", &self_align);
 
     //BP operation functions
-    m.def("kmer_count",    &kmer_count<KLEN>);
-    m.def("str_to_kmer",   &str_to_kmer<KLEN>);
-    m.def("kmer_rev",      pybind11::vectorize(&kmer_rev<KLEN>));
-    m.def("kmer_comp",     pybind11::vectorize(&kmer_comp<KLEN>));
-    m.def("kmer_revcomp",  pybind11::vectorize(&kmer_revcomp<KLEN>));
-    m.def("kmer_head",     pybind11::vectorize(&kmer_head<KLEN>));
-    m.def("kmer_base",     pybind11::vectorize(&kmer_base<KLEN>));
-    m.def("kmer_to_str",   &kmer_to_str<KLEN>);
-    m.def("seq_to_kmers",  &seq_to_kmers<KLEN>);
-    m.def("kmer_neighbor", &kmer_neighbor<KLEN>);
+    auto nt_module = m.def_submodule("nt", "Contains functions and constants for manipulating nucleotides and fixed length k-mers (5-mers) in binary format");
+    nt_pybind_defs<KLEN>(nt_module);
 
     m.def("unpack_moves", &unpack_moves);
 

@@ -1,0 +1,4 @@
+[console_scripts]
+read_until_ident = read_until.identification:main [guppy]
+read_until_simple = read_until.simple:main
+

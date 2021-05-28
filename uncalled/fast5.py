@@ -73,20 +73,21 @@ def parse_read_ids(reads):
 
 class Fast5Reader:
 
-    def __init__(self, fast5s=None, index=None, reads=None, recursive=None, config=None):
-        self.config = unc.Config() if config is None else config
-        self.prms = self.config.fast5_reader
+    def __init__(self, fast5s=None, index=None, reads=None, recursive=None, conf=None):
+        self.conf = unc.Config() if conf is None else conf
+        self.prms = self.conf.fast5_reader
 
         if fast5s is None: 
             fast5s = self.prms.fast5_files
 
-        self.prms.fast5_files = parse_fast5_paths(fast5s)
+        if recursive is not None: self.prms.recursive = recursive
+
+        self.prms.fast5_files = parse_fast5_paths(fast5s, recursive)
 
         if reads is not None: 
             self.prms.read_filter = parse_read_ids(reads)
 
         if index     is not None: self.prms.fast5_index = index
-        if recursive is not None: self.prms.recursive = recursive
 
         self.indexed = len(self.prms.fast5_index) != 0
 

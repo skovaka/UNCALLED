@@ -192,7 +192,8 @@ def paf_ref_compare(qry, ref, ret_qry=True, check_locs=True, ext=1.5):
     return tp, tn, fp, fn, fp_unmap
 
 
-def run(config):
+def main(config):
+    """Computes speed and accuracy of UNCALLED mappings."""
     locs = [p for p in parse_paf(config.infile, max_reads=config.max_reads)]
 
     num_mapped = sum([p.is_mapped for p in locs])
@@ -234,8 +235,3 @@ def run(config):
         statsout.write("BP mapped:  %9.2f %9.2f\n" % (np.mean(map_bp),   np.median(map_bp)))
         statsout.write("MS to map:  %9.2f %9.2f\n" % (np.mean(map_ms),   np.median(map_ms)))
 
-CMD = unc.config.Subcmd(
-    "pafstats",
-    "Computes speed and accuracy of UNCALLED mappings.",
-    OPTS, run
-)

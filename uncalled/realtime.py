@@ -26,61 +26,34 @@ from __future__ import division
 import sys                         
 import os
 import numpy as np
-import uncalled as unc
 
-Opt = unc.config.Opt
-#def add_ru_opts(self, p):
-#    #TODO: selectively enrich or deplete refs in index
-#
-#    modes = p.add_mutually_exclusive_group(required=True)
-#    modes.add_argument(
-#            "-D", "--deplete", action='store_const', 
-#            const=unc.RealtimePool.DEPLETE, dest='realtime_mode', 
-#            help="Will eject reads that align to index"
-#    )
-#    modes.add_argument(
-#            "-E", "--enrich", action='store_const',
-#            const=unc.RealtimePool.ENRICH, dest='realtime_mode', 
-#            help="Will eject reads that don't align to index"
-#    )
-#
-#    active = p.add_mutually_exclusive_group()
-#    active.add_argument(
-#            "--full", action='store_const', 
-#            const=unc.RealtimePool.FULL, dest='active_chs',
-#            help="Will monitor all pores if set (default)"
-#    )
-#    active.add_argument(
-#            "--even", action='store_const', 
-#            const=unc.RealtimePool.EVEN, dest='active_chs', 
-#            help="Will only monitor even pores if set"
-#    )
-#    active.add_argument(
-#            "--odd", action='store_const', 
-#            const=unc.RealtimePool.ODD, dest='active_chs', 
-#            help="Will only monitor odd pores if set")
-#
+from . import index
+from .map import MAPPER_OPTS
+from .config import Opt, MutexOpts
+from . import ReadUntilClient
+
+
 REALTIME_OPTS = (
-    unc.config.MutexOpts("realtime_mode", [
+    MutexOpts("realtime_mode", [
         Opt(("-D", "--deplete"), fn="set_rt_deplete"),
         Opt(("-E", "--enrich"), fn="set_rt_enrich"),
     ]),
-    unc.config.MutexOpts("active_chs", [
+    MutexOpts("active_chs", [
         Opt("--even", fn="set_active_chs_even", help="world"),
         Opt("--odd", fn="set_active_chs_odd", help="Hello"),
     ])
 )
 
-OPTS = unc.index.BWA_OPTS + unc.map.MAPPER_OPTS + (
+OPTS = index.BWA_OPTS + MAPPER_OPTS + (
     Opt("--host", "realtime"),
     Opt("--port", "realtime"),
     Opt("--duration", "realtime"),
 ) + REALTIME_OPTS
-#TODO ADD RU OPTS!!
 
-def run(config, client=None):
+def main(config, client=None):
+    """Perform real-time targeted (ReadUntil) sequencing"""
 
-    unc.index.check_prefix(config.bwa_prefix)
+    index.check_prefix(config.bwa_prefix)
 
     pool = None
     client = None
@@ -88,7 +61,7 @@ def run(config, client=None):
     #TODO make simulator indisinguishable from client, maybe w/ python wrapper
     if client is None:
         sim = False
-        client = unc.minknow_client.Client(config.host, config.port, config.chunk_time, config.num_channels)
+        client = ReadUntilClient(config.host, config.port, config.chunk_time, config.num_channels)
     else:
         sim = True
 
@@ -200,8 +173,3 @@ def run(config, client=None):
         pool.stop_all()
 
 
-CMD = unc.config.Subcmd(
-    "realtime",
-    "Perform real-time targeted (ReadUntil) sequencing",
-    OPTS, run
-)

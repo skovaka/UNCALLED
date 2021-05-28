@@ -50,6 +50,11 @@ IndexParams._def_params(
 unc.Config._EXTRA_GROUPS["index"] = IndexParams
 
 Opt = unc.config.Opt
+BWA_OPTS = (
+    Opt("bwa_prefix", "mapper"),
+    Opt(("-p", "--idx-preset"), "mapper"),
+)
+
 OPTS = (
     Opt("fasta_filename", "index"),
     Opt(("-o", "--bwa-prefix"), "index"),
@@ -65,34 +70,9 @@ OPTS = (
     Opt("--speeds", "index"),
 )
 
-BWA_OPTS = (
-    Opt("bwa_prefix", "mapper"),
-    Opt(("-p", "--idx-preset"), "mapper"),
-)
+def main(config):
+    """Builds an UNCALLED index from a FASTA reference"""
 
-#TODO move to BwaIndex?
-UNCL_SUFF = ".uncl"
-AMB_SUFF = ".amb"
-ANN_SUFF = ".ann"
-BWT_SUFF = ".bwt"
-PAC_SUFF = ".pac" 
-SA_SUFF = ".sa"
-BWA_SUFFS = [AMB_SUFF, ANN_SUFF, BWT_SUFF, PAC_SUFF, SA_SUFF]
-
-def check_prefix(path, check_uncl=True):
-    suffs = BWA_SUFFS
-    if check_uncl:
-        suffs.append(UNCL_SUFF)
-
-    for suff in suffs:
-        fname = path+suff
-        if not os.path.exists(fname):
-            raise FileNotFoundError("could not find index file \"%s\"" % fname)
-    return True
-
-ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
-
-def run(config):
     prms = config.index
 
     if prms.bwa_prefix is None or len(prms.bwa_prefix) == 0:
@@ -134,6 +114,29 @@ def run(config):
     p.write()
 
     sys.stderr.write("Done\n")
+
+#TODO move to BwaIndex?
+UNCL_SUFF = ".uncl"
+AMB_SUFF = ".amb"
+ANN_SUFF = ".ann"
+BWT_SUFF = ".bwt"
+PAC_SUFF = ".pac" 
+SA_SUFF = ".sa"
+BWA_SUFFS = [AMB_SUFF, ANN_SUFF, BWT_SUFF, PAC_SUFF, SA_SUFF]
+
+def check_prefix(path, check_uncl=True):
+    suffs = BWA_SUFFS
+    if check_uncl:
+        suffs.append(UNCL_SUFF)
+
+    for suff in suffs:
+        fname = path+suff
+        if not os.path.exists(fname):
+            raise FileNotFoundError("could not find index file \"%s\"" % fname)
+    return True
+
+ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+
 
 def power_fn(xmax, ymin, ymax, exp, N=100):
     dt = 1.0/N
@@ -302,7 +305,3 @@ class IndexParameterizer:
 
         params_out.close()
 
-CMD = unc.config.Subcmd("index", 
-    "Builds the UNCALLED index of a FASTA reference", 
-    OPTS, run
-)
