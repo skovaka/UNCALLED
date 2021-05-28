@@ -8,6 +8,7 @@ import re
 import time
 from typing import NamedTuple
 from matplotlib.colors import Normalize
+import pandas as pd
 
 from ..pafstats import parse_paf
 from ..config import Config
@@ -51,6 +52,10 @@ class Track:
             self.conf.to_toml(self.config_filename)
             self.index_file.write(self.INDEX_HEADER + "\n")
 
+    @property
+    def read_ids(self):
+        return list(self.index.index)
+
     def add_read(self, read_id, fast5_fname, rae_df):
         if self.mode != "w":
             raise RuntimeError("Must be write mode to add read to track")
@@ -74,15 +79,13 @@ class Track:
     def get_matrix(self, ref_bounds, mm2_paf=None, partial_overlap=False):
 
         if mm2_paf is None:
-            mm2_paf = self.conf.mm2_paf
+            mm2_paf = self.conf.align.mm2_paf
 
         read_filter = set(self.index.index)
         mm2s = {p.qr_name : p
                  for p in parse_paf(
                     mm2_paf,
-                    ref_bounds[0],
-                    ref_bounds[1],
-                    ref_bounds[2],
+                    ref_bounds,
                     read_filter=read_filter,
                     full_overlap=not partial_overlap
         )}

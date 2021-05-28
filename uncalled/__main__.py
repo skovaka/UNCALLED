@@ -1,4 +1,4 @@
-"""Rapidly maps raw nanopore signal to dna references"""
+"""Utility for Nanopore Read ALignment to Large Expanses of DNA"""
 
 import numpy as np
 from . import index, map, realtime, sim, pafstats, dtw, config

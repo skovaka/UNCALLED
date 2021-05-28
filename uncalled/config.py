@@ -166,7 +166,7 @@ class ArgParser:
         self._add_subcmds(self.parser, subcmds)
 
     def _add_subcmds(self, parser, subcmds):
-        subparsers = parser.add_subparsers()
+        subparsers = parser.add_subparsers(title="subcommands")
         for module in subcmds:
 
             name = module.__name__.split(".")[-1]
@@ -190,8 +190,12 @@ class ArgParser:
                         self._add_opt(sp, o)
                     elif type(o) is MutexOpts:
                         self._add_mutex_opts(sp, o)
-            else:
+
+            elif hasattr(module, "SUBCMDS"):
                 self._add_subcmds(sp, module.SUBCMDS)
+
+            else:
+                raise RuntimeError("Subcommand module \"%s\" does not contain \"main\" function or \"SUBCMDS\" list" % module.__name__)
 
     def _add_opt(self, parser, opt):
         arg = parser.add_argument(*opt.args, **opt.get_kwargs(self.config))

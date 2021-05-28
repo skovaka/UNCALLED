@@ -126,8 +126,7 @@ class Fast5Reader {
 
         //DPRM(p, "fast5_files", &Fast5Reader::Params::fast5_files);
         PY_FAST5_READER_PRM(fast5_files, 
-                "File containing a list of paths to fast5 files, one per line."
-                "List of paths to any combination of\n"
+                "List of paths to any combination of:\n"
                 " 1. fast5 files\n"
                 " 2. directories to search for fast5 files (optionally recursive)\n"
                 " 3. text file(s) listing one fast5 file or directory to search per line"

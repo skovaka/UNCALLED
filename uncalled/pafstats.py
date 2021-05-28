@@ -130,9 +130,14 @@ class PafEntry:
         return s
 
 
-def parse_paf(infile, ref_name=None, ref_start=None, ref_end=None, max_reads=None, read_filter=None, full_overlap=False):
+def parse_paf(infile, ref_bounds=None, max_reads=None, read_filter=None, full_overlap=False):
     if max_reads == 0:
         max_reads = None
+
+    if ref_bounds is None:
+        ref_name=ref_start=ref_end=None
+    else:
+        ref_name,ref_start,ref_end=ref_bounds[:3]
 
     if isinstance(infile, str):
         infile = open(infile)

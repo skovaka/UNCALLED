@@ -145,6 +145,12 @@ class Fast5Reader:
             raise RuntimeError("Fast5 index is required to query fast5 filenames")
         return self._dict.get_read_file(read_id)
 
+    def __contains__(self, read_id):
+        if not self.indexed:
+            raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")
+        #TODO faster solution?
+        return not self._dict[read_id].empty()
+
     def __getitem__(self, read_id):
         if not self.indexed:
             raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")

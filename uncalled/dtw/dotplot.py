@@ -1,7 +1,67 @@
 import time
+import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter, FuncFormatter
+
+from ..sigproc import ProcRead
+from ..config import Config, ArgParser, ParamGroup, Opt
+from ..fast5 import Fast5Reader, parse_read_ids
+from ..pafstats import parse_paf
+from .dtw import Track, ref_coords
+#from .align import GuidedDTW, BcFast5Aln
+
+class DotplotParams(ParamGroup): pass
+DotplotParams._def_params(
+    ("track", None, str, "DTW aligment track containing reads to plot"),
+    ("read_filter", None, list, "List of reads to plot"),
+)
+Config._EXTRA_GROUPS["dotplot"] = DotplotParams #TODO put in ParamGroup con
+
+OPTS = [
+    Opt("track", "dotplot"),
+    Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
+    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
+]
+
+def main(conf):
+    """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
+
+    track = Track(conf.dotplot.track, 'r')
+    conf = track.conf
+
+    fast5s = Fast5Reader(conf=conf)
+
+    ref_bounds = conf.align.ref_bounds
+    #if hasattr(conf, "ref_bounds"):
+    #else:
+    #    ref_bounds = [None]*3
+
+    read_filter = set(conf.fast5_reader.read_filter)
+
+    mm2s = {p.qr_name : p
+             for p in parse_paf(
+                conf.align.mm2_paf,
+                ref_bounds,
+                read_filter=read_filter
+    )}
+
+    for read_id in track.read_ids:
+        if read_id in fast5s:
+            fast5_read = fast5s[read_id]
+            proc_read = ProcRead(fast5_read, conf=conf)
+            bcaln = BcFast5Aln(proc_read, mm2s[read.id])
+
+            aln = track.get_aln(read_id)
+
+            #TODO shouldn't need GuidedDTW, just read_aln
+            dtw = GuidedDTW(
+                self.idx, 
+                proc_read, 
+                bcaln, 
+                dtw_events=aln,
+                ref_bounds=ref_bounds
+            )
 
 def dotplot(dtw, out_prefix=None, cursor=None):
 

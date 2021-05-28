@@ -45,6 +45,7 @@ OPTS = BWA_OPTS + FAST5_OPTS + (
     Opt(("-s", "--band-shift"), "align"),
     Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
     Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
+    Opt(("-f", "--force-overwrite"), action="store_true"),
     Opt(("-o", "--out-path"), "align"),
 )
 
@@ -58,6 +59,8 @@ def main(conf):
     conf.proc_read.detect_events = True
     conf.export_static()
 
+    print(type(conf.align.mm2_paf), conf.align.mm2_paf)
+
     mm2s = dict()
     if conf.align.mm2_paf is not None:
         for p in parse_paf(conf.align.mm2_paf):
@@ -70,7 +73,7 @@ def main(conf):
     fast5s = Fast5Processor(conf=conf)
 
     if conf.align.out_path is not None:
-        track = Track(conf.align.out_path, "w")
+        track = Track(conf.align.out_path, "w", conf=conf, overwrite=conf.force_overwrite)
     else:
         track = None
 
@@ -92,8 +95,8 @@ def main(conf):
         if dtw.empty:
             continue
 
+        print(read.id)
         if track is None:
-            print(read.id)
             dotplot(dtw)
         else:
             save(dtw, track)

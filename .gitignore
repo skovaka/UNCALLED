@@ -1,6 +1,7 @@
 *.o
 .*.swp
 .*.swo
+.eggs
 build
 dist
 bin

@@ -156,7 +156,6 @@ setup(
 
     packages=find_packages(),
     include_package_data=True,
-    #scripts = ['scripts/uncalled'],
     ext_modules = [uncalled],
     cmdclass={'build_ext': pre_build},
     entry_points = {
