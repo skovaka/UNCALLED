@@ -14,8 +14,6 @@ from _uncalled import PORE_MODELS, BwaIndex, DTWd, DTWp, StaticBDTW, BandedDTW, 
 from .dotplot import dotplot
 from . import Track, ref_coords
 
-#from . import T
-
 #TODO make this better
 METHODS = {
     "DTWd" : DTWd,
@@ -128,7 +126,7 @@ class GuidedDTW:
 
         model_name = self.conf.mapper.pore_model
 
-        #TODO probably need to rethink fwd/rev compl, but either way clean this up
+        #TODO clean this up
         if model_name.endswith("_compl"):
             model_name = model_name[:-5]+"templ"
 
@@ -158,7 +156,6 @@ class GuidedDTW:
             if bcaln.flip_ref:
                 self.samp_min, self.samp_max = (self.samp_max, self.samp_min)
 
-
         self.load_kmers()
 
         if dtw_events is None:
@@ -169,6 +166,7 @@ class GuidedDTW:
 
         self.empty = False
 
+    #TODO generate AlignedRead
     def calc_events(self):
 
         if self.read.has_events:
@@ -188,31 +186,18 @@ class GuidedDTW:
         if self.read.has_events:
             self.events['length'] = grp['length'].sum()
             self.events['mean'] = grp['sum'].sum() / self.events['length']
-            self.events['stdv'] = grp['signal'].std().fillna(0) #TODO not legit
             self.dtw.drop(columns=['sum'])
         else:
             self.events['length'] = grp['signal'].count()
             self.events['mean'] = grp['signal'].mean() 
             self.events['stdv'] = grp['signal'].std().fillna(0)
 
-        #self.events.set_index('ref', inplace=True)
-        #self.events.sort_index(inplace=True)
-
+    #TODO do with mirror coords in BWA index
     def load_kmers(self):
 
         shift = nt.K - 1
         st = self.ref_min - (shift if not self.bcaln.flip_ref else 0)
         en = self.ref_max + (shift if self.bcaln.flip_ref else 0)
-
-        #ref_len = self.bcaln.rf_en-self.bcaln.rf_st+K  
-        #shift = K - 1                                  
-        #if not self.bcaln.flip_ref:                    
-        #    st = self.bcaln.rf_st - shift              
-        #    en = st + ref_len                          
-        #else:                                          
-        #    en = self.bcaln.rf_en + shift              
-        #    st = en - ref_len
-
 
         if st < 0:
             pad = -st
@@ -231,8 +216,6 @@ class GuidedDTW:
             kmers = nt.kmer_comp(kmers)
 
         self.ref_kmers = np.insert(kmers, 0, [0]*pad)
-        #self.ref_kmers = kmers
-        #print([unc.kmer_to_str(k) for k in kmers])
 
 
     def get_dtw_args(self, read_block, ref_start, ref_kmers):
@@ -240,7 +223,6 @@ class GuidedDTW:
         qry_len = len(read_block)
         ref_len = len(ref_kmers)
 
-        #TODO slow, probably bc of "searchsorted" line
         #should maybe move to C++
         if self.method == "GuidedBDTW":
             band_count = qry_len + ref_len
@@ -267,6 +249,7 @@ class GuidedDTW:
         else:
             return common + (DTW_GLOB,)
 
+    #TODO store in ReadAln metadata
     def ll_to_df(self, ll, read_block, ref_st, ref_len):
         block_qry_st = np.clip(ll['qry'],                 0, len(read_block)-1)
         block_qry_en = np.clip(ll['qry']-self.prms.band_width, 0, len(read_block)-1)
@@ -287,6 +270,7 @@ class GuidedDTW:
         })
 
 
+    #TODO refactor inner loop to call function per-block
     def calc_dtw(self):
         self.mats = list()
 
@@ -298,14 +282,15 @@ class GuidedDTW:
         block_min = self.bcaln.df['sample'].searchsorted(self.samp_min)
         block_max = self.bcaln.df['sample'].searchsorted(self.samp_max)
 
-
         y_min = self.bcaln.df['ref'][block_min]
 
         block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
         block_ends   = np.append(self.bcaln.ref_gaps, block_max)
 
-        for st, en in [(block_min, block_max)]:#zip(block_starts, block_ends):
+        #TODO make this actually do something for spliced RNA
+        for st, en in [(block_min, block_max)]:
         #for st, en in zip(block_starts, block_ends):
+
             samp_st = self.bcaln.df.loc[st,'sample']
             samp_en = self.bcaln.df.loc[en-1,'sample']
 
@@ -348,6 +333,7 @@ class GuidedDTW:
         else:
             self.bands = pd.DataFrame(band_blocks[0])
 
+    #TODO move to AlignedRead
     def load_dtw_events(self, event_file):
         self.events = pd.read_pickle(event_file).reset_index()
 
@@ -356,12 +342,6 @@ class GuidedDTW:
 
         y_min = self.events['ref'].min()
         y_max = self.events['ref'].max()
-
-        #block_min2 = self.events['start'].searchsorted(self.samp_min)
-        #print(self.events)
-        #print(block_min2, self.samp_min)
-        #y_min2 = self.events['ref'].iloc[block_min2]
-
 
         self.events = self.events.loc[(self.events['start'] >= self.samp_min) & (self.events['start'] <= self.samp_max)]#.reset_index(drop=True)
 
@@ -372,7 +352,6 @@ class GuidedDTW:
         else:
             self.events['idx'] = self.events['ref'] - y_min
 
-
         self.events.set_index('idx', inplace=True)
         self.events.sort_index(inplace=True)
 
@@ -382,14 +361,14 @@ class GuidedDTW:
         self.dtw.reset_index()
         self.bands = None
 
+    #TODO move to dotplot
     def plot_dotplot(self, ax):
         if self.bands is not None:
             ax.fill_between(self.bands['samp'], self.bands['ref_st']-1, self.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
 
-
-        #return ax.scatter(self.dtw['sample'], self.dtw['ref'],s=7,color="purple", zorder=2)
         return ax.step(self.dtw['sample'], self.dtw['ref'],where="post",color="purple", zorder=3, linewidth=3)
 
+    #TODO move to dotplot
     def plot_dtw_events(self, ax_sig, ax_padiff):
         c = 'purple'
 
@@ -422,7 +401,6 @@ class GuidedDTW:
             en = int(st + self.dtw.iloc[i]['length'])
             samp_bases[st:en] = bases[i]
 
-            
         def plot_base(base, color):
             ax_sig.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color, interpolate=True)
         plot_base(0, "#80ff80")
@@ -443,26 +421,21 @@ class GuidedDTW:
         if self.read.has_events:
             ax_sig.step(self.read.df['start'][evts], self.read.df['norm_sig'][evts], where='post', color='black', linewidth=3)
         else:
-            ax_sig.scatter(self.read.df['start'][evts], self.read.df['norm_sig'][evts], s=5, alpha=0.75, c="#777777") #TODO really need to store constants, this is so badly organized
+            ax_sig.scatter(self.read.df['start'][evts], self.read.df['norm_sig'][evts], s=5, alpha=0.75, c="#777777") 
 
         model_means = self.model.get_mean(self.events['kmer'])
 
-        #ax_padiff.scatter(self.dtw['signal'], self.dtw['ref'], color='purple', s=5, alpha=0.25)
-
         pa_diffs = np.abs(self.events['mean'] - self.model.get_mean(self.events['kmer']))
-
-        #ax_padiff.plot(model_means, self.events.index, color='forestgreen')
 
         ax_padiff.step(pa_diffs, self.events.index, color=c, where="post")
 
-        #replace .events['ref'] with index with .index to fix for cmd for some reason
-
-#TODO move into GuidedDTW, or ReadAln?
+#TODO move to ReadAln
 def save(dtw, track):
     events_out = dtw.events.reset_index(drop=True).set_index('ref').sort_index()
 
     track.add_read(dtw.read.id, dtw.read.f5.filename, events_out)
 
+#TODO move to its own module? extend ReadAln
 class BcFast5Aln:
     BCE_K = 4
     CIG_OPS_STR = "MIDNSHP=X"

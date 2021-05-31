@@ -14,6 +14,10 @@ from ..pafstats import parse_paf
 from ..config import Config
 from _uncalled import PORE_MODELS
 
+class ReadAln:
+    def __init__(self):
+        pass
+
 class Track:
     CONF_FNAME = "conf.toml"
     ALN_DIR = "alns"
