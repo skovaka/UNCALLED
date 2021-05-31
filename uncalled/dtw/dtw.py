@@ -249,6 +249,7 @@ class TrackMatrix:
         return self.ref_bounds[2]
 
 def ref_coords(coord_str):
+    print("COORD", coord_str)
     spl = coord_str.split(":")
     ch = spl[0]
     st,en = spl[1].split("-")

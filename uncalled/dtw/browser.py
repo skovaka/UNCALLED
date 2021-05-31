@@ -20,7 +20,7 @@ from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
 from .dtw import Track, ref_coords
 from .align import GuidedDTW, BcFast5Aln
-from .dotplot import dotplot
+from .dotplot import Dotplot
 from _uncalled import BwaIndex, nt
 
 CMAP = "viridis"
@@ -30,14 +30,13 @@ class BrowserParams(ParamGroup): pass
 BrowserParams._def_params(
     ("track_a", None, str, "Path to directory where alignments are stored"),
     ("track_b", None, str, "Path to directory where alignments are stored"),
-    ("ref_bounds", None, tuple, "Reference cooridinates to view"),
     ("full_overlap", None, bool, "If true will only include reads which fully cover reference bounds")
 )
 Config._EXTRA_GROUPS["browser"] = BrowserParams #TODO put in ParamGroup con
 
 #BWA_OPTS + 
 OPTS = (
-    Opt("ref_bounds", "browser", type=ref_coords),
+    Opt("ref_bounds", "align", type=ref_coords),
     Opt("track_a", "browser"),
     Opt("track_b", "browser", nargs="?"),
     Opt("--rna", action = "store_true"),
@@ -99,13 +98,15 @@ class RawBrowser:
         else:
             self.single_track = True
 
-        self.ref_name, self.ref_start, self.ref_end = self.prms.ref_bounds
+        ref_bounds = self.conf.align.ref_bounds
+
+        self.ref_name, self.ref_start, self.ref_end = ref_bounds
         self.width = self.ref_end - self.ref_start
 
         for path in track_paths:
             sys.stderr.write("Loading %s track...\n" % path)
             track = Track(path, conf=conf)
-            self.track_mats.append(track.get_matrix(self.prms.ref_bounds))
+            self.track_mats.append(track.get_matrix(ref_bounds))
             self.conf = track.conf
 
         if not self.single_track:
@@ -155,7 +156,9 @@ class RawBrowser:
             ref_bounds=mat.ref_bounds
         )
 
-        dotplot(dtw, cursor=mat.ref_start + rf)
+        dpl = Dotplot(dtw, cursor=mat.ref_start + rf)
+        dpl.show()
+
 
         #fig = plt.figure()
         #ax = fig.subplots(1,1)
@@ -371,10 +374,8 @@ class RawBrowser:
         strand = mat.reads['fwd'] == fwd
         return np.sum(mat[layer,strand], axis=0) / np.sum(mat.mask[strand], axis=0)
 
+    #TODO refactor into _init_fig(), show(), and save()
     def show(self):
-        #TODO move axis inits into show, below each subplot call init function
-        #i.e. init_mat, init_sum, init_info, init_opts ?
-
         self.fig = plt.figure(
             tight_layout={"pad" : 2, "h_pad" : 0, "w_pad" : 1}
         )
@@ -398,7 +399,6 @@ class RawBrowser:
 
         mng = plt.get_current_fig_manager()
         mng.window.attributes('-zoomed', True)
-        #mng.window.maximize()
 
         plt.show()
 

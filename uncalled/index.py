@@ -34,7 +34,7 @@ from typing import NamedTuple
 class IndexParams(unc.config.ParamGroup): pass
 IndexParams._def_params(
     ("fasta_filename", None, str, "FASTA file to index"),
-    ("bwa_prefix", None, str, "Index output prefix. Will use input fasta filename by default"),
+    ("index_prefix", None, str, "Index output prefix. Will use input fasta filename by default"),
     ("max_sample_dist", 100, int, "Maximum average sampling distance between reference alignments."),
     ("min_samples", 50000, int, "Minimum number of alignments to produce (approximate, due to deterministically random start locations),"),
     ("max_samples", 1000000, int, "Maximum number of alignments to produce (approximate, due to deterministically random start locations),"),
@@ -57,7 +57,7 @@ BWA_OPTS = (
 
 OPTS = (
     Opt("fasta_filename", "index"),
-    Opt(("-o", "--bwa-prefix"), "index"),
+    Opt(("-o", "--index-prefix"), "index"),
     Opt(("-s", "--max-sample-dist"), "index"),
     Opt("--min-samples", "index"),
     Opt("--max-samples", "index"),
@@ -75,20 +75,20 @@ def main(config):
 
     prms = config.index
 
-    if prms.bwa_prefix is None or len(prms.bwa_prefix) == 0:
-        prms.bwa_prefix = prms.fasta_filename
+    if prms.index_prefix is None or len(prms.index_prefix) == 0:
+        prms.index_prefix = prms.fasta_filename
 
     bwa_built = True
 
     for suff in unc.index.BWA_SUFFS:
-        if not os.path.exists(prms.bwa_prefix + suff):
+        if not os.path.exists(prms.index_prefix + suff):
             bwa_built = False
             break
 
     if bwa_built:
-        sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % prms.bwa_prefix)
+        sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % prms.index_prefix)
     else:
-        unc.BwaIndex.create(prms.fasta_filename, prms.bwa_prefix)
+        unc.BwaIndex.create(prms.fasta_filename, prms.index_prefix)
 
     sys.stderr.write("Initializing parameter search\n")
     p = unc.index.IndexParameterizer(prms)
@@ -151,7 +151,7 @@ class IndexParameterizer:
     def __init__(self, params):
         self.prms = params
 
-        self.out_fname = self.prms.bwa_prefix + UNCL_SUFF
+        self.out_fname = self.prms.index_prefix + UNCL_SUFF
 
         self.pck1 = self.prms.matchpr1
         self.pck2 = self.prms.matchpr2
@@ -163,7 +163,7 @@ class IndexParameterizer:
 
     def calc_map_stats(self):
 
-        ann_in = open(self.prms.bwa_prefix + ANN_SUFF)
+        ann_in = open(self.prms.index_prefix + ANN_SUFF)
         header = ann_in.readline()
         ref_len = int(header.split()[0])
         ann_in.close()
@@ -176,7 +176,7 @@ class IndexParameterizer:
         else:
             sample_dist = self.prms.max_sample_dist
 
-        fmlens = unc.self_align(self.prms.bwa_prefix, sample_dist)
+        fmlens = unc.self_align(self.prms.index_prefix, sample_dist)
         path_kfmlens = [p[self.prms.kmer_len-1:] if len(p) >= self.prms.kmer_len else [1] for p in fmlens]
 
         max_pathlen = 0

@@ -11,7 +11,7 @@ from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..sigproc import ProcRead
 from _uncalled import PORE_MODELS, BwaIndex, DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 
-from .dotplot import dotplot
+from .dotplot import Dotplot
 from . import Track, ref_coords
 
 #TODO make this better
@@ -95,7 +95,8 @@ def main(conf):
 
         print(read.id)
         if track is None:
-            dotplot(dtw)
+            dplt = Dotplot(dtw)
+            dplt.show()
         else:
             save(dtw, track)
 

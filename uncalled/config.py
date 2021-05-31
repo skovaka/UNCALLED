@@ -201,7 +201,13 @@ class ArgParser:
         arg = parser.add_argument(*opt.args, **opt.get_kwargs(self.config))
 
         if opt.has_dest:
-            self.dests[arg.dest] = opt.get_dest(self.config)
+            name = arg.dest
+            dest = opt.get_dest(self.config)
+
+            if name in self.dests and self.dests[name] != dest:
+                print(self.dests[name], dest)
+                raise RuntimeError("Conflicting ArgParser dests with name \"%s\"" % arg.dest)
+            self.dests[name] = dest
 
         if opt.has_fn:
             self.fns[arg.dest] = opt.fn
@@ -239,6 +245,8 @@ class ArgParser:
                 else: 
                     group = self.config
                     param = name
+                
+                print(name, value, group, param)
 
                 if value is not None or not hasattr(group, param):
                     setattr(group, param, value)
