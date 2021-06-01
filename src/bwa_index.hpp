@@ -37,6 +37,8 @@
 
 #ifdef PYBIND
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/numpy.h>
 #endif
 
 //From submods/bwa/bwtindex.c
@@ -170,7 +172,7 @@ class BwaIndex {
         return bns_pos2rid(bns_, sa_loc);
     }
 
-    std::string get_ref_name(u32 rid) const {
+    std::string get_ref_name(u32 rid) {
         return bns_->anns[rid].name;
     }
 
@@ -244,7 +246,7 @@ class BwaIndex {
         return seqs;
     }
 
-    u64 coord_to_pacseq(std::string name, u64 coord) {
+    u64 ref_to_pachalf(std::string name, u64 coord) {
         i32 i;
         for (i = 0; i < bns_->n_seqs; i++) {
             if (strcmp(name.c_str(), bns_->anns[i].name) == 0)
@@ -253,18 +255,77 @@ class BwaIndex {
         return INT_MAX;
     } 
 
+    u64 get_pac_shift(const std::string &ref_name) {
+        auto rid = get_ref_id(ref_name);
+        return bns_->anns[rid].offset;
+    }
+
+    std::pair<u64, u64> mirror_ref_coords(const std::string &ref_name, u64 st, u64 en, bool fwd, bool is_rna) {
+        auto shift = get_pac_shift(ref_name);
+
+        u64 pac_st = shift+st, pac_en = shift+en;
+
+        auto flip = fwd == is_rna;
+
+        if (!flip) return {pac_st, pac_en};
+        return {size() - pac_en, size() - pac_st};
+    }
+
     bool pacseq_loaded() const {
         return pacseq_ != NULL;
     }
 
+    //std::vector<u16> get_kmers(const std::string &nm, u64 st, u64 en, bool fwd, bool is_rna) {
+    //    auto mirs = mirror_ref_coords(nm,st,en,fwd,is_rna);
+    //    return get_kmers(mirs.first, mirs.second);
+
     std::vector<u16> get_kmers(const std::string &nm, u64 st, u64 en) {
-        u64 sti = coord_to_pacseq(nm, st),
-            eni = coord_to_pacseq(nm, en);
-        return get_kmers(sti, eni);
+        u64 pac_st = ref_to_pachalf(nm, st),
+            pac_en = ref_to_pachalf(nm, en);
+        return seq_to_kmers<KLEN>(pacseq_, pac_st, pac_en);
     }
 
-    std::vector<u16> get_kmers(u64 st, u64 en) {
-        return seq_to_kmers<KLEN>(pacseq_, st, en);
+    u64 mirror_to_ref(u64 mirror_coord) {
+        i64 pac = mirror_coord;
+        if (pac >= size() / 2) {
+            pac = size() - pac;
+        }
+        i32 rid = bns_pos2rid(bns_, pac);
+        return pac - bns_->anns[rid].offset;
+    }
+
+    std::vector<kmer_t> get_kmers(u64 mir_st, u64 mir_en, bool is_rna) {
+        bool flip = mir_st >= size() / 2;
+
+        bool fwd = flip == is_rna;
+        
+        auto st = mir_st, en = mir_en;
+        if (flip) {
+            st = size() - mir_en;
+            en = size() - mir_st;
+        }
+
+        auto kmers = seq_to_kmers<KLEN>(pacseq_, st, en);
+
+        std::vector<kmer_t> ret;
+        ret.reserve(kmers.size());
+
+        //TODO refactor
+        if (flip) {
+            for (auto itr = kmers.rbegin(); itr < kmers.rend(); itr++) {
+                auto kmer = kmer_rev<KLEN>(*itr);
+                if (!fwd) kmer = kmer_comp<KLEN>(kmer);
+                ret.push_back(kmer);
+            }
+        } else {
+            for (auto itr = kmers.begin(); itr < kmers.end(); itr++) {
+                auto kmer = *itr;
+                if (!fwd) kmer = kmer_comp<KLEN>(kmer);
+                ret.push_back(kmer);
+            }
+        }
+
+        return ret;
     }
 
     u8 get_base(u64 i) {
@@ -283,7 +344,7 @@ class BwaIndex {
 
         u32 slop = static_cast<int>( ceil(log(ref_len) / log(4)) );
 
-        u64 pac_min = coord_to_pacseq(ref_name, start),
+        u64 pac_min = ref_to_pachalf(ref_name, start),
             pac_max = pac_min + (end - start) - 1;
 
         u64 fwd_st;
@@ -409,18 +470,22 @@ class BwaIndex {
         PY_BWA_INDEX_METH(size);
         PY_BWA_INDEX_METH(pac_to_ref);
         PY_BWA_INDEX_METH(get_seqs);
-        PY_BWA_INDEX_METH(coord_to_pacseq);
         PY_BWA_INDEX_METH(pacseq_loaded);
         PY_BWA_INDEX_METH(get_base);
         PY_BWA_INDEX_METH(get_sa_loc);
         PY_BWA_INDEX_METH(get_ref_coord);
         PY_BWA_INDEX_METH(get_ref_name);
         PY_BWA_INDEX_METH(get_ref_len);
+        PY_BWA_INDEX_METH(get_pac_shift);
         PY_BWA_INDEX_METH(range_to_fms);
-        c.def("get_ref_id", static_cast< i32 (BwaIndex::*)(u64)> (&BwaIndex::get_ref_id) );
-        c.def("get_ref_id", static_cast< i32 (BwaIndex::*)(const std::string &)> (&BwaIndex::get_ref_id) );
-        c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(u64, u64)> (&BwaIndex::get_kmers) );
+        c.def("get_ref_id", static_cast<i32 (BwaIndex::*)(u64)> (&BwaIndex::get_ref_id) );
+        c.def("get_ref_id", static_cast<i32 (BwaIndex::*)(const std::string &)> (&BwaIndex::get_ref_id));
+        //c.def("get_kmers_new", &BwaIndex::get_kmers_new);
+        PY_BWA_INDEX_METH(mirror_ref_coords);
+        c.def("mirror_to_ref", pybind11::vectorize(&BwaIndex::mirror_to_ref));
+        //c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(u64, u64)> (&BwaIndex::get_kmers) );
         c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(const std::string &, u64, u64)> (&BwaIndex::get_kmers) );
+        c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(u64, u64, bool)> (&BwaIndex::get_kmers) );
     }
 
     #endif

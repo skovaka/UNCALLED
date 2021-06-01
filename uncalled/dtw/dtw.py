@@ -10,14 +10,90 @@ from typing import NamedTuple
 from matplotlib.colors import Normalize
 import pandas as pd
 
-from ..pafstats import parse_paf
+from ..pafstats import parse_paf, PafEntry
 from ..config import Config
 from _uncalled import PORE_MODELS
 
 class ReadAln:
-    def __init__(self):
-        pass
 
+    def __init__(self, index, aln, is_rna=False, ref_bounds=None):
+        if type(aln) != PafEntry:
+            raise RuntimeError("ReadAlns can only be initialized from PafEntrys currently")
+
+        self.index = index
+        self.is_rna = is_rna
+
+        self.clipped = False
+
+        if ref_bounds is None:
+            self.ref_bounds = (aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
+        else:
+            if aln.rf_st < ref_bounds[1]:
+                ref_st = ref_bounds[1]
+                clipped = True
+            else:
+                ref_st = aln.rf_st
+
+            if aln.rf_en > ref_bounds[2]:
+                ref_en = ref_bounds[2]
+                clipped = True
+            else:
+                ref_en = aln.rf_en
+
+            if ref_st > ref_en:
+                self.empty = True
+                return
+
+            self.ref_bounds = (aln.rf_name, ref_st, ref_en, aln.is_fwd)
+
+        self._init_mirror_coords()
+
+        self.empty = False
+
+    def miref_to_ref(self, miref):
+        return index.mirror_to_ref(miref) 
+
+    def ref_to_miref(self, ref):
+        return self.index.mirror_ref_coords(self.ref_name, ref, ref, self.is_fwd, self.is_rna)[0]
+
+    def _init_mirror_coords(self):
+        self.miref_start, self.miref_end = self.index.mirror_ref_coords(*self.ref_bounds, self.is_rna)
+
+
+    @property
+    def ref_name(self):
+        """The sequence name of the alignment reference coordinate"""
+        return self.ref_bounds[0]
+
+    @property
+    def ref_start(self):
+        """The start of the alignment reference coordinate"""
+        return self.ref_bounds[1]
+
+    @property
+    def ref_end(self):
+        """The end of the alignment reference coordinate"""
+        return self.ref_bounds[2]
+
+    @property
+    def is_fwd(self):
+        return self.ref_bounds[3]
+
+    def get_index_kmers(self, index, kmer_shift=4):
+        """Returns the k-mer sequence at the alignment reference coordinates"""
+        start = self.miref_start - kmer_shift
+
+        if start < 0:
+            lpad = -self.miref_start
+            start = 0
+        else:
+            lpad = 0
+
+        kmers = index.get_kmers(start, self.miref_end, self.is_rna)
+
+        return np.insert(kmers, 0, [0]*lpad)
+
+    
 class Track:
     CONF_FNAME = "conf.toml"
     ALN_DIR = "alns"
@@ -261,4 +337,244 @@ def ref_coords(coord_str):
     else:
         return coord + (spl[2] == "+",)
 
+class BcFast5Aln(ReadAln):
+    BCE_K = 4
+    CIG_OPS_STR = "MIDNSHP=X"
+    CIG_RE = re.compile("(\d+)(["+CIG_OPS_STR+"])")
+    CIG_OPS = set(CIG_OPS_STR)
+    CIG_INCR_ALL = {'M','=', 'X'}
+    CIG_INCR_RD = CIG_INCR_ALL | {'I','S'}
+    CIG_INCR_RF = CIG_INCR_ALL | {'D','N'}
 
+    SUB = 0
+    INS = 1
+    DEL = 2
+    ERR_TYPES = [SUB, INS, DEL]
+    ERR_MARKS = ['o', 'P', '_']
+    ERR_SIZES = [100, 150, 150]
+    ERR_WIDTHS = [0,0,5]
+
+    def __init__(self, index, read, paf, ref_bounds=None):
+        self.seq_fwd = read.conf.read_buffer.seq_fwd
+        ReadAln.__init__(self, index, paf, not self.seq_fwd, ref_bounds=ref_bounds)
+
+        self.refgap_bps = list()
+        self.sub_bps = list()
+        self.ins_bps = list()
+        self.del_bps = list()
+        self.err_bps = None
+
+        self.empty = (
+                paf is None or 
+                not read.f5.bc_loaded or 
+                (not self.parse_cs(paf) and
+                 not self.parse_cigar(paf))
+        )
+        if self.empty: return
+
+        #TODO make c++ build this 
+        moves = np.array(read.f5.moves, bool)
+        bce_qrs = np.cumsum(read.f5.moves)
+        bce_samps = read.f5.template_start + np.arange(len(bce_qrs)) * read.f5.bce_stride
+
+        samp_bps = pd.DataFrame({
+            'sample' : bce_samps,#[moves],
+            'bp'     : np.cumsum(read.f5.moves),#[moves],
+        })
+
+        self.df = samp_bps.join(self.bp_miref_aln, on='bp').dropna()
+        self.df.reset_index(inplace=True, drop=True)
+
+        if self.err_bps is not None:
+            self.errs = samp_bps.join(self.err_bps.set_index('bp'), on='bp').dropna()
+            self.errs.reset_index(inplace=True, drop=True)
+        else:
+            self.errs = None
+
+        self.ref_gaps = self.df[self.df['bp'].isin(self.refgap_bps)].index
+
+        self.subs = self.df[self.df['bp'].isin(self.sub_bps)].index
+        self.inss = self.df[self.df['bp'].isin(self.ins_bps)].index
+        self.dels = self.df[self.df['bp'].isin(self.del_bps)].index
+
+        self.empty = len(self.df) == 0
+        if self.empty: return
+
+        self.flip_ref = paf.is_fwd != self.seq_fwd
+
+        #if self.flip_ref:
+        #    ref_st = paf.rf_en - self.df['miref'].max() - 1
+        #    ref_en = paf.rf_en
+        #else:
+        #    ref_st = paf.rf_st 
+        #    ref_en = paf.rf_st + self.df['miref'].max() + 1
+
+        #self.ref_bounds = (
+        #    paf.rf_name,
+        #    ref_st,
+        #    ref_en,
+        #    paf.is_fwd
+        #)
+
+        self.y_min = -paf.rf_en if self.flip_ref else paf.rf_st
+        self.y_max = self.y_min + self.df['miref'].max()
+
+    def ref_tick_fmt(self, ref, pos=None):
+        return int(np.round(np.abs(self.y_min + ref)))
+
+    def parse_cs(self, paf):
+        cs = paf.tags.get('cs', (None,)*2)[0]
+        if cs is None: return False
+
+        sys.stderr.write("Loading cs tag\n")
+
+        #TODO rename to general cig/cs
+        bp_miref_aln = list()
+        err_bps = list()
+
+        if self.seq_fwd:
+            qr_i = paf.qr_st
+            #rf_i = paf.rf_st
+        else:
+            qr_i = paf.qr_len - paf.qr_en 
+            #rf_i = -paf.rf_en+1
+
+        print(self.miref_start, self.clipped, "MIORR")
+        mr_i = self.miref_start
+
+        cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
+
+        if paf.is_fwd != self.seq_fwd:
+            cs_ops = reversed(cs_ops)
+
+        for op in cs_ops:
+            c = op[0]
+            if c in {'=',':'}:
+                l = len(op[1]) if c == '=' else int(op[1])
+                bp_miref_aln += zip(range(qr_i, qr_i+l), range(mr_i, mr_i+l))
+                qr_i += l
+                mr_i += l
+
+            elif c == '*':
+                self.sub_bps.append(qr_i)
+                bp_miref_aln.append((qr_i,mr_i))
+                err_bps.append( (qr_i,mr_i,self.SUB) )
+                qr_i += 1
+                mr_i += 1
+
+            elif c == '-':
+                self.ins_bps.append(qr_i)
+                err_bps.append( (qr_i,mr_i,self.DEL) )
+                l = len(op[1])
+                mr_i += l
+
+            elif c == '+':
+                self.del_bps.append(qr_i)
+                err_bps.append( (qr_i,mr_i,self.INS) )
+
+                l = len(op[1])
+                qr_i += l
+
+            elif c == '~':
+                l = int(op[1][2:-2])
+                self.refgap_bps.append(qr_i)
+                mr_i += l
+
+            else:
+                print("UNIMPLEMENTED ", op)
+
+        self.bp_miref_aln = pd.DataFrame(bp_miref_aln, columns=["bp","miref"], dtype='Int64')
+        self.bp_miref_aln.set_index("bp", inplace=True)
+
+        #TODO type shouldn't have to be 64 bit
+        self.err_bps = pd.DataFrame(err_bps, columns=["bp","miref","type"], dtype='Int64')
+
+        return True        
+
+
+    def parse_cigar(self, paf):
+        cig = paf.tags.get('cg', (None,)*2)[0]
+        if cig is None: return False
+
+        bp_miref_aln = list()#defaultdict(list)
+        self.refgap_bps = list()
+
+        if self.seq_fwd:
+            qr_i = paf.qr_st
+            mr_i = self.ref_to_miref(paf.rf_st)
+        else:
+            qr_i = paf.qr_len - paf.qr_en 
+            mr_i = self.ref_to_miref(paf.rf_en)
+
+        #mr_i = self.miref_start
+        print(self.miref_start, self.clipped, "MIORR")
+        mr_bounds = range(self.miref_start, self.miref_end)
+
+        cig_ops = self.CIG_RE.findall(cig)
+
+        if paf.is_fwd != self.seq_fwd:
+            cig_ops = list(reversed(cig_ops))
+
+        for l,c in cig_ops:
+            l = int(l)
+            incr_qr = c in self.CIG_INCR_RD
+            incr_rf = c in self.CIG_INCR_RF
+            qr_j = qr_i + (l if incr_qr else 1)
+            mr_j = mr_i + (l if incr_rf else 1)
+
+            if c == "M":
+                for qr, mr in zip(range(qr_i, qr_j), range(mr_i, mr_j)):
+                    if mr in mr_bounds:
+                        bp_miref_aln.append((qr,mr))
+                #bp_miref_aln += zip(range(qr_i, qr_j), range(mr_i, mr_j))
+            elif c == "N":
+                if mr_i in mr_bounds:
+                    bp_miref_aln.append((qr_i,mr))
+
+            if incr_qr:
+                qr_i = qr_j 
+
+            if incr_rf:
+                mr_i = mr_j 
+
+        self.bp_miref_aln = pd.DataFrame(bp_miref_aln, columns=["bp","miref"], dtype='Int64')
+        self.bp_miref_aln.set_index("bp", inplace=True)
+
+        return True
+
+    def get_xy(self, i):
+        df = self.df.loc[i]
+        return (df['sample'], df['miref']-0.5)
+
+    def plot_scatter(self, ax, real_start=False, samp_min=None, samp_max=None):
+        if samp_min is None: samp_min = 0
+        if samp_max is None: samp_max = self.df['sample'].max()
+        i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
+
+        return ax.scatter(self.df['sample'][i], self.df['miref'][i], color='orange', zorder=2,s=20)
+
+    def plot_step(self, ax, real_start=False, samp_min=None, samp_max=None):
+        i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
+
+        ret = ax.step(self.df['sample'][i], self.df['miref'][i], color='orange', zorder=1, where='post')
+
+        if self.errs is not None:
+            for t in self.ERR_TYPES:
+                e = self.errs[self.errs['type'] == t]
+                ax.scatter(
+                    e['sample'], e['miref'], 
+                    color='red', zorder=3, 
+                    s=self.ERR_SIZES[t],
+                    linewidth=self.ERR_WIDTHS[t],
+                    marker=self.ERR_MARKS[t]
+                )
+
+        return ret
+
+    def ref_to_samp(self, ref):
+        return self.miref_to_samp(self.ref_to_miref(ref))
+        
+
+    def miref_to_samp(self, miref):
+        i = np.clip(self.df['miref'].searchsorted(miref), 0, len(self.df)-1)
+        return self.df['sample'][i]

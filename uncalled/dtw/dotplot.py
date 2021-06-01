@@ -61,12 +61,14 @@ def main(conf):
             )
 
 class Dotplot:
-    def __init__(self, dtw, out_prefix=None, cursor=None):
+    def __init__(self, index, dtw, out_prefix=None, cursor=None):
         self._init_plot()
 
-        self.ax_dot.set_ylabel("%s (%s)" % (dtw.bcaln.rf_name, "+" if dtw.bcaln.is_fwd else "-"), fontsize=12)
+        self.index = index
 
-        self.ax_dot.yaxis.set_major_formatter(FuncFormatter(dtw.bcaln.ref_tick_fmt))
+        self.ax_dot.set_ylabel("%s (%s)" % (dtw.bcaln.ref_name, "+" if dtw.bcaln.is_fwd else "-"), fontsize=12)
+
+        self.ax_dot.yaxis.set_major_formatter(FuncFormatter(self._tick_formatter))
         
         self.ax_sig.set_title(dtw.read.id)
 
@@ -93,6 +95,9 @@ class Dotplot:
         dtw.plot_dtw_events(self.ax_sig, self.ax_padiff)
 
         self.fig.tight_layout()
+
+    def _tick_formatter(self, x, pos):
+        return self.index.mirror_to_ref(int(x))
 
     def _init_plot(self):
         matplotlib.use("TkAgg")

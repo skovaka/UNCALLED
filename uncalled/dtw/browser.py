@@ -156,7 +156,7 @@ class RawBrowser:
             ref_bounds=mat.ref_bounds
         )
 
-        dpl = Dotplot(dtw, cursor=mat.ref_start + rf)
+        dpl = Dotplot(self.idx, dtw, cursor=mat.ref_start + rf)
         dpl.show()
 
 

@@ -142,6 +142,10 @@ class Config(_Conf):
             return self
 
         return getattr(self, group_name)
+    
+    @property
+    def is_rna(self):
+        return not self.read_buffer.seq_fwd
 
 class ArgParser:
 
@@ -205,7 +209,6 @@ class ArgParser:
             dest = opt.get_dest(self.config)
 
             if name in self.dests and self.dests[name] != dest:
-                print(self.dests[name], dest)
                 raise RuntimeError("Conflicting ArgParser dests with name \"%s\"" % arg.dest)
             self.dests[name] = dest
 
@@ -229,7 +232,6 @@ class ArgParser:
         fns =  getattr(args, "_fns", None)
         if fns is not None:
             for fn in fns:
-                print("calling", fn)
                 getattr(self.config, fn)()
 
         #TODO use functions with parameters for special opts
@@ -246,7 +248,6 @@ class ArgParser:
                     group = self.config
                     param = name
                 
-                print(name, value, group, param)
 
                 if value is not None or not hasattr(group, param):
                     setattr(group, param, value)

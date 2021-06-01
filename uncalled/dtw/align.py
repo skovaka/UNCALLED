@@ -12,7 +12,7 @@ from ..sigproc import ProcRead
 from _uncalled import PORE_MODELS, BwaIndex, DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 
 from .dotplot import Dotplot
-from . import Track, ref_coords
+from . import BcFast5Aln, ReadAln, Track, ref_coords
 
 #TODO make this better
 METHODS = {
@@ -57,8 +57,6 @@ def main(conf):
     conf.proc_read.detect_events = True
     conf.export_static()
 
-    print(type(conf.align.mm2_paf), conf.align.mm2_paf)
-
     mm2s = dict()
     if conf.align.mm2_paf is not None:
         for p in parse_paf(conf.align.mm2_paf):
@@ -76,26 +74,21 @@ def main(conf):
         track = None
 
     for read in fast5s:
-        bcaln = BcFast5Aln(read, mm2s.get(read.id, None))
-        if bcaln.empty:
-            continue
 
         t = time.time()
 
-        #TODO move to dotplot main
-        #if track is not None:
-        #    aln_file = track.aln_fname(read.id)
-        #else:
-        #    aln_file = None
+        if not read.id in mm2s:
+            continue
 
-        dtw = GuidedDTW(idx, read, bcaln, conf)
+        dtw = GuidedDTW(idx, read, mm2s[read.id], conf)
 
         if dtw.empty:
+            print("EMPTY DTW")
             continue
 
         print(read.id)
         if track is None:
-            dplt = Dotplot(dtw)
+            dplt = Dotplot(idx, dtw)
             dplt.show()
         else:
             save(dtw, track)
@@ -105,16 +98,18 @@ def main(conf):
 class GuidedDTW:
 
     #TODO do more in constructor using prms, not in main
-    def __init__(self, index, read, bcaln, conf=None, dtw_events=None, **kwargs):
+    def __init__(self, index, read, paf, conf=None, dtw_events=None, **kwargs):
         self.conf = read.conf if conf is None else conf
         self.prms = self.conf.align
 
-        #self.prms.set(**kwargs)
+        self.bcaln = BcFast5Aln(index, read, paf, self.conf.align.ref_bounds)
+        if self.bcaln.empty:
+            self.empty = True
+            return
 
-        t = time.time()
+        self.aln = ReadAln(index, paf, self.conf.is_rna)
 
         self.read = read
-        self.bcaln = bcaln
         self.idx = index
 
         self.method = self.prms.method
@@ -133,31 +128,27 @@ class GuidedDTW:
 
         self.model = PORE_MODELS[model_name]
 
-        self.ref_min = self.bcaln.rf_st
-        self.ref_max = self.bcaln.rf_en
+        self.ref_name = self.bcaln.ref_name
+        self.ref_min = self.bcaln.ref_start
+        self.ref_max = self.bcaln.ref_end
 
         #self.ref_min, self.ref_max = sorted(
         #        np.abs([self.bcaln.y_min, self.bcaln.y_max])
         #)
+        print(self.ref_min, self.ref_max, "REFS")
 
-        if self.prms.ref_bounds is None:
-            self.samp_min = self.bcaln.df['sample'].min()
-            self.samp_max = self.bcaln.df['sample'].max()
-        else:
-            self.ref_min = max(self.ref_min, self.prms.ref_bounds[1])
-            self.ref_max = min(self.ref_max, self.prms.ref_bounds[2])
+        #if self.prms.ref_bounds is None:
+        self.samp_min = self.bcaln.df['sample'].min()
+        self.samp_max = self.bcaln.df['sample'].max()
+        print(self.samp_min, self.samp_max)
+        #else:
+        #    self.samp_min = int(self.bcaln.ref_to_samp(self.ref_min))
+        #    self.samp_max = int(self.bcaln.ref_to_samp(self.ref_max))
+        #    if self.bcaln.flip_ref:
+        #        self.samp_min, self.samp_max = (self.samp_max, self.samp_min)
 
-            if self.ref_min >= self.ref_max:
-                self.empty = True
-                return
-
-
-            self.samp_min = int(bcaln.ref_to_samp(self.ref_min))
-            self.samp_max = int(bcaln.ref_to_samp(self.ref_max))
-            if bcaln.flip_ref:
-                self.samp_min, self.samp_max = (self.samp_max, self.samp_min)
-
-        self.load_kmers()
+        #self.load_kmers()
+        self.ref_kmers = self.aln.get_index_kmers(self.idx)
 
         if dtw_events is None:
             self.calc_dtw()
@@ -197,6 +188,13 @@ class GuidedDTW:
     def load_kmers(self):
 
         shift = nt.K - 1
+
+        pac_st, pac_en = self.idx.mirror_ref_coords(self.ref_name, self.ref_min, self.ref_max, self.bcaln.is_fwd, not self.bcaln.seq_fwd)
+        pac_st -= shift
+
+        kmers2 = self.idx.get_kmers(pac_st, pac_en, not self.bcaln.seq_fwd)
+        kmers3 = self.aln.get_index_kmers(self.idx)
+
         st = self.ref_min - (shift if not self.bcaln.flip_ref else 0)
         en = self.ref_max + (shift if self.bcaln.flip_ref else 0)
 
@@ -210,13 +208,22 @@ class GuidedDTW:
             self.bcaln.rf_name, st, en
         ))
 
+        def print_kmers(kmers):
+            print(
+                [nt.kmer_to_str(k) for k in kmers[:10]],
+                [nt.kmer_to_str(k) for k in kmers[-10:]],
+            )
+
         if self.bcaln.flip_ref:
             kmers = np.flip(nt.kmer_rev(kmers))
 
         if not self.bcaln.is_fwd:
             kmers = nt.kmer_comp(kmers)
 
-        self.ref_kmers = np.insert(kmers, 0, [0]*pad)
+        print_kmers(kmers)
+        print_kmers(kmers3)
+
+        #self.ref_kmers = np.insert(kmers, 0, [0]*pad)
 
 
     def get_dtw_args(self, read_block, ref_start, ref_kmers):
@@ -237,7 +244,7 @@ class GuidedDTW:
                 band_lls.append( (int(q+shift), int(r-shift)) )
 
                 tgt = starts[q] if q < len(starts) else starts[-1]
-                if r <= self.bcaln.df.loc[tgt,'ref'] - ref_start:
+                if r <= self.bcaln.df.loc[tgt,'miref'] - ref_start:
                     r += 1
                 else:
                     q += 1
@@ -279,11 +286,13 @@ class GuidedDTW:
         path_refs = list()
 
         band_blocks = list()
+        print(self.samp_min, self.samp_max)
 
         block_min = self.bcaln.df['sample'].searchsorted(self.samp_min)
         block_max = self.bcaln.df['sample'].searchsorted(self.samp_max)
 
-        y_min = self.bcaln.df['ref'][block_min]
+        y_min = self.aln.miref_start
+        print(block_min, y_min, self.ref_min, )
 
         block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
         block_ends   = np.append(self.bcaln.ref_gaps, block_max)
@@ -291,12 +300,14 @@ class GuidedDTW:
         #TODO make this actually do something for spliced RNA
         for st, en in [(block_min, block_max)]:
         #for st, en in zip(block_starts, block_ends):
+            print(st,en)
+            sys.stdout.flush()
 
             samp_st = self.bcaln.df.loc[st,'sample']
             samp_en = self.bcaln.df.loc[en-1,'sample']
 
-            ref_st = self.bcaln.df.loc[st,"ref"]
-            ref_en = self.bcaln.df.loc[en-1,"ref"]
+            ref_st = self.bcaln.df.loc[st,"miref"]
+            ref_en = self.bcaln.df.loc[en-1,"miref"]
 
             read_block = self.read.sample_range(samp_st, samp_en)
 
@@ -436,252 +447,6 @@ def save(dtw, track):
 
     track.add_read(dtw.read.id, dtw.read.f5.filename, events_out)
 
-#TODO move to its own module? extend ReadAln
-class BcFast5Aln:
-    BCE_K = 4
-    CIG_OPS_STR = "MIDNSHP=X"
-    CIG_RE = re.compile("(\d+)(["+CIG_OPS_STR+"])")
-    CIG_OPS = set(CIG_OPS_STR)
-    CIG_INCR_ALL = {'M','=', 'X'}
-    CIG_INCR_RD = CIG_INCR_ALL | {'I','S'}
-    CIG_INCR_RF = CIG_INCR_ALL | {'D','N'}
-
-    SUB = 0
-    INS = 1
-    DEL = 2
-    ERR_TYPES = [SUB, INS, DEL]
-    ERR_MARKS = ['o', 'P', '_']
-    ERR_SIZES = [100, 150, 150]
-    ERR_WIDTHS = [0,0,5]
-
-    def __init__(self, read, paf):
-        self.seq_fwd = read.conf.read_buffer.seq_fwd
-
-        self.refgap_bps = list()
-        self.sub_bps = list()
-        self.ins_bps = list()
-        self.del_bps = list()
-        self.err_bps = None
-
-        self.empty = (
-                paf is None or 
-                not read.f5.bc_loaded or 
-                (not self.parse_cs(paf) and
-                 not self.parse_cigar(paf))
-        )
-        if self.empty: return
-
-        self.rf_name = paf.rf_name
-        self.rf_st = paf.rf_st
-        self.rf_en = paf.rf_en
-        self.is_fwd = paf.is_fwd
-
-        #TODO make c++ build this 
-        moves = np.array(read.f5.moves, bool)
-        bce_qrs = np.cumsum(read.f5.moves)
-        bce_samps = read.f5.template_start + np.arange(len(bce_qrs)) * read.f5.bce_stride
-
-        samp_bps = pd.DataFrame({
-            'sample' : bce_samps,#[moves],
-            'bp'     : np.cumsum(read.f5.moves),#[moves],
-        })
-
-        self.df = samp_bps.join(self.bp_rf_aln, on='bp').dropna()
-        self.df.reset_index(inplace=True, drop=True)
-
-        #Make sure ref starts at 0
-        self.df['ref'] -= self.df['ref'].min()
-        
-        if self.err_bps is not None:
-            self.errs = samp_bps.join(self.err_bps.set_index('bp'), on='bp').dropna()
-            self.errs.reset_index(inplace=True, drop=True)
-        else:
-            self.errs = None
-
-        self.ref_gaps = self.df[self.df['bp'].isin(self.refgap_bps)].index
-
-        self.subs = self.df[self.df['bp'].isin(self.sub_bps)].index
-        self.inss = self.df[self.df['bp'].isin(self.ins_bps)].index
-        self.dels = self.df[self.df['bp'].isin(self.del_bps)].index
-
-        #print((self.bce_samps == self.df[self.df['ref'] == self.bce_refs]['sample']).all())
-        #self.rfgap_bces = self.bce_refs[self.bce_bps == 
-
-        self.empty = len(self.df) == 0
-        if self.empty: return
-
-        self.flip_ref = paf.is_fwd != self.seq_fwd
-        if self.flip_ref:
-            rf_st = paf.rf_en - self.df['ref'].max() - 1
-            rf_en = paf.rf_en
-        else:
-            rf_st = paf.rf_st 
-            rf_en = paf.rf_st + self.df['ref'].max() + 1
-
-        self.ref_bounds = (
-            paf.rf_name,
-            rf_st,
-            rf_en,
-            paf.is_fwd
-        )
-
-        self.y_min = -paf.rf_en if self.flip_ref else paf.rf_st
-        self.y_max = self.y_min + self.df['ref'].max()
-
-    def ref_tick_fmt(self, ref, pos=None):
-        return int(np.round(np.abs(self.y_min + ref)))
-
-    def parse_cs(self, paf):
-        cs = paf.tags.get('cs', (None,)*2)[0]
-        if cs is None: return False
-
-        sys.stderr.write("Loading cs tag\n")
-
-        #TODO rename to general cig/cs
-        bp_rf_aln = list()
-        err_bps = list()
-
-        if self.seq_fwd:
-            qr_i = paf.qr_st
-            #rf_i = paf.rf_st
-        else:
-            qr_i = paf.qr_len - paf.qr_en 
-            #rf_i = -paf.rf_en+1
-        rf_i = 0
-
-        cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
-
-        if paf.is_fwd != self.seq_fwd:
-            cs_ops = reversed(cs_ops)
-
-        for op in cs_ops:
-            c = op[0]
-            if c in {'=',':'}:
-                l = len(op[1]) if c == '=' else int(op[1])
-                bp_rf_aln += zip(range(qr_i, qr_i+l), range(rf_i, rf_i+l))
-                qr_i += l
-                rf_i += l
-
-            elif c == '*':
-                self.sub_bps.append(qr_i)
-                bp_rf_aln.append((qr_i,rf_i))
-                err_bps.append( (qr_i,rf_i,self.SUB) )
-                qr_i += 1
-                rf_i += 1
-
-            elif c == '-':
-                self.ins_bps.append(qr_i)
-                err_bps.append( (qr_i,rf_i,self.DEL) )
-                l = len(op[1])
-                rf_i += l
-
-            elif c == '+':
-                self.del_bps.append(qr_i)
-                err_bps.append( (qr_i,rf_i,self.INS) )
-
-                l = len(op[1])
-                qr_i += l
-
-            elif c == '~':
-                l = int(op[1][2:-2])
-                self.refgap_bps.append(qr_i)
-                rf_i += l
-
-            else:
-                print("UNIMPLEMENTED ", op)
-
-        self.bp_rf_aln = pd.DataFrame(bp_rf_aln, columns=["bp","ref"], dtype='Int64')
-        self.bp_rf_aln.set_index("bp", inplace=True)
-        #TODO type shouldn't have to be 64 bit
-        self.err_bps = pd.DataFrame(err_bps, columns=["bp","ref","type"], dtype='Int64')
-
-        return True        
-
-
-    def parse_cigar(self, paf):
-        cig = paf.tags.get('cg', (None,)*2)[0]
-        if cig is None: return False
-
-        bp_rf_aln = list()#defaultdict(list)
-        self.refgap_bps = list()
-
-        if self.seq_fwd:
-            qr_i = paf.qr_st
-            #rf_i = paf.rf_st
-        else:
-            qr_i = paf.qr_len - paf.qr_en 
-            #rf_i = -paf.rf_en+1
-
-        rf_i = 0
-
-        cig_ops = self.CIG_RE.findall(cig)
-
-        if paf.is_fwd != self.seq_fwd:
-            cig_ops = list(reversed(cig_ops))
-
-        for l,c in cig_ops:
-            l = int(l)
-            incr_qr = c in self.CIG_INCR_RD
-            incr_rf = c in self.CIG_INCR_RF
-            qr_j = qr_i + (l if incr_qr else 1)
-            rf_j = rf_i + (l if incr_rf else 1)
-
-            if c == "M":
-                bp_rf_aln += zip(range(qr_i, qr_j), range(rf_i, rf_j))
-            elif c == "N":
-                self.refgap_bps.append(qr_i)
-
-            if incr_qr:
-                qr_i = qr_j 
-
-            if incr_rf:
-                rf_i = rf_j 
-
-        self.bp_rf_aln = pd.DataFrame(bp_rf_aln, columns=["bp","ref"], dtype='Int64')
-        self.bp_rf_aln.set_index("bp", inplace=True)
-
-        return True
-
-    def get_xy(self, i):
-        df = self.df.loc[i]
-        return (df['sample'], df['ref']-0.5)
-
-    def plot_scatter(self, ax, real_start=False, samp_min=None, samp_max=None):
-        if samp_min is None: samp_min = 0
-        if samp_max is None: samp_max = self.df['sample'].max()
-        i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
-
-        return ax.scatter(self.df['sample'][i], self.df['ref'][i], color='orange', zorder=2,s=20)
-
-    def plot_step(self, ax, real_start=False, samp_min=None, samp_max=None):
-        i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
-
-        ret = ax.step(self.df['sample'][i], self.df['ref'][i], color='orange', zorder=1, where='post')
-
-        if self.errs is not None:
-            for t in self.ERR_TYPES:
-                e = self.errs[self.errs['type'] == t]
-                ax.scatter(
-                    e['sample'], e['ref'], 
-                    color='red', zorder=3, 
-                    s=self.ERR_SIZES[t],
-                    linewidth=self.ERR_WIDTHS[t],
-                    marker=self.ERR_MARKS[t]
-                )
-
-        return ret
-
-    def samp_to_ref(self, samp):
-        if self.flip_ref: ref = -ref
-        ref = ref - self.y_min
-        i = np.clip(self.df['ref'].searchsorted(ref), 0, len(self.df)-1)
-        return self.df['sample'][i]
-
-    def ref_to_samp(self, ref):
-        if self.flip_ref: ref = -ref
-        ref = ref - self.y_min
-        i = np.clip(self.df['ref'].searchsorted(ref), 0, len(self.df)-1)
-        return self.df['sample'][i]
 
 class Fast5Processor(Fast5Reader):
     def __next__(self):
