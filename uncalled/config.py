@@ -47,6 +47,8 @@ def param_valid(name, val):
 Param = namedtuple("Param", ["name", "default", "type", "doc"])
 class ParamGroup:
     _types = dict()
+    _name = None
+
     def __init__(self):
         self._values = dict()
 
@@ -67,6 +69,8 @@ class ParamGroup:
             if type(p) != Param:
                 p = Param._make(p)
             _class._def_param_property(p)
+
+        Config._EXTRA_GROUPS[_class._name] = _class 
 
     @classmethod
     #def _prm(_class, name, default, type, docstr):

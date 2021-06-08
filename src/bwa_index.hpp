@@ -260,38 +260,50 @@ class BwaIndex {
         return bns_->anns[rid].offset;
     }
 
-    std::pair<u64, u64> mirror_ref_coords(const std::string &ref_name, u64 st, u64 en, bool fwd, bool is_rna) {
+    bool pacseq_loaded() const {
+        return pacseq_ != NULL;
+    }
+
+    std::pair<u64, u64> ref_to_miref(const std::string &ref_name, u64 st, u64 en, bool is_fwd, bool is_rna) {
         auto shift = get_pac_shift(ref_name);
 
         u64 pac_st = shift+st, pac_en = shift+en;
 
-        auto flip = fwd == is_rna;
+        auto flip = is_fwd == is_rna;
 
         if (!flip) return {pac_st, pac_en};
         return {size() - pac_en, size() - pac_st};
     }
 
-    bool pacseq_loaded() const {
-        return pacseq_ != NULL;
+    u64 ref_to_miref(i32 rid, u64 ref_coord, bool is_fwd, bool is_rna) {
+        auto shift = bns_->anns[rid].offset;
+        auto pac_coord = shift+ref_coord;
+        auto flip = is_fwd == is_rna;
+
+        if (!flip) return pac_coord;
+        return size() - pac_coord;
     }
 
     //std::vector<u16> get_kmers(const std::string &nm, u64 st, u64 en, bool fwd, bool is_rna) {
     //    auto mirs = mirror_ref_coords(nm,st,en,fwd,is_rna);
     //    return get_kmers(mirs.first, mirs.second);
 
+
+    u64 miref_to_ref(u64 mirror_coord) {
+        i64 pac;
+        if (mirror_coord >= size() / 2) {
+            pac = size() - mirror_coord;
+        } else {
+            pac = mirror_coord;
+        }
+        i32 rid = bns_pos2rid(bns_, pac);
+        return pac - bns_->anns[rid].offset;
+    }
+
     std::vector<u16> get_kmers(const std::string &nm, u64 st, u64 en) {
         u64 pac_st = ref_to_pachalf(nm, st),
             pac_en = ref_to_pachalf(nm, en);
         return seq_to_kmers<KLEN>(pacseq_, pac_st, pac_en);
-    }
-
-    u64 mirror_to_ref(u64 mirror_coord) {
-        i64 pac = mirror_coord;
-        if (pac >= size() / 2) {
-            pac = size() - pac;
-        }
-        i32 rid = bns_pos2rid(bns_, pac);
-        return pac - bns_->anns[rid].offset;
     }
 
     std::vector<kmer_t> get_kmers(u64 mir_st, u64 mir_en, bool is_rna) {
@@ -481,8 +493,9 @@ class BwaIndex {
         c.def("get_ref_id", static_cast<i32 (BwaIndex::*)(u64)> (&BwaIndex::get_ref_id) );
         c.def("get_ref_id", static_cast<i32 (BwaIndex::*)(const std::string &)> (&BwaIndex::get_ref_id));
         //c.def("get_kmers_new", &BwaIndex::get_kmers_new);
-        PY_BWA_INDEX_METH(mirror_ref_coords);
-        c.def("mirror_to_ref", pybind11::vectorize(&BwaIndex::mirror_to_ref));
+        c.def("ref_to_miref", static_cast<std::pair<u64,u64> (BwaIndex::*)(const std::string &, u64, u64, bool, bool)> (&BwaIndex::ref_to_miref));
+        c.def("ref_to_miref", pybind11::vectorize(static_cast<u64 (BwaIndex::*)(i32, u64, bool, bool)> (&BwaIndex::ref_to_miref)));
+        c.def("miref_to_ref", pybind11::vectorize(&BwaIndex::miref_to_ref));
         //c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(u64, u64)> (&BwaIndex::get_kmers) );
         c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(const std::string &, u64, u64)> (&BwaIndex::get_kmers) );
         c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(u64, u64, bool)> (&BwaIndex::get_kmers) );

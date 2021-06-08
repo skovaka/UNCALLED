@@ -26,13 +26,14 @@ from _uncalled import BwaIndex, nt
 CMAP = "viridis"
 #CMAP = "plasma"
 
-class BrowserParams(ParamGroup): pass
+class BrowserParams(ParamGroup):
+    _name = "browser"
+
 BrowserParams._def_params(
     ("track_a", None, str, "Path to directory where alignments are stored"),
     ("track_b", None, str, "Path to directory where alignments are stored"),
     ("full_overlap", None, bool, "If true will only include reads which fully cover reference bounds")
 )
-Config._EXTRA_GROUPS["browser"] = BrowserParams #TODO put in ParamGroup con
 
 #BWA_OPTS + 
 OPTS = (
@@ -43,7 +44,6 @@ OPTS = (
     Opt(("-f", "--full-overlap"), "browser", action="store_true"),
     Opt(("-s", "--seqsum"), type=str, default=None),
     Opt(("-n", "--max-reads"), "fast5_reader"),
-
 )
 
 def main(conf):
@@ -140,23 +140,30 @@ class RawBrowser:
     def plot_dotplot(self, event):
         mat_i,rf,rd = self.cursor
         mat = self.track_mats[mat_i]
+        track = mat.track
 
         read = mat.reads.iloc[rd]
 
         fast5_read = self.fast5s[read.id]
         proc_read = ProcRead(fast5_read, conf=self.conf)
-        bcaln = BcFast5Aln(proc_read, mat.mm2s[read.id])
+
+        aln = track.get_aln(read.id)
+        bcaln = BcFast5Aln(aln.index, proc_read, track.mm2s[read.id])
+
+        #bcaln = BcFast5Aln(proc_read, mat.mm2s[read.id])
 
         #TODO shouldn't need GuidedDTW, just read_aln
-        dtw = GuidedDTW(
-            self.idx, 
-            proc_read, 
-            bcaln, 
-            dtw_events=mat.track.aln_fname(read.id),
-            ref_bounds=mat.ref_bounds
-        )
+        #dtw = GuidedDTW(
+        #    self.idx, 
+        #    proc_read, 
+        #    bcaln, 
+        #    dtw_events=mat.track.aln_fname(read.id),
+        #    ref_bounds=mat.ref_bounds
+        #)
 
-        dpl = Dotplot(self.idx, dtw, cursor=mat.ref_start + rf)
+        dpl = Dotplot(aln.index, proc_read, conf=self.conf)
+        dpl.add_aln(bcaln, False)
+        dpl.add_aln(aln, True)
         dpl.show()
 
 
@@ -243,6 +250,8 @@ class RawBrowser:
     def set_info(self, mat, rf, rd):
 
         read = mat.reads.iloc[rd]
+
+        print(read['id'])
 
         kmer,diff,dwell,pa = mat[:,rd,rf]
 

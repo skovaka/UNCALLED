@@ -31,7 +31,8 @@ from bisect import bisect_left, bisect_right
 from typing import NamedTuple
 
 #Index parameter group
-class IndexParams(unc.config.ParamGroup): pass
+class IndexParams(unc.config.ParamGroup):
+    _name = "index"
 IndexParams._def_params(
     ("fasta_filename", None, str, "FASTA file to index"),
     ("index_prefix", None, str, "Index output prefix. Will use input fasta filename by default"),
@@ -47,7 +48,7 @@ IndexParams._def_params(
     ("speeds", None, str, "Find parameters with specified speed coefficents (comma separated)"),
 )
 #TODO do this from config. need to restructure dependencies
-unc.Config._EXTRA_GROUPS["index"] = IndexParams
+#unc.Config._EXTRA_GROUPS["index"] = IndexParams
 
 Opt = unc.config.Opt
 BWA_OPTS = (

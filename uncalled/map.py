@@ -48,11 +48,11 @@ MAPPER_OPTS = (
 
 OPTS = BWA_OPTS + FAST5_OPTS + MAPPER_OPTS
 
-def main(config):
+def main(conf):
     """Map fast5 files to a DNA reference"""
-    check_prefix(config.bwa_prefix)
+    check_prefix(conf.bwa_prefix)
 
-    mapper = MapPoolOrd(config)
+    mapper = MapPoolOrd(conf)
     
     sys.stderr.write("Loading fast5s\n")
     sys.stderr.flush()

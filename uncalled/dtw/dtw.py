@@ -12,19 +12,56 @@ import pandas as pd
 
 from ..pafstats import parse_paf, PafEntry
 from ..config import Config
-from _uncalled import PORE_MODELS
+from _uncalled import PORE_MODELS, BwaIndex
+
+
 
 class ReadAln:
 
-    def __init__(self, index, aln, is_rna=False, ref_bounds=None):
-        if type(aln) != PafEntry:
+    MIREF_COL  = "miref"
+    REF_COL    = "ref"
+    START_COL  = "start"
+    LENGTH_COL = "length"
+    MEAN_COL   = "mean"
+    KMER_COL   = "kmer"
+
+    def __init__(self, index, aln, df=None, is_rna=False, ref_bounds=None):
+        if not isinstance(aln, PafEntry):
             raise RuntimeError("ReadAlns can only be initialized from PafEntrys currently")
 
         self.index = index
+        self.read_id = aln.qr_name
         self.is_rna = is_rna
 
         self.clipped = False
+    
+        self.set_ref_bounds(aln, ref_bounds)
 
+        if self.empty: 
+            return
+
+        self._init_mirror_coords()
+
+        if df is not None:
+            self.df = df[(df.index >= self.ref_start) & (df.index <= self.ref_end)]
+
+            has_ref = self.df.index.name == self.REF_COL
+            has_miref = self.MIREF_COL in self.df.columns
+
+            #TODO check for required columns
+            if not has_ref and not has_miref:
+                raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % (self.REF_COL, self.MIREF_COL))
+            
+            if has_ref and not has_miref:
+                self.df[self.MIREF_COL] = self.index.ref_to_miref(self.ref_id, self.df.index, self.is_fwd, self.is_rna)
+
+            elif not has_ref and has_miref:
+                self.df[REF_COL] = self.index.mirref_to_ref(self.df[MIREF_COL])
+
+            self.df.sort_values("miref", inplace=True)
+        
+
+    def set_ref_bounds(self, aln, ref_bounds):
         if ref_bounds is None:
             self.ref_bounds = (aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
         else:
@@ -46,19 +83,27 @@ class ReadAln:
 
             self.ref_bounds = (aln.rf_name, ref_st, ref_en, aln.is_fwd)
 
-        self._init_mirror_coords()
+        self.ref_id = self.index.get_ref_id(self.ref_name)
 
         self.empty = False
 
+    #TODO ReadAln stores RefCoords, handles all this conversion?
+
     def miref_to_ref(self, miref):
-        return index.mirror_to_ref(miref) 
+        return self.index.miref_to_ref(miref) 
 
     def ref_to_miref(self, ref):
-        return self.index.mirror_ref_coords(self.ref_name, ref, ref, self.is_fwd, self.is_rna)[0]
+        return self.index.ref_to_miref(self.ref_name, ref, ref, self.is_fwd, self.is_rna)[0]
+
+    def ref_to_samp(self, ref):
+        return self.miref_to_samp(self.ref_to_miref(ref))
+        
+    def miref_to_samp(self, miref):
+        i = np.clip(self.df['miref'].searchsorted(miref), 0, len(self.df)-1)
+        return self.df['sample'][i]
 
     def _init_mirror_coords(self):
-        self.miref_start, self.miref_end = self.index.mirror_ref_coords(*self.ref_bounds, self.is_rna)
-
+        self.miref_start, self.miref_end = self.index.ref_to_miref(*self.ref_bounds, self.is_rna)
 
     @property
     def ref_name(self):
@@ -79,6 +124,40 @@ class ReadAln:
     def is_fwd(self):
         return self.ref_bounds[3]
 
+    def get_samp_bounds(self):
+        samp_min = self.df['start'].min()
+        max_i = self.df['start'].argmax()
+        samp_max = self.df['start'].iloc[max_i] + self.df['length'].iloc[max_i]
+        return samp_min, samp_max
+    
+    #def set_bands(self, bands):
+
+    def set_subevent_aln(self, aln, ref_mirrored=False, kmer_str=False, ref_col=MIREF_COL, start_col=START_COL, length_col=LENGTH_COL, mean_col=MEAN_COL, kmer_col=KMER_COL):
+
+        aln["cuml_mean"] = aln[length_col] * aln[mean_col]
+
+        grp = aln.groupby(ref_col)
+
+        if kmer_str:
+            kmers = [nt.kmer_rev(nt.str_to_kmer(k,0)) for k in grp[kmer_col].first()]
+        else:
+            kmers = grp[kmer_col].first()
+
+        mirefs = grp[ref_col].first()
+        refs = self.miref_to_ref(mirefs)
+
+        lengths = grp[length_col].sum()
+
+        self.df = pd.DataFrame({
+            self.REF_COL    : refs,
+            self.MIREF_COL  : mirefs,
+            self.KMER_COL   : kmers,
+            self.START_COL  : grp[start_col].min(),
+            self.LENGTH_COL : lengths,
+            self.MEAN_COL   : grp["cuml_mean"].sum() / lengths
+        }).set_index(self.REF_COL).sort_values(self.MIREF_COL)
+        
+
     def get_index_kmers(self, index, kmer_shift=4):
         """Returns the k-mer sequence at the alignment reference coordinates"""
         start = self.miref_start - kmer_shift
@@ -92,7 +171,6 @@ class ReadAln:
         kmers = index.get_kmers(start, self.miref_end, self.is_rna)
 
         return np.insert(kmers, 0, [0]*lpad)
-
     
 class Track:
     CONF_FNAME = "conf.toml"
@@ -111,30 +189,47 @@ class Track:
     READ_MODE = "r"
     MODES = {WRITE_MODE, READ_MODE}
 
-    def __init__(self, path, mode="r", conf=None, overwrite=False):
+    def __init__(self, path, mode="r", conf=None, overwrite=False, index=None, mm2s=None):
         self.path = path.strip("/")
         self.mode = mode
+        self.index = index
 
         self.conf = conf if conf is not None else Config()
 
         if mode == self.WRITE_MODE:
             os.makedirs(self.aln_dir, exist_ok=overwrite)
 
-        self.index_file = open(self.index_filename, mode)
+        self.fname_mapping_file = open(self.fname_mapping_filename, mode)
 
         if mode == self.READ_MODE:
             self.conf.load_toml(self.config_filename)
-            self.conf.fast5_reader.fast5_index = self.index_filename
+            self.conf.fast5_reader.fast5_index = self.fname_mapping_filename
             self._load_index()
             #self._load_reads()
 
         elif mode == self.WRITE_MODE:
             self.conf.to_toml(self.config_filename)
-            self.index_file.write(self.INDEX_HEADER + "\n")
+            self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
+
+
+        #TODO arguments overload conf params
+        if conf.align.mm2_paf is not None:
+            ref_bounds = conf.align.ref_bounds
+            read_filter = set(conf.fast5_reader.read_filter)
+            self.mm2s = {p.qr_name : p
+                     for p in parse_paf(
+                        conf.align.mm2_paf,
+                        #ref_bounds,
+                        #read_filter=read_filter
+            )}
+
+        #TODO static bwa_index parameters?
+        if len(conf.mapper.bwa_prefix) > 0:
+            self.index = BwaIndex(conf.mapper.bwa_prefix, True)
 
     @property
     def read_ids(self):
-        return list(self.index.index)
+        return list(self.fname_mapping.index)
 
     def add_read(self, read_id, fast5_fname, rae_df):
         if self.mode != "w":
@@ -143,25 +238,26 @@ class Track:
         aln_fname = self.aln_fname(read_id)
         rae_df.to_pickle(aln_fname)
 
-        self.index_file.write("\t".join([read_id, fast5_fname, aln_fname]) + "\n")
+        self.fname_mapping_file.write("\t".join([read_id, fast5_fname, aln_fname]) + "\n")
 
     def _load_index(self):
-        self.index = pd.read_csv(self.index_file, sep="\t", index_col="read_id")
+        self.fname_mapping = pd.read_csv(self.fname_mapping_file, sep="\t", index_col="read_id")
 
     def get_aln(self, read_id, ref_bounds=None):
-        aln = pd.read_pickle(self.aln_fname(read_id))
-
-        if ref_bounds is not None:
-            _,st,en = ref_bounds[:3]
-            return aln[st:en]
-        return aln
+        mm2 = self.mm2s[read_id]
+        df = pd.read_pickle(self.aln_fname(read_id))
+        return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd)
+        #if ref_bounds is not None:
+        #    _,st,en = ref_bounds[:3]
+        #    return aln[st:en]
+        #return aln
 
     def get_matrix(self, ref_bounds, mm2_paf=None, partial_overlap=False):
 
         if mm2_paf is None:
             mm2_paf = self.conf.align.mm2_paf
 
-        read_filter = set(self.index.index)
+        read_filter = set(self.fname_mapping.index)
         mm2s = {p.qr_name : p
                  for p in parse_paf(
                     mm2_paf,
@@ -172,7 +268,7 @@ class Track:
 
         mat = TrackMatrix(self, ref_bounds, mm2s, conf=self.conf)
 
-        for read_id,read in self.index.iterrows():
+        for read_id,read in self.fname_mapping.iterrows():
             mm2 = mm2s.get(read_id, None)
             if mm2 is None: continue
             df = pd.read_pickle(read["aln_file"])
@@ -183,19 +279,23 @@ class Track:
         return mat
 
     def close(self):
-        self.index_file.close()
+        self.fname_mapping_file.close()
 
     @property
     def config_filename(self):
         return os.path.join(self.path, self.CONF_FNAME)
 
     @property
-    def index_filename(self):
+    def fname_mapping_filename(self):
         return os.path.join(self.path, self.INDEX_FNAME)
     
     @property
     def aln_dir(self):
         return os.path.join(self.path, self.ALN_DIR)
+    
+    @property
+    def read_count(self):
+        return len(self.fname_mapping)
     
     def aln_fname(self, read_id):
         return os.path.join(self.aln_dir, read_id+self.ALN_SUFFIX)
@@ -325,7 +425,6 @@ class TrackMatrix:
         return self.ref_bounds[2]
 
 def ref_coords(coord_str):
-    print("COORD", coord_str)
     spl = coord_str.split(":")
     ch = spl[0]
     st,en = spl[1].split("-")
@@ -355,8 +454,9 @@ class BcFast5Aln(ReadAln):
     ERR_WIDTHS = [0,0,5]
 
     def __init__(self, index, read, paf, ref_bounds=None):
-        self.seq_fwd = read.conf.read_buffer.seq_fwd
-        ReadAln.__init__(self, index, paf, not self.seq_fwd, ref_bounds=ref_bounds)
+        self.seq_fwd = read.conf.read_buffer.seq_fwd #TODO just store is_rna
+        ReadAln.__init__(self, index, paf, is_rna=not self.seq_fwd, ref_bounds=ref_bounds)
+        if self.empty: return
 
         self.refgap_bps = list()
         self.sub_bps = list()
@@ -364,13 +464,15 @@ class BcFast5Aln(ReadAln):
         self.del_bps = list()
         self.err_bps = None
 
+        self.flip_ref = paf.is_fwd != self.seq_fwd
+
         self.empty = (
-                paf is None or 
                 not read.f5.bc_loaded or 
                 (not self.parse_cs(paf) and
                  not self.parse_cigar(paf))
         )
-        if self.empty: return
+        if self.empty: 
+            return
 
         #TODO make c++ build this 
         moves = np.array(read.f5.moves, bool)
@@ -398,29 +500,11 @@ class BcFast5Aln(ReadAln):
         self.dels = self.df[self.df['bp'].isin(self.del_bps)].index
 
         self.empty = len(self.df) == 0
-        if self.empty: return
-
-        self.flip_ref = paf.is_fwd != self.seq_fwd
-
-        #if self.flip_ref:
-        #    ref_st = paf.rf_en - self.df['miref'].max() - 1
-        #    ref_en = paf.rf_en
-        #else:
-        #    ref_st = paf.rf_st 
-        #    ref_en = paf.rf_st + self.df['miref'].max() + 1
-
-        #self.ref_bounds = (
-        #    paf.rf_name,
-        #    ref_st,
-        #    ref_en,
-        #    paf.is_fwd
-        #)
+        if self.empty: 
+            return
 
         self.y_min = -paf.rf_en if self.flip_ref else paf.rf_st
         self.y_max = self.y_min + self.df['miref'].max()
-
-    def ref_tick_fmt(self, ref, pos=None):
-        return int(np.round(np.abs(self.y_min + ref)))
 
     def parse_cs(self, paf):
         cs = paf.tags.get('cs', (None,)*2)[0]
@@ -439,7 +523,6 @@ class BcFast5Aln(ReadAln):
             qr_i = paf.qr_len - paf.qr_en 
             #rf_i = -paf.rf_en+1
 
-        print(self.miref_start, self.clipped, "MIORR")
         mr_i = self.miref_start
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
@@ -499,15 +582,17 @@ class BcFast5Aln(ReadAln):
         bp_miref_aln = list()#defaultdict(list)
         self.refgap_bps = list()
 
+        #mr_i = self.miref_start
         if self.seq_fwd:
             qr_i = paf.qr_st
-            mr_i = self.ref_to_miref(paf.rf_st)
         else:
             qr_i = paf.qr_len - paf.qr_en 
-            mr_i = self.ref_to_miref(paf.rf_en)
 
-        #mr_i = self.miref_start
-        print(self.miref_start, self.clipped, "MIORR")
+        if self.flip_ref:
+            mr_i = self.ref_to_miref(paf.rf_en)
+        else:
+            mr_i = self.ref_to_miref(paf.rf_st)
+
         mr_bounds = range(self.miref_start, self.miref_end)
 
         cig_ops = self.CIG_RE.findall(cig)
@@ -571,10 +656,3 @@ class BcFast5Aln(ReadAln):
 
         return ret
 
-    def ref_to_samp(self, ref):
-        return self.miref_to_samp(self.ref_to_miref(ref))
-        
-
-    def miref_to_samp(self, miref):
-        i = np.clip(self.df['miref'].searchsorted(miref), 0, len(self.df)-1)
-        return self.df['sample'][i]

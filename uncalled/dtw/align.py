@@ -22,7 +22,9 @@ METHODS = {
     "GuidedBDTW" : BandedDTW
 }
 
-class AlignParams(ParamGroup): pass
+class AlignParams(ParamGroup):
+    _name = "align"
+
 AlignParams._def_params(
     ("method", "DTWd", str, "DTW method"),
     ("band_width", 100, int, "DTW band width (only applies to BDTW)"),
@@ -31,7 +33,6 @@ AlignParams._def_params(
     ("mm2_paf", None, str, "Path to minimap2 alignments of basecalled reads in PAF format. Used to determine where each should be aligned. Should include cigar string."),
     ("out_path", None, str, "Path to directory where alignments will be stored. If not specified will display interactive dotplot for each read."),
 )
-Config._EXTRA_GROUPS["align"] = AlignParams #TODO put in ParamGroup con
 
 OPTS = BWA_OPTS + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "align", required=True),
@@ -83,17 +84,16 @@ def main(conf):
         dtw = GuidedDTW(idx, read, mm2s[read.id], conf)
 
         if dtw.empty:
-            print("EMPTY DTW")
             continue
 
         print(read.id)
         if track is None:
-            dplt = Dotplot(idx, dtw)
+            dplt = Dotplot(idx, read, conf=conf)
+            dplt.add_aln(dtw.bcaln, False)
+            dplt.add_aln(dtw.aln, True)
             dplt.show()
         else:
             save(dtw, track)
-
-            #TODO add progressbar
 
 class GuidedDTW:
 
@@ -107,7 +107,7 @@ class GuidedDTW:
             self.empty = True
             return
 
-        self.aln = ReadAln(index, paf, self.conf.is_rna)
+        self.aln = ReadAln(index, paf, is_rna=self.conf.is_rna)
 
         self.read = read
         self.idx = index
@@ -135,12 +135,10 @@ class GuidedDTW:
         #self.ref_min, self.ref_max = sorted(
         #        np.abs([self.bcaln.y_min, self.bcaln.y_max])
         #)
-        print(self.ref_min, self.ref_max, "REFS")
 
         #if self.prms.ref_bounds is None:
         self.samp_min = self.bcaln.df['sample'].min()
         self.samp_max = self.bcaln.df['sample'].max()
-        print(self.samp_min, self.samp_max)
         #else:
         #    self.samp_min = int(self.bcaln.ref_to_samp(self.ref_min))
         #    self.samp_max = int(self.bcaln.ref_to_samp(self.ref_max))
@@ -152,7 +150,7 @@ class GuidedDTW:
 
         if dtw_events is None:
             self.calc_dtw()
-            self.calc_events()
+            #self.calc_events()
         else:
             self.load_dtw_events(dtw_events)
 
@@ -162,15 +160,15 @@ class GuidedDTW:
     def calc_events(self):
 
         if self.read.has_events:
-            self.dtw['sum'] = self.dtw['signal'] * self.dtw['length']
+            self.aln.df['sum'] = self.aln.df['signal'] * self.aln.df['length']
 
-        grp = self.dtw.groupby("ref")
+        grp = self.aln.df.groupby("miref")
         sigs = grp['signal']
 
-        ref_coords = np.abs(self.bcaln.y_min + grp['ref'].first())
+        ref_coords = np.abs(self.bcaln.y_min + grp['miref'].first())
 
         self.events = pd.DataFrame({
-            "ref"   : ref_coords,
+            "miref"   : ref_coords,
             "start"  : grp['sample'].min(),
             "kmer" : grp['kmer'].first(),
         })#.reset_index(drop=True)
@@ -178,7 +176,7 @@ class GuidedDTW:
         if self.read.has_events:
             self.events['length'] = grp['length'].sum()
             self.events['mean'] = grp['sum'].sum() / self.events['length']
-            self.dtw.drop(columns=['sum'])
+            self.aln.df.drop(columns=['sum'])
         else:
             self.events['length'] = grp['signal'].count()
             self.events['mean'] = grp['signal'].mean() 
@@ -208,11 +206,6 @@ class GuidedDTW:
             self.bcaln.rf_name, st, en
         ))
 
-        def print_kmers(kmers):
-            print(
-                [nt.kmer_to_str(k) for k in kmers[:10]],
-                [nt.kmer_to_str(k) for k in kmers[-10:]],
-            )
 
         if self.bcaln.flip_ref:
             kmers = np.flip(nt.kmer_rev(kmers))
@@ -220,8 +213,6 @@ class GuidedDTW:
         if not self.bcaln.is_fwd:
             kmers = nt.kmer_comp(kmers)
 
-        print_kmers(kmers)
-        print_kmers(kmers3)
 
         #self.ref_kmers = np.insert(kmers, 0, [0]*pad)
 
@@ -286,13 +277,11 @@ class GuidedDTW:
         path_refs = list()
 
         band_blocks = list()
-        print(self.samp_min, self.samp_max)
 
         block_min = self.bcaln.df['sample'].searchsorted(self.samp_min)
         block_max = self.bcaln.df['sample'].searchsorted(self.samp_max)
 
         y_min = self.aln.miref_start
-        print(block_min, y_min, self.ref_min, )
 
         block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
         block_ends   = np.append(self.bcaln.ref_gaps, block_max)
@@ -300,43 +289,42 @@ class GuidedDTW:
         #TODO make this actually do something for spliced RNA
         for st, en in [(block_min, block_max)]:
         #for st, en in zip(block_starts, block_ends):
-            print(st,en)
-            sys.stdout.flush()
-
             samp_st = self.bcaln.df.loc[st,'sample']
             samp_en = self.bcaln.df.loc[en-1,'sample']
 
-            ref_st = self.bcaln.df.loc[st,"miref"]
-            ref_en = self.bcaln.df.loc[en-1,"miref"]
+            miref_st = self.bcaln.df.loc[st,"miref"]
+            miref_en = self.bcaln.df.loc[en-1,"miref"]
 
             read_block = self.read.sample_range(samp_st, samp_en)
 
             block_signal = read_block['norm_sig'].to_numpy()
-            block_kmers = self.ref_kmers[ref_st-y_min:ref_en-y_min]
+            block_kmers = self.ref_kmers[miref_st-self.aln.miref_start:miref_en-self.aln.miref_start]
 
-            args = self.get_dtw_args(read_block, ref_st, block_kmers)
+            args = self.get_dtw_args(read_block, miref_st, block_kmers)
 
             dtw = self.dtw_fn(*args)
 
             #TODO flip in traceback
             path = np.flip(dtw.path)
             path_qrys.append(read_block.index[path['qry']])
-            path_refs.append(ref_st + path['ref'])
+            path_refs.append(miref_st + path['ref'])
 
             if hasattr(dtw, "ll"):
                 band_blocks.append(
-                    self.ll_to_df(dtw.ll, read_block, ref_st, len(block_kmers))
+                    self.ll_to_df(dtw.ll, read_block, miref_st, len(block_kmers))
                 )
 
-        self.dtw = pd.DataFrame({'ref': np.concatenate(path_refs)}, 
+        df = pd.DataFrame({'miref': np.concatenate(path_refs)}, 
                                index = np.concatenate(path_qrys),
                                dtype='Int32') \
                   .join(self.read.df) \
                   .drop(columns=['mean', 'stdv', 'mask'], errors='ignore') \
-                  .rename(columns={'start' : 'sample', 'norm_sig' : 'signal'})
-        self.dtw['kmer'] = self.ref_kmers[self.dtw['ref'].astype(int)-y_min]
+                  .rename(columns={'norm_sig' : 'mean'})
+        df['kmer'] = self.ref_kmers[df['miref'].astype(int)-y_min]
 
-        #self.dtw['ref'] += self.bcaln.y_min
+        self.aln.set_subevent_aln(df, True)
+
+        #self.dtw['miref'] += self.bcaln.y_min
 
         if len(band_blocks) == 0:
             self.bands = None
@@ -350,27 +338,27 @@ class GuidedDTW:
         self.events = pd.read_pickle(event_file).reset_index()
 
         block_min = self.bcaln.df['sample'].searchsorted(self.samp_min)
-        y_min1 = self.bcaln.df['ref'][block_min]
+        y_min1 = self.bcaln.df['miref'][block_min]
 
-        y_min = self.events['ref'].min()
-        y_max = self.events['ref'].max()
+        y_min = self.events['miref'].min()
+        y_max = self.events['miref'].max()
 
         self.events = self.events.loc[(self.events['start'] >= self.samp_min) & (self.events['start'] <= self.samp_max)]#.reset_index(drop=True)
 
-        y_min2 = self.events['ref'].min()
+        y_min2 = self.events['miref'].min()
 
         if self.bcaln.flip_ref:
-            self.events['idx'] = -self.events['ref'] + y_max
+            self.events['idx'] = -self.events['miref'] + y_max
         else:
-            self.events['idx'] = self.events['ref'] - y_min
+            self.events['idx'] = self.events['miref'] - y_min
 
         self.events.set_index('idx', inplace=True)
         self.events.sort_index(inplace=True)
 
-        self.dtw = self.events.drop(columns=["ref"]) \
+        self.aln.df = self.events.drop(columns=["miref"]) \
                               .reset_index() \
-                              .rename(columns={'idx' : 'ref', 'start' : 'sample', 'mean' : 'signal'})
-        self.dtw.reset_index()
+                              .rename(columns={'idx' : 'miref', 'start' : 'sample', 'mean' : 'signal'})
+        self.aln.df.reset_index()
         self.bands = None
 
     #TODO move to dotplot
@@ -378,75 +366,63 @@ class GuidedDTW:
         if self.bands is not None:
             ax.fill_between(self.bands['samp'], self.bands['ref_st']-1, self.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
 
-        return ax.step(self.dtw['sample'], self.dtw['ref'],where="post",color="purple", zorder=3, linewidth=3)
+        return ax.step(self.aln.df['start'], self.aln.df['miref'],where="post",color="purple", zorder=3, linewidth=3)
+    
+    def plot_signal(self, ax_sig):
+        samp_min, samp_max = self.aln.get_samp_bounds()
 
-    #TODO move to dotplot
-    def plot_dtw_events(self, ax_sig, ax_padiff):
-        c = 'purple'
-
-        samps = np.arange(self.samp_min, self.samp_max)
-
-        raw_norm = np.zeros(len(samps))
-        i = self.read.norm_params["end"].searchsorted(self.samp_min)
-        while i < len(self.read.norm_params):
-            n = self.read.norm_params.iloc[i]
-
-            st = int(n["start"])
-            if st >= self.samp_max: break
-
-            en = int(n["end"])-1
-
-            st = max(st, self.samp_min)
-            en = min(en, self.samp_max)
-
-            raw = self.read.f5.signal[st:en]
-            raw_norm[st-self.samp_min:en-self.samp_min] = (n["scale"] * raw) + n["shift"]
-            i += 1
+        samps = np.arange(samp_min, samp_max)
+        raw_norm = self.read.get_norm_signal(samp_min, samp_max)
 
         ymin = np.min(raw_norm[raw_norm>0])
         ymax = np.max(raw_norm[raw_norm>0])
-        bases = nt.kmer_base(self.dtw['kmer'], 2)
+        bases = nt.kmer_base(self.aln.df['kmer'], 2)
 
         samp_bases = np.zeros(len(samps), int)
-        for i in range(len(self.dtw)):
-            st = int(self.dtw.iloc[i]['sample']-self.samp_min)
-            en = int(st + self.dtw.iloc[i]['length'])
+        for i in range(len(self.aln.df)):
+            st = int(self.aln.df.iloc[i]['start'] - samp_min)
+            en = int(st + self.aln.df.iloc[i]['length'])
             samp_bases[st:en] = bases[i]
 
-        def plot_base(base, color):
+        BASE_COLORS = [
+            "#80ff80",
+            "#8080ff",
+            "#ffbd00",
+            "#ff8080",
+        ]
+        for base, color in enumerate(BASE_COLORS):
             ax_sig.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color, interpolate=True)
-        plot_base(0, "#80ff80")
-        plot_base(1, "#8080ff")
-        plot_base(2, "#ffbd00")
-        plot_base(3, "#ff8080")
 
         ax_sig.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, alpha=0.75, c="#777777")
 
-        model_means = self.model.get_mean(self.events['kmer'])
+        ax_sig.step(self.aln.df['start'], self.model.get_mean(self.aln.df['kmer']), color='white', linewidth=2, where="post")
 
-        ax_sig.step(self.events['start'], self.model.get_mean(self.events['kmer']), color='white', linewidth=2, where="post")
+        ax_sig.vlines(self.aln.df['start'], ymin, ymax, linewidth=2, color="white")
 
-        ax_sig.vlines(self.events['start'], ymin, ymax, linewidth=2, color="white")
-
-        evts = (self.read.df['start'] >= self.samp_min) & (self.read.df['start'] < self.samp_max) & (self.read.df['norm_sig'] > 0)
+        evts = (self.read.df['start'] >= samp_min) & (self.read.df['start'] < samp_max) & (self.read.df['norm_sig'] > 0)
 
         if self.read.has_events:
             ax_sig.step(self.read.df['start'][evts], self.read.df['norm_sig'][evts], where='post', color='black', linewidth=3)
         else:
             ax_sig.scatter(self.read.df['start'][evts], self.read.df['norm_sig'][evts], s=5, alpha=0.75, c="#777777") 
 
-        model_means = self.model.get_mean(self.events['kmer'])
+    #TODO move to dotplot
+    def plot_dtw_events(self, ax_sig, ax_padiff):
+        c = 'purple'
 
-        pa_diffs = np.abs(self.events['mean'] - self.model.get_mean(self.events['kmer']))
+        self.plot_signal(ax_sig)
 
-        ax_padiff.step(pa_diffs, self.events.index, color=c, where="post")
+        model_means = self.model.get_mean(self.aln.df['kmer'])
+
+        pa_diffs = np.abs(self.aln.df['mean'] - self.model.get_mean(self.aln.df['kmer']))
+
+        ax_padiff.step(pa_diffs, self.aln.df['miref'], color=c, where="post")
 
 #TODO move to ReadAln
 def save(dtw, track):
-    events_out = dtw.events.reset_index(drop=True).set_index('ref').sort_index()
+    events_out = dtw.aln.df.sort_index()
 
     track.add_read(dtw.read.id, dtw.read.f5.filename, events_out)
-
 
 class Fast5Processor(Fast5Reader):
     def __next__(self):

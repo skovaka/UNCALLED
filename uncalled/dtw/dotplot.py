@@ -9,97 +9,168 @@ from ..config import Config, ArgParser, ParamGroup, Opt
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
 from .dtw import Track, ref_coords
-#from .align import GuidedDTW, BcFast5Aln
+from _uncalled import PORE_MODELS, nt, BwaIndex
+from .dtw import BcFast5Aln
 
-class DotplotParams(ParamGroup): pass
+class DotplotParams(ParamGroup):
+    _name = "dotplot"
 DotplotParams._def_params(
     ("track", None, str, "DTW aligment track containing reads to plot"),
     ("read_filter", None, list, "List of reads to plot"),
 )
-Config._EXTRA_GROUPS["dotplot"] = DotplotParams #TODO put in ParamGroup con
+#Config._EXTRA_GROUPS["dotplot"] = DotplotParams #TODO put in ParamGroup con
 
 OPTS = [
     Opt("track", "dotplot"),
     Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
+    Opt(("-C", "--max-chunks"), "read_buffer"),
 ]
 
 def main(conf):
     """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
 
-    track = Track(conf.dotplot.track, 'r')
+    track = Track(conf.dotplot.track, 'r', conf)
     conf = track.conf
 
     fast5s = Fast5Reader(conf=conf)
 
-    ref_bounds = conf.align.ref_bounds
-
-    read_filter = set(conf.fast5_reader.read_filter)
-
-    mm2s = {p.qr_name : p
-             for p in parse_paf(
-                conf.align.mm2_paf,
-                ref_bounds,
-                read_filter=read_filter
-    )}
-
     for read_id in track.read_ids:
         if read_id in fast5s:
             fast5_read = fast5s[read_id]
-            proc_read = ProcRead(fast5_read, conf=conf)
-            bcaln = BcFast5Aln(proc_read, mm2s[read.id])
+            read = ProcRead(fast5_read, conf=conf)
 
-            aln = track.get_aln(read_id)
+            aln = track.get_aln(read.id)
+            bcaln = BcFast5Aln(aln.index, read, track.mm2s[read.id])
+
+            print(read.id)
+
+            dplt = Dotplot(aln.index, read, conf=conf)
+            dplt.add_aln(bcaln, False)
+            dplt.add_aln(aln, True)
+            dplt.show()
 
             #TODO shouldn't need GuidedDTW, just read_aln
-            dtw = GuidedDTW(
-                self.idx, 
-                proc_read, 
-                bcaln, 
-                dtw_events=aln,
-                ref_bounds=ref_bounds
-            )
+            #dtw = GuidedDTW(
+            #    self.idx, 
+            #    proc_read, 
+            #    bcaln, 
+            #    dtw_events=aln,
+            #    ref_bounds=ref_bounds,
+            #    conf=conf
+            #)
 
 class Dotplot:
-    def __init__(self, index, dtw, out_prefix=None, cursor=None):
-        self._init_plot()
+    def __init__(self, index, read, out_prefix=None, cursor=None, conf=None):
+        self.conf = conf if conf is not None else Config()
 
         self.index = index
+        self.read = read
 
-        self.ax_dot.set_ylabel("%s (%s)" % (dtw.bcaln.ref_name, "+" if dtw.bcaln.is_fwd else "-"), fontsize=12)
+        self.ref_bounds = None
+        self.alns = list()
+        self.focus = set()
 
-        self.ax_dot.yaxis.set_major_formatter(FuncFormatter(self._tick_formatter))
+        model_name = self.conf.mapper.pore_model
+
+        #TODO clean this up
+        if model_name.endswith("_compl"):
+            model_name = model_name[:-5]+"templ"
+
+        self.model = PORE_MODELS[model_name]
+
+    def add_aln(self, aln, focus=False):
+        if self.read.id is not None and self.read.id != aln.read_id:
+            raise RuntimeError("All Dotplot alignments must be from same self.read")
+
+        if self.ref_bounds is None:
+            self.ref_bounds = aln.ref_bounds
+
+        elif self.ref_bounds[0] != aln.ref_bounds[0]:
+            raise RuntimeError("All Dotplot alignments must be on same reference sequence")
+        else:
+            nm,st,en,fw = self.ref_bounds
+            self.ref_bounds = (nm, min(st, aln.ref_bounds[1]), max(en, aln.ref_bounds[2]), fw)
+
+        if focus:
+            if len(self.focus) > 0:
+                raise RuntimeError("Dotplot can currently only have one focus alignment")
+            self.focus.add(len(self.alns))
+
+        self.alns.append(aln)
+
+    def _plot_aln_scatter(self, aln):
+        self.ax_dot.scatter(aln.df['sample'], aln.df['miref'], color='orange', zorder=2,s=20)
+
+    def _plot_aln_step(self, aln):
+
+        self.ax_dot.step(aln.df['start'], aln.df['miref'], where="post", color="purple", zorder=3, linewidth=3)
+        #if samp_min is None: samp_min = 0
+        #if samp_max is None: samp_max = self.df['sample'].max()
+        #i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
+
+        model_means = self.model.get_mean(aln.df['kmer'])
+
+        pa_diffs = np.abs(aln.df['mean'] - self.model.get_mean(aln.df['kmer']))
+
+        self.ax_padiff.step(pa_diffs, aln.df['miref'], color="purple", where="post")
+
+    def _plot_signal(self, aln):
+        samp_min, samp_max = aln.get_samp_bounds()
+
+        samps = np.arange(samp_min, samp_max)
+        raw_norm = self.read.get_norm_signal(samp_min, samp_max)
+
+        ymin = np.min(raw_norm[raw_norm>0])
+        ymax = np.max(raw_norm[raw_norm>0])
+        bases = nt.kmer_base(aln.df['kmer'], 2)
+
+        samp_bases = np.zeros(len(samps), int)
+        for i in range(len(aln.df)):
+            st = int(aln.df.iloc[i]['start'] - samp_min)
+            en = int(st + aln.df.iloc[i]['length'])
+            samp_bases[st:en] = bases[i]
+
+        BASE_COLORS = [
+            "#80ff80",
+            "#8080ff",
+            "#ffbd00",
+            "#ff8080",
+        ]
+        for base, color in enumerate(BASE_COLORS):
+            self.ax_sig.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color, interpolate=True)
+
+        self.ax_sig.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, alpha=0.75, c="#777777")
+        self.ax_sig.step(aln.df['start'], self.model.get_mean(aln.df['kmer']), color='white', linewidth=2, where="post")
+        self.ax_sig.vlines(aln.df['start'], ymin, ymax, linewidth=2, color="white")
+
+        evts = (self.read.df['start'] >= samp_min) & (self.read.df['start'] < samp_max) & (self.read.df['norm_sig'] > 0)
+
+        if self.read.has_events:
+            self.ax_sig.step(self.read.df['start'][evts], self.read.df['norm_sig'][evts], where='post', color='black', linewidth=3)
+        else:
+            self.ax_sig.scatter(self.read.df['start'][evts], self.read.df['norm_sig'][evts], s=5, alpha=0.75, c="#777777") 
+
+
+    def set_cursor(self, cursor):
+        cursor_kw = {
+            'color' : 'red', 
+            'alpha' : 0.5
+        }
+        if dtw.bcaln.flip_ref:
+            cursor_ref = np.abs(dtw.bcaln.y_min + cursor)
+        else:
+            cursor_ref = cursor - dtw.bcaln.y_min
+        i = dtw.dtw['ref'].searchsorted(cursor_ref)
+        cursor_samp = dtw.dtw.iloc[i]['sample'] + dtw.dtw.iloc[i]['length']/2
         
-        self.ax_sig.set_title(dtw.read.id)
-
-        dtw.bcaln.plot_scatter(self.ax_dot, False, samp_min=dtw.samp_min, samp_max=dtw.samp_max)
-
-        #TODO move to plot_cursor, don't put in constructor
-        if cursor is not None:
-            cursor_kw = {
-                'color' : 'red', 
-                'alpha' : 0.5
-            }
-            if dtw.bcaln.flip_ref:
-                cursor_ref = np.abs(dtw.bcaln.y_min + cursor)
-            else:
-                cursor_ref = cursor - dtw.bcaln.y_min
-            i = dtw.dtw['ref'].searchsorted(cursor_ref)
-            cursor_samp = dtw.dtw.iloc[i]['sample'] + dtw.dtw.iloc[i]['length']/2
-            
-            self.ax_dot.axvline(cursor_samp, **cursor_kw),
-            self.ax_dot.axhline(cursor_ref,  **cursor_kw)
-
-        dtw.plot_dotplot(self.ax_dot)
-
-        dtw.plot_dtw_events(self.ax_sig, self.ax_padiff)
-
-        self.fig.tight_layout()
+        self.ax_dot.axvline(cursor_samp, **cursor_kw),
+        self.ax_dot.axhline(cursor_ref,  **cursor_kw)
 
     def _tick_formatter(self, x, pos):
-        return self.index.mirror_to_ref(int(x))
+        return self.index.miref_to_ref(int(x))
 
-    def _init_plot(self):
+    def _plot(self):
         matplotlib.use("TkAgg")
         plt.style.use(['seaborn'])
 
@@ -131,9 +202,32 @@ class Dotplot:
         self.ax_sig.xaxis.set_major_formatter(NullFormatter())
         self.ax_padiff.yaxis.set_major_formatter(NullFormatter())
 
+        self.ax_dot.set_ylabel("%s (%s)" % (self.ref_bounds[0], "+" if self.ref_bounds[3] else "-"), fontsize=12)
+
+        self.ax_dot.yaxis.set_major_formatter(FuncFormatter(self._tick_formatter))
+        
+        self.ax_sig.set_title(self.read.id)
+
+        for i,aln in enumerate(self.alns):
+            print(aln.df)
+
+            if isinstance(aln, BcFast5Aln):
+                self._plot_aln_scatter(aln)
+                aln.plot_scatter(self.ax_dot, False)
+            else:
+
+                if i in self.focus:
+                    self._plot_signal(aln)
+
+                self._plot_aln_step(aln)
+
+                #self.samp_min, self.samp_max = aln.get_samp_bounds()
+
+        self.fig.tight_layout()
+
 
     def show(self):
-        #self._init_plot()
+        self._plot()
 
         plt.show()
         plt.close()

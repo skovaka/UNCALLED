@@ -11,13 +11,14 @@ from _uncalled import EventDetector, EventProfiler, Normalizer, PORE_MODELS
 #TODO refactor into SignalProcessor -> ProcRead
 #eventually turn into C++
 
-class ProcReadParams(ParamGroup): pass
+class ProcReadParams(ParamGroup):
+    _name = "proc_read"
 ProcReadParams._def_params(
     ("detect_events", False, bool, "Will detect events if True"),
     ("profile", False, bool, "Will mask events within low stdv windows if True"),
     ("normalizer", None, None, ""),
 )
-Config._EXTRA_GROUPS["proc_read"] = ProcReadParams
+#Config._EXTRA_GROUPS["proc_read"] = ProcReadParams
 
 class ProcRead:
 
@@ -166,6 +167,29 @@ class ProcRead:
 
     def sample_range(self, start, end):
         return self.df.loc[(self.df['start'] >= start) & (self.df['start'] <= end) & self.df['mask']]
+
+    def get_norm_signal(self, samp_min, samp_max):
+        ret = np.zeros(samp_max - samp_min)
+
+        i = self.norm_params["end"].searchsorted(samp_min)
+
+        while i < len(self.norm_params):
+            n = self.norm_params.iloc[i]
+
+            st = int(n["start"])
+            if st >= samp_max: break
+
+            en = int(n["end"])-1
+
+            st = max(st, samp_min)
+            en = min(en, samp_max)
+
+            raw = self.f5.signal[st:en]
+            ret[st-samp_min:en-samp_min] = (n["scale"] * raw) + n["shift"]
+            i += 1
+
+        return ret
+
 
     def plot_events(self, ax, samp_min=None, samp_max=None):
         if samp_min is not None and samp_max is not None:
