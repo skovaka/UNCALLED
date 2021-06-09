@@ -147,8 +147,10 @@ class RawBrowser:
         fast5_read = self.fast5s[read.id]
         proc_read = ProcRead(fast5_read, conf=self.conf)
 
-        aln = track.get_aln(read.id)
+        aln = track.load_aln(read.id)
         bcaln = BcFast5Aln(aln.index, proc_read, track.mm2s[read.id])
+
+        print(aln.df)
 
         #bcaln = BcFast5Aln(proc_read, mat.mm2s[read.id])
 

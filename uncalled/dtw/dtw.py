@@ -12,9 +12,7 @@ import pandas as pd
 
 from ..pafstats import parse_paf, PafEntry
 from ..config import Config
-from _uncalled import PORE_MODELS, BwaIndex
-
-
+from _uncalled import PORE_MODELS, BwaIndex, nt
 
 class ReadAln:
 
@@ -143,19 +141,26 @@ class ReadAln:
         else:
             kmers = grp[kmer_col].first()
 
-        mirefs = grp[ref_col].first()
-        refs = self.miref_to_ref(mirefs)
+        if ref_mirrored:
+            mirefs = grp[ref_col].first()
+            refs = self.miref_to_ref(mirefs)
+        else:
+            refs = grp[ref_col].first()
 
         lengths = grp[length_col].sum()
 
         self.df = pd.DataFrame({
             self.REF_COL    : refs,
-            self.MIREF_COL  : mirefs,
             self.KMER_COL   : kmers,
             self.START_COL  : grp[start_col].min(),
             self.LENGTH_COL : lengths,
             self.MEAN_COL   : grp["cuml_mean"].sum() / lengths
-        }).set_index(self.REF_COL).sort_values(self.MIREF_COL)
+        })
+        
+        if ref_mirrored:
+            self.df[self.MIREF_COL] = mirefs
+
+        self.df = self.df.set_index(self.REF_COL).sort_values(self.REF_COL)
         
 
     def get_index_kmers(self, index, kmer_shift=4):
@@ -163,7 +168,7 @@ class ReadAln:
         start = self.miref_start - kmer_shift
 
         if start < 0:
-            lpad = -self.miref_start
+            lpad = -start
             start = 0
         else:
             lpad = 0
@@ -203,14 +208,16 @@ class Track:
 
         if mode == self.READ_MODE:
             self.conf.load_toml(self.config_filename)
-            self.conf.fast5_reader.fast5_index = self.fname_mapping_filename
+
+            if len(self.conf.fast5_reader.fast5_index) == 0:
+                self.conf.fast5_reader.fast5_index = self.fname_mapping_filename
+
             self._load_index()
             #self._load_reads()
 
         elif mode == self.WRITE_MODE:
             self.conf.to_toml(self.config_filename)
             self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
-
 
         #TODO arguments overload conf params
         if conf.align.mm2_paf is not None:
@@ -219,8 +226,6 @@ class Track:
             self.mm2s = {p.qr_name : p
                      for p in parse_paf(
                         conf.align.mm2_paf,
-                        #ref_bounds,
-                        #read_filter=read_filter
             )}
 
         #TODO static bwa_index parameters?
@@ -231,26 +236,21 @@ class Track:
     def read_ids(self):
         return list(self.fname_mapping.index)
 
-    def add_read(self, read_id, fast5_fname, rae_df):
-        if self.mode != "w":
-            raise RuntimeError("Must be write mode to add read to track")
-
-        aln_fname = self.aln_fname(read_id)
-        rae_df.to_pickle(aln_fname)
-
-        self.fname_mapping_file.write("\t".join([read_id, fast5_fname, aln_fname]) + "\n")
-
     def _load_index(self):
         self.fname_mapping = pd.read_csv(self.fname_mapping_file, sep="\t", index_col="read_id")
 
-    def get_aln(self, read_id, ref_bounds=None):
+    def save_aln(self, aln, fast5_fname):
+        if self.mode != "w":
+            raise RuntimeError("Must be write mode to add read to track")
+
+        aln_fname = self.aln_fname(aln.read_id)
+        aln.df.sort_index().to_pickle(aln_fname)
+        self.fname_mapping_file.write("\t".join([aln.read_id, fast5_fname, aln_fname]) + "\n")
+
+    def load_aln(self, read_id, ref_bounds=None):
         mm2 = self.mm2s[read_id]
-        df = pd.read_pickle(self.aln_fname(read_id))
+        df = pd.read_pickle(self.aln_fname(read_id)).sort_index()
         return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd)
-        #if ref_bounds is not None:
-        #    _,st,en = ref_bounds[:3]
-        #    return aln[st:en]
-        #return aln
 
     def get_matrix(self, ref_bounds, mm2_paf=None, partial_overlap=False):
 
@@ -272,6 +272,8 @@ class Track:
             mm2 = mm2s.get(read_id, None)
             if mm2 is None: continue
             df = pd.read_pickle(read["aln_file"])
+            #print(read_id)
+            #print(df)
             mat._add_read(df, mm2)
 
         mat._flatten()

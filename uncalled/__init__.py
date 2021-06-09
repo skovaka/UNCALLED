@@ -4,3 +4,6 @@ from .config import Config, ArgParser
 from .fast5 import Fast5Reader
 from .sigproc import ProcRead
 from . import dtw
+
+from . import config
+config.DEFAULTS = Config()

@@ -74,26 +74,28 @@ def main(conf):
     else:
         track = None
 
-    for read in fast5s:
+    t = time.time()
 
-        t = time.time()
+    for read in fast5s:
 
         if not read.id in mm2s:
             continue
 
         dtw = GuidedDTW(idx, read, mm2s[read.id], conf)
 
+
         if dtw.empty:
             continue
 
-        print(read.id)
         if track is None:
             dplt = Dotplot(idx, read, conf=conf)
             dplt.add_aln(dtw.bcaln, False)
             dplt.add_aln(dtw.aln, True)
             dplt.show()
         else:
-            save(dtw, track)
+            track.save_aln(dtw.aln, read.f5.filename)
+        
+        print(read.id)
 
 class GuidedDTW:
 
@@ -101,6 +103,8 @@ class GuidedDTW:
     def __init__(self, index, read, paf, conf=None, dtw_events=None, **kwargs):
         self.conf = read.conf if conf is None else conf
         self.prms = self.conf.align
+
+        t = time.time()
 
         self.bcaln = BcFast5Aln(index, read, paf, self.conf.align.ref_bounds)
         if self.bcaln.empty:
@@ -132,20 +136,9 @@ class GuidedDTW:
         self.ref_min = self.bcaln.ref_start
         self.ref_max = self.bcaln.ref_end
 
-        #self.ref_min, self.ref_max = sorted(
-        #        np.abs([self.bcaln.y_min, self.bcaln.y_max])
-        #)
-
-        #if self.prms.ref_bounds is None:
         self.samp_min = self.bcaln.df['sample'].min()
         self.samp_max = self.bcaln.df['sample'].max()
-        #else:
-        #    self.samp_min = int(self.bcaln.ref_to_samp(self.ref_min))
-        #    self.samp_max = int(self.bcaln.ref_to_samp(self.ref_max))
-        #    if self.bcaln.flip_ref:
-        #        self.samp_min, self.samp_max = (self.samp_max, self.samp_min)
 
-        #self.load_kmers()
         self.ref_kmers = self.aln.get_index_kmers(self.idx)
 
         if dtw_events is None:
@@ -212,10 +205,6 @@ class GuidedDTW:
 
         if not self.bcaln.is_fwd:
             kmers = nt.kmer_comp(kmers)
-
-
-        #self.ref_kmers = np.insert(kmers, 0, [0]*pad)
-
 
     def get_dtw_args(self, read_block, ref_start, ref_kmers):
         common = (read_block['norm_sig'].to_numpy(), ref_kmers, self.model)
@@ -306,6 +295,7 @@ class GuidedDTW:
 
             #TODO flip in traceback
             path = np.flip(dtw.path)
+            print(list(dtw.path))
             path_qrys.append(read_block.index[path['qry']])
             path_refs.append(miref_st + path['ref'])
 
@@ -327,11 +317,11 @@ class GuidedDTW:
         #self.dtw['miref'] += self.bcaln.y_min
 
         if len(band_blocks) == 0:
-            self.bands = None
+            self.aln.bands = None
         elif len(band_blocks) > 1:
-            self.bands = pd.concat(band_blocks)
+            self.aln.bands = pd.concat(band_blocks)
         else:
-            self.bands = pd.DataFrame(band_blocks[0])
+            self.aln.bands = pd.DataFrame(band_blocks[0])
 
     #TODO move to AlignedRead
     def load_dtw_events(self, event_file):

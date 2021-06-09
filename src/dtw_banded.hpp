@@ -210,29 +210,6 @@ class BandedDTW {
     //}
 
     void traceback() {
-        //score_sum_ = MAX_COST;
-        //i32 path_band = band_count(), path_k = band_width_;
-        //for (size_t band = band_count()-1; band > 0; band--) {
-    
-        //    //Find index with last ref coordinate
-        //    //stop search if not in band
-        //    auto offs = ref_size() - ll_[band].ref - 1;
-        //    //std::cout << offs << " AH\n";
-        //    if (offs >= band_width_) break;
-
-        //    auto k = band_coord(band, offs);
-        //    //std::cout << ll_[band].qry-offs << " " << ll_[band].second+offs << " " << mat_[k] << " AH\n";
-
-        //    if (mat_[k] < score_sum_) {
-        //        path_band = band;
-        //        path_k = k;
-        //        score_sum_ = mat_[k];
-        //        std::cout << band << "\t" << k << "\t" << mat_[k] << "\n";
-        //    }
-        //}
-
-        //std::cout << band_count() << "\t" << path_band << "\n";
-        //std::cout << path_k << "\t" << mat_.size() << "\n";
 
         i32 path_band = band_count()-1,
             offs = ref_size() - ll_[path_band].ref - 1,
@@ -252,17 +229,20 @@ class BandedDTW {
 
             switch(bcrumbs_[path_k]) {
             case Move::D:
+                //std::cout << "D";
                 path_band -= 2;
                 next_ll = ll_[path_band];
                 shift = 2 * band_width_ + (next_ll.ref - path_ll.ref + 1);
                 break;
 
             case Move::H:
+                //std::cout << "H";
                 path_band -= 1;
                 next_ll = ll_[path_band];
                 shift = band_width_ + (next_ll.ref - path_ll.ref + 1);
                 break;
             case Move::V:
+                //std::cout << "V";
                 path_band -= 1;
                 next_ll = ll_[path_band];
                 shift = band_width_ + (next_ll.ref - path_ll.ref);
@@ -274,6 +254,7 @@ class BandedDTW {
             path_k -= shift;
         }
 
+        //std::cout << "\n";
         path_.push_back({0,0});
     }
 

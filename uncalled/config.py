@@ -38,11 +38,6 @@ SPECIAL_PARAMS = {FAST5_PARAM, CONFIG_PARAM}
 
 TOML_TYPES = {int, float, str, list, bool}
 
-def param_valid(name, val):
-    return (not name.startswith("_") and
-            type(val) in TOML_TYPES and
-            (not hasattr(val, "__len__") or len(val) > 0))
-
 #TODO make this a factory function or whatever
 Param = namedtuple("Param", ["name", "default", "type", "doc"])
 class ParamGroup:
@@ -97,27 +92,35 @@ class Config(_Conf):
         if toml is not None:
             self.load_toml(toml)
 
+    def _param_writable(self, name, val, group=None):
+        return (not self.is_default(name, group) and
+                not name.startswith("_") and
+                type(val) in TOML_TYPES and
+                (not hasattr(val, "__len__") or len(val) > 0))
+
     def to_toml(self, filename=None):
         out = dict()
 
         for param in self._GLOBAL_PARAMS:
             val = getattr(self,param)
-            if param_valid(param, val):
+            if self._param_writable(param, val):
                 out[param] = val
 
         for param, val in vars(self).items():
-            if param_valid(param, val):
+            if self._param_writable(param, val):
                 out[param] = val
 
         groups = self._PARAM_GROUPS + list(self._EXTRA_GROUPS.keys())
 
         for group_name in groups:
             group = getattr(self, group_name)
-            out[group_name] = dict()
+            vals = dict()
             for param in dir(group):
                 val = getattr(group,param)
-                if param_valid(param, val):
-                    out[group_name][param] = val
+                if self._param_writable(param, val, group_name):
+                    vals[param] = val
+            if len(vals) > 0:
+                out[group_name] = vals
 
         if filename is None:
             return toml.dumps(out)
@@ -132,12 +135,15 @@ class Config(_Conf):
             if isinstance(val, dict):
                 group = getattr(self, name, None)
                 if group is None:
-                    setattr(self, name, val)
+                    if self.is_default(name):
+                        setattr(self, name, val)
                 else:
                     for param, value in val.items():
-                        setattr(group, param, value)
+                        if self.is_default(param, name):
+                            setattr(group, param, value)
             else:
-                setattr(self, name, val)
+                if self.is_default(name):
+                    setattr(self, name, val)
 
     def get_group(self, group_name):
         """Returns the group based on the group name"""
@@ -150,6 +156,20 @@ class Config(_Conf):
     @property
     def is_rna(self):
         return not self.read_buffer.seq_fwd
+
+    def is_default(self, param, group=None):
+        if group is None:
+            sg = self
+            dg = DEFAULTS
+        else:
+            sg = getattr(self, group, None)
+            dg = getattr(DEFAULTS, group, None)
+            if sg is None and dg is None:
+                return True
+            elif sg is None or dg is None:
+                return False
+
+        return getattr(sg, param, None) == getattr(dg, param, None)
 
 class ArgParser:
 
@@ -360,4 +380,4 @@ class Subcmd:
         elif self.has_opts and not all([type(o) in [Opt, MutexOpts] for o in opts]):
             raise TypeError("Cannot specify function for subcommand \"%s\" unless all options are of type Opt" % name)
 
-
+DEFAULTS = Config()

@@ -7,7 +7,7 @@ import argparse
 import pandas as pd
 from ont_fast5_api.fast5_interface import get_fast5_file
 
-from .dtw import Track, ref_coords
+from .dtw import ReadAln, Track, ref_coords
 from ..config import Config, ArgParser, ParamGroup, Opt
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..index import BWA_OPTS
@@ -55,33 +55,24 @@ class nanopolish:
 
         sys.stderr.write("Grouping\n")
 
-        read_groups = alns.groupby("read_name")
+        read_groups = alns.groupby(["contig", "read_name"])
 
         sys.stderr.write("Writing alignments\n")
 
         track = Track(conf.align.out_path, "w", conf, conf.force_overwrite)
 
-        for read_id, rows in read_groups.groups.items():
-            aln = alns.iloc[rows]
+        for (contig, read_id), rows in read_groups.groups.items():
+            mm2 =  track.mm2s[read_id]
+            if contig != mm2.rf_name: continue
 
-            grp = aln.groupby("position")
+            aln = ReadAln(track.index, mm2, is_rna=conf.is_rna)
+            df = alns.iloc[rows]
 
-            lengths = grp["event_length"].sum()
-
-            kmers = [nt.kmer_rev(nt.str_to_kmer(k,0)) for k in grp["reference_kmer"].first()]
-
-            aln_out = pd.DataFrame({
-                "ref"    : grp["position"].first()-5,
-                "kmer"   : kmers,
-                "start"  : grp["start_idx"].min(),
-                "length" : lengths,
-                "mean"   : grp["sum"].sum() / lengths
-            }).set_index("ref")
+            aln.set_subevent_aln(df, kmer_str=True, ref_col="position", start_col="start_idx", length_col="event_length", mean_col="event_level_mean", kmer_col="reference_kmer")
 
             fast5_name = os.path.basename(f5reader.get_read_file(read_id))
 
-            track.add_read(read_id, fast5_name, aln_out)
-
+            track.save_aln(aln, fast5_name)
 
 class tombo:
 
@@ -110,6 +101,8 @@ class tombo:
                 pbar_count += 1
 
                 read, = fast5.get_reads()
+
+                if read.read_id not in track.mm2s: continue
 
                 if not 'BaseCalled_template' in read.handle['Analyses']['RawGenomeCorrected_000']:
                     #TODO debug logs
@@ -143,7 +136,7 @@ class tombo:
                 bases = tombo_events["base"].to_numpy().astype(str)
                 kmers = [nt.str_to_kmer("".join(bases[i:i+K]), 0) for i in range(len(bases)-K+1)]
                 kmers = shift*[kmers[0]] + kmers + (K-shift-1)*[kmers[-1]]
-                #TODO load from genome (this padding is very dumb)
+                #TODO load kmers from genome
                 
                 signal = tombo_events["norm_mean"]
                 scale = MODELS[is_rna].get_means_stdv() / np.std(signal)
@@ -153,9 +146,11 @@ class tombo:
                 if not sig_fwd:
                     samps = raw_len - tombo_start - samps - tombo_events["length"]
                     kmers = nt.kmer_rev(kmers)
-                    #refs = -refs
 
-                dtw_out = pd.DataFrame({
+                mm2 =  track.mm2s[read.read_id]
+                aln = ReadAln(track.index, mm2, is_rna=is_rna)
+
+                aln.df = pd.DataFrame({
                     "ref"    : refs,
                     "start"  : samps,
                     "kmer"   : kmers,
@@ -163,7 +158,7 @@ class tombo:
                     "mean"   : signal
                 }).set_index("ref")
 
-                track.add_read(read.read_id, fast5_basename, dtw_out)
+                track.save_aln(aln, fast5_basename)
 
                 pbar.update(pbar_count)
 

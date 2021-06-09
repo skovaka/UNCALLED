@@ -35,30 +35,18 @@ def main(conf):
 
     fast5s = Fast5Reader(conf=conf)
 
-    for read_id in track.read_ids:
-        if read_id in fast5s:
-            fast5_read = fast5s[read_id]
-            read = ProcRead(fast5_read, conf=conf)
+    for fast5_read in fast5s:
+        read = ProcRead(fast5_read, conf=conf)
 
-            aln = track.get_aln(read.id)
-            bcaln = BcFast5Aln(aln.index, read, track.mm2s[read.id])
+        aln = track.load_aln(read.id)
+        bcaln = BcFast5Aln(aln.index, read, track.mm2s[read.id])
 
-            print(read.id)
+        print(read.id)
 
-            dplt = Dotplot(aln.index, read, conf=conf)
-            dplt.add_aln(bcaln, False)
-            dplt.add_aln(aln, True)
-            dplt.show()
-
-            #TODO shouldn't need GuidedDTW, just read_aln
-            #dtw = GuidedDTW(
-            #    self.idx, 
-            #    proc_read, 
-            #    bcaln, 
-            #    dtw_events=aln,
-            #    ref_bounds=ref_bounds,
-            #    conf=conf
-            #)
+        dplt = Dotplot(aln.index, read, conf=conf)
+        dplt.add_aln(bcaln, False)
+        dplt.add_aln(aln, True)
+        dplt.show()
 
 class Dotplot:
     def __init__(self, index, read, out_prefix=None, cursor=None, conf=None):
@@ -103,6 +91,8 @@ class Dotplot:
         self.ax_dot.scatter(aln.df['sample'], aln.df['miref'], color='orange', zorder=2,s=20)
 
     def _plot_aln_step(self, aln):
+        if getattr(aln, "bands", None) is not None:
+            self.ax_dot.fill_between(aln.bands['samp'], aln.bands['ref_st']-1, aln.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
 
         self.ax_dot.step(aln.df['start'], aln.df['miref'], where="post", color="purple", zorder=3, linewidth=3)
         #if samp_min is None: samp_min = 0
@@ -209,7 +199,6 @@ class Dotplot:
         self.ax_sig.set_title(self.read.id)
 
         for i,aln in enumerate(self.alns):
-            print(aln.df)
 
             if isinstance(aln, BcFast5Aln):
                 self._plot_aln_scatter(aln)

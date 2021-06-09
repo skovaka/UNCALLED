@@ -14,7 +14,7 @@ from _uncalled import EventDetector, EventProfiler, Normalizer, PORE_MODELS
 class ProcReadParams(ParamGroup):
     _name = "proc_read"
 ProcReadParams._def_params(
-    ("detect_events", False, bool, "Will detect events if True"),
+    ("detect_events", True, bool, "Will detect events if True"),
     ("profile", False, bool, "Will mask events within low stdv windows if True"),
     ("normalizer", None, None, ""),
 )
