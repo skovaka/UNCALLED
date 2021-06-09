@@ -105,12 +105,13 @@ class RawBrowser:
 
         for path in track_paths:
             sys.stderr.write("Loading %s track...\n" % path)
-            track = Track(path, conf=conf)
+            track = Track(path, conf=self.conf)
             self.track_mats.append(track.get_matrix(ref_bounds))
-            self.conf = track.conf
+            self.conf.align.mm2_paf = None
+        self.conf = track.conf
 
         if not self.single_track:
-            self._calc_kstats()
+            self.ks_stats = self.track_mats[0].calc_ks(self.track_mats[1])
 
         self.seq_fwd = conf.read_buffer.seq_fwd
 
@@ -149,8 +150,6 @@ class RawBrowser:
 
         aln = track.load_aln(read.id)
         bcaln = BcFast5Aln(aln.index, proc_read, track.mm2s[read.id])
-
-        print(aln.df)
 
         #bcaln = BcFast5Aln(proc_read, mat.mm2s[read.id])
 
@@ -536,7 +535,7 @@ class RawBrowser:
         ax.grid()
 
         self.sumstat_img = ax.imshow(
-            self.kstats, 
+            self.ks_stats, 
             aspect="auto", 
             cmap="inferno", 
             interpolation='none'

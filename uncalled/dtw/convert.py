@@ -115,6 +115,8 @@ class tombo:
                     continue
 
                 is_rna = handle.attrs["rna"]
+                if is_rna != conf.is_rna:
+                    raise RuntimeError("Reads appear to be RNA but --rna not specified")
 
                 aln_attrs = dict(handle["Alignment"].attrs)
                 ch = aln_attrs["mapped_chrom"]

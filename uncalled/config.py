@@ -242,8 +242,6 @@ class ArgParser:
     def _add_mutex_opts(self, parser, mutex):
         group = parser.add_mutually_exclusive_group()
         for opt in mutex.opts:
-            #opt.extra_kw["dest"] = mutex.dest
-            #print(opt
             self._add_opt(group, opt)
 
     def parse_args(self, argv=sys.argv[1:]):
@@ -271,7 +269,6 @@ class ArgParser:
                 else: 
                     group = self.config
                     param = name
-                
 
                 if value is not None or not hasattr(group, param):
                     setattr(group, param, value)

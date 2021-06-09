@@ -26,8 +26,8 @@ class AlignParams(ParamGroup):
     _name = "align"
 
 AlignParams._def_params(
-    ("method", "DTWd", str, "DTW method"),
-    ("band_width", 100, int, "DTW band width (only applies to BDTW)"),
+    ("method", "GuidedBDTW", str, "DTW method"),
+    ("band_width", 50, int, "DTW band width (only applies to BDTW)"),
     ("band_shift", 0.5, float, "DTW band shift coefficent (only applies to BDTW)"),
     ("ref_bounds", None, tuple, "Will only output DTW within these reference coordinates if specified"),
     ("mm2_paf", None, str, "Path to minimap2 alignments of basecalled reads in PAF format. Used to determine where each should be aligned. Should include cigar string."),

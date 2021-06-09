@@ -9,6 +9,7 @@ import time
 from typing import NamedTuple
 from matplotlib.colors import Normalize
 import pandas as pd
+import scipy.stats
 
 from ..pafstats import parse_paf, PafEntry
 from ..config import Config
@@ -213,7 +214,6 @@ class Track:
                 self.conf.fast5_reader.fast5_index = self.fname_mapping_filename
 
             self._load_index()
-            #self._load_reads()
 
         elif mode == self.WRITE_MODE:
             self.conf.to_toml(self.config_filename)
@@ -225,7 +225,9 @@ class Track:
             read_filter = set(conf.fast5_reader.read_filter)
             self.mm2s = {p.qr_name : p
                      for p in parse_paf(
-                        conf.align.mm2_paf,
+                        self.conf.align.mm2_paf,
+                        ref_bounds=conf.align.ref_bounds,
+                        full_overlap=conf.browser.full_overlap,
             )}
 
         #TODO static bwa_index parameters?
@@ -252,28 +254,17 @@ class Track:
         df = pd.read_pickle(self.aln_fname(read_id)).sort_index()
         return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd)
 
-    def get_matrix(self, ref_bounds, mm2_paf=None, partial_overlap=False):
+    def get_matrix(self, ref_bounds=None, mm2_paf=None, partial_overlap=False):
 
-        if mm2_paf is None:
-            mm2_paf = self.conf.align.mm2_paf
+        if ref_bounds is None:
+            ref_bounds = self.conf.align.ref_bounds
 
-        read_filter = set(self.fname_mapping.index)
-        mm2s = {p.qr_name : p
-                 for p in parse_paf(
-                    mm2_paf,
-                    ref_bounds,
-                    read_filter=read_filter,
-                    full_overlap=not partial_overlap
-        )}
-
-        mat = TrackMatrix(self, ref_bounds, mm2s, conf=self.conf)
-
+        mat = TrackMatrix(self, ref_bounds, self.mm2s, conf=self.conf)
         for read_id,read in self.fname_mapping.iterrows():
-            mm2 = mm2s.get(read_id, None)
-            if mm2 is None: continue
+            mm2 = self.mm2s.get(read_id, None)
+            if mm2 is None: 
+                continue
             df = pd.read_pickle(read["aln_file"])
-            #print(read_id)
-            #print(df)
             mat._add_read(df, mm2)
 
         mat._flatten()
@@ -309,6 +300,15 @@ class TrackMatrix:
     DWELL_LAYER = 2
     PA_DIFF_LAYER = 3
 
+    KS_LAYERS = [PA_LAYER, DWELL_LAYER]
+
+    LAYER_META = [
+        ("K-mer",              False),
+        ("Current (pA)",       True),
+        ("Dwell Time (ms/bp)", True),
+        ("pA Difference",      True)
+    ]
+
     def __init__(self, track, ref_bounds, mm2s, height=None, conf=None):
         self.conf = conf if conf is not None else Config()
         self.track = track
@@ -333,6 +333,17 @@ class TrackMatrix:
                 np.arange(self.width, dtype=int),
                 index=pd.RangeIndex(self.ref_start, self.ref_end)
         )
+
+    def calc_ks(self, mat_b):
+        ks_stats = np.zeros((len(self.KS_LAYERS), self.width))
+
+        for i,l in enumerate(self.KS_LAYERS):
+            for rf in range(self.width):
+                a = self[l,:,rf][self.mask[:,rf]]
+                b = mat_b[l,:,rf][mat_b.mask[:,rf]]
+                ks_stats[i,rf] = scipy.stats.kstest(a,b)[0]
+
+        return ks_stats
 
     def __getitem__(self, i):
         return self._layers.__getitem__(i)
