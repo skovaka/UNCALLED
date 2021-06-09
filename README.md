@@ -12,6 +12,10 @@ Also supports standalone signal mapping of fast5 reads
 
 Read the [preprint on BioRxiv](https://www.biorxiv.org/content/10.1101/2020.02.03.931923v1)
 
+## Table of Contents
+
+- [Installation](#installation)
+
 ## Installation
 
 ```
