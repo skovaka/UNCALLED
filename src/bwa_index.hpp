@@ -31,6 +31,7 @@
 #include <bwa/bwa.h>
 #include <bwa/utils.h>
 #include <pdqsort.h>
+#include <zlib.h>
 #include "util.hpp"
 #include "nt.hpp"
 #include "range.hpp"
@@ -60,14 +61,22 @@ class BwaIndex {
     public:
 
     static void create(const std::string &fasta_fname, 
-                      const std::string &prefix = "") {
+                       const std::string &prefix = "",
+                       bool no_bwt=false) {
 
         std::string prefix_auto = prefix.empty() ? fasta_fname : prefix;
 
-        bwa_idx_build(fasta_fname.c_str(), 
-                      prefix.c_str(), 
-                      BWTALGO_AUTO,
-                      BWA_BLOCK_SIZE);
+        if (no_bwt) {
+            gzFile fp = xzopen(fasta_fname.c_str(), "r");
+            bns_fasta2bntseq(fp, prefix_auto.c_str(), 0);
+            err_gzclose(fp);
+
+        } else {
+            bwa_idx_build(fasta_fname.c_str(), 
+                          prefix.c_str(), 
+                          BWTALGO_AUTO,
+                          BWA_BLOCK_SIZE);
+        }
     }
 
     BwaIndex() :

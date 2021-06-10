@@ -36,6 +36,7 @@ class IndexParams(unc.config.ParamGroup):
 IndexParams._def_params(
     ("fasta_filename", None, str, "FASTA file to index"),
     ("index_prefix", None, str, "Index output prefix. Will use input fasta filename by default"),
+    ("no_bwt", False, bool, "Will only generate the pacseq if specified, which is much faster to build. Can only be used with DTW subcommands (NOT map, sim, or realtime)"),
     ("max_sample_dist", 100, int, "Maximum average sampling distance between reference alignments."),
     ("min_samples", 50000, int, "Minimum number of alignments to produce (approximate, due to deterministically random start locations),"),
     ("max_samples", 1000000, int, "Maximum number of alignments to produce (approximate, due to deterministically random start locations),"),
@@ -59,10 +60,10 @@ BWA_OPTS = (
 OPTS = (
     Opt("fasta_filename", "index"),
     Opt(("-o", "--index-prefix"), "index"),
+    Opt("--no-bwt", "index", action="store_true"),
     Opt(("-s", "--max-sample-dist"), "index"),
     Opt("--min-samples", "index"),
     Opt("--max-samples", "index"),
-    Opt(("-k", "--kmer-len"), "index"),
     Opt(("-1", "--matchpr1"), "index"),
     Opt(("-2", "--matchpr2"), "index"),
     Opt(("-f", "--pathlen-percentile"), "index"),
@@ -81,7 +82,7 @@ def main(config):
 
     bwa_built = True
 
-    for suff in unc.index.BWA_SUFFS:
+    for suff in unc.index.UNCL_SUFFS:
         if not os.path.exists(prms.index_prefix + suff):
             bwa_built = False
             break
@@ -89,7 +90,11 @@ def main(config):
     if bwa_built:
         sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % prms.index_prefix)
     else:
-        unc.BwaIndex.create(prms.fasta_filename, prms.index_prefix)
+        unc.BwaIndex.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
+        
+        if prms.no_bwt: 
+            sys.stderr.write("Pacseq built\n")
+            return
 
     sys.stderr.write("Initializing parameter search\n")
     p = unc.index.IndexParameterizer(prms)
@@ -123,12 +128,14 @@ ANN_SUFF = ".ann"
 BWT_SUFF = ".bwt"
 PAC_SUFF = ".pac" 
 SA_SUFF = ".sa"
-BWA_SUFFS = [AMB_SUFF, ANN_SUFF, BWT_SUFF, PAC_SUFF, SA_SUFF]
+NOBWT_SUFFS = [ANN_SUFF, AMB_SUFF, PAC_SUFF]
+UNCL_SUFFS = NOBWT_SUFFS + [UNCL_SUFF, PAC_SUFF, SA_SUFF]
 
-def check_prefix(path, check_uncl=True):
-    suffs = BWA_SUFFS
-    if check_uncl:
-        suffs.append(UNCL_SUFF)
+def check_prefix(path, no_bwt=False):
+    if no_bwt:
+        suffs = NOBWT_SUFFS
+    else:
+        suffs = UNCL_SUFFS
 
     for suff in suffs:
         fname = path+suff

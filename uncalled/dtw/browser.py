@@ -163,7 +163,8 @@ class RawBrowser:
         #)
 
         dpl = Dotplot(aln.index, proc_read, conf=self.conf)
-        dpl.add_aln(bcaln, False)
+        if not bcaln.empty:
+            dpl.add_aln(bcaln, False)
         dpl.add_aln(aln, True)
         dpl.show()
 
