@@ -16,10 +16,9 @@ from . import BcFast5Aln, ReadAln, Track, ref_coords
 
 #TODO make this better
 METHODS = {
-    "DTWd" : DTWd,
-    "DTWp" : DTWp,
+    "GuidedBDTW" : BandedDTW,
     "StaticBDTW" : StaticBDTW,
-    "GuidedBDTW" : BandedDTW
+    "DTW" : DTWd,
 }
 
 class AlignParams(ParamGroup):
@@ -36,16 +35,14 @@ AlignParams._def_params(
 
 OPTS = BWA_OPTS + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "align", required=True),
-    Opt(("-c", "--start-chunk"), "read_buffer"),
-    Opt(("-C", "--max-chunks"), "read_buffer"),
+    Opt(("-o", "--out-path"), "align"),
+    Opt(("-f", "--force-overwrite"), action="store_true", help="Will overwrite alignment track if one already exists"),
     Opt("--rna", fn="set_r94_rna"),
+    Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
     Opt("--method", "align", choices=METHODS.keys()),
     Opt(("-b", "--band-width"), "align"),
     Opt(("-s", "--band-shift"), "align"),
     Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
-    Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
-    Opt(("-f", "--force-overwrite"), action="store_true"),
-    Opt(("-o", "--out-path"), "align"),
 )
 
 def main(conf):
@@ -212,7 +209,7 @@ class GuidedDTW:
         ref_len = len(ref_kmers)
 
         #should maybe move to C++
-        if self.method == "GuidedBDTW":
+        if self.method == "GuidedDTW":
             band_count = qry_len + ref_len
             band_lls = list()
 

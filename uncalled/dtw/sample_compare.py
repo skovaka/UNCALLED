@@ -33,7 +33,7 @@ OPTS = (
 )
 
 def main(conf):
-    """Plot, analyze, and compare dtw alignment tracks interactively or to SVG"""
+    """Outputs a TSV file conaining Kolmogorov–Smirnov test statistics comparing the current and dwell time of two alignment tracks"""
 
     track_a = Track(conf.browser.track_a, conf=conf)
     mat_a = track_a.get_matrix()

@@ -1,5 +1,7 @@
 import time
 import numpy as np
+import os 
+
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter, FuncFormatter
@@ -22,6 +24,8 @@ DotplotParams._def_params(
 
 OPTS = [
     Opt("track", "dotplot"),
+    Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
+    Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
     Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
     Opt(("-C", "--max-chunks"), "read_buffer"),
@@ -47,7 +51,11 @@ def main(conf):
         if not bcaln.empty:
             dplt.add_aln(bcaln, False)
         dplt.add_aln(aln, True)
-        dplt.show()
+
+        if conf.out_prefix is None:
+            dplt.show()
+        else:
+            dplt.save(conf.out_prefix, conf.out_format)
 
 class Dotplot:
     def __init__(self, index, read, out_prefix=None, cursor=None, conf=None):
@@ -162,7 +170,7 @@ class Dotplot:
         return self.index.miref_to_ref(int(x))
 
     def _plot(self):
-        matplotlib.use("TkAgg")
+        #matplotlib.use("TkAgg")
         plt.style.use(['seaborn'])
 
         self.fig = plt.figure()
@@ -222,15 +230,15 @@ class Dotplot:
         plt.show()
         plt.close()
     
-    def save(self, out_prefix):
-        #self._init_plot()
+    def save(self, out_prefix, fmt):
+        self._plot()
 
-        suffix = read.id + ".png"
+        suffix = self.read.id + "." + fmt
         if os.path.isdir(out_prefix):
             out_fname = os.path.join(out_prefix, suffix)
         else:
             out_fname = out_prefix + suffix
 
         self.fig.set_size_inches(8, 6)
-        self.fig.savefig(out_fname, dpi=100)
+        self.fig.savefig(out_fname, dpi=200)
         plt.close()

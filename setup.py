@@ -151,7 +151,10 @@ setup(
 
     setup_requires=[
         'pybind11>=2.6.0', 
-        'read-until==3.0.0'
+        'read-until==3.0.0',
+        'pandas>=1.1.5',
+        'matplotlib>=3.3.4',
+        'scipy>=1.5.4',
     ],
 
     packages=find_packages(),

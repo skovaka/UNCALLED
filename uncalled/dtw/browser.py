@@ -1,17 +1,19 @@
 import sys, os
 import numpy as np
-import matplotlib.pyplot as plt
 import argparse
 from collections import defaultdict
 import re
 import time
+import types
+
+import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter, FuncFormatter
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
 from matplotlib import widgets
 import matplotlib
+
 import scipy.stats
-import types
 import pandas as pd
 
 from ..sigproc import ProcRead
@@ -40,16 +42,16 @@ OPTS = (
     Opt("ref_bounds", "align", type=ref_coords),
     Opt("track_a", "browser"),
     Opt("track_b", "browser", nargs="?"),
-    Opt("--rna", action = "store_true"),
     Opt(("-f", "--full-overlap"), "browser", action="store_true"),
-    Opt(("-s", "--seqsum"), type=str, default=None),
-    Opt(("-n", "--max-reads"), "fast5_reader"),
+    #Opt("--rna", action = "store_true"),
+    #Opt(("-s", "--seqsum"), type=str, default=None),
+    #Opt(("-n", "--max-reads"), "fast5_reader"),
 )
 
 def main(conf):
     """Plot, analyze, and compare dtw alignment tracks interactively or to SVG"""
 
-    matplotlib.use("TkAgg")
+    #matplotlib.use("TkAgg")
     plt.style.use(['seaborn'])
 
     browser = RawBrowser(conf)
@@ -408,8 +410,8 @@ class RawBrowser:
         self.fig.canvas.mpl_connect('button_press_event', self.down_click) 
         self.fig.canvas.mpl_connect('button_release_event', self.up_click) 
 
-        mng = plt.get_current_fig_manager()
-        mng.window.attributes('-zoomed', True)
+        #mng = plt.get_current_fig_manager()
+        #mng.window.attributes('-zoomed', True)
 
         plt.show()
 
