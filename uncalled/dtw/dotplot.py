@@ -44,7 +44,8 @@ def main(conf):
         print(read.id)
 
         dplt = Dotplot(aln.index, read, conf=conf)
-        dplt.add_aln(bcaln, False)
+        if not bcaln.empty:
+            dplt.add_aln(bcaln, False)
         dplt.add_aln(aln, True)
         dplt.show()
 
