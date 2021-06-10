@@ -13,7 +13,7 @@ except:
     from setuptools import Extension as Pybind11Extension
 
 
-__version__ = "2.2"
+__version__ = "3.0"
 
 ROOT_DIR = os.getcwd()
 
