@@ -295,7 +295,9 @@ Currently nanopolish eventalign **must** but run with the options `-n/--print-re
 
 ### `dotplot`
 
-Displays signal-to-reference dotplots from alignment tracks output by `uncalled dtw align` or `uncalled dtw convert`
+Displays signal-to-reference dotplots from alignment tracks output by `uncalled dtw align` or `uncalled dtw convert`. The signal is annotated by which base is assigned to stretches of signal: green for A, blue for C, red for G, orange for T. Horizontal white lines behind the signal plot represent the expected current level. The difference between the mean observed current and the expected current is plotted on the right side of the plot.
+
+If alignments were generated basecalled FAST5 files, will also display a dotplot of the basecalled alignment projected into signal space in orange.
 
 **Example:**
 
