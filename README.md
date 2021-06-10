@@ -39,13 +39,13 @@ Nature Biotechnology (2020)
 ## Installation
 
 ```
-> pip3 install git+https://github.com/skovaka/UNCALLED.git --user
+> pip3 install git+https://github.com/skovaka/UNCALLED.git@drna --user
 ```
 
 OR
 
 ```
-> git clone --recursive https://github.com/skovaka/UNCALLED.git
+> git clone --recursive https://github.com/skovaka/UNCALLED.git@drna
 > cd UNCALLED
 > python3 setup.py install --user
 ```
