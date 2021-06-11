@@ -209,6 +209,8 @@ class Dotplot:
 
         for i,aln in enumerate(self.alns):
 
+            aln.sort_refmir()
+
             if isinstance(aln, BcFast5Aln):
                 self._plot_aln_scatter(aln)
                 aln.plot_scatter(self.ax_dot, False)

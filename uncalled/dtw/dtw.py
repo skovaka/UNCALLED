@@ -17,7 +17,7 @@ from _uncalled import PORE_MODELS, BwaIndex, nt
 
 class ReadAln:
 
-    MIREF_COL  = "refmir"
+    REFMIR_COL  = "refmir"
     REF_COL    = "ref"
     START_COL  = "start"
     LENGTH_COL = "length"
@@ -45,17 +45,17 @@ class ReadAln:
             self.df = df[(df.index >= self.ref_start) & (df.index <= self.ref_end)]
 
             has_ref = self.df.index.name == self.REF_COL
-            has_refmir = self.MIREF_COL in self.df.columns
+            has_refmir = self.REFMIR_COL in self.df.columns
 
             #TODO check for required columns
             if not has_ref and not has_refmir:
-                raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % (self.REF_COL, self.MIREF_COL))
+                raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % (self.REF_COL, self.REFMIR_COL))
             
             if has_ref and not has_refmir:
-                self.df[self.MIREF_COL] = self.index.ref_to_refmir(self.ref_id, self.df.index, self.is_fwd, self.is_rna)
+                self.df[self.REFMIR_COL] = self.index.ref_to_refmir(self.ref_id, self.df.index, self.is_fwd, self.is_rna)
 
             elif not has_ref and has_refmir:
-                self.df[REF_COL] = self.index.mirref_to_ref(self.df[MIREF_COL])
+                self.df[REF_COL] = self.index.mirref_to_ref(self.df[REFMIR_COL])
 
             self.df.sort_values("refmir", inplace=True)
         
@@ -122,6 +122,12 @@ class ReadAln:
     @property
     def is_fwd(self):
         return self.ref_bounds[3]
+    
+    def sort_ref(self):
+        self.df.sort_values(self.REF_COL, inplace=True)
+
+    def sort_refmir(self):
+        self.df.sort_values(self.REFMIR_COL, inplace=True)
 
     def get_samp_bounds(self):
         samp_min = self.df['start'].min()
@@ -131,7 +137,7 @@ class ReadAln:
     
     #def set_bands(self, bands):
 
-    def set_subevent_aln(self, aln, ref_mirrored=False, kmer_str=False, ref_col=MIREF_COL, start_col=START_COL, length_col=LENGTH_COL, mean_col=MEAN_COL, kmer_col=KMER_COL):
+    def set_subevent_aln(self, aln, ref_mirrored=False, kmer_str=False, ref_col=REFMIR_COL, start_col=START_COL, length_col=LENGTH_COL, mean_col=MEAN_COL, kmer_col=KMER_COL):
 
         aln["cuml_mean"] = aln[length_col] * aln[mean_col]
 
@@ -159,7 +165,7 @@ class ReadAln:
         })
         
         if ref_mirrored:
-            self.df[self.MIREF_COL] = refmirs
+            self.df[self.REFMIR_COL] = refmirs
 
         self.df = self.df.set_index(self.REF_COL).sort_values(self.REF_COL)
         
