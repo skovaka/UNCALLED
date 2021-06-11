@@ -97,13 +97,13 @@ class Dotplot:
         self.alns.append(aln)
 
     def _plot_aln_scatter(self, aln):
-        self.ax_dot.scatter(aln.df['sample'], aln.df['miref'], color='orange', zorder=2,s=20)
+        self.ax_dot.scatter(aln.df['sample'], aln.df['refmir'], color='orange', zorder=2,s=20)
 
     def _plot_aln_step(self, aln):
         if getattr(aln, "bands", None) is not None:
             self.ax_dot.fill_between(aln.bands['samp'], aln.bands['ref_st']-1, aln.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
 
-        self.ax_dot.step(aln.df['start'], aln.df['miref'], where="post", color="purple", zorder=3, linewidth=3)
+        self.ax_dot.step(aln.df['start'], aln.df['refmir'], where="post", color="purple", zorder=3, linewidth=3)
         #if samp_min is None: samp_min = 0
         #if samp_max is None: samp_max = self.df['sample'].max()
         #i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
@@ -112,7 +112,7 @@ class Dotplot:
 
         pa_diffs = np.abs(aln.df['mean'] - self.model.get_mean(aln.df['kmer']))
 
-        self.ax_padiff.step(pa_diffs, aln.df['miref'], color="purple", where="post")
+        self.ax_padiff.step(pa_diffs, aln.df['refmir'], color="purple", where="post")
 
     def _plot_signal(self, aln):
         samp_min, samp_max = aln.get_samp_bounds()
@@ -167,7 +167,7 @@ class Dotplot:
         self.ax_dot.axhline(cursor_ref,  **cursor_kw)
 
     def _tick_formatter(self, x, pos):
-        return self.index.miref_to_ref(int(x))
+        return self.index.refmir_to_ref(int(x))
 
     def _plot(self):
         #matplotlib.use("TkAgg")

@@ -152,13 +152,13 @@ class GuidedDTW:
         if self.read.has_events:
             self.aln.df['sum'] = self.aln.df['signal'] * self.aln.df['length']
 
-        grp = self.aln.df.groupby("miref")
+        grp = self.aln.df.groupby("refmir")
         sigs = grp['signal']
 
-        ref_coords = np.abs(self.bcaln.y_min + grp['miref'].first())
+        ref_coords = np.abs(self.bcaln.y_min + grp['refmir'].first())
 
         self.events = pd.DataFrame({
-            "miref"   : ref_coords,
+            "refmir"   : ref_coords,
             "start"  : grp['sample'].min(),
             "kmer" : grp['kmer'].first(),
         })#.reset_index(drop=True)
@@ -209,7 +209,7 @@ class GuidedDTW:
         ref_len = len(ref_kmers)
 
         #should maybe move to C++
-        if self.method == "GuidedDTW":
+        if self.method == "GuidedBDTW":
             band_count = qry_len + ref_len
             band_lls = list()
 
@@ -221,7 +221,7 @@ class GuidedDTW:
                 band_lls.append( (int(q+shift), int(r-shift)) )
 
                 tgt = starts[q] if q < len(starts) else starts[-1]
-                if r <= self.bcaln.df.loc[tgt,'miref'] - ref_start:
+                if r <= self.bcaln.df.loc[tgt,'refmir'] - ref_start:
                     r += 1
                 else:
                     q += 1
@@ -267,7 +267,7 @@ class GuidedDTW:
         block_min = self.bcaln.df['sample'].searchsorted(self.samp_min)
         block_max = self.bcaln.df['sample'].searchsorted(self.samp_max)
 
-        y_min = self.aln.miref_start
+        y_min = self.aln.refmir_start
 
         block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
         block_ends   = np.append(self.bcaln.ref_gaps, block_max)
@@ -278,40 +278,39 @@ class GuidedDTW:
             samp_st = self.bcaln.df.loc[st,'sample']
             samp_en = self.bcaln.df.loc[en-1,'sample']
 
-            miref_st = self.bcaln.df.loc[st,"miref"]
-            miref_en = self.bcaln.df.loc[en-1,"miref"]
+            refmir_st = self.bcaln.df.loc[st,"refmir"]
+            refmir_en = self.bcaln.df.loc[en-1,"refmir"]
 
             read_block = self.read.sample_range(samp_st, samp_en)
 
             block_signal = read_block['norm_sig'].to_numpy()
-            block_kmers = self.ref_kmers[miref_st-self.aln.miref_start:miref_en-self.aln.miref_start]
+            block_kmers = self.ref_kmers[refmir_st-self.aln.refmir_start:refmir_en-self.aln.refmir_start]
 
-            args = self.get_dtw_args(read_block, miref_st, block_kmers)
+            args = self.get_dtw_args(read_block, refmir_st, block_kmers)
 
             dtw = self.dtw_fn(*args)
 
             #TODO flip in traceback
             path = np.flip(dtw.path)
-            print(list(dtw.path))
             path_qrys.append(read_block.index[path['qry']])
-            path_refs.append(miref_st + path['ref'])
+            path_refs.append(refmir_st + path['ref'])
 
             if hasattr(dtw, "ll"):
                 band_blocks.append(
-                    self.ll_to_df(dtw.ll, read_block, miref_st, len(block_kmers))
+                    self.ll_to_df(dtw.ll, read_block, refmir_st, len(block_kmers))
                 )
 
-        df = pd.DataFrame({'miref': np.concatenate(path_refs)}, 
+        df = pd.DataFrame({'refmir': np.concatenate(path_refs)}, 
                                index = np.concatenate(path_qrys),
                                dtype='Int32') \
                   .join(self.read.df) \
                   .drop(columns=['mean', 'stdv', 'mask'], errors='ignore') \
                   .rename(columns={'norm_sig' : 'mean'})
-        df['kmer'] = self.ref_kmers[df['miref'].astype(int)-y_min]
+        df['kmer'] = self.ref_kmers[df['refmir'].astype(int)-y_min]
 
         self.aln.set_subevent_aln(df, True)
 
-        #self.dtw['miref'] += self.bcaln.y_min
+        #self.dtw['refmir'] += self.bcaln.y_min
 
         if len(band_blocks) == 0:
             self.aln.bands = None
@@ -325,26 +324,26 @@ class GuidedDTW:
         self.events = pd.read_pickle(event_file).reset_index()
 
         block_min = self.bcaln.df['sample'].searchsorted(self.samp_min)
-        y_min1 = self.bcaln.df['miref'][block_min]
+        y_min1 = self.bcaln.df['refmir'][block_min]
 
-        y_min = self.events['miref'].min()
-        y_max = self.events['miref'].max()
+        y_min = self.events['refmir'].min()
+        y_max = self.events['refmir'].max()
 
         self.events = self.events.loc[(self.events['start'] >= self.samp_min) & (self.events['start'] <= self.samp_max)]#.reset_index(drop=True)
 
-        y_min2 = self.events['miref'].min()
+        y_min2 = self.events['refmir'].min()
 
         if self.bcaln.flip_ref:
-            self.events['idx'] = -self.events['miref'] + y_max
+            self.events['idx'] = -self.events['refmir'] + y_max
         else:
-            self.events['idx'] = self.events['miref'] - y_min
+            self.events['idx'] = self.events['refmir'] - y_min
 
         self.events.set_index('idx', inplace=True)
         self.events.sort_index(inplace=True)
 
-        self.aln.df = self.events.drop(columns=["miref"]) \
+        self.aln.df = self.events.drop(columns=["refmir"]) \
                               .reset_index() \
-                              .rename(columns={'idx' : 'miref', 'start' : 'sample', 'mean' : 'signal'})
+                              .rename(columns={'idx' : 'refmir', 'start' : 'sample', 'mean' : 'signal'})
         self.aln.df.reset_index()
         self.bands = None
 
@@ -353,7 +352,7 @@ class GuidedDTW:
         if self.bands is not None:
             ax.fill_between(self.bands['samp'], self.bands['ref_st']-1, self.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
 
-        return ax.step(self.aln.df['start'], self.aln.df['miref'],where="post",color="purple", zorder=3, linewidth=3)
+        return ax.step(self.aln.df['start'], self.aln.df['refmir'],where="post",color="purple", zorder=3, linewidth=3)
     
     def plot_signal(self, ax_sig):
         samp_min, samp_max = self.aln.get_samp_bounds()
@@ -403,7 +402,7 @@ class GuidedDTW:
 
         pa_diffs = np.abs(self.aln.df['mean'] - self.model.get_mean(self.aln.df['kmer']))
 
-        ax_padiff.step(pa_diffs, self.aln.df['miref'], color=c, where="post")
+        ax_padiff.step(pa_diffs, self.aln.df['refmir'], color=c, where="post")
 
 #TODO move to ReadAln
 def save(dtw, track):

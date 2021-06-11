@@ -17,7 +17,7 @@ from _uncalled import PORE_MODELS, BwaIndex, nt
 
 class ReadAln:
 
-    MIREF_COL  = "miref"
+    MIREF_COL  = "refmir"
     REF_COL    = "ref"
     START_COL  = "start"
     LENGTH_COL = "length"
@@ -45,19 +45,19 @@ class ReadAln:
             self.df = df[(df.index >= self.ref_start) & (df.index <= self.ref_end)]
 
             has_ref = self.df.index.name == self.REF_COL
-            has_miref = self.MIREF_COL in self.df.columns
+            has_refmir = self.MIREF_COL in self.df.columns
 
             #TODO check for required columns
-            if not has_ref and not has_miref:
+            if not has_ref and not has_refmir:
                 raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % (self.REF_COL, self.MIREF_COL))
             
-            if has_ref and not has_miref:
-                self.df[self.MIREF_COL] = self.index.ref_to_miref(self.ref_id, self.df.index, self.is_fwd, self.is_rna)
+            if has_ref and not has_refmir:
+                self.df[self.MIREF_COL] = self.index.ref_to_refmir(self.ref_id, self.df.index, self.is_fwd, self.is_rna)
 
-            elif not has_ref and has_miref:
+            elif not has_ref and has_refmir:
                 self.df[REF_COL] = self.index.mirref_to_ref(self.df[MIREF_COL])
 
-            self.df.sort_values("miref", inplace=True)
+            self.df.sort_values("refmir", inplace=True)
         
 
     def set_ref_bounds(self, aln, ref_bounds):
@@ -88,21 +88,21 @@ class ReadAln:
 
     #TODO ReadAln stores RefCoords, handles all this conversion?
 
-    def miref_to_ref(self, miref):
-        return self.index.miref_to_ref(miref) 
+    def refmir_to_ref(self, refmir):
+        return self.index.refmir_to_ref(refmir) 
 
-    def ref_to_miref(self, ref):
-        return self.index.ref_to_miref(self.ref_name, ref, ref, self.is_fwd, self.is_rna)[0]
+    def ref_to_refmir(self, ref):
+        return self.index.ref_to_refmir(self.ref_name, ref, ref, self.is_fwd, self.is_rna)[0]
 
     def ref_to_samp(self, ref):
-        return self.miref_to_samp(self.ref_to_miref(ref))
+        return self.refmir_to_samp(self.ref_to_refmir(ref))
         
-    def miref_to_samp(self, miref):
-        i = np.clip(self.df['miref'].searchsorted(miref), 0, len(self.df)-1)
+    def refmir_to_samp(self, refmir):
+        i = np.clip(self.df['refmir'].searchsorted(refmir), 0, len(self.df)-1)
         return self.df['sample'][i]
 
     def _init_mirror_coords(self):
-        self.miref_start, self.miref_end = self.index.ref_to_miref(*self.ref_bounds, self.is_rna)
+        self.refmir_start, self.refmir_end = self.index.ref_to_refmir(*self.ref_bounds, self.is_rna)
 
     @property
     def ref_name(self):
@@ -143,8 +143,8 @@ class ReadAln:
             kmers = grp[kmer_col].first()
 
         if ref_mirrored:
-            mirefs = grp[ref_col].first()
-            refs = self.miref_to_ref(mirefs)
+            refmirs = grp[ref_col].first()
+            refs = self.refmir_to_ref(refmirs)
         else:
             refs = grp[ref_col].first()
 
@@ -159,14 +159,14 @@ class ReadAln:
         })
         
         if ref_mirrored:
-            self.df[self.MIREF_COL] = mirefs
+            self.df[self.MIREF_COL] = refmirs
 
         self.df = self.df.set_index(self.REF_COL).sort_values(self.REF_COL)
         
 
     def get_index_kmers(self, index, kmer_shift=4):
         """Returns the k-mer sequence at the alignment reference coordinates"""
-        start = self.miref_start - kmer_shift
+        start = self.refmir_start - kmer_shift
 
         if start < 0:
             lpad = -start
@@ -174,7 +174,7 @@ class ReadAln:
         else:
             lpad = 0
 
-        kmers = index.get_kmers(start, self.miref_end, self.is_rna)
+        kmers = index.get_kmers(start, self.refmir_end, self.is_rna)
 
         return np.insert(kmers, 0, [0]*lpad)
     
@@ -497,7 +497,7 @@ class BcFast5Aln(ReadAln):
             'bp'     : np.cumsum(read.f5.moves),#[moves],
         })
 
-        self.df = samp_bps.join(self.bp_miref_aln, on='bp').dropna()
+        self.df = samp_bps.join(self.bp_refmir_aln, on='bp').dropna()
         self.df.reset_index(inplace=True, drop=True)
 
         if self.err_bps is not None:
@@ -517,7 +517,7 @@ class BcFast5Aln(ReadAln):
             return
 
         self.y_min = -paf.rf_en if self.flip_ref else paf.rf_st
-        self.y_max = self.y_min + self.df['miref'].max()
+        self.y_max = self.y_min + self.df['refmir'].max()
 
     def parse_cs(self, paf):
         cs = paf.tags.get('cs', (None,)*2)[0]
@@ -526,7 +526,7 @@ class BcFast5Aln(ReadAln):
         sys.stderr.write("Loading cs tag\n")
 
         #TODO rename to general cig/cs
-        bp_miref_aln = list()
+        bp_refmir_aln = list()
         err_bps = list()
 
         if self.seq_fwd:
@@ -536,7 +536,7 @@ class BcFast5Aln(ReadAln):
             qr_i = paf.qr_len - paf.qr_en 
             #rf_i = -paf.rf_en+1
 
-        mr_i = self.miref_start
+        mr_i = self.refmir_start
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
 
@@ -547,13 +547,13 @@ class BcFast5Aln(ReadAln):
             c = op[0]
             if c in {'=',':'}:
                 l = len(op[1]) if c == '=' else int(op[1])
-                bp_miref_aln += zip(range(qr_i, qr_i+l), range(mr_i, mr_i+l))
+                bp_refmir_aln += zip(range(qr_i, qr_i+l), range(mr_i, mr_i+l))
                 qr_i += l
                 mr_i += l
 
             elif c == '*':
                 self.sub_bps.append(qr_i)
-                bp_miref_aln.append((qr_i,mr_i))
+                bp_refmir_aln.append((qr_i,mr_i))
                 err_bps.append( (qr_i,mr_i,self.SUB) )
                 qr_i += 1
                 mr_i += 1
@@ -579,11 +579,11 @@ class BcFast5Aln(ReadAln):
             else:
                 print("UNIMPLEMENTED ", op)
 
-        self.bp_miref_aln = pd.DataFrame(bp_miref_aln, columns=["bp","miref"], dtype='Int64')
-        self.bp_miref_aln.set_index("bp", inplace=True)
+        self.bp_refmir_aln = pd.DataFrame(bp_refmir_aln, columns=["bp","refmir"], dtype='Int64')
+        self.bp_refmir_aln.set_index("bp", inplace=True)
 
         #TODO type shouldn't have to be 64 bit
-        self.err_bps = pd.DataFrame(err_bps, columns=["bp","miref","type"], dtype='Int64')
+        self.err_bps = pd.DataFrame(err_bps, columns=["bp","refmir","type"], dtype='Int64')
 
         return True        
 
@@ -592,21 +592,21 @@ class BcFast5Aln(ReadAln):
         cig = paf.tags.get('cg', (None,)*2)[0]
         if cig is None: return False
 
-        bp_miref_aln = list()#defaultdict(list)
+        bp_refmir_aln = list()#defaultdict(list)
         self.refgap_bps = list()
 
-        #mr_i = self.miref_start
+        #mr_i = self.refmir_start
         if self.seq_fwd:
             qr_i = paf.qr_st
         else:
             qr_i = paf.qr_len - paf.qr_en 
 
         if self.flip_ref:
-            mr_i = self.ref_to_miref(paf.rf_en)
+            mr_i = self.ref_to_refmir(paf.rf_en)
         else:
-            mr_i = self.ref_to_miref(paf.rf_st)
+            mr_i = self.ref_to_refmir(paf.rf_st)
 
-        mr_bounds = range(self.miref_start, self.miref_end)
+        mr_bounds = range(self.refmir_start, self.refmir_end)
 
         cig_ops = self.CIG_RE.findall(cig)
 
@@ -623,11 +623,11 @@ class BcFast5Aln(ReadAln):
             if c == "M":
                 for qr, mr in zip(range(qr_i, qr_j), range(mr_i, mr_j)):
                     if mr in mr_bounds:
-                        bp_miref_aln.append((qr,mr))
-                #bp_miref_aln += zip(range(qr_i, qr_j), range(mr_i, mr_j))
+                        bp_refmir_aln.append((qr,mr))
+                #bp_refmir_aln += zip(range(qr_i, qr_j), range(mr_i, mr_j))
             elif c == "N":
                 if mr_i in mr_bounds:
-                    bp_miref_aln.append((qr_i,mr))
+                    bp_refmir_aln.append((qr_i,mr))
 
             if incr_qr:
                 qr_i = qr_j 
@@ -635,32 +635,32 @@ class BcFast5Aln(ReadAln):
             if incr_rf:
                 mr_i = mr_j 
 
-        self.bp_miref_aln = pd.DataFrame(bp_miref_aln, columns=["bp","miref"], dtype='Int64')
-        self.bp_miref_aln.set_index("bp", inplace=True)
+        self.bp_refmir_aln = pd.DataFrame(bp_refmir_aln, columns=["bp","refmir"], dtype='Int64')
+        self.bp_refmir_aln.set_index("bp", inplace=True)
 
         return True
 
     def get_xy(self, i):
         df = self.df.loc[i]
-        return (df['sample'], df['miref']-0.5)
+        return (df['sample'], df['refmir']-0.5)
 
     def plot_scatter(self, ax, real_start=False, samp_min=None, samp_max=None):
         if samp_min is None: samp_min = 0
         if samp_max is None: samp_max = self.df['sample'].max()
         i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
 
-        return ax.scatter(self.df['sample'][i], self.df['miref'][i], color='orange', zorder=2,s=20)
+        return ax.scatter(self.df['sample'][i], self.df['refmir'][i], color='orange', zorder=2,s=20)
 
     def plot_step(self, ax, real_start=False, samp_min=None, samp_max=None):
         i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
 
-        ret = ax.step(self.df['sample'][i], self.df['miref'][i], color='orange', zorder=1, where='post')
+        ret = ax.step(self.df['sample'][i], self.df['refmir'][i], color='orange', zorder=1, where='post')
 
         if self.errs is not None:
             for t in self.ERR_TYPES:
                 e = self.errs[self.errs['type'] == t]
                 ax.scatter(
-                    e['sample'], e['miref'], 
+                    e['sample'], e['refmir'], 
                     color='red', zorder=3, 
                     s=self.ERR_SIZES[t],
                     linewidth=self.ERR_WIDTHS[t],

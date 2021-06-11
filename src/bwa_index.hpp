@@ -273,7 +273,7 @@ class BwaIndex {
         return pacseq_ != NULL;
     }
 
-    std::pair<u64, u64> ref_to_miref(const std::string &ref_name, u64 st, u64 en, bool is_fwd, bool is_rna) {
+    std::pair<u64, u64> ref_to_refmir(const std::string &ref_name, u64 st, u64 en, bool is_fwd, bool is_rna) {
         auto shift = get_pac_shift(ref_name);
 
         u64 pac_st = shift+st, pac_en = shift+en;
@@ -284,7 +284,7 @@ class BwaIndex {
         return {size() - pac_en, size() - pac_st};
     }
 
-    u64 ref_to_miref(i32 rid, u64 ref_coord, bool is_fwd, bool is_rna) {
+    u64 ref_to_refmir(i32 rid, u64 ref_coord, bool is_fwd, bool is_rna) {
         auto shift = bns_->anns[rid].offset;
         auto pac_coord = shift+ref_coord;
         auto flip = is_fwd == is_rna;
@@ -298,7 +298,7 @@ class BwaIndex {
     //    return get_kmers(mirs.first, mirs.second);
 
 
-    u64 miref_to_ref(u64 mirror_coord) {
+    u64 refmir_to_ref(u64 mirror_coord) {
         i64 pac;
         if (mirror_coord >= size() / 2) {
             pac = size() - mirror_coord;
@@ -502,9 +502,9 @@ class BwaIndex {
         c.def("get_ref_id", static_cast<i32 (BwaIndex::*)(u64)> (&BwaIndex::get_ref_id) );
         c.def("get_ref_id", static_cast<i32 (BwaIndex::*)(const std::string &)> (&BwaIndex::get_ref_id));
         //c.def("get_kmers_new", &BwaIndex::get_kmers_new);
-        c.def("ref_to_miref", static_cast<std::pair<u64,u64> (BwaIndex::*)(const std::string &, u64, u64, bool, bool)> (&BwaIndex::ref_to_miref));
-        c.def("ref_to_miref", pybind11::vectorize(static_cast<u64 (BwaIndex::*)(i32, u64, bool, bool)> (&BwaIndex::ref_to_miref)));
-        c.def("miref_to_ref", pybind11::vectorize(&BwaIndex::miref_to_ref));
+        c.def("ref_to_refmir", static_cast<std::pair<u64,u64> (BwaIndex::*)(const std::string &, u64, u64, bool, bool)> (&BwaIndex::ref_to_refmir));
+        c.def("ref_to_refmir", pybind11::vectorize(static_cast<u64 (BwaIndex::*)(i32, u64, bool, bool)> (&BwaIndex::ref_to_refmir)));
+        c.def("refmir_to_ref", pybind11::vectorize(&BwaIndex::refmir_to_ref));
         //c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(u64, u64)> (&BwaIndex::get_kmers) );
         c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(const std::string &, u64, u64)> (&BwaIndex::get_kmers) );
         c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(u64, u64, bool)> (&BwaIndex::get_kmers) );
