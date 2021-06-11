@@ -32,6 +32,8 @@ import inspect
 from _uncalled import _Conf
 from collections import namedtuple
 
+from . import __title__, __version__, __summary__
+
 FAST5_PARAM = "fast5_files"
 CONFIG_PARAM = "config_toml"
 SPECIAL_PARAMS = {FAST5_PARAM, CONFIG_PARAM}
@@ -188,8 +190,11 @@ class ArgParser:
 
         self.parser = argparse.ArgumentParser(
                 description=desc, 
-                formatter_class=argparse.ArgumentDefaultsHelpFormatter
+                formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                prog=__title__
         )
+
+        self.parser.add_argument("-v", "--version", action="version", version=__version__)
 
         self._add_subcmds(self.parser, subcmds)
 

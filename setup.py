@@ -12,8 +12,9 @@ try:
 except:
     from setuptools import Extension as Pybind11Extension
 
-
-__version__ = "3.0"
+about = {}
+with open("uncalled/__about__.py") as fp:
+    exec(fp.read(), about)
 
 ROOT_DIR = os.getcwd()
 
@@ -136,12 +137,12 @@ uncalled = Pybind11Extension(
 )
 
 setup(
-    name = "uncalled",
-    version = __version__,
-    description = "Rapidly maps raw nanopore signal to DNA references",
-    author = "Sam Kovaka",
-    author_email = "skovaka@gmail.com",
-    url = "https://github.com/skovaka/UNCALLED",
+    name = about["__title__"],
+    version = about["__version__"],
+    description = about["__summary__"],
+    author = about["__author__"],
+    author_email = about["__email__"],
+    url = about["__uri__"],
 
     classifiers=[
       "Programming Language :: Python :: 3"

@@ -1,3 +1,15 @@
+from .__about__ import (
+    __title__,
+    __version__, 
+    __summary__, 
+    __author__, 
+    __email__,  
+    __uri__,   
+    __license__,  
+    __copyright__,
+)
+
+
 from _uncalled import *
 from .read_until import ReadUntilClient
 from .config import Config, ArgParser
