@@ -215,7 +215,7 @@ Exactly one of `--deplete` or `--enrich` must be specified
 
 The `uncalled dtw` command consists of several subcommands for alignment, analysis, and visualizations of raw nanopore signal aligned via dynamic time warping. `uncalled dtw align` and `uncalled dtw convert` produce raw signal **alignment tracks**, which is a set of reads (typically from one sample) aligned to the same reference. The rest of the subcommands detailed below produce visualizations, analysis, and comparisons of alignment tracks.
 
-### `align`
+### align
 
 Aligns raw nanopore signal guided by basecaller output and minimap2 alignments.
 
@@ -244,7 +244,7 @@ Currently the **fast5 files must contain basecalling information** output by Gup
 - `-l/--read-filter` Will only align reads listed if included. Can be comma-separated list of IDs or text file containing one read ID per line.
 - `-r/--recursive` Will recursively search for fast5s if included
 
-### `convert`
+### convert
 
 Converts Nanopolish eventalign output and Tombo alignments to UNCALLED DTW alignment tracks. 
 
@@ -273,7 +273,7 @@ Currently nanopolish eventalign **must** but run with the options `-n/--print-re
 - `-l/--read-filter` Will only align reads listed if included. Can be comma-separated list of IDs or text file containing one read ID per line.
 - `-r/--recursive` Will recursively search for fast5s if included
 
-#### `convert tombo`
+#### convert tombo
 
 **Example:**
 
@@ -293,7 +293,7 @@ Currently nanopolish eventalign **must** but run with the options `-n/--print-re
 - `-l/--read-filter` Will only align reads listed if included. Can be comma-separated list of IDs or text file containing one read ID per line.
 - `-r/--recursive` Will recursively search for fast5s if included
 
-### `dotplot`
+### dotplot
 
 Displays signal-to-reference dotplots from alignment tracks output by `uncalled dtw align` or `uncalled dtw convert`. The signal is annotated by which base is assigned to stretches of signal: green for A, blue for C, red for G, orange for T. Horizontal white lines behind the signal plot represent the expected current level. The difference between the mean observed current and the expected current is plotted on the right side of the plot.
 
@@ -317,7 +317,7 @@ If no output prefix is specified this will display an interactive plot.
 - `-o/--out-prefix` If included will output images with specified prefix, otherwise will display interactive plot.
 - `-f/--out-format` Image output format ("svg" (defualt), "pdf", or "png")
 
-### `browser`
+### browser
 
 Displays a raw signal genome browser of one or two alignment tracks, including interactive plotting options and summary statistics. You can choose to display at each position for each read the mean current, the dwell time, or the difference between expected and observed current. You can also click on different locations to view reads statistics at that position and open dotplots of the selected read.
 
@@ -335,7 +335,7 @@ Displays a raw signal genome browser of one or two alignment tracks, including i
 **Optional arguments**
 - `-f/--full-overlap` Will only display reads which fully overlap the specified reference bounds
 
-### `sample_compare`
+### sample_compare
 
 Outputs a TSV file conaining Kolmogorov–Smirnov test statistics comparing the current and dwell time of two alignment tracks
 
