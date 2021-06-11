@@ -429,6 +429,7 @@ UNCALLED currently only supports reads sequenced with r9.4.1/r9.4 chemistry.
 
 ## Release Notes
 
+- v3.0: added DTW alignment, analysis, and visualization commands
 - v2.2: added event profiler which masks out pore stalls, and added compile-time debug options
 - v2.1: updated ReadUntil client for latest MinKNOW version, made `uncalled index` automatically build the BWA index, added hdf5 submodule, further automated installation by auto-building hdf5, switched to using setuptools, moved submodules to submods/
 - v2.0: released the ReadUntil simulator `uncalled sim`, which can predict how much enrichment UNCALLED could provide on a given reference, using a control and UNCALLED run as a template. _Also changed the format of certain arguments_: index prefix and fast5 list are now positional, and some flags have changed names.
