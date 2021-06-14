@@ -63,6 +63,7 @@ class ReadAln:
     def set_ref_bounds(self, aln, ref_bounds):
         if ref_bounds is None:
             self.ref_bounds = (aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
+            print("None", self.ref_bounds, self.is_rna)
         else:
             if aln.rf_st < ref_bounds[1]:
                 ref_st = ref_bounds[1]
@@ -180,6 +181,7 @@ class ReadAln:
         else:
             lpad = 0
 
+        print(start, self.refmir_end, self.is_rna, "AHAHSDF")
         kmers = index.get_kmers(start, self.refmir_end, self.is_rna)
 
         return np.insert(kmers, 0, [0]*lpad)
@@ -271,6 +273,7 @@ class Track:
             if mm2 is None: 
                 continue
             df = pd.read_pickle(read["aln_file"])
+            df.sort_index(inplace=True)
             mat._add_read(df, mm2)
 
         mat._flatten()

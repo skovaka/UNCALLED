@@ -80,7 +80,6 @@ def main(conf):
 
         dtw = GuidedDTW(idx, read, mm2s[read.id], conf)
 
-
         if dtw.empty:
             continue
 
@@ -280,6 +279,8 @@ class GuidedDTW:
 
             refmir_st = self.bcaln.df.loc[st,"refmir"]
             refmir_en = self.bcaln.df.loc[en-1,"refmir"]
+
+            print(samp_st, samp_en, refmir_st, refmir_en, self.aln.refmir_start, self.idx.refmir_to_ref(refmir_en))
 
             read_block = self.read.sample_range(samp_st, samp_en)
 
