@@ -18,7 +18,7 @@ from ..sigproc import ProcRead
 from ..config import Config, ParamGroup, Opt
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
-from .dtw import Track, TrackMatrix, ref_coords
+from .dtw import Track, ref_coords
 from .align import GuidedDTW, BcFast5Aln
 from .dotplot import Dotplot
 from _uncalled import BwaIndex, nt
@@ -37,8 +37,6 @@ def main(conf):
     """Outputs summary statistics comparing aligned current distibutions to the pore model"""
 
     track = Track(conf.track_in, conf=conf)
-    mat = track.get_matrix()
 
-    desc = scipy.stats.describe(mat[TrackMatrix.PA_LAYER], nan_policy='omit')
+    desc = scipy.stats.describe(track[Track.PA_LAYER])#, nan_policy='omit')
     print(desc)
-    print(mat._layers.shape, desc.mean.shape)

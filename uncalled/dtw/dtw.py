@@ -195,8 +195,6 @@ class Track:
     INDEX_FNAME = "filename_mapping.txt"
     INDEX_HEADER = "read_id\tfilename\taln_file"
 
-    #REF_LOCS = "read_id\tsample_start\tsample_end\tref_name\tref_start\tref_end\tstrand"
-
     #TODO make fast5_file alias for filename in Fast5Reader
     #also, in fast5 reader make static fast5 filename parser
 
@@ -204,7 +202,21 @@ class Track:
     READ_MODE = "r"
     MODES = {WRITE_MODE, READ_MODE}
 
-    def __init__(self, path, mode="r", conf=None, overwrite=False, index=None, mm2s=None):
+    KMER_LAYER = 0
+    PA_LAYER = 1
+    DWELL_LAYER = 2
+    PA_DIFF_LAYER = 3
+
+    KS_LAYERS = [PA_LAYER, DWELL_LAYER]
+
+    LAYER_META = [
+        ("K-mer",              False),
+        ("Current (pA)",       True),
+        ("Dwell Time (ms/bp)", True),
+        ("pA Difference",      True)
+    ]
+
+    def __init__(self, path, mode="r", ref_bounds=None, full_overlap=None, conf=None, overwrite=False, index=None, mm2s=None):
         self.path = path.strip("/")
         self.mode = mode
         self.index = index
@@ -228,9 +240,13 @@ class Track:
             self.conf.to_toml(self.config_filename)
             self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
 
+        print(ref_bounds)
+        #TODO make TrackParams, deal with kwargs
+        if ref_bounds is None:
+            ref_bounds = self.conf.align.ref_bounds
+
         #TODO arguments overload conf params
         if self.conf.align.mm2_paf is not None:
-            ref_bounds = self.conf.align.ref_bounds
             read_filter = set(self.conf.fast5_reader.read_filter)
             self.mm2s = {p.qr_name : p
                      for p in parse_paf(
@@ -242,6 +258,17 @@ class Track:
         #TODO static bwa_index parameters, or instance
         if self.index is None and len(self.conf.mapper.bwa_prefix) > 0:
             self.index = BwaIndex(self.conf.mapper.bwa_prefix, True)
+
+        #TODO PROBABLY NEED TO RETHINK FWD/REV COMPL, BUT EITHER WAY CLEAN THIS UP
+        model_name = self.conf.mapper.pore_model
+        if model_name.endswith("_compl"):
+            model_name = model_name[:-5]+"templ"
+        self.model = PORE_MODELS[model_name]
+
+        print(ref_bounds)
+
+        if ref_bounds is not None:
+            self.load_region(ref_bounds, full_overlap)
 
     @property
     def read_ids(self):
@@ -263,23 +290,100 @@ class Track:
         df = pd.read_pickle(self.aln_fname(read_id)).sort_index()
         return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd)
 
-    def get_matrix(self, ref_bounds=None, mm2_paf=None, partial_overlap=False):
+    #TODO parse mm2 every time to enable changing bounds
+    #eventually use some kind of tabix-like indexing
+    def load_region(self, ref_bounds=None, partial_overlap=False):
 
-        if ref_bounds is None:
-            ref_bounds = self.conf.align.ref_bounds
+        #self.mat = TrackMatrix(self, ref_bounds, self.mm2s, conf=self.conf)
 
-        mat = TrackMatrix(self, ref_bounds, self.mm2s, conf=self.conf)
+        self.ref_bounds = ref_bounds
+        self.width = self.ref_end-self.ref_start
+        self.height = None
+
+        read_meta = defaultdict(list)
+
+        read_rows = defaultdict(list)
+        mask_rows = list()
+
+        self.ref_coords = pd.Series(
+                np.arange(self.width, dtype=int),
+                index=pd.RangeIndex(self.ref_start, self.ref_end)
+        )
+
+        def _add_row(df, mm2_paf):
+
+            dtw_roi = df.loc[self.ref_start:self.ref_end-1]
+
+            xs = self.ref_coords.reindex(
+                self.ref_coords.index.intersection(dtw_roi.index)
+            )
+
+            roi_mask = np.ones(self.width)#, dtype=bool)
+            roi_mask[xs] = False
+            mask_rows.append(roi_mask)
+
+            pa_diffs = self.model.match_diff(dtw_roi['mean'], dtw_roi['kmer'])
+            dwell = 1000 * dtw_roi['length'] / self.conf.read_buffer.sample_rate
+
+            def _add_layer_row(layer, vals):
+                row = np.zeros(self.width)
+                row[xs] = vals
+                read_rows[layer].append(row)
+
+            _add_layer_row(self.KMER_LAYER, dtw_roi['kmer'])
+            _add_layer_row(self.PA_LAYER, dtw_roi['mean'])
+            _add_layer_row(self.PA_DIFF_LAYER, pa_diffs)
+            _add_layer_row(self.DWELL_LAYER, dwell)
+
+            read_meta['ref_start'].append(df.index.min())
+            read_meta['id'].append(mm2_paf.qr_name)
+            read_meta['fwd'].append(mm2_paf.is_fwd)
+
+            #self.mm2s[mm2_paf.qr_name] = mm2_paf
+
         for read_id,read in self.fname_mapping.iterrows():
             mm2 = self.mm2s.get(read_id, None)
             if mm2 is None: 
                 continue
             df = pd.read_pickle(read["aln_file"])
             df.sort_index(inplace=True)
-            mat._add_read(df, mm2)
+            _add_row(df, mm2)
 
-        mat._flatten()
+        self.reads = pd.DataFrame(read_meta) \
+                     .sort_values(['fwd', 'ref_start'], ascending=[False, True])
+
+        self.has_fwd = np.any(self.reads['fwd'])
+        self.has_rev = not np.all(self.reads['fwd'])
+
+        read_order = self.reads.index.to_numpy()
+
+        layer_names = sorted(read_rows.keys())
+
+        mat = np.stack([
+            np.stack(read_rows[l])[read_order] for l in layer_names
+        ])
+        mask = np.stack([np.stack(mask_rows)[read_order].astype(bool) for _ in layer_names])
+
+        self.mat = np.ma.masked_array(mat, mask=mask)
+
+        self.height = len(self.reads)
+
+        #self.layer_extrema = np.array([
+        #    [np.min(layer), np.max(layer)]
+        #    for layer in self.mat
+        #])
+        #TODO define get_soft_minmax(num_stdvs):
+
+        self.norms = [Normalize(np.min(layer), np.max(layer)) for layer in self.mat]
+        for l in [self.PA_LAYER, self.DWELL_LAYER]:
+            layer = self.mat[l]
+            self.norms[l].vmax = min(
+                layer.max(),
+                np.ma.median(layer) + 2 * layer.std()
+            )
 
         return mat
+
 
     def close(self):
         self.fname_mapping_file.close()
@@ -303,137 +407,9 @@ class Track:
     def aln_fname(self, read_id):
         return os.path.join(self.aln_dir, read_id+self.ALN_SUFFIX)
 
-class TrackMatrix:
-
-    KMER_LAYER = 0
-    PA_LAYER = 1
-    DWELL_LAYER = 2
-    PA_DIFF_LAYER = 3
-
-    KS_LAYERS = [PA_LAYER, DWELL_LAYER]
-
-    LAYER_META = [
-        ("K-mer",              False),
-        ("Current (pA)",       True),
-        ("Dwell Time (ms/bp)", True),
-        ("pA Difference",      True)
-    ]
-
-    def __init__(self, track, ref_bounds, mm2s, height=None, conf=None):
-        self.conf = conf if conf is not None else Config()
-        self.track = track
-
-        self.ref_bounds = ref_bounds
-        self.width = self.ref_end-self.ref_start
-        self.height = height
-
-        self._layers = defaultdict(list)
-        self.reads = defaultdict(list)
-        self.mask = list()
-        self.mm2s = dict()
-
-        model_name = self.conf.mapper.pore_model
-        #TODO probably need to rethink fwd/rev compl, but either way clean this up
-        if model_name.endswith("_compl"):
-            model_name = model_name[:-5]+"templ"
-
-        self.model = PORE_MODELS[model_name]
-
-        self.ref_to_x = pd.Series(
-                np.arange(self.width, dtype=int),
-                index=pd.RangeIndex(self.ref_start, self.ref_end)
-        )
-
-    def calc_ks(self, mat_b):
-        ks_stats = np.zeros((len(self.KS_LAYERS), self.width))
-
-        for i,l in enumerate(self.KS_LAYERS):
-            for rf in range(self.width):
-                a = self[l,:,rf][self.mask[:,rf]]
-                b = mat_b[l,:,rf][mat_b.mask[:,rf]]
-                ks_stats[i,rf] = scipy.stats.ks_2samp(a,b,mode="asymp")[0]
-
-        return ks_stats
-
-    def __getitem__(self, i):
-        return self._layers.__getitem__(i)
-    
-    @property
-    def kmer(self):
-        return self._layers[self.KMER_LAYER]
-
-    @property
-    def pa(self):
-        return self._layers[self.PA_LAYER]
-    
-    @property
-    def dwell(self):
-        return self._layers[self.DWELL_LAYER]
-    
-    @property
-    def pa_diff(self):
-        return self._layers[self.PA_DIFF_LAYER]
-
-    def _add_read(self, df, mm2_paf):
-
-        dtw_roi = df.loc[self.ref_start:self.ref_end-1]
-
-        xs = self.ref_to_x.reindex(self.ref_to_x.index.intersection(dtw_roi.index))
-
-        roi_mask = np.zeros(self.width)
-        roi_mask[xs] = True
-        self.mask.append(roi_mask)
-
-        pa_diffs = self.model.match_diff(dtw_roi['mean'], dtw_roi['kmer'])
-        dwell = 1000 * dtw_roi['length'] / self.conf.read_buffer.sample_rate
-
-        self._add_layer_row(self.KMER_LAYER, dtw_roi['kmer'], xs)
-        self._add_layer_row(self.PA_LAYER, dtw_roi['mean'], xs)
-        self._add_layer_row(self.PA_DIFF_LAYER, pa_diffs, xs)
-        self._add_layer_row(self.DWELL_LAYER, dwell, xs)
-
-        self.reads['ref_start'].append(df.index.min())
-        self.reads['id'].append(mm2_paf.qr_name)
-        self.reads['fwd'].append(mm2_paf.is_fwd)
-
-        self.mm2s[mm2_paf.qr_name] = mm2_paf
-
-    def _add_layer_row(self, layer, vals, xs):
-        row = np.zeros(self.width)
-        row[xs] = vals
-        self._layers[layer].append(row)
-        return row
-
-    def _flatten(self):
-        self.reads = pd.DataFrame(self.reads) \
-                     .sort_values(['fwd', 'ref_start'], ascending=[False, True])
-
-        self.has_fwd = np.any(self.reads['fwd'])
-        self.has_rev = not np.all(self.reads['fwd'])
-
-        read_order = self.reads.index.to_numpy()
-
-        layer_names = sorted(self._layers.keys())
-
-        self._layers = np.stack([
-            np.stack(self._layers[l])[read_order] for l in layer_names
-        ])
-        self.mask = np.stack(self.mask)[read_order].astype(bool)
-        self._layers[:,~self.mask] = np.nan
-
-        self.height = len(self.reads)
-
-        self.norms = [Normalize(np.min(l[self.mask]), np.max(l[self.mask])) for l in self._layers]
-        for l in [self.PA_LAYER, self.DWELL_LAYER]:
-            lmask = self._layers[l][self.mask]
-            self.norms[l].vmax = min(
-                lmask.max(),
-                np.median(lmask) + 2 * lmask.std()
-            )
-
     def sort(self, layer, ref):
-        order = np.argsort(self._layers[layer,:,ref])
-        self._layers = self._layers[:,order,:]
+        order = np.argsort(self.mat[layer,:,ref])
+        self.mat = self.mat[:,order,:]
         self.reads = self.reads.iloc[order]
 
     @property
@@ -447,6 +423,38 @@ class TrackMatrix:
     @property
     def ref_end(self):
         return self.ref_bounds[2]
+
+    def calc_ks(self, mat_b):
+        ks_stats = np.zeros((len(self.KS_LAYERS), self.width))
+
+        for i,l in enumerate(self.KS_LAYERS):
+            for rf in range(self.width):
+                a = self[l,:,rf][self.mask[:,rf]]
+                b = mat_b[l,:,rf][mat_b.mask[:,rf]]
+                ks_stats[i,rf] = scipy.stats.ks_2samp(a,b,mode="asymp")[0]
+
+        return ks_stats
+
+    def __getitem__(self, i):
+        return self.mat.__getitem__(i)
+    
+    @property
+    def kmer(self):
+        return self.mat[self.KMER_LAYER]
+
+    @property
+    def pa(self):
+        return self.mat[self.PA_LAYER]
+    
+    @property
+    def dwell(self):
+        return self.mat[self.DWELL_LAYER]
+    
+    @property
+    def pa_diff(self):
+        return self.mat[self.PA_DIFF_LAYER]
+
+
 
 def ref_coords(coord_str):
     spl = coord_str.split(":")
