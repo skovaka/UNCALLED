@@ -737,7 +737,7 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         //TODO: store in buffer, replace sa_checked
         
         //Reverse the reference coords so they both go L->R
-        u64 pac_end = fmi.fm_to_pac(fm); //fmi.size() - fmi.sa(s);
+        u64 pac_end = fmi.fm_to_refmir(fm); //fmi.size() - fmi.sa(s);
 
         //Add seed and store updated seed cluster
         auto clust = seed_tracker_.add_seed(
@@ -750,7 +750,7 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         u32 ref_len = path.move_count() + KLEN - 1;
         u64 pac_start = pac_end - ref_len;// + 1;
 
-        auto loc = fmi.pac_to_ref(pac_start, pac_end, read_.PRMS.seq_fwd);
+        auto loc = fmi.refmir_to_ref_bound(pac_start, pac_end, read_.PRMS.seq_fwd);
 
         meta_.seeds.push_back({
             ref_id  : loc.ref_id, 
@@ -786,7 +786,7 @@ u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
 }                  
 
 void Mapper::set_ref_loc(const SeedCluster &seeds) {
-    auto loc = fmi.pac_to_ref(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
+    auto loc = fmi.refmir_to_ref_bound(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
     
     u64 rd_st = event_to_bp(seeds.evt_st_ - PRMS.seed_len),
         rd_en = event_to_bp(seeds.evt_en_, true),

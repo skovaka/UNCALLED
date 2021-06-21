@@ -85,20 +85,42 @@ class ParamGroup:
 class Config(_Conf):
     _EXTRA_GROUPS = dict()
 
-    def __init__(self, toml=None):
+    def __init__(self, conf=None, toml=None):
         _Conf.__init__(self)
 
         for name,cls in self._EXTRA_GROUPS.items():
             setattr(self, name, cls())
+
+        if conf is not None:
+            self.load_config(conf)
         
         if toml is not None:
             self.load_toml(toml)
+
 
     def _param_writable(self, name, val, group=None):
         return (not self.is_default(name, group) and
                 not name.startswith("_") and
                 type(val) in TOML_TYPES and
                 (not hasattr(val, "__len__") or len(val) > 0))
+
+    def load_config(self, other, ignore_defaults=True):
+        for param in self._GLOBAL_PARAMS:
+            if not (ignore_defaults or other.is_default(param)):
+                setattr(self, param, copy.copy(getattr(other, param)))
+
+        for param, val in vars(other).items():
+            if not (ignore_defaults or other.is_default(param)):
+                setattr(self, param, copy.copy(val))
+
+        groups = other._PARAM_GROUPS + list(self._EXTRA_GROUPS.keys())
+
+        for group_name in groups:
+            ogroup = getattr(other, group_name)
+            sgroup = getattr(self, group_name)
+            for param in dir(ogroup):
+                if not (param.startswith("_") or (ignore_defaults and other.is_default(param, group_name))):
+                    setattr(sgroup, param, getattr(ogroup, param))
 
     def to_toml(self, filename=None):
         out = dict()

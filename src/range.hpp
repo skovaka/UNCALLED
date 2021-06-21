@@ -62,6 +62,18 @@ class Range {
     u64 length() const;
 
     friend bool operator< (const Range &q1, const Range &q2);
+
+    #ifdef PYBIND
+
+    #define PY_BWA_INDEX_METH(P) c.def(#P, &BwaIndex<KLEN>::P);
+
+    static void pybind_defs(pybind11::class_<Range> &c) {
+        c.def(pybind11::init<u64, u64>());
+        c.def_readwrite("start", &Range::start_);
+        c.def_readwrite("end", &Range::end_);
+    }
+    #endif
+
 };
 
 bool operator< (const Range &q1, const Range &q2);

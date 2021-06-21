@@ -67,7 +67,7 @@ def main(conf):
     fast5s = Fast5Processor(conf=conf)
 
     if conf.align.out_path is not None:
-        track = Track(conf.align.out_path, "w", conf=conf, overwrite=conf.force_overwrite)
+        track = Track(conf.align.out_path, "w", conf=conf, overwrite=conf.force_overwrite, index=idx)
     else:
         track = None
 
@@ -136,6 +136,7 @@ class GuidedDTW:
         self.samp_max = self.bcaln.df['sample'].max()
 
         self.ref_kmers = self.aln.get_index_kmers(self.idx)
+        self.load_kmers()
 
         if dtw_events is None:
             self.calc_dtw()
@@ -176,7 +177,7 @@ class GuidedDTW:
 
         shift = nt.K - 1
 
-        pac_st, pac_en = self.idx.mirror_ref_coords(self.ref_name, self.ref_min, self.ref_max, self.bcaln.is_fwd, not self.bcaln.seq_fwd)
+        pac_st, pac_en = self.idx.ref_to_refmir(self.ref_name, self.ref_min, self.ref_max, self.bcaln.is_fwd, not self.bcaln.seq_fwd)
         pac_st -= shift
 
         kmers2 = self.idx.get_kmers(pac_st, pac_en, not self.bcaln.seq_fwd)
@@ -192,15 +193,17 @@ class GuidedDTW:
             pad = 0
 
         kmers = np.array(self.idx.get_kmers(
-            self.bcaln.rf_name, st, en
+            self.bcaln.ref_name, st, en
         ))
-
 
         if self.bcaln.flip_ref:
             kmers = np.flip(nt.kmer_rev(kmers))
 
         if not self.bcaln.is_fwd:
             kmers = nt.kmer_comp(kmers)
+
+        print(list(kmers))
+        print(list(kmers3))
 
     def get_dtw_args(self, read_block, ref_start, ref_kmers):
         common = (read_block['norm_sig'].to_numpy(), ref_kmers, self.model)

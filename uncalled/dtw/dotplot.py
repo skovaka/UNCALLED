@@ -68,6 +68,8 @@ class Dotplot:
         self.alns = list()
         self.focus = set()
 
+        self.cursor = None
+
         model_name = self.conf.mapper.pore_model
 
         #TODO clean this up
@@ -150,27 +152,22 @@ class Dotplot:
         else:
             self.ax_sig.scatter(self.read.df['start'][evts], self.read.df['norm_sig'][evts], s=5, alpha=0.75, c="#777777") 
 
+    def set_cursor(self, ref_coord):
+        aln = self.alns[list(self.focus)[0]]
+        refmir = aln.ref_to_refmir(ref_coord)
 
-    def set_cursor(self, cursor):
-        cursor_kw = {
-            'color' : 'red', 
-            'alpha' : 0.5
-        }
-        if dtw.bcaln.flip_ref:
-            cursor_ref = np.abs(dtw.bcaln.y_min + cursor)
-        else:
-            cursor_ref = cursor - dtw.bcaln.y_min
-        i = dtw.dtw['ref'].searchsorted(cursor_ref)
-        cursor_samp = dtw.dtw.iloc[i]['sample'] + dtw.dtw.iloc[i]['length']/2
-        
-        self.ax_dot.axvline(cursor_samp, **cursor_kw),
-        self.ax_dot.axhline(cursor_ref,  **cursor_kw)
+        print(aln.df)
+        print(ref_coord, refmir)
+        i = aln.df['refmir'].searchsorted(refmir)
+        samp = aln.df.iloc[i]['start'] + aln.df.iloc[i]['length']/2
+
+        self.cursor = (samp, refmir)
 
     def _tick_formatter(self, x, pos):
         return self.index.refmir_to_ref(int(x))
 
     def _plot(self):
-        #matplotlib.use("TkAgg")
+        matplotlib.use("TkAgg")
         plt.style.use(['seaborn'])
 
         self.fig = plt.figure()
@@ -207,6 +204,16 @@ class Dotplot:
         
         self.ax_sig.set_title(self.read.id)
 
+
+        if self.cursor is not None:
+            cursor_kw = {
+                'color' : 'red', 
+                'alpha' : 0.5
+            }
+            samp, refmir = self.cursor
+            self.ax_dot.axvline(samp, **cursor_kw),
+            self.ax_dot.axhline(refmir,  **cursor_kw)
+
         for i,aln in enumerate(self.alns):
 
             aln.sort_refmir()
@@ -230,6 +237,7 @@ class Dotplot:
         self._plot()
 
         plt.show()
+        print("SHOWED")
         plt.close()
     
     def save(self, out_prefix, fmt):

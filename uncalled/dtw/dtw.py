@@ -10,6 +10,7 @@ from typing import NamedTuple
 from matplotlib.colors import Normalize
 import pandas as pd
 import scipy.stats
+import copy
 
 from ..pafstats import parse_paf, PafEntry
 from ..config import Config
@@ -63,7 +64,6 @@ class ReadAln:
     def set_ref_bounds(self, aln, ref_bounds):
         if ref_bounds is None:
             self.ref_bounds = (aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
-            print("None", self.ref_bounds, self.is_rna)
         else:
             if aln.rf_st < ref_bounds[1]:
                 ref_st = ref_bounds[1]
@@ -183,8 +183,9 @@ class ReadAln:
 
         print(start, self.refmir_end, self.is_rna, "AHAHSDF")
         kmers = index.get_kmers(start, self.refmir_end, self.is_rna)
+        return np.array(kmers)
 
-        return np.insert(kmers, 0, [0]*lpad)
+        #return np.insert(kmers, 0, [0]*lpad)
     
 class Track:
     CONF_FNAME = "conf.toml"
@@ -208,7 +209,7 @@ class Track:
         self.mode = mode
         self.index = index
 
-        self.conf = conf if conf is not None else Config()
+        self.conf = Config(conf)
 
         if mode == self.WRITE_MODE:
             os.makedirs(self.aln_dir, exist_ok=overwrite)
@@ -228,19 +229,19 @@ class Track:
             self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
 
         #TODO arguments overload conf params
-        if conf.align.mm2_paf is not None:
-            ref_bounds = conf.align.ref_bounds
-            read_filter = set(conf.fast5_reader.read_filter)
+        if self.conf.align.mm2_paf is not None:
+            ref_bounds = self.conf.align.ref_bounds
+            read_filter = set(self.conf.fast5_reader.read_filter)
             self.mm2s = {p.qr_name : p
                      for p in parse_paf(
                         self.conf.align.mm2_paf,
-                        ref_bounds=conf.align.ref_bounds,
-                        full_overlap=conf.browser.full_overlap,
+                        ref_bounds=self.conf.align.ref_bounds,
+                        full_overlap=self.conf.browser.full_overlap,
             )}
 
-        #TODO static bwa_index parameters?
-        if len(conf.mapper.bwa_prefix) > 0:
-            self.index = BwaIndex(conf.mapper.bwa_prefix, True)
+        #TODO static bwa_index parameters, or instance
+        if self.index is None and len(self.conf.mapper.bwa_prefix) > 0:
+            self.index = BwaIndex(self.conf.mapper.bwa_prefix, True)
 
     @property
     def read_ids(self):
@@ -350,7 +351,7 @@ class TrackMatrix:
             for rf in range(self.width):
                 a = self[l,:,rf][self.mask[:,rf]]
                 b = mat_b[l,:,rf][mat_b.mask[:,rf]]
-                ks_stats[i,rf] = scipy.stats.kstest(a,b)[0]
+                ks_stats[i,rf] = scipy.stats.ks_2samp(a,b,mode="asymp")[0]
 
         return ks_stats
 
@@ -418,6 +419,7 @@ class TrackMatrix:
             np.stack(self._layers[l])[read_order] for l in layer_names
         ])
         self.mask = np.stack(self.mask)[read_order].astype(bool)
+        self._layers[:,~self.mask] = np.nan
 
         self.height = len(self.reads)
 

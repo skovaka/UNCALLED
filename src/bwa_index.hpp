@@ -155,7 +155,7 @@ class BwaIndex {
         return Range(index_->L2[base], index_->L2[base+1]);
     }
 
-    u64 fm_to_pac(u64 fm) {
+    u64 fm_to_refmir(u64 fm) {
         return size() - bwt_sa(index_, fm);
     }
 
@@ -177,19 +177,26 @@ class BwaIndex {
         return -1;
     }
 
-    i32 get_ref_id(u64 sa_loc) {
-        return bns_pos2rid(bns_, sa_loc);
+    i32 get_ref_id(u64 ref) {
+        if (ref >= size() / 2) {
+            ref = size() - ref;
+        }
+        return bns_pos2rid(bns_, ref);
     }
 
     std::string get_ref_name(u32 rid) {
         return bns_->anns[rid].name;
     }
 
-    std::pair<u32, i32> get_ref_coord(u64 sa_loc) {
-        auto rid = get_ref_id(sa_loc);
+    std::pair<u32, i32> get_ref_coord(u64 ref) {
+        if (ref >= size() / 2) {
+            ref = size() - ref;
+        }
+
+        auto rid = get_ref_id(ref);
         return {
             rid, 
-            sa_loc - bns_->anns[rid].offset
+            ref - bns_->anns[rid].offset
         };
     }
 
@@ -208,7 +215,7 @@ class BwaIndex {
 
 
     //auto ref_loc = fmi.translate_loc(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
-    RefLoc pac_to_ref(u64 sa_start, u64 sa_end, bool read_fwd) const {
+    RefLoc refmir_to_ref_bound(u64 sa_start, u64 sa_end, bool read_fwd) const {
 
         //TODO work out sa vs pac vs half whatever
 
@@ -316,10 +323,10 @@ class BwaIndex {
     }
 
     std::vector<kmer_t> get_kmers(u64 mir_st, u64 mir_en, bool is_rna) {
-        bool flip = mir_st >= size() / 2;
+        bool flip = mir_en >= size() / 2;
 
         bool fwd = flip == is_rna;
-        
+
         auto st = mir_st, en = mir_en;
         if (flip) {
             st = size() - mir_en;
@@ -488,8 +495,9 @@ class BwaIndex {
         PY_BWA_INDEX_METH(get_kmer_count);
         PY_BWA_INDEX_METH(get_base_range);
         PY_BWA_INDEX_METH(sa);
+        PY_BWA_INDEX_METH(fm_to_refmir);
         PY_BWA_INDEX_METH(size);
-        PY_BWA_INDEX_METH(pac_to_ref);
+        PY_BWA_INDEX_METH(refmir_to_ref_bound);
         PY_BWA_INDEX_METH(get_seqs);
         PY_BWA_INDEX_METH(pacseq_loaded);
         PY_BWA_INDEX_METH(get_base);

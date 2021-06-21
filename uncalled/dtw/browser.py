@@ -51,7 +51,7 @@ OPTS = (
 def main(conf):
     """Plot, analyze, and compare dtw alignment tracks interactively or to SVG"""
 
-    #matplotlib.use("TkAgg")
+    matplotlib.use("TkAgg")
     plt.style.use(['seaborn'])
 
     browser = RawBrowser(conf)
@@ -109,7 +109,6 @@ class RawBrowser:
             sys.stderr.write("Loading %s track...\n" % path)
             track = Track(path, conf=self.conf)
             self.track_mats.append(track.get_matrix(ref_bounds))
-            self.conf.align.mm2_paf = None
         self.conf = track.conf
 
         if not self.single_track:
@@ -153,21 +152,11 @@ class RawBrowser:
         aln = track.load_aln(read.id)
         bcaln = BcFast5Aln(aln.index, proc_read, track.mm2s[read.id])
 
-        #bcaln = BcFast5Aln(proc_read, mat.mm2s[read.id])
-
-        #TODO shouldn't need GuidedDTW, just read_aln
-        #dtw = GuidedDTW(
-        #    self.idx, 
-        #    proc_read, 
-        #    bcaln, 
-        #    dtw_events=mat.track.aln_fname(read.id),
-        #    ref_bounds=mat.ref_bounds
-        #)
-
         dpl = Dotplot(aln.index, proc_read, conf=self.conf)
         if not bcaln.empty:
             dpl.add_aln(bcaln, False)
         dpl.add_aln(aln, True)
+        dpl.set_cursor(self.ref_start + rf)
         dpl.show()
 
 
@@ -211,9 +200,9 @@ class RawBrowser:
         rf, rd = int(event.xdata+0.5), int(event.ydata+0.5)
         self.set_cursor(mat_i, rf, rd)
 
-        if self.single_track:
-            self.set_info(mat, rf, rd)
-            self.plot_hists(mat, rf)
+        #if self.single_track:
+        self.set_info(mat, rf, rd)
+        self.plot_hists(mat, rf)
 
         self.fig.tight_layout()
         self.fig.canvas.draw()
@@ -434,8 +423,12 @@ class RawBrowser:
         self._init_sumstat_ks(gs_left[2])
 
 
-        gs_right = gspec[1].subgridspec(2, 1, height_ratios=[4,14], hspace=0.35)
+        #gs_right = gspec[1].subgridspec(2, 1, height_ratios=[4,14], hspace=0.35)
+        gs_right = gspec[1].subgridspec(5, 1, height_ratios=[4,5,4,4,1], hspace=0.35)
         self._init_layer_picker(gs_right[0])
+        self._init_info(gs_right[1])
+        self._init_hists(gs_right[2], gs_right[3])
+        self._init_btns(gs_right[4])
     
     @staticmethod
     def _noticks(ax, x=True, y=True):

@@ -84,6 +84,9 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Normalizer> norm(m, "Normalizer");
     Normalizer::pybind_defs(norm);
 
+    py::class_<Range> range(m, "Range");
+    Range::pybind_defs(range);
+
     py::class_< PoreModel<KLEN> > model(m, "PoreModel");
     PoreModel<KLEN>::pybind_defs(model);
     m.attr("PORE_MODELS") = py::cast(PORE_MODELS);
