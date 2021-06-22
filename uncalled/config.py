@@ -29,6 +29,7 @@ import numpy as np
 import uncalled as unc
 import toml
 import inspect
+import copy
 from _uncalled import _Conf
 from collections import namedtuple
 
@@ -106,11 +107,12 @@ class Config(_Conf):
 
     def load_config(self, other, ignore_defaults=True):
         for param in self._GLOBAL_PARAMS:
-            if not (ignore_defaults or other.is_default(param)):
+            if not (ignore_defaults and other.is_default(param)):
                 setattr(self, param, copy.copy(getattr(other, param)))
 
         for param, val in vars(other).items():
-            if not (ignore_defaults or other.is_default(param)):
+            print(param, val, ignore_defaults, other.is_default(param))
+            if not (ignore_defaults and other.is_default(param)):
                 setattr(self, param, copy.copy(val))
 
         groups = other._PARAM_GROUPS + list(self._EXTRA_GROUPS.keys())
@@ -185,13 +187,19 @@ class Config(_Conf):
         if group is None:
             sg = self
             dg = DEFAULTS
+
+            if not hasattr(dg, param) and hasattr(sg, param):
+                return False
+
         else:
             sg = getattr(self, group, None)
             dg = getattr(DEFAULTS, group, None)
-            if sg is None and dg is None:
-                return True
-            elif sg is None or dg is None:
-                return False
+
+        if sg is None and dg is None:
+            return True
+        elif sg is None or dg is None:
+            return False
+
 
         return getattr(sg, param, None) == getattr(dg, param, None)
 
@@ -296,6 +304,8 @@ class ArgParser:
                 else: 
                     group = self.config
                     param = name
+
+                print(name, value, group)
 
                 if value is not None or not hasattr(group, param):
                     setattr(group, param, value)

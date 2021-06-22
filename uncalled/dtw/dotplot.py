@@ -34,7 +34,7 @@ OPTS = [
 def main(conf):
     """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
 
-    track = Track(conf.dotplot.track, 'r', conf)
+    track = Track(conf.dotplot.track, 'r', conf=conf)
     conf = track.conf
 
     fast5s = Fast5Reader(conf=conf)
@@ -53,8 +53,10 @@ def main(conf):
         dplt.add_aln(aln, True)
 
         if conf.out_prefix is None:
+            print("SHOW")
             dplt.show()
         else:
+            print(conf.out_prefix)
             dplt.save(conf.out_prefix, conf.out_format)
 
 class Dotplot:
