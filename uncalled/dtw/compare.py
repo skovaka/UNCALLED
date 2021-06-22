@@ -36,14 +36,12 @@ def main(conf):
     """Outputs a TSV file conaining Kolmogorov–Smirnov test statistics comparing the current and dwell time of two alignment tracks"""
 
     track_a = Track(conf.browser.track_a, conf=conf)
-    mat_a = track_a.get_matrix()
     conf.align.mm2_paf = None
 
     track_b = Track(conf.browser.track_b, conf=conf)
-    mat_b = track_b.get_matrix()
     
     # , dtype=[   print(ks.dtype)
-    ks = pd.DataFrame(mat_a.calc_ks(mat_b).T, columns=[TrackMatrix.LAYER_META[l][0] for l in TrackMatrix.KS_LAYERS])
+    ks = pd.DataFrame(track_a.calc_ks(track_b).T, columns=[Track.LAYER_META[l][0] for l in Track.KS_LAYERS])
     
     csv = ks.to_csv(conf.outfile, sep="\t", index=False)
     if conf.outfile is None:

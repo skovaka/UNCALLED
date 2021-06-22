@@ -424,13 +424,13 @@ class Track:
     def ref_end(self):
         return self.ref_bounds[2]
 
-    def calc_ks(self, mat_b):
+    def calc_ks(self, track_b):
         ks_stats = np.zeros((len(self.KS_LAYERS), self.width))
 
         for i,l in enumerate(self.KS_LAYERS):
             for rf in range(self.width):
-                a = self[l,:,rf][self.mask[:,rf]]
-                b = mat_b[l,:,rf][mat_b.mask[:,rf]]
+                a = self[l,:,rf]
+                b = track_b[l,:,rf]
                 ks_stats[i,rf] = scipy.stats.ks_2samp(a,b,mode="asymp")[0]
 
         return ks_stats

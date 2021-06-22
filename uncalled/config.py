@@ -230,16 +230,21 @@ class ArgParser:
 
     def _add_subcmds(self, parser, subcmds):
         subparsers = parser.add_subparsers(title="subcommands")
-        for module in subcmds:
+        for subcmd in subcmds:
 
-            name = module.__name__.split(".")[-1]
-
-            main_func = getattr(module, "main", None)
-
-            if main_func is None:
-                desc = module.__doc__
+            if isinstance(subcmd, tuple):
+                subcmd, opts = subcmd
+                main_func = subcmd
             else:
+                opts = getattr(subcmd, "OPTS", None)
+                main_func = getattr(subcmd, "main", None)
+
+            name = subcmd.__name__.split(".")[-1]
+
+            if main_func is not None:
                 desc = main_func.__doc__
+            else:
+                desc = subcmd.__doc__
 
             sp = subparsers.add_parser(
                 name, help=desc, 
@@ -248,14 +253,14 @@ class ArgParser:
 
             if main_func is not None:
                 sp.set_defaults(_cmd=main_func)
-                for o in module.OPTS:
+                for o in opts:
                     if type(o) is Opt:
                         self._add_opt(sp, o)
                     elif type(o) is MutexOpts:
                         self._add_mutex_opts(sp, o)
 
-            elif hasattr(module, "SUBCMDS"):
-                self._add_subcmds(sp, module.SUBCMDS)
+            elif hasattr(subcmd, "SUBCMDS"):
+                self._add_subcmds(sp, subcmd.SUBCMDS)
 
             else:
                 raise RuntimeError("Subcommand module \"%s\" does not contain \"main\" function or \"SUBCMDS\" list" % module.__name__)

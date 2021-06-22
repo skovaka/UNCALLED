@@ -18,7 +18,7 @@ def main():
     cmd, conf = parser.parse_args()
 
     if cmd is not None:
-        cmd(conf)
+        cmd(conf=conf)
     else:
         parser.print_help()
 
