@@ -159,7 +159,7 @@ std::vector<float> EventDetector::get_means(const std::vector<float> &raw) {
     return events;
 }
 
-float EventDetector::get_mean() const {
+float EventDetector::kmer_current() const {
     return event_.mean;
 }
 

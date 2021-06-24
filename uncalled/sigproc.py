@@ -6,7 +6,7 @@ import numpy as np
 
 from .config import ParamGroup, Config
 from .pafstats import parse_paf
-from _uncalled import EventDetector, EventProfiler, Normalizer, PORE_MODELS, PoreModel
+from . import PoreModel, EventDetector, EventProfiler, Normalizer, PORE_MODELS
 
 #TODO refactor into SignalProcessor -> ProcRead
 #eventually turn into C++
@@ -107,16 +107,16 @@ class ProcRead:
         #if conf.normalizer.len
         if self.prms.normalizer is None and self.conf.normalizer.len > 0:
             #model = PORE_MODELS[self.conf.mapper.pore_model]
-            self.conf.normalizer.tgt_mean = self.model.get_means_mean()
-            self.conf.normalizer.tgt_stdv = self.model.get_means_stdv() #TODO set when pore model is set
+            self.conf.normalizer.tgt_mean = self.model.model_mean()
+            self.conf.normalizer.tgt_stdv = self.model.model_stdv() #TODO set when pore model is set
             self.prms.normalizer = Normalizer(self.conf.normalizer)
 
 
         #Full-read normalization
         if self.prms.normalizer is None:
             self.df.insert(self.df.shape[1], "norm_sig", 0)
-            self.scale = self.model.get_means_stdv() / np.std(signal)
-            self.shift = self.model.get_means_mean() - self.scale * np.mean(signal)
+            self.scale = self.model.model_stdv() / np.std(signal)
+            self.shift = self.model.model_mean() - self.scale * np.mean(signal)
             self.df.loc[self.df['mask'], "norm_sig"] = self.scale * signal + self.shift
             norm_params.append( (0, len(self.f5), self.scale, self.shift) )
         

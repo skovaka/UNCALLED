@@ -9,7 +9,7 @@ from ..config import Config, ArgParser, ParamGroup, Opt
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..sigproc import ProcRead
-from _uncalled import PORE_MODELS, BwaIndex, DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
+from .. import PORE_MODELS, BwaIndex, DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 
 from .dotplot import Dotplot
 from . import BcFast5Aln, ReadAln, Track, ref_coords
@@ -385,7 +385,7 @@ class GuidedDTW:
 
         ax_sig.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, alpha=0.75, c="#777777")
 
-        ax_sig.step(self.aln.df['start'], self.model.get_mean(self.aln.df['kmer']), color='white', linewidth=2, where="post")
+        ax_sig.step(self.aln.df['start'], self.model.kmer_current(self.aln.df['kmer']), color='white', linewidth=2, where="post")
 
         ax_sig.vlines(self.aln.df['start'], ymin, ymax, linewidth=2, color="white")
 
@@ -402,9 +402,9 @@ class GuidedDTW:
 
         self.plot_signal(ax_sig)
 
-        model_means = self.model.get_mean(self.aln.df['kmer'])
+        model_means = self.model.kmer_current(self.aln.df['kmer'])
 
-        pa_diffs = np.abs(self.aln.df['mean'] - self.model.get_mean(self.aln.df['kmer']))
+        pa_diffs = np.abs(self.aln.df['mean'] - self.model.kmer_current(self.aln.df['kmer']))
 
         ax_padiff.step(pa_diffs, self.aln.df['refmir'], color=c, where="post")
 

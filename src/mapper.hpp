@@ -325,7 +325,7 @@ class Mapper {
         u64 fm_start, fm_length;
         u16 kmer;
         u32 length, total_moves;
-        float match_prob, seed_prob;
+        float norm_pdf, seed_prob;
         moves_t moves_pac;
     };
 
@@ -396,7 +396,7 @@ class Mapper {
         PYBIND11_NUMPY_DTYPE(MetaSeed, ref_id, start, end, fwd, event, path, cluster);
 
         PYBIND11_NUMPY_DTYPE(MetaPath, event, id, parent, fm_start, fm_length, kmer, 
-                             length, total_moves, match_prob, seed_prob, moves_pac);
+                             length, total_moves, norm_pdf, seed_prob, moves_pac);
 
 
         //map.def_static("moves_to_u8", Mapper::moves_to_u8);

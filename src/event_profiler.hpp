@@ -83,9 +83,9 @@ class EventProfiler {
 
         if (window_.unread_size() <= WIN_MID) return false;
 
-        //float win_stdv = norm_scale_ * window_.get_stdv() + norm_shift_;
-        win_mean_ = window_.get_mean();
-        win_stdv_ = window_.get_stdv();
+        //float win_stdv = norm_scale_ * window_.kmer_stdv() + norm_shift_;
+        win_mean_ = window_.kmer_current();
+        win_stdv_ = window_.kmer_stdv();
         if (win_stdv_ < PRMS.win_stdv_min) {
             to_mask_ = PRMS.win_len-1;
         } else if (to_mask_ > 0) {

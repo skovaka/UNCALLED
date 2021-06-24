@@ -160,8 +160,8 @@ class DTWp {
     float score_sum_;
 
     float costfn(float pA, u16 kmer) {
-        return abs(pA-model_.get_mean(kmer));
-        //return -model_.match_prob(pA,kmer);
+        return abs(pA-model_.kmer_current(kmer));
+        //return -model_.norm_pdf(pA,kmer);
     }
 
     inline float hscore(u64 r, u64 q) {
@@ -222,7 +222,7 @@ class DTWd : public DTWp {
 
     private:
     float costfn(float pA, u16 kmer) {
-        return abs(pA-model_.get_mean(kmer));
+        return abs(pA-model_.kmer_current(kmer));
     }
 
     public:

@@ -87,7 +87,7 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Range> range(m, "Range");
     Range::pybind_defs(range);
 
-    py::class_< PoreModel<KLEN> > model(m, "PoreModel");
+    py::class_< PoreModel<KLEN> > model(m, "_PoreModel");
     PoreModel<KLEN>::pybind_defs(model);
     m.attr("PORE_MODELS") = py::cast(PORE_MODELS);
     //m.attr("pmodel_r94_dna_templ") = py::cast(pmodel_r94_dna_templ);
@@ -98,7 +98,7 @@ PYBIND11_MODULE(_uncalled, m) {
     m.def("self_align", &self_align);
 
     //BP operation functions
-    auto nt_module = m.def_submodule("nt", "Contains functions and constants for manipulating nucleotides and fixed length k-mers (5-mers) in binary format");
+    auto nt_module = m.def_submodule("_nt", "Contains functions and constants for manipulating nucleotides and fixed length k-mers (5-mers) in binary format");
     nt_pybind_defs<KLEN>(nt_module);
 
     m.def("unpack_moves", &unpack_moves);

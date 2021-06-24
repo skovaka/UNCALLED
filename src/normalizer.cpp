@@ -94,16 +94,16 @@ void Normalizer::reset(u32 buffer_size) {
     signal_[0] = 0;
 }
 
-float Normalizer::get_mean() const {
+float Normalizer::kmer_current() const {
     return mean_;
 }
 
-float Normalizer::get_stdv() const {
+float Normalizer::kmer_stdv() const {
     return sqrt(varsum_ / n_);
 }
 
 float Normalizer::get_scale() const {
-    return PRMS.tgt_stdv / get_stdv();
+    return PRMS.tgt_stdv / kmer_stdv();
 }
 
 float Normalizer::get_shift() const {

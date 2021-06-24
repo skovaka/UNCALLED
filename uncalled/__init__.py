@@ -14,8 +14,11 @@ from _uncalled import *
 from .read_until import ReadUntilClient
 from .config import Config, ArgParser
 from .fast5 import Fast5Reader
+from .pore_model import PoreModel
 from .sigproc import ProcRead
-from . import dtw
 
+from . import dtw
 from . import config
+from . import nt
+
 config.DEFAULTS = Config()

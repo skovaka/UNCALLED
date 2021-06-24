@@ -538,8 +538,8 @@ class DebugParser:
                     self.conf_dots.add( (e,r) )
 
             #kmer       =       tabs[C['kmer']]
-            #match_prob = float(tabs[C['match_prob']])
-            #self.seed_kmers[(e, refs[-1])] = (kmer, match_prob)
+            #norm_pdf = float(tabs[C['norm_pdf']])
+            #self.seed_kmers[(e, refs[-1])] = (kmer, norm_pdf)
 
 
             #print(path_id,parent,fm_start,fm_len,kmer,full_len,seed_prob,moves)

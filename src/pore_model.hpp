@@ -40,7 +40,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
-
 namespace py = pybind11;
 #endif
 
@@ -69,9 +68,9 @@ class PoreModel {
 
         kmer_count_ = kmer_count<KLEN>();
 
-        lv_means_.resize(kmer_count_);
-        lv_stdvs_.resize(kmer_count_);
-        lv_vars_x2_.resize(kmer_count_);
+        kmer_means_.resize(kmer_count_);
+        kmer_stdvs_.resize(kmer_count_);
+        kmer_2vars_.resize(kmer_count_);
         lognorm_denoms_.resize(kmer_count_);
 
         if (p.name.empty()) return;
@@ -161,41 +160,33 @@ class PoreModel {
         loaded_ = true;
     }
 
-    float match_prob(float samp, u16 kmer) const {
-        return (-pow(samp - lv_means_[kmer], 2) / lv_vars_x2_[kmer]) - lognorm_denoms_[kmer];
+    float norm_pdf(float samp, u16 kmer) const {
+        return (-pow(samp - kmer_means_[kmer], 2) / kmer_2vars_[kmer]) - lognorm_denoms_[kmer];
     }
 
     //TODO should be able to overload
     float match_prob_evt(const Event &evt, u16 kmer) const {
-        return match_prob(evt.mean, kmer);
+        return norm_pdf(evt.mean, kmer);
     }
 
-    float match_diff(float samp, u16 kmer) const {
-        return std::abs(samp - lv_means_[kmer]);
+    float abs_diff(float samp, u16 kmer) const {
+        return std::abs(samp - kmer_means_[kmer]);
     }
 
-    std::vector<float> match_probs(std::vector<float> means, std::vector<u16> kmers) const {
-        std::vector<float> probs(means.size());
-        for (u32 i = 0; i < means.size(); i++) {
-            probs[i] = match_prob(means[i], kmers[i]);
-        }
-        return probs;
-    }
-
-    float get_means_mean() const {
+    float model_mean() const {
         return model_mean_;
     }
 
-    float get_means_stdv() const {
+    float model_stdv() const {
         return model_stdv_;
     }
 
-    float get_mean(u16 kmer) const {
-        return lv_means_[kmer];
+    float kmer_current(u16 kmer) const {
+        return kmer_means_[kmer];
     }
 
-    float get_stdv(u16 kmer) const {
-        return lv_stdvs_[kmer];
+    float kmer_stdv(u16 kmer) const {
+        return kmer_stdvs_[kmer];
     }
 
     bool is_loaded() const {
@@ -208,8 +199,8 @@ class PoreModel {
               max_score = 0;
         std::vector<float> tp_scores(kmers.size());
         for (u64 i = 0; i < means.size(); i++) {
-            if (prob_score) tp_scores[i] = -match_prob(means[i], kmers[i]);
-            else tp_scores[i] = match_diff(means[i], kmers[i]);
+            if (prob_score) tp_scores[i] = -norm_pdf(means[i], kmers[i]);
+            else tp_scores[i] = abs_diff(means[i], kmers[i]);
             min_score = std::min(min_score, tp_scores[i]);
             max_score = std::max(max_score, tp_scores[i]);
         }
@@ -244,8 +235,8 @@ class PoreModel {
                 auto &tgt = is_true ? tp_counts : fp_counts;
 
                 float score;
-                if (prob_score) score = -match_prob(means[i], k);
-                else score = match_diff(means[i], k);
+                if (prob_score) score = -norm_pdf(means[i], k);
+                else score = abs_diff(means[i], k);
 
                 for (u64 t = 0; t < threshs.size(); t++) {
                     tgt[t] += score <= threshs[t];
@@ -270,7 +261,7 @@ class PoreModel {
     }
 
     private:
-    std::vector<float> lv_means_, lv_stdvs_, lv_vars_x2_, lognorm_denoms_;
+    std::vector<float> kmer_means_, kmer_stdvs_, kmer_2vars_, lognorm_denoms_;
     float model_mean_, model_stdv_;
     u16 kmer_count_;
     bool loaded_, compl_;
@@ -279,7 +270,7 @@ class PoreModel {
         model_stdv_ = 0;
 
         for (u16 kmer = 0; kmer < kmer_count_; kmer++) {
-            model_stdv_ += pow(lv_means_[kmer] - model_mean_, 2);
+            model_stdv_ += pow(kmer_means_[kmer] - model_mean_, 2);
         }
 
         model_stdv_ = sqrt(model_stdv_ / kmer_count_);
@@ -289,19 +280,21 @@ class PoreModel {
         if (PRMS.reverse)  k = kmer_rev<KLEN>(k);
         if (PRMS.complement) k = kmer_comp<KLEN>(k);
 
-        lv_means_[k] = mean;
-        lv_stdvs_[k] = stdv;
-        lv_vars_x2_[k] = 2 * stdv * stdv;
-        lognorm_denoms_[k] = log(sqrt(M_PI * lv_vars_x2_[k]));
+        kmer_means_[k] = mean;
+        kmer_stdvs_[k] = stdv;
+        kmer_2vars_[k] = 2 * stdv * stdv;
+        lognorm_denoms_[k] = log(sqrt(M_PI * kmer_2vars_[k]));
     }
 
     //void calc_roc_diff(std::vector<u16> kmers, std::vector<float> means, std::vector<float> threshs) {
-    //    calc_roc(kmers, means, threshs, &PoreModel<KLEN>::match_diff);
+    //    calc_roc(kmers, means, threshs, &PoreModel<KLEN>::abs_diff);
     //}
 
     #ifdef PYBIND
 
-    #define PY_PORE_MODEL_METH(P) c.def(#P, &PoreModel<KLEN>::P);
+    #define PY_MODEL_DEF(P, D) c.def(#P, &PoreModel<KLEN>::P, D);
+    #define PY_MODEL_DEFVEC(P, D) c.def(#P, py::vectorize(&PoreModel<KLEN>::P), D);
+    #define PY_MODEL_PROP(P, D) c.def_property_readonly(#P, &PoreModel<KLEN>::P, D);
 
     public:
 
@@ -309,18 +302,28 @@ class PoreModel {
         c.def(pybind11::init<const std::string &, bool, bool>(), 
               py::arg("name")=PRMS_DEF.name, py::arg("reverse")=PRMS_DEF.reverse, py::arg("complement")=PRMS_DEF.complement);
 
-        //PY_PORE_MODEL_METH(match_prob);
-        PY_PORE_MODEL_METH(match_probs);
-        PY_PORE_MODEL_METH(get_means_mean);
-        PY_PORE_MODEL_METH(get_means_stdv);
-        c.def("match_prob", pybind11::vectorize(&PoreModel<KLEN>::match_prob));
-        c.def("match_diff", pybind11::vectorize(&PoreModel<KLEN>::match_diff));
-        c.def("get_mean", pybind11::vectorize(&PoreModel<KLEN>::get_mean));
-        c.def("get_stdv", pybind11::vectorize(&PoreModel<KLEN>::get_stdv));
-        //PY_PORE_MODEL_METH(get_mean);
-        //PY_PORE_MODEL_METH(get_stdv);
-        PY_PORE_MODEL_METH(calc_roc);
-        c.def_property_readonly("kmer_count", &PoreModel::get_kmer_count);
+        //PY_MODEL_DEF(norm_pdf);
+        c.def_property_readonly("kmer_count", &PoreModel::get_kmer_count, "The number of k-mers in the model");
+        PY_MODEL_PROP(model_mean, "The mean of all model k-mer currents");
+        PY_MODEL_PROP(model_stdv, "The standard deviation of all model k-mer currents");
+
+        c.def_property_readonly("means", [](PoreModel<KLEN> &r) -> pybind11::array_t<float> {
+             return pybind11::array_t<float>(r.kmer_means_.size(), r.kmer_means_.data());
+        }, "The expected mean current of each k-mer");
+
+        c.def_property_readonly("stdvs", [](PoreModel<KLEN> &r) -> pybind11::array_t<float> {
+             return pybind11::array_t<float>(r.kmer_stdvs_.size(), r.kmer_stdvs_.data());
+        }, "The expected standard devaition of each k-mer");
+
+        PY_MODEL_DEFVEC(norm_pdf, "Returns the log probability that the current matches the k-mer based on the normal distibution probability density function");
+        PY_MODEL_DEFVEC(abs_diff, "Returns the absolute difference between the observed and model current");
+
+        c.def("__getitem__", py::vectorize(&PoreModel::kmer_current), "Alias for get_current()");
+
+        c.def("__len__", &PoreModel::get_kmer_count, "Alias for kmer_count");
+
+        PY_MODEL_DEF(calc_roc, "");
+
     }
 
     #endif

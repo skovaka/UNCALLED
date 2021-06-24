@@ -92,7 +92,7 @@ Mapper::Mapper() :
     event_i_ = 0;
     seed_tracker_.reset();
 
-    norm_.set_target(model.get_means_mean(), model.get_means_stdv());
+    norm_.set_target(model.model_mean(), model.model_stdv());
 }
 
 Mapper::Mapper(const Mapper &m) : Mapper() {}
@@ -469,7 +469,7 @@ bool Mapper::map_next() {
 
     //TODO: store kmer_probs_ in static array
     for (u16 kmer = 0; kmer < kmer_probs_.size(); kmer++) {
-        kmer_probs_[kmer] = model.match_prob(event, kmer);
+        kmer_probs_[kmer] = model.norm_pdf(event, kmer);
     }
 
     Range prev_range;
@@ -694,7 +694,7 @@ bool Mapper::map_next() {
             kmer        : p.kmer_,
             length      : p.length_,
             total_moves : p.total_moves_,
-            match_prob  : p.prob_head(),
+            norm_pdf  : p.prob_head(),
             seed_prob   : p.seed_prob_,
             moves_pac   : p.event_moves_
         });
@@ -975,7 +975,7 @@ void Mapper::meta_open_all() {
             << "fm_len\t"
             << "kmer\t"
             << "full_len\t"
-            << "match_prob\t"
+            << "norm_pdf\t"
             << "seed_prob\t"
             << "moves\n";
         #endif

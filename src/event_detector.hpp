@@ -50,7 +50,7 @@ class EventDetector {
     Event get_event() const;
     std::vector<Event> get_events(const std::vector<float> &raw);
 
-    float get_mean() const;
+    float kmer_current() const;
     std::vector<float> get_means(const std::vector<float> &raw);
 
     float mean_event_len() const;
@@ -97,7 +97,7 @@ class EventDetector {
         PY_EVTD_METH(add_sample, "");
         PY_EVTD_METH(get_event, "");
         PY_EVTD_METH(get_events, "");
-        PY_EVTD_METH(get_mean, "");
+        PY_EVTD_METH(kmer_current, "");
         PY_EVTD_METH(get_means, "");
         PY_EVTD_METH(mean_event_len, "");
 

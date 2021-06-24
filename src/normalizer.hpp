@@ -30,8 +30,8 @@ class Normalizer {
     void set_target(float tgt_mean, float tgt_stdv);
     void set_signal(const std::vector<float> &signal);
 
-    float get_mean() const;
-    float get_stdv() const;
+    float kmer_current() const;
+    float kmer_stdv() const;
 
     float get_scale() const;
     float get_shift() const;
@@ -63,8 +63,8 @@ class Normalizer {
         PY_NORM_METH(set_target, "Sets target mean and standard deviation");
         PY_NORM_METH(set_signal, "Sets full signal to normalize");
         PY_NORM_METH(set_length, "Sets the length of the rolling normalization window");
-        PY_NORM_METH(get_mean, "Returns the mean of the signal in the buffer");
-        PY_NORM_METH(get_stdv, "Return the standard deviation of the signal in the buffer");
+        PY_NORM_METH(kmer_current, "Returns the mean of the signal in the buffer");
+        PY_NORM_METH(kmer_stdv, "Return the standard deviation of the signal in the buffer");
         PY_NORM_METH(get_scale, "Returns the scaling parameter required to normalize the signal in the buffer to the target mean/stdv");
         //PY_NORM_METH(get_shift, "Returns the shift parameter required to normalize the signal in the buffer to the target mean/stdv");
 

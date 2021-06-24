@@ -110,17 +110,17 @@ int main(int argc, char** argv) {
 
         float read_mean = 0;
         for (u16 k : kmers) {
-            read_mean += model.get_mean(k);
+            read_mean += model.kmer_current(k);
         }
         read_mean /= kmers.size();
         float read_stdv = 0;
         for (u16 k : kmers) {
-            read_stdv += pow(model.get_mean(k) - read_mean, 2);
+            read_stdv += pow(model.kmer_current(k) - read_mean, 2);
         }
         read_stdv = sqrt(read_stdv / kmers.size());
         Normalizer norm(read_mean, read_stdv);
 
-        //Normalizer norm(model.get_means_mean(), model.get_means_stdv());
+        //Normalizer norm(model.model_mean(), model.model_stdv());
 
         //Get raw signal
         auto &full_raw = read.get_signal();

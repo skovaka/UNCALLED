@@ -14,7 +14,7 @@ import copy
 
 from ..pafstats import parse_paf, PafEntry
 from ..config import Config, Opt
-from _uncalled import PORE_MODELS, BwaIndex, nt, PoreModel
+from .. import PORE_MODELS, BwaIndex, nt, PoreModel
 
 class ReadAln:
 
@@ -327,8 +327,8 @@ class Track:
             mask_rows.append(roi_mask)
 
 
-            pa_diffs = dtw_roi["mean"] - self.model.get_mean(dtw_roi["kmer"])
-            #pa_diffs = self.model.match_diff(dtw_roi['mean'], dtw_roi['kmer'])
+            pa_diffs = dtw_roi["mean"] - self.model.kmer_current(dtw_roi["kmer"])
+            #pa_diffs = self.model.abs_diff(dtw_roi['mean'], dtw_roi['kmer'])
             dwell = 1000 * dtw_roi['length'] / self.conf.read_buffer.sample_rate
 
             def _add_layer_row(layer, vals):

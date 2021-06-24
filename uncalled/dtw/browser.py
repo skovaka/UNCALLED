@@ -16,6 +16,8 @@ import matplotlib
 import scipy.stats
 import pandas as pd
 
+from .. import BwaIndex, nt
+
 from ..sigproc import ProcRead
 from ..config import Config, ParamGroup, Opt
 from ..index import BWA_OPTS
@@ -23,7 +25,6 @@ from ..fast5 import Fast5Reader
 from .dtw import Track, ref_coords
 from .align import GuidedDTW, BcFast5Aln
 from .dotplot import Dotplot
-from _uncalled import BwaIndex, nt
 
 CMAP = "viridis"
 #CMAP = "plasma"
@@ -301,8 +302,8 @@ class RawBrowser:
             self.axs.dwell_hist.hist(dwell_fwd, bins=dwell_bins, **fwd_kw)
 
             kmer = int(scipy.stats.mode(track[self.KMER_LAYER,track.reads['fwd'],rf]).mode[0])
-            exp_mean = track.model.get_mean(kmer)
-            exp_stdv = track.model.get_stdv(kmer)
+            exp_mean = track.model.kmer_current(kmer)
+            exp_stdv = track.model.kmer_stdv(kmer)
 
             slop = pa_span*0.05
             xs = np.linspace(pa_min-slop, pa_max+slop, 100)
@@ -314,8 +315,8 @@ class RawBrowser:
             self.axs.dwell_hist.hist(dwell_rev, bins=dwell_bins, **rev_kw)
 
             kmer = int(scipy.stats.mode(track[self.KMER_LAYER,~fwds,rf]).mode[0])
-            exp_mean = track.model.get_mean(kmer)
-            exp_stdv = track.model.get_stdv(kmer)
+            exp_mean = track.model.kmer_current(kmer)
+            exp_stdv = track.model.kmer_stdv(kmer)
             slop = pa_span*0.05
             xs = np.linspace(pa_min-slop, pa_max+slop, 100)
             ys = scipy.stats.norm.pdf(xs, exp_mean, exp_stdv)

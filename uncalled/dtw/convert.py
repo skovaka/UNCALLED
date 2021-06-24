@@ -11,7 +11,7 @@ from .dtw import ReadAln, Track, ref_coords
 from ..config import Config, ArgParser, ParamGroup, Opt
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..index import BWA_OPTS
-from _uncalled import nt, PORE_MODELS, PoreModel
+from .. import nt, PORE_MODELS, PoreModel
 
 import progressbar as progbar
 
@@ -131,8 +131,8 @@ def tombo(conf):
             
             signal = tombo_events["norm_mean"]
             model = PoreModel("/home/skovaka/Dropbox/results/unc/ecoli_drna/r94_rna_tombo.txt", False)
-            scale = MODELS[is_rna].get_means_stdv() / np.std(signal)
-            shift = MODELS[is_rna].get_means_mean() - scale * np.mean(signal)
+            scale = MODELS[is_rna].model_stdv() / np.std(signal)
+            shift = MODELS[is_rna].model_mean() - scale * np.mean(signal)
             signal = scale * signal + shift
 
             if not sig_fwd:

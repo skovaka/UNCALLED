@@ -334,8 +334,8 @@ class BandedDTW {
     protected:
 
     float costfn(float pA, u16 kmer) {
-        return abs(pA-model_.get_mean(kmer));
-        //return -model_.match_prob(pA,kmer);
+        return abs(pA-model_.kmer_current(kmer));
+        //return -model_.norm_pdf(pA,kmer);
     }
 
     public:
