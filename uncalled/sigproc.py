@@ -6,7 +6,7 @@ import numpy as np
 
 from .config import ParamGroup, Config
 from .pafstats import parse_paf
-from _uncalled import EventDetector, EventProfiler, Normalizer, PORE_MODELS
+from _uncalled import EventDetector, EventProfiler, Normalizer, PORE_MODELS, PoreModel
 
 #TODO refactor into SignalProcessor -> ProcRead
 #eventually turn into C++
@@ -31,9 +31,12 @@ class ProcRead:
 
         #TODO probably need to rethink fwd/rev compl, but either way clean this up
         model_name = self.conf.mapper.pore_model
-        if model_name.endswith("_compl"):
-            model_name = model_name[:-5]+"templ"
-        self.model = PORE_MODELS[model_name]
+        if os.path.exists(model_name):
+            self.model = PoreModel(model_name, False)
+        else:
+            if model_name.endswith("_compl"):
+                model_name = model_name[:-5]+"templ"
+            self.model = PORE_MODELS[model_name]
 
         self.prms = conf.proc_read
         self.has_events = self.prms.detect_events
@@ -103,9 +106,9 @@ class ProcRead:
 
         #if conf.normalizer.len
         if self.prms.normalizer is None and self.conf.normalizer.len > 0:
-            model = PORE_MODELS[self.conf.mapper.pore_model]
-            self.conf.normalizer.tgt_mean = model.get_means_mean()
-            self.conf.normalizer.tgt_stdv = model.get_means_stdv() #TODO set when pore model is set
+            #model = PORE_MODELS[self.conf.mapper.pore_model]
+            self.conf.normalizer.tgt_mean = self.model.get_means_mean()
+            self.conf.normalizer.tgt_stdv = self.model.get_means_stdv() #TODO set when pore model is set
             self.prms.normalizer = Normalizer(self.conf.normalizer)
 
 

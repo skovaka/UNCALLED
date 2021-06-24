@@ -72,13 +72,11 @@ class Dotplot:
 
         self.cursor = None
 
-        model_name = self.conf.mapper.pore_model
+        #model_name = self.conf.mapper.pore_model
+        #if model_name.endswith("_compl"):
+        #    model_name = model_name[:-5]+"templ"
 
-        #TODO clean this up
-        if model_name.endswith("_compl"):
-            model_name = model_name[:-5]+"templ"
-
-        self.model = PORE_MODELS[model_name]
+        self.model = self.read.model#PORE_MODELS[model_name]
 
     def add_aln(self, aln, focus=False):
         if self.read.id is not None and self.read.id != aln.read_id:

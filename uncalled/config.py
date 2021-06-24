@@ -111,8 +111,7 @@ class Config(_Conf):
                 setattr(self, param, copy.copy(getattr(other, param)))
 
         for param, val in vars(other).items():
-            print(param, val, ignore_defaults, other.is_default(param))
-            if not (ignore_defaults and other.is_default(param)):
+            if not (isinstance(val, ParamGroup) or (ignore_defaults and other.is_default(param))):
                 setattr(self, param, copy.copy(val))
 
         groups = other._PARAM_GROUPS + list(self._EXTRA_GROUPS.keys())
@@ -122,6 +121,7 @@ class Config(_Conf):
             sgroup = getattr(self, group_name)
             for param in dir(ogroup):
                 if not (param.startswith("_") or (ignore_defaults and other.is_default(param, group_name))):
+                    #print(sgroup, param, getattr(ogroup, param))
                     setattr(sgroup, param, getattr(ogroup, param))
 
     def to_toml(self, filename=None):
@@ -263,7 +263,7 @@ class ArgParser:
                 self._add_subcmds(sp, subcmd.SUBCMDS)
 
             else:
-                raise RuntimeError("Subcommand module \"%s\" does not contain \"main\" function or \"SUBCMDS\" list" % module.__name__)
+                raise RuntimeError("Subcommand module \"%s\" does not contain \"main\" function or \"SUBCMDS\" list" % subcmd.__name__)
 
     def _add_opt(self, parser, opt):
         arg = parser.add_argument(*opt.args, **opt.get_kwargs(self.config))
@@ -309,8 +309,6 @@ class ArgParser:
                 else: 
                     group = self.config
                     param = name
-
-                print(name, value, group)
 
                 if value is not None or not hasattr(group, param):
                     setattr(group, param, value)

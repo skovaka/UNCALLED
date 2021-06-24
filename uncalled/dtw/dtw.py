@@ -13,8 +13,8 @@ import scipy.stats
 import copy
 
 from ..pafstats import parse_paf, PafEntry
-from ..config import Config
-from _uncalled import PORE_MODELS, BwaIndex, nt
+from ..config import Config, Opt
+from _uncalled import PORE_MODELS, BwaIndex, nt, PoreModel
 
 class ReadAln:
 
@@ -181,11 +181,11 @@ class ReadAln:
         else:
             lpad = 0
 
-        print(start, self.refmir_end, self.is_rna, "AHAHSDF")
         kmers = index.get_kmers(start, self.refmir_end, self.is_rna)
         return np.array(kmers)
 
         #return np.insert(kmers, 0, [0]*lpad)
+
     
 class Track:
     CONF_FNAME = "conf.toml"
@@ -207,7 +207,11 @@ class Track:
     DWELL_LAYER = 2
     PA_DIFF_LAYER = 3
 
-    KS_LAYERS = [PA_LAYER, DWELL_LAYER]
+    CMP_LAYERS = [PA_LAYER, DWELL_LAYER]
+
+    LAYER_NAMES = ["kmer", "current", "dwell", "model_diff"]
+
+    #TODO settle on pa_mean, cur_mean, current, level_mean, ...?
 
     LAYER_META = [
         ("K-mer",              False),
@@ -240,7 +244,6 @@ class Track:
             self.conf.to_toml(self.config_filename)
             self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
 
-        print(ref_bounds)
         #TODO make TrackParams, deal with kwargs
         if ref_bounds is None:
             ref_bounds = self.conf.align.ref_bounds
@@ -261,11 +264,12 @@ class Track:
 
         #TODO PROBABLY NEED TO RETHINK FWD/REV COMPL, BUT EITHER WAY CLEAN THIS UP
         model_name = self.conf.mapper.pore_model
-        if model_name.endswith("_compl"):
-            model_name = model_name[:-5]+"templ"
-        self.model = PORE_MODELS[model_name]
-
-        print(ref_bounds)
+        if os.path.exists(model_name):
+            self.model = PoreModel(model_name, False)
+        else:
+            if model_name.endswith("_compl"):
+                model_name = model_name[:-5]+"templ"
+            self.model = PORE_MODELS[model_name]
 
         if ref_bounds is not None:
             self.load_region(ref_bounds, full_overlap)
@@ -322,7 +326,9 @@ class Track:
             roi_mask[xs] = False
             mask_rows.append(roi_mask)
 
-            pa_diffs = self.model.match_diff(dtw_roi['mean'], dtw_roi['kmer'])
+
+            pa_diffs = dtw_roi["mean"] - self.model.get_mean(dtw_roi["kmer"])
+            #pa_diffs = self.model.match_diff(dtw_roi['mean'], dtw_roi['kmer'])
             dwell = 1000 * dtw_roi['length'] / self.conf.read_buffer.sample_rate
 
             def _add_layer_row(layer, vals):
@@ -425,9 +431,9 @@ class Track:
         return self.ref_bounds[2]
 
     def calc_ks(self, track_b):
-        ks_stats = np.zeros((len(self.KS_LAYERS), self.width))
+        ks_stats = np.zeros((len(self.CMP_LAYERS), self.width))
 
-        for i,l in enumerate(self.KS_LAYERS):
+        for i,l in enumerate(self.CMP_LAYERS):
             for rf in range(self.width):
                 a = self[l,:,rf]
                 b = track_b[l,:,rf]
@@ -687,4 +693,89 @@ class BcFast5Aln(ReadAln):
                 )
 
         return ret
+
+def _load_track_arg(arg_track, conf_track, conf):
+    track = arg_track if arg_track is not None else conf_track
+    if isinstance(track, str):
+        return Track(track, conf=conf)
+    elif isinstance(track, Track):
+        return track
+    raise RuntimeError("Track must either be path to alignment track or Track instance")
+
+COMPARE_OPTS = (
+    Opt("ref_bounds", "align", type=ref_coords),
+    Opt("track_a", "browser"),
+    Opt("track_b", "browser"),
+    Opt(("-f", "--full-overlap"), "browser", action="store_true"),
+    #Opt(("-o", "--outfile"), type=str, default=None),
+)
+
+def compare(track_a=None, track_b=None, full_overlap=None, conf=None):
+    """Outputs a TSV file conaining Kolmogorov–Smirnov test statistics comparing the current and dwell time of two alignment tracks"""
+
+    if conf is None:
+        conf = conf if conf is not None else Config()
+
+    if full_overlap is not None:
+        conf.browser.full_overlap = full_overlap
+
+    track_a = _load_track_arg(track_a, conf.browser.track_a, conf)
+    track_b = _load_track_arg(track_b, conf.browser.track_b, conf)
+
+    ks_stats = np.recarray(
+        track_a.width,
+        dtype=[(Track.LAYER_NAMES[l], '<f8') for l in Track.CMP_LAYERS]
+    )
+
+    for i,l in enumerate(Track.CMP_LAYERS):
+        for rf in range(track_a.width):
+            a = track_a[l,:,rf]
+            b = track_b[l,:,rf]
+            ks = scipy.stats.mstats.ks_2samp(a,b,mode="asymp")
+            ks_stats[rf][i] = ks[0]
+
+    return pd.DataFrame(
+        ks_stats, 
+        index = track_a.ref_coords.index.rename("ref")
+    )
+
+REFSTATS_OPTS = (
+    Opt("ref_bounds", "align", type=ref_coords),
+    Opt("track_in", type=str),
+    Opt(("-m", "--pore-model"), "mapper", default=None),
+    Opt("--rna", fn="set_r94_rna"),
+    Opt(("-f", "--full-overlap"), "browser", action="store_true"),
+)
+
+def refstats(
+        track=None, 
+        full_overlap=None, 
+        layers=[Track.PA_LAYER, Track.DWELL_LAYER, Track.PA_DIFF_LAYER], #TODO use strings
+        stats=["mean", "variance", "skewness", "kurtosis"], 
+        conf=None):
+
+    if conf is None:
+        conf = conf if conf is not None else Config()
+    if full_overlap is not None:
+        conf.browser.full_overlap = full_overlap
+    track = _load_track_arg(track, getattr(conf, "track_in", None), conf)
+
+    vals = dict()
+    data = list()
+    names = list()
+
+    mask = ~track[0].mask
+    vals["cov"] = np.sum(mask, axis=0)
+    vals["kmer"] = [
+        nt.kmer_to_str(int(k)) 
+        for k in np.ma.median(track[Track.KMER_LAYER], axis=0).data
+    ]
+
+    for l in layers:
+        layer_name = Track.LAYER_NAMES[l]
+        desc = scipy.stats.mstats.describe(track[l], axis=0)
+        for stat in stats:
+            vals["%s_%s" % (layer_name, stat)] = getattr(desc, stat)
+
+    return pd.DataFrame(vals, index=track.ref_coords.index.rename("ref"))
 

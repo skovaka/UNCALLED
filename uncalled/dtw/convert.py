@@ -11,7 +11,7 @@ from .dtw import ReadAln, Track, ref_coords
 from ..config import Config, ArgParser, ParamGroup, Opt
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..index import BWA_OPTS
-from _uncalled import nt, PORE_MODELS
+from _uncalled import nt, PORE_MODELS, PoreModel
 
 import progressbar as progbar
 
@@ -36,7 +36,6 @@ def nanopolish(conf):
     conf.fast5_reader.load_bc = True
 
     sample_rate = conf.read_buffer.sample_rate
-    print(sample_rate)
 
     sys.stderr.write("Parsing TSV\n")
     alns = pd.read_csv(
@@ -131,12 +130,13 @@ def tombo(conf):
             #TODO load kmers from genome
             
             signal = tombo_events["norm_mean"]
+            model = PoreModel("/home/skovaka/Dropbox/results/unc/ecoli_drna/r94_rna_tombo.txt", False)
             scale = MODELS[is_rna].get_means_stdv() / np.std(signal)
             shift = MODELS[is_rna].get_means_mean() - scale * np.mean(signal)
             signal = scale * signal + shift
 
             if not sig_fwd:
-                samps = raw_len - tombo_start - samps - tombo_events["length"]
+                samps = raw_len - tombo_start - samps - tombo_events["length"] - 1
                 kmers = nt.kmer_rev(kmers)
 
             mm2 =  track.mm2s[read.read_id]

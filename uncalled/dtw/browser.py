@@ -37,12 +37,12 @@ BrowserParams._def_params(
     ("full_overlap", None, bool, "If true will only include reads which fully cover reference bounds")
 )
 
-#BWA_OPTS + 
 OPTS = (
     Opt("ref_bounds", "align", type=ref_coords),
     Opt("track_a", "browser"),
     Opt("track_b", "browser", nargs="?"),
     Opt(("-f", "--full-overlap"), "browser", action="store_true"),
+    Opt(("-m", "--pore-model"), "mapper"),
     #Opt("--rna", action = "store_true"),
     #Opt(("-s", "--seqsum"), type=str, default=None),
     #Opt(("-n", "--max-reads"), "fast5_reader"),
@@ -168,7 +168,7 @@ class RawBrowser:
     def sort_position(self, event):
         tr,rf,rd = self.cursor
 
-        for tr in self.tracks:
+        for track in self.tracks:
             track.sort(self.active_layer, rf)
             track.img.set_data(track[self.active_layer])
             self.del_cursor()
@@ -222,7 +222,7 @@ class RawBrowser:
             trk.cursor[0].set_xdata(rf)
             trk.cursor[0].set_visible(True)
 
-            if i == trk:
+            if i == tr:
                 trk.cursor[1].set_ydata(rd)
                 trk.cursor[1].set_visible(True)
             else:

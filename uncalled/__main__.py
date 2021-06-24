@@ -1,6 +1,8 @@
 """Utility for Nanopore Read ALignment to Large Expanses of DNA"""
 
+import sys
 import numpy as np
+import pandas as pd
 from . import index, map, realtime, sim, pafstats, dtw, config
 
 SUBCMDS = [
@@ -18,7 +20,11 @@ def main():
     cmd, conf = parser.parse_args()
 
     if cmd is not None:
-        cmd(conf=conf)
+        ret = cmd(conf=conf)
+
+        if isinstance(ret, pd.DataFrame):
+            ret.to_csv(sys.stdout, sep="\t")
+
     else:
         parser.print_help()
 

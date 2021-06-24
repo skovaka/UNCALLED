@@ -24,26 +24,3 @@ from .dotplot import Dotplot
 from _uncalled import BwaIndex, nt
 
 #BWA_OPTS + 
-OPTS = (
-    Opt("ref_bounds", "align", type=ref_coords),
-    Opt("track_a", "browser"),
-    Opt("track_b", "browser"),
-    Opt(("-f", "--full-overlap"), "browser", action="store_true"),
-    Opt(("-o", "--outfile"), type=str, default=None),
-)
-
-def main(conf):
-    """Outputs a TSV file conaining Kolmogorov–Smirnov test statistics comparing the current and dwell time of two alignment tracks"""
-
-    track_a = Track(conf.browser.track_a, conf=conf)
-    conf.align.mm2_paf = None
-
-    track_b = Track(conf.browser.track_b, conf=conf)
-    
-    # , dtype=[   print(ks.dtype)
-    ks = pd.DataFrame(track_a.calc_ks(track_b).T, columns=[Track.LAYER_META[l][0] for l in Track.KS_LAYERS])
-    
-    csv = ks.to_csv(conf.outfile, sep="\t", index=False)
-    if conf.outfile is None:
-        print(csv)
-
