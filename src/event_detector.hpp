@@ -36,7 +36,7 @@ class EventDetector {
         float max_mean;
     } Params;
 
-    static Params const PRMS_DEF;
+    static const Params PRMS_DEF;
 
     Params PRMS;
 

@@ -115,7 +115,7 @@ void Mapper::load_static() {
     if (m != PORE_MODELS.end()) {
         model = m->second;
     } else {
-        model = PoreModel<KLEN>(PRMS.pore_model, true);
+        model = PoreModel<KLEN>(PRMS.pore_model, false, true);
     }
 
     fmi.load_index(PRMS.bwa_prefix);

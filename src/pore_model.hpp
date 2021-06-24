@@ -30,6 +30,8 @@
 #include <functional>
 #include <cfloat>
 #include <algorithm>
+#include <unordered_map>
+#include <iostream>
 #include "event_detector.hpp"
 #include "util.hpp"
 #include "nt.hpp"
@@ -38,6 +40,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
+
+namespace py = pybind11;
 #endif
 
 typedef struct {
@@ -48,33 +52,20 @@ typedef struct {
 template<KmerLen KLEN>
 class PoreModel {
 
-    private:
-    std::vector<float> lv_means_, lv_stdvs_, lv_vars_x2_, lognorm_denoms_;
-    float model_mean_, model_stdv_;
-    u16 kmer_count_;
-    bool loaded_, compl_;
-
-    void init_stdv() {
-        model_stdv_ = 0;
-
-        for (u16 kmer = 0; kmer < kmer_count_; kmer++) {
-            model_stdv_ += pow(lv_means_[kmer] - model_mean_, 2);
-        }
-
-        model_stdv_ = sqrt(model_stdv_ / kmer_count_);
-    }
-
-    void init_kmer(u16 k, float mean, float stdv) {
-        lv_means_[k] = mean;
-        lv_stdvs_[k] = stdv;
-        lv_vars_x2_[k] = 2 * stdv * stdv;
-        lognorm_denoms_[k] = log(sqrt(M_PI * lv_vars_x2_[k]));
-    }
-
     public:
 
-    PoreModel() 
-        :  loaded_(false) {
+    static const std::unordered_map<std::string, const std::vector<float> &> PRESETS;
+
+    struct Params {
+        std::string name;
+        bool reverse, complement;
+    };
+    static const Params PRMS_DEF;
+
+    Params PRMS;
+
+    PoreModel(Params p) : PRMS(p) {
+        loaded_ = false;
 
         kmer_count_ = kmer_count<KLEN>();
 
@@ -82,26 +73,36 @@ class PoreModel {
         lv_stdvs_.resize(kmer_count_);
         lv_vars_x2_.resize(kmer_count_);
         lognorm_denoms_.resize(kmer_count_);
+
+        if (p.name.empty()) return;
+
+        auto vals = PRESETS.find(PRMS.name);
+        if (vals != PRESETS.end()) {
+            init_vals(vals->second);
+        } else {
+            init_tsv(PRMS.name);
+        }
     }
-    
-    //PoreModel(const ModelPreset &p, bool cmpl) : PoreModel() {
-    PoreModel(const std::vector<float> &means_stdvs, bool cmpl) 
-        : PoreModel() {
 
-        //if (p.k != KLEN) return;
+    PoreModel() : PoreModel(PRMS_DEF) {}
 
+    PoreModel(const std::vector<float> &means_stdvs, bool reverse, bool complement) 
+        : PoreModel("", reverse, complement) {
+        init_vals(means_stdvs);
+    }
+
+    PoreModel(const std::string &name, bool reverse=false, bool complement=false) : 
+        PoreModel(Params({name, reverse, complement})) {}
+
+    void init_vals(const std::vector<float> &vals) {
         model_mean_ = 0;
 
         u16 kmer = 0;
-        for (u32 i = 0; i < means_stdvs.size(); i += 2) {
-            float mean = means_stdvs[i],
-                  stdv = means_stdvs[i+1];
+        for (u32 i = 0; i < vals.size(); i += 2) {
+            float mean = vals[i],
+                  stdv = vals[i+1];
 
-            if (cmpl) {
-                init_kmer(kmer_comp<KLEN>(kmer), mean, stdv);
-            } else { 
-                init_kmer(kmer, mean, stdv);
-            }
+            init_kmer(kmer, mean, stdv);
             
             kmer++;
             model_mean_ += mean;
@@ -112,12 +113,8 @@ class PoreModel {
 
         loaded_ = true;
     }
-
-    //TODO: clean up IO
-    //maybe load from toml and/or header file
-    //make scripts for model to toml and header?
-    PoreModel(const std::string &model_fname, bool cmpl) : PoreModel () {
-
+        
+    void init_tsv(const std::string &model_fname) {
         std::ifstream model_in(model_fname);
 
         if (!model_in.is_open()) {
@@ -137,8 +134,6 @@ class PoreModel {
 
         //Read and store rest of the model
         for (u32 i = 0; i < kmer_count_; i++) {
-        //while (!model_in.eof()) {
-        //
             if (model_in.eof()) {
                 std::cerr << "Error: ran out of k-mers\n";
                 return;
@@ -152,11 +147,6 @@ class PoreModel {
             if (kmer >= kmer_count_) {
                 std::cerr << "Error: kmer '" << kmer << "' is invalid\n";
                 return;
-            }
-
-            //Complement kmer if needed
-            if (cmpl) {
-                kmer = kmer_comp<KLEN>(kmer);
             }
 
             init_kmer(kmer, lv_mean, lv_stdv);
@@ -224,10 +214,6 @@ class PoreModel {
             max_score = std::max(max_score, tp_scores[i]);
         }
 
-        //
-        //float min_score = tp_scores[0];
-        //float max_score = tp_scores[static_cast<u32>(tp_scores.size()*0.99)];
-        //
         std::sort(tp_scores.begin(), tp_scores.end());
 
         u64 dt = tp_scores.size() / (n_threshs-1);
@@ -283,6 +269,32 @@ class PoreModel {
         return kmer_count_;
     }
 
+    private:
+    std::vector<float> lv_means_, lv_stdvs_, lv_vars_x2_, lognorm_denoms_;
+    float model_mean_, model_stdv_;
+    u16 kmer_count_;
+    bool loaded_, compl_;
+
+    void init_stdv() {
+        model_stdv_ = 0;
+
+        for (u16 kmer = 0; kmer < kmer_count_; kmer++) {
+            model_stdv_ += pow(lv_means_[kmer] - model_mean_, 2);
+        }
+
+        model_stdv_ = sqrt(model_stdv_ / kmer_count_);
+    }
+
+    void init_kmer(u16 k, float mean, float stdv) {
+        if (PRMS.reverse)  k = kmer_rev<KLEN>(k);
+        if (PRMS.complement) k = kmer_comp<KLEN>(k);
+
+        lv_means_[k] = mean;
+        lv_stdvs_[k] = stdv;
+        lv_vars_x2_[k] = 2 * stdv * stdv;
+        lognorm_denoms_[k] = log(sqrt(M_PI * lv_vars_x2_[k]));
+    }
+
     //void calc_roc_diff(std::vector<u16> kmers, std::vector<float> means, std::vector<float> threshs) {
     //    calc_roc(kmers, means, threshs, &PoreModel<KLEN>::match_diff);
     //}
@@ -291,8 +303,12 @@ class PoreModel {
 
     #define PY_PORE_MODEL_METH(P) c.def(#P, &PoreModel<KLEN>::P);
 
+    public:
+
     static void pybind_defs(pybind11::class_<PoreModel<KLEN>> &c) {
-        c.def(pybind11::init<const std::string &, bool>());
+        c.def(pybind11::init<const std::string &, bool, bool>(), 
+              py::arg("name")=PRMS_DEF.name, py::arg("reverse")=PRMS_DEF.reverse, py::arg("complement")=PRMS_DEF.complement);
+
         //PY_PORE_MODEL_METH(match_prob);
         PY_PORE_MODEL_METH(match_probs);
         PY_PORE_MODEL_METH(get_means_mean);

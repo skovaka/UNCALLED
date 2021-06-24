@@ -1,9 +1,9 @@
-#ifndef _INCL_MODEL_R94
-#define _INCL_MODEL_R94
+#ifndef _INCL_MODEL_R94_DNA
+#define _INCL_MODEL_R94_DNA
 
 #include "pore_model.hpp"
 
-const std::vector<float> model_r94_means_stdvs = {
+const std::vector<float> model_r94_dna_means_stdvs = {
         85.083612,	1.517846, //AAAAA
         76.635809,	1.705015, //AAAAC
         83.489101,	1.537572, //AAAAG
@@ -1031,9 +1031,9 @@ const std::vector<float> model_r94_means_stdvs = {
 };
 
 const PoreModel<KmerLen::k5> 
-    pmodel_r94_dna_templ(model_r94_means_stdvs, false);
+    pmodel_r94_dna_templ(model_r94_dna_means_stdvs, false, false);
 
 const PoreModel<KmerLen::k5> 
-    pmodel_r94_dna_compl(model_r94_means_stdvs, true);
+    pmodel_r94_dna_compl(model_r94_dna_means_stdvs, false, true);
 
 #endif

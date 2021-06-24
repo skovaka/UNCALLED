@@ -94,6 +94,7 @@ uncalled = Pybind11Extension(
     "_uncalled",
 
     sources = [
+       "src/pore_model.cpp",
        "src/pybinder.cpp",
        "src/config.cpp",
        "src/event_profiler.cpp", 
