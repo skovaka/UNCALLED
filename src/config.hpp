@@ -70,9 +70,10 @@ class Config {
     EventProfiler::Params event_profiler = EventProfiler::PRMS_DEF;
     SeedTracker::Params   seed_tracker   = SeedTracker::PRMS_DEF;
     Fast5Reader::Params   fast5_reader   = Fast5Reader::PRMS_DEF;
+    PoreModel<KLEN>::Params     pore_model     = PoreModel<KLEN>::PRMS_DEF;
 
     RealtimeParams        realtime       = REALTIME_PRMS_DEF;
-    SimulatorParams             simulator     = SIM_PRMS_DEF;
+    SimulatorParams       simulator     = SIM_PRMS_DEF;
     MapOrdParams          map_pool_ord   = MAP_ORD_PRMS_DEF;
 
     Config() : mode(Mode::UNDEF), threads(1) {}
@@ -356,6 +357,7 @@ class Config {
         CONF_GROUP(event_profiler, "")
         CONF_GROUP(seed_tracker, "")
         CONF_GROUP(fast5_reader, "") 
+        CONF_GROUP(pore_model, "") 
         CONF_GROUP(realtime, "") 
         CONF_GROUP(simulator, "")
         CONF_GROUP(map_pool_ord, "")
@@ -365,7 +367,6 @@ class Config {
 
         DEFPRP(bwa_prefix)
         DEFPRP(idx_preset)
-        DEFPRP(pore_model);
         DEFPRP(max_events)
         DEFPRP(seed_len);
         DEFPRP(chunk_time)

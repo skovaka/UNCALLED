@@ -87,8 +87,8 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Range> range(m, "Range");
     Range::pybind_defs(range);
 
-    py::class_< PoreModel<KLEN> > model(m, "_PoreModel");
-    PoreModel<KLEN>::pybind_defs(model);
+    //py::class_< PoreModel<KLEN> > model(m, "_PoreModel");
+    PoreModel<KLEN>::pybind_defs(m);
     m.attr("PORE_MODELS") = py::cast(PORE_MODELS);
     //m.attr("pmodel_r94_dna_templ") = py::cast(pmodel_r94_dna_templ);
     //m.attr("pmodel_r94_dna_compl") = py::cast(pmodel_r94_dna_compl);

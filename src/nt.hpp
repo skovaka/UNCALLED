@@ -183,7 +183,7 @@ u16 str_to_kmer(const KmerArr<K> &kmer, u32 offs) {
 
 template <KmerLen K>
 KmerArr<K> kmer_to_arr(u16 kmer) {
-    KmerArr<K> ret;
+    KmerArr<K> ret{0};
     for (size_t i = 0; i < K; i++) {
         ret[i] = BASE_CHARS[kmer_base<K>(kmer, i)];
     }
@@ -195,21 +195,19 @@ KmerArr<K> kmer_to_arr(u16 kmer) {
 template <KmerLen KLEN>
 static void nt_pybind_defs(pybind11::module_ &m) {
     m.attr("K") = pybind11::cast(KMER_LEN);
-    m.def("kmer_count",    &kmer_count<KLEN>);
+    m.def("kmer_count", &kmer_count<KLEN>);
 
     m.def("str_to_kmer",   py::vectorize(static_cast< u16 (*) (const KmerArr<KLEN> &, u32)>(&str_to_kmer<KLEN>)), py::arg("kmer"), py::arg("offs")=0);
 
-    m.def("_kmer_to_str",   &kmer_to_str<KLEN>);
-    m.def("_kmer_to_arr",   py::vectorize(&kmer_to_arr<KLEN>));
+    m.def("_kmer_to_str",  &kmer_to_str<KLEN>);
+    m.def("_kmer_to_arr",  py::vectorize(&kmer_to_arr<KLEN>));
     
     m.def("kmer_rev",      py::vectorize(&kmer_rev<KLEN>));
     m.def("kmer_comp",     py::vectorize(&kmer_comp<KLEN>));
     m.def("kmer_revcomp",  py::vectorize(&kmer_revcomp<KLEN>));
     m.def("kmer_head",     py::vectorize(&kmer_head<KLEN>));
     m.def("kmer_base",     py::vectorize(&kmer_base<KLEN>));
-    //m.def("kmer_to_str",   &kmer_to_str<KLEN>);
-    m.def("seq_to_kmers",  &seq_to_kmers<KLEN>);
-    m.def("kmer_neighbor", &kmer_neighbor<KLEN>);
+    m.def("kmer_neighbor", py::vectorize(&kmer_neighbor<KLEN>));
 }
 #endif
 

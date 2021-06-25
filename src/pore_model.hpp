@@ -295,27 +295,43 @@ class PoreModel {
     #define PY_MODEL_DEF(P, D) c.def(#P, &PoreModel<KLEN>::P, D);
     #define PY_MODEL_DEFVEC(P, D) c.def(#P, py::vectorize(&PoreModel<KLEN>::P), D);
     #define PY_MODEL_PROP(P, D) c.def_property_readonly(#P, &PoreModel<KLEN>::P, D);
+    #define PY_MODEL_PARAM(P, D) p.def_readwrite(#P, &PoreModel<KLEN>::Params::P, D);
 
     public:
 
-    static void pybind_defs(pybind11::class_<PoreModel<KLEN>> &c) {
+
+    static void pybind_defs(py::module_ &m) {
+        py::class_< PoreModel<KLEN> > c(m, "_PoreModel");
+
+        py::class_<PoreModel<KLEN>::Params> p(c, "Params");
+        PY_MODEL_PARAM(name, "Model preset name or TSV filename");
+        PY_MODEL_PARAM(reverse, "Will reverse (flip) k-mer sequences if True");
+        PY_MODEL_PARAM(complement, "Will complement k-mer sequences if True");
+
         c.def(pybind11::init<const std::string &, bool, bool>(), 
               py::arg("name")=PRMS_DEF.name, py::arg("reverse")=PRMS_DEF.reverse, py::arg("complement")=PRMS_DEF.complement);
+        c.def(pybind11::init<const std::vector<float> &, bool, bool>(), 
+              py::arg("vals"), py::arg("reverse")=PRMS_DEF.reverse, py::arg("complement")=PRMS_DEF.complement);
+        c.def(pybind11::init<PoreModel<KLEN>::Params>());
 
-        //PY_MODEL_DEF(norm_pdf);
+        c.def_readonly_static("PRMS_DEF", &PoreModel::PRMS_DEF);
+
         c.def_property_readonly("kmer_count", &PoreModel::get_kmer_count, "The number of k-mers in the model");
         PY_MODEL_PROP(model_mean, "The mean of all model k-mer currents");
         PY_MODEL_PROP(model_stdv, "The standard deviation of all model k-mer currents");
 
-        c.def_property_readonly("means", [](PoreModel<KLEN> &r) -> pybind11::array_t<float> {
-             return pybind11::array_t<float>(r.kmer_means_.size(), r.kmer_means_.data());
+        c.def_property_readonly("means", 
+            [](PoreModel<KLEN> &r) -> pybind11::array_t<float> {
+                return pybind11::array_t<float>(r.kmer_means_.size(), r.kmer_means_.data());
         }, "The expected mean current of each k-mer");
 
-        c.def_property_readonly("stdvs", [](PoreModel<KLEN> &r) -> pybind11::array_t<float> {
-             return pybind11::array_t<float>(r.kmer_stdvs_.size(), r.kmer_stdvs_.data());
+        c.def_property_readonly("stdvs",
+            [](PoreModel<KLEN> &r) -> pybind11::array_t<float> {
+                return pybind11::array_t<float>(r.kmer_stdvs_.size(), r.kmer_stdvs_.data());
         }, "The expected standard devaition of each k-mer");
 
         PY_MODEL_DEFVEC(norm_pdf, "Returns the log probability that the current matches the k-mer based on the normal distibution probability density function");
+
         PY_MODEL_DEFVEC(abs_diff, "Returns the absolute difference between the observed and model current");
 
         c.def("__getitem__", py::vectorize(&PoreModel::kmer_current), "Alias for get_current()");
