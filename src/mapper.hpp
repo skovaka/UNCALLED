@@ -32,7 +32,6 @@
 #include "event_detector.hpp"
 #include "event_profiler.hpp"
 #include "pore_model.hpp"
-#include "models.inl"
 #include "seed_tracker.hpp"
 #include "read_buffer.hpp"
 #include "paf.hpp"
@@ -50,6 +49,7 @@
 //rematch "params" python module
 #define INDEX_SUFF ".uncl"
 
+constexpr KmerLen KLEN = KmerLen::k5;
 
 class Mapper {
     public:
@@ -72,7 +72,7 @@ class Mapper {
 
         std::string bwa_prefix;
         std::string idx_preset;
-        std::string pore_model;
+        std::string pore_model; //TODO use PoreModel::params
 
         SeedTracker::Params seed_tracker;
         Normalizer::Params normalizer;

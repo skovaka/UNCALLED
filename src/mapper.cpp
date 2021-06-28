@@ -40,7 +40,7 @@ Mapper::Params Mapper::PRMS {
     chunk_timeout   : 4000.0,
     bwa_prefix      : "",
     idx_preset      : "default",
-    pore_model      : "r94_dna_compl",
+    pore_model      : "r94_dna",//_compl",
     seed_tracker    : SeedTracker::PRMS_DEF,
     normalizer      : Normalizer::PRMS_DEF,
     event_detector  : EventDetector::PRMS_DEF,
@@ -50,6 +50,7 @@ Mapper::Params Mapper::PRMS {
     , meta_prefix : "meta_"
     #endif
 };
+
 
 BwaIndex<KLEN> Mapper::fmi;
 std::vector<float> Mapper::prob_threshes_;
@@ -111,12 +112,7 @@ void Mapper::load_static() {
 
     if (fmi.is_loaded()) return;
 
-    auto m = PORE_MODELS.find(PRMS.pore_model);
-    if (m != PORE_MODELS.end()) {
-        model = m->second;
-    } else {
-        model = PoreModel<KLEN>(PRMS.pore_model, false, true);
-    }
+    model = PoreModel<KLEN>(PRMS.pore_model, false, ReadBuffer::PRMS.seq_fwd);
 
     fmi.load_index(PRMS.bwa_prefix);
     if (!fmi.is_loaded()) {

@@ -197,19 +197,19 @@ def paf_ref_compare(qry, ref, ret_qry=True, check_locs=True, ext=1.5):
     return tp, tn, fp, fn, fp_unmap
 
 
-def main(config):
+def main(conf):
     """Computes speed and accuracy of UNCALLED mappings."""
-    locs = [p for p in parse_paf(config.infile, max_reads=config.max_reads)]
+    locs = [p for p in parse_paf(conf.infile, max_reads=conf.max_reads)]
 
     num_mapped = sum([p.is_mapped for p in locs])
 
-    statsout = sys.stderr if config.annotate else sys.stdout
+    statsout = sys.stderr if conf.annotate else sys.stdout
 
     statsout.write("Summary: %d reads, %d mapped (%.2f%%)\n\n" % (len(locs), num_mapped, 100*num_mapped/len(locs)))
 
-    if config.ref_paf != None:
+    if conf.ref_paf != None:
         statsout.write("Comparing to reference PAF\n")
-        tp, tn, fp, fn, fp_unmap = paf_ref_compare(locs, parse_paf(config.ref_paf))
+        tp, tn, fp, fn, fp_unmap = paf_ref_compare(locs, parse_paf(conf.ref_paf))
         ntp,ntn,nfp,nfn,nfp_unmap = map(len, [tp, tn, fp, fn, fp_unmap])
         n = len(locs)
 
@@ -218,7 +218,7 @@ def main(config):
         statsout.write("F %6.2f %5.2f\n" % (100*(nfp)/n, 100*nfn/n))
         statsout.write("NA: %.2f\n\n" % (100*nfp_unmap/n))
 
-        if config.annotate:
+        if conf.annotate:
             group_labels = [(tp, "tp"), 
                             (tn, "tn"), 
                             (fp, "fp"),

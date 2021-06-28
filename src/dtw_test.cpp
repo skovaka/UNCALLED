@@ -4,7 +4,6 @@
 
 #include "event_profiler.hpp"
 #include "normalizer.hpp"
-#include "models.inl"
 #include "fast5_reader.hpp"
 #include "bwa_index.hpp"
 #include "dtw.hpp"
@@ -76,7 +75,7 @@ int main(int argc, char** argv) {
 
     if (false) {
 
-    auto model = pmodel_r94_dna_templ;
+    auto model = PoreModel("r94_dna");
 
     auto dtwp = DTW_RAW_GLOB;
     dtwp.dw = dtwp.vw = dtwp.hw = 1;

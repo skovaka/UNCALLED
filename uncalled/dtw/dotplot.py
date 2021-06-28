@@ -6,7 +6,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter, FuncFormatter
 
-from .. import PORE_MODELS, nt, BwaIndex
+from .. import nt, BwaIndex
 
 from ..sigproc import ProcRead
 from ..config import Config, ArgParser, ParamGroup, Opt
@@ -111,9 +111,9 @@ class Dotplot:
         #if samp_max is None: samp_max = self.df['sample'].max()
         #i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
 
-        model_means = self.model.kmer_current(aln.df['kmer'])
+        model_means = self.model[aln.df['kmer']]
 
-        pa_diffs = np.abs(aln.df['mean'] - self.model.kmer_current(aln.df['kmer']))
+        pa_diffs = np.abs(aln.df['mean'] - model_means)
 
         self.ax_padiff.step(pa_diffs, aln.df['refmir'], color="purple", where="post")
 
@@ -143,7 +143,7 @@ class Dotplot:
             self.ax_sig.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color, interpolate=True)
 
         self.ax_sig.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, alpha=0.75, c="#777777")
-        self.ax_sig.step(aln.df['start'], self.model.kmer_current(aln.df['kmer']), color='white', linewidth=2, where="post")
+        self.ax_sig.step(aln.df['start'], self.model[aln.df['kmer']], color='white', linewidth=2, where="post")
         self.ax_sig.vlines(aln.df['start'], ymin, ymax, linewidth=2, color="white")
 
         evts = (self.read.df['start'] >= samp_min) & (self.read.df['start'] < samp_max) & (self.read.df['norm_sig'] > 0)

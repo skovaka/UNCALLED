@@ -32,7 +32,6 @@
 #include "event_detector.hpp"
 #include "event_profiler.hpp"
 #include "pore_model.hpp"
-#include "models.inl"
 #include "seed_tracker.hpp"
 #include "read_buffer.hpp"
 #include "paf.hpp"

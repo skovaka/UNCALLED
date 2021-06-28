@@ -14,7 +14,7 @@ import copy
 
 from ..pafstats import parse_paf, PafEntry
 from ..config import Config, Opt
-from .. import PORE_MODELS, BwaIndex, nt, PoreModel
+from .. import BwaIndex, nt, PoreModel
 
 class ReadAln:
 
@@ -262,14 +262,7 @@ class Track:
         if self.index is None and len(self.conf.mapper.bwa_prefix) > 0:
             self.index = BwaIndex(self.conf.mapper.bwa_prefix, True)
 
-        #TODO PROBABLY NEED TO RETHINK FWD/REV COMPL, BUT EITHER WAY CLEAN THIS UP
-        model_name = self.conf.mapper.pore_model
-        if os.path.exists(model_name):
-            self.model = PoreModel(model_name, False)
-        else:
-            if model_name.endswith("_compl"):
-                model_name = model_name[:-5]+"templ"
-            self.model = PORE_MODELS[model_name]
+        self.model = PoreModel(self.conf.pore_model)
 
         if ref_bounds is not None:
             self.load_region(ref_bounds, full_overlap)
@@ -327,7 +320,7 @@ class Track:
             mask_rows.append(roi_mask)
 
 
-            pa_diffs = dtw_roi["mean"] - self.model.kmer_current(dtw_roi["kmer"])
+            pa_diffs = dtw_roi["mean"] - self.model[dtw_roi["kmer"]]
             #pa_diffs = self.model.abs_diff(dtw_roi['mean'], dtw_roi['kmer'])
             dwell = 1000 * dtw_roi['length'] / self.conf.read_buffer.sample_rate
 

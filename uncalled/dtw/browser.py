@@ -43,7 +43,6 @@ OPTS = (
     Opt("track_a", "browser"),
     Opt("track_b", "browser", nargs="?"),
     Opt(("-f", "--full-overlap"), "browser", action="store_true"),
-    Opt(("-m", "--pore-model"), "mapper"),
     #Opt("--rna", action = "store_true"),
     #Opt(("-s", "--seqsum"), type=str, default=None),
     #Opt(("-n", "--max-reads"), "fast5_reader"),
@@ -302,12 +301,13 @@ class RawBrowser:
             self.axs.dwell_hist.hist(dwell_fwd, bins=dwell_bins, **fwd_kw)
 
             kmer = int(scipy.stats.mode(track[self.KMER_LAYER,track.reads['fwd'],rf]).mode[0])
-            exp_mean = track.model.kmer_current(kmer)
-            exp_stdv = track.model.kmer_stdv(kmer)
+            exp_mean = track.model.means[kmer]
+            exp_stdv = track.model.stdvs[kmer]
 
             slop = pa_span*0.05
             xs = np.linspace(pa_min-slop, pa_max+slop, 100)
-            ys = scipy.stats.norm.pdf(xs, exp_mean, exp_stdv)
+            ys = np.exp(track.model.norm_pdf(xs, kmer))
+            #ys = scipy.stats.norm.pdf(xs, exp_mean, exp_stdv)
             self.axs.pa_hist.plot(xs, ys, color="blue", linewidth=2)
 
         if track.has_rev:
@@ -315,11 +315,12 @@ class RawBrowser:
             self.axs.dwell_hist.hist(dwell_rev, bins=dwell_bins, **rev_kw)
 
             kmer = int(scipy.stats.mode(track[self.KMER_LAYER,~fwds,rf]).mode[0])
-            exp_mean = track.model.kmer_current(kmer)
-            exp_stdv = track.model.kmer_stdv(kmer)
+            exp_mean = track.model.means[kmer]
+            exp_stdv = track.model.stdvs[kmer]
             slop = pa_span*0.05
             xs = np.linspace(pa_min-slop, pa_max+slop, 100)
-            ys = scipy.stats.norm.pdf(xs, exp_mean, exp_stdv)
+            ys = np.exp(track.model.norm_pdf(xs, kmer))
+            #ys = scipy.stats.norm.pdf(xs, exp_mean, exp_stdv)
             self.axs.pa_hist.plot(xs, ys, color="red", linewidth=2)
 
         self.axs.pa_hist.set_xlabel(self.LAYER_META[self.PA_LAYER][0])

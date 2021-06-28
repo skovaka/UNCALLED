@@ -11,7 +11,7 @@ from .dtw import ReadAln, Track, ref_coords
 from ..config import Config, ArgParser, ParamGroup, Opt
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..index import BWA_OPTS
-from .. import nt, PORE_MODELS, PoreModel
+from .. import nt, PoreModel
 
 import progressbar as progbar
 
@@ -22,11 +22,6 @@ CONVERT_OPTS = BWA_OPTS + FAST5_OPTS + (
     Opt(("-f", "--force-overwrite"), action="store_true"),
     Opt(("-o", "--out-path"), "align", required=True),
 )
-
-MODELS = [
-    PORE_MODELS["r94_dna_templ"], 
-    PORE_MODELS["r94_rna_templ"]
-]
 
 NANOPOLISH_OPTS = CONVERT_OPTS + (Opt("eventalign_tsv", type=str, default=None),)
 def nanopolish(conf):
@@ -131,8 +126,11 @@ def tombo(conf):
             
             signal = tombo_events["norm_mean"]
             model = PoreModel("/home/skovaka/Dropbox/results/unc/ecoli_drna/r94_rna_tombo.txt", False)
-            scale = MODELS[is_rna].model_stdv() / np.std(signal)
-            shift = MODELS[is_rna].model_mean() - scale * np.mean(signal)
+
+            #TODO pick model based on is_rna
+
+            scale = model.model_stdv / np.std(signal)
+            shift = model.model_mean - scale * np.mean(signal)
             signal = scale * signal + shift
 
             if not sig_fwd:

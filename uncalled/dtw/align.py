@@ -9,10 +9,10 @@ from ..config import Config, ArgParser, ParamGroup, Opt
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..sigproc import ProcRead
-from .. import PORE_MODELS, BwaIndex, DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
+from .. import BwaIndex, DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 
 from .dotplot import Dotplot
-from . import BcFast5Aln, ReadAln, Track, ref_coords
+from . import PoreModel, BcFast5Aln, ReadAln, Track, ref_coords
 
 #TODO make this better
 METHODS = {
@@ -120,13 +120,7 @@ class GuidedDTW:
 
         self.dtw_fn = METHODS[self.method]
 
-        model_name = self.conf.mapper.pore_model
-
-        #TODO clean this up
-        if model_name.endswith("_compl"):
-            model_name = model_name[:-5]+"templ"
-
-        self.model = PORE_MODELS[model_name]
+        self.model = PoreModel(self.conf.pore_model)
 
         self.ref_name = self.bcaln.ref_name
         self.ref_min = self.bcaln.ref_start
@@ -136,7 +130,7 @@ class GuidedDTW:
         self.samp_max = self.bcaln.df['sample'].max()
 
         self.ref_kmers = self.aln.get_index_kmers(self.idx)
-        self.load_kmers()
+        #self.load_kmers()
 
         if dtw_events is None:
             self.calc_dtw()

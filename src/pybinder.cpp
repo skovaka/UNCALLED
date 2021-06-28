@@ -8,7 +8,6 @@
 #include "realtime_pool.hpp"
 #include "map_pool_ord.hpp"
 #include "simulator.hpp"
-#include "models.inl"
 #include "dtw.hpp"
 #include "dtw_banded.hpp"
 
@@ -87,13 +86,7 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Range> range(m, "Range");
     Range::pybind_defs(range);
 
-    //py::class_< PoreModel<KLEN> > model(m, "_PoreModel");
     PoreModel<KLEN>::pybind_defs(m);
-    m.attr("PORE_MODELS") = py::cast(PORE_MODELS);
-    //m.attr("pmodel_r94_dna_templ") = py::cast(pmodel_r94_dna_templ);
-    //m.attr("pmodel_r94_dna_compl") = py::cast(pmodel_r94_dna_compl);
-    //m.attr("pmodel_r94_rna_templ") = py::cast(pmodel_r94_rna_templ);
-    //m.attr("pmodel_r94_rna_compl") = py::cast(pmodel_r94_rna_compl);
 
     m.def("self_align", &self_align);
 

@@ -103,7 +103,10 @@ class Config {
         //read_buffer.max_chunks  = 20;
         read_buffer.seq_fwd     = false;
 
-        mapper.pore_model    = "r94_rna_templ";
+        //TODO make mapper store pore_model group
+        mapper.pore_model  = "r94_rna";
+        pore_model.name    = "r94_rna";
+
         mapper.min_seed_prob = -3.0;
         mapper.max_paths     = 10000;
 

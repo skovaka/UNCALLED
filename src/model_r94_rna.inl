@@ -1030,10 +1030,5 @@ const std::vector<float> model_r94_rna_means_stdvs = {
     80.784332,	1.969599, //TTTTT
 };
 
-const PoreModel<KmerLen::k5> 
-    pmodel_r94_rna_templ(model_r94_rna_means_stdvs, false, false);
-
-const PoreModel<KmerLen::k5> 
-    pmodel_r94_rna_compl(model_r94_rna_means_stdvs, false, true);
 
 #endif

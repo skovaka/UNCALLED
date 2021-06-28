@@ -165,6 +165,8 @@ class Config(_Conf):
                         setattr(self, name, val)
                 else:
                     for param, value in val.items():
+                        if not hasattr(group, param):
+                            raise ValueError("Unrecognized parameter in TOML: %s.%s" % (gorup, param))
                         if self.is_default(param, name):
                             setattr(group, param, value)
             else:
