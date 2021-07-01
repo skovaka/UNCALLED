@@ -18,10 +18,10 @@ class PoreModel(_PoreModel):
     def _param_defaults():
         return _PoreModel.Params(config.DEFAULTS.pore_model)
 
-    def __init__(self, model=None, reverse=None, complement=None, df=None):
+    def __init__(self, model=None, name=None, reverse=None, complement=None, df=None):
         if model is not None: 
             if isinstance(model, _PoreModel):
-                _PoreModel.__init__(self, model)
+                self._init(name, model)
                 return 
 
             if isinstance(model, str):
@@ -44,24 +44,33 @@ class PoreModel(_PoreModel):
             vals = _vals_from_df(df)
 
         elif self.is_preset(prms.name):
-            _PoreModel.__init__(self, prms)
+            self._init(name, prms)
             return
 
         elif os.path.exists(prms.name):
             try:
                 vals = self._vals_from_tsv(prms.name)
             except:
-                #try:
-                vals = self._vals_from_hdf5(prms.name)
-                #except:
-                #    raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
+                try:
+                    vals = self._vals_from_hdf5(prms.name)
+                except:
+                    raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
         else:
             raise ValueError(
-                "PoreModel name must be a filename or one of {%s}" & \
-                ", ".join(self.get_preset_names())
+                "PoreModel name must be a filename or one of {%s}" % \
+                ", ".join(_PoreModel.get_preset_names())
             )
 
-        _PoreModel.__init__(self, vals, prms.reverse, prms.complement)
+        self._init(name, vals, prms.reverse, prms.complement)
+
+    def _init(self, name, *args):
+        _PoreModel.__init__(self, *args)
+        if name is not None:
+            self.PRMS.name = name
+
+    @property
+    def name(self):
+        return self.PRMS.name
 
     def _vals_from_df(self, df):
         return np.ravel(df.rename(columns=self.TSV_RENAME) \
@@ -102,6 +111,9 @@ class PoreModel(_PoreModel):
             "stdv" : self.stdvs
         })
 
+    def to_tsv(self, out=None):
+        return self.to_df().to_csv(out, sep="\t", index=False)
+
     def normalize(self, current, tgt_mean=None, tgt_stdv=None):
         tgt_mean = self.model_mean if tgt_mean is None else tgt_mean
         tgt_stdv = self.model_stdv if tgt_stdv is None else tgt_stdv
@@ -119,7 +131,8 @@ class PoreModel(_PoreModel):
 
         means = self.normalize(self.means, tgt_mean, tgt_stdv)
         vals = np.ravel(np.dstack([means,self.stdvs]))
-        return(PoreModel(_PoreModel(vals)))
+        return(PoreModel(_PoreModel(vals), name=self.name))
+    
     
     def __repr__(self):
         ret = "<PoreModel mean=%.3f stdv=%.3f>\n" % (self.model_mean, self.model_stdv)
@@ -132,3 +145,4 @@ class PoreModel(_PoreModel):
         for i in nt.KMERS[-3:]:
             ret += kmer_str(i)
         return ret[:-1]
+

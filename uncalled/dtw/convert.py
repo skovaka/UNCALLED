@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import argparse
 import pandas as pd
 from ont_fast5_api.fast5_interface import get_fast5_file
+import scipy.stats
 
 from .dtw import ReadAln, Track, ref_coords
 from ..config import Config, ArgParser, ParamGroup, Opt
@@ -67,6 +68,7 @@ def tombo(conf):
     """Convert from Tombo resquiggled fast5s to uncalled DTW track"""
     f5reader = Fast5Reader(conf=conf)
     conf.fast5_reader.load_bc = True
+    conf.pore_model.name = "r94_rna_tombo"
 
     track = Track(conf.align.out_path, "w", conf=conf, overwrite=conf.force_overwrite)
     
@@ -76,6 +78,8 @@ def tombo(conf):
             widgets=[progbar.Percentage(), progbar.Bar(), progbar.ETA()], 
             maxval=len(fast5_files)).start()
     pbar_count = 0
+
+    model = PoreModel(conf.pore_model)
 
     for fast5_name in fast5_files:
 
@@ -123,19 +127,23 @@ def tombo(conf):
             kmers = [nt.str_to_kmer("".join(bases[i:i+K]), 0) for i in range(len(bases)-K+1)]
             kmers = shift*[kmers[0]] + kmers + (K-shift-1)*[kmers[-1]]
             #TODO load kmers from genome
-            
-            signal = tombo_events["norm_mean"]
-            model = PoreModel("/home/skovaka/Dropbox/results/unc/ecoli_drna/r94_rna_tombo.txt", False)
-
-            #TODO pick model based on is_rna
-
-            scale = model.model_stdv / np.std(signal)
-            shift = model.model_mean - scale * np.mean(signal)
-            signal = scale * signal + shift
 
             if not sig_fwd:
                 samps = raw_len - tombo_start - samps - tombo_events["length"] - 1
                 kmers = nt.kmer_rev(kmers)
+            
+            lr = scipy.stats.linregress(tombo_events["norm_mean"], model[kmers])
+
+            signal = lr.slope * tombo_events["norm_mean"] + lr.intercept
+            ##signal = tombo_events["norm_mean"]
+            #signal2 = model.normalize(signal)
+            #plt.scatter(signal, signal2)
+            #plt.show()
+
+            #TODO pick model based on is_rna
+            #scale = model.model_stdv / np.std(signal)
+            #shift = model.model_mean - scale * np.mean(signal)
+            #signal = scale * signal + shift
 
             mm2 =  track.mm2s[read.read_id]
             aln = ReadAln(track.index, mm2, is_rna=is_rna)

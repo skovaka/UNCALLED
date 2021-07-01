@@ -3,7 +3,7 @@
 
 #include "pore_model.hpp"
 
-const std::vector<float> model_r94_rna_means_stdvs = {
+const std::vector<float> model_r94_rna_vals = {
     108.901413,	2.676522, //AAAAA
     105.724444,	2.676522, //AAAAC
     106.417182,	2.676522, //AAAAG

@@ -125,16 +125,22 @@ class Config(_Conf):
                     setattr(sgroup, param, getattr(ogroup, param))
 
     def to_toml(self, filename=None):
+
+        def fmt(val):
+            if isinstance(val, str) and os.path.exists(val):
+                return os.path.abspath(val)
+            return val
+        
         out = dict()
 
         for param in self._GLOBAL_PARAMS:
             val = getattr(self,param)
             if self._param_writable(param, val):
-                out[param] = val
+                out[param] = fmt(val)
 
         for param, val in vars(self).items():
             if self._param_writable(param, val):
-                out[param] = val
+                out[param] = fmt(val)
 
         groups = self._PARAM_GROUPS + list(self._EXTRA_GROUPS.keys())
 
@@ -144,9 +150,9 @@ class Config(_Conf):
             for param in dir(group):
                 val = getattr(group,param)
                 if self._param_writable(param, val, group_name):
-                    vals[param] = val
+                    vals[param] = fmt(val)
             if len(vals) > 0:
-                out[group_name] = vals
+                out[group_name] = fmt(vals)
 
         if filename is None:
             return toml.dumps(out)
@@ -166,7 +172,7 @@ class Config(_Conf):
                 else:
                     for param, value in val.items():
                         if not hasattr(group, param):
-                            raise ValueError("Unrecognized parameter in TOML: %s.%s" % (gorup, param))
+                            raise ValueError("Unrecognized parameter in TOML: %s.%s" % (group, param))
                         if self.is_default(param, name):
                             setattr(group, param, value)
             else:

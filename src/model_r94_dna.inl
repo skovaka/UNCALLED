@@ -3,7 +3,7 @@
 
 #include "pore_model.hpp"
 
-const std::vector<float> model_r94_dna_means_stdvs = {
+const std::vector<float> model_r94_dna_vals = {
         85.083612,	1.517846, //AAAAA
         76.635809,	1.705015, //AAAAC
         83.489101,	1.537572, //AAAAG

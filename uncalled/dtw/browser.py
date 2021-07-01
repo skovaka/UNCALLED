@@ -169,7 +169,7 @@ class RawBrowser:
         tr,rf,rd = self.cursor
 
         for track in self.tracks:
-            track.sort(self.active_layer, rf)
+            track.sort(self.active_layer, self.ref_start + rf)
             track.img.set_data(track[self.active_layer])
             self.del_cursor()
 

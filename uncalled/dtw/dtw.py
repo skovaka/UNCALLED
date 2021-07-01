@@ -12,6 +12,8 @@ import pandas as pd
 import scipy.stats
 import copy
 
+import matplotlib.pyplot as plt
+
 from ..pafstats import parse_paf, PafEntry
 from ..config import Config, Opt
 from .. import BwaIndex, nt, PoreModel
@@ -43,7 +45,10 @@ class ReadAln:
         self._init_mirror_coords()
 
         if df is not None:
-            self.df = df[(df.index >= self.ref_start) & (df.index <= self.ref_end)]
+            if ref_bounds is None:
+                self.df = df
+            else:
+                self.df = df[(df.index >= self.ref_start) & (df.index <= self.ref_end)].copy()
 
             has_ref = self.df.index.name == self.REF_COL
             has_refmir = self.REFMIR_COL in self.df.columns
@@ -267,12 +272,16 @@ class Track:
         if ref_bounds is not None:
             self.load_region(ref_bounds, full_overlap)
 
-    @property
-    def read_ids(self):
-        return list(self.fname_mapping.index)
+    #@property
+    #def read_ids(self):
+    #    return list(self.fname_mapping.index)
+
+    def __contains__(self, read_id):
+        return read_id in self.read_ids
 
     def _load_index(self):
         self.fname_mapping = pd.read_csv(self.fname_mapping_file, sep="\t", index_col="read_id")
+        self.read_ids = set(self.fname_mapping.index)
 
     def save_aln(self, aln, fast5_fname):
         if self.mode != "w":
@@ -285,7 +294,7 @@ class Track:
     def load_aln(self, read_id, ref_bounds=None):
         mm2 = self.mm2s[read_id]
         df = pd.read_pickle(self.aln_fname(read_id)).sort_index()
-        return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd)
+        return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=ref_bounds)
 
     #TODO parse mm2 every time to enable changing bounds
     #eventually use some kind of tabix-like indexing
@@ -407,7 +416,7 @@ class Track:
         return os.path.join(self.aln_dir, read_id+self.ALN_SUFFIX)
 
     def sort(self, layer, ref):
-        order = np.argsort(self.mat[layer,:,ref])
+        order = np.argsort(self.mat[layer,:,ref-self.ref_start])
         self.mat = self.mat[:,order,:]
         self.reads = self.reads.iloc[order]
 
@@ -732,6 +741,60 @@ def compare(track_a=None, track_b=None, full_overlap=None, conf=None):
         index = track_a.ref_coords.index.rename("ref")
     )
 
+
+METHOD_COMPARE_OPTS = (
+    Opt("track_a", "browser"),
+    Opt("track_b", "browser"),
+    #Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
+    Opt(("-f", "--full-overlap"), "browser", action="store_true"),
+)
+
+def method_compare(track_a=None, track_b=None, full_overlap=None, conf=None):
+    if conf is None:
+        conf = conf if conf is not None else Config()
+    if full_overlap is not None:
+        conf.browser.full_overlap = full_overlap
+    track_a = _load_track_arg(track_a, conf.browser.track_a, conf)
+    track_b = _load_track_arg(track_b, conf.browser.track_b, conf)
+
+    common_reads = set(track_a.read_ids) & set(track_b.read_ids)
+    if len(common_reads) == 0:
+        sys.stderr.write("Error: method_compare tracks must have reads in common\n")
+        return
+
+    for read in common_reads:
+        aln_a = track_a.load_aln(read)
+        aln_b = track_b.load_aln(read)
+        print (method_compmare_aln(aln_a, aln_b))
+
+def method_compare_aln(aln_a, aln_b):
+    merge = aln_a.df.join(aln_b.df, lsuffix="_a", rsuffix="_b").dropna().set_index("refmir_a")
+
+    def get_ends(suff):
+        return merge["start_"+suff]+merge["length_"+suff]
+
+    st_a = merge["start_a"]
+    st_b = merge["start_b"]
+    en_a = get_ends("a")
+    en_b = get_ends("b")
+
+    mid_a = st_a + merge["length_a"] 
+    mid_b = st_b + merge["length_b"] 
+
+    st_min = np.minimum(st_a, st_b)
+    st_max = np.maximum(st_a, st_b)
+    en_min = np.minimum(en_a, en_b)
+    en_max = np.maximum(en_a, en_b)
+
+    df = pd.DataFrame({
+        "jaccard" : np.maximum(0, en_min-st_max)/(en_max-st_min),
+        "centroid_diff" : mid_a-mid_b,
+        "dwell_diff" : merge["length_a"]-merge["length_b"],
+    })
+    #print(merge[["start_a","length_a","start_b","length_b"]])
+    return df
+        
+
 REFSTATS_OPTS = (
     Opt("ref_bounds", "align", type=ref_coords),
     Opt("track_in", type=str),
@@ -771,4 +834,3 @@ def refstats(
             vals["%s_%s" % (layer_name, stat)] = getattr(desc, stat)
 
     return pd.DataFrame(vals, index=track.ref_coords.index.rename("ref"))
-

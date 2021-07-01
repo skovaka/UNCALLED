@@ -56,7 +56,7 @@ class PoreModel {
     static const std::unordered_map<std::string, const std::vector<float> &> PRESETS;
 
     struct Params {
-        std::string name;
+        std::string model, name;
         bool reverse, complement;
     };
     static const Params PRMS_DEF;
@@ -73,26 +73,26 @@ class PoreModel {
         kmer_2vars_.resize(kmer_count_);
         lognorm_denoms_.resize(kmer_count_);
 
-        if (p.name.empty()) return;
+        if (p.model.empty()) return;
 
-        auto vals = PRESETS.find(PRMS.name);
+        auto vals = PRESETS.find(PRMS.model);
         if (vals != PRESETS.end()) {
             init_vals(vals->second);
         } else {
-            init_tsv(PRMS.name);
+            init_tsv(PRMS.model);
         }
     }
 
     PoreModel() : PoreModel(PRMS_DEF) {
     }
 
-    PoreModel(const std::vector<float> &means_stdvs, bool reverse, bool complement) 
+    PoreModel(const std::vector<float> &means_stdvs, const std::string &name, bool reverse, bool complement) 
         : PoreModel("", reverse, complement) {
         init_vals(means_stdvs);
     }
 
-    PoreModel(const std::string &name, bool reverse=false, bool complement=false) : 
-        PoreModel(Params({name, reverse, complement})) {}
+    PoreModel(const std::string &model, const std::string &name, bool reverse=false, bool complement=false) : 
+        PoreModel(Params({model, name, reverse, complement})) {}
 
     
 
@@ -321,6 +321,7 @@ class PoreModel {
         py::class_<PoreModel<KLEN>::Params> p(c, "Params");
         p.def(py::init<>());
         p.def(py::init<PoreModel<KLEN>::Params>());
+        PY_MODEL_PARAM(model, "Model preset name or TSV filename");
         PY_MODEL_PARAM(name, "Model preset name or TSV filename");
         PY_MODEL_PARAM(reverse, "Will reverse (flip) k-mer sequences if True");
         PY_MODEL_PARAM(complement, "Will complement k-mer sequences if True");
@@ -330,12 +331,11 @@ class PoreModel {
         c.def(pybind11::init<const PoreModel<KLEN> &>());
         c.def(pybind11::init<PoreModel<KLEN>::Params>());
         c.def(pybind11::init<const std::string &, bool, bool>(), 
-              py::arg("name"), py::arg("reverse")=PRMS_DEF.reverse, py::arg("complement")=PRMS_DEF.complement);
+              py::arg("model"), py::arg("name"), py::arg("reverse")=PRMS_DEF.reverse, py::arg("complement")=PRMS_DEF.complement);
         c.def(pybind11::init<const std::vector<float> &, bool, bool>(), 
-              py::arg("vals"), py::arg("reverse")=PRMS_DEF.reverse, py::arg("complement")=PRMS_DEF.complement);
+              py::arg("vals"), py::arg("name"), py::arg("reverse")=PRMS_DEF.reverse, py::arg("complement")=PRMS_DEF.complement);
 
         c.def_property_readonly("kmer_count", &PoreModel::get_kmer_count, "The number of k-mers in the model");
-        c.def_readwrite("PRMS", &PoreModel::PRMS, "PoreModel parameters");
         PY_MODEL_PROP(model_mean, "The mean of all model k-mer currents");
         PY_MODEL_PROP(model_stdv, "The standard deviation of all model k-mer currents");
 

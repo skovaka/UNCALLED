@@ -100,8 +100,8 @@ class ProcRead:
         #if conf.normalizer.len
         if self.prms.normalizer is None and self.conf.normalizer.len > 0:
             #model = PORE_MODELS[self.conf.mapper.pore_model]
-            self.conf.normalizer.tgt_mean = self.model.model_mean()
-            self.conf.normalizer.tgt_stdv = self.model.model_stdv() #TODO set when pore model is set
+            self.conf.normalizer.tgt_mean = self.model.model_mean
+            self.conf.normalizer.tgt_stdv = self.model.model_stdv #TODO set when pore model is set
             self.prms.normalizer = Normalizer(self.conf.normalizer)
 
 
