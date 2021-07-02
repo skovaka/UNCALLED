@@ -121,7 +121,6 @@ class Config(_Conf):
             sgroup = getattr(self, group_name)
             for param in dir(ogroup):
                 if not (param.startswith("_") or (ignore_defaults and other.is_default(param, group_name))):
-                    #print(sgroup, param, getattr(ogroup, param))
                     setattr(sgroup, param, getattr(ogroup, param))
 
     def to_toml(self, filename=None):
@@ -247,7 +246,7 @@ class ArgParser:
                 opts = getattr(subcmd, "OPTS", None)
                 main_func = getattr(subcmd, "main", None)
 
-            name = subcmd.__name__.split(".")[-1]
+            subcmd_name = subcmd.__name__.split(".")[-1]
 
             if main_func is not None:
                 desc = main_func.__doc__
@@ -255,17 +254,17 @@ class ArgParser:
                 desc = subcmd.__doc__
 
             sp = subparsers.add_parser(
-                name, help=desc, 
+                subcmd_name, help=desc, 
                 formatter_class=argparse.ArgumentDefaultsHelpFormatter
             )
 
             if main_func is not None:
-                sp.set_defaults(_cmd=main_func)
-                for o in opts:
-                    if type(o) is Opt:
-                        self._add_opt(sp, o)
-                    elif type(o) is MutexOpts:
-                        self._add_mutex_opts(sp, o)
+                sp.set_defaults(_cmd=(subcmd_name, main_func))
+                for opt in opts:
+                    if type(opt) is Opt:
+                        self._add_opt(subcmd_name, sp, opt)
+                    elif type(opt) is MutexOpts:
+                        self._add_mutex_opts(subcmd_name, sp, opt)
 
             elif hasattr(subcmd, "SUBCMDS"):
                 self._add_subcmds(sp, subcmd.SUBCMDS)
@@ -273,7 +272,7 @@ class ArgParser:
             else:
                 raise RuntimeError("Subcommand module \"%s\" does not contain \"main\" function or \"SUBCMDS\" list" % subcmd.__name__)
 
-    def _add_opt(self, parser, opt):
+    def _add_opt(self, subcmd, parser, opt):
         arg = parser.add_argument(*opt.args, **opt.get_kwargs(self.config))
 
         if opt.has_dest:
@@ -282,22 +281,23 @@ class ArgParser:
 
             if name in self.dests and self.dests[name] != dest:
                 raise RuntimeError("Conflicting ArgParser dests with name \"%s\"" % arg.dest)
-            self.dests[name] = dest
+            self.dests[(subcmd,name)] = dest
 
+        #TODO don't need this?
         if opt.has_fn:
-            self.fns[arg.dest] = opt.fn
+            self.fns[(subcmd,arg.dest)] = opt.fn
 
-    def _add_mutex_opts(self, parser, mutex):
+    def _add_mutex_opts(self, subcmd, parser, mutex):
         group = parser.add_mutually_exclusive_group()
         for opt in mutex.opts:
-            self._add_opt(group, opt)
+            self._add_opt(subcmd, group, opt)
 
     def parse_args(self, argv=sys.argv[1:]):
         self.config.args = " ".join(argv)
 
         args = self.parser.parse_args(argv)
 
-        cmd = getattr(args, "_cmd", None)
+        cmd_name, cmd = getattr(args, "_cmd", None)
 
         fns =  getattr(args, "_fns", None)
         if fns is not None:
@@ -312,8 +312,8 @@ class ArgParser:
         for name, value in vars(args).items():
 
             if not name.startswith("_") or name in SPECIAL_PARAMS:
-                if name in self.dests:
-                    group, param = self.dests[name]
+                if (cmd_name,name) in self.dests:
+                    group, param = self.dests[(cmd_name,name)]
                 else: 
                     group = self.config
                     param = name

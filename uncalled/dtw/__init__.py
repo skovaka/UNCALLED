@@ -1,6 +1,7 @@
 """DTW alignment and analysis methods"""
 
-from .dtw import *
+from .read_aln import *
+from .track import *
 from . import align, dotplot, browser, convert #refstats #compare, 
 
 SUBCMDS = [

@@ -31,7 +31,6 @@ CMAP = "viridis"
 
 class BrowserParams(ParamGroup):
     _name = "browser"
-
 BrowserParams._def_params(
     ("track_a", None, str, "Path to directory where alignments are stored"),
     ("track_b", None, str, "Path to directory where alignments are stored"),

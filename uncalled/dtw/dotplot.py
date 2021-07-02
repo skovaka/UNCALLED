@@ -12,7 +12,7 @@ from ..sigproc import ProcRead
 from ..config import Config, ArgParser, ParamGroup, Opt
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
-from .dtw import Track, ref_coords, BcFast5Aln, method_compare_aln
+from . import Track, ref_coords, BcFast5Aln, method_compare_aln
 
 class DotplotParams(ParamGroup):
     _name = "dotplot"
