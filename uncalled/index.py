@@ -48,10 +48,10 @@ IndexParams._def_params(
     ("probs", None, str, "Find parameters with specified target probabilites (comma separated)"),
     ("speeds", None, str, "Find parameters with specified speed coefficents (comma separated)"),
 )
-#TODO do this from config. need to restructure dependencies
+#TODO do this from conf. need to restructure dependencies
 #unc.Config._EXTRA_GROUPS["index"] = IndexParams
 
-Opt = unc.config.Opt
+from uncalled.config import Opt
 BWA_OPTS = (
     Opt("bwa_prefix", "mapper"),
     Opt(("-p", "--idx-preset"), "mapper"),
@@ -72,10 +72,10 @@ OPTS = (
     Opt("--speeds", "index"),
 )
 
-def main(config):
+def main(conf):
     """Builds an UNCALLED index from a FASTA reference"""
 
-    prms = config.index
+    prms = conf.index
 
     if prms.index_prefix is None or len(prms.index_prefix) == 0:
         prms.index_prefix = prms.fasta_filename
@@ -153,7 +153,7 @@ def power_fn(xmax, ymin, ymax, exp, N=100):
     return t*xmax, (t**exp) * (ymax-ymin) + ymin
 
 class IndexParameterizer:
-    #MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "config/r94_5mers_rna_threshs.txt")
+    #MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "conf/r94_5mers_rna_threshs.txt")
     MODEL_THRESHS_FNAME = os.path.join(ROOT_DIR, "config/r94_5mers_threshs.txt")
 
     def __init__(self, params):
