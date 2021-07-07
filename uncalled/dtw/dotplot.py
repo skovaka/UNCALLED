@@ -27,49 +27,10 @@ OPTS = [
     Opt("track_b", "dotplot", nargs="?"),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
-    Opt(("-R", "--ref-bounds"), "align", type=RefCoord),
+    Opt(("-R", "--ref-bounds"), "track", type=RefCoord),
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
     Opt(("-C", "--max-chunks"), "read_buffer"),
 ]
-
-def main_old(conf):
-    """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
-
-    track = Track(conf.dotplot.track_a, conf=conf)
-
-    if conf.dotplot.track_b is not None:
-        track_b = Track(conf.dotplot.track_b, conf=conf)
-    else:
-        track_b = None
-
-    conf = track.conf
-
-    fast5s = Fast5Reader(conf=conf)
-
-    for fast5_read in fast5s:
-        if not fast5_read.id in track.mm2s: continue
-        read = ProcRead(fast5_read, conf=conf)
-
-        aln = track.load_aln(read.id, ref_bounds=conf.align.ref_bounds)
-        bcaln = BcFast5Aln(aln.index, read, track.mm2s[read.id], ref_bounds=conf.align.ref_bounds)
-
-        print(read.id)
-
-        dplt = Dotplot(aln.index, read, conf=conf)
-
-        if not bcaln.empty:
-            dplt.add_aln(bcaln, False)
-
-        if track_b is not None and read.id in track_b:
-            aln_b = track_b.load_aln(read.id, ref_bounds=conf.align.ref_bounds)
-            dplt.add_aln(aln_b, False, "royalblue", track_b.model)
-
-        dplt.add_aln(aln, True, model=track.model)
-
-        if conf.out_prefix is None:
-            dplt.show()
-        else:
-            dplt.save(conf.out_prefix, conf.out_format)
 
 def main(conf):
     """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
@@ -78,6 +39,7 @@ def main(conf):
 class Dotplot:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
+        self.conf.track.load_mat = False
 
         self.track_a = Track(self.prms.track_a, conf=self.conf)
         self.conf.load_config(self.track_a.conf)
@@ -101,36 +63,17 @@ class Dotplot:
         for read_id in self.read_ids:
             self.show(read_id)
 
-    def show(self, read_id):
-        self.ref_bounds = None
-        self.alns = list()
-        self.focus = set()
 
-        self.cursor = None
-
-        fast5_read = self.fast5s[read_id]
-
-        if not read_id in self.mm2s:
-            return
-
-        self.read = ProcRead(fast5_read, conf=self.conf)
-
-        self.aln_a = self.track_a.load_aln(read_id, ref_bounds=self.conf.align.ref_bounds)
-        self.ref_bounds = self.aln_a.ref_bounds
-
-        if self.track_b is not None and read_id in self.track_b:
-            self.aln_b = self.track_b.load_aln(read_id, ref_bounds=self.conf.align.ref_bounds)
-        else:
-            self.aln_b = None
-
-        self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], ref_bounds=self.conf.align.ref_bounds)
+    def show(self, read_id, cursor=None):
+        if not self._plot(read_id, cursor):
+            return False
 
         print(read_id)
 
-        self._plot()
-
         plt.show()
         plt.close()
+
+        return True
 
     def add_aln(self, aln, focus=False, color="purple", model=None):
         if self.read.id is not None and self.read.id != aln.read_id:
@@ -154,9 +97,6 @@ class Dotplot:
             self.focus.add(len(self.alns))
 
         self.alns.append((aln, color, model))
-
-    def _plot_aln_scatter(self, aln):
-        self.ax_dot.scatter(aln.df['sample'], aln.df['refmir'], color='orange', zorder=2,s=20)
 
     def _plot_aln_step(self, aln, color):
         if getattr(aln, "bands", None) is not None:
@@ -221,7 +161,33 @@ class Dotplot:
     def _tick_formatter(self, x, pos):
         return self.index.refmir_to_ref(int(x))
 
-    def _plot(self):
+    def _load_read(self, read_id):
+        self.cursor = None
+
+        fast5_read = self.fast5s[read_id]
+
+        if not read_id in self.mm2s:
+            return False
+
+        self.read = ProcRead(fast5_read, conf=self.conf)
+
+        self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], ref_bounds=self.conf.track.ref_bounds)
+
+        self.aln_a = self.track_a.load_aln(read_id, ref_bounds=self.conf.track.ref_bounds)
+
+        if self.track_b is not None and read_id in self.track_b:
+            self.aln_b = self.track_b.load_aln(read_id, ref_bounds=self.conf.track.ref_bounds)
+        else:
+            self.aln_b = None
+
+        self.ref_bounds = self.aln_a.ref_bounds
+
+        return True
+
+    def _plot(self, read_id, cursor=None):
+        if not self._load_read(read_id):
+            return False
+
         matplotlib.use("TkAgg")
         plt.style.use(['seaborn'])
 
@@ -272,12 +238,12 @@ class Dotplot:
         
         self.ax_sig.set_title(self.read.id)
 
-        if self.cursor is not None:
+        if cursor is not None:
             cursor_kw = {
                 'color' : 'red', 
                 'alpha' : 0.5
             }
-            samp, refmir = self.cursor
+            samp, refmir = cursor
             self.ax_dot.axvline(samp, **cursor_kw),
             self.ax_dot.axhline(refmir,  **cursor_kw)
 
@@ -287,7 +253,6 @@ class Dotplot:
             self._plot_aln_step(self.aln_b, "royalblue")
 
             compare = method_compare_aln(self.aln_a, self.aln_b)
-            #refmir = aln_a.ref_to_refmir(compare.index.to_numpy())
             self.ax_padiff.step(compare["jaccard"], compare.index, where="post", color="green")
             self.ax_centroid.step(compare["centroid_diff"], compare.index, where="post", color="green")
             self.ax_dwell.step(compare["dwell_diff"], compare.index, where="post", color="green")
@@ -296,28 +261,13 @@ class Dotplot:
         self._plot_signal(self.aln_a, self.ax_sig, self.track_a.model)
         self._plot_aln_step(self.aln_a, "purple")
 
-        self._plot_aln_scatter(self.aln_bc)
-        #self.aln_bc.plot_scatter(self.ax_dot, False)
-
-
-        #for i,(aln,color,model) in enumerate(self.alns):
-
-        #    if isinstance(aln, BcFast5Aln):
-        #    else:
-
-        #        if i in self.focus:
-        #            self._plot_signal(aln, self.ax_sig, model)
-        #        else:
-        #            self._plot_signal(aln, self.ax_sig2, model)
-
-        #        self._plot_aln_step(aln, color)
-
-        #        #self.samp_min, self.samp_max = aln.get_samp_bounds()
+        self.ax_dot.scatter(self.aln_bc.df['sample'], self.aln_bc.df['refmir'], color='orange', zorder=2, s=20)
 
         self.fig.tight_layout()
 
+        return True
 
-    
+
     def save(self, out_prefix, fmt):
         self._plot()
 
