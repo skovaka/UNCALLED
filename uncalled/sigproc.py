@@ -18,7 +18,6 @@ ProcReadParams._def_params(
     ("profile", False, bool, "Will mask events within low stdv windows if True"),
     ("normalizer", None, None, ""),
 )
-#Config._EXTRA_GROUPS["proc_read"] = ProcReadParams
 
 class ProcRead:
 

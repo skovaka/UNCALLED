@@ -244,6 +244,7 @@ class Track:
 
         self.norms = [Normalize(np.min(layer), np.max(layer)) for layer in self.mat]
         for l in [CURRENT_LAYER, DWELL_LAYER]:
+            if l not in self.layer_idxs: continue
             i = self.layer_idxs[l]
             layer = self.mat[i]
             self.norms[i].vmax = min(

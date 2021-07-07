@@ -23,4 +23,5 @@ from . import dtw
 from . import config
 from . import nt
 
-config.DEFAULTS = Config()
+config._DEFAULTS = Config()
+config.rc = Config()

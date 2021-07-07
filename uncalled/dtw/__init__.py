@@ -10,3 +10,4 @@ SUBCMDS = [
     (method_compare, METHOD_COMPARE_OPTS),
     (refstats, REFSTATS_OPTS),
 ]
+

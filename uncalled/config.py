@@ -205,14 +205,14 @@ class Config(_Conf):
     def is_default(self, param, group=None):
         if group is None:
             sg = self
-            dg = DEFAULTS
+            dg = _DEFAULTS
 
             if not hasattr(dg, param) and hasattr(sg, param):
                 return False
 
         else:
             sg = getattr(self, group, None)
-            dg = getattr(DEFAULTS, group, None)
+            dg = getattr(_DEFAULTS, group, None)
 
         if sg is None and dg is None:
             return True
@@ -469,5 +469,3 @@ class Subcmd:
         elif self.has_opts and not all([type(o) in [Opt, MutexOpts] for o in opts]):
             raise TypeError("Cannot specify function for subcommand \"%s\" unless all options are of type Opt" % name)
 
-_defaults = Config()
-rc = Config()
