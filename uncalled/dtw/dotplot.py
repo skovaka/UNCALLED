@@ -12,7 +12,7 @@ from ..sigproc import ProcRead
 from ..config import Config, ArgParser, ParamGroup, Opt
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
-from . import Track, ref_coords, BcFast5Aln, method_compare_aln
+from . import RefCoord, Track, ref_coords, BcFast5Aln, method_compare_aln
 
 class DotplotParams(ParamGroup):
     _name = "dotplot"
@@ -27,7 +27,7 @@ OPTS = [
     Opt("track_b", "browser", nargs="?"),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
-    Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
+    Opt(("-R", "--ref-bounds"), "align", type=RefCoord),
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
     Opt(("-C", "--max-chunks"), "read_buffer"),
 ]
@@ -97,11 +97,14 @@ class Dotplot:
         if self.ref_bounds is None:
             self.ref_bounds = aln.ref_bounds
 
-        elif self.ref_bounds[0] != aln.ref_bounds[0]:
+        elif self.ref_bounds.name != aln.ref_bounds.name:
             raise RuntimeError("All Dotplot alignments must be on same reference sequence")
         else:
-            nm,st,en,fw = self.ref_bounds
-            self.ref_bounds = (nm, min(st, aln.ref_bounds[1]), max(en, aln.ref_bounds[2]), fw)
+            self.ref_bounds = RefCoord(
+                self.ref_bounds.name,
+                min(self.ref_bounds.start, aln.ref_bounds.start), 
+                max(self.ref_bounds.end, aln.ref_bounds.end), 
+                self.ref_bounds.fwd)
 
         if focus:
             if len(self.focus) > 0:
@@ -221,7 +224,7 @@ class Dotplot:
         self.ax_centroid.yaxis.set_major_formatter(NullFormatter())
         self.ax_dwell.yaxis.set_major_formatter(NullFormatter())
 
-        self.ax_dot.set_ylabel("%s (%s)" % (self.ref_bounds[0], "+" if self.ref_bounds[3] else "-"), fontsize=12)
+        self.ax_dot.set_ylabel("%s (%s)" % (self.ref_bounds.name, "+" if self.ref_bounds.fwd else "-"), fontsize=12)
 
         self.ax_dot.yaxis.set_major_formatter(FuncFormatter(self._tick_formatter))
         

@@ -22,12 +22,16 @@ class RefCoord:
     def __init__(self, name, start=None, end=None, fwd=None):
         self.fwd = fwd
         if start is None and end is None:
-            self._init_str(name)
+            if isinstance(name ,str):
+                self._init_str(name)
+            elif isinstance(name, tuple):
+                self._init_tuple(name)
 
         elif start is None:
             raise ValueError("RefCoords must include a start coordinate")
         
         else:
+            self.name = name
             self.start = start
             self.end = end
 
@@ -48,6 +52,14 @@ class RefCoord:
             self.fwd = spl[2] == "+"
         else:
             self.fwd = None
+
+    def _init_tuple(self, coords):
+        self.name = coords[0]
+        self.start = coords[1]
+        if len(coords) > 2:
+            self.end = coords[2]
+        if len(coords) > 3:
+            self.end = coords[3]
 
     def __repr__(self):
         s = "%s:%d" % (self.name, self.start)
@@ -107,16 +119,17 @@ class ReadAln:
 
     def set_ref_bounds(self, aln, ref_bounds):
         if ref_bounds is None:
-            self.ref_bounds = (aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
+            self.ref_bounds = RefCoord(aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
+            print(aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
         else:
-            if aln.rf_st < ref_bounds[1]:
-                ref_st = ref_bounds[1]
+            if aln.rf_st < ref_bounds.start:
+                ref_st = ref_bounds.start
                 clipped = True
             else:
                 ref_st = aln.rf_st
 
-            if aln.rf_en > ref_bounds[2]:
-                ref_en = ref_bounds[2]
+            if aln.rf_en > ref_bounds.end:
+                ref_en = ref_bounds.end
                 clipped = True
             else:
                 ref_en = aln.rf_en
@@ -125,7 +138,7 @@ class ReadAln:
                 self.empty = True
                 return
 
-            self.ref_bounds = (aln.rf_name, ref_st, ref_en, aln.is_fwd)
+            self.ref_bounds = RefCoord(aln.rf_name, ref_st, ref_en, aln.is_fwd)
 
         self.ref_id = self.index.get_ref_id(self.ref_name)
 
@@ -147,26 +160,27 @@ class ReadAln:
         return self.df['sample'][i]
 
     def _init_mirror_coords(self):
-        self.refmir_start, self.refmir_end = self.index.ref_to_refmir(*self.ref_bounds, self.is_rna)
+        #self.refmir_start, self.refmir_end = self.index.ref_to_refmir(*self.ref_bounds, self.is_rna)
+        self.refmir_start, self.refmir_end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end, self.is_fwd, self.is_rna)
 
     @property
     def ref_name(self):
         """The sequence name of the alignment reference coordinate"""
-        return self.ref_bounds[0]
+        return self.ref_bounds.name
 
     @property
     def ref_start(self):
         """The start of the alignment reference coordinate"""
-        return self.ref_bounds[1]
+        return self.ref_bounds.start
 
     @property
     def ref_end(self):
         """The end of the alignment reference coordinate"""
-        return self.ref_bounds[2]
+        return self.ref_bounds.end
 
     @property
     def is_fwd(self):
-        return self.ref_bounds[3]
+        return self.ref_bounds.fwd
     
     def sort_ref(self):
         self.df.sort_values(self.REF_COL, inplace=True)

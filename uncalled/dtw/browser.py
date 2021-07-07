@@ -16,20 +16,21 @@ import matplotlib
 import scipy.stats
 import pandas as pd
 
-from .. import BwaIndex, nt
+from .. import BwaIndex, config, nt
 
+#from ..config import Config, ParamGroup, Opt
 from ..sigproc import ProcRead
-from ..config import Config, ParamGroup, Opt
+
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
-from .dtw import Track, ref_coords
+from . import Track, ref_coords
 from .align import GuidedDTW, BcFast5Aln
 from .dotplot import Dotplot
 
 CMAP = "viridis"
 #CMAP = "plasma"
 
-class BrowserParams(ParamGroup):
+class BrowserParams(config.ParamGroup):
     _name = "browser"
 BrowserParams._def_params(
     ("track_a", None, str, "Path to directory where alignments are stored"),
@@ -37,14 +38,12 @@ BrowserParams._def_params(
     ("full_overlap", None, bool, "If true will only include reads which fully cover reference bounds")
 )
 
+from ..config import Opt
 OPTS = (
-    Opt("ref_bounds", "align", type=ref_coords),
+    Opt("ref_bounds", "track", type=ref_coords),
     Opt("track_a", "browser"),
     Opt("track_b", "browser", nargs="?"),
-    Opt(("-f", "--full-overlap"), "browser", action="store_true"),
-    #Opt("--rna", action = "store_true"),
-    #Opt(("-s", "--seqsum"), type=str, default=None),
-    #Opt(("-n", "--max-reads"), "fast5_reader"),
+    Opt(("-f", "--full-overlap"), "track", action="store_true"),
 )
 
 def main(conf):
@@ -53,10 +52,10 @@ def main(conf):
     matplotlib.use("TkAgg")
     plt.style.use(['seaborn'])
 
-    browser = RawBrowser(conf)
+    browser = Browser(conf=conf)
     browser.show()
 
-class RawBrowser:
+class Browser:
     KMER_LAYER = 0
     PA_LAYER = 1
     DWELL_LAYER = 2
@@ -86,9 +85,8 @@ class RawBrowser:
 
     KS_LAYERS = [PA_LAYER, DWELL_LAYER]
 
-    def __init__(self, conf=None, **kwargs):
-        self.conf = Config() if conf is None else conf
-        self.prms = self.conf.browser.from_kw(**kwargs)
+    def __init__(self, *args, **kwargs):
+        self.conf, self.prms = config._init_group("browser", *args, **kwargs)
 
         self.tracks = list()
 
@@ -99,9 +97,11 @@ class RawBrowser:
         else:
             self.single_track = True
 
-        ref_bounds = self.conf.align.ref_bounds
+        ref_bounds = self.conf.track.ref_bounds
 
-        self.ref_name, self.ref_start, self.ref_end = ref_bounds
+        self.ref_name = ref_bounds.name
+        self.ref_start = ref_bounds.start
+        self.ref_end = ref_bounds.end
         self.width = self.ref_end - self.ref_start
 
         for path in track_paths:
@@ -113,8 +113,6 @@ class RawBrowser:
 
         if not self.single_track:
             self.ks_stats = self.tracks[0].calc_ks(self.tracks[1])
-
-        self.seq_fwd = conf.read_buffer.seq_fwd
 
         self.idx = BwaIndex(self.conf.mapper.bwa_prefix, True)
         self.fast5s = Fast5Reader(conf=self.conf)
@@ -482,7 +480,7 @@ class RawBrowser:
         self._noticks(track.ax, x=not ref_ticks)
 
         track.ax.set_xlabel(self.ref_coords, fontsize=15)
-        track.ax.set_ylabel("%s (%d reads)" % (track.path, track.height), fontsize=15)
+        track.ax.set_ylabel("%s (%d reads)" % (track.prms.path, track.height), fontsize=15)
 
         track.img = track.ax.imshow(
             track[self.active_layer], 

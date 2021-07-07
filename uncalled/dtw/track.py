@@ -17,19 +17,16 @@ import matplotlib.pyplot as plt
 from . import ReadAln, RefCoord
 
 from ..pafstats import parse_paf, PafEntry
+from .. import config 
 from ..config import Config, Opt
 from .. import BwaIndex, nt, PoreModel
 
-#class TrackParams(ParamGroup):
-#    _name = "track"
-#BrowserParams._def_params(
-#    ("path", None, str, "Path to directory where alignments are stored"),
-#    ("layers", ["current", "dwell", "model_diff"], list, "Layers to load"),
-#    ("ref_bounds", None, ref_bounds, "If true will only include reads which fully cover reference bounds")
-#    ("full_overlap", None, bool, "If true will only include reads which fully cover reference bounds")
-#    ("load_mat", None, bool, "If true will only include reads which fully cover reference bounds")
-#)
-
+KMER_LAYER       = "kmer"
+CURRENT_LAYER    = "current"
+DWELL_LAYER      = "dwell"
+MODEL_DIFF_LAYER = "model_diff"
+DEFAULT_LAYERS = [KMER_LAYER, CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
+ 
 def ref_coords(coord_str):             
     spl = coord_str.split(":")         
     ch = spl[0]                        
@@ -41,6 +38,19 @@ def ref_coords(coord_str):
         return coord                   
     else:                              
         return coord + (spl[2] == "+",)
+
+class TrackParams(config.ParamGroup):
+    _name = "track"
+TrackParams._def_params(
+    ("path", None, str, "Path to directory where alignments are stored"),
+    ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
+    ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
+    ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
+    ("layers", DEFAULT_LAYERS, list, "Layers to load"),
+    ("mode", "r", str, "Read (r) or write (w) mode"),
+    ("overwrite", False, bool, "Will overwrite existing directories if True"),
+    ignore_toml={"mode", "overwrite"}
+)
 
 class Track:
     CONF_FNAME = "conf.toml"
@@ -57,16 +67,7 @@ class Track:
     READ_MODE = "r"
     MODES = {WRITE_MODE, READ_MODE}
 
-    KMER_LAYER = 0
-    PA_LAYER = 1
-    DWELL_LAYER = 2
-    PA_DIFF_LAYER = 3
-
-    CMP_LAYERS = [PA_LAYER, DWELL_LAYER]
-
-    LAYER_NAMES = ["kmer", "current", "dwell", "model_diff"]
-
-    #TODO settle on pa_mean, cur_mean, current, level_mean, ...?
+    CMP_LAYERS = [CURRENT_LAYER, DWELL_LAYER]
 
     LAYER_META = [
         ("K-mer",              False),
@@ -75,19 +76,27 @@ class Track:
         ("pA Difference",      True)
     ]
 
-    def __init__(self, path, mode="r", ref_bounds=None, full_overlap=None, conf=None, overwrite=False, index=None, mm2s=None):
-        self.path = path.strip("/")
-        self.mode = mode
-        self.index = index
+    LAYER_FNS = {
+        KMER_LAYER : (
+            lambda self,df: df["kmer"]),
+        CURRENT_LAYER : (
+            lambda self,df: df["mean"]),
+        DWELL_LAYER : (
+            lambda self,df: df['length'] / self.conf.read_buffer.sample_rate),
+        MODEL_DIFF_LAYER : (
+            lambda self,df: df["mean"] - self.model[df["kmer"]]),
+    }
 
-        self.conf = Config(conf)
+    #def __init__(self, path, mode="r", ref_bounds=None, full_overlap=None, conf=None, overwrite=False, index=None, mm2s=None):
+    def __init__(self, *args, **kwargs):
+        self.conf, self.prms = config._init_group("track", *args, **kwargs)
 
-        if mode == self.WRITE_MODE:
-            os.makedirs(self.aln_dir, exist_ok=overwrite)
+        if self.prms.mode == self.WRITE_MODE:
+            os.makedirs(self.aln_dir, exist_ok=self.prms.overwrite)
 
-        self.fname_mapping_file = open(self.fname_mapping_filename, mode)
+        self.fname_mapping_file = open(self.fname_mapping_filename, self.prms.mode)
 
-        if mode == self.READ_MODE:
+        if self.prms.mode == self.READ_MODE:
             self.conf.load_toml(self.config_filename)
 
             if len(self.conf.fast5_reader.fast5_index) == 0:
@@ -95,13 +104,9 @@ class Track:
 
             self._load_index()
 
-        elif mode == self.WRITE_MODE:
+        elif self.prms.mode == self.WRITE_MODE:
             self.conf.to_toml(self.config_filename)
             self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
-
-        #TODO make TrackParams, deal with kwargs
-        if ref_bounds is None:
-            ref_bounds = self.conf.align.ref_bounds
 
         #TODO arguments overload conf params
         if self.conf.align.mm2_paf is not None:
@@ -109,18 +114,18 @@ class Track:
             self.mm2s = {p.qr_name : p
                      for p in parse_paf(
                         self.conf.align.mm2_paf,
-                        ref_bounds=self.conf.align.ref_bounds,
-                        full_overlap=self.conf.browser.full_overlap,
+                        ref_bounds=self.prms.ref_bounds,
+                        full_overlap=self.prms.full_overlap,
             )}
 
         #TODO static bwa_index parameters, or instance
-        if self.index is None and len(self.conf.mapper.bwa_prefix) > 0:
+        if len(self.conf.mapper.bwa_prefix) > 0:
             self.index = BwaIndex(self.conf.mapper.bwa_prefix, True)
 
         self.model = PoreModel(self.conf.pore_model)
 
-        if ref_bounds is not None:
-            self.load_region(ref_bounds, full_overlap)
+        if self.prms.load_mat and self.prms.ref_bounds is not None:
+            self.load_region(self.prms.ref_bounds)
 
     #@property
     #def read_ids(self):
@@ -134,7 +139,7 @@ class Track:
         self.read_ids = set(self.fname_mapping.index)
 
     def save_aln(self, aln, fast5_fname):
-        if self.mode != "w":
+        if self.prms.mode != "w":
             raise RuntimeError("Must be write mode to add read to track")
 
         aln_fname = self.aln_fname(aln.read_id)
@@ -146,13 +151,21 @@ class Track:
         df = pd.read_pickle(self.aln_fname(read_id)).sort_index()
         return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=ref_bounds)
 
+    def set_layers(self, layers):
+        if layers is not None:
+            self.prms.layers = layers
+        self.layer_idxs = {layer : i for i,layer in enumerate(self.prms.layers)}
+
     #TODO parse mm2 every time to enable changing bounds
     #eventually use some kind of tabix-like indexing
-    def load_region(self, ref_bounds=None, partial_overlap=False):
+    def load_region(self, ref_bounds=None, layers=None):
 
         #self.mat = TrackMatrix(self, ref_bounds, self.mm2s, conf=self.conf)
 
-        self.ref_bounds = ref_bounds
+        self.set_layers(layers)
+        if ref_bounds is not None:
+            self.prms.ref_bounds = ref_bounds
+
         self.width = self.ref_end-self.ref_start
         self.height = None
 
@@ -167,7 +180,6 @@ class Track:
         )
 
         def _add_row(df, mm2_paf):
-
             dtw_roi = df.loc[self.ref_start:self.ref_end-1]
 
             xs = self.ref_coords.reindex(
@@ -178,20 +190,20 @@ class Track:
             roi_mask[xs] = False
             mask_rows.append(roi_mask)
 
-
-            pa_diffs = dtw_roi["mean"] - self.model[dtw_roi["kmer"]]
+            #pa_diffs = dtw_roi["mean"] - self.model[dtw_roi["kmer"]]
             #pa_diffs = self.model.abs_diff(dtw_roi['mean'], dtw_roi['kmer'])
-            dwell = 1000 * dtw_roi['length'] / self.conf.read_buffer.sample_rate
+            #dwell = 1000 * dtw_roi['length'] / self.conf.read_buffer.sample_rate
 
-            def _add_layer_row(layer, vals):
+            #def _add_layer_row(layer, vals):
+            for layer in self.prms.layers:
                 row = np.zeros(self.width)
-                row[xs] = vals
+                row[xs] = self.LAYER_FNS[layer](self, dtw_roi)
                 read_rows[layer].append(row)
 
-            _add_layer_row(self.KMER_LAYER, dtw_roi['kmer'])
-            _add_layer_row(self.PA_LAYER, dtw_roi['mean'])
-            _add_layer_row(self.PA_DIFF_LAYER, pa_diffs)
-            _add_layer_row(self.DWELL_LAYER, dwell)
+            #_add_layer_row(self.KMER_LAYER, dtw_roi['kmer'])
+            #_add_layer_row(self.PA_LAYER, dtw_roi['mean'])
+            #_add_layer_row(self.PA_DIFF_LAYER, pa_diffs)
+            #_add_layer_row(self.DWELL_LAYER, dwell)
 
             read_meta['ref_start'].append(df.index.min())
             read_meta['id'].append(mm2_paf.qr_name)
@@ -215,12 +227,10 @@ class Track:
 
         read_order = self.reads.index.to_numpy()
 
-        layer_names = sorted(read_rows.keys())
-
         mat = np.stack([
-            np.stack(read_rows[l])[read_order] for l in layer_names
+            np.stack(read_rows[l])[read_order] for l in self.prms.layers
         ])
-        mask = np.stack([np.stack(mask_rows)[read_order].astype(bool) for _ in layer_names])
+        mask = np.stack([np.stack(mask_rows)[read_order].astype(bool) for _ in self.prms.layers])
 
         self.mat = np.ma.masked_array(mat, mask=mask)
 
@@ -233,9 +243,10 @@ class Track:
         #TODO define get_soft_minmax(num_stdvs):
 
         self.norms = [Normalize(np.min(layer), np.max(layer)) for layer in self.mat]
-        for l in [self.PA_LAYER, self.DWELL_LAYER]:
-            layer = self.mat[l]
-            self.norms[l].vmax = min(
+        for l in [CURRENT_LAYER, DWELL_LAYER]:
+            i = self.layer_idxs[l]
+            layer = self.mat[i]
+            self.norms[i].vmax = min(
                 layer.max(),
                 np.ma.median(layer) + 2 * layer.std()
             )
@@ -248,15 +259,15 @@ class Track:
 
     @property
     def config_filename(self):
-        return os.path.join(self.path, self.CONF_FNAME)
+        return os.path.join(self.prms.path, self.CONF_FNAME)
 
     @property
     def fname_mapping_filename(self):
-        return os.path.join(self.path, self.INDEX_FNAME)
+        return os.path.join(self.prms.path, self.INDEX_FNAME)
     
     @property
     def aln_dir(self):
-        return os.path.join(self.path, self.ALN_DIR)
+        return os.path.join(self.prms.path, self.ALN_DIR)
     
     @property
     def read_count(self):
@@ -272,15 +283,15 @@ class Track:
 
     @property
     def ref_name(self):
-        return self.ref_bounds[0]
+        return self.prms.ref_bounds.name
 
     @property
     def ref_start(self):
-        return self.ref_bounds[1]
+        return self.prms.ref_bounds.start
 
     @property
     def ref_end(self):
-        return self.ref_bounds[2]
+        return self.prms.ref_bounds.end
 
     def calc_ks(self, track_b):
         ks_stats = np.zeros((len(self.CMP_LAYERS), self.width))
@@ -293,8 +304,14 @@ class Track:
 
         return ks_stats
 
-    def __getitem__(self, i):
-        return self.mat.__getitem__(i)
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            key = self.layer_idxs[key]
+        elif isinstance(key, tuple) and isinstance(key[0], str):
+            key = (self.layer_idxs[key[0]],) + key[1:]
+        elif isinstance(key, list):
+            key = [self.layer_idxs[l] if isinstance(l, str) else l for l in key]
+        return self.mat.__getitem__(key)
     
     @property
     def kmer(self):
@@ -322,10 +339,10 @@ def _load_track_arg(arg_track, conf_track, conf):
 
 
 COMPARE_OPTS = (
-    Opt("ref_bounds", "align", type=ref_coords),
+    Opt("ref_bounds", "track", type=ref_coords),
     Opt("track_a", type=str),
     Opt("track_b", type=str, nargs="?"),
-    Opt(("-f", "--full-overlap"), "browser", action="store_true"),
+    Opt(("-f", "--full-overlap"), "track", action="store_true"),
     #Opt(("-o", "--outfile"), type=str, default=None),
 )
 
@@ -343,7 +360,7 @@ def compare(track_a=None, track_b=None, full_overlap=None, conf=None):
 
     ks_stats = np.recarray(
         track_a.width,
-        dtype=[(Track.LAYER_NAMES[l], '<f8') for l in Track.CMP_LAYERS]
+        dtype=[(l, '<f8') for l in Track.CMP_LAYERS]
     )
 
     for i,l in enumerate(Track.CMP_LAYERS):
@@ -411,19 +428,25 @@ def method_compare_aln(aln_a, aln_b):
     #print(merge[["start_a","length_a","start_b","length_b"]])
     return df
         
+#class TrackParams(config.ParamGroup):
+#    _name = "track"
+#BrowserParams._def_params(
+#    ("track_a", None, str, "Path to directory where alignments are stored"),
+#    ("track_b", None, str, "Path to directory where alignments are stored"),
+#    ("stats", None, str, "Path to directory where alignments are stored"),
 
 REFSTATS_OPTS = (
-    Opt("ref_bounds", "align", type=ref_coords),
+    Opt("ref_bounds", "track", type=ref_coords),
     Opt("track_in", type=str),
+    Opt(("-f", "--full-overlap"), "track", action="store_true"),
     Opt(("-m", "--pore-model"), "mapper", default=None),
     Opt("--rna", fn="set_r94_rna"),
-    Opt(("-f", "--full-overlap"), "browser", action="store_true"),
 )
 
 def refstats(
         track=None, 
         full_overlap=None, 
-        layers=[Track.PA_LAYER, Track.DWELL_LAYER, Track.PA_DIFF_LAYER], #TODO use strings
+        layers=[CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER], #TODO use strings
         stats=["mean", "variance", "skewness", "kurtosis"], 
         conf=None):
 
@@ -441,13 +464,12 @@ def refstats(
     vals["cov"] = np.sum(mask, axis=0)
     vals["kmer"] = [
         nt.kmer_to_str(int(k)) 
-        for k in np.ma.median(track[Track.KMER_LAYER], axis=0).data
+        for k in np.ma.median(track[KMER_LAYER], axis=0).data
     ]
 
     for l in layers:
-        layer_name = Track.LAYER_NAMES[l]
         desc = scipy.stats.mstats.describe(track[l], axis=0)
         for stat in stats:
-            vals["%s_%s" % (layer_name, stat)] = getattr(desc, stat)
+            vals["%s_%s" % (l, stat)] = getattr(desc, stat)
 
     return pd.DataFrame(vals, index=track.ref_coords.index.rename("ref"))

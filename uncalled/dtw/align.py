@@ -36,7 +36,7 @@ AlignParams._def_params(
 OPTS = BWA_OPTS + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "align", required=True),
     Opt(("-o", "--out-path"), "align"),
-    Opt(("-f", "--force-overwrite"), action="store_true", help="Will overwrite alignment track if one already exists"),
+    Opt(("-f", "--overwrite"), "track", action="store_true", help="Will overwrite alignment track if one already exists"),
     Opt("--rna", fn="set_r94_rna"),
     Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
     Opt("--method", "align", choices=METHODS.keys()),
@@ -47,10 +47,6 @@ OPTS = BWA_OPTS + FAST5_OPTS + (
 
 def main(conf):
     """Performs DTW alignment and either outputs as alignment Track or displays dotplots"""
-
-    #if conf.rna:
-    #    conf.set_r94_rna()
-
     conf.fast5_reader.load_bc = True
     conf.proc_read.detect_events = True
     conf.export_static()
@@ -67,7 +63,7 @@ def main(conf):
     fast5s = Fast5Processor(conf=conf)
 
     if conf.align.out_path is not None:
-        track = Track(conf.align.out_path, "w", conf=conf, overwrite=conf.force_overwrite, index=idx)
+        track = Track(conf.align.out_path, mode="w", conf=conf)
     else:
         track = None
 
@@ -196,8 +192,6 @@ class GuidedDTW:
         if not self.bcaln.is_fwd:
             kmers = nt.kmer_comp(kmers)
 
-        print(list(kmers))
-        print(list(kmers3))
 
     def get_dtw_args(self, read_block, ref_start, ref_kmers):
         common = (read_block['norm_sig'].to_numpy(), ref_kmers, self.model)
@@ -277,7 +271,7 @@ class GuidedDTW:
             refmir_st = self.bcaln.df.loc[st,"refmir"]
             refmir_en = self.bcaln.df.loc[en-1,"refmir"]
 
-            print(samp_st, samp_en, refmir_st, refmir_en, self.aln.refmir_start, self.idx.refmir_to_ref(refmir_en))
+            #print(samp_st, samp_en, refmir_st, refmir_en, self.aln.refmir_start, self.idx.refmir_to_ref(refmir_en))
 
             read_block = self.read.sample_range(samp_st, samp_en)
 

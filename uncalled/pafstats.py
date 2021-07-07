@@ -136,8 +136,12 @@ def parse_paf(infile, ref_bounds=None, max_reads=None, read_filter=None, full_ov
 
     if ref_bounds is None:
         ref_name=ref_start=ref_end=None
-    else:
+    elif isinstance(ref_bounds, tuple):
         ref_name,ref_start,ref_end=ref_bounds[:3]
+    else:
+        ref_name = ref_bounds.name
+        ref_start = ref_bounds.start
+        ref_end = ref_bounds.end
 
     if isinstance(infile, str):
         infile = open(infile)
