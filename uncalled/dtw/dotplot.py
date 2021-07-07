@@ -5,6 +5,7 @@ import os
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter, FuncFormatter
+import types
 
 from .. import nt, BwaIndex, config
 
@@ -18,6 +19,10 @@ class DotplotParams(config.ParamGroup):
 DotplotParams._def_params(
     ("track_a", None, str, "DTW aligment track containing reads to plot"),
     ("track_b", None, str, "DTW aligment track containing reads to plot"),
+    ("layers", ["current", "dwell"], list, "Layers to plot in side panels"),
+    ("color_a", "purple", str, "Color for track_a alignments"),
+    ("color_b", "royalblue", str, "Color for track_a alignments"),
+    ("color_bc", "orange", str, "Color for basecall alignments"),
 )
 #Config._EXTRA_GROUPS["dotplot"] = DotplotParams #TODO put in ParamGroup con
 
@@ -41,23 +46,26 @@ class Dotplot:
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
         self.conf.track.load_mat = False
 
-        self.track_a = Track(self.prms.track_a, conf=self.conf)
-        self.conf.load_config(self.track_a.conf)
+        self.tracks = [Track(self.prms.track_a, conf=self.conf)]
+        self.colors = [self.prms.color_a]
 
-        if self.conf.dotplot.track_b is None:
-            self.track_b = None
-            self.read_ids = self.track_a.read_ids
-        else:
-            self.track_b = Track(self.prms.track_b, conf=self.conf)
-            self.read_ids = self.track_a.read_ids & self.track_b.read_ids
+        self.conf.load_config(self.tracks[0].conf)
+
+        if self.conf.dotplot.track_b is not None:
+            self.tracks.append(Track(self.prms.track_b, conf=self.conf))
+            self.colors.append(self.prms.color_b)
+
+            self.read_ids = self.tracks[0].read_ids & self.tracks[1].read_ids
 
             if len(self.read_ids) == 0:
                 raise RuntimeError("Dotplot tracks must have reads in common")
+        else:
+            self.read_ids = self.tracks[0].read_ids
         
-        self.fast5s = Fast5Reader(reads=self.read_ids, conf=self.track_a.conf)
+        self.fast5s = Fast5Reader(reads=self.read_ids, conf=self.tracks[0].conf)
 
-        self.index = self.track_a.index
-        self.mm2s = self.track_a.mm2s
+        self.index = self.tracks[0].index
+        self.mm2s = self.tracks[0].mm2s
 
     def show_all(self):
         for read_id in self.read_ids:
@@ -98,21 +106,6 @@ class Dotplot:
 
         self.alns.append((aln, color, model))
 
-    def _plot_aln_step(self, aln, color):
-        if getattr(aln, "bands", None) is not None:
-            self.ax_dot.fill_between(aln.bands['samp'], aln.bands['ref_st']-1, aln.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
-
-        self.ax_dot.step(aln.df['start'], aln.df['refmir'], where="post", color=color, zorder=3, linewidth=3)
-        #if samp_min is None: samp_min = 0
-        #if samp_max is None: samp_max = self.df['sample'].max()
-        #i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
-
-        model_means = self.track_a.model[aln.df['kmer']]
-
-        pa_diffs = np.abs(aln.df['mean'] - model_means)
-
-        #self.ax_padiff.step(pa_diffs, aln.df['refmir'], color=color, where="post")
-
     def _plot_signal(self, aln, ax, model):
         samp_min, samp_max = aln.get_samp_bounds()
 
@@ -149,6 +142,24 @@ class Dotplot:
         else:
             ax.scatter(self.read.df['start'][evts], self.read.df['norm_sig'][evts], s=5, alpha=0.75, c="#777777") 
 
+    def _plot_aln(self, i):
+        aln = self.alns[i]
+        aln.sort_refmir()
+
+        if getattr(aln, "bands", None) is not None:
+            self.ax_dot.fill_between(aln.bands['samp'], aln.bands['ref_st']-1, aln.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
+
+        self.ax_dot.step(aln.df['start'], aln.df['refmir'], where="post", color=self.colors[i], zorder=3, linewidth=3)
+
+        self._plot_signal(aln, self.sig_axs[i], self.tracks[i].model)
+
+        #if samp_min is None: samp_min = 0
+        #if samp_max is None: samp_max = self.df['sample'].max()
+        #i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
+        #model_means = self.track_a.model[aln.df['kmer']]
+        #pa_diffs = np.abs(aln.df['mean'] - model_means)
+        #self.ax_padiff.step(pa_diffs, aln.df['refmir'], color=color, where="post")
+
     def set_cursor(self, ref_coord):
         aln,_,_ = self.alns[list(self.focus)[0]]
         refmir = aln.ref_to_refmir(ref_coord)
@@ -173,16 +184,19 @@ class Dotplot:
 
         self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], ref_bounds=self.conf.track.ref_bounds)
 
-        self.aln_a = self.track_a.load_aln(read_id, ref_bounds=self.conf.track.ref_bounds)
+        self.alns = [
+            track.load_aln(read_id)#, ref_bounds=self.conf.track.ref_bounds)
+            for track in self.tracks
+        ]
 
-        if self.track_b is not None and read_id in self.track_b:
-            self.aln_b = self.track_b.load_aln(read_id, ref_bounds=self.conf.track.ref_bounds)
-        else:
-            self.aln_b = None
-
-        self.ref_bounds = self.aln_a.ref_bounds
+        #TODO improve this
+        self.ref_bounds = self.alns[0].ref_bounds
 
         return True
+    
+    @property
+    def track_count(self):
+        return len(self.tracks)
 
     def _plot(self, read_id, cursor=None):
         if not self._load_read(read_id):
@@ -191,53 +205,47 @@ class Dotplot:
         matplotlib.use("TkAgg")
         plt.style.use(['seaborn'])
 
+        widths=[5]
+        for _ in self.prms.layers:
+            widths.append(1)
+
+        heights=[1,3] 
+        if self.track_count == 2:
+            heights.append(1)
+
         self.fig = plt.figure()
         gspec = self.fig.add_gridspec(
-                #ncols=2, nrows=2, 
-                ncols=4, nrows=3, 
-                width_ratios=[5,1,1,1],
-                height_ratios=[1,3,1] 
+                ncols=len(widths), nrows=len(heights), 
+                width_ratios=widths,
+                height_ratios=heights 
         )
 
-        self.ax_sig = self.fig.add_subplot(gspec[0,0])
-        self.ax_sig2 = self.fig.add_subplot(gspec[2,0])
+        self.sig_axs = [self.fig.add_subplot(gspec[i*2,0]) 
+                        for i in range(len(self.tracks))]
+
         self.ax_dot = self.fig.add_subplot(gspec[1,0])
-        self.ax_padiff = self.fig.add_subplot(gspec[1,1])
-        self.ax_centroid = self.fig.add_subplot(gspec[1,2])
-        self.ax_dwell = self.fig.add_subplot(gspec[1,3])
 
-        def sharex(ax1, ax2):
-            ax1.get_shared_x_axes().join(ax1,ax2)
-
-        def sharey(ax1, ax2):
-            ax1.get_shared_y_axes().join(ax1,ax2)
-
-        sharex(self.ax_dot, self.ax_sig)
-        sharex(self.ax_dot, self.ax_sig2)
-        sharey(self.ax_dot, self.ax_padiff)
-        sharey(self.ax_dot, self.ax_centroid)
-        sharey(self.ax_dot, self.ax_dwell)
+        self.layer_axs = [self.fig.add_subplot(gspec[1,l+1])
+                          for l in range(len(self.prms.layers))]
 
         fontsize=12
-        self.ax_sig.set_ylabel("Current (pA)", fontsize=fontsize)
-        self.ax_sig2.set_xlabel("Raw Sample", fontsize=fontsize)
-        #self.ax_dot.set_xlabel("Raw Sample", fontsize=fontsize)
-        #self.ax_padiff.set_xlabel("Abs. pA Difference", fontsize=fontsize)
-        self.ax_padiff.set_xlabel("Sample Jaccard", fontsize=fontsize)
-        self.ax_centroid.set_xlabel("Centroid Difference", fontsize=fontsize)
-        self.ax_dwell.set_xlabel("Dwell Difference", fontsize=fontsize)
 
-        self.ax_sig.xaxis.set_major_formatter(NullFormatter())
-        self.ax_padiff.yaxis.set_major_formatter(NullFormatter())
-        self.ax_centroid.yaxis.set_major_formatter(NullFormatter())
-        self.ax_dwell.yaxis.set_major_formatter(NullFormatter())
+        for ax in self.sig_axs:
+            ax.get_shared_x_axes().join(self.ax_dot, ax)
+            ax.set_ylabel("Current (pA)", fontsize=fontsize)
+
+        self.sig_axs[0].set_title(self.read.id)
+        self.sig_axs[-1].set_xlabel("Raw Sample", fontsize=fontsize)
+
+        for i,ax in enumerate(self.layer_axs):
+            ax.get_shared_y_axes().join(self.ax_dot, ax)
+            ax.yaxis.set_major_formatter(NullFormatter())
+            ax.set_xlabel(self.prms.layers[i], fontsize=fontsize)
 
         self.ax_dot.set_ylabel("%s (%s)" % (self.ref_bounds.name, "+" if self.ref_bounds.fwd else "-"), fontsize=12)
 
         self.ax_dot.yaxis.set_major_formatter(FuncFormatter(self._tick_formatter))
         
-        self.ax_sig.set_title(self.read.id)
-
         if cursor is not None:
             cursor_kw = {
                 'color' : 'red', 
@@ -247,21 +255,11 @@ class Dotplot:
             self.ax_dot.axvline(samp, **cursor_kw),
             self.ax_dot.axhline(refmir,  **cursor_kw)
 
-        if self.aln_b is not None:
-            self.aln_b.sort_refmir()
-            self._plot_signal(self.aln_b, self.ax_sig2, self.track_b.model)
-            self._plot_aln_step(self.aln_b, "royalblue")
+        for i in range(self.track_count):
+            self._plot_aln(i)
 
-            compare = method_compare_aln(self.aln_a, self.aln_b)
-            self.ax_padiff.step(compare["jaccard"], compare.index, where="post", color="green")
-            self.ax_centroid.step(compare["centroid_diff"], compare.index, where="post", color="green")
-            self.ax_dwell.step(compare["dwell_diff"], compare.index, where="post", color="green")
-
-        self.aln_a.sort_refmir()
-        self._plot_signal(self.aln_a, self.ax_sig, self.track_a.model)
-        self._plot_aln_step(self.aln_a, "purple")
-
-        self.ax_dot.scatter(self.aln_bc.df['sample'], self.aln_bc.df['refmir'], color='orange', zorder=2, s=20)
+        if not self.aln_bc.empty:
+            self.ax_dot.scatter(self.aln_bc.df['sample'], self.aln_bc.df['refmir'], color='orange', zorder=2, s=20)
 
         self.fig.tight_layout()
 

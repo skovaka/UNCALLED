@@ -149,7 +149,7 @@ class Track:
     def load_aln(self, read_id, ref_bounds=None):
         mm2 = self.mm2s[read_id]
         df = pd.read_pickle(self.aln_fname(read_id)).sort_index()
-        return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=ref_bounds)
+        return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
 
     def set_layers(self, layers):
         if layers is not None:
