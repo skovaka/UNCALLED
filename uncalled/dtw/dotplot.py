@@ -6,25 +6,25 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter, FuncFormatter
 
-from .. import nt, BwaIndex
+from .. import nt, BwaIndex, config
 
 from ..sigproc import ProcRead
-from ..config import Config, ArgParser, ParamGroup, Opt
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
 from . import RefCoord, Track, ref_coords, BcFast5Aln, method_compare_aln
 
-class DotplotParams(ParamGroup):
+class DotplotParams(config.ParamGroup):
     _name = "dotplot"
 DotplotParams._def_params(
-    ("track", None, str, "DTW aligment track containing reads to plot"),
-    ("read_filter", None, list, "List of reads to plot"),
+    ("track_a", None, str, "DTW aligment track containing reads to plot"),
+    ("track_b", None, str, "DTW aligment track containing reads to plot"),
 )
 #Config._EXTRA_GROUPS["dotplot"] = DotplotParams #TODO put in ParamGroup con
 
+from ..config import Opt
 OPTS = [
-    Opt("track", "dotplot"),
-    Opt("track_b", "browser", nargs="?"),
+    Opt("track_a", "dotplot"),
+    Opt("track_b", "dotplot", nargs="?"),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
     Opt(("-R", "--ref-bounds"), "align", type=RefCoord),
@@ -32,13 +32,13 @@ OPTS = [
     Opt(("-C", "--max-chunks"), "read_buffer"),
 ]
 
-def main(conf):
+def main_old(conf):
     """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
 
-    track = Track(conf.dotplot.track, 'r', conf=conf)
+    track = Track(conf.dotplot.track_a, conf=conf)
 
-    if conf.browser.track_b is not None:
-        track_b = Track(conf.browser.track_b, conf=conf)
+    if conf.dotplot.track_b is not None:
+        track_b = Track(conf.dotplot.track_b, conf=conf)
     else:
         track_b = None
 
@@ -71,24 +71,66 @@ def main(conf):
         else:
             dplt.save(conf.out_prefix, conf.out_format)
 
+def main(conf):
+    """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
+    Dotplot(conf=conf).show_all()
+
 class Dotplot:
-    def __init__(self, index, read, out_prefix=None, cursor=None, conf=None):
-        self.conf = conf if conf is not None else Config()
+    def __init__(self, *args, **kwargs):
+        self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
 
-        self.index = index
-        self.read = read
+        self.track_a = Track(self.prms.track_a, conf=self.conf)
+        self.conf.load_config(self.track_a.conf)
 
+        if self.conf.dotplot.track_b is None:
+            self.track_b = None
+            self.read_ids = self.track_a.read_ids
+        else:
+            self.track_b = Track(self.prms.track_b, conf=self.conf)
+            self.read_ids = self.track_a.read_ids & self.track_b.read_ids
+
+            if len(self.read_ids) == 0:
+                raise RuntimeError("Dotplot tracks must have reads in common")
+        
+        self.fast5s = Fast5Reader(reads=self.read_ids, conf=self.track_a.conf)
+
+        self.index = self.track_a.index
+        self.mm2s = self.track_a.mm2s
+
+    def show_all(self):
+        for read_id in self.read_ids:
+            self.show(read_id)
+
+    def show(self, read_id):
         self.ref_bounds = None
         self.alns = list()
         self.focus = set()
 
         self.cursor = None
 
-        #model_name = self.conf.mapper.pore_model
-        #if model_name.endswith("_compl"):
-        #    model_name = model_name[:-5]+"templ"
+        fast5_read = self.fast5s[read_id]
 
-        self.model = self.read.model#PORE_MODELS[model_name]
+        if not read_id in self.mm2s:
+            return
+
+        self.read = ProcRead(fast5_read, conf=self.conf)
+
+        self.aln_a = self.track_a.load_aln(read_id, ref_bounds=self.conf.align.ref_bounds)
+        self.ref_bounds = self.aln_a.ref_bounds
+
+        if self.track_b is not None and read_id in self.track_b:
+            self.aln_b = self.track_b.load_aln(read_id, ref_bounds=self.conf.align.ref_bounds)
+        else:
+            self.aln_b = None
+
+        self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], ref_bounds=self.conf.align.ref_bounds)
+
+        print(read_id)
+
+        self._plot()
+
+        plt.show()
+        plt.close()
 
     def add_aln(self, aln, focus=False, color="purple", model=None):
         if self.read.id is not None and self.read.id != aln.read_id:
@@ -125,7 +167,7 @@ class Dotplot:
         #if samp_max is None: samp_max = self.df['sample'].max()
         #i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
 
-        model_means = self.model[aln.df['kmer']]
+        model_means = self.track_a.model[aln.df['kmer']]
 
         pa_diffs = np.abs(aln.df['mean'] - model_means)
 
@@ -239,41 +281,42 @@ class Dotplot:
             self.ax_dot.axvline(samp, **cursor_kw),
             self.ax_dot.axhline(refmir,  **cursor_kw)
 
-        for i,(aln,color,model) in enumerate(self.alns):
+        if self.aln_b is not None:
+            self.aln_b.sort_refmir()
+            self._plot_signal(self.aln_b, self.ax_sig2, self.track_b.model)
+            self._plot_aln_step(self.aln_b, "royalblue")
 
-            aln.sort_refmir()
-
-            if isinstance(aln, BcFast5Aln):
-                self._plot_aln_scatter(aln)
-                aln.plot_scatter(self.ax_dot, False)
-            else:
-
-                if i in self.focus:
-                    self._plot_signal(aln, self.ax_sig, model)
-                else:
-                    self._plot_signal(aln, self.ax_sig2, model)
-
-                self._plot_aln_step(aln, color)
-
-                #self.samp_min, self.samp_max = aln.get_samp_bounds()
-
-        if len(self.alns) == 3:
-            aln_a = self.alns[1][0]
-            aln_b = self.alns[2][0]
-            compare = method_compare_aln(aln_a, aln_b)
+            compare = method_compare_aln(self.aln_a, self.aln_b)
             #refmir = aln_a.ref_to_refmir(compare.index.to_numpy())
             self.ax_padiff.step(compare["jaccard"], compare.index, where="post", color="green")
             self.ax_centroid.step(compare["centroid_diff"], compare.index, where="post", color="green")
             self.ax_dwell.step(compare["dwell_diff"], compare.index, where="post", color="green")
 
+        self.aln_a.sort_refmir()
+        self._plot_signal(self.aln_a, self.ax_sig, self.track_a.model)
+        self._plot_aln_step(self.aln_a, "purple")
+
+        self._plot_aln_scatter(self.aln_bc)
+        #self.aln_bc.plot_scatter(self.ax_dot, False)
+
+
+        #for i,(aln,color,model) in enumerate(self.alns):
+
+        #    if isinstance(aln, BcFast5Aln):
+        #    else:
+
+        #        if i in self.focus:
+        #            self._plot_signal(aln, self.ax_sig, model)
+        #        else:
+        #            self._plot_signal(aln, self.ax_sig2, model)
+
+        #        self._plot_aln_step(aln, color)
+
+        #        #self.samp_min, self.samp_max = aln.get_samp_bounds()
+
         self.fig.tight_layout()
 
 
-    def show(self):
-        self._plot()
-
-        plt.show()
-        plt.close()
     
     def save(self, out_prefix, fmt):
         self._plot()

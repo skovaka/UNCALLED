@@ -65,11 +65,14 @@ def parse_read_ids(reads):
     if reads is None:
         return []
 
-    if os.path.exists(reads):
-        with open(reads) as reads_in:
-            return [line.split()[0] for line in reads_in]
+    if isinstance(reads, str):
+        if os.path.exists(reads):
+            with open(reads) as reads_in:
+                return [line.split()[0] for line in reads_in]
+        else:
+            return reads.split(",")
 
-    return reads.split(",")
+    return list(reads)
 
 class Fast5Reader:
 
@@ -87,7 +90,7 @@ class Fast5Reader:
         if reads is not None: 
             self.prms.read_filter = parse_read_ids(reads)
 
-        if index     is not None: self.prms.fast5_index = index
+        if index is not None: self.prms.fast5_index = index
 
         self.indexed = len(self.prms.fast5_index) != 0
 
