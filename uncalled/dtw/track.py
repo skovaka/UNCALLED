@@ -14,7 +14,7 @@ import copy
 
 import matplotlib.pyplot as plt
 
-from . import ReadAln, RefCoord
+from . import ReadAln, RefCoord, LayerMeta, LAYER_META
 
 from ..pafstats import parse_paf, PafEntry
 from .. import config 
@@ -26,6 +26,11 @@ CURRENT_LAYER    = "current"
 DWELL_LAYER      = "dwell"
 MODEL_DIFF_LAYER = "model_diff"
 DEFAULT_LAYERS = [KMER_LAYER, CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
+
+LAYER_META.update({
+    "dwell" : LayerMeta(float, "Dwell Time (ms/nt)"),
+    "model_diff" : LayerMeta(float, "Model pA Difference"),
+})
  
 def ref_coords(coord_str):             
     spl = coord_str.split(":")         
@@ -69,23 +74,18 @@ class Track:
 
     CMP_LAYERS = [CURRENT_LAYER, DWELL_LAYER]
 
-    LAYER_META = [
-        ("K-mer",              False),
-        ("Current (pA)",       True),
-        ("Dwell Time (ms/bp)", True),
-        ("pA Difference",      True)
-    ]
-
     LAYER_FNS = {
-        KMER_LAYER : (
+        "kmer" : (
             lambda self,df: df["kmer"]),
-        CURRENT_LAYER : (
+        "current" : (
             lambda self,df: df["mean"]),
-        DWELL_LAYER : (
-            lambda self,df: df['length'] / self.conf.read_buffer.sample_rate),
-        MODEL_DIFF_LAYER : (
+        "dwell" : (
+            lambda self,df: 1000 * df['length'] / self.conf.read_buffer.sample_rate),
+        "model_diff" : (
             lambda self,df: df["mean"] - self.model[df["kmer"]]),
     }
+
+    #def _compute_layer(
 
     #def __init__(self, path, mode="r", ref_bounds=None, full_overlap=None, conf=None, overwrite=False, index=None, mm2s=None):
     def __init__(self, *args, **kwargs):
@@ -146,9 +146,12 @@ class Track:
         aln.df.sort_index().to_pickle(aln_fname)
         self.fname_mapping_file.write("\t".join([aln.read_id, fast5_fname, aln_fname]) + "\n")
 
-    def load_aln(self, read_id, ref_bounds=None):
-        mm2 = self.mm2s[read_id]
+    def get_aln(self, read_id):
+        mm2 = self.mm2s.get(read_id, None)
+        if mm2 is None: return None
+
         df = pd.read_pickle(self.aln_fname(read_id)).sort_index()
+
         return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
 
     def set_layers(self, layers):
@@ -179,45 +182,27 @@ class Track:
                 index=pd.RangeIndex(self.ref_start, self.ref_end)
         )
 
-        def _add_row(df, mm2_paf):
-            dtw_roi = df.loc[self.ref_start:self.ref_end-1]
-
-            xs = self.ref_coords.reindex(
-                self.ref_coords.index.intersection(dtw_roi.index)
-            )
-
-            roi_mask = np.ones(self.width)#, dtype=bool)
-            roi_mask[xs] = False
-            mask_rows.append(roi_mask)
-
-            #pa_diffs = dtw_roi["mean"] - self.model[dtw_roi["kmer"]]
-            #pa_diffs = self.model.abs_diff(dtw_roi['mean'], dtw_roi['kmer'])
-            #dwell = 1000 * dtw_roi['length'] / self.conf.read_buffer.sample_rate
-
-            #def _add_layer_row(layer, vals):
-            for layer in self.prms.layers:
-                row = np.zeros(self.width)
-                row[xs] = self.LAYER_FNS[layer](self, dtw_roi)
-                read_rows[layer].append(row)
-
-            #_add_layer_row(self.KMER_LAYER, dtw_roi['kmer'])
-            #_add_layer_row(self.PA_LAYER, dtw_roi['mean'])
-            #_add_layer_row(self.PA_DIFF_LAYER, pa_diffs)
-            #_add_layer_row(self.DWELL_LAYER, dwell)
-
-            read_meta['ref_start'].append(df.index.min())
-            read_meta['id'].append(mm2_paf.qr_name)
-            read_meta['fwd'].append(mm2_paf.is_fwd)
-
-            #self.mm2s[mm2_paf.qr_name] = mm2_paf
 
         for read_id,read in self.fname_mapping.iterrows():
-            mm2 = self.mm2s.get(read_id, None)
-            if mm2 is None: 
-                continue
-            df = pd.read_pickle(read["aln_file"])
-            df.sort_index(inplace=True)
-            _add_row(df, mm2)
+            aln = self.get_aln(read_id)
+            if aln is None: continue 
+
+            xs = self.ref_coords.reindex(
+                self.ref_coords.index.intersection(aln.df.index)
+            )
+
+            mask_row = np.ones(self.width)#, dtype=bool)
+            mask_row[xs] = False
+            mask_rows.append(mask_row)
+
+            for layer in self.prms.layers:
+                row = np.zeros(self.width)
+                row[xs] = self.LAYER_FNS[layer](self, aln.df)
+                read_rows[layer].append(row)
+
+            read_meta['ref_start'].append(aln.ref_start)
+            read_meta['id'].append(aln.read_id)
+            read_meta['fwd'].append(aln.is_fwd)
 
         self.reads = pd.DataFrame(read_meta) \
                      .sort_values(['fwd', 'ref_start'], ascending=[False, True])
@@ -398,9 +383,9 @@ def method_compare(track_a=None, track_b=None, full_overlap=None, conf=None):
         return
 
     for read in common_reads:
-        aln_a = track_a.load_aln(read)
-        aln_b = track_b.load_aln(read)
-        print (method_compmare_aln(aln_a, aln_b))
+        aln_a = track_a.get_aln(read)
+        aln_b = track_b.get_aln(read)
+        print (method_compare_aln(aln_a, aln_b))
 
 def method_compare_aln(aln_a, aln_b):
     merge = aln_a.df.join(aln_b.df, lsuffix="_a", rsuffix="_b").dropna().set_index("refmir_a")

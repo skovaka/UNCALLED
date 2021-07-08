@@ -3,10 +3,9 @@
 import sys, os
 import numpy as np
 import argparse
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 import re
 import time
-from typing import NamedTuple
 from matplotlib.colors import Normalize
 import pandas as pd
 import scipy.stats
@@ -69,6 +68,17 @@ class RefCoord:
             s += " (%s)" % ("+" if self.fwd else "-")
         return s
 
+LayerMeta = namedtuple("LayerMeta", ["type", "label"])
+
+LAYER_META = {
+    "ref"     : LayerMeta(int, "Reference Coordinate"),
+    "start"   : LayerMeta(int, "Sample Start"),
+    "length"  : LayerMeta(int, "Sample Length"),
+    "current" : LayerMeta(float, "Mean Current (pA)"),
+    "kmer"    : LayerMeta(int, "Reference K-mer"),
+    "refmir"  : LayerMeta(int, "Mirrored Packed Ref. Coord."),
+}
+
 class ReadAln:
 
     REFMIR_COL  = "refmir"
@@ -99,7 +109,8 @@ class ReadAln:
             if ref_bounds is None:
                 self.df = df
             else:
-                self.df = df[(df.index >= self.ref_start) & (df.index <= self.ref_end)].copy()
+                #self.df = df[(df.index >= self.ref_start) & (df.index <= self.ref_end)].copy()
+                self.df = df.loc[self.ref_start:self.ref_end-1].copy()
 
             has_ref = self.df.index.name == self.REF_COL
             has_refmir = self.REFMIR_COL in self.df.columns
@@ -120,7 +131,6 @@ class ReadAln:
     def set_ref_bounds(self, aln, ref_bounds):
         if ref_bounds is None:
             self.ref_bounds = RefCoord(aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
-            print(aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
         else:
             if aln.rf_st < ref_bounds.start:
                 ref_st = ref_bounds.start

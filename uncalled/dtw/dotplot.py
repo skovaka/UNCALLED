@@ -19,12 +19,15 @@ class DotplotParams(config.ParamGroup):
 DotplotParams._def_params(
     ("track_a", None, str, "DTW aligment track containing reads to plot"),
     ("track_b", None, str, "DTW aligment track containing reads to plot"),
-    ("layers", ["current", "dwell"], list, "Layers to plot in side panels"),
+    ("layers", ["mean", "length"], list, "Layers to plot in side panels"),
     ("color_a", "purple", str, "Color for track_a alignments"),
     ("color_b", "royalblue", str, "Color for track_a alignments"),
     ("color_bc", "orange", str, "Color for basecall alignments"),
 )
 #Config._EXTRA_GROUPS["dotplot"] = DotplotParams #TODO put in ParamGroup con
+
+def comma_split(s):
+    return s.split(",")
 
 from ..config import Opt
 OPTS = [
@@ -34,6 +37,7 @@ OPTS = [
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
     Opt(("-R", "--ref-bounds"), "track", type=RefCoord),
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
+    Opt(("-L", "--layers"), "dotplot", type=comma_split),
     Opt(("-C", "--max-chunks"), "read_buffer"),
 ]
 
@@ -45,6 +49,7 @@ class Dotplot:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
         self.conf.track.load_mat = False
+        self.conf.track.layers = self.conf.dotplot.layers
 
         self.tracks = [Track(self.prms.track_a, conf=self.conf)]
         self.colors = [self.prms.color_a]
@@ -185,7 +190,7 @@ class Dotplot:
         self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], ref_bounds=self.conf.track.ref_bounds)
 
         self.alns = [
-            track.load_aln(read_id)#, ref_bounds=self.conf.track.ref_bounds)
+            track.get_aln(read_id)#, ref_bounds=self.conf.track.ref_bounds)
             for track in self.tracks
         ]
 
@@ -193,6 +198,9 @@ class Dotplot:
         self.ref_bounds = self.alns[0].ref_bounds
 
         return True
+    
+    #def _load_layer(self, layer):
+
     
     @property
     def track_count(self):
@@ -257,6 +265,11 @@ class Dotplot:
 
         for i in range(self.track_count):
             self._plot_aln(i)
+
+        for ax,layer in zip(self.layer_axs, self.prms.layers):
+            for i,aln in enumerate(self.alns):
+                ax.step(aln.df[layer], aln.df["refmir"], color=self.colors[i], where="post")
+
 
         if not self.aln_bc.empty:
             self.ax_dot.scatter(self.aln_bc.df['sample'], self.aln_bc.df['refmir'], color='orange', zorder=2, s=20)
