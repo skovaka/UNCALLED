@@ -152,6 +152,10 @@ class Track:
 
         df = pd.read_pickle(self.aln_fname(read_id)).sort_index()
 
+        for layer in self.prms.layers:
+            if not layer in df.columns:
+                df[layer] = self.LAYER_FNS[layer](self, df)
+
         return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
 
     def set_layers(self, layers):
