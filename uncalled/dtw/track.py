@@ -201,7 +201,7 @@ class Track:
 
             for layer in self.prms.layers:
                 row = np.zeros(self.width)
-                row[xs] = self.LAYER_FNS[layer](self, aln.df)
+                row[xs] = aln.df[layer]
                 read_rows[layer].append(row)
 
             read_meta['ref_start'].append(aln.ref_start)
