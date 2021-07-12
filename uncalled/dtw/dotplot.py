@@ -19,7 +19,7 @@ class DotplotParams(config.ParamGroup):
 DotplotParams._def_params(
     ("track_a", None, str, "DTW aligment track containing reads to plot"),
     ("track_b", None, str, "DTW aligment track containing reads to plot"),
-    ("layers", ["mean", "length"], list, "Layers to plot in side panels"),
+    ("layers", ["current", "length"], list, "Layers to plot in side panels"),
     ("color_a", "purple", str, "Color for track_a alignments"),
     ("color_b", "royalblue", str, "Color for track_a alignments"),
     ("color_bc", "orange", str, "Color for basecall alignments"),
@@ -190,7 +190,7 @@ class Dotplot:
         self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], ref_bounds=self.conf.track.ref_bounds)
 
         self.alns = [
-            track.get_aln(read_id)#, ref_bounds=self.conf.track.ref_bounds)
+            track.load_read(read_id)#, ref_bounds=self.conf.track.ref_bounds)
             for track in self.tracks
         ]
 

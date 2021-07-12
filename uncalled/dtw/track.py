@@ -58,6 +58,7 @@ TrackParams._def_params(
 )
 
 class Track:
+    HDF_FNAME = "alns.h5"
     CONF_FNAME = "conf.toml"
     ALN_DIR = "alns"
     ALN_SUFFIX = ".pkl"
@@ -78,16 +79,13 @@ class Track:
         "kmer" : (
             lambda self,df: df["kmer"]),
         "current" : (
-            lambda self,df: df["mean"]),
+            lambda self,df: df["current"]),
         "dwell" : (
             lambda self,df: 1000 * df['length'] / self.conf.read_buffer.sample_rate),
         "model_diff" : (
-            lambda self,df: df["mean"] - self.model[df["kmer"]]),
+            lambda self,df: df["current"] - self.model[df["kmer"]]),
     }
 
-    #def _compute_layer(
-
-    #def __init__(self, path, mode="r", ref_bounds=None, full_overlap=None, conf=None, overwrite=False, index=None, mm2s=None):
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("track", *args, **kwargs)
 
@@ -95,6 +93,7 @@ class Track:
             os.makedirs(self.aln_dir, exist_ok=self.prms.overwrite)
 
         self.fname_mapping_file = open(self.fname_mapping_filename, self.prms.mode)
+        self.hdf = pd.HDFStore(self.hdf_filename, mode=self.prms.mode, complib="lzo")
 
         if self.prms.mode == self.READ_MODE:
             self.conf.load_toml(self.config_filename)
@@ -105,6 +104,8 @@ class Track:
             self._load_index()
 
         elif self.prms.mode == self.WRITE_MODE:
+            self.read_coords = list()
+
             self.conf.to_toml(self.config_filename)
             self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
 
@@ -138,25 +139,54 @@ class Track:
         self.fname_mapping = pd.read_csv(self.fname_mapping_file, sep="\t", index_col="read_id")
         self.read_ids = set(self.fname_mapping.index)
 
-    def save_aln(self, aln, fast5_fname):
+    def save_read(self, fast5_fname, aln=None):
         if self.prms.mode != "w":
             raise RuntimeError("Must be write mode to add read to track")
+        
+        if aln is not None:
+            self.read_aln = aln
 
-        aln_fname = self.aln_fname(aln.read_id)
-        aln.df.sort_index().to_pickle(aln_fname)
-        self.fname_mapping_file.write("\t".join([aln.read_id, fast5_fname, aln_fname]) + "\n")
+        aln_i = len(self.read_coords)
+        self.read_coords.append(
+            (self.read_aln.ref_id, self.read_aln.ref_start, self.read_aln.ref_end, self.read_aln.read_id, aln_i)
+        )
 
-    def get_aln(self, read_id):
+        df = self.read_aln.df.drop(columns=["refmir"], errors="ignore").sort_index()
+        self.hdf.put("_%d/dtw" % aln_i, df, format="fixed")
+
+        aln_fname = self.aln_fname(self.read_aln.read_id)
+        self.read_aln.df.sort_index().to_pickle(aln_fname)
+        self.fname_mapping_file.write("\t".join([self.read_aln.read_id, fast5_fname, aln_fname]) + "\n")
+
+    def load_read(self, read_id=None, coords=None):
+        if read_id is None and coords is None:
+            raise ValueError("read_id or coords must be specified for Track.load_read")
+        elif coords is not None:
+            read_id = coords.read_id
+        else:
+            coords = self.hdf.select("/coords", "read_id=read_id")
+
+        group = "/_%d" % coords.i
+
         mm2 = self.mm2s.get(read_id, None)
         if mm2 is None: return None
 
-        df = pd.read_pickle(self.aln_fname(read_id)).sort_index()
+        if self.prms.ref_bounds is None:
+            where = None
+        else:
+            start = self.prms.ref_bounds.start
+            end = self.prms.ref_bounds.end
+            where = "index >= self.prms.ref_bounds.start & index < self.prms.ref_bounds.end"
+
+        df = self.hdf.select(group + "/dtw")#, where=where)
 
         for layer in self.prms.layers:
             if not layer in df.columns:
                 df[layer] = self.LAYER_FNS[layer](self, df)
 
-        return ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
+        self.read_aln = ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
+
+        return self.read_aln
 
     def set_layers(self, layers):
         if layers is not None:
@@ -186,9 +216,16 @@ class Track:
                 index=pd.RangeIndex(self.ref_start, self.ref_end)
         )
 
+        ref_id = self.ref_id
+        where = (
+            "ref_id == ref_id & "
+            "(ref_start < self.ref_start & ref_end > self.ref_end)" 
+        )
+        coords = self.hdf.select("/coords", where=where)
 
-        for read_id,read in self.fname_mapping.iterrows():
-            aln = self.get_aln(read_id)
+        #for read_id,read in self.fname_mapping.iterrows():
+        for coord in coords.itertuples():
+            aln = self.load_read(coords=coord)
             if aln is None: continue 
 
             xs = self.ref_coords.reindex(
@@ -243,9 +280,21 @@ class Track:
 
         return mat
 
+    def write_coords(self):
+        df = pd.DataFrame(
+                self.read_coords, 
+                columns=["ref_id", "ref_start", "ref_end", "read_id", "i"]
+        ).set_index(["ref_id", "ref_start", "ref_end"]).sort_index()
+        self.hdf.put("coords", df, data_columns=["read_id"], format="table")
 
     def close(self):
+        self.write_coords()
+        self.hdf.close()
         self.fname_mapping_file.close()
+
+    @property
+    def hdf_filename(self):
+        return os.path.join(self.prms.path, self.HDF_FNAME)
 
     @property
     def config_filename(self):
@@ -270,6 +319,10 @@ class Track:
         order = np.argsort(self.mat[layer,:,ref-self.ref_start])
         self.mat = self.mat[:,order,:]
         self.reads = self.reads.iloc[order]
+
+    @property
+    def ref_id(self):
+        return self.index.get_ref_id(self.ref_name)
 
     @property
     def ref_name(self):
@@ -387,8 +440,8 @@ def method_compare(track_a=None, track_b=None, full_overlap=None, conf=None):
         return
 
     for read in common_reads:
-        aln_a = track_a.get_aln(read)
-        aln_b = track_b.get_aln(read)
+        aln_a = track_a.load_read(read)
+        aln_b = track_b.load_read(read)
         print (method_compare_aln(aln_a, aln_b))
 
 def method_compare_aln(aln_a, aln_b):

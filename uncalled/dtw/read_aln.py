@@ -81,13 +81,6 @@ LAYER_META = {
 
 class ReadAln:
 
-    REFMIR_COL  = "refmir"
-    REF_COL    = "ref"
-    START_COL  = "start"
-    LENGTH_COL = "length"
-    MEAN_COL   = "mean"
-    KMER_COL   = "kmer"
-
     def __init__(self, index, aln, df=None, is_rna=False, ref_bounds=None):
         if not isinstance(aln, PafEntry):
             raise RuntimeError("ReadAlns can only be initialized from PafEntrys currently")
@@ -112,18 +105,18 @@ class ReadAln:
                 #self.df = df[(df.index >= self.ref_start) & (df.index <= self.ref_end)].copy()
                 self.df = df.loc[self.ref_start:self.ref_end-1].copy()
 
-            has_ref = self.df.index.name == self.REF_COL
-            has_refmir = self.REFMIR_COL in self.df.columns
+            has_ref = self.df.index.name == "ref"
+            has_refmir = "refmir" in self.df.columns
 
             #TODO check for required columns
             if not has_ref and not has_refmir:
-                raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % (self.REF_COL, self.REFMIR_COL))
+                raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % ("ref", "refmir"))
             
             if has_ref and not has_refmir:
-                self.df[self.REFMIR_COL] = self.index.ref_to_refmir(self.ref_id, self.df.index, self.is_fwd, self.is_rna)
+                self.df["refmir"] = self.index.ref_to_refmir(self.ref_id, self.df.index, self.is_fwd, self.is_rna)
 
             elif not has_ref and has_refmir:
-                self.df[REF_COL] = self.index.mirref_to_ref(self.df[REFMIR_COL])
+                self.df[REF_COL] = self.index.mirref_to_ref(self.df["refmir"])
 
             self.df.sort_values("refmir", inplace=True)
         
@@ -193,10 +186,10 @@ class ReadAln:
         return self.ref_bounds.fwd
     
     def sort_ref(self):
-        self.df.sort_values(self.REF_COL, inplace=True)
+        self.df.sort_values("ref", inplace=True)
 
     def sort_refmir(self):
-        self.df.sort_values(self.REFMIR_COL, inplace=True)
+        self.df.sort_values("refmir", inplace=True)
 
     def get_samp_bounds(self):
         samp_min = self.df['start'].min()
@@ -206,7 +199,7 @@ class ReadAln:
     
     #def set_bands(self, bands):
 
-    def set_subevent_aln(self, aln, ref_mirrored=False, kmer_str=False, ref_col=REFMIR_COL, start_col=START_COL, length_col=LENGTH_COL, mean_col=MEAN_COL, kmer_col=KMER_COL):
+    def set_subevent_aln(self, aln, ref_mirrored=False, kmer_str=False, ref_col="refmir", start_col="start", length_col="length", mean_col="current", kmer_col="kmer"):
 
         aln["cuml_mean"] = aln[length_col] * aln[mean_col]
 
@@ -226,17 +219,17 @@ class ReadAln:
         lengths = grp[length_col].sum()
 
         self.df = pd.DataFrame({
-            self.REF_COL    : refs,
-            self.KMER_COL   : kmers,
-            self.START_COL  : grp[start_col].min(),
-            self.LENGTH_COL : lengths,
-            self.MEAN_COL   : grp["cuml_mean"].sum() / lengths
+            "ref"    : refs.astype("int64"),
+            "kmer"   : kmers.astype("uint16"),
+            "start"  : grp[start_col].min().astype("uint32"),
+            "length" : lengths.astype("uint32"),
+            "current"   : grp["cuml_mean"].sum() / lengths
         })
         
         if ref_mirrored:
-            self.df[self.REFMIR_COL] = refmirs
+            self.df["refmir"] = refmirs
 
-        self.df = self.df.set_index(self.REF_COL).sort_values(self.REF_COL)
+        self.df = self.df.set_index("ref").sort_values("ref")
         
 
     def get_index_kmers(self, index, kmer_shift=4):

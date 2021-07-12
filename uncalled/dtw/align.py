@@ -85,9 +85,12 @@ def main(conf):
             dplt.add_aln(dtw.aln, True)
             dplt.show()
         else:
-            track.save_aln(dtw.aln, read.f5.filename)
+            track.save_read(read.f5.filename, dtw.aln)
         
         print(read.id)
+
+    if not track is None:
+        track.close()
 
 class GuidedDTW:
 
@@ -181,7 +184,7 @@ class GuidedDTW:
                                dtype='Int32') \
                   .join(self.read.df) \
                   .drop(columns=['mean', 'stdv', 'mask'], errors='ignore') \
-                  .rename(columns={'norm_sig' : 'mean'})
+                  .rename(columns={'norm_sig' : 'current'})
 
         y_min = self.aln.refmir_start
         df['kmer'] = self.ref_kmers[df['refmir'].astype(int)-y_min]
