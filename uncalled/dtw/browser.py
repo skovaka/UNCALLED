@@ -53,7 +53,7 @@ def main(conf):
     plt.style.use(['seaborn'])
 
     browser = Browser(conf=conf)
-    #browser.show()
+    browser.show()
 
 class Browser:
     KMER_LAYER = 0
