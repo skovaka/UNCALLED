@@ -8,7 +8,7 @@ import pandas as pd
 from ont_fast5_api.fast5_interface import get_fast5_file
 import scipy.stats
 
-from .dtw import ReadAln, Track, ref_coords
+from . import ReadAln, Track, RefCoord
 from ..config import Config, ArgParser, ParamGroup, Opt
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..index import BWA_OPTS
@@ -19,9 +19,9 @@ import progressbar as progbar
 CONVERT_OPTS = BWA_OPTS + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "align", required=True),
     Opt("--rna", fn="set_r94_rna"),
-    Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
-    Opt(("-f", "--force-overwrite"), action="store_true"),
-    Opt(("-o", "--out-path"), "align", required=True),
+    Opt(("-R", "--ref-bounds"), "track", type=RefCoord),
+    Opt(("-f", "--overwrite"), "track", action="store_true"),
+    Opt(("-o", "--out-path"), "track", "path", required=True),
 )
 
 NANOPOLISH_OPTS = CONVERT_OPTS + (Opt("eventalign_tsv", type=str, default=None),)
@@ -48,7 +48,7 @@ def nanopolish(conf):
 
     sys.stderr.write("Writing alignments\n")
 
-    track = Track(conf.align.out_path, "w", conf=conf, overwrite=conf.force_overwrite)
+    track = Track(mode="w", conf=conf)
 
     for (contig, read_id), rows in read_groups.groups.items():
         mm2 =  track.mm2s[read_id]
@@ -70,7 +70,7 @@ def tombo(conf):
     conf.fast5_reader.load_bc = True
     conf.pore_model.name = "r94_rna_tombo"
 
-    track = Track(conf.align.out_path, "w", conf=conf, overwrite=conf.force_overwrite)
+    track = Track(mode="w", conf=conf)
     
     fast5_files = f5reader.prms.fast5_files
     
@@ -148,15 +148,15 @@ def tombo(conf):
             mm2 =  track.mm2s[read.read_id]
             aln = ReadAln(track.index, mm2, is_rna=is_rna)
 
-            aln.df = pd.DataFrame({
+            aln.set_aln(pd.DataFrame({
                 "ref"    : refs,
                 "start"  : samps,
                 "kmer"   : kmers,
                 "length" : tombo_events["length"],
-                "mean"   : signal
-            }).set_index("ref")
+                "current"   : signal
+            }).set_index("ref"))
 
-            track.save_aln(aln, fast5_basename)
+            track.save_read(fast5_basename, aln)
 
             pbar.update(pbar_count)
 

@@ -147,6 +147,8 @@ class Dotplot:
 
     def _plot_aln(self, i):
         aln = self.alns[i]
+        if not "refmir" in aln.aln:
+            aln.calc_refmir()
         aln.sort_refmir()
 
         if getattr(aln, "bands", None) is not None:
@@ -155,6 +157,9 @@ class Dotplot:
         self.ax_dot.step(aln.aln['start'], aln.aln['refmir'], where="post", linewidth=3,
             **self.prms.style["aln_kws"][i]
         )
+
+        #if "bcerr" in aln.dfs:
+        #    print(aln.ref_to_samp(aln.bcerr[aln.bcerr["type"] == "INS"].index))
 
         self._plot_signal(aln, self.sig_axs[i], self.tracks[i].model)
 

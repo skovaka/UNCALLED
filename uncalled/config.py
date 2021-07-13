@@ -112,6 +112,9 @@ class Config(_Conf):
 
 
     def _param_writable(self, name, val, group=None):
+        if group is not None: 
+            if name in getattr(getattr(self, group), "_ignore_toml", {}):
+                return False
         return (not self.is_default(name, group) and
                 not name.startswith("_") and
                 type(val) in TOML_TYPES and

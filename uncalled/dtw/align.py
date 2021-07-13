@@ -108,6 +108,12 @@ class GuidedDTW:
 
         self.aln = ReadAln(index, paf, is_rna=self.conf.is_rna)
 
+        if self.bcaln.errs is not None:
+            bcerr = self.bcaln.errs[["ref", "type"]].drop_duplicates()
+            bcerr.set_index("ref", drop=True, inplace=True)
+            bcerr.astype("category", copy=False)
+            self.aln.set_bcerr(bcerr)
+
         self.read = read
         self.idx = index
 
@@ -125,8 +131,8 @@ class GuidedDTW:
         self.ref_min = self.bcaln.ref_start
         self.ref_max = self.bcaln.ref_end
 
-        self.samp_min = self.bcaln.df['sample'].min()
-        self.samp_max = self.bcaln.df['sample'].max()
+        self.samp_min = self.bcaln.aln['sample'].min()
+        self.samp_max = self.bcaln.aln['sample'].max()
 
         self.ref_kmers = self.aln.get_index_kmers(self.idx)
         self._calc_dtw()
@@ -142,21 +148,23 @@ class GuidedDTW:
 
         band_blocks = list()
 
-        block_min = self.bcaln.df['sample'].searchsorted(self.samp_min)
-        block_max = self.bcaln.df['sample'].searchsorted(self.samp_max)
+        bc = self.bcaln.aln.sort_values("sample").reset_index()
+        block_min = bc['sample'].searchsorted(self.samp_min)
+        block_max = bc['sample'].searchsorted(self.samp_max)
 
 
         block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
         block_ends   = np.append(self.bcaln.ref_gaps, block_max)
+        
 
         #TODO make this actually do something for spliced RNA
         for st, en in [(block_min, block_max)]:
         #for st, en in zip(block_starts, block_ends):
-            samp_st = self.bcaln.df.loc[st,'sample']
-            samp_en = self.bcaln.df.loc[en-1,'sample']
+            samp_st = bc.loc[st,'sample']
+            samp_en = bc.loc[en-1,'sample']
 
-            refmir_st = self.bcaln.df.loc[st,"refmir"]
-            refmir_en = self.bcaln.df.loc[en-1,"refmir"]
+            refmir_st = bc.loc[st,"refmir"]
+            refmir_en = bc.loc[en-1,"refmir"]
 
             #print(samp_st, samp_en, refmir_st, refmir_en, self.aln.refmir_start, self.idx.refmir_to_ref(refmir_en))
 
@@ -165,7 +173,7 @@ class GuidedDTW:
             block_signal = read_block['norm_sig'].to_numpy()
             block_kmers = self.ref_kmers[refmir_st-self.aln.refmir_start:refmir_en-self.aln.refmir_start]
 
-            args = self._get_dtw_args(read_block, refmir_st, block_kmers)
+            args = self._get_dtw_args(bc, read_block, refmir_st, block_kmers)
 
             dtw = self.dtw_fn(*args)
 
@@ -200,7 +208,7 @@ class GuidedDTW:
         else:
             self.aln.bands = pd.DataFrame(band_blocks[0])
 
-    def _get_dtw_args(self, read_block, ref_start, ref_kmers):
+    def _get_dtw_args(self, bc, read_block, ref_start, ref_kmers):
         common = (read_block['norm_sig'].to_numpy(), ref_kmers, self.model)
         qry_len = len(read_block)
         ref_len = len(ref_kmers)
@@ -210,7 +218,7 @@ class GuidedDTW:
             band_count = qry_len + ref_len
             band_lls = list()
 
-            starts = self.bcaln.df['sample'].searchsorted(read_block['start'])
+            starts = bc['sample'].searchsorted(read_block['start'])
 
             q = r = 0
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
@@ -218,7 +226,7 @@ class GuidedDTW:
                 band_lls.append( (int(q+shift), int(r-shift)) )
 
                 tgt = starts[q] if q < len(starts) else starts[-1]
-                if r <= self.bcaln.df.loc[tgt,'refmir'] - ref_start:
+                if r <= bc.loc[tgt,'refmir'] - ref_start:
                     r += 1
                 else:
                     q += 1

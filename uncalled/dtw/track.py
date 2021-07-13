@@ -89,10 +89,12 @@ class Track:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("track", *args, **kwargs)
 
+        print(self.prms.path)
         if self.prms.mode == self.WRITE_MODE:
             os.makedirs(self.aln_dir, exist_ok=self.prms.overwrite)
 
         self.fname_mapping_file = open(self.fname_mapping_filename, self.prms.mode)
+        print(self.prms.mode)
         self.hdf = pd.HDFStore(self.hdf_filename, mode=self.prms.mode, complib="lzo")
 
         if self.prms.mode == self.READ_MODE:
@@ -138,6 +140,7 @@ class Track:
     def _load_index(self):
         self.fname_mapping = pd.read_csv(self.fname_mapping_file, sep="\t", index_col="read_id")
         self.read_ids = set(self.fname_mapping.index)
+        print("LOAD")
 
     def save_read(self, fast5_fname, aln=None):
         if self.prms.mode != "w":
@@ -151,12 +154,21 @@ class Track:
             (self.read_aln.ref_id, self.read_aln.ref_start, self.read_aln.ref_end, self.read_aln.read_id, aln_i)
         )
 
-        df = self.read_aln.aln.drop(columns=["refmir"], errors="ignore").sort_index()
-        self.hdf.put("_%d/dtw" % aln_i, df, format="fixed")
+        for name in self.read_aln.dfs:
+            df = getattr(self.read_aln, name)
+            df = df.drop(columns=["refmir"], errors="ignore").sort_index()
+            self.hdf.put("_%d/%s" % (aln_i, name), df, format="fixed")
+
+        #df = self.read_aln.aln.drop(columns=["refmir"], errors="ignore").sort_index()
+        #self.hdf.put("_%d/dtw" % aln_i, df, format="fixed")
 
         aln_fname = self.aln_fname(self.read_aln.read_id)
-        self.read_aln.aln.sort_index().to_pickle(aln_fname)
-        self.fname_mapping_file.write("\t".join([self.read_aln.read_id, fast5_fname, aln_fname]) + "\n")
+        #self.read_aln.aln.sort_index().to_pickle(aln_fname)
+
+        s = "\t".join([self.read_aln.read_id, fast5_fname, "-"]) + "\n"
+        self.fname_mapping_file.write(s)
+
+
 
     def load_read(self, read_id=None, coords=None):
         if read_id is None and coords is None:
@@ -178,13 +190,18 @@ class Track:
             end = self.prms.ref_bounds.end
             where = "index >= self.prms.ref_bounds.start & index < self.prms.ref_bounds.end"
 
-        df = self.hdf.select(group + "/dtw")#, where=where)
+        #self.read_aln = ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
+        self.read_aln = ReadAln(self.index, mm2, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
+
+        for (path, subgroups, subkeys) in self.hdf.walk(group):
+            for name in subkeys:
+                df = self.hdf.select(os.path.join(group, name))#, where=where)
+                self.read_aln.set_df(df, name)
+            #print(path, subgroups, subkeys)
 
         for layer in self.prms.layers:
-            if not layer in df.columns:
-                df[layer] = self.LAYER_FNS[layer](self, df)
-
-        self.read_aln = ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
+            if not layer in self.read_aln.aln.columns:
+                self.read_aln.aln[layer] = self.LAYER_FNS[layer](self, self.read_aln.aln)
 
         return self.read_aln
 

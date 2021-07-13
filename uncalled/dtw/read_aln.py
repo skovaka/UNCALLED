@@ -22,6 +22,7 @@ class RefCoord:
         self.fwd = fwd
         if start is None and end is None:
             if isinstance(name ,str):
+                print(name)
                 self._init_str(name)
             elif isinstance(name, tuple):
                 self._init_tuple(name)
@@ -101,10 +102,7 @@ class ReadAln:
         self.dfs = set()
 
         if df is not None:
-            if ref_bounds is None:
-                self.set_aln(df)
-            else:
-                self.set_aln(df.loc[self.ref_start:self.ref_end-1].copy())
+            self.set_aln(df)
 
             has_ref = self.aln.index.name == "ref"
             has_refmir = "refmir" in self.aln.columns
@@ -162,6 +160,9 @@ class ReadAln:
     def refmir_to_samp(self, refmir):
         i = np.clip(self.aln['refmir'].searchsorted(refmir), 0, len(self.aln)-1)
         return self.aln['sample'][i]
+    
+    def calc_refmir(self):
+        self.aln["refmir"] = self.index.ref_to_refmir(self.ref_id, self.aln.index, self.is_fwd, self.is_rna)
 
     def _init_mirror_coords(self):
         #self.refmir_start, self.refmir_end = self.index.ref_to_refmir(*self.ref_bounds, self.is_rna)
@@ -201,7 +202,9 @@ class ReadAln:
     #def set_bands(self, bands):
     def set_df(self, df, name):
         self.dfs.add(name)
+        df = df.loc[self.ref_start:self.ref_end-1].copy()
         setattr(self, name, df)
+
 
     def set_aln(self, df):
         self.set_df(df, "aln")
@@ -273,6 +276,8 @@ class BcFast5Aln(ReadAln):
     ERR_SIZES = [100, 150, 150]
     ERR_WIDTHS = [0,0,5]
 
+    #Error = pd.Caegorical(["SUB", "INS", "DEL"])
+
     def __init__(self, index, read, paf, ref_bounds=None):
         self.seq_fwd = read.conf.read_buffer.seq_fwd #TODO just store is_rna
         ReadAln.__init__(self, index, paf, is_rna=not self.seq_fwd, ref_bounds=ref_bounds)
@@ -304,16 +309,20 @@ class BcFast5Aln(ReadAln):
             'bp'     : np.cumsum(read.f5.moves),#[moves],
         })
 
-        self.set_aln(samp_bps.join(self.bp_refmir_aln, on='bp').dropna())
-        self.aln.reset_index(inplace=True, drop=True)
+        df = samp_bps.join(self.bp_refmir_aln, on='bp').dropna()
+        df["ref"] = self.refmir_to_ref(df["refmir"])
+        df.set_index("ref", drop=True, inplace=True)
+        self.set_aln(df.sort_index())
+        #self.aln.reset_index(inplace=True, drop=True)
 
         if self.err_bps is not None:
             self.errs = samp_bps.join(self.err_bps.set_index('bp'), on='bp').dropna()
             self.errs.reset_index(inplace=True, drop=True)
+            self.errs["ref"] = self.refmir_to_ref(self.errs["refmir"])
+            #self.errs.set_index("ref", inplace=True)
         else:
             self.errs = None
 
-        print(self.errs)
 
         self.ref_gaps = self.aln[self.aln['bp'].isin(self.refgap_bps)].index
 
@@ -361,19 +370,19 @@ class BcFast5Aln(ReadAln):
             elif c == '*':
                 self.sub_bps.append(qr_i)
                 bp_refmir_aln.append((qr_i,mr_i))
-                err_bps.append( (qr_i,mr_i,self.SUB) )
+                err_bps.append( (qr_i,mr_i,"SUB") )
                 qr_i += 1
                 mr_i += 1
 
             elif c == '-':
                 self.ins_bps.append(qr_i)
-                err_bps.append( (qr_i,mr_i,self.DEL) )
+                err_bps.append( (qr_i,mr_i,"DEL") )
                 l = len(op[1])
                 mr_i += l
 
             elif c == '+':
                 self.del_bps.append(qr_i)
-                err_bps.append( (qr_i,mr_i,self.INS) )
+                err_bps.append( (qr_i,mr_i,"INS") )
 
                 l = len(op[1])
                 qr_i += l
@@ -390,7 +399,7 @@ class BcFast5Aln(ReadAln):
         self.bp_refmir_aln.set_index("bp", inplace=True)
 
         #TODO type shouldn't have to be 64 bit
-        self.err_bps = pd.DataFrame(err_bps, columns=["bp","refmir","type"], dtype='Int64')
+        self.err_bps = pd.DataFrame(err_bps, columns=["bp","refmir","type"])#, dtype='Int64')
 
         return True        
 
