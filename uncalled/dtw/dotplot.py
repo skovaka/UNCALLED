@@ -20,9 +20,13 @@ DotplotParams._def_params(
     ("track_a", None, str, "DTW aligment track containing reads to plot"),
     ("track_b", None, str, "DTW aligment track containing reads to plot"),
     ("layers", ["current", "length"], list, "Layers to plot in side panels"),
-    ("color_a", "purple", str, "Color for track_a alignments"),
-    ("color_b", "royalblue", str, "Color for track_a alignments"),
-    ("color_bc", "orange", str, "Color for basecall alignments"),
+    ("style", {
+        "aln_kws" : [
+            {"color" : "purple", "alpha" : 1},
+            {"color" : "royalblue", "alpha" : 0.5}],
+        "bc_color": "orange",
+        "base_colors" : ["#80ff80", "#8080ff", "#ffbd00", "#ff8080"], #A,C,G,T
+    }, dict, "Plotting style options")
 )
 #Config._EXTRA_GROUPS["dotplot"] = DotplotParams #TODO put in ParamGroup con
 
@@ -52,13 +56,13 @@ class Dotplot:
         self.conf.track.layers = self.conf.dotplot.layers
 
         self.tracks = [Track(self.prms.track_a, conf=self.conf)]
-        self.colors = [self.prms.color_a]
+        #self.colors = [self.prms.styles["color_a"]]
 
         self.conf.load_config(self.tracks[0].conf)
 
         if self.conf.dotplot.track_b is not None:
             self.tracks.append(Track(self.prms.track_b, conf=self.conf))
-            self.colors.append(self.prms.color_b)
+            #self.colors.append(self.prms.styles["color_b"])
 
             self.read_ids = self.tracks[0].read_ids & self.tracks[1].read_ids
 
@@ -119,26 +123,20 @@ class Dotplot:
 
         ymin = np.min(raw_norm[raw_norm>0])
         ymax = np.max(raw_norm[raw_norm>0])
-        bases = nt.kmer_base(aln.df['kmer'], 2)
+        bases = nt.kmer_base(aln.aln['kmer'], 2)
 
         samp_bases = np.zeros(len(samps), int)
-        for i in range(len(aln.df)):
-            st = int(aln.df.iloc[i]['start'] - samp_min)
-            en = int(st + aln.df.iloc[i]['length'])
+        for i in range(len(aln.aln)):
+            st = int(aln.aln.iloc[i]['start'] - samp_min)
+            en = int(st + aln.aln.iloc[i]['length'])
             samp_bases[st:en] = bases[i]
 
-        BASE_COLORS = [
-            "#80ff80",
-            "#8080ff",
-            "#ffbd00",
-            "#ff8080",
-        ]
-        for base, color in enumerate(BASE_COLORS):
+        for base, color in enumerate(self.prms.style["base_colors"]):
             ax.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color, interpolate=True)
 
         ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, alpha=0.75, c="#777777")
-        ax.step(aln.df['start'], model[aln.df['kmer']], color='white', linewidth=2, where="post")
-        ax.vlines(aln.df['start'], ymin, ymax, linewidth=2, color="white")
+        ax.step(aln.aln['start'], model[aln.aln['kmer']], color='white', linewidth=2, where="post")
+        ax.vlines(aln.aln['start'], ymin, ymax, linewidth=2, color="white")
 
         evts = (self.read.df['start'] >= samp_min) & (self.read.df['start'] < samp_max) & (self.read.df['norm_sig'] > 0)
 
@@ -154,23 +152,25 @@ class Dotplot:
         if getattr(aln, "bands", None) is not None:
             self.ax_dot.fill_between(aln.bands['samp'], aln.bands['ref_st']-1, aln.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
 
-        self.ax_dot.step(aln.df['start'], aln.df['refmir'], where="post", color=self.colors[i], zorder=3, linewidth=3)
+        self.ax_dot.step(aln.aln['start'], aln.aln['refmir'], where="post", linewidth=3,
+            **self.prms.style["aln_kws"][i]
+        )
 
         self._plot_signal(aln, self.sig_axs[i], self.tracks[i].model)
 
         #if samp_min is None: samp_min = 0
         #if samp_max is None: samp_max = self.df['sample'].max()
         #i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
-        #model_means = self.track_a.model[aln.df['kmer']]
-        #pa_diffs = np.abs(aln.df['mean'] - model_means)
-        #self.ax_padiff.step(pa_diffs, aln.df['refmir'], color=color, where="post")
+        #model_means = self.track_a.model[aln.aln['kmer']]
+        #pa_diffs = np.abs(aln.aln['mean'] - model_means)
+        #self.ax_padiff.step(pa_diffs, aln.aln['refmir'], color=color, where="post")
 
     def set_cursor(self, ref_coord):
         aln,_,_ = self.alns[list(self.focus)[0]]
         refmir = aln.ref_to_refmir(ref_coord)
 
-        i = aln.df['refmir'].searchsorted(refmir)
-        samp = aln.df.iloc[i]['start'] + aln.df.iloc[i]['length']/2
+        i = aln.aln['refmir'].searchsorted(refmir)
+        samp = aln.aln.iloc[i]['start'] + aln.aln.iloc[i]['length']/2
 
         self.cursor = (samp, refmir)
 
@@ -268,11 +268,15 @@ class Dotplot:
 
         for ax,layer in zip(self.layer_axs, self.prms.layers):
             for i,aln in enumerate(self.alns):
-                ax.step(aln.df[layer], aln.df["refmir"], color=self.colors[i], where="post")
+                ax.step(
+                    aln.aln[layer], aln.aln["refmir"], 
+                    where="post",
+                    **self.prms.style["aln_kws"][i]
+                )
 
 
         if not self.aln_bc.empty:
-            self.ax_dot.scatter(self.aln_bc.df['sample'], self.aln_bc.df['refmir'], color='orange', zorder=2, s=20)
+            self.ax_dot.scatter(self.aln_bc.aln['sample'], self.aln_bc.aln['refmir'], color='orange', zorder=2, s=20)
 
         self.fig.tight_layout()
 

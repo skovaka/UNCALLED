@@ -98,27 +98,28 @@ class ReadAln:
 
         self._init_mirror_coords()
 
+        self.dfs = set()
+
         if df is not None:
             if ref_bounds is None:
-                self.df = df
+                self.set_aln(df)
             else:
-                #self.df = df[(df.index >= self.ref_start) & (df.index <= self.ref_end)].copy()
-                self.df = df.loc[self.ref_start:self.ref_end-1].copy()
+                self.set_aln(df.loc[self.ref_start:self.ref_end-1].copy())
 
-            has_ref = self.df.index.name == "ref"
-            has_refmir = "refmir" in self.df.columns
+            has_ref = self.aln.index.name == "ref"
+            has_refmir = "refmir" in self.aln.columns
 
             #TODO check for required columns
             if not has_ref and not has_refmir:
                 raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % ("ref", "refmir"))
             
             if has_ref and not has_refmir:
-                self.df["refmir"] = self.index.ref_to_refmir(self.ref_id, self.df.index, self.is_fwd, self.is_rna)
+                self.aln["refmir"] = self.index.ref_to_refmir(self.ref_id, self.aln.index, self.is_fwd, self.is_rna)
 
             elif not has_ref and has_refmir:
-                self.df[REF_COL] = self.index.mirref_to_ref(self.df["refmir"])
+                self.aln[REF_COL] = self.index.mirref_to_ref(self.aln["refmir"])
 
-            self.df.sort_values("refmir", inplace=True)
+            self.aln.sort_values("refmir", inplace=True)
         
 
     def set_ref_bounds(self, aln, ref_bounds):
@@ -159,8 +160,8 @@ class ReadAln:
         return self.refmir_to_samp(self.ref_to_refmir(ref))
         
     def refmir_to_samp(self, refmir):
-        i = np.clip(self.df['refmir'].searchsorted(refmir), 0, len(self.df)-1)
-        return self.df['sample'][i]
+        i = np.clip(self.aln['refmir'].searchsorted(refmir), 0, len(self.aln)-1)
+        return self.aln['sample'][i]
 
     def _init_mirror_coords(self):
         #self.refmir_start, self.refmir_end = self.index.ref_to_refmir(*self.ref_bounds, self.is_rna)
@@ -186,18 +187,27 @@ class ReadAln:
         return self.ref_bounds.fwd
     
     def sort_ref(self):
-        self.df.sort_values("ref", inplace=True)
+        self.aln.sort_values("ref", inplace=True)
 
     def sort_refmir(self):
-        self.df.sort_values("refmir", inplace=True)
+        self.aln.sort_values("refmir", inplace=True)
 
     def get_samp_bounds(self):
-        samp_min = self.df['start'].min()
-        max_i = self.df['start'].argmax()
-        samp_max = self.df['start'].iloc[max_i] + self.df['length'].iloc[max_i]
+        samp_min = self.aln['start'].min()
+        max_i = self.aln['start'].argmax()
+        samp_max = self.aln['start'].iloc[max_i] + self.aln['length'].iloc[max_i]
         return samp_min, samp_max
     
     #def set_bands(self, bands):
+    def set_df(self, df, name):
+        self.dfs.add(name)
+        setattr(self, name, df)
+
+    def set_aln(self, df):
+        self.set_df(df, "aln")
+
+    def set_bcerr(self, df):
+        self.set_df(df, "bcerr")
 
     def set_subevent_aln(self, aln, ref_mirrored=False, kmer_str=False, ref_col="refmir", start_col="start", length_col="length", mean_col="current", kmer_col="kmer"):
 
@@ -218,7 +228,7 @@ class ReadAln:
 
         lengths = grp[length_col].sum()
 
-        self.df = pd.DataFrame({
+        aln = pd.DataFrame({
             "ref"    : refs.astype("int64"),
             "kmer"   : kmers.astype("uint16"),
             "start"  : grp[start_col].min().astype("uint32"),
@@ -227,10 +237,9 @@ class ReadAln:
         })
         
         if ref_mirrored:
-            self.df["refmir"] = refmirs
+            aln["refmir"] = refmirs
 
-        self.df = self.df.set_index("ref").sort_values("ref")
-        
+        self.set_aln(aln.set_index("ref").sort_values("ref"))
 
     def get_index_kmers(self, index, kmer_shift=4):
         """Returns the k-mer sequence at the alignment reference coordinates"""
@@ -295,8 +304,8 @@ class BcFast5Aln(ReadAln):
             'bp'     : np.cumsum(read.f5.moves),#[moves],
         })
 
-        self.df = samp_bps.join(self.bp_refmir_aln, on='bp').dropna()
-        self.df.reset_index(inplace=True, drop=True)
+        self.set_aln(samp_bps.join(self.bp_refmir_aln, on='bp').dropna())
+        self.aln.reset_index(inplace=True, drop=True)
 
         if self.err_bps is not None:
             self.errs = samp_bps.join(self.err_bps.set_index('bp'), on='bp').dropna()
@@ -304,24 +313,24 @@ class BcFast5Aln(ReadAln):
         else:
             self.errs = None
 
-        self.ref_gaps = self.df[self.df['bp'].isin(self.refgap_bps)].index
+        print(self.errs)
 
-        self.subs = self.df[self.df['bp'].isin(self.sub_bps)].index
-        self.inss = self.df[self.df['bp'].isin(self.ins_bps)].index
-        self.dels = self.df[self.df['bp'].isin(self.del_bps)].index
+        self.ref_gaps = self.aln[self.aln['bp'].isin(self.refgap_bps)].index
 
-        self.empty = len(self.df) == 0
+        self.subs = self.aln[self.aln['bp'].isin(self.sub_bps)].index
+        self.inss = self.aln[self.aln['bp'].isin(self.ins_bps)].index
+        self.dels = self.aln[self.aln['bp'].isin(self.del_bps)].index
+
+        self.empty = len(self.aln) == 0
         if self.empty: 
             return
 
         self.y_min = -paf.rf_en if self.flip_ref else paf.rf_st
-        self.y_max = self.y_min + self.df['refmir'].max()
+        self.y_max = self.y_min + self.aln['refmir'].max()
 
     def parse_cs(self, paf):
         cs = paf.tags.get('cs', (None,)*2)[0]
         if cs is None: return False
-
-        sys.stderr.write("Loading cs tag\n")
 
         #TODO rename to general cig/cs
         bp_refmir_aln = list()
@@ -438,20 +447,20 @@ class BcFast5Aln(ReadAln):
         return True
 
     def get_xy(self, i):
-        df = self.df.loc[i]
+        df = self.aln.loc[i]
         return (df['sample'], df['refmir']-0.5)
 
     def plot_scatter(self, ax, real_start=False, samp_min=None, samp_max=None):
         if samp_min is None: samp_min = 0
-        if samp_max is None: samp_max = self.df['sample'].max()
-        i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
+        if samp_max is None: samp_max = self.aln['sample'].max()
+        i = (self.aln['sample'] >= samp_min) & (self.aln['sample'] <= samp_max)
 
-        return ax.scatter(self.df['sample'][i], self.df['refmir'][i], color='orange', zorder=2,s=20)
+        return ax.scatter(self.aln['sample'][i], self.aln['refmir'][i], color='orange', zorder=2,s=20)
 
     def plot_step(self, ax, real_start=False, samp_min=None, samp_max=None):
-        i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
+        i = (self.aln['sample'] >= samp_min) & (self.aln['sample'] <= samp_max)
 
-        ret = ax.step(self.df['sample'][i], self.df['refmir'][i], color='orange', zorder=1, where='post')
+        ret = ax.step(self.aln['sample'][i], self.aln['refmir'][i], color='orange', zorder=1, where='post')
 
         if self.errs is not None:
             for t in self.ERR_TYPES:

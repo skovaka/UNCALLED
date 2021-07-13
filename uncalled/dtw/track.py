@@ -151,11 +151,11 @@ class Track:
             (self.read_aln.ref_id, self.read_aln.ref_start, self.read_aln.ref_end, self.read_aln.read_id, aln_i)
         )
 
-        df = self.read_aln.df.drop(columns=["refmir"], errors="ignore").sort_index()
+        df = self.read_aln.aln.drop(columns=["refmir"], errors="ignore").sort_index()
         self.hdf.put("_%d/dtw" % aln_i, df, format="fixed")
 
         aln_fname = self.aln_fname(self.read_aln.read_id)
-        self.read_aln.df.sort_index().to_pickle(aln_fname)
+        self.read_aln.aln.sort_index().to_pickle(aln_fname)
         self.fname_mapping_file.write("\t".join([self.read_aln.read_id, fast5_fname, aln_fname]) + "\n")
 
     def load_read(self, read_id=None, coords=None):
@@ -229,7 +229,7 @@ class Track:
             if aln is None: continue 
 
             xs = self.ref_coords.reindex(
-                self.ref_coords.index.intersection(aln.df.index)
+                self.ref_coords.index.intersection(aln.aln.index)
             )
 
             mask_row = np.ones(self.width)#, dtype=bool)
@@ -238,7 +238,7 @@ class Track:
 
             for layer in self.prms.layers:
                 row = np.zeros(self.width)
-                row[xs] = aln.df[layer]
+                row[xs] = aln.aln[layer]
                 read_rows[layer].append(row)
 
             read_meta['ref_start'].append(aln.ref_start)
@@ -445,7 +445,7 @@ def method_compare(track_a=None, track_b=None, full_overlap=None, conf=None):
         print (method_compare_aln(aln_a, aln_b))
 
 def method_compare_aln(aln_a, aln_b):
-    merge = aln_a.df.join(aln_b.df, lsuffix="_a", rsuffix="_b").dropna().set_index("refmir_a")
+    merge = aln_a.aln.join(aln_b.aln, lsuffix="_a", rsuffix="_b").dropna().set_index("refmir_a")
 
     def get_ends(suff):
         return merge["start_"+suff]+merge["length_"+suff]
