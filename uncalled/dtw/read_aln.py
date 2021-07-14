@@ -22,7 +22,6 @@ class RefCoord:
         self.fwd = fwd
         if start is None and end is None:
             if isinstance(name ,str):
-                print(name)
                 self._init_str(name)
             elif isinstance(name, tuple):
                 self._init_tuple(name)
@@ -370,19 +369,19 @@ class BcFast5Aln(ReadAln):
             elif c == '*':
                 self.sub_bps.append(qr_i)
                 bp_refmir_aln.append((qr_i,mr_i))
-                err_bps.append( (qr_i,mr_i,"SUB") )
+                err_bps.append( (qr_i,mr_i,"SUB",op[1][1].upper()) )
                 qr_i += 1
                 mr_i += 1
 
             elif c == '-':
                 self.ins_bps.append(qr_i)
-                err_bps.append( (qr_i,mr_i,"DEL") )
+                err_bps.append( (qr_i,mr_i,"DEL",op[1].upper()) )
                 l = len(op[1])
                 mr_i += l
 
             elif c == '+':
                 self.del_bps.append(qr_i)
-                err_bps.append( (qr_i,mr_i,"INS") )
+                err_bps.append( (qr_i,mr_i,"INS",op[1].upper()) )
 
                 l = len(op[1])
                 qr_i += l
@@ -399,7 +398,7 @@ class BcFast5Aln(ReadAln):
         self.bp_refmir_aln.set_index("bp", inplace=True)
 
         #TODO type shouldn't have to be 64 bit
-        self.err_bps = pd.DataFrame(err_bps, columns=["bp","refmir","type"])#, dtype='Int64')
+        self.err_bps = pd.DataFrame(err_bps, columns=["bp","refmir","type","seq"])#, dtype='Int64')
 
         return True        
 

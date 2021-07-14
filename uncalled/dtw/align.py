@@ -109,10 +109,10 @@ class GuidedDTW:
         self.aln = ReadAln(index, paf, is_rna=self.conf.is_rna)
 
         if self.bcaln.errs is not None:
-            bcerr = self.bcaln.errs[["ref", "type"]].drop_duplicates()
+            bcerr = self.bcaln.errs[["ref", "type", "seq"]].drop_duplicates()
             bcerr.set_index("ref", drop=True, inplace=True)
-            bcerr.astype("category", copy=False)
-            self.aln.set_bcerr(bcerr)
+            bcerr["type"].astype("category", copy=False)
+            self.aln.set_bcerr(bcerr.sort_index())
 
         self.read = read
         self.idx = index

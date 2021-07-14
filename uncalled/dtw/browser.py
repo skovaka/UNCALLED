@@ -8,7 +8,7 @@ import types
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter, FuncFormatter
-from matplotlib.colors import Normalize
+from matplotlib.colors import Normalize, TwoSlopeNorm, ListedColormap
 from matplotlib.cm import ScalarMappable
 from matplotlib import widgets
 import matplotlib
@@ -23,9 +23,10 @@ from ..sigproc import ProcRead
 
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
-from . import Track, ref_coords
 from .align import GuidedDTW, BcFast5Aln
 from .dotplot import Dotplot
+
+from . import Track, ref_coords, LAYER_META
 
 CMAP = "viridis"
 #CMAP = "plasma"
@@ -35,8 +36,11 @@ class BrowserParams(config.ParamGroup):
 BrowserParams._def_params(
     ("track_a", None, str, "Path to directory where alignments are stored"),
     ("track_b", None, str, "Path to directory where alignments are stored"),
-    ("full_overlap", None, bool, "If true will only include reads which fully cover reference bounds")
+    ("full_overlap", None, bool, "If true will only include reads which fully cover reference bounds"),
 )
+
+def comma_split(s):
+    return s.split(",")
 
 from ..config import Opt
 OPTS = (
@@ -44,6 +48,7 @@ OPTS = (
     Opt("track_a", "browser"),
     Opt("track_b", "browser", nargs="?"),
     Opt(("-f", "--full-overlap"), "track", action="store_true"),
+    Opt(("-L", "--layers"), "track", type=comma_split),
 )
 
 def main(conf):
@@ -56,34 +61,6 @@ def main(conf):
     browser.show()
 
 class Browser:
-    KMER_LAYER = 0
-    PA_LAYER = 1
-    DWELL_LAYER = 2
-    PA_DIFF_LAYER = 3
-
-    LAYER_META = [
-        ("K-mer",              False),
-        ("Current (pA)",       True),
-        ("Dwell Time (ms/bp)", True),
-        ("pA Difference",      True)
-    ]
-
-    #class InfoPanel:
-    #    def __init__(self, read_id, pa, dwell
-
-    INFO_REF   = 0
-    INFO_READ  = 1
-    INFO_KMER  = 2
-    INFO_DIFF  = 3
-    INFO_DWELL = 4
-    INFO_PA    = 5
-
-    INFO_LABELS = [
-        "Reference Coord",
-        "Read ID",
-    ] + [name for name,_ in LAYER_META]
-
-    KS_LAYERS = [PA_LAYER, DWELL_LAYER]
 
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("browser", *args, **kwargs)
@@ -120,10 +97,14 @@ class Browser:
         self.cursor = None
 
         self.LAYER_IDS = dict()
-        for i in range(len(self.LAYER_META)):
-            self.LAYER_IDS[self.LAYER_META[i][0]] = i
+        for i,layer in enumerate(self.conf.track.layers):
+            self.LAYER_IDS[LAYER_META[layer].label] = layer
 
-        self.active_layer = self.PA_LAYER #TODO parameter
+        self.active_layer = self.conf.track.layers[0] #TODO parameter
+
+        self.info_labels = ["Reference Coord", "Read ID"]
+        for layer in self.conf.track.layers:
+            self.info_labels.append(LAYER_META[layer].label)
 
         self.axs = types.SimpleNamespace()
     
@@ -199,7 +180,7 @@ class Browser:
 
         #if self.single_track:
         self.set_info(track, rf, rd)
-        self.plot_hists(track, rf)
+        #self.plot_hists(track, rf)
 
         self.fig.tight_layout()
         self.fig.canvas.draw()
@@ -243,14 +224,15 @@ class Browser:
 
         print(read['id'])
 
-        kmer,diff,dwell,pa = trk[:,rd,rf]
+        self.set_info_cell(0,  self.ref_coord(trk, rf, read['fwd']))
+        self.set_info_cell(1, read['id'])
 
-        self.set_info_cell(self.INFO_REF,  self.ref_coord(trk, rf, read['fwd']))
-        self.set_info_cell(self.INFO_READ, read['id'])
-        self.set_info_cell(self.INFO_KMER, nt.kmer_to_str(int(kmer)))
-        self.set_info_cell(self.INFO_PA,   "%.4f" % pa)
-        self.set_info_cell(self.INFO_DWELL,"%.4f" % dwell)
-        self.set_info_cell(self.INFO_DIFF, "%.4f" % diff)
+        for i,val in enumerate(trk[:,rd,rf]):
+            self.set_info_cell(i+2, val)
+        #self.set_info_cell(self.INFO_KMER, nt.kmer_to_str(int(kmer)))
+        #self.set_info_cell(self.INFO_PA,   "%.4f" % pa)
+        #self.set_info_cell(self.INFO_DWELL,"%.4f" % dwell)
+        #self.set_info_cell(self.INFO_DIFF, "%.4f" % diff)
 
         self.info_table.auto_set_column_width(1)
 
@@ -336,13 +318,19 @@ class Browser:
         self.active_layer = layer
 
         for track in self.tracks:
+
             track.img.set_data(track[layer])
 
-            #TODO same norm between images
-            track.img.set_norm(track.norms[layer])
+            cmap, norm = self._layer_cmap(self.active_layer)
 
-        self.cbar.update_normal(ScalarMappable(norm=track.norms[layer], cmap=CMAP))
-        self.axs.cbar.set_ylabel(self.LAYER_META[layer][0]) 
+            #TODO same norm between images
+            track.img.set_norm(norm)
+            track.img.set_cmap(cmap)
+
+        #self.cbar.update_normal(ScalarMappable(norm=track.norms[layer], cmap=CMAP))
+        #self.cbar.update_normal(ScalarMappable(norm=norm, cmap=cmap))
+        self.cbar.update_normal(ScalarMappable(norm=norm, cmap=cmap))
+        self.axs.cbar.set_ylabel(LAYER_META[layer].label) 
         self.axs.cbar.yaxis.set_label_position('left') 
 
         self._update_sumstat()
@@ -446,13 +434,14 @@ class Browser:
         subspec = gspec.subgridspec(1, 2, width_ratios=[1,6], wspace=0.1)
 
         self.axs.cbar = self.fig.add_subplot(subspec[0])
+        cmap, norm = self._layer_cmap(self.active_layer)
         self.cbar = self.fig.colorbar(
-            ScalarMappable(norm=self.tracks[0].norms[self.active_layer], cmap=CMAP),
-            cax=self.axs.cbar, extend='max', orientation="vertical"
+            ScalarMappable(norm=norm, cmap=cmap),
+            cax=self.axs.cbar, extend="both", orientation="vertical"
         )
         self.cbar.outline.set_visible(False)
         self.axs.cbar.yaxis.set_label_position('left') 
-        self.axs.cbar.set_ylabel(self.LAYER_META[self.active_layer][0]) 
+        self.axs.cbar.set_ylabel(LAYER_META[self.active_layer].label) 
 
         self.axs.opt = self.fig.add_subplot(subspec[1])
 
@@ -461,12 +450,34 @@ class Browser:
         self._noticks(self.axs.opt)
 
         self.layer_radio = widgets.RadioButtons(
-            self.axs.opt, [name for name,visible in self.LAYER_META if visible], 
-            self.active_layer-1, #TODO hacky way to deal with hidden layers
-            activecolor = 'red' #TODO param
+            self.axs.opt, [LAYER_META[layer].label for layer in self.conf.track.layers],
+            0, #TODO hacky way to deal with hidden layers
+            activecolor = 'red'
         )
         self.layer_radio.on_clicked(self.set_layer)
 
+    #LAYER_CMAPS = {
+    #    "model_diff" : lambda track: ("bwr", TwoSlopeNorm(vcenter=0))
+    #}
+
+    def _layer_cmap(self, layer):
+        if layer == "bcerr":
+            return (ListedColormap(["#80ff80", "#8080ff", "#ffbd00", "#ff8080", "purple", "yellow"]), None)
+
+        mins = list()
+        maxs = list()
+        for track in self.tracks:
+            std = np.std(track[layer])
+            med = np.median(track[layer])
+            mins.append(max(np.min(track[layer]), med - std*3))
+            maxs.append(min(np.max(track[layer]), med + std*3))
+
+        vmin = min(mins)
+        vmax = max(maxs)
+
+        if layer == "model_diff":
+            return ("bwr", TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax))
+        return ("viridis", Normalize(vmin, vmax))
 
     def _init_track_ax(self, track, gspec, ref_ticks=True):
         track.ax = self.fig.add_subplot(gspec) 
@@ -482,12 +493,13 @@ class Browser:
         track.ax.set_xlabel(self.ref_coords, fontsize=15)
         track.ax.set_ylabel("%s (%d reads)" % (track.prms.path, track.height), fontsize=15)
 
+        cmap, norm = self._layer_cmap(self.active_layer)
         track.img = track.ax.imshow(
             track[self.active_layer], 
             #alpha=np.array((~track.track.mask[0]).astype(float)), #TODO use mat_alpha()
             aspect='auto', 
-            cmap=CMAP, 
-            norm=track.norms[self.active_layer],
+            cmap=cmap, 
+            norm=norm,
             interpolation='none'#'antialiased' if self.zoomed_out() else 'none'
         )
 
@@ -522,7 +534,7 @@ class Browser:
         )
 
         ax.set_yticks(np.arange(len(self.KS_LAYERS)))
-        ax.set_yticklabels([self.LAYER_META[l][0].split()[0] for l in self.KS_LAYERS])
+        ax.set_yticklabels([LAYER_META[l][0].split()[0] for l in self.KS_LAYERS])
             
     def _init_sumstat_mean(self, gspec, track):
         self._init_sumstat(gspec)
@@ -541,18 +553,18 @@ class Browser:
         self.axs.info.set_yticks([])
         self.axs.info.set_facecolor('white')
 
-        y = 2*len(self.INFO_LABELS)
+        y = 2*len(self.info_labels)
         self.axs.info.set_ylim(0, y+0.5)
         self.axs.info.set_xlim(-0.1, 10)
 
         self.info_table = self.axs.info.table(
-            cellText = [[label, ""] for label in self.INFO_LABELS],
-            cellColours = [["lightcoral", "white"] for _ in self.INFO_LABELS],
+            cellText = [[label, ""] for label in self.info_labels],
+            cellColours = [["lightcoral", "white"] for _ in self.info_labels],
             loc='upper center', cellLoc='left'
         )
         self.info_table.auto_set_font_size(True)
         
-        for i in range(len(self.INFO_LABELS)):
+        for i in range(len(self.info_labels)):
             self.info_table[i,1].PAD=0.05
             self.info_table[i,0].set_text_props(weight='bold')
             self.info_table[i,1].set_text_props(family='monospace')
@@ -580,6 +592,8 @@ class Browser:
         self.axs.dot_btn.set_visible(False)
 
     def on_close(self, event):
+        for t in self.tracks:
+            t.close()
         sys.exit(0)
 
 

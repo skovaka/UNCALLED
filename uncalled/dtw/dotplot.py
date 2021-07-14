@@ -23,7 +23,7 @@ DotplotParams._def_params(
     ("style", {
         "aln_kws" : [
             {"color" : "purple", "alpha" : 1},
-            {"color" : "royalblue", "alpha" : 0.5}],
+            {"color" : "royalblue", "alpha" : 0.75}],
         "bc_color": "orange",
         "base_colors" : ["#80ff80", "#8080ff", "#ffbd00", "#ff8080"], #A,C,G,T
     }, dict, "Plotting style options")

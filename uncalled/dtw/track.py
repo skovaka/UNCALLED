@@ -30,6 +30,7 @@ DEFAULT_LAYERS = [KMER_LAYER, CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
 LAYER_META.update({
     "dwell" : LayerMeta(float, "Dwell Time (ms/nt)"),
     "model_diff" : LayerMeta(float, "Model pA Difference"),
+    "bcerr"      : LayerMeta(float, "BC Alignment Errors")
 })
  
 def ref_coords(coord_str):             
@@ -75,26 +76,45 @@ class Track:
 
     CMP_LAYERS = [CURRENT_LAYER, DWELL_LAYER]
 
+    #LAYER_FNS = {
+    #    "kmer" : (
+    #        lambda self,df: df["kmer"]),
+    #    "current" : (
+    #        lambda self,df: df["current"]),
+    #    "dwell" : (
+    #        lambda self,df: 1000 * df['length'] / self.conf.read_buffer.sample_rate),
+    #    "model_diff" : (
+    #        lambda self,df: df["current"] - self.model[df["kmer"]]),
+    #}
+
+    def get_bcerr_layer(self, aln):
+        bcerr = aln.bcerr.reindex(aln.aln.index)
+        ret = pd.Series(np.nan, bcerr.index)
+        subs = bcerr[bcerr["type"]=="SUB"]
+        ret[subs.index] = subs["seq"].replace({"A":0,"C":1,"G":2,"T":3})
+        ret[bcerr["type"]=="DEL"] = 4
+        ret[bcerr["type"]=="INS"] = 5
+        return ret
+
     LAYER_FNS = {
         "kmer" : (
-            lambda self,df: df["kmer"]),
+            lambda self,a: a.aln["kmer"]),
         "current" : (
-            lambda self,df: df["current"]),
+            lambda self,a: a.aln["current"]),
         "dwell" : (
-            lambda self,df: 1000 * df['length'] / self.conf.read_buffer.sample_rate),
+            lambda self,a: 1000 * a.aln['length'] / self.conf.read_buffer.sample_rate),
         "model_diff" : (
-            lambda self,df: df["current"] - self.model[df["kmer"]]),
+            lambda self,a: a.aln["current"] - self.model[a.aln["kmer"]]),
+        "bcerr" : get_bcerr_layer
     }
 
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("track", *args, **kwargs)
 
-        print(self.prms.path)
         if self.prms.mode == self.WRITE_MODE:
             os.makedirs(self.aln_dir, exist_ok=self.prms.overwrite)
 
         self.fname_mapping_file = open(self.fname_mapping_filename, self.prms.mode)
-        print(self.prms.mode)
         self.hdf = pd.HDFStore(self.hdf_filename, mode=self.prms.mode, complib="lzo")
 
         if self.prms.mode == self.READ_MODE:
@@ -140,7 +160,6 @@ class Track:
     def _load_index(self):
         self.fname_mapping = pd.read_csv(self.fname_mapping_file, sep="\t", index_col="read_id")
         self.read_ids = set(self.fname_mapping.index)
-        print("LOAD")
 
     def save_read(self, fast5_fname, aln=None):
         if self.prms.mode != "w":
@@ -197,17 +216,21 @@ class Track:
             for name in subkeys:
                 df = self.hdf.select(os.path.join(group, name))#, where=where)
                 self.read_aln.set_df(df, name)
-            #print(path, subgroups, subkeys)
 
         for layer in self.prms.layers:
             if not layer in self.read_aln.aln.columns:
-                self.read_aln.aln[layer] = self.LAYER_FNS[layer](self, self.read_aln.aln)
+                self.read_aln.aln[layer] = self.LAYER_FNS[layer](self, self.read_aln)
+                #print(self.read_aln.bcerr)
+                #print(layer, self.read_aln.aln[layer].drop_duplicates())
 
         return self.read_aln
 
     def set_layers(self, layers):
         if layers is not None:
             self.prms.layers = layers
+        self.layers_split = [
+            tuple(l.split(".")) if "." in l else ("aln", l) 
+            for l in self.prms.layers]
         self.layer_idxs = {layer : i for i,layer in enumerate(self.prms.layers)}
 
     #TODO parse mm2 every time to enable changing bounds
@@ -285,12 +308,10 @@ class Track:
         #])
         #TODO define get_soft_minmax(num_stdvs):
 
-        self.norms = [Normalize(np.min(layer), np.max(layer)) for layer in self.mat]
-        for l in [CURRENT_LAYER, DWELL_LAYER]:
-            if l not in self.layer_idxs: continue
-            i = self.layer_idxs[l]
-            layer = self.mat[i]
-            self.norms[i].vmax = min(
+        self.norms = {layer: Normalize(np.min(self[layer]), np.max(self[layer])) for layer in self.prms.layers}
+        for l in ["current", "dwell"]:
+            layer = self[l]
+            self.norms[l].vmax = min(
                 layer.max(),
                 np.ma.median(layer) + 2 * layer.std()
             )
@@ -333,6 +354,8 @@ class Track:
         return os.path.join(self.aln_dir, read_id+self.ALN_SUFFIX)
 
     def sort(self, layer, ref):
+        if isinstance(layer, str):
+            layer = self.layer_idxs[layer]
         order = np.argsort(self.mat[layer,:,ref-self.ref_start])
         self.mat = self.mat[:,order,:]
         self.reads = self.reads.iloc[order]
