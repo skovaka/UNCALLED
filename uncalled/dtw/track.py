@@ -18,7 +18,7 @@ from . import ReadAln, RefCoord, LayerMeta, LAYER_META
 
 from ..pafstats import parse_paf, PafEntry
 from ..config import Config, Opt
-from .. import nt, PoreModel, config, index, BwaIndex
+from .. import nt, PoreModel, config, index 
 from ..index import load_index
 
 KMER_LAYER       = "kmer"

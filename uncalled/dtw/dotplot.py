@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter, FuncFormatter
 import types
 
-from .. import nt, BwaIndex, config
+from .. import nt, config
 
 from ..sigproc import ProcRead
 from ..fast5 import Fast5Reader, parse_read_ids

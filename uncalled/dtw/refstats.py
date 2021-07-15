@@ -21,7 +21,7 @@ from ..fast5 import Fast5Reader
 from .dtw import Track, ref_coords
 from .align import GuidedDTW, BcFast5Aln
 from .dotplot import Dotplot
-from _uncalled import BwaIndex, nt
+from _uncalled import nt
 
 #BWA_OPTS + 
 OPTS = (

@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
                 fasta_fname(argv[2]);
     u32 min_k = atoi(argv[3]);
 
-    BwaIndex fmi(bwa_prefix);
+    RefIndex fmi(bwa_prefix);
     
 
     //for (u64 i = 0; i < 50; i++) {

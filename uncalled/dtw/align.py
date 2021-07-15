@@ -9,7 +9,7 @@ from ..config import Config, ArgParser, ParamGroup, Opt
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..sigproc import ProcRead
-from .. import BwaIndex, DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
+from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 
 from .dotplot import Dotplot
 from . import PoreModel, BcFast5Aln, ReadAln, Track, ref_coords

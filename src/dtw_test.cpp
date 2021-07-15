@@ -5,7 +5,7 @@
 #include "event_profiler.hpp"
 #include "normalizer.hpp"
 #include "fast5_reader.hpp"
-#include "bwa_index.hpp"
+#include "ref_index.hpp"
 #include "dtw.hpp"
 #include "dtw_banded.hpp"
 
@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
     EventDetector evdt;
     EventProfiler evpr;
 
-    BwaIndex<KLEN> idx(index_prefix);
+    RefIndex<KLEN> idx(index_prefix);
     idx.load_pacseq();
 
     Fast5Iter fast5s;
@@ -187,7 +187,6 @@ int main(int argc, char** argv) {
 
     }
 
-    idx.destroy();
 
     }//end if false
 

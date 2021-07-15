@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 from ..pafstats import parse_paf, PafEntry
 from ..config import Config, Opt
-from .. import BwaIndex, nt, PoreModel
+from .. import nt, PoreModel
 
 class RefCoord:
     def __init__(self, name, start=None, end=None, fwd=None):

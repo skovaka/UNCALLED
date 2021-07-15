@@ -52,7 +52,7 @@ Mapper::Params Mapper::PRMS {
 };
 
 
-BwaIndex<KLEN> Mapper::fmi;
+RefIndex<KLEN> Mapper::fmi;
 std::vector<float> Mapper::prob_threshes_;
 
 PoreModel<KLEN> Mapper::model;// = IS_RNA ? pmodel_r94_rna_templ : pmodel_r94_dna_compl;

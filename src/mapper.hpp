@@ -27,7 +27,7 @@
 #include <iostream>
 #include <vector>
 #include <mutex>
-#include "bwa_index.hpp"
+#include "ref_index.hpp"
 #include "normalizer.hpp"
 #include "event_detector.hpp"
 #include "event_profiler.hpp"
@@ -87,7 +87,7 @@ class Mapper {
     static Params PRMS;
 
     //TODO PRIVATIZE
-    static BwaIndex<KLEN> fmi;
+    static RefIndex<KLEN> fmi;
     static PoreModel<KLEN> model;
     static std::vector<float> prob_threshes_;
 

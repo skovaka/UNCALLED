@@ -65,7 +65,7 @@ class Range {
 
     #ifdef PYBIND
 
-    #define PY_BWA_INDEX_METH(P) c.def(#P, &BwaIndex<KLEN>::P);
+    #define PY_BWA_INDEX_METH(P) c.def(#P, &RefIndex<KLEN>::P);
 
     static void pybind_defs(pybind11::class_<Range> &c) {
         c.def(pybind11::init<u64, u64>());

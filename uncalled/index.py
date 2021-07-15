@@ -35,7 +35,7 @@ _index_cache = dict()
 def load_index(prefix, load_pacseq=True, load_bwt=False):
     idx = _index_cache.get(prefix, None)
     if idx is None:
-        idx = unc.BwaIndex(prefix, load_pacseq, load_bwt)
+        idx = unc.RefIndex(prefix, load_pacseq, load_bwt)
         _index_cache[prefix] = idx
     else:
         if load_pacseq and not idx.pacseq_loaded():
@@ -102,7 +102,7 @@ def main(conf):
     if bwa_built:
         sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % prms.index_prefix)
     else:
-        unc.BwaIndex.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
+        unc.RefIndex.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
         
         if prms.no_bwt: 
             sys.stderr.write("Pacseq built\n")
@@ -133,7 +133,7 @@ def main(conf):
 
     sys.stderr.write("Done\n")
 
-#TODO move to BwaIndex?
+#TODO move to RefIndex?
 UNCL_SUFF = ".uncl"
 AMB_SUFF = ".amb"
 ANN_SUFF = ".ann"

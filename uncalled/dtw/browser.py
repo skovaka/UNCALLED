@@ -16,7 +16,7 @@ import matplotlib
 import scipy.stats
 import pandas as pd
 
-from .. import BwaIndex, config, nt
+from .. import config, nt
 
 #from ..config import Config, ParamGroup, Opt
 from ..sigproc import ProcRead
@@ -91,7 +91,6 @@ class Browser:
         if not self.single_track:
             self.ks_stats = self.tracks[0].calc_ks(self.tracks[1])
 
-        self.idx = BwaIndex(self.conf.mapper.bwa_prefix, True)
         self.fast5s = Fast5Reader(conf=self.conf)
 
         self.cursor = None

@@ -57,7 +57,7 @@ struct RefLoc {
 //};
 
 template <KmerLen KLEN>
-class BwaIndex {
+class RefIndex {
     public:
 
     static void create(const std::string &fasta_fname, 
@@ -79,7 +79,7 @@ class BwaIndex {
         }
     }
 
-    BwaIndex() :
+    RefIndex() :
         index_(NULL),
         bns_(NULL),
         pacseq_(NULL),
@@ -88,7 +88,7 @@ class BwaIndex {
         loaded_(false),
         size_(0) {}
 
-    BwaIndex(const std::string &prefix, bool pacseq=false, bool bwt=true) : BwaIndex() {
+    RefIndex(const std::string &prefix, bool pacseq=false, bool bwt=true) : RefIndex() {
         if (!prefix.empty()) {
             bns_ = bns_restore(prefix.c_str());
             size_ = 2 * (bns_->l_pac);
@@ -474,9 +474,9 @@ class BwaIndex {
 
     #ifdef PYBIND
 
-    #define PY_BWA_INDEX_METH(P) c.def(#P, &BwaIndex<KLEN>::P);
+    #define PY_BWA_INDEX_METH(P) c.def(#P, &RefIndex<KLEN>::P);
 
-    static void pybind_defs(pybind11::class_<BwaIndex<KLEN>> &c) {
+    static void pybind_defs(pybind11::class_<RefIndex<KLEN>> &c) {
         c.def(pybind11::init<>());
         c.def(pybind11::init<const std::string &>());
         c.def(pybind11::init<const std::string &, bool>());
@@ -503,15 +503,15 @@ class BwaIndex {
         PY_BWA_INDEX_METH(get_ref_len);
         PY_BWA_INDEX_METH(get_pac_shift);
         PY_BWA_INDEX_METH(range_to_fms);
-        c.def("get_ref_id", static_cast<i32 (BwaIndex::*)(i64)> (&BwaIndex::get_ref_id) );
-        c.def("get_ref_id", static_cast<i32 (BwaIndex::*)(const std::string &)> (&BwaIndex::get_ref_id));
-        //c.def("get_kmers_new", &BwaIndex::get_kmers_new);
-        c.def("ref_to_refmir", static_cast<std::pair<i64,i64> (BwaIndex::*)(const std::string &, i64, i64, bool, bool)> (&BwaIndex::ref_to_refmir));
-        c.def("ref_to_refmir", pybind11::vectorize(static_cast<i64 (BwaIndex::*)(i32, i64, bool, bool)> (&BwaIndex::ref_to_refmir)));
-        c.def("refmir_to_ref", pybind11::vectorize(&BwaIndex::refmir_to_ref));
-        //c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(i64, i64)> (&BwaIndex::get_kmers) );
-        c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(const std::string &, i64, i64)> (&BwaIndex::get_kmers) );
-        c.def("get_kmers", static_cast< std::vector<u16> (BwaIndex::*)(i64, i64, bool)> (&BwaIndex::get_kmers) );
+        c.def("get_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::get_ref_id) );
+        c.def("get_ref_id", static_cast<i32 (RefIndex::*)(const std::string &)> (&RefIndex::get_ref_id));
+        //c.def("get_kmers_new", &RefIndex::get_kmers_new);
+        c.def("ref_to_refmir", static_cast<std::pair<i64,i64> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::ref_to_refmir));
+        c.def("ref_to_refmir", pybind11::vectorize(static_cast<i64 (RefIndex::*)(i32, i64, bool, bool)> (&RefIndex::ref_to_refmir)));
+        c.def("refmir_to_ref", pybind11::vectorize(&RefIndex::refmir_to_ref));
+        //c.def("get_kmers", static_cast< std::vector<u16> (RefIndex::*)(i64, i64)> (&RefIndex::get_kmers) );
+        c.def("get_kmers", static_cast< std::vector<u16> (RefIndex::*)(const std::string &, i64, i64)> (&RefIndex::get_kmers) );
+        c.def("get_kmers", static_cast< std::vector<u16> (RefIndex::*)(i64, i64, bool)> (&RefIndex::get_kmers) );
     }
 
     #endif
