@@ -110,12 +110,12 @@ Mapper::~Mapper() {
 
 void Mapper::load_static() {
 
-    if (fmi.is_loaded()) return;
+    if (fmi.bwt_loaded()) return;
 
     model = PoreModel<KLEN>(PRMS.pore_model, false, ReadBuffer::PRMS.seq_fwd);
 
     fmi.load_index(PRMS.bwa_prefix);
-    if (!fmi.is_loaded()) {
+    if (!fmi.bwt_loaded()) {
         std::cerr << "Error: failed to load BWA index\n";
         abort();
     }
@@ -158,11 +158,11 @@ void Mapper::load_static() {
 
 }
 
-inline u64 Mapper::get_fm_bin(u64 fmlen) {
+inline i64 Mapper::get_fm_bin(i64 fmlen) {
     return __builtin_clzll(fmlen);
 }
 
-float Mapper::get_prob_thresh(u64 fmlen) const {
+float Mapper::get_prob_thresh(i64 fmlen) const {
     return prob_threshes_[get_fm_bin(fmlen)];
 }
 
@@ -728,12 +728,12 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
 
     if (!path.is_seed_valid(path_ended)) return;
 
-    for (u64 fm = path.fm_range_.start_; fm <= path.fm_range_.end_; fm++) {
+    for (auto fm = path.fm_range_.start_; fm <= path.fm_range_.end_; fm++) {
 
         //TODO: store in buffer, replace sa_checked
         
         //Reverse the reference coords so they both go L->R
-        u64 pac_end = fmi.fm_to_refmir(fm); //fmi.size() - fmi.sa(s);
+        auto pac_end = fmi.fm_to_refmir(fm); //fmi.size() - fmi.sa(s);
 
         //Add seed and store updated seed cluster
         auto clust = seed_tracker_.add_seed(
@@ -744,7 +744,7 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
 
         #ifdef PYDEBUG
         u32 ref_len = path.move_count() + KLEN - 1;
-        u64 pac_start = pac_end - ref_len;// + 1;
+        auto pac_start = pac_end - ref_len;// + 1;
 
         auto loc = fmi.refmir_to_ref_bound(pac_start, pac_end, read_.PRMS.seq_fwd);
 
@@ -784,7 +784,7 @@ u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
 void Mapper::set_ref_loc(const SeedCluster &seeds) {
     auto loc = fmi.refmir_to_ref_bound(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
     
-    u64 rd_st = event_to_bp(seeds.evt_st_ - PRMS.seed_len),
+    auto rd_st = event_to_bp(seeds.evt_st_ - PRMS.seed_len),
         rd_en = event_to_bp(seeds.evt_en_, true),
         rd_len = event_to_bp(event_i_, true);
 
@@ -1077,7 +1077,7 @@ void Mapper::meta_seeds_out(
         const PathBuffer &path, 
         u32 clust, 
         u32 evt_end,
-        u64 sa_start, 
+        i64 sa_start, 
         u32 ref_len) {
     #ifdef DEBUG_SEEDS
 
@@ -1086,7 +1086,7 @@ void Mapper::meta_seeds_out(
 
     auto loc = fmi.translate_loc(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
     
-    u64 sa_st;
+    i64 sa_st;
 
     bool flip = sa_start >= fmi.size() / 2;
     bool fwd = (!flip && read_.PRMS.seq_fwd) || (flip && !read_.PRMS.seq_fwd);
@@ -1096,7 +1096,7 @@ void Mapper::meta_seeds_out(
     else sa_half = sa_start;
 
     std::string rf_name;
-    u64 ref_st = 0;
+    i64 ref_st = 0;
     fmi.translate_loc(sa_half, rf_name, ref_st);
 
     seeds_out_ << rf_name << "\t"

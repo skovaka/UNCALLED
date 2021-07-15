@@ -30,6 +30,20 @@ import uncalled as unc
 from bisect import bisect_left, bisect_right
 from typing import NamedTuple
 
+_index_cache = dict()
+
+def load_index(prefix, load_pacseq=True, load_bwt=False):
+    idx = _index_cache.get(prefix, None)
+    if idx is None:
+        idx = unc.BwaIndex(prefix, load_pacseq, load_bwt)
+        _index_cache[prefix] = idx
+    else:
+        if load_pacseq and not idx.pacseq_loaded():
+            idx.load_pacseq()
+        if load_bwt and not idx.bwt_loaded():
+            idx.load_index()
+    return idx
+
 #Index parameter group
 class IndexParams(unc.config.ParamGroup):
     _name = "index"
@@ -48,8 +62,6 @@ IndexParams._def_params(
     ("probs", None, str, "Find parameters with specified target probabilites (comma separated)"),
     ("speeds", None, str, "Find parameters with specified speed coefficents (comma separated)"),
 )
-#TODO do this from conf. need to restructure dependencies
-#unc.Config._EXTRA_GROUPS["index"] = IndexParams
 
 from uncalled.config import Opt
 BWA_OPTS = (

@@ -133,11 +133,11 @@ u8 kmer_base(u16 kmer, u8 i) {
     return (u8) ((kmer >> (2 * ((u16)k-i-1))) & 0x3);
 }
 
-template <KmerLen k>
+template <KmerLen K>
 std::string kmer_to_str(u16 kmer) {
-    std::string s(k, 'N');
-    for (u8 i = 0; i < k; i++) {
-        s[i] = BASE_CHARS[kmer_base<k>(kmer, i)];
+    std::string s(K, 'N');
+    for (u8 i = 0; i < K; i++) {
+        s[i] = BASE_CHARS[kmer_base<K>(kmer, i)];
     }
     return s;
 }

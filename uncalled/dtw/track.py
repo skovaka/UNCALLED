@@ -17,9 +17,9 @@ import matplotlib.pyplot as plt
 from . import ReadAln, RefCoord, LayerMeta, LAYER_META
 
 from ..pafstats import parse_paf, PafEntry
-from .. import config 
 from ..config import Config, Opt
-from .. import BwaIndex, nt, PoreModel
+from .. import nt, PoreModel, config, index, BwaIndex
+from ..index import load_index
 
 KMER_LAYER       = "kmer"
 CURRENT_LAYER    = "current"
@@ -50,6 +50,7 @@ class TrackParams(config.ParamGroup):
 TrackParams._def_params(
     ("path", None, str, "Path to directory where alignments are stored"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
+    ("index_prefix", None, str, "BWA index prefix"),
     ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("layers", DEFAULT_LAYERS, list, "Layers to load"),
@@ -141,9 +142,7 @@ class Track:
                         full_overlap=self.prms.full_overlap,
             )}
 
-        #TODO static bwa_index parameters, or instance
-        if len(self.conf.mapper.bwa_prefix) > 0:
-            self.index = BwaIndex(self.conf.mapper.bwa_prefix, True)
+        self.index = load_index(self.prms.index_prefix)
 
         self.model = PoreModel(self.conf.pore_model)
 

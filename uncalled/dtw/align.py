@@ -33,7 +33,7 @@ AlignParams._def_params(
     ("out_path", None, str, "Path to directory where alignments will be stored. If not specified will display interactive dotplot for each read."),
 )
 
-OPTS = BWA_OPTS + FAST5_OPTS + (
+OPTS = (Opt("index_prefix", "track"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "align", required=True),
     Opt(("-o", "--out-path"), "align"),
     Opt(("-f", "--overwrite"), "track", action="store_true", help="Will overwrite alignment track if one already exists"),
@@ -58,8 +58,6 @@ def main(conf):
             if old is None or old.aln_len < p.aln_len:
                 mm2s[p.qr_name] = p
 
-    idx = BwaIndex(conf.mapper.bwa_prefix, True)
-
     fast5s = Fast5Processor(conf=conf)
 
     if conf.align.out_path is not None:
@@ -67,14 +65,12 @@ def main(conf):
     else:
         track = None
 
-    t = time.time()
-
     for read in fast5s:
 
         if not read.id in mm2s:
             continue
 
-        dtw = GuidedDTW(idx, read, mm2s[read.id], conf)
+        dtw = GuidedDTW(track, read, mm2s[read.id], conf)
 
         if dtw.empty:
             continue
@@ -95,18 +91,18 @@ def main(conf):
 class GuidedDTW:
 
     #TODO do more in constructor using prms, not in main
-    def __init__(self, index, read, paf, conf=None, **kwargs):
+    def __init__(self, track, read, paf, conf=None, **kwargs):
         self.conf = read.conf if conf is None else conf
         self.prms = self.conf.align
 
-        t = time.time()
+        self.track = track
 
-        self.bcaln = BcFast5Aln(index, read, paf, self.conf.align.ref_bounds)
+        self.bcaln = BcFast5Aln(self.track.index, read, paf, self.conf.align.ref_bounds)
         if self.bcaln.empty:
             self.empty = True
             return
 
-        self.aln = ReadAln(index, paf, is_rna=self.conf.is_rna)
+        self.aln = ReadAln(self.track.index, paf, is_rna=self.conf.is_rna)
 
         if self.bcaln.errs is not None:
             bcerr = self.bcaln.errs[["ref", "type", "seq"]].drop_duplicates()
@@ -115,7 +111,6 @@ class GuidedDTW:
             self.aln.set_bcerr(bcerr.sort_index())
 
         self.read = read
-        self.idx = index
 
         self.method = self.prms.method
         if not self.method in METHODS:
@@ -134,7 +129,7 @@ class GuidedDTW:
         self.samp_min = self.bcaln.aln['sample'].min()
         self.samp_max = self.bcaln.aln['sample'].max()
 
-        self.ref_kmers = self.aln.get_index_kmers(self.idx)
+        self.ref_kmers = self.aln.get_index_kmers(self.track.index)
         self._calc_dtw()
 
         self.empty = False

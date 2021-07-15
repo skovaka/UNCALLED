@@ -92,7 +92,7 @@ class Mapper {
     static std::vector<float> prob_threshes_;
 
     static void load_static();
-    static inline u64 get_fm_bin(u64 fmlen);
+    static inline i64 get_fm_bin(i64 fmlen);
 
     enum class State { INACTIVE, MAPPING, SUCCESS, FAILURE };
 
@@ -101,7 +101,7 @@ class Mapper {
 
     ~Mapper();
 
-    float get_prob_thresh(u64 fmlen) const;
+    float get_prob_thresh(i64 fmlen) const;
     float get_source_prob() const;
     u16 get_max_events() const;
 
@@ -140,25 +140,11 @@ class Mapper {
     static std::array<u32,EVENT_TYPES.size()> EVENT_ADDS;
     static u32 PATH_MASK, PATH_TAIL_MOVE;
 
-    //std::vector<bool> Mapper::unpack_moves(u64 moves, u8 length);
-
-
     using moves_t = u32;
     using moves_u8_t = std::array<u8,4>;
     static constexpr u8 U8_BITS = 8;
 
 	static std::vector<bool> unpack_moves(u64 moves, u8 length);
-
-    //static moves_u8_t moves_to_u8(moves_t moves) {
-    //    moves_u8_t ret{0};
-    //    for (size_t i = 0; i < ret.size(); i++) {
-    //        for (size_t j = 0; j < U8_BITS; j++) {
-    //            size_t k = U8_BITS * i + j;
-    //            ret[i] |= ((moves >> k) & 1);
-    //        }
-    //    }
-    //    return ret;
-    //}
 
     class PathBuffer {
         public:
@@ -265,7 +251,7 @@ class Mapper {
         const PathBuffer &path, 
         u32 clust, 
         u32 evt_end, 
-        u64 sa_start, 
+        i64 sa_start, 
         u32 ref_len
     );
 
@@ -322,7 +308,7 @@ class Mapper {
 
     struct MetaPath {
         u32 event, id, parent;
-        u64 fm_start, fm_length;
+        i64 fm_start, fm_length;
         u16 kmer;
         u32 length, total_moves;
         float norm_pdf, seed_prob;
@@ -333,7 +319,7 @@ class Mapper {
         const PathBuffer &path, 
         u32 clust, 
         u32 evt_end, 
-        u64 sa_start, 
+        i64 sa_start, 
         u32 ref_len
     );
 
