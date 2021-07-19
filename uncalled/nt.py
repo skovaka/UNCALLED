@@ -1,4 +1,5 @@
 from collections import Sequence
+
 import numpy as np 
 
 from _uncalled._nt import *
@@ -14,8 +15,8 @@ def kmer_array(kmer):
         if not np.all(np.char.str_len(arr) == K):
             raise RuntimeError("All k-mers must be %d bases long" % nt.K)
 
-        return str_to_kmer(arr)
-    return arr
+        arr = str_to_kmer(arr)
+    return KmerArray(arr)
 
 def kmer_to_str(kmer, dtype=str):
     if isinstance(kmer, (Sequence, KmerArray, np.ndarray)):

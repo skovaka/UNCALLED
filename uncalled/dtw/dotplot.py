@@ -19,8 +19,8 @@ from _uncalled import _RefIndex
 class DotplotParams(config.ParamGroup):
     _name = "dotplot"
 DotplotParams._def_params(
-    ("track_a", None, str, "DTW aligment track containing reads to plot"),
-    ("track_b", None, str, "DTW aligment track containing reads to plot"),
+    ("track_a", None, None, "DTW aligment track containing reads to plot"),
+    ("track_b", None, None, "DTW aligment track containing reads to plot"),
     ("layers", ["current", "length"], list, "Layers to plot in side panels"),
     ("style", {
         "aln_kws" : [
@@ -37,8 +37,8 @@ def comma_split(s):
 
 from ..config import Opt
 OPTS = [
-    Opt("track_a", "dotplot"),
-    Opt("track_b", "dotplot", nargs="?"),
+    Opt("track_a", "dotplot", type=str),
+    Opt("track_b", "dotplot", nargs="?", type=str),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
     Opt(("-R", "--ref-bounds"), "track", type=RefCoord),
@@ -60,13 +60,20 @@ class Dotplot:
         self.conf.track.load_mat = False
         self.conf.track.layers = self.conf.dotplot.layers
 
-        self.tracks = [Track(self.prms.track_a, conf=self.conf)]
+        print(type(self.prms.track_a), isinstance(self.prms.track_a, Track))
+        if isinstance(self.prms.track_a, Track):
+            self.tracks = [self.prms.track_a]
+        else:
+            self.tracks = [Track(self.prms.track_a, conf=self.conf)]
         #self.colors = [self.prms.styles["color_a"]]
 
         self.conf.load_config(self.tracks[0].conf)
 
         if self.conf.dotplot.track_b is not None:
-            self.tracks.append(Track(self.prms.track_b, conf=self.conf))
+            if isinstance(self.prms.track_b, Track):
+                self.tracks.append(self.prms.track_b)
+            else:
+                self.tracks.append(Track(self.prms.track_b, conf=self.conf))
             #self.colors.append(self.prms.styles["color_b"])
 
             self.read_ids = self.tracks[0].read_ids & self.tracks[1].read_ids
@@ -86,8 +93,9 @@ class Dotplot:
             self.show(read_id)
 
 
-    def show(self, read_id, cursor=None):
-        if not self._plot(read_id, cursor):
+    def show(self, read_id=None, cursor=None, fast5_read=None):
+        if not self._plot(read_id, cursor, fast5_read):
+            print("no")
             return False
 
         print(read_id)
@@ -187,15 +195,25 @@ class Dotplot:
     def _tick_formatter(self, x, pos):
         return self.index.refmir_to_ref(int(x))
 
-    def _load_read(self, read_id):
+    def _load_read(self, read_id, fast5_read=None):
+        if read_id is None and fast5_read is None:
+            raise ValueError("Must specify read to show")
+            #read_id = self.tracks[0].read_aln.read_id
+
         self.cursor = None
 
-        fast5_read = self.fast5s[read_id]
+        if fast5_read is None:
+            fast5_read = self.fast5s[read_id]
+        else:
+            read_id = fast5_read.id
 
         if not read_id in self.mm2s:
             return False
 
-        self.read = ProcRead(fast5_read, conf=self.conf)
+        if isinstance(fast5_read, ProcRead):
+            self.read = fast5_read
+        else:
+            self.read = ProcRead(fast5_read, conf=self.conf)
 
         self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], ref_bounds=self.conf.track.ref_bounds)
 
@@ -216,8 +234,8 @@ class Dotplot:
     def track_count(self):
         return len(self.tracks)
 
-    def _plot(self, read_id, cursor=None):
-        if not self._load_read(read_id):
+    def _plot(self, read_id, cursor=None, fast5_read=None):
+        if not self._load_read(read_id, fast5_read):
             return False
 
         matplotlib.use("TkAgg")

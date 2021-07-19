@@ -48,7 +48,7 @@ def ref_coords(coord_str):
 class TrackParams(config.ParamGroup):
     _name = "track"
 TrackParams._def_params(
-    ("path", None, str, "Path to directory where alignments are stored"),
+    ("path", None, None, "Path to directory where alignments are stored"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("index_prefix", None, str, "BWA index prefix"),
     ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
@@ -112,25 +112,29 @@ class Track:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("track", *args, **kwargs)
 
-        if self.prms.mode == self.WRITE_MODE:
-            os.makedirs(self.aln_dir, exist_ok=self.prms.overwrite)
+        self.in_mem = self.prms.path is None
 
-        self.fname_mapping_file = open(self.fname_mapping_filename, self.prms.mode)
-        self.hdf = pd.HDFStore(self.hdf_filename, mode=self.prms.mode, complib="lzo")
+        self.read_ids = set()
+        if not self.in_mem:
+            if self.prms.mode == self.WRITE_MODE:
+                os.makedirs(self.aln_dir, exist_ok=self.prms.overwrite)
 
-        if self.prms.mode == self.READ_MODE:
-            self.conf.load_toml(self.config_filename)
+            self.fname_mapping_file = open(self.fname_mapping_filename, self.prms.mode)
+            self.hdf = pd.HDFStore(self.hdf_filename, mode=self.prms.mode, complib="lzo")
 
-            if len(self.conf.fast5_reader.fast5_index) == 0:
-                self.conf.fast5_reader.fast5_index = self.fname_mapping_filename
+            if self.prms.mode == self.READ_MODE:
+                self.conf.load_toml(self.config_filename)
 
-            self._load_index()
+                if len(self.conf.fast5_reader.fast5_index) == 0:
+                    self.conf.fast5_reader.fast5_index = self.fname_mapping_filename
 
-        elif self.prms.mode == self.WRITE_MODE:
-            self.read_coords = list()
+                self._load_index()
 
-            self.conf.to_toml(self.config_filename)
-            self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
+            elif self.prms.mode == self.WRITE_MODE:
+                self.read_coords = list()
+
+                self.conf.to_toml(self.config_filename)
+                self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
 
         #TODO arguments overload conf params
         if self.conf.align.mm2_paf is not None:
@@ -146,6 +150,8 @@ class Track:
 
         self.model = PoreModel(self.conf.pore_model)
 
+        self.read_aln = None
+
         if self.prms.load_mat and self.prms.ref_bounds is not None:
             self.load_region(self.prms.ref_bounds)
 
@@ -159,6 +165,23 @@ class Track:
     def _load_index(self):
         self.fname_mapping = pd.read_csv(self.fname_mapping_file, sep="\t", index_col="read_id")
         self.read_ids = set(self.fname_mapping.index)
+
+    def init_read_aln(self, read_id):
+        paf = self.mm2s[read_id]
+        self.read_aln = ReadAln(self.index, paf, is_rna=self.conf.is_rna)
+
+        if self.in_mem:
+            self.read_ids = {read_id}
+        else:
+            self.read_ids.add(read_id)
+
+    def get_aln_kmers(self, aln=None):
+        if aln is None:
+            aln = self.read_aln
+        return pd.Series(
+            self.index.get_kmers(aln.refmir_start, aln.refmir_end, aln.is_rna),
+            pd.RangeIndex(aln.refmir_start+nt.K-1, aln.refmir_end)
+        )
 
     def save_read(self, fast5_fname, aln=None):
         if self.prms.mode != "w":
@@ -177,18 +200,16 @@ class Track:
             df = df.drop(columns=["refmir"], errors="ignore").sort_index()
             self.hdf.put("_%d/%s" % (aln_i, name), df, format="fixed")
 
-        #df = self.read_aln.aln.drop(columns=["refmir"], errors="ignore").sort_index()
-        #self.hdf.put("_%d/dtw" % aln_i, df, format="fixed")
-
         aln_fname = self.aln_fname(self.read_aln.read_id)
-        #self.read_aln.aln.sort_index().to_pickle(aln_fname)
 
         s = "\t".join([self.read_aln.read_id, fast5_fname, "-"]) + "\n"
         self.fname_mapping_file.write(s)
 
 
-
     def load_read(self, read_id=None, coords=None):
+        if self.read_aln is not None and read_id == self.read_aln.read_id: 
+            return self.read_aln
+
         if read_id is None and coords is None:
             raise ValueError("read_id or coords must be specified for Track.load_read")
         elif coords is not None:
@@ -207,8 +228,6 @@ class Track:
             start = self.prms.ref_bounds.start
             end = self.prms.ref_bounds.end
             where = "index >= self.prms.ref_bounds.start & index < self.prms.ref_bounds.end"
-
-        #self.read_aln = ReadAln(self.index, mm2, df, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
         self.read_aln = ReadAln(self.index, mm2, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
 
         for (path, subgroups, subkeys) in self.hdf.walk(group):
@@ -343,6 +362,7 @@ class Track:
     
     @property
     def aln_dir(self):
+        if self.prms.path is None: return None
         return os.path.join(self.prms.path, self.ALN_DIR)
     
     @property
@@ -350,6 +370,7 @@ class Track:
         return len(self.fname_mapping)
     
     def aln_fname(self, read_id):
+        if self.prms.path is None: return None
         return os.path.join(self.aln_dir, read_id+self.ALN_SUFFIX)
 
     def sort(self, layer, ref):

@@ -330,6 +330,11 @@ class RefIndex {
         return kmer_neighbor<KLEN>(kmer, get_base(pac, comp));
     }
 
+    void next_kmer(std::vector<kmer_t> &kmers, i64 pac, bool comp) {
+        kmers.push_back(next_kmer(kmers.back(), pac, comp));
+        //return kmer_neighbor<KLEN>(kmer, get_base(pac, comp));
+    }
+
     public:
     kmer_t get_kmer(i64 pac, bool comp) {
         kmer_t kmer = 0;
@@ -344,13 +349,14 @@ class RefIndex {
         if (!rev) {
             ret.push_back(get_kmer(pac_start, comp));
             for (auto i = pac_start+KLEN; i < pac_end; i++) {
-                ret.push_back(next_kmer(ret.back(), i, comp));
+                next_kmer(ret, i, comp);
+                //ret.push_back(next_kmer(ret.back(), i, comp));
             }
         } else {
-            ret.push_back(
-                kmer_rev<KLEN>(get_kmer(pac_end-KLEN, comp)));
+            ret.push_back(kmer_rev<KLEN>(get_kmer(pac_end-KLEN, comp)));
             for (auto i = pac_end-KLEN-1; i >= pac_start; i--) {
-                ret.push_back(next_kmer(ret.back(), i, comp));
+                next_kmer(ret, i, comp);
+                //ret.push_back(next_kmer(ret.back(), i, comp));
             }
         }
         return ret;

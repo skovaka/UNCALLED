@@ -245,10 +245,15 @@ class ReadAln:
 
     def get_index_kmers(self, index, kmer_shift=4):
         """Returns the k-mer sequence at the alignment reference coordinates"""
-        start = max(0, self.refmir_start - kmer_shift)
+        #start = max(0, self.refmir_start - kmer_shift)
+        start = self.refmir_start
 
-        kmers = index.get_kmers(start, self.refmir_end, self.is_rna)
-        return np.array(kmers)
+        return pd.Series(
+            index.get_kmers(self.refmir_start, self.refmir_end, self.is_rna),
+            pd.RangeIndex(self.refmir_start+nt.K-1, self.refmir_end)
+        )
+        #kmers = index.get_kmers(start, self.refmir_end, self.is_rna)
+        #return np.array(kmers)
 
 class BcFast5Aln(ReadAln):
     BCE_K = 4

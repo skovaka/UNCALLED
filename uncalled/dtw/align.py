@@ -11,6 +11,8 @@ from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..sigproc import ProcRead
 from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 
+from _uncalled._nt import KmerArray
+
 from .dotplot import Dotplot
 from . import PoreModel, BcFast5Aln, ReadAln, Track, ref_coords
 
@@ -51,37 +53,33 @@ def main(conf):
     conf.proc_read.detect_events = True
     conf.export_static()
 
-    mm2s = dict()
-    if conf.align.mm2_paf is not None:
-        for p in parse_paf(conf.align.mm2_paf):
-            old = mm2s.get(p.qr_name, None)
-            if old is None or old.aln_len < p.aln_len:
-                mm2s[p.qr_name] = p
-
     fast5s = Fast5Processor(conf=conf)
 
-    if conf.align.out_path is not None:
-        track = Track(conf.align.out_path, mode="w", conf=conf)
-    else:
-        track = None
+    #if conf.align.out_path is not None:
+    #else:
+    #    track = None
+    print(conf.align.out_path)
+    track = Track(conf.align.out_path, mode="w", conf=conf)
+
+    mm2s = track.mm2s
 
     for read in fast5s:
 
         if not read.id in mm2s:
             continue
 
-        dtw = GuidedDTW(track, read, mm2s[read.id], conf)
+        dtw = GuidedDTW(track, read, conf)
 
         if dtw.empty:
             continue
 
-        if track is None:
-            dplt = Dotplot(idx, read, conf=conf)
-            dplt.add_aln(dtw.bcaln, False)
-            dplt.add_aln(dtw.aln, True)
-            dplt.show()
+        if conf.align.out_path is None:
+            print(track, type(track))
+            dplt = Dotplot(track, conf=conf)
+            dplt.show(fast5_read=read)
+            print("SHOWED")
         else:
-            track.save_read(read.f5.filename, dtw.aln)
+            track.save_read(read.f5.filename)
         
         print(read.id)
 
@@ -91,24 +89,26 @@ def main(conf):
 class GuidedDTW:
 
     #TODO do more in constructor using prms, not in main
-    def __init__(self, track, read, paf, conf=None, **kwargs):
+    def __init__(self, track, read, conf=None, **kwargs):
         self.conf = read.conf if conf is None else conf
         self.prms = self.conf.align
 
         self.track = track
+
+        self.track.init_read_aln(read.id)
+
+        paf = self.track.mm2s[read.id]
 
         self.bcaln = BcFast5Aln(self.track.index, read, paf, self.conf.align.ref_bounds)
         if self.bcaln.empty:
             self.empty = True
             return
 
-        self.aln = ReadAln(self.track.index, paf, is_rna=self.conf.is_rna)
-
         if self.bcaln.errs is not None:
             bcerr = self.bcaln.errs[["ref", "type", "seq"]].drop_duplicates()
             bcerr.set_index("ref", drop=True, inplace=True)
             bcerr["type"].astype("category", copy=False)
-            self.aln.set_bcerr(bcerr.sort_index())
+            self.track.read_aln.set_bcerr(bcerr.sort_index())
 
         self.read = read
 
@@ -129,7 +129,7 @@ class GuidedDTW:
         self.samp_min = self.bcaln.aln['sample'].min()
         self.samp_max = self.bcaln.aln['sample'].max()
 
-        self.ref_kmers = self.aln.get_index_kmers(self.track.index)
+        self.ref_kmers = self.track.get_aln_kmers()
         self._calc_dtw()
 
         self.empty = False
@@ -147,7 +147,6 @@ class GuidedDTW:
         block_min = bc['sample'].searchsorted(self.samp_min)
         block_max = bc['sample'].searchsorted(self.samp_max)
 
-
         block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
         block_ends   = np.append(self.bcaln.ref_gaps, block_max)
         
@@ -158,15 +157,14 @@ class GuidedDTW:
             samp_st = bc.loc[st,'sample']
             samp_en = bc.loc[en-1,'sample']
 
-            refmir_st = bc.loc[st,"refmir"]
-            refmir_en = bc.loc[en-1,"refmir"]
+            refmir_st = bc.loc[st,"refmir"]+nt.K-1
+            refmir_en = bc.loc[en-1,"refmir"]+1
 
-            #print(samp_st, samp_en, refmir_st, refmir_en, self.aln.refmir_start, self.idx.refmir_to_ref(refmir_en))
 
             read_block = self.read.sample_range(samp_st, samp_en)
 
             block_signal = read_block['norm_sig'].to_numpy()
-            block_kmers = self.ref_kmers[refmir_st-self.aln.refmir_start:refmir_en-self.aln.refmir_start]
+            block_kmers = self.ref_kmers.loc[refmir_st:refmir_en]
 
             args = self._get_dtw_args(bc, read_block, refmir_st, block_kmers)
 
@@ -189,22 +187,22 @@ class GuidedDTW:
                   .drop(columns=['mean', 'stdv', 'mask'], errors='ignore') \
                   .rename(columns={'norm_sig' : 'current'})
 
-        y_min = self.aln.refmir_start
-        df['kmer'] = self.ref_kmers[df['refmir'].astype(int)-y_min]
+        df['kmer'] = self.ref_kmers.loc[df['refmir']].to_numpy()
 
-        self.aln.set_subevent_aln(df, True)
-
-        #self.dtw['refmir'] += self.bcaln.y_min
+        self.track.read_aln.set_subevent_aln(df, True)
 
         if len(band_blocks) == 0:
-            self.aln.bands = None
+            self.track.read_aln.bands = None
         elif len(band_blocks) > 1:
-            self.aln.bands = pd.concat(band_blocks)
+            self.track.read_aln.bands = pd.concat(band_blocks)
         else:
-            self.aln.bands = pd.DataFrame(band_blocks[0])
+            self.track.read_aln.bands = pd.DataFrame(band_blocks[0])
 
     def _get_dtw_args(self, bc, read_block, ref_start, ref_kmers):
-        common = (read_block['norm_sig'].to_numpy(), ref_kmers, self.model)
+        common = (
+            read_block['norm_sig'].to_numpy(), 
+            nt.kmer_array(ref_kmers), 
+            self.model)
         qry_len = len(read_block)
         ref_len = len(ref_kmers)
 
