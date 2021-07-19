@@ -40,6 +40,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
+
+namespace py = pybind11;
 #endif
 
 //From submods/bwa/bwtindex.c
@@ -314,49 +316,66 @@ class RefIndex {
         return pac - bns_->anns[rid].offset;
     }
 
-    std::vector<u16> get_kmers(const std::string &nm, i64 st, i64 en) {
-        i64 pac_st = ref_to_pac(nm, st),
-            pac_en = ref_to_pac(nm, en);
-        return seq_to_kmers<KLEN>(pacseq_, pac_st, pac_en);
+    u8 get_base(i64 pac, bool comp=false) {
+        if (pac < 0 || pac > static_cast<i64>(size() / 2)) { //TODO better size definition
+            throw std::invalid_argument("Base out of range");
+        }
+        size_t i = pac >> 2,
+               shift = ((pac & 3) ^ 3) << 1;
+        return ((pacseq_[i] >> shift) & 3) ^ (comp | (comp<<1));
+    }
+    
+    private:
+    kmer_t next_kmer(kmer_t kmer, i64 pac, bool comp) {
+        return kmer_neighbor<KLEN>(kmer, get_base(pac, comp));
     }
 
-    std::vector<kmer_t> get_kmers(i64 mir_st, i64 mir_en, bool is_rna) {
-        bool flip = is_pac_rev(mir_en);// >= size() / 2;
-
-        bool fwd = flip == is_rna;
-
-        auto st = mir_st, en = mir_en;
-        if (flip) {
-            st = size() - mir_en;
-            en = size() - mir_st;
+    public:
+    kmer_t get_kmer(i64 pac, bool comp) {
+        kmer_t kmer = 0;
+        for (auto i = pac; i < pac + KLEN; i++) {
+            kmer = next_kmer(kmer, i, comp);
         }
+        return kmer;
+    }
 
-        auto kmers = seq_to_kmers<KLEN>(pacseq_, st, en);
-
+    std::vector<kmer_t> get_kmers(i64 pac_start, i64 pac_end, bool rev, bool comp) {
         std::vector<kmer_t> ret;
-        ret.reserve(kmers.size());
-
-        //TODO refactor
-        if (flip) {
-            for (auto itr = kmers.rbegin(); itr < kmers.rend(); itr++) {
-                auto kmer = kmer_rev<KLEN>(*itr);
-                if (!fwd) kmer = kmer_comp<KLEN>(kmer);
-                ret.push_back(kmer);
+        if (!rev) {
+            ret.push_back(get_kmer(pac_start, comp));
+            for (auto i = pac_start+KLEN; i < pac_end; i++) {
+                ret.push_back(next_kmer(ret.back(), i, comp));
             }
         } else {
-            for (auto itr = kmers.begin(); itr < kmers.end(); itr++) {
-                auto kmer = *itr;
-                if (!fwd) kmer = kmer_comp<KLEN>(kmer);
-                ret.push_back(kmer);
+            ret.push_back(
+                kmer_rev<KLEN>(get_kmer(pac_end-KLEN, comp)));
+            for (auto i = pac_end-KLEN-1; i >= pac_start; i--) {
+                ret.push_back(next_kmer(ret.back(), i, comp));
             }
         }
-
         return ret;
     }
 
-    u8 get_base(u64 i) {
-        return (pacseq_[i>>2] >> ( ((3^i)&3) << 1 )) & 3;
+    std::vector<kmer_t> get_kmers(const std::string &name, i64 start, i64 end, bool rev=false, bool comp=false) {
+        i64 pac_start = ref_to_pac(name, start),
+            pac_end = ref_to_pac(name, end);
+        return get_kmers(pac_start, pac_end, rev, comp);
     }
+
+    //u16 get_kmer(i64 refmir, bool rev, bool comp) {
+    //    
+    //}
+    
+    std::vector<kmer_t> get_kmers(i64 refmir_start, i64 refmir_end, bool is_rna) {
+        bool rev = is_pac_rev(refmir_end);
+        bool comp = rev != is_rna;
+        if (rev) {
+            return get_kmers(size()-refmir_end, size()-refmir_start, true, comp);
+        }
+        return get_kmers(refmir_start, refmir_end, false, comp);
+    }
+
+
 
     using FwdRevCoords = std::pair< std::vector<i64>, std::vector<i64> >;
 
@@ -440,8 +459,10 @@ class RefIndex {
             i += st_;
             auto pst = i >> 2;
             u32 comb = *((u32 *) &pacseq_[pst]);
-            u8 shift = i & 3;
-            return (u16) ( (comb >> ((16-KLEN)<<1)) & KMER_MASK );
+            auto shift = (i & 3) >> 1;
+            std::cout << comb << "\n";
+            //return (u16) ( (comb >> ((16-KLEN-shift)<<1)) & KMER_MASK );
+            return (u16) ( (comb >> shift) & KMER_MASK );
         }
 
         i64 size() {
@@ -475,12 +496,21 @@ class RefIndex {
     #ifdef PYBIND
 
     #define PY_BWA_INDEX_METH(P) c.def(#P, &RefIndex<KLEN>::P);
+    #define PY_BWA_INDEX_VEC(P) c.def(#P, py::vectorize(&RefIndex<KLEN>::P));
 
-    static void pybind_defs(pybind11::class_<RefIndex<KLEN>> &c) {
-        c.def(pybind11::init<>());
-        c.def(pybind11::init<const std::string &>());
-        c.def(pybind11::init<const std::string &, bool>());
-        c.def(pybind11::init<const std::string &, bool, bool>());
+    static void index_test(const RefIndex<KLEN> &idx) {
+        std::cout << idx.size() << " size!\n";
+    }
+
+    static void pybind_defs(pybind11::module_ m) {
+        py::class_<RefIndex<KLEN>> c(m, "_RefIndex");
+
+        c.def_static("index_test", &RefIndex<KLEN>::index_test);
+
+        c.def(py::init<>());
+        c.def(py::init<const std::string &>());
+        c.def(py::init<const std::string &, bool>());
+        c.def(py::init<const std::string &, bool, bool>());
         PY_BWA_INDEX_METH(create);
         PY_BWA_INDEX_METH(load_index);
         PY_BWA_INDEX_METH(bwt_loaded);
@@ -496,22 +526,30 @@ class RefIndex {
         PY_BWA_INDEX_METH(refmir_to_ref_bound);
         PY_BWA_INDEX_METH(get_seqs);
         PY_BWA_INDEX_METH(pacseq_loaded);
-        PY_BWA_INDEX_METH(get_base);
         PY_BWA_INDEX_METH(get_sa_loc);
         PY_BWA_INDEX_METH(get_ref_coord);
         PY_BWA_INDEX_METH(get_ref_name);
         PY_BWA_INDEX_METH(get_ref_len);
         PY_BWA_INDEX_METH(get_pac_shift);
         PY_BWA_INDEX_METH(range_to_fms);
+        PY_BWA_INDEX_VEC(get_base);
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::get_ref_id) );
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(const std::string &)> (&RefIndex::get_ref_id));
         //c.def("get_kmers_new", &RefIndex::get_kmers_new);
         c.def("ref_to_refmir", static_cast<std::pair<i64,i64> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::ref_to_refmir));
         c.def("ref_to_refmir", pybind11::vectorize(static_cast<i64 (RefIndex::*)(i32, i64, bool, bool)> (&RefIndex::ref_to_refmir)));
         c.def("refmir_to_ref", pybind11::vectorize(&RefIndex::refmir_to_ref));
-        //c.def("get_kmers", static_cast< std::vector<u16> (RefIndex::*)(i64, i64)> (&RefIndex::get_kmers) );
-        c.def("get_kmers", static_cast< std::vector<u16> (RefIndex::*)(const std::string &, i64, i64)> (&RefIndex::get_kmers) );
-        c.def("get_kmers", static_cast< std::vector<u16> (RefIndex::*)(i64, i64, bool)> (&RefIndex::get_kmers) );
+        //c.def("get_kmers", static_cast< std::vector<kmer_t> (RefIndex::*)(i64, i64)> (&RefIndex::get_kmers) );
+        
+        c.def("get_kmers", 
+            static_cast< std::vector<kmer_t> (RefIndex::*)(i64, i64, bool, bool)> (&RefIndex::get_kmers),
+            py::arg("pac_start"), py::arg("pac_end"), py::arg("rev"), py::arg("comp"));
+        c.def("get_kmers", 
+            static_cast< std::vector<kmer_t> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::get_kmers),
+            py::arg("name"), py::arg("start"), py::arg("end"), py::arg("rev")=false, py::arg("comp")=false);
+        c.def("get_kmers", 
+            static_cast< std::vector<kmer_t> (RefIndex::*)(i64, i64, bool)> (&RefIndex::get_kmers),
+            py::arg("miref_start"), py::arg("miref_end"), py::arg("is_rna"));
     }
 
     #endif
@@ -525,7 +563,6 @@ class RefIndex {
     bool loaded_;
     size_t size_;
 };
-
 
 
 #endif

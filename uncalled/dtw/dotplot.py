@@ -14,6 +14,8 @@ from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
 from . import RefCoord, Track, ref_coords, BcFast5Aln, method_compare_aln
 
+from _uncalled import _RefIndex
+
 class DotplotParams(config.ParamGroup):
     _name = "dotplot"
 DotplotParams._def_params(
@@ -47,7 +49,10 @@ OPTS = [
 
 def main(conf):
     """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
-    Dotplot(conf=conf).show_all()
+    d = Dotplot(conf=conf)
+    _RefIndex.index_test(d.tracks[0].index)
+    d.show_all()
+
 
 class Dotplot:
     def __init__(self, *args, **kwargs):

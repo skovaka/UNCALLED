@@ -29,14 +29,18 @@ import numpy as np
 import uncalled as unc
 from bisect import bisect_left, bisect_right
 from typing import NamedTuple
+from _uncalled import _RefIndex
+
+class RefIndex(_RefIndex):
+    pass
 
 _index_cache = dict()
 
-def load_index(prefix, load_pacseq=True, load_bwt=False):
+def load_index(prefix, load_pacseq=True, load_bwt=False, cache=True):
     idx = _index_cache.get(prefix, None)
     if idx is None:
-        idx = unc.RefIndex(prefix, load_pacseq, load_bwt)
-        _index_cache[prefix] = idx
+        idx = RefIndex(prefix, load_pacseq, load_bwt)
+        if cache: _index_cache[prefix] = idx
     else:
         if load_pacseq and not idx.pacseq_loaded():
             idx.load_pacseq()

@@ -2,7 +2,7 @@ from collections import Sequence
 import numpy as np 
 
 from _uncalled._nt import *
-from _uncalled._nt import _kmer_to_arr, _kmer_to_str
+from _uncalled._nt import KmerArray, _kmer_to_arr, _kmer_to_str
 
 KMERS = np.arange(kmer_count())
 
@@ -18,7 +18,7 @@ def kmer_array(kmer):
     return arr
 
 def kmer_to_str(kmer, dtype=str):
-    if isinstance(kmer, (Sequence, np.ndarray)):
+    if isinstance(kmer, (Sequence, KmerArray, np.ndarray)):
         return _kmer_to_arr(kmer).astype(dtype)
     return dtype(_kmer_to_str(kmer))
 

@@ -28,10 +28,12 @@
 #include <vector>
 #include <cstdint>
 #include <cmath>
+#include "util.hpp"
 
 #ifdef PYBIND
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
 #include <pybind11/numpy.h>
 namespace py = pybind11;
 #endif
@@ -61,6 +63,9 @@ const char BASE_COMP_C[]
       'N','N','N','N','a','N','N','N','N','N','N','N','N','N','N','N'};//112-127 (t)
 
 const u8 BASE_COMP_B[] {3, 2, 1, 0};
+
+char base_to_char(u8 base);
+u8 base_comp(u8 base);
 
 //Binary k-mer representaiton
 using kmer_t = u16;
@@ -109,8 +114,8 @@ u16 kmer_revcomp(u16 kmer) {
 }
 
 template <KmerLen KLEN>
-std::vector<u16> kmers_revcomp(const std::vector<u16> &kmers) {
-    std::vector<u16> rev;
+std::vector<kmer_t> kmers_revcomp(const std::vector<u16> &kmers) {
+    std::vector<kmer_t> rev;
     rev.reserve(kmers.size());
     for (auto k = kmers.rbegin(); k != kmers.rend(); k++) {
         rev.push_back(kmer_revcomp<KLEN>(*k));
@@ -143,8 +148,8 @@ std::string kmer_to_str(u16 kmer) {
 }
 
 template <KmerLen KLEN>
-std::vector<u16> seq_to_kmers(u8 *seq, u64 st, u64 en) {
-    std::vector<u16> ret;
+std::vector<kmer_t> pacseq_to_kmers(u8 *seq, u64 st, u64 en) {
+    std::vector<kmer_t> ret;
 
     u64 pst = st >> 2,
         pen = ((en) >> 2)+1;
@@ -173,17 +178,18 @@ std::vector<u16> seq_to_kmers(u8 *seq, u64 st, u64 en) {
 #define PY_DBG_VAL(P, D) dbg.def_readonly(#P, &Debug::P, D);
 
 template <KmerLen K>
-using KmerArr = std::array<char, K+1>;
+using kmerpy_t = std::array<char, K+1>;
+
 
 template <KmerLen K>
-u16 str_to_kmer(const KmerArr<K> &kmer, u32 offs) {
+u16 str_to_kmer(const kmerpy_t<K> &kmer, u32 offs) {
     auto s = std::string(kmer.data());
     return str_to_kmer<K>(s, offs);
 }
 
 template <KmerLen K>
-KmerArr<K> kmer_to_arr(u16 kmer) {
-    KmerArr<K> ret{0};
+kmerpy_t<K> kmer_to_arr(u16 kmer) {
+    kmerpy_t<K> ret{0};
     for (size_t i = 0; i < K; i++) {
         ret[i] = BASE_CHARS[kmer_base<K>(kmer, i)];
     }
@@ -192,15 +198,35 @@ KmerArr<K> kmer_to_arr(u16 kmer) {
     //return str_to_kmer<K>(s, offs);
 }
 
+PYBIND11_MAKE_OPAQUE(std::vector<kmer_t>);
+
 template <KmerLen KLEN>
 static void nt_pybind_defs(pybind11::module_ &m) {
+	py::bind_vector<std::vector<kmer_t>>(m, "KmerArray", py::buffer_protocol());
+
+	//PYBIND11_MAKE_OPAQUE(std::vector<kmer_t>);
+    //py::class_<std::vector<kmer_t>>(m, "KmerArray", py::buffer_protocol())
+    //    .def_buffer([](std::vector<kmer_t> &k) -> py::buffer_info {
+    //    return py::buffer_info(
+    //        k.data(),                
+    //        sizeof(kmer_t), 
+    //        py::format_descriptor<kmer_t>::format(),
+    //        1,
+    //        {k.size()},
+	//		{sizeof(kmer_t)}
+    //    );
+    //});
+
     m.attr("K") = pybind11::cast(KMER_LEN);
     m.def("kmer_count", &kmer_count<KLEN>);
 
-    m.def("str_to_kmer",   py::vectorize(static_cast< u16 (*) (const KmerArr<KLEN> &, u32)>(&str_to_kmer<KLEN>)), py::arg("kmer"), py::arg("offs")=0);
+    m.def("str_to_kmer",   py::vectorize(static_cast< u16 (*) (const kmerpy_t<KLEN> &, u32)>(&str_to_kmer<KLEN>)), py::arg("kmer"), py::arg("offs")=0);
 
     m.def("_kmer_to_str",  &kmer_to_str<KLEN>);
     m.def("_kmer_to_arr",  py::vectorize(&kmer_to_arr<KLEN>));
+
+    m.def("base_to_char", py::vectorize(&base_to_char)); 
+    m.def("base_comp", py::vectorize(&base_comp));
     
     m.def("kmer_rev",      py::vectorize(&kmer_rev<KLEN>));
     m.def("kmer_comp",     py::vectorize(&kmer_comp<KLEN>));
@@ -208,6 +234,7 @@ static void nt_pybind_defs(pybind11::module_ &m) {
     m.def("kmer_head",     py::vectorize(&kmer_head<KLEN>));
     m.def("kmer_base",     py::vectorize(&kmer_base<KLEN>));
     m.def("kmer_neighbor", py::vectorize(&kmer_neighbor<KLEN>));
+
 }
 #endif
 

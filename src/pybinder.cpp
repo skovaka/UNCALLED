@@ -49,8 +49,7 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Paf> paf(m, "Paf");
     Paf::pybind_defs(paf);
 
-    py::class_<RefIndex<KLEN>> ref_index(m, "RefIndex");
-    RefIndex<KLEN>::pybind_defs(ref_index);
+    RefIndex<KLEN>::pybind_defs(m);//ref_index);
     
     py::class_<ReadBuffer> read_buffer(m, "ReadBuffer");
     ReadBuffer::pybind_defs(read_buffer);
