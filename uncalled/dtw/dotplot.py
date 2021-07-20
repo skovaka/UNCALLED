@@ -5,6 +5,7 @@ import os
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter, FuncFormatter
+from matplotlib.patches import Rectangle
 import types
 
 from .. import nt, config
@@ -129,34 +130,30 @@ class Dotplot:
         self.alns.append((aln, color, model))
 
     def _plot_signal(self, aln, ax, model):
-        samp_min, samp_max = aln.get_samp_bounds()
 
-        samps = np.arange(samp_min, samp_max)
+        samp_min, samp_max = aln.get_samp_bounds()
         raw_norm = self.read.get_norm_signal(samp_min, samp_max)
 
         ymin = np.min(raw_norm[raw_norm>0])
         ymax = np.max(raw_norm[raw_norm>0])
-        bases = nt.kmer_base(aln.aln['kmer'], 2)
 
-        samp_bases = np.zeros(len(samps), int)
+        starts = aln.aln['start']
+        ends = starts+aln.aln['length']
+
+        aln_bases = nt.kmer_base(aln.aln['kmer'], 2)
+        samp_bases = np.full(samp_max-samp_min, -1)
         for i in range(len(aln.aln)):
             st = int(aln.aln.iloc[i]['start'] - samp_min)
-            en = int(st + aln.aln.iloc[i]['length'])
-            samp_bases[st:en] = bases[i]
+            en = int(st + aln.aln.iloc[i]['length']) - 1
+            samp_bases[st:en] = aln_bases[i]
 
+        samps = np.arange(samp_min, samp_max)
         for base, color in enumerate(self.prms.style["base_colors"]):
-            ax.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color, interpolate=True)
+            ax.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color)
 
-        ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, alpha=0.75, c="#777777")
+        ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, alpha=0.75, c="black")
         ax.step(aln.aln['start'], model[aln.aln['kmer']], color='white', linewidth=2, where="post")
-        ax.vlines(aln.aln['start'], ymin, ymax, linewidth=2, color="white")
 
-        evts = (self.read.df['start'] >= samp_min) & (self.read.df['start'] < samp_max) & (self.read.df['norm_sig'] > 0)
-
-        if self.read.has_events:
-            ax.step(self.read.df['start'][evts], self.read.df['norm_sig'][evts], where='post', color='black', linewidth=3)
-        else:
-            ax.scatter(self.read.df['start'][evts], self.read.df['norm_sig'][evts], s=5, alpha=0.75, c="#777777") 
 
     def _plot_aln(self, i):
         aln = self.alns[i]
@@ -245,33 +242,44 @@ class Dotplot:
         for _ in self.prms.layers:
             widths.append(1)
 
-        heights=[1,3] 
-        if self.track_count == 2:
-            heights.append(1)
+        heights=[1] * self.track_count
+        heights.append(3)
 
-        self.fig = plt.figure()
+        self.fig = plt.figure(figsize=(15, 10))
         gspec = self.fig.add_gridspec(
                 ncols=len(widths), nrows=len(heights), 
                 width_ratios=widths,
                 height_ratios=heights 
         )
 
-        self.sig_axs = [self.fig.add_subplot(gspec[i*2,0]) 
-                        for i in range(len(self.tracks))]
+        track_count = len(self.tracks)
 
-        self.ax_dot = self.fig.add_subplot(gspec[1,0])
+        self.sig_axs = [self.fig.add_subplot(gspec[i,0]) 
+                        for i in range(track_count)]
 
-        self.layer_axs = [self.fig.add_subplot(gspec[1,l+1])
+        self.ax_dot = self.fig.add_subplot(gspec[track_count,0])
+
+        self.layer_axs = [self.fig.add_subplot(gspec[track_count,l+1])
                           for l in range(len(self.prms.layers))]
 
-        fontsize=12
+        fontsize=14
 
-        for ax in self.sig_axs:
+        self.sig_axs[0].xaxis.tick_top()
+        self.sig_axs[0].xaxis.set_label_position("top")
+        for ax in self.sig_axs[1:]:
+            ax.xaxis.set_major_formatter(NullFormatter())
+
+        for i,ax in enumerate(self.sig_axs):
             ax.get_shared_x_axes().join(self.ax_dot, ax)
-            ax.set_ylabel("Current (pA)", fontsize=fontsize)
+            ax.set_ylabel(
+                "Current (pA)", 
+                fontsize=fontsize, 
+                color=self.prms.style["aln_kws"][i]["color"])
+
+
 
         self.sig_axs[0].set_title(self.read.id)
-        self.sig_axs[-1].set_xlabel("Raw Sample", fontsize=fontsize)
+        self.ax_dot.set_xlabel("Raw Sample", fontsize=fontsize)
 
         for i,ax in enumerate(self.layer_axs):
             ax.get_shared_y_axes().join(self.ax_dot, ax)
@@ -297,7 +305,7 @@ class Dotplot:
         for ax,layer in zip(self.layer_axs, self.prms.layers):
             for i,aln in enumerate(self.alns):
                 ax.step(
-                    aln.aln[layer], aln.aln["refmir"], 
+                    aln.aln[layer], aln.aln["refmir"]-0.5, 
                     where="post",
                     **self.prms.style["aln_kws"][i]
                 )

@@ -88,6 +88,7 @@ class ParamGroup:
         def setter(self, value):
             type_ = self._types[p.name]
             if not (type_ is None or isinstance(value, type_)):
+                print(type_, type(value), p.name)
                 value = type_(value)
             self._values[p.name] = value
 

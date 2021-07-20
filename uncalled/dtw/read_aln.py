@@ -276,7 +276,9 @@ class BcFast5Aln(ReadAln):
 
     def __init__(self, index, read, paf, ref_bounds=None):
         self.seq_fwd = read.conf.read_buffer.seq_fwd #TODO just store is_rna
+        print(ref_bounds, "BuNDS")
         ReadAln.__init__(self, index, paf, is_rna=not self.seq_fwd, ref_bounds=ref_bounds)
+        print(self.ref_bounds, "BONDS")
         if self.empty: return
 
         self.refgap_bps = list()

@@ -130,6 +130,9 @@ class Track:
 
                 self._load_index()
 
+            if self.prms.load_mat and self.prms.ref_bounds is not None:
+                self.load_region(self.prms.ref_bounds)
+
             elif self.prms.mode == self.WRITE_MODE:
                 self.read_coords = list()
 
@@ -151,9 +154,6 @@ class Track:
         self.model = PoreModel(self.conf.pore_model)
 
         self.read_aln = None
-
-        if self.prms.load_mat and self.prms.ref_bounds is not None:
-            self.load_region(self.prms.ref_bounds)
 
     #@property
     #def read_ids(self):

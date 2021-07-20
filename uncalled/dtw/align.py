@@ -14,7 +14,7 @@ from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 from _uncalled._nt import KmerArray
 
 from .dotplot import Dotplot
-from . import PoreModel, BcFast5Aln, ReadAln, Track, ref_coords
+from . import PoreModel, BcFast5Aln, ReadAln, Track, RefCoord
 
 #TODO make this better
 METHODS = {
@@ -30,7 +30,7 @@ AlignParams._def_params(
     ("method", "GuidedBDTW", str, "DTW method"),
     ("band_width", 50, int, "DTW band width (only applies to BDTW)"),
     ("band_shift", 0.5, float, "DTW band shift coefficent (only applies to BDTW)"),
-    ("ref_bounds", None, tuple, "Will only output DTW within these reference coordinates if specified"),
+    #("ref_bounds", None, RefCoord, "Will only output DTW within these reference coordinates if specified"),
     ("mm2_paf", None, str, "Path to minimap2 alignments of basecalled reads in PAF format. Used to determine where each should be aligned. Should include cigar string."),
     ("out_path", None, str, "Path to directory where alignments will be stored. If not specified will display interactive dotplot for each read."),
 )
@@ -40,7 +40,7 @@ OPTS = (Opt("index_prefix", "track"),) + FAST5_OPTS + (
     Opt(("-o", "--out-path"), "align"),
     Opt(("-f", "--overwrite"), "track", action="store_true", help="Will overwrite alignment track if one already exists"),
     Opt("--rna", fn="set_r94_rna"),
-    Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
+    Opt(("-R", "--ref-bounds"), "track"),
     Opt("--method", "align", choices=METHODS.keys()),
     Opt(("-b", "--band-width"), "align"),
     Opt(("-s", "--band-shift"), "align"),
@@ -97,9 +97,11 @@ class GuidedDTW:
 
         self.track.init_read_aln(read.id)
 
+        self.ref_kmers = self.track.get_aln_kmers()
+
         paf = self.track.mm2s[read.id]
 
-        self.bcaln = BcFast5Aln(self.track.index, read, paf, self.conf.align.ref_bounds)
+        self.bcaln = BcFast5Aln(self.track.index, read, paf, self.conf.track.ref_bounds)
         if self.bcaln.empty:
             self.empty = True
             return
@@ -129,7 +131,6 @@ class GuidedDTW:
         self.samp_min = self.bcaln.aln['sample'].min()
         self.samp_max = self.bcaln.aln['sample'].max()
 
-        self.ref_kmers = self.track.get_aln_kmers()
         self._calc_dtw()
 
         self.empty = False
