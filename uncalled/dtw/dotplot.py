@@ -24,6 +24,10 @@ DotplotParams._def_params(
     ("track_b", None, None, "DTW aligment track containing reads to plot"),
     ("layers", ["current", "length"], list, "Layers to plot in side panels"),
     ("style", {
+        "rc" : {
+            "figure.figsize" : (15, 10), 
+            "axes.labelsize" : 14, 
+            "axes.titlesize" : 16},
         "aln_kws" : [
             {"color" : "purple", "alpha" : 1},
             {"color" : "royalblue", "alpha" : 0.75}],
@@ -58,10 +62,16 @@ def main(conf):
 class Dotplot:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
+
+        matplotlib.use("TkAgg")
+        matplotlib.rcdefaults()
+        plt.style.use(['seaborn'])
+        matplotlib.rcParams.update(self.prms.style["rc"])
+        
+
         self.conf.track.load_mat = False
         self.conf.track.layers = self.conf.dotplot.layers
 
-        print(type(self.prms.track_a), isinstance(self.prms.track_a, Track))
         if isinstance(self.prms.track_a, Track):
             self.tracks = [self.prms.track_a]
         else:
@@ -91,15 +101,13 @@ class Dotplot:
 
     def show_all(self):
         for read_id in self.read_ids:
+            print(read_id)
             self.show(read_id)
 
 
     def show(self, read_id=None, cursor=None, fast5_read=None):
         if not self._plot(read_id, cursor, fast5_read):
-            print("no")
             return False
-
-        print(read_id)
 
         plt.show()
         plt.close()
@@ -151,34 +159,25 @@ class Dotplot:
         for base, color in enumerate(self.prms.style["base_colors"]):
             ax.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color)
 
-        ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, alpha=0.75, c="black")
+        ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, c="black")
         ax.step(aln.aln['start'], model[aln.aln['kmer']], color='white', linewidth=2, where="post")
 
 
     def _plot_aln(self, i):
         aln = self.alns[i]
-        if not "refmir" in aln.aln:
-            aln.calc_refmir()
-        aln.sort_refmir()
+        #if not "refmir" in aln.aln:
+        #    aln.calc_refmir()
+        #aln.sort_refmir()
 
         if getattr(aln, "bands", None) is not None:
             self.ax_dot.fill_between(aln.bands['samp'], aln.bands['ref_st']-1, aln.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
 
-        self.ax_dot.step(aln.aln['start'], aln.aln['refmir'], where="post", linewidth=3,
+        self.ax_dot.step(aln.aln['start'], aln.aln.index, where="post", linewidth=3,
             **self.prms.style["aln_kws"][i]
         )
 
-        #if "bcerr" in aln.dfs:
-        #    print(aln.ref_to_samp(aln.bcerr[aln.bcerr["type"] == "INS"].index))
-
         self._plot_signal(aln, self.sig_axs[i], self.tracks[i].model)
 
-        #if samp_min is None: samp_min = 0
-        #if samp_max is None: samp_max = self.df['sample'].max()
-        #i = (self.df['sample'] >= samp_min) & (self.df['sample'] <= samp_max)
-        #model_means = self.track_a.model[aln.aln['kmer']]
-        #pa_diffs = np.abs(aln.aln['mean'] - model_means)
-        #self.ax_padiff.step(pa_diffs, aln.aln['refmir'], color=color, where="post")
 
     def set_cursor(self, ref_coord):
         aln,_,_ = self.alns[list(self.focus)[0]]
@@ -219,6 +218,13 @@ class Dotplot:
             for track in self.tracks
         ]
 
+        for t in self.tracks:
+            t.load_aln_kmers(store=True)
+        #self.aln_kmers = [
+        #    track.get_aln_kmers(read_id)#, ref_bounds=self.conf.track.ref_bounds)
+        #    for track in self.tracks
+        #]
+
         #TODO improve this
         self.ref_bounds = self.alns[0].ref_bounds
 
@@ -235,9 +241,6 @@ class Dotplot:
         if not self._load_read(read_id, fast5_read):
             return False
 
-        matplotlib.use("TkAgg")
-        plt.style.use(['seaborn'])
-
         widths=[5]
         for _ in self.prms.layers:
             widths.append(1)
@@ -245,7 +248,7 @@ class Dotplot:
         heights=[1] * self.track_count
         heights.append(3)
 
-        self.fig = plt.figure(figsize=(15, 10))
+        self.fig = plt.figure()
         gspec = self.fig.add_gridspec(
                 ncols=len(widths), nrows=len(heights), 
                 width_ratios=widths,
@@ -262,8 +265,6 @@ class Dotplot:
         self.layer_axs = [self.fig.add_subplot(gspec[track_count,l+1])
                           for l in range(len(self.prms.layers))]
 
-        fontsize=14
-
         self.sig_axs[0].xaxis.tick_top()
         self.sig_axs[0].xaxis.set_label_position("top")
         for ax in self.sig_axs[1:]:
@@ -273,20 +274,21 @@ class Dotplot:
             ax.get_shared_x_axes().join(self.ax_dot, ax)
             ax.set_ylabel(
                 "Current (pA)", 
-                fontsize=fontsize, 
                 color=self.prms.style["aln_kws"][i]["color"])
+            #rax = ax.twinx()
+            #rax.set_ylabel(self.tracks[i].name)
 
 
 
         self.sig_axs[0].set_title(self.read.id)
-        self.ax_dot.set_xlabel("Raw Sample", fontsize=fontsize)
+        self.ax_dot.set_xlabel("Raw Sample")
 
         for i,ax in enumerate(self.layer_axs):
             ax.get_shared_y_axes().join(self.ax_dot, ax)
             ax.yaxis.set_major_formatter(NullFormatter())
-            ax.set_xlabel(self.prms.layers[i], fontsize=fontsize)
+            ax.set_xlabel(self.prms.layers[i])
 
-        self.ax_dot.set_ylabel("%s (%s)" % (self.ref_bounds.name, "+" if self.ref_bounds.fwd else "-"), fontsize=12)
+        self.ax_dot.set_ylabel("%s (%s)" % (self.ref_bounds.name, "+" if self.ref_bounds.fwd else "-"))
 
         self.ax_dot.yaxis.set_major_formatter(FuncFormatter(self._tick_formatter))
         
@@ -305,14 +307,14 @@ class Dotplot:
         for ax,layer in zip(self.layer_axs, self.prms.layers):
             for i,aln in enumerate(self.alns):
                 ax.step(
-                    aln.aln[layer], aln.aln["refmir"]-0.5, 
+                    aln.aln[layer], aln.aln.index-0.5, 
                     where="post",
                     **self.prms.style["aln_kws"][i]
                 )
 
 
         if not self.aln_bc.empty:
-            self.ax_dot.scatter(self.aln_bc.aln['sample'], self.aln_bc.aln['refmir'], color='orange', zorder=2, s=20)
+            self.ax_dot.scatter(self.aln_bc.aln['sample'], self.aln_bc.aln.index, color='orange', zorder=2, s=20)
 
         self.fig.tight_layout()
 

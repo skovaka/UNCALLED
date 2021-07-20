@@ -34,6 +34,18 @@ class RefCoord:
             self.start = start
             self.end = end
 
+    def union(self, other):
+        if self.name != other.name or max(self.start, other.start) > min(self.end, other.end):
+            return None
+        return RefCoord(self.name, min(self.start, other.start), max(self.end, other.end), self.fwd)
+
+    def intersect(self, other):
+        start = max(self.start, other.start)
+        end = min(self.end, other.end)
+        if self.name != other.name or start > end:
+            return None
+        return RefCoord(self.name, start, end, self.fwd)
+
     def _init_str(self, coord_str):
         spl = coord_str.split(":")
         self.name = spl[0]
@@ -201,7 +213,9 @@ class ReadAln:
     #def set_bands(self, bands):
     def set_df(self, df, name):
         self.dfs.add(name)
-        df = df.loc[self.ref_start:self.ref_end-1].copy()
+        mask = (df.index >= self.refmir_start+nt.K-1) & (df.index < self.refmir_end)
+        if not np.all(mask):
+            df = df.loc[mask].copy()
         setattr(self, name, df)
 
 
@@ -217,31 +231,40 @@ class ReadAln:
 
         grp = aln.groupby(ref_col)
 
-        if kmer_str:
-            kmers = [nt.kmer_rev(nt.str_to_kmer(k,0)) for k in grp[kmer_col].first()]
+        if kmer_col in aln:
+            if kmer_str:
+                kmers = [nt.kmer_rev(nt.str_to_kmer(k,0)) for k in grp[kmer_col].first()]
+            else:
+                kmers = grp[kmer_col].first()
         else:
-            kmers = grp[kmer_col].first()
+            kmers = None
 
-        if ref_mirrored:
+        if ref_col == "refmir":
             refmirs = grp[ref_col].first()
-            refs = self.refmir_to_ref(refmirs)
         else:
-            refs = grp[ref_col].first()
+            refmirs = self.ref_to_refmir(grp[ref_col].first())
+        #    refs = self.refmir_to_ref(refmirs)
+        #else:
+        #    refs = grp[ref_col].first()
 
         lengths = grp[length_col].sum()
 
         aln = pd.DataFrame({
-            "ref"    : refs.astype("int64"),
-            "kmer"   : kmers.astype("uint16"),
+            #"ref"    : refs.astype("int64"),
+            "refmir"    : refmirs.astype("int64"),
             "start"  : grp[start_col].min().astype("uint32"),
             "length" : lengths.astype("uint32"),
             "current"   : grp["cuml_mean"].sum() / lengths
         })
-        
-        if ref_mirrored:
-            aln["refmir"] = refmirs
 
-        self.set_aln(aln.set_index("ref").sort_values("ref"))
+        if kmers is not None:
+            aln["kmer"] = kmers.astype("uint16")
+        
+        #if ref_mirrored:
+        #    aln["refmir"] = refmirs
+
+        aln = aln.set_index("refmir").sort_index()
+        self.set_aln(aln)
 
     def get_index_kmers(self, index, kmer_shift=4):
         """Returns the k-mer sequence at the alignment reference coordinates"""
@@ -276,10 +299,10 @@ class BcFast5Aln(ReadAln):
 
     def __init__(self, index, read, paf, ref_bounds=None):
         self.seq_fwd = read.conf.read_buffer.seq_fwd #TODO just store is_rna
-        print(ref_bounds, "BuNDS")
         ReadAln.__init__(self, index, paf, is_rna=not self.seq_fwd, ref_bounds=ref_bounds)
-        print(self.ref_bounds, "BONDS")
-        if self.empty: return
+
+        if self.empty: 
+            return
 
         self.refgap_bps = list()
         self.sub_bps = list()
@@ -308,9 +331,12 @@ class BcFast5Aln(ReadAln):
         })
 
         df = samp_bps.join(self.bp_refmir_aln, on='bp').dropna()
-        df["ref"] = self.refmir_to_ref(df["refmir"])
-        df.set_index("ref", drop=True, inplace=True)
-        self.set_aln(df.sort_index())
+        #df["ref"] = self.refmir_to_ref(df["refmir"])
+        df['refmir'] = df['refmir'].astype("Int64")
+        df = df.set_index("refmir", drop=True) \
+               .sort_index() 
+        df = df[~df.index.duplicated(keep="last")]
+        self.set_aln(df)
         #self.aln.reset_index(inplace=True, drop=True)
 
         if self.err_bps is not None:
@@ -331,9 +357,6 @@ class BcFast5Aln(ReadAln):
         self.empty = len(self.aln) == 0
         if self.empty: 
             return
-
-        self.y_min = -paf.rf_en if self.flip_ref else paf.rf_st
-        self.y_max = self.y_min + self.aln['refmir'].max()
 
     def parse_cs(self, paf):
         cs = paf.tags.get('cs', (None,)*2)[0]

@@ -99,7 +99,7 @@ class Track:
 
     LAYER_FNS = {
         "kmer" : (
-            lambda self,a: a.aln["kmer"]),
+            lambda self,a: self.load_aln_kmers(a)),
         "current" : (
             lambda self,a: a.aln["current"]),
         "dwell" : (
@@ -113,6 +113,7 @@ class Track:
         self.conf, self.prms = config._init_group("track", *args, **kwargs)
 
         self.in_mem = self.prms.path is None
+
 
         self.read_ids = set()
         if not self.in_mem:
@@ -128,18 +129,13 @@ class Track:
                 if len(self.conf.fast5_reader.fast5_index) == 0:
                     self.conf.fast5_reader.fast5_index = self.fname_mapping_filename
 
-                self._load_index()
+                self._load_fast5_index()
 
-            if self.prms.load_mat and self.prms.ref_bounds is not None:
-                self.load_region(self.prms.ref_bounds)
+        self.index = load_index(self.prms.index_prefix)
+        self.model = PoreModel(self.conf.pore_model)
+        self.read_aln = None
+        self.mat = None
 
-            elif self.prms.mode == self.WRITE_MODE:
-                self.read_coords = list()
-
-                self.conf.to_toml(self.config_filename)
-                self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
-
-        #TODO arguments overload conf params
         if self.conf.align.mm2_paf is not None:
             read_filter = set(self.conf.fast5_reader.read_filter)
             self.mm2s = {p.qr_name : p
@@ -149,11 +145,15 @@ class Track:
                         full_overlap=self.prms.full_overlap,
             )}
 
-        self.index = load_index(self.prms.index_prefix)
+        if not self.in_mem:
+            if self.prms.load_mat and self.prms.ref_bounds is not None:
+                self.load_region(self.prms.ref_bounds)
 
-        self.model = PoreModel(self.conf.pore_model)
+            elif self.prms.mode == self.WRITE_MODE:
+                self.read_coords = list()
 
-        self.read_aln = None
+                self.conf.to_toml(self.config_filename)
+                self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
 
     #@property
     #def read_ids(self):
@@ -162,26 +162,31 @@ class Track:
     def __contains__(self, read_id):
         return read_id in self.read_ids
 
-    def _load_index(self):
+    def _load_fast5_index(self):
         self.fname_mapping = pd.read_csv(self.fname_mapping_file, sep="\t", index_col="read_id")
         self.read_ids = set(self.fname_mapping.index)
 
     def init_read_aln(self, read_id):
         paf = self.mm2s[read_id]
-        self.read_aln = ReadAln(self.index, paf, is_rna=self.conf.is_rna)
+        self.read_aln = ReadAln(self.index, paf, is_rna=self.conf.is_rna, ref_bounds=self.prms.ref_bounds)
 
         if self.in_mem:
             self.read_ids = {read_id}
         else:
             self.read_ids.add(read_id)
 
-    def get_aln_kmers(self, aln=None):
+    def load_aln_kmers(self, aln=None, store=True):
         if aln is None:
             aln = self.read_aln
-        return pd.Series(
+
+        kmers = pd.Series(
             self.index.get_kmers(aln.refmir_start, aln.refmir_end, aln.is_rna),
             pd.RangeIndex(aln.refmir_start+nt.K-1, aln.refmir_end)
         )
+
+        if store:
+            self.read_aln.aln["kmer"] = kmers
+        return kmers
 
     def save_read(self, fast5_fname, aln=None):
         if self.prms.mode != "w":
@@ -235,11 +240,11 @@ class Track:
                 df = self.hdf.select(os.path.join(group, name))#, where=where)
                 self.read_aln.set_df(df, name)
 
+        self.load_aln_kmers()
+
         for layer in self.prms.layers:
             if not layer in self.read_aln.aln.columns:
                 self.read_aln.aln[layer] = self.LAYER_FNS[layer](self, self.read_aln)
-                #print(self.read_aln.bcerr)
-                #print(layer, self.read_aln.aln[layer].drop_duplicates())
 
         return self.read_aln
 
@@ -287,7 +292,7 @@ class Track:
             if aln is None: continue 
 
             xs = self.ref_coords.reindex(
-                self.ref_coords.index.intersection(aln.aln.index)
+                self.ref_coords.index.intersection(aln.refmir_to_ref(aln.aln.index))
             )
 
             mask_row = np.ones(self.width)#, dtype=bool)
@@ -344,9 +349,17 @@ class Track:
         self.hdf.put("coords", df, data_columns=["read_id"], format="table")
 
     def close(self):
-        self.write_coords()
+        if self.in_mem: return
+        if self.prms.mode == "w":
+            self.write_coords()
         self.hdf.close()
         self.fname_mapping_file.close()
+
+    #@property
+    #def name(self):
+    #    if self.prms.path is None:
+    #        return self.fast5s
+    #    return self.prms.path.split("/")[-1]
 
     @property
     def hdf_filename(self):
@@ -528,7 +541,6 @@ def method_compare_aln(aln_a, aln_b):
         "centroid_diff" : mid_a-mid_b,
         "dwell_diff" : merge["length_a"]-merge["length_b"],
     })
-    #print(merge[["start_a","length_a","start_b","length_b"]])
     return df
         
 #class TrackParams(config.ParamGroup):

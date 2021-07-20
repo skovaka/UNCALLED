@@ -58,7 +58,6 @@ def main(conf):
     #if conf.align.out_path is not None:
     #else:
     #    track = None
-    print(conf.align.out_path)
     track = Track(conf.align.out_path, mode="w", conf=conf)
 
     mm2s = track.mm2s
@@ -74,10 +73,8 @@ def main(conf):
             continue
 
         if conf.align.out_path is None:
-            print(track, type(track))
             dplt = Dotplot(track, conf=conf)
             dplt.show(fast5_read=read)
-            print("SHOWED")
         else:
             track.save_read(read.f5.filename)
         
@@ -97,7 +94,7 @@ class GuidedDTW:
 
         self.track.init_read_aln(read.id)
 
-        self.ref_kmers = self.track.get_aln_kmers()
+        self.ref_kmers = self.track.load_aln_kmers(store=False)
 
         paf = self.track.mm2s[read.id]
 
@@ -188,7 +185,7 @@ class GuidedDTW:
                   .drop(columns=['mean', 'stdv', 'mask'], errors='ignore') \
                   .rename(columns={'norm_sig' : 'current'})
 
-        df['kmer'] = self.ref_kmers.loc[df['refmir']].to_numpy()
+        #df['kmer'] = self.ref_kmers.loc[df['refmir']].to_numpy()
 
         self.track.read_aln.set_subevent_aln(df, True)
 

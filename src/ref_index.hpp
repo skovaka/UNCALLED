@@ -188,7 +188,7 @@ class RefIndex {
     }
 
     bool is_pac_rev(i64 pac) const {
-        return pac > static_cast<i32>(size() / 2);
+        return pac >= static_cast<i32>(size() / 2);
     }
 
     bool pac_to_refmir(i64 pac) {
@@ -302,13 +302,13 @@ class RefIndex {
         auto flip = is_fwd == is_rna;
 
         if (!flip) return pac_coord;
-        return size() - pac_coord;
+        return size() - pac_coord - 1;
     }
 
     i64 refmir_to_ref(i64 refmir) {
         i64 pac;
         if (is_pac_rev(refmir)) {
-            pac = size() - refmir;
+            pac = size() - refmir - 1;
         } else {
             pac = refmir;
         }
