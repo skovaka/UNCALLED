@@ -98,6 +98,8 @@ class Track:
         return ret
 
     LAYER_FNS = {
+        #"id" : (
+        #    lambda self,a: a.id),
         "kmer" : (
             lambda self,a: self.load_aln_kmers(a)),
         "current" : (
@@ -106,7 +108,7 @@ class Track:
             lambda self,a: 1000 * a.aln['length'] / self.conf.read_buffer.sample_rate),
         "model_diff" : (
             lambda self,a: a.aln["current"] - self.model[a.aln["kmer"]]),
-        "bcerr" : get_bcerr_layer
+        "bcerr" : get_bcerr_layer,
     }
 
     def __init__(self, *args, **kwargs):
@@ -116,6 +118,8 @@ class Track:
 
 
         self.read_ids = set()
+        self.aln_reads = dict()
+
         if not self.in_mem:
             if self.prms.mode == self.WRITE_MODE:
                 os.makedirs(self.aln_dir, exist_ok=self.prms.overwrite)
@@ -165,10 +169,16 @@ class Track:
     def _load_fast5_index(self):
         self.fname_mapping = pd.read_csv(self.fname_mapping_file, sep="\t", index_col="read_id")
         self.read_ids = set(self.fname_mapping.index)
+        if len(self.conf.fast5_reader.read_filter) > 0:
+            self.read_ids = self.read_ids & set(self.conf.fast5_reader.read_filter)
 
     def init_read_aln(self, read_id):
         paf = self.mm2s[read_id]
-        self.read_aln = ReadAln(self.index, paf, is_rna=self.conf.is_rna, ref_bounds=self.prms.ref_bounds)
+        aln_id = len(self.aln_reads)
+
+        self.read_aln = ReadAln(self.index, paf, is_rna=self.conf.is_rna, ref_bounds=self.prms.ref_bounds, aln_id=aln_id)
+
+        self.aln_reads[aln_id] = read_id
 
         if self.in_mem:
             self.read_ids = {read_id}

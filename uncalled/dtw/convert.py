@@ -16,7 +16,7 @@ from .. import nt, PoreModel
 
 import progressbar as progbar
 
-CONVERT_OPTS = BWA_OPTS + FAST5_OPTS + (
+CONVERT_OPTS = (Opt("index_prefix", "track"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "align", required=True),
     Opt("--rna", fn="set_r94_rna"),
     Opt(("-R", "--ref-bounds"), "track", type=RefCoord),
@@ -106,6 +106,10 @@ def tombo(conf):
             if is_rna != conf.is_rna:
                 raise RuntimeError("Reads appear to be RNA but --rna not specified")
 
+            track.init_read_aln(read.read_id)
+
+            #aln = ReadAln(track.index, mm2, is_rna=is_rna)
+
             aln_attrs = dict(handle["Alignment"].attrs)
             ch = aln_attrs["mapped_chrom"]
             st = aln_attrs["mapped_start"]
@@ -124,13 +128,18 @@ def tombo(conf):
             K = 5
             shift = 1
             bases = tombo_events["base"].to_numpy().astype(str)
-            kmers = [nt.str_to_kmer("".join(bases[i:i+K]), 0) for i in range(len(bases)-K+1)]
-            kmers = shift*[kmers[0]] + kmers + (K-shift-1)*[kmers[-1]]
+            kmers_old = [nt.str_to_kmer("".join(bases[i:i+K]), 0) for i in range(len(bases)-K+1)]
+            kmers_old = shift*[kmers_old[0]] + kmers_old + (K-shift-1)*[kmers_old[-1]]
+            kmers = track.load_aln_kmers(store=False)
+
             #TODO load kmers from genome
 
             if not sig_fwd:
                 samps = raw_len - tombo_start - samps - tombo_events["length"] - 1
-                kmers = nt.kmer_rev(kmers)
+                kmers_old = nt.kmer_rev(kmers_old)
+
+            print(list(kmers))
+            print(list(kmers_old))
             
             lr = scipy.stats.linregress(tombo_events["norm_mean"], model[kmers])
 
@@ -145,8 +154,6 @@ def tombo(conf):
             #shift = model.model_mean - scale * np.mean(signal)
             #signal = scale * signal + shift
 
-            mm2 =  track.mm2s[read.read_id]
-            aln = ReadAln(track.index, mm2, is_rna=is_rna)
 
             aln.set_aln(pd.DataFrame({
                 "ref"    : refs,

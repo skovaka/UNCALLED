@@ -168,9 +168,9 @@ class GuidedDTW:
 
             dtw = self.dtw_fn(*args)
 
-            #TODO flip in traceback
             path = np.flip(dtw.path)
-            path_qrys.append(read_block.index[path['qry']])
+            #TODO shouldn't need to clip, error in bdtw
+            path_qrys.append(read_block.index[np.clip(path['qry'], 0, len(read_block))])
             path_refs.append(refmir_st + path['ref'])
 
             if hasattr(dtw, "ll"):

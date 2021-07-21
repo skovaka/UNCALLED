@@ -93,13 +93,14 @@ LAYER_META = {
 
 class ReadAln:
 
-    def __init__(self, index, aln, df=None, is_rna=False, ref_bounds=None):
+    def __init__(self, index, aln, df=None, is_rna=False, ref_bounds=None, aln_id=None):
         if not isinstance(aln, PafEntry):
             raise RuntimeError("ReadAlns can only be initialized from PafEntrys currently")
 
         self.index = index
         self.read_id = aln.qr_name
         self.is_rna = is_rna
+        self.id = aln_id
 
         self.clipped = False
     
@@ -213,6 +214,9 @@ class ReadAln:
     #def set_bands(self, bands):
     def set_df(self, df, name):
         self.dfs.add(name)
+        if not "id" in df:
+            df["id"] = self.id
+        #df = df.loc[self.refmir_start+nt.K-1:self.refmir_end]
         mask = (df.index >= self.refmir_start+nt.K-1) & (df.index < self.refmir_end)
         if not np.all(mask):
             df = df.loc[mask].copy()
@@ -373,7 +377,11 @@ class BcFast5Aln(ReadAln):
             qr_i = paf.qr_len - paf.qr_en 
             #rf_i = -paf.rf_en+1
 
-        mr_i = self.refmir_start
+        #mr_i = self.refmir_start
+        if self.flip_ref:
+            mr_i = self.ref_to_refmir(paf.rf_en)
+        else:
+            mr_i = self.ref_to_refmir(paf.rf_st)
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
 
@@ -475,33 +483,4 @@ class BcFast5Aln(ReadAln):
         self.bp_refmir_aln.set_index("bp", inplace=True)
 
         return True
-
-    def get_xy(self, i):
-        df = self.aln.loc[i]
-        return (df['sample'], df['refmir']-0.5)
-
-    def plot_scatter(self, ax, real_start=False, samp_min=None, samp_max=None):
-        if samp_min is None: samp_min = 0
-        if samp_max is None: samp_max = self.aln['sample'].max()
-        i = (self.aln['sample'] >= samp_min) & (self.aln['sample'] <= samp_max)
-
-        return ax.scatter(self.aln['sample'][i], self.aln['refmir'][i], color='orange', zorder=2,s=20)
-
-    def plot_step(self, ax, real_start=False, samp_min=None, samp_max=None):
-        i = (self.aln['sample'] >= samp_min) & (self.aln['sample'] <= samp_max)
-
-        ret = ax.step(self.aln['sample'][i], self.aln['refmir'][i], color='orange', zorder=1, where='post')
-
-        if self.errs is not None:
-            for t in self.ERR_TYPES:
-                e = self.errs[self.errs['type'] == t]
-                ax.scatter(
-                    e['sample'], e['refmir'], 
-                    color='red', zorder=3, 
-                    s=self.ERR_SIZES[t],
-                    linewidth=self.ERR_WIDTHS[t],
-                    marker=self.ERR_MARKS[t]
-                )
-
-        return ret
 

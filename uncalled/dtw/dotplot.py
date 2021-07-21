@@ -67,7 +67,6 @@ class Dotplot:
         matplotlib.rcdefaults()
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])
-        
 
         self.conf.track.load_mat = False
         self.conf.track.layers = self.conf.dotplot.layers
@@ -307,7 +306,7 @@ class Dotplot:
         for ax,layer in zip(self.layer_axs, self.prms.layers):
             for i,aln in enumerate(self.alns):
                 ax.step(
-                    aln.aln[layer], aln.aln.index-0.5, 
+                    aln.aln[layer], aln.aln.index+0.5, 
                     where="post",
                     **self.prms.style["aln_kws"][i]
                 )

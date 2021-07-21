@@ -585,15 +585,19 @@ class Browser:
         self.axs.dwell_hist.set_visible(False)
 
     def _init_btns(self, gspec):
-        subspec = gspec.subgridspec(1, 2, wspace=0.1)
+        subspec = gspec.subgridspec(1, 3, wspace=0.1)
 
-        self.axs.sort_btn = self.fig.add_subplot(subspec[0])
-        self.sort_btn = widgets.Button(self.axs.sort_btn, "Sort by Position")
+        self.axs.pileup_btn = self.fig.add_subplot(subspec[0])
+        self.pileup_btn = widgets.Button(self.axs.pileup_btn, "Pileup")
+        #self.pileup_btn.on_clicked(self.sort_position)
+
+        self.axs.sort_btn = self.fig.add_subplot(subspec[1])
+        self.sort_btn = widgets.Button(self.axs.sort_btn, "Sort")
         self.sort_btn.on_clicked(self.sort_position)
         self.axs.sort_btn.set_visible(False)
 
-        self.axs.dot_btn = self.fig.add_subplot(subspec[1])
-        self.dot_btn = widgets.Button(self.axs.dot_btn, "Plot Dotplot")
+        self.axs.dot_btn = self.fig.add_subplot(subspec[2])
+        self.dot_btn = widgets.Button(self.axs.dot_btn, "Dotplot")
         self.dot_btn.on_clicked(self.plot_dotplot)
         self.axs.dot_btn.set_visible(False)
 
