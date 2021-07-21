@@ -104,8 +104,8 @@ class GuidedDTW:
             return
 
         if self.bcaln.errs is not None:
-            bcerr = self.bcaln.errs[["ref", "type", "seq"]].drop_duplicates()
-            bcerr.set_index("ref", drop=True, inplace=True)
+            bcerr = self.bcaln.errs[["refmir", "type", "seq"]].drop_duplicates()
+            bcerr.set_index("refmir", drop=True, inplace=True)
             bcerr["type"].astype("category", copy=False)
             self.track.read_aln.set_bcerr(bcerr.sort_index())
 

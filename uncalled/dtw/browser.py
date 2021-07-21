@@ -101,6 +101,7 @@ class Browser:
         self.fast5s = Fast5Reader(conf=self.conf)
 
         self.cursor = None
+        self.pileup = False
 
         self.LAYER_IDS = dict()
         for i,layer in enumerate(self.conf.track.layers):
@@ -149,12 +150,19 @@ class Browser:
         #dtw.plot_dotplot(ax)
         #fig.show()
 
+    def toggle_pileup(self, event):
+        self.pileup = not self.pileup
+        for track in self.tracks:
+            track.img.set_data(self.get_img(track))
+        self.fig.canvas.draw()
+        #if self.pileup:
+
     def sort_position(self, event):
         tr,rf,rd = self.cursor
-
+        self.pileup = False
         for track in self.tracks:
             track.sort(self.active_layer, self.ref_start + rf)
-            track.img.set_data(track[self.active_layer])
+            track.img.set_data(self.get_img(track))
             self.del_cursor()
 
         self.fig.canvas.draw()
@@ -325,7 +333,7 @@ class Browser:
 
         for track in self.tracks:
 
-            track.img.set_data(track[layer])
+            track.img.set_data(self.get_img(track))
 
             cmap, norm = self._layer_cmap(self.active_layer)
 
@@ -501,7 +509,7 @@ class Browser:
 
         cmap, norm = self._layer_cmap(self.active_layer)
         track.img = track.ax.imshow(
-            track[self.active_layer], 
+            self.get_img(track), 
             #alpha=np.array((~track.track.mask[0]).astype(float)), #TODO use mat_alpha()
             aspect='auto', 
             cmap=cmap, 
@@ -511,6 +519,11 @@ class Browser:
 
         self._init_cursor(track)
 
+    def get_img(self, track):
+        if self.pileup:
+            print("PILE")
+            return track.get_pileup(self.active_layer)
+        return track[self.active_layer]
 
     def _init_cursor(self, track):
         cursor_kw = {
@@ -589,7 +602,7 @@ class Browser:
 
         self.axs.pileup_btn = self.fig.add_subplot(subspec[0])
         self.pileup_btn = widgets.Button(self.axs.pileup_btn, "Pileup")
-        #self.pileup_btn.on_clicked(self.sort_position)
+        self.pileup_btn.on_clicked(self.toggle_pileup)
 
         self.axs.sort_btn = self.fig.add_subplot(subspec[1])
         self.sort_btn = widgets.Button(self.axs.sort_btn, "Sort")

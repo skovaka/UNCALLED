@@ -17,6 +17,18 @@ from ..pafstats import parse_paf, PafEntry
 from ..config import Config, Opt
 from .. import nt, PoreModel
 
+LayerMeta = namedtuple("LayerMeta", ["type", "label"])
+
+LAYER_META = {
+    "ref"     : LayerMeta(int, "Reference Coordinate"),
+    "start"   : LayerMeta(int, "Sample Start"),
+    "length"  : LayerMeta(int, "Sample Length"),
+    "current" : LayerMeta(float, "Mean Current (pA)"),
+    "kmer"    : LayerMeta(int, "Reference K-mer"),
+    "refmir"  : LayerMeta(int, "Mirrored Packed Ref. Coord."),
+    "id"      : LayerMeta(int, "Alignment ID"),
+}
+
 class RefCoord:
     def __init__(self, name, start=None, end=None, fwd=None):
         self.fwd = fwd
@@ -79,17 +91,6 @@ class RefCoord:
         if self.fwd is not None:
             s += " (%s)" % ("+" if self.fwd else "-")
         return s
-
-LayerMeta = namedtuple("LayerMeta", ["type", "label"])
-
-LAYER_META = {
-    "ref"     : LayerMeta(int, "Reference Coordinate"),
-    "start"   : LayerMeta(int, "Sample Start"),
-    "length"  : LayerMeta(int, "Sample Length"),
-    "current" : LayerMeta(float, "Mean Current (pA)"),
-    "kmer"    : LayerMeta(int, "Reference K-mer"),
-    "refmir"  : LayerMeta(int, "Mirrored Packed Ref. Coord."),
-}
 
 class ReadAln:
 
@@ -346,7 +347,7 @@ class BcFast5Aln(ReadAln):
         if self.err_bps is not None:
             self.errs = samp_bps.join(self.err_bps.set_index('bp'), on='bp').dropna()
             self.errs.reset_index(inplace=True, drop=True)
-            self.errs["ref"] = self.refmir_to_ref(self.errs["refmir"])
+            #self.errs["ref"] = self.refmir_to_ref(self.errs["refmir"])
             #self.errs.set_index("ref", inplace=True)
         else:
             self.errs = None

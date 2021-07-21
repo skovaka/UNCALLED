@@ -25,7 +25,7 @@ KMER_LAYER       = "kmer"
 CURRENT_LAYER    = "current"
 DWELL_LAYER      = "dwell"
 MODEL_DIFF_LAYER = "model_diff"
-DEFAULT_LAYERS = [KMER_LAYER, CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
+DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
 
 LAYER_META.update({
     "dwell" : LayerMeta(float, "Dwell Time (ms/nt)"),
@@ -266,7 +266,6 @@ class Track:
             for l in self.prms.layers]
         self.layer_idxs = {layer : i for i,layer in enumerate(self.prms.layers)}
 
-
     #TODO parse mm2 every time to enable changing bounds
     #eventually use some kind of tabix-like indexing
     def load_region(self, ref_bounds=None, layers=None):
@@ -363,6 +362,9 @@ class Track:
             )
 
         return mat
+
+    def get_pileup(self, layer):
+        return np.flip(np.sort(self[layer], axis=0), axis=0)
 
     def write_coords(self):
         df = pd.DataFrame(
