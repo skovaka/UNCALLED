@@ -521,7 +521,6 @@ class Browser:
 
     def get_img(self, track):
         if self.pileup:
-            print("PILE")
             return track.get_pileup(self.active_layer)
         return track[self.active_layer]
 

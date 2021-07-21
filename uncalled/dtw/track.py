@@ -282,18 +282,18 @@ class Track:
         mask_rows = list()
 
         ##TODO make index take RefCoord (combine with RefLoc)
-        #self.ref_coords = pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1)
-        #self._refmirs = list()
-        #self._kmers = list()
-        #for fwd in [False, True]:
-        #    start,end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end, fwd, self.conf.is_rna)
-        #    r = pd.RangeIndex(start, end)
-        #    k = self.index.get_kmers(r.start, r.stop, fwd)
-        #    if fwd == self.conf.is_rna:
-        #        r = r[::-1]
-        #        k = k[::-1]
-        #    self._refmirs.append(r)
-        #    self._kmers.append(k)
+        self.ref_coords = pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1)
+        self._refmirs = list()
+        self._kmers = list()
+        for fwd in [False, True]:
+            start,end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end-nt.K+1, fwd, self.conf.is_rna)
+            r = pd.RangeIndex(start, end)
+            k = self.index.get_kmers(r.start, r.stop, fwd)
+            if fwd == self.conf.is_rna:
+                r = r[::-1]
+                k = k[::-1]
+            self._refmirs.append(r)
+            self._kmers.append(k)
         #print(self._kmers) 
         
         self.ref_coords = pd.Series(
@@ -313,18 +313,20 @@ class Track:
             aln = self.load_read(coords=coord)
             if aln is None: continue 
 
-            xs = self.ref_coords.reindex(
+            xs = np.flip(self.ref_coords.reindex(
                 self.ref_coords.index.intersection(aln.refmir_to_ref(aln.aln.index))
-            )
+            ))
 
             mask_row = np.ones(self.width)#, dtype=bool)
             mask_row[xs] = False
             mask_rows.append(mask_row)
 
             for layer in self.prms.layers:
-                row = np.zeros(self.width)
-                row[xs] = aln.aln[layer]
-                read_rows[layer].append(row)
+                #row = np.zeros(self.width)
+                #row = np.zeros(self.width)
+                #row[xs] = aln.aln[layer]
+                row = aln.aln[layer].reindex(self._refmirs[aln.is_fwd])
+                read_rows[layer].append(row.to_numpy().astype(float))
 
             read_meta['ref_start'].append(aln.ref_start)
             read_meta['id'].append(aln.read_id)
