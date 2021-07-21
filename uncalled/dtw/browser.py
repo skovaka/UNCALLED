@@ -37,6 +37,11 @@ BrowserParams._def_params(
     ("track_a", None, str, "Path to directory where alignments are stored"),
     ("track_b", None, str, "Path to directory where alignments are stored"),
     ("full_overlap", None, bool, "If true will only include reads which fully cover reference bounds"),
+    ("style", {
+        "rc" : {
+            "figure.figsize" : (16, 10)
+        },
+    }, dict, "Plotting style options")
 )
 
 def comma_split(s):
@@ -54,9 +59,6 @@ OPTS = (
 def main(conf):
     """Plot, analyze, and compare dtw alignment tracks interactively or to SVG"""
 
-    matplotlib.use("TkAgg")
-    plt.style.use(['seaborn'])
-
     browser = Browser(conf=conf)
     browser.show()
 
@@ -64,6 +66,11 @@ class Browser:
 
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("browser", *args, **kwargs)
+
+        matplotlib.use("TkAgg")
+        matplotlib.rcdefaults()
+        plt.style.use(['seaborn'])
+        matplotlib.rcParams.update(self.prms.style["rc"])
 
         self.tracks = list()
 

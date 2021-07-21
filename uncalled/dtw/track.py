@@ -256,17 +256,15 @@ class Track:
             for l in self.prms.layers]
         self.layer_idxs = {layer : i for i,layer in enumerate(self.prms.layers)}
 
+
     #TODO parse mm2 every time to enable changing bounds
     #eventually use some kind of tabix-like indexing
     def load_region(self, ref_bounds=None, layers=None):
-
-        #self.mat = TrackMatrix(self, ref_bounds, self.mm2s, conf=self.conf)
-
         self.set_layers(layers)
         if ref_bounds is not None:
             self.prms.ref_bounds = ref_bounds
 
-        self.width = self.ref_end-self.ref_start
+        self.width = self.ref_end-self.ref_start-nt.K+1
         self.height = None
 
         read_meta = defaultdict(list)
@@ -274,9 +272,24 @@ class Track:
         read_rows = defaultdict(list)
         mask_rows = list()
 
+        ##TODO make index take RefCoord (combine with RefLoc)
+        #self.ref_coords = pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1)
+        #self._refmirs = list()
+        #self._kmers = list()
+        #for fwd in [False, True]:
+        #    start,end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end, fwd, self.conf.is_rna)
+        #    r = pd.RangeIndex(start, end)
+        #    k = self.index.get_kmers(r.start, r.stop, fwd)
+        #    if fwd == self.conf.is_rna:
+        #        r = r[::-1]
+        #        k = k[::-1]
+        #    self._refmirs.append(r)
+        #    self._kmers.append(k)
+        #print(self._kmers) 
+        
         self.ref_coords = pd.Series(
                 np.arange(self.width, dtype=int),
-                index=pd.RangeIndex(self.ref_start, self.ref_end)
+                index=pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1)
         )
 
         ref_id = self.ref_id
