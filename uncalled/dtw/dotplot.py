@@ -67,7 +67,7 @@ class Dotplot:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
 
-        #matplotlib.use("TkAgg")
+        matplotlib.use("TkAgg")
         matplotlib.rcdefaults()
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])

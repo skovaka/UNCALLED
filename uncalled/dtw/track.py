@@ -418,7 +418,7 @@ class Track:
     def sort(self, layer, ref):
         if isinstance(layer, str):
             layer = self.layer_idxs[layer]
-        order = np.argsort(self.mat[layer,:,ref-self.ref_start])
+        order = np.argsort(-self.mat[layer,:,ref-self.ref_start])
         self.mat = self.mat[:,order,:]
         self.reads = self.reads.iloc[order]
 

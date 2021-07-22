@@ -67,7 +67,7 @@ class Browser:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("browser", *args, **kwargs)
 
-        #matplotlib.use("TkAgg")
+        matplotlib.use("TkAgg")
         matplotlib.rcdefaults()
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])
@@ -134,18 +134,18 @@ class Browser:
 
         read = track.reads.iloc[rd]
 
-        fast5_read = self.fast5s[read.id]
-        proc_read = ProcRead(fast5_read, conf=self.conf)
+        #fast5_read = self.fast5s[read.id]
+        #proc_read = ProcRead(fast5_read, conf=self.conf)
+        #aln = track.load_aln(read.id)
+        #bcaln = BcFast5Aln(aln.index, proc_read, track.mm2s[read.id])
 
-        aln = track.load_aln(read.id)
-        bcaln = BcFast5Aln(aln.index, proc_read, track.mm2s[read.id])
-
-        dpl = Dotplot(aln.index, proc_read, conf=self.conf)
-        if not bcaln.empty:
-            dpl.add_aln(bcaln, False)
-        dpl.add_aln(aln, True)
-        dpl.set_cursor(self.ref_start + rf)
-        dpl.show()
+        dpl = Dotplot(track, conf=self.conf)
+        dpl.show(read.id)
+        #if not bcaln.empty:
+        #    dpl.add_aln(bcaln, False)
+        #dpl.add_aln(aln, True)
+        #dpl.set_cursor(self.ref_start + rf)
+        #dpl.show()
 
 
         #fig = plt.figure()
