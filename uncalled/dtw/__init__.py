@@ -2,7 +2,9 @@
 
 from .read_aln import *
 from .track import *
-from . import align, dotplot, browser, convert #refstats #compare, 
+from .browser import Browser
+from .dotplot import Dotplot
+from . import align, convert #refstats #compare, 
 
 SUBCMDS = [
     align, dotplot, browser, convert, 

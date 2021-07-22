@@ -34,8 +34,8 @@ CMAP = "viridis"
 class BrowserParams(config.ParamGroup):
     _name = "browser"
 BrowserParams._def_params(
-    ("track_a", None, str, "Path to directory where alignments are stored"),
-    ("track_b", None, str, "Path to directory where alignments are stored"),
+    ("track_a", None, None, "Path to directory where alignments are stored"),
+    ("track_b", None, None, "Path to directory where alignments are stored"),
     ("full_overlap", None, bool, "If true will only include reads which fully cover reference bounds"),
     ("style", {
         "rc" : {
@@ -50,8 +50,8 @@ def comma_split(s):
 from ..config import Opt
 OPTS = (
     Opt("ref_bounds", "track", type=ref_coords),
-    Opt("track_a", "browser"),
-    Opt("track_b", "browser", nargs="?"),
+    Opt("track_a", "browser", type=str),
+    Opt("track_b", "browser", type=str, nargs="?"),
     Opt(("-f", "--full-overlap"), "track", action="store_true"),
     Opt(("-L", "--layers"), "track", type=comma_split),
 )
@@ -67,19 +67,28 @@ class Browser:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("browser", *args, **kwargs)
 
-        matplotlib.use("TkAgg")
+        #matplotlib.use("TkAgg")
         matplotlib.rcdefaults()
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])
 
+        #track_paths = [self.prms.track_a]
+        #if self.prms.track_b is not None:
+        #    track_paths.append(self.prms.track_b)
+        #    self.single_track = False
+        #else:
+        #    self.single_track = True
+
         self.tracks = list()
 
-        track_paths = [self.prms.track_a]
-        if self.prms.track_b is not None:
-            track_paths.append(self.prms.track_b)
-            self.single_track = False
-        else:
-            self.single_track = True
+        for track in [self.prms.track_a, self.prms.track_b]:
+            if track is None: continue
+            if not isinstance(track, Track):
+                track = Track(track, conf=self.conf)
+            self.tracks.append(track)
+        self.single_track = len(self.tracks) == 1
+
+        self.conf = self.tracks[0].conf
 
         ref_bounds = self.conf.track.ref_bounds
 
@@ -88,12 +97,6 @@ class Browser:
         self.ref_end = ref_bounds.end
         self.width = self.ref_end - self.ref_start
 
-        for path in track_paths:
-            sys.stderr.write("Loading %s track...\n" % path)
-            track = Track(path, conf=self.conf)
-            self.tracks.append(track)
-            #self.track_mats.append(track.get_matrix(ref_bounds))
-        self.conf = track.conf
 
         if not self.single_track:
             self.ks_stats = self.tracks[0].calc_ks(self.tracks[1])
@@ -150,14 +153,14 @@ class Browser:
         #dtw.plot_dotplot(ax)
         #fig.show()
 
-    def toggle_pileup(self, event):
+    def toggle_pileup(self, event=None):
         self.pileup = not self.pileup
         for track in self.tracks:
             track.img.set_data(self.get_img(track))
         self.fig.canvas.draw()
         #if self.pileup:
 
-    def sort_position(self, event):
+    def sort_position(self, event=None):
         tr,rf,rd = self.cursor
         self.pileup = False
         for track in self.tracks:
@@ -200,6 +203,7 @@ class Browser:
         self.fig.canvas.draw()
 
     def del_cursor(self):
+        self.cursor = None
         to_hide = [self.axs.info, self.axs.pa_hist, self.axs.dwell_hist, self.axs.dot_btn, self.axs.sort_btn]
         for track in self.tracks:
             to_hide += track.cursor
@@ -325,8 +329,10 @@ class Browser:
         #hist_fig.tight_layout()
         #hist_fig.show()
 
-    def set_layer(self, layer_name):
-        layer = self.LAYER_IDS[layer_name]
+    def set_layer(self, layer):
+        if layer in self.LAYER_IDS:
+            layer = self.LAYER_IDS[layer]
+
         if layer == self.active_layer: return
 
         self.active_layer = layer
@@ -528,12 +534,17 @@ class Browser:
         cursor_kw = {
             'color' : 'red', 
             'alpha' : 0.75,
-            'visible' : False
+            'visible' : self.cursor != None
         }
+
         track.cursor = (
             track.ax.axvline(0,0,track.height, **cursor_kw),
             track.ax.axhline(0,0,track.width,  **cursor_kw)
         )
+
+        if self.cursor != None:
+            self.set_cursor(*self.cursor)
+            
 
     def _init_sumstat(self, gspec):
         self.axs.sumstat = self.fig.add_subplot(gspec)

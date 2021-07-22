@@ -245,6 +245,8 @@ class Track:
             where = "index >= self.prms.ref_bounds.start & index < self.prms.ref_bounds.end"
         self.read_aln = ReadAln(self.index, mm2, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
 
+        if self.read_aln.empty: return None
+
         for (path, subgroups, subkeys) in self.hdf.walk(group):
             for name in subkeys:
                 df = self.hdf.select(os.path.join(group, name))#, where=where)

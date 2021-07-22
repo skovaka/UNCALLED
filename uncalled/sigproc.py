@@ -164,7 +164,7 @@ class ProcRead:
         return self.df.loc[(self.df['start'] >= start) & (self.df['start'] <= end) & self.df['mask']]
 
     def get_norm_signal(self, samp_min, samp_max):
-        ret = np.zeros(samp_max - samp_min)
+        ret = np.zeros(int(samp_max - samp_min))
 
         i = self.norm_params["end"].searchsorted(samp_min)
 

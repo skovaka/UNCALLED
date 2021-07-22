@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import os 
+import sys
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -56,14 +57,17 @@ def main(conf):
     """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
     d = Dotplot(conf=conf)
     _RefIndex.index_test(d.tracks[0].index)
-    d.show_all()
+    if conf.out_prefix is None:
+        d.show_all()
+    else:
+        d.save_all(conf.out_prefix, conf.out_format)
 
 
 class Dotplot:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
 
-        matplotlib.use("TkAgg")
+        #matplotlib.use("TkAgg")
         matplotlib.rcdefaults()
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])
@@ -103,6 +107,22 @@ class Dotplot:
             print(read_id)
             self.show(read_id)
 
+    def save_all(self, out_prefix, fmt):
+        for read_id in self.read_ids:
+            if not self._plot(read_id):
+                continue
+            print(read_id)
+
+
+            suffix = read_id + "." + fmt
+            if os.path.isdir(out_prefix):
+                out_fname = os.path.join(out_prefix, suffix)
+            else:
+                out_fname = out_prefix + suffix
+
+            self.fig.set_size_inches(8, 6)
+            self.fig.savefig(out_fname, dpi=200)
+            plt.close()
 
     def show(self, read_id=None, cursor=None, fast5_read=None):
         if not self._plot(read_id, cursor, fast5_read):
@@ -139,6 +159,8 @@ class Dotplot:
     def _plot_signal(self, aln, ax, model):
 
         samp_min, samp_max = aln.get_samp_bounds()
+        print(samp_min, samp_max)
+        sys.stdout.flush()
         raw_norm = self.read.get_norm_signal(samp_min, samp_max)
 
         ymin = np.min(raw_norm[raw_norm>0])
@@ -300,8 +322,16 @@ class Dotplot:
             self.ax_dot.axvline(samp, **cursor_kw),
             self.ax_dot.axhline(refmir,  **cursor_kw)
 
+        xmin = np.inf
+        xmax = -np.inf
         for i in range(self.track_count):
             self._plot_aln(i)
+            samp_min, samp_max = self.alns[i].get_samp_bounds()
+            xmin = min(xmin, samp_min)
+            xmax = max(xmax, samp_max)
+
+        xslop = (xmax-xmin) * 0.01
+        self.ax_dot.set_xlim(xmin-xslop, xmax+xslop)
 
         for ax,layer in zip(self.layer_axs, self.prms.layers):
             for i,aln in enumerate(self.alns):
@@ -311,7 +341,6 @@ class Dotplot:
                     **self.prms.style["aln_kws"][i]
                 )
 
-
         if not self.aln_bc.empty:
             self.ax_dot.scatter(self.aln_bc.aln['sample'], self.aln_bc.aln.index, color='orange', zorder=2, s=20)
 
@@ -319,16 +348,3 @@ class Dotplot:
 
         return True
 
-
-    def save(self, out_prefix, fmt):
-        self._plot()
-
-        suffix = self.read.id + "." + fmt
-        if os.path.isdir(out_prefix):
-            out_fname = os.path.join(out_prefix, suffix)
-        else:
-            out_fname = out_prefix + suffix
-
-        self.fig.set_size_inches(8, 6)
-        self.fig.savefig(out_fname, dpi=200)
-        plt.close()

@@ -149,7 +149,7 @@ class ReadAln:
             else:
                 ref_en = aln.rf_en
 
-            if ref_st > ref_en:
+            if ref_en-ref_st < nt.K:#ref_st > ref_en:
                 self.empty = True
                 return
 
