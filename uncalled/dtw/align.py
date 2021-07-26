@@ -60,15 +60,22 @@ def main(conf):
     #    track = None
     track = Track(conf.align.out_path, mode="w", conf=conf)
 
-    mm2s = track.mm2s
+    mm2s = {p.qr_name : p
+         for p in parse_paf(
+            conf.align.mm2_paf,
+            ref_bounds=conf.track.ref_bounds,
+            full_overlap=conf.track.full_overlap,
+    )}
 
     for read in fast5s:
         print(read.id)
 
-        if not read.id in mm2s:
+        paf = mm2s.get(read.id, None)
+
+        if paf is None:
             continue
 
-        dtw = GuidedDTW(track, read, conf)
+        dtw = GuidedDTW(track, read, paf, conf)
 
         if dtw.empty:
             continue
@@ -86,15 +93,17 @@ def main(conf):
 class GuidedDTW:
 
     #TODO do more in constructor using prms, not in main
-    def __init__(self, track, read, conf=None, **kwargs):
+    def __init__(self, track, read, paf, conf=None, **kwargs):
         self.conf = read.conf if conf is None else conf
         self.prms = self.conf.align
 
         self.track = track
 
-        paf = self.track.mm2s[read.id]
+        paf_st, paf_en = self.track.index.ref_to_refmir(
+            paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd, self.conf.is_rna)
+        refmirs = pd.RangeIndex(paf_st+nt.K-1, paf_en)
 
-        if not self.track.init_read_aln(read.id):
+        if not self.track.init_read_aln(read.id, refmirs):
             return
 
         self.ref_kmers = self.track.load_aln_kmers(store=False)

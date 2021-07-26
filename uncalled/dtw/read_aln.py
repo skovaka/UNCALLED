@@ -129,12 +129,13 @@ class ReadAln:
             #self.aln.sort_values("refmir", inplace=True)
         
     def set_coords(self, coords):
-        self.empty = self.refmir_end - self.refmir_start <= 0
-        if self.empty: return
-
         loc = self.index.refmir_to_ref_bound(self.refmir_start,self.refmir_end,not self.is_rna)
         self.ref_bounds = RefCoord(loc.ref_name, loc.start, loc.end, loc.fwd)
         self.ref_id = loc.ref_id
+
+    @property
+    def empty(self):
+        return not hasattr(self, "aln") or len(self.aln) == 0
 
     @property
     def refmir_start(self):
@@ -209,10 +210,10 @@ class ReadAln:
         self.aln.sort_values("refmir", inplace=True)
 
     def get_samp_bounds(self):
+        pd.set_option('display.max_rows', None)
         samp_min = int(self.aln['start'].min())
         max_i = self.aln['start'].argmax()
         samp_max = int(self.aln['start'].iloc[max_i] + self.aln['length'].iloc[max_i])
-        #print(samp_min, samp_max)
         return samp_min, samp_max
     
     #def set_bands(self, bands):
@@ -221,7 +222,8 @@ class ReadAln:
             self.refmirs = df.index
             self.set_coords(df.index)
         else:
-            df = df.reindex(index=self.refmirs, copy=False).dropna()
+            index = df.index.intersection(self.refmirs)
+            df = df.reindex(index=index, copy=False)
 
         self.dfs.add(name)
         if not "id" in df:
@@ -318,8 +320,8 @@ class BcFast5Aln(ReadAln):
         
         ReadAln.__init__(self, 0, read.id, refmirs, index=index, is_rna=read.conf.is_rna)
 
-        if self.empty: 
-            return
+        #if self.empty: 
+        #    return
 
         self.refgap_bps = list()
         self.sub_bps = list()
@@ -329,13 +331,10 @@ class BcFast5Aln(ReadAln):
 
         self.flip_ref = paf.is_fwd != self.seq_fwd
 
-        self.empty = (
-                not read.f5.bc_loaded or 
-                (not self.parse_cs(paf) and
-                 not self.parse_cigar(paf))
-        )
-        if self.empty: 
+        if not read.f5.bc_loaded or (not self.parse_cs(paf) and not self.parse_cigar(paf)):
             return
+        #if self.empty: 
+        #    return
 
         #TODO make c++ build this 
         moves = np.array(read.f5.moves, bool)
@@ -371,9 +370,9 @@ class BcFast5Aln(ReadAln):
         self.inss = self.aln[self.aln['bp'].isin(self.ins_bps)].index
         self.dels = self.aln[self.aln['bp'].isin(self.del_bps)].index
 
-        self.empty = len(self.aln) == 0
-        if self.empty: 
-            return
+        #self.empty = len(self.aln) == 0
+        #if self.empty: 
+        #    return
 
     def parse_cs(self, paf):
         cs = paf.tags.get('cs', (None,)*2)[0]

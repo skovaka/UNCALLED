@@ -209,12 +209,16 @@ class RefIndex {
         return -1;
     }
 
-    bool is_refmir_rev(i64 i) const {
+    bool is_refmir_flipped(i64 i) const {
         return i >= static_cast<i32>(size() / 2);
     }
 
+    bool is_refmir_fwd(i64 i, bool is_rna) const {
+        return is_refmir_flipped(i) == is_rna;
+    }
+
     bool refmir_to_pac(i64 refmir) {
-        if (is_refmir_rev(refmir)) {
+        if (is_refmir_flipped(refmir)) {
             return size() - refmir + 1;
         }
         return refmir;
@@ -321,7 +325,7 @@ class RefIndex {
 
     i64 refmir_to_ref(i64 refmir) {
         i64 pac;
-        if (is_refmir_rev(refmir)) {
+        if (is_refmir_flipped(refmir)) {
             pac = size() - refmir - 1;
         } else {
             pac = refmir;
@@ -387,7 +391,7 @@ class RefIndex {
     //}
     
     std::vector<kmer_t> get_kmers(i64 refmir_start, i64 refmir_end, bool is_rna) {
-        bool rev = is_refmir_rev(refmir_end);
+        bool rev = is_refmir_flipped(refmir_end);
         bool comp = rev != is_rna;
         if (rev) {
             return get_kmers(size()-refmir_end, size()-refmir_start, true, comp);
@@ -551,6 +555,7 @@ class RefIndex {
         PY_BWA_INDEX_METH(get_ref_len);
         PY_BWA_INDEX_METH(get_pac_shift);
         PY_BWA_INDEX_METH(range_to_fms);
+        PY_BWA_INDEX_METH(is_refmir_fwd);
         PY_BWA_INDEX_VEC(get_base);
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::get_ref_id) );
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(const std::string &)> (&RefIndex::get_ref_id));

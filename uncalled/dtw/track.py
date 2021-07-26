@@ -144,12 +144,6 @@ class Track:
 
         if self.conf.align.mm2_paf is not None:
             read_filter = set(self.conf.fast5_reader.read_filter)
-            self.mm2s = {p.qr_name : p
-                     for p in parse_paf(
-                        self.conf.align.mm2_paf,
-                        ref_bounds=self.prms.ref_bounds,
-                        full_overlap=self.prms.full_overlap,
-            )}
 
         if not self.in_mem:
             if self.prms.load_mat and self.prms.ref_bounds is not None:
@@ -190,29 +184,18 @@ class Track:
                     k = k[::-1]
                 self._refmirs.append(r)
                 self._kmers.append(k)
+        print(self._refmirs)
 
 
-    def init_read_aln(self, read_id):
-        paf = self.mm2s[read_id]
+    def init_read_aln(self, read_id, refmirs):
         aln_id = len(self.aln_reads)
 
-        paf_st, paf_en = self.index.ref_to_refmir(
-            paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd, self.conf.is_rna)
-        refmirs = pd.RangeIndex(paf_st+nt.K-1, paf_en)
-            
-
         if self._refmirs != None:
-            refmirs = refmirs.intersection(self._refmirs[paf.is_fwd])
+            fwd = self.index.is_refmir_fwd(refmirs.min(), self.conf.is_rna)
+            refmirs = refmirs.intersection(self._refmirs[fwd])
             if len(refmirs) == 0: return False
 
-        #TODO make read_aln take aln_bounds instead of PAF
-        #make track store refmir_bounds based on ref_bounds
-        #find intersection of aln_bounds and track_bounds (in ReadAln?)
-        #make Range.to_series?
-
         self.read_aln = ReadAln(aln_id, read_id, refmirs, index=self.index, is_rna=self.conf.is_rna)
-
-        #self.read_aln = ReadAln(self.index, paf, is_rna=self.conf.is_rna, ref_bounds=self.prms.ref_bounds, aln_id=aln_id)
 
         self.aln_reads[aln_id] = read_id
 
@@ -229,8 +212,8 @@ class Track:
 
         kmers = pd.Series(
             self.index.get_kmers(aln.refmir_start-nt.K+1, aln.refmir_end, aln.is_rna),
-            aln.refmirs
-            #pd.RangeIndex(aln.refmir_start+nt.K-1, aln.refmir_end)
+            #aln.refmirs
+            pd.RangeIndex(aln.refmir_start, aln.refmir_end)
         )
 
         if store:
@@ -270,11 +253,11 @@ class Track:
         elif coords is not None:
             read_id = coords.read_id
         else:
-            coords = self.hdf.select("/coords", "read_id=read_id")
+            coords = self.hdf.select("/coords", "read_id=read_id").iloc[0]
 
-        aln_id = coords.i
+        aln_id = coords.aln_id
         group = "/_%d" % aln_id
-        print(coords)
+        #print(coords)
 
         #mm2 = self.mm2s.get(read_id, None)
         #if mm2 is None: return None
@@ -292,7 +275,6 @@ class Track:
         else:
             refmirs = None
 
-        #self.read_aln = ReadAln(self.index, mm2, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
         self.read_aln = ReadAln(aln_id, read_id, refmirs, index=self.index, is_rna=self.conf.is_rna)
 
         #if self.read_aln.empty: return None
@@ -302,11 +284,12 @@ class Track:
                 df = self.hdf.select(os.path.join(group, name))#, where=where)
                 self.read_aln.set_df(df, name)
 
-        self.load_aln_kmers()
+        if not self.read_aln.empty:
+            self.load_aln_kmers()
 
-        for layer in self.prms.layers:
-            if not layer in self.read_aln.aln.columns:
-                self.read_aln.aln[layer] = self.LAYER_FNS[layer](self, self.read_aln)
+            for layer in self.prms.layers:
+                if not layer in self.read_aln.aln.columns:
+                    self.read_aln.aln[layer] = self.LAYER_FNS[layer](self, self.read_aln)
 
         return self.read_aln
 
@@ -426,7 +409,7 @@ class Track:
         df = pd.DataFrame(
                 self.read_coords, 
                 columns=["aln_id", "read_id", "ref_id", "ref_start", "ref_end", "fwd", "primary"]
-        ).set_index(["refmir_start", "refmir_end"]).sort_index()
+        ).set_index(["ref_id", "ref_start", "ref_end"]).sort_index()
         self.hdf.put("coords", df, data_columns=["read_id"], format="table")
 
     def close(self):

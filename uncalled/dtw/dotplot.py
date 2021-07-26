@@ -101,7 +101,7 @@ class Dotplot:
         self.fast5s = Fast5Reader(reads=self.read_ids, conf=self.tracks[0].conf)
 
         self.index = self.tracks[0].index
-        self.mm2s = self.tracks[0].mm2s
+        #self.mm2s = self.tracks[0].mm2s
 
     def show_all(self):
         for read_id in self.read_ids:
@@ -225,21 +225,20 @@ class Dotplot:
         else:
             read_id = fast5_read.id
 
-        if not read_id in self.mm2s:
-            return False
-
         if isinstance(fast5_read, ProcRead):
             self.read = fast5_read
         else:
             self.read = ProcRead(fast5_read, conf=self.conf)
-
 
         self.alns = [
             track.load_read(read_id)#, ref_bounds=self.conf.track.ref_bounds)
             for track in self.tracks
         ]
 
-        self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], refmirs=self.alns[0].refmirs)
+        if np.any([a.empty for a in self.alns]):
+            return False
+
+        #self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], refmirs=self.alns[0].refmirs)
 
         for t in self.tracks:
             t.load_aln_kmers(store=True)
@@ -343,8 +342,8 @@ class Dotplot:
                     **self.prms.style["aln_kws"][i]
                 )
 
-        if not self.aln_bc.empty:
-            self.ax_dot.scatter(self.aln_bc.aln['sample'], self.aln_bc.aln.index, color='orange', zorder=2, s=20)
+        #if not self.aln_bc.empty:
+        #    self.ax_dot.scatter(self.aln_bc.aln['sample'], self.aln_bc.aln.index, color='orange', zorder=2, s=20)
 
         self.fig.tight_layout()
 
