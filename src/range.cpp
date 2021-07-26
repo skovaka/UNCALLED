@@ -23,11 +23,11 @@
 
 #include "range.hpp"
 
-size_t max(size_t a, size_t b) {
+i64 max(i64 a, i64 b) {
     return a > b ? a : b;
 }
 
-size_t min(size_t a, size_t b) {
+i64 min(i64 a, i64 b) {
     return a < b ? a : b;
 }
 
@@ -35,8 +35,7 @@ Range::Range(const Range &prev)
     : start_(prev.start_), 
       end_(prev.end_) {}
 
-Range::Range(size_t start, size_t end) : start_(start), end_(end) {}
-
+Range::Range(i64 start, i64 end) : start_(start), end_(end) {}
 
 Range::Range() : start_(1), end_(0) {}
 
@@ -46,7 +45,7 @@ bool Range::intersects(const Range &q) const {
            !(q.start_ > end_ || q.end_ < start_);
 }
 
-size_t Range::length() const {
+i64 Range::length() const {
     return end_ - start_ + 1;
 }
 
@@ -100,10 +99,6 @@ Range& Range::operator=(const Range& prev) {
     return *this;
 }
 
-
-bool Range::same_range(const Range &q) const {
-    return start_ == q.start_ && end_ == q.end_;
-}
 
 bool Range::is_valid() const {
     return start_ <= end_;

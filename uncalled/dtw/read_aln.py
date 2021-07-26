@@ -30,7 +30,7 @@ LAYER_META = {
 }
 
 class RefCoord:
-    def __init__(self, name, start=None, end=None, fwd=None):
+    def __init__(self, name=None, start=None, end=None, fwd=None):
         self.fwd = fwd
         if start is None and end is None:
             if isinstance(name ,str):
@@ -94,70 +94,94 @@ class RefCoord:
 
 class ReadAln:
 
-    def __init__(self, index, aln, df=None, is_rna=False, ref_bounds=None, aln_id=None):
-        if not isinstance(aln, PafEntry):
-            raise RuntimeError("ReadAlns can only be initialized from PafEntrys currently")
+    #def __init__(self, index, aln, df=None, is_rna=False, ref_bounds=None, aln_id=None):
+    def __init__(self, aln_id, read_id, refmirs=None, index=None, is_rna=False):
+        #if not isinstance(aln, PafEntry):
+        #    raise RuntimeError("ReadAlns can only be initialized from PafEntrys currently")
 
-        self.index = index
-        self.read_id = aln.qr_name
-        self.is_rna = is_rna
         self.id = aln_id
-
-        self.clipped = False
-    
-        self.set_ref_bounds(aln, ref_bounds)
-
-        if self.empty: 
-            return
-
-        self._init_mirror_coords()
+        self.read_id = read_id
+        self.index = index
+        self.is_rna = is_rna
 
         self.dfs = set()
 
-        if df is not None:
-            self.set_aln(df)
+        self.refmirs = refmirs
+        if refmirs is not None:
+            self.set_coords(refmirs)
 
-            has_ref = self.aln.index.name == "ref"
-            has_refmir = "refmir" in self.aln.columns
+        #if dtw is not None:
+        #    self.set_aln(dtw)
 
-            #TODO check for required columns
-            if not has_ref and not has_refmir:
-                raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % ("ref", "refmir"))
-            
-            if has_ref and not has_refmir:
-                self.aln["refmir"] = self.index.ref_to_refmir(self.ref_id, self.aln.index, self.is_fwd, self.is_rna)
+            #has_ref = self.aln.index.name == "ref"
+            #has_refmir = "refmir" in self.aln.columns
 
-            elif not has_ref and has_refmir:
-                self.aln[REF_COL] = self.index.mirref_to_ref(self.aln["refmir"])
+            ##TODO check for required columns
+            #if not has_ref and not has_refmir:
+            #    raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % ("ref", "refmir"))
+            #
+            #if has_ref and not has_refmir:
+            #    self.aln["refmir"] = self.index.ref_to_refmir(self.ref_id, self.aln.index, self.is_fwd, self.is_rna)
 
-            self.aln.sort_values("refmir", inplace=True)
+            #elif not has_ref and has_refmir:
+            #    self.aln[REF_COL] = self.index.mirref_to_ref(self.aln["refmir"])
+
+            #self.aln.sort_values("refmir", inplace=True)
         
+    def set_coords(self, coords):
+        self.empty = self.refmir_end - self.refmir_start <= 0
+        if self.empty: return
 
-    def set_ref_bounds(self, aln, ref_bounds):
-        if ref_bounds is None:
-            self.ref_bounds = RefCoord(aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
-        else:
-            if aln.rf_st < ref_bounds.start:
-                ref_st = ref_bounds.start
-                clipped = True
-            else:
-                ref_st = aln.rf_st
+        loc = self.index.refmir_to_ref_bound(self.refmir_start,self.refmir_end,not self.is_rna)
+        self.ref_bounds = RefCoord(loc.ref_name, loc.start, loc.end, loc.fwd)
+        self.ref_id = loc.ref_id
 
-            if aln.rf_en > ref_bounds.end:
-                ref_en = ref_bounds.end
-                clipped = True
-            else:
-                ref_en = aln.rf_en
+    @property
+    def refmir_start(self):
+        return self.refmirs.min()
 
-            if ref_en-ref_st < nt.K:#ref_st > ref_en:
-                self.empty = True
-                return
+    @property
+    def refmir_end(self):
+        return self.refmirs.max()+1
+    
+    @property
+    def ref_start(self):
+        return self.ref_bounds.start
 
-            self.ref_bounds = RefCoord(aln.rf_name, ref_st, ref_en, aln.is_fwd)
+    @property
+    def ref_end(self):
+        return self.ref_bounds.end
 
-        self.ref_id = self.index.get_ref_id(self.ref_name)
+    @property
+    def ref_name(self):
+        return self.ref_bounds.name
 
-        self.empty = False
+
+    #def set_ref_bounds(self, aln, ref_bounds):
+    #    if ref_bounds is None:
+    #        self.ref_bounds = RefCoord(aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
+    #    else:
+    #        if aln.rf_st < ref_bounds.start:
+    #            ref_st = ref_bounds.start
+    #            clipped = True
+    #        else:
+    #            ref_st = aln.rf_st
+
+    #        if aln.rf_en > ref_bounds.end:
+    #            ref_en = ref_bounds.end
+    #            clipped = True
+    #        else:
+    #            ref_en = aln.rf_en
+
+    #        if ref_en-ref_st < nt.K:#ref_st > ref_en:
+    #            self.empty = True
+    #            return
+
+    #        self.ref_bounds = RefCoord(aln.rf_name, ref_st, ref_en, aln.is_fwd)
+
+    #    self.ref_id = self.index.get_ref_id(self.ref_name)
+
+    #    self.empty = False
 
     #TODO ReadAln stores RefCoords, handles all this conversion?
 
@@ -177,50 +201,37 @@ class ReadAln:
     def calc_refmir(self):
         self.aln["refmir"] = self.index.ref_to_refmir(self.ref_id, self.aln.index, self.is_fwd, self.is_rna)
 
-    def _init_mirror_coords(self):
-        #self.refmir_start, self.refmir_end = self.index.ref_to_refmir(*self.ref_bounds, self.is_rna)
-        self.refmir_start, self.refmir_end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end, self.is_fwd, self.is_rna)
-
-    @property
-    def ref_name(self):
-        """The sequence name of the alignment reference coordinate"""
-        return self.ref_bounds.name
-
-    @property
-    def ref_start(self):
-        """The start of the alignment reference coordinate"""
-        return self.ref_bounds.start
-
-    @property
-    def ref_end(self):
-        """The end of the alignment reference coordinate"""
-        return self.ref_bounds.end
-
     @property
     def is_fwd(self):
         return self.ref_bounds.fwd
-    
-    def sort_ref(self):
-        self.aln.sort_values("ref", inplace=True)
 
     def sort_refmir(self):
         self.aln.sort_values("refmir", inplace=True)
 
     def get_samp_bounds(self):
-        samp_min = self.aln['start'].min()
+        samp_min = int(self.aln['start'].min())
         max_i = self.aln['start'].argmax()
-        samp_max = self.aln['start'].iloc[max_i] + self.aln['length'].iloc[max_i]
+        samp_max = int(self.aln['start'].iloc[max_i] + self.aln['length'].iloc[max_i])
+        #print(samp_min, samp_max)
         return samp_min, samp_max
     
     #def set_bands(self, bands):
     def set_df(self, df, name):
+        if self.refmirs is None:
+            self.refmirs = df.index
+            self.set_coords(df.index)
+        else:
+            df = df.reindex(index=self.refmirs, copy=False).dropna()
+
         self.dfs.add(name)
         if not "id" in df:
             df["id"] = self.id
+
         #df = df.loc[self.refmir_start+nt.K-1:self.refmir_end]
-        mask = (df.index >= self.refmir_start+nt.K-1) & (df.index < self.refmir_end)
-        if not np.all(mask):
-            df = df.loc[mask].copy()
+        #mask = (df.index >= self.refmir_start+nt.K-1) & (df.index < self.refmir_end)
+        #if not np.all(mask):
+        #    df = df.loc[mask].copy()
+
         setattr(self, name, df)
 
 
@@ -302,9 +313,10 @@ class BcFast5Aln(ReadAln):
 
     #Error = pd.Caegorical(["SUB", "INS", "DEL"])
 
-    def __init__(self, index, read, paf, ref_bounds=None):
+    def __init__(self, index, read, paf, refmirs=None):
         self.seq_fwd = read.conf.read_buffer.seq_fwd #TODO just store is_rna
-        ReadAln.__init__(self, index, paf, is_rna=not self.seq_fwd, ref_bounds=ref_bounds)
+        
+        ReadAln.__init__(self, 0, read.id, refmirs, index=index, is_rna=read.conf.is_rna)
 
         if self.empty: 
             return

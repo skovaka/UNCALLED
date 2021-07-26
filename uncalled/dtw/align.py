@@ -63,6 +63,7 @@ def main(conf):
     mm2s = track.mm2s
 
     for read in fast5s:
+        print(read.id)
 
         if not read.id in mm2s:
             continue
@@ -78,7 +79,6 @@ def main(conf):
         else:
             track.save_read(read.f5.filename)
         
-        print(read.id)
 
     if not track is None:
         track.close()
@@ -92,13 +92,14 @@ class GuidedDTW:
 
         self.track = track
 
-        self.track.init_read_aln(read.id)
+        paf = self.track.mm2s[read.id]
+
+        if not self.track.init_read_aln(read.id):
+            return
 
         self.ref_kmers = self.track.load_aln_kmers(store=False)
 
-        paf = self.track.mm2s[read.id]
-
-        self.bcaln = BcFast5Aln(self.track.index, read, paf, self.conf.track.ref_bounds)
+        self.bcaln = BcFast5Aln(self.track.index, read, paf, self.track.read_aln.refmirs)
         if self.bcaln.empty:
             self.empty = True
             return
@@ -121,10 +122,6 @@ class GuidedDTW:
 
         self.model = PoreModel(self.conf.pore_model)
 
-        self.ref_name = self.bcaln.ref_name
-        self.ref_min = self.bcaln.ref_start
-        self.ref_max = self.bcaln.ref_end
-
         self.samp_min = self.bcaln.aln['sample'].min()
         self.samp_max = self.bcaln.aln['sample'].max()
 
@@ -141,13 +138,12 @@ class GuidedDTW:
 
         band_blocks = list()
 
-        bc = self.bcaln.aln.sort_values("sample").reset_index()
-        block_min = bc['sample'].searchsorted(self.samp_min)
-        block_max = bc['sample'].searchsorted(self.samp_max)
+        bc = self.bcaln.aln#.sort_values("sample").reset_index()
+        block_min = int(bc.index[bc['sample'].searchsorted(self.samp_min)])
+        block_max = int(bc.index[bc['sample'].searchsorted(self.samp_max)])
 
         block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
         block_ends   = np.append(self.bcaln.ref_gaps, block_max)
-        
 
         #TODO make this actually do something for spliced RNA
         for st, en in [(block_min, block_max)]:
@@ -155,9 +151,8 @@ class GuidedDTW:
             samp_st = bc.loc[st,'sample']
             samp_en = bc.loc[en-1,'sample']
 
-            refmir_st = bc.loc[st,"refmir"]+nt.K-1
-            refmir_en = bc.loc[en-1,"refmir"]+1
-
+            refmir_st = st#+nt.K-1#bc.loc[st,"refmir"]+nt.K-1
+            refmir_en = en+1#bc.loc[en-1,"refmir"]+1
 
             read_block = self.read.sample_range(samp_st, samp_en)
 
@@ -196,7 +191,7 @@ class GuidedDTW:
         else:
             self.track.read_aln.bands = pd.DataFrame(band_blocks[0])
 
-    def _get_dtw_args(self, bc, read_block, ref_start, ref_kmers):
+    def _get_dtw_args(self, bc, read_block, refmir_start, ref_kmers):
         common = (
             read_block['norm_sig'].to_numpy(), 
             nt.kmer_array(ref_kmers), 
@@ -209,7 +204,7 @@ class GuidedDTW:
             band_count = qry_len + ref_len
             band_lls = list()
 
-            starts = bc['sample'].searchsorted(read_block['start'])
+            starts = bc.index[bc['sample'].searchsorted(read_block['start'])]
 
             q = r = 0
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
@@ -217,7 +212,7 @@ class GuidedDTW:
                 band_lls.append( (int(q+shift), int(r-shift)) )
 
                 tgt = starts[q] if q < len(starts) else starts[-1]
-                if r <= bc.loc[tgt,'refmir'] - ref_start:
+                if r <= tgt - refmir_start:
                     r += 1
                 else:
                     q += 1

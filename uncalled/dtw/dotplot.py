@@ -1,7 +1,8 @@
 import time
-import numpy as np
 import os 
 import sys
+import numpy as np
+import pandas as pd
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -159,7 +160,6 @@ class Dotplot:
     def _plot_signal(self, aln, ax, model):
 
         samp_min, samp_max = aln.get_samp_bounds()
-        print(samp_min, samp_max)
         sys.stdout.flush()
         raw_norm = self.read.get_norm_signal(samp_min, samp_max)
 
@@ -171,6 +171,7 @@ class Dotplot:
 
         aln_bases = nt.kmer_base(aln.aln['kmer'], 2)
         samp_bases = np.full(samp_max-samp_min, -1)
+
         for i in range(len(aln.aln)):
             st = int(aln.aln.iloc[i]['start'] - samp_min)
             en = int(st + aln.aln.iloc[i]['length']) - 1
@@ -232,12 +233,13 @@ class Dotplot:
         else:
             self.read = ProcRead(fast5_read, conf=self.conf)
 
-        self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], ref_bounds=self.conf.track.ref_bounds)
 
         self.alns = [
             track.load_read(read_id)#, ref_bounds=self.conf.track.ref_bounds)
             for track in self.tracks
         ]
+
+        self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], refmirs=self.alns[0].refmirs)
 
         for t in self.tracks:
             t.load_aln_kmers(store=True)

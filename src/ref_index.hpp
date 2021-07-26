@@ -32,6 +32,7 @@
 #include <bwa/utils.h>
 #include <pdqsort.h>
 #include <zlib.h>
+#include <algorithm>
 #include "util.hpp"
 #include "nt.hpp"
 #include "range.hpp"
@@ -53,6 +54,27 @@ struct RefLoc {
     i64 ref_len, start, end;
     bool fwd;
 };
+
+//struct Coords {
+//    i64 start, end;
+//
+//    i64 length() const {
+//        return end - start;
+//    }
+//
+//    bool empty() const {
+//        return start >= end;
+//    }
+//};
+//
+//Coords intersect(const Coords &a, const Coords &b) const {
+//    return {max(a.start, b.start), min(a.end, b.end)};
+//}
+//
+//Coords merge(const Coords &a, const Coords &b) const {
+//    return {min(a.start, b.start), max(a.end, b.end)};
+//}
+
 
 //struct MirrorCoords {
 //    u32
@@ -187,34 +209,25 @@ class RefIndex {
         return -1;
     }
 
-    bool is_pac_rev(i64 pac) const {
-        return pac >= static_cast<i32>(size() / 2);
+    bool is_refmir_rev(i64 i) const {
+        return i >= static_cast<i32>(size() / 2);
     }
 
-    bool pac_to_refmir(i64 pac) {
-        if (is_pac_rev(pac)) {
-            return size() - pac;
+    bool refmir_to_pac(i64 refmir) {
+        if (is_refmir_rev(refmir)) {
+            return size() - refmir + 1;
         }
-        return pac;
+        return refmir;
     }
 
     i32 get_ref_id(i64 ref) {
-        return bns_pos2rid(bns_, pac_to_refmir(ref));
+        return bns_pos2rid(bns_, refmir_to_pac(ref));
     }
 
     std::string get_ref_name(u32 rid) {
         return bns_->anns[rid].name;
     }
 
-    std::pair<u32, i32> get_ref_coord(i64 ref) {
-        ref = pac_to_refmir(ref);
-
-        auto rid = get_ref_id(ref);
-        return {
-            rid, 
-            ref - bns_->anns[rid].offset
-        };
-    }
 
     i64 get_ref_len(u32 rid) const {
         return bns_->anns[rid].len;
@@ -288,7 +301,8 @@ class RefIndex {
     std::pair<i64, i64> ref_to_refmir(const std::string &ref_name, i64 st, i64 en, bool is_fwd, bool is_rna) {
         auto shift = get_pac_shift(ref_name);
 
-        i64 pac_st = shift+st, pac_en = shift+en;
+        i64 pac_st = shift+st, 
+            pac_en = shift+en;
 
         auto flip = is_fwd == is_rna;
 
@@ -307,7 +321,7 @@ class RefIndex {
 
     i64 refmir_to_ref(i64 refmir) {
         i64 pac;
-        if (is_pac_rev(refmir)) {
+        if (is_refmir_rev(refmir)) {
             pac = size() - refmir - 1;
         } else {
             pac = refmir;
@@ -373,7 +387,7 @@ class RefIndex {
     //}
     
     std::vector<kmer_t> get_kmers(i64 refmir_start, i64 refmir_end, bool is_rna) {
-        bool rev = is_pac_rev(refmir_end);
+        bool rev = is_refmir_rev(refmir_end);
         bool comp = rev != is_rna;
         if (rev) {
             return get_kmers(size()-refmir_end, size()-refmir_start, true, comp);
@@ -533,7 +547,6 @@ class RefIndex {
         PY_BWA_INDEX_METH(get_seqs);
         PY_BWA_INDEX_METH(pacseq_loaded);
         PY_BWA_INDEX_METH(get_sa_loc);
-        PY_BWA_INDEX_METH(get_ref_coord);
         PY_BWA_INDEX_METH(get_ref_name);
         PY_BWA_INDEX_METH(get_ref_len);
         PY_BWA_INDEX_METH(get_pac_shift);
@@ -542,7 +555,7 @@ class RefIndex {
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::get_ref_id) );
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(const std::string &)> (&RefIndex::get_ref_id));
         //c.def("get_kmers_new", &RefIndex::get_kmers_new);
-        c.def("ref_to_refmir", static_cast<std::pair<i64,i64> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::ref_to_refmir));
+        c.def("ref_to_refmir", static_cast<std::pair<i64, i64> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::ref_to_refmir));
         c.def("ref_to_refmir", pybind11::vectorize(static_cast<i64 (RefIndex::*)(i32, i64, bool, bool)> (&RefIndex::ref_to_refmir)));
         c.def("refmir_to_ref", pybind11::vectorize(&RefIndex::refmir_to_ref));
         //c.def("get_kmers", static_cast< std::vector<kmer_t> (RefIndex::*)(i64, i64)> (&RefIndex::get_kmers) );
@@ -556,6 +569,14 @@ class RefIndex {
         c.def("get_kmers", 
             static_cast< std::vector<kmer_t> (RefIndex::*)(i64, i64, bool)> (&RefIndex::get_kmers),
             py::arg("miref_start"), py::arg("miref_end"), py::arg("is_rna"));
+
+        py::class_<RefLoc> l(m, "RefLoc");
+        l.def_readwrite("ref_id", &RefLoc::ref_id);
+        l.def_readwrite("ref_name", &RefLoc::ref_name);
+        l.def_readwrite("start", &RefLoc::start);
+        l.def_readwrite("end", &RefLoc::end);
+        l.def_readwrite("fwd", &RefLoc::fwd);
+
     }
 
     #endif

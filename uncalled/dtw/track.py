@@ -116,9 +116,9 @@ class Track:
 
         self.in_mem = self.prms.path is None
 
-
         self.read_ids = set()
         self.aln_reads = dict()
+
 
         if not self.in_mem:
             if self.prms.mode == self.WRITE_MODE:
@@ -139,6 +139,8 @@ class Track:
         self.model = PoreModel(self.conf.pore_model)
         self.read_aln = None
         self.mat = None
+
+        self.set_ref_bounds(self.prms.ref_bounds)
 
         if self.conf.align.mm2_paf is not None:
             read_filter = set(self.conf.fast5_reader.read_filter)
@@ -172,11 +174,45 @@ class Track:
         if len(self.conf.fast5_reader.read_filter) > 0:
             self.read_ids = self.read_ids & set(self.conf.fast5_reader.read_filter)
 
+    def set_ref_bounds(self, ref_bounds):
+        if ref_bounds == None:
+            self._refmirs = None
+            self._kmers = None
+        else:
+            self._refmirs = list()
+            self._kmers = list()
+            for fwd in [False, True]:
+                start,end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end-nt.K+1, fwd, self.conf.is_rna)
+                r = pd.RangeIndex(start, end)
+                k = self.index.get_kmers(r.start, r.stop, fwd)
+                if fwd == self.conf.is_rna:
+                    r = r[::-1]
+                    k = k[::-1]
+                self._refmirs.append(r)
+                self._kmers.append(k)
+
+
     def init_read_aln(self, read_id):
         paf = self.mm2s[read_id]
         aln_id = len(self.aln_reads)
 
-        self.read_aln = ReadAln(self.index, paf, is_rna=self.conf.is_rna, ref_bounds=self.prms.ref_bounds, aln_id=aln_id)
+        paf_st, paf_en = self.index.ref_to_refmir(
+            paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd, self.conf.is_rna)
+        refmirs = pd.RangeIndex(paf_st+nt.K-1, paf_en)
+            
+
+        if self._refmirs != None:
+            refmirs = refmirs.intersection(self._refmirs[paf.is_fwd])
+            if len(refmirs) == 0: return False
+
+        #TODO make read_aln take aln_bounds instead of PAF
+        #make track store refmir_bounds based on ref_bounds
+        #find intersection of aln_bounds and track_bounds (in ReadAln?)
+        #make Range.to_series?
+
+        self.read_aln = ReadAln(aln_id, read_id, refmirs, index=self.index, is_rna=self.conf.is_rna)
+
+        #self.read_aln = ReadAln(self.index, paf, is_rna=self.conf.is_rna, ref_bounds=self.prms.ref_bounds, aln_id=aln_id)
 
         self.aln_reads[aln_id] = read_id
 
@@ -185,13 +221,16 @@ class Track:
         else:
             self.read_ids.add(read_id)
 
+        return True
+
     def load_aln_kmers(self, aln=None, store=True):
         if aln is None:
             aln = self.read_aln
 
         kmers = pd.Series(
-            self.index.get_kmers(aln.refmir_start, aln.refmir_end, aln.is_rna),
-            pd.RangeIndex(aln.refmir_start+nt.K-1, aln.refmir_end)
+            self.index.get_kmers(aln.refmir_start-nt.K+1, aln.refmir_end, aln.is_rna),
+            aln.refmirs
+            #pd.RangeIndex(aln.refmir_start+nt.K-1, aln.refmir_end)
         )
 
         if store:
@@ -205,9 +244,10 @@ class Track:
         if aln is not None:
             self.read_aln = aln
 
+        #columns=["aln_id", "read_id", "ref_id", "ref_start", "ref_end", "fwd", "primary"]
         aln_i = len(self.read_coords)
         self.read_coords.append(
-            (self.read_aln.ref_id, self.read_aln.ref_start, self.read_aln.ref_end, self.read_aln.read_id, aln_i)
+            (aln_i, self.read_aln.read_id, self.read_aln.ref_id, self.read_aln.ref_start, self.read_aln.ref_end, self.read_aln.is_fwd, True)
         )
 
         for name in self.read_aln.dfs:
@@ -232,20 +272,30 @@ class Track:
         else:
             coords = self.hdf.select("/coords", "read_id=read_id")
 
-        group = "/_%d" % coords.i
+        aln_id = coords.i
+        group = "/_%d" % aln_id
+        print(coords)
 
-        mm2 = self.mm2s.get(read_id, None)
-        if mm2 is None: return None
+        #mm2 = self.mm2s.get(read_id, None)
+        #if mm2 is None: return None
 
-        if self.prms.ref_bounds is None:
-            where = None
+        #if self.prms.ref_bounds is None:
+        #    where = None
+        #else:
+        #    start = self.prms.ref_bounds.start
+        #    end = self.prms.ref_bounds.end
+        #    where = "index >= self.prms.ref_bounds.start & index < self.prms.ref_bounds.end"
+
+        if self._refmirs != None:
+            refmirs = self._refmirs[coords.fwd]
+            if len(refmirs) == 0: return False
         else:
-            start = self.prms.ref_bounds.start
-            end = self.prms.ref_bounds.end
-            where = "index >= self.prms.ref_bounds.start & index < self.prms.ref_bounds.end"
-        self.read_aln = ReadAln(self.index, mm2, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
+            refmirs = None
 
-        if self.read_aln.empty: return None
+        #self.read_aln = ReadAln(self.index, mm2, is_rna=not self.conf.read_buffer.seq_fwd, ref_bounds=self.prms.ref_bounds)
+        self.read_aln = ReadAln(aln_id, read_id, refmirs, index=self.index, is_rna=self.conf.is_rna)
+
+        #if self.read_aln.empty: return None
 
         for (path, subgroups, subkeys) in self.hdf.walk(group):
             for name in subkeys:
@@ -284,18 +334,20 @@ class Track:
         mask_rows = list()
 
         ##TODO make index take RefCoord (combine with RefLoc)
-        self.ref_coords = pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1)
-        self._refmirs = list()
-        self._kmers = list()
-        for fwd in [False, True]:
-            start,end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end-nt.K+1, fwd, self.conf.is_rna)
-            r = pd.RangeIndex(start, end)
-            k = self.index.get_kmers(r.start, r.stop, fwd)
-            if fwd == self.conf.is_rna:
-                r = r[::-1]
-                k = k[::-1]
-            self._refmirs.append(r)
-            self._kmers.append(k)
+        self.set_ref_bounds(self.prms.ref_bounds)
+
+        #self.ref_coords = pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1)
+        #self._refmirs = list()
+        #self._kmers = list()
+        #for fwd in [False, True]:
+        #    start,end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end-nt.K+1, fwd, self.conf.is_rna)
+        #    r = pd.RangeIndex(start, end)
+        #    k = self.index.get_kmers(r.start, r.stop, fwd)
+        #    if fwd == self.conf.is_rna:
+        #        r = r[::-1]
+        #        k = k[::-1]
+        #    self._refmirs.append(r)
+        #    self._kmers.append(k)
         #print(self._kmers) 
         
         self.ref_coords = pd.Series(
@@ -373,8 +425,8 @@ class Track:
     def write_coords(self):
         df = pd.DataFrame(
                 self.read_coords, 
-                columns=["ref_id", "ref_start", "ref_end", "read_id", "i"]
-        ).set_index(["ref_id", "ref_start", "ref_end"]).sort_index()
+                columns=["aln_id", "read_id", "ref_id", "ref_start", "ref_end", "fwd", "primary"]
+        ).set_index(["refmir_start", "refmir_end"]).sort_index()
         self.hdf.put("coords", df, data_columns=["read_id"], format="table")
 
     def close(self):

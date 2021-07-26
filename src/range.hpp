@@ -27,19 +27,26 @@
 #include <string>
 #include "util.hpp"
 
-u64 max(u64 a, u64 b);
+#ifdef PYBIND
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/numpy.h>
+#endif 
 
-u64 min(u64 a, u64 b);
+i64 max(i64 a, i64 b);
+
+i64 min(i64 a, i64 b);
+
 
 class Range {
     
     public:
-    u64 start_, end_; 
+    i64 start_, end_; 
 
     //Copy constructor
     Range(const Range &prev);
 
-    Range(u64 start, u64 end);
+    Range(i64 start, i64 end);
 
     Range();
 
@@ -53,24 +60,33 @@ class Range {
 
     float get_recp_overlap(const Range &r) const;
 
-    bool same_range(const Range &r) const;
-
     bool intersects(const Range &r) const;
 
     bool is_valid() const;
 
-    u64 length() const;
+    i64 length() const;
 
     friend bool operator< (const Range &q1, const Range &q2);
+    friend bool operator== (const Range &q1, const Range &q2);
 
     #ifdef PYBIND
 
-    #define PY_BWA_INDEX_METH(P) c.def(#P, &RefIndex<KLEN>::P);
+    #define PY_RANGE_METH(P) c.def(#P, &Range::P);
 
     static void pybind_defs(pybind11::class_<Range> &c) {
-        c.def(pybind11::init<u64, u64>());
+        c.def(pybind11::init<i64, i64>());
+        PY_RANGE_METH(intersect)
+        PY_RANGE_METH(merge)
+        PY_RANGE_METH(get_recp_overlap)
+        PY_RANGE_METH(intersects)
+        PY_RANGE_METH(is_valid)
+        PY_RANGE_METH(length)
+        c.def_property_readonly("is_valid", &Range::is_valid);
+        c.def_property_readonly("length", &Range::length);
         c.def_readwrite("start", &Range::start_);
         c.def_readwrite("end", &Range::end_);
+
+        //PYBIND11_NUMPY_DTYPE(Range, start, end);
     }
     #endif
 
