@@ -244,7 +244,7 @@ class Track:
         self.fname_mapping_file.write(s)
 
 
-    def load_read(self, read_id=None, coords=None):
+    def load_read(self, read_id=None, coords=None, load_kmers=True):
         if self.read_aln is not None and read_id == self.read_aln.read_id: 
             return self.read_aln
 
@@ -257,10 +257,6 @@ class Track:
 
         aln_id = coords.aln_id
         group = "/_%d" % aln_id
-        #print(coords)
-
-        #mm2 = self.mm2s.get(read_id, None)
-        #if mm2 is None: return None
 
         #if self.prms.ref_bounds is None:
         #    where = None
@@ -285,7 +281,8 @@ class Track:
                 self.read_aln.set_df(df, name)
 
         if not self.read_aln.empty:
-            self.load_aln_kmers()
+            if load_kmers:
+                self.load_aln_kmers()
 
             for layer in self.prms.layers:
                 if not layer in self.read_aln.aln.columns:
