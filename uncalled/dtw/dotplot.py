@@ -56,6 +56,7 @@ OPTS = [
 
 def main(conf):
     """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
+    matplotlib.use("TkAgg")
     d = Dotplot(conf=conf)
     _RefIndex.index_test(d.tracks[0].index)
     if conf.out_prefix is None:
@@ -68,7 +69,7 @@ class Dotplot:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
 
-        matplotlib.use("TkAgg")
+        #matplotlib.use("TkAgg")
         matplotlib.rcdefaults()
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])

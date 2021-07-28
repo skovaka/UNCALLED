@@ -391,7 +391,7 @@ class RefIndex {
     //}
     
     std::vector<kmer_t> get_kmers(i64 refmir_start, i64 refmir_end, bool is_rna) {
-        bool rev = is_refmir_flipped(refmir_end);
+        bool rev = is_refmir_flipped(refmir_end-1);
         bool comp = rev != is_rna;
         if (rev) {
             return get_kmers(size()-refmir_end, size()-refmir_start, true, comp);

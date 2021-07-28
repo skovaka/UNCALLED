@@ -229,6 +229,8 @@ class ReadAln:
         if not "id" in df:
             df["id"] = self.id
 
+        #print(name, df)
+
         #df = df.loc[self.refmir_start+nt.K-1:self.refmir_end]
         #mask = (df.index >= self.refmir_start+nt.K-1) & (df.index < self.refmir_end)
         #if not np.all(mask):

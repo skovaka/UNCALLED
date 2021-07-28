@@ -59,6 +59,7 @@ OPTS = (
 def main(conf):
     """Plot, analyze, and compare dtw alignment tracks interactively or to SVG"""
 
+    matplotlib.use("TkAgg")
     browser = Browser(conf=conf)
     browser.show()
 
@@ -67,7 +68,6 @@ class Browser:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("browser", *args, **kwargs)
 
-        matplotlib.use("TkAgg")
         matplotlib.rcdefaults()
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])
@@ -117,6 +117,8 @@ class Browser:
             self.info_labels.append(LAYER_META[layer].label)
 
         self.axs = types.SimpleNamespace()
+
+        self.shown = False
     
     @property
     def ref_coords(self):
@@ -164,7 +166,7 @@ class Browser:
         tr,rf,rd = self.cursor
         self.pileup = False
         for track in self.tracks:
-            track.sort(self.active_layer, self.ref_start + rf)
+            track.sort_coord(self.active_layer, self.ref_start + rf)
             track.img.set_data(self.get_img(track))
             self.del_cursor()
 
@@ -245,7 +247,7 @@ class Browser:
         self.set_info_cell(0,  self.ref_coord(trk, rf, read['fwd']))
         self.set_info_cell(1, read['id'])
 
-        for i,val in enumerate(trk[:,rd,rf]):
+        for i,val in enumerate(trk[:,rd,self.ref_start+rf]):
             self.set_info_cell(i+2, val)
         #self.set_info_cell(self.INFO_KMER, nt.kmer_to_str(int(kmer)))
         #self.set_info_cell(self.INFO_PA,   "%.4f" % pa)
@@ -337,6 +339,8 @@ class Browser:
 
         self.active_layer = layer
 
+        if not self.shown: return
+
         for track in self.tracks:
 
             track.img.set_data(self.get_img(track))
@@ -407,6 +411,7 @@ class Browser:
         self.fig.canvas.mpl_connect('button_press_event', self.down_click) 
         self.fig.canvas.mpl_connect('button_release_event', self.up_click) 
 
+        self.shown = True
         #mng = plt.get_current_fig_manager()
         #mng.window.attributes('-zoomed', True)
 
@@ -627,6 +632,6 @@ class Browser:
     def on_close(self, event):
         for t in self.tracks:
             t.close()
-        sys.exit(0)
+        #sys.exit(0)
 
 

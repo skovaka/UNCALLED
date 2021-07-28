@@ -9,8 +9,10 @@ import time
 from typing import NamedTuple
 from matplotlib.colors import Normalize
 import pandas as pd
-import scipy.stats
 import copy
+
+import scipy.stats
+from sklearn.decomposition import PCA
 
 import matplotlib.pyplot as plt
 
@@ -89,7 +91,7 @@ class Track:
     #}
 
     def get_bcerr_layer(self, aln):
-        bcerr = aln.bcerr.reindex(aln.aln.index)
+        bcerr = aln.bcerr#.reindex(aln.aln.index)
         ret = pd.Series(np.nan, bcerr.index)
         subs = bcerr[bcerr["type"]=="SUB"]
         ret[subs.index] = subs["seq"].replace({"A":0,"C":1,"G":2,"T":3})
@@ -184,8 +186,6 @@ class Track:
                     k = k[::-1]
                 self._refmirs.append(r)
                 self._kmers.append(k)
-        print(self._refmirs)
-
 
     def init_read_aln(self, read_id, refmirs):
         aln_id = len(self.aln_reads)
@@ -447,10 +447,13 @@ class Track:
         if self.prms.path is None: return None
         return os.path.join(self.aln_dir, read_id+self.ALN_SUFFIX)
 
-    def sort(self, layer, ref):
-        if isinstance(layer, str):
-            layer = self.layer_idxs[layer]
-        order = np.argsort(-self.mat[layer,:,ref-self.ref_start])
+    def sort_coord(self, layer, ref):
+        #if isinstance(layer, str):
+        #    layer = self.layer_idxs[layer]
+        order = np.argsort(-self[layer,:,ref])
+        self.sort(order)
+
+    def sort(self, order):
         self.mat = self.mat[:,order,:]
         self.reads = self.reads.iloc[order]
 
@@ -481,11 +484,35 @@ class Track:
 
         return ks_stats
 
+
+    def calc_pca(self, layer, ref_start, ref_end, n_components=2):
+        x = self[layer,:,ref_start:ref_end].T
+        pc = PCA(n_components=n_components).fit_transform(x)
+        data = {"read_id" : self.reads["id"]}
+        for c in range(n_components):
+            data["pc%d" % (c+1)] = pc[:,c]
+        return pd.DataFrame(data).set_index("read_id")
+    
+    
+    def sort_pca(self, layer, ref_start, ref_end):
+        pc = self.calc_pca(layer, ref_start, ref_end, 1)
+        self.sort(pc["pc1"].argsort())
+
+
     def __getitem__(self, key):
         if isinstance(key, str):
             key = self.layer_idxs[key]
-        elif isinstance(key, tuple) and isinstance(key[0], str):
-            key = (self.layer_idxs[key[0]],) + key[1:]
+        elif isinstance(key, tuple): 
+            ikey = list()
+            if isinstance(key[0], str):
+                ikey.append(self.layer_idxs[key[0]])
+            else:
+                ikey.append(key[0])
+            if len(key) > 1: ikey.append(key[1])
+            if len(key) > 2:
+                ikey.append(self.ref_coords.loc[key[2]])
+
+            key = tuple(ikey)
         elif isinstance(key, list):
             key = [self.layer_idxs[l] if isinstance(l, str) else l for l in key]
         return self.mat.__getitem__(key)
