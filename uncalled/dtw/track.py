@@ -170,6 +170,15 @@ class Track:
         if len(self.conf.fast5_reader.read_filter) > 0:
             self.read_ids = self.read_ids & set(self.conf.fast5_reader.read_filter)
 
+    #TODO move to RefIndex python wrapper? 
+    def _ref_coords_to_refmirs(self, ref_coords, fwd=None):
+        if fwd is None:
+            fwd = ref_coords.fwd
+        start, end = self.index.ref_to_refmir(
+            ref_coords.name, ref_coords.start, ref_coords.end-nt.K+1, fwd, self.conf.is_rna)
+        return pd.RangeIndex(start, end)
+
+
     def set_ref_bounds(self, ref_bounds):
         if ref_bounds == None:
             self._refmirs = None
@@ -178,24 +187,30 @@ class Track:
             self._refmirs = list()
             self._kmers = list()
             for fwd in [False, True]:
-                start,end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end-nt.K+1, fwd, self.conf.is_rna)
-                r = pd.RangeIndex(start, end)
-                k = self.index.get_kmers(r.start, r.stop, fwd)
+                refmirs = self._ref_coords_to_refmirs(ref_bounds, fwd)
+                kmers = self.index.get_kmers(r.start, r.stop, fwd)
+                #start,end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end-nt.K+1, fwd, self.conf.is_rna)
+                #r = pd.RangeIndex(start, end)
                 if fwd == self.conf.is_rna:
                     r = r[::-1]
                     k = k[::-1]
                 self._refmirs.append(r)
                 self._kmers.append(k)
 
-    def init_read_aln(self, read_id, refmirs):
+    def init_read_aln(self, read_id, bounds):
         aln_id = len(self.aln_reads)
 
-        if self._refmirs != None:
-            fwd = self.index.is_refmir_fwd(refmirs.min(), self.conf.is_rna)
-            refmirs = refmirs.intersection(self._refmirs[fwd])
-            if len(refmirs) == 0: return False
+        if isinstance(bounds, RefCoord):
+            bounds = self._ref_coords_to_refmirs(bounds)
+        elif not isinstance(bounds, pd.RangeIndex):
+            raise ValueError("ReadAlns can only be initialized with RangeIndex or RefCoord bounds")
 
-        self.read_aln = ReadAln(aln_id, read_id, refmirs, index=self.index, is_rna=self.conf.is_rna)
+        if self._refmirs is not None:
+            fwd = self.index.is_refmir_fwd(bounds.min(), self.conf.is_rna)
+            bounds = bounds.intersection(self._bounds[fwd])
+            if len(bounds) == 0: return False
+
+        self.read_aln = ReadAln(aln_id, read_id, bounds, index=self.index, is_rna=self.conf.is_rna)
 
         self.aln_reads[aln_id] = read_id
 

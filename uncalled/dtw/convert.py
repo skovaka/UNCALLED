@@ -51,8 +51,8 @@ def nanopolish(conf):
     track = Track(mode="w", conf=conf)
 
     for (contig, read_id), rows in read_groups.groups.items():
-        mm2 =  track.mm2s[read_id]
-        if contig != mm2.rf_name: continue
+        #mm2 =  track.mm2s[read_id]
+        #if contig != mm2.rf_name: continue
 
         aln = ReadAln(track.index, mm2, is_rna=conf.is_rna)
         df = alns.iloc[rows]
@@ -73,6 +73,9 @@ def tombo(conf):
     track = Track(mode="w", conf=conf)
     
     fast5_files = f5reader.prms.fast5_files
+
+    if len(fast5_files) > conf.fast5_reader.max_reads:
+        fast5_files = fast5_files[:conf.fast5_reader.max_reads]
     
     pbar = progbar.ProgressBar(
             widgets=[progbar.Percentage(), progbar.Bar(), progbar.ETA()], 
@@ -90,7 +93,7 @@ def tombo(conf):
 
             read, = fast5.get_reads()
 
-            if read.read_id not in track.mm2s: continue
+            #if read.read_id not in track.mm2s: continue
 
             if not 'BaseCalled_template' in read.handle['Analyses']['RawGenomeCorrected_000']:
                 #TODO debug logs
@@ -106,24 +109,24 @@ def tombo(conf):
             if is_rna != conf.is_rna:
                 raise RuntimeError("Reads appear to be RNA but --rna not specified")
 
-            track.init_read_aln(read.read_id)
-
             #aln = ReadAln(track.index, mm2, is_rna=is_rna)
 
             aln_attrs = dict(handle["Alignment"].attrs)
-            ch = aln_attrs["mapped_chrom"]
-            st = aln_attrs["mapped_start"]
-            en = aln_attrs["mapped_end"]
+            ref_bounds = RefCoord(
+                aln_attrs["mapped_chrom"],
+                aln_attrs["mapped_start"]-1,
+                aln_attrs["mapped_end"]+3,
+                aln_attrs["mapped_strand"] == "+")
+            sig_fwd = (ref_bounds.fwd != is_rna)
 
-            fwd = aln_attrs["mapped_strand"] == "+"
-            sig_fwd = (fwd != is_rna)
+            track.init_read_aln(read.read_id, ref_bounds)
 
             tombo_events = pd.DataFrame(np.array(handle["Events"]))
             tombo_start = handle["Events"].attrs["read_start_rel_to_raw"]
             
             raw_len = len(read.get_raw_data())
-            samps = tombo_events["start"]
-            refs = np.arange(st, en)
+            starts = tombo_events["start"]
+            #refs = np.arange(st, en)
 
             K = 5
             shift = 1
@@ -132,38 +135,34 @@ def tombo(conf):
             kmers_old = shift*[kmers_old[0]] + kmers_old + (K-shift-1)*[kmers_old[-1]]
             kmers = track.load_aln_kmers(store=False)
 
-            #TODO load kmers from genome
+            currents = tombo_events["norm_mean"]
+            lengths = tombo_events["length"]
 
             if not sig_fwd:
-                samps = raw_len - tombo_start - samps - tombo_events["length"] - 1
-                kmers_old = nt.kmer_rev(kmers_old)
+                starts = np.flip(raw_len - tombo_start - starts - tombo_events["length"] - 1)
+                currents = np.flip(currents)
+                lengths = np.flip(lengths)
 
-            print(list(kmers))
-            print(list(kmers_old))
+                kmers_old = np.flip(nt.kmer_rev(kmers_old))
+
+                #kmers = np.flip(kmers)
+
+            #print(len(kmers), list(kmers))
+            #print(len(kmers_old), list(kmers_old))
             
-            lr = scipy.stats.linregress(tombo_events["norm_mean"], model[kmers])
+            lr = scipy.stats.linregress(currents, model[kmers])
 
-            signal = lr.slope * tombo_events["norm_mean"] + lr.intercept
-            ##signal = tombo_events["norm_mean"]
-            #signal2 = model.normalize(signal)
-            #plt.scatter(signal, signal2)
-            #plt.show()
+            currents = lr.slope * currents + lr.intercept
 
-            #TODO pick model based on is_rna
-            #scale = model.model_stdv / np.std(signal)
-            #shift = model.model_mean - scale * np.mean(signal)
-            #signal = scale * signal + shift
+            track.read_aln.set_aln(pd.DataFrame({
+                "refmirs"    : track.read_aln.refmirs,
+                "start"  : starts,
+            #    "kmer"   : kmers,
+                "length" : lengths,
+                "current"   : currents
+            }).set_index("refmirs"))
 
-
-            aln.set_aln(pd.DataFrame({
-                "ref"    : refs,
-                "start"  : samps,
-                "kmer"   : kmers,
-                "length" : tombo_events["length"],
-                "current"   : signal
-            }).set_index("ref"))
-
-            track.save_read(fast5_basename, aln)
+            track.save_read(fast5_basename)
 
             pbar.update(pbar_count)
 

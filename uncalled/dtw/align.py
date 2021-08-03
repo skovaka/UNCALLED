@@ -99,11 +99,12 @@ class GuidedDTW:
 
         self.track = track
 
-        paf_st, paf_en = self.track.index.ref_to_refmir(
-            paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd, self.conf.is_rna)
-        refmirs = pd.RangeIndex(paf_st+nt.K-1, paf_en)
+        #paf_st, paf_en = self.track.index.ref_to_refmir(
+        #    paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd, self.conf.is_rna)
+        #refmirs = pd.RangeIndex(paf_st+nt.K-1, paf_en)
 
-        if not self.track.init_read_aln(read.id, refmirs):
+        ref_bounds = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
+        if not self.track.init_read_aln(read.id, ref_bounds):
             return
 
         self.ref_kmers = self.track.load_aln_kmers(store=False)
