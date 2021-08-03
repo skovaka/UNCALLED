@@ -131,8 +131,8 @@ class Sigplot:
             return False
 
         self.fig, self.axs = plt.subplots(len(self.alns), 1)
-        for ax in self.axs[1:]:
-            ax.get_shared_x_axes().join(self.axs[0], ax)
+        #for ax in self.axs[1:]:
+        #    ax.get_shared_x_axes().join(self.axs[0], ax)
 
         for i in range(len(self.alns)):
             self.plot_aln(i)
@@ -155,9 +155,10 @@ class Sigplot:
 
         track, read = self.reads[read_id]
         raw_norm = read.get_norm_signal(samp_min, samp_max)
+        model_current = track.model[aln.aln['kmer']]
 
-        ymin = np.min(raw_norm[raw_norm>0])
-        ymax = np.max(raw_norm[raw_norm>0])
+        ymin = min(np.min(model_current), np.min(raw_norm[raw_norm>0]))
+        ymax = max(np.max(model_current), np.max(raw_norm[raw_norm>0]))
 
         starts = aln.aln['start']
         ends = starts+aln.aln['length']
@@ -176,7 +177,11 @@ class Sigplot:
 
         ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, c="black")
 
-        ax.step(aln.aln['start']-xshift, track.model[aln.aln['kmer']], color='white', linewidth=2, where="post")
+        ax.step(aln.aln['start']-xshift, model_current, color='white', linewidth=2, where="post")
+
+        skips = aln.aln[np.diff(aln.aln.start, append=-1)==0].index
+        ax.vlines(aln.aln.loc[skips, "start"]-xshift-1, ymin, ymax, colors="red", linestyles="dashed", linewidth=3)
+
         self.fig.tight_layout()
 
         return True

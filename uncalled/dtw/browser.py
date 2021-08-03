@@ -632,6 +632,6 @@ class Browser:
     def on_close(self, event):
         for t in self.tracks:
             t.close()
-        #sys.exit(0)
+        sys.exit(0)
 
 

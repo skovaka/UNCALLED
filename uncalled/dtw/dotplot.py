@@ -158,14 +158,15 @@ class Dotplot:
 
         self.alns.append((aln, color, model))
 
-    def _plot_signal(self, aln, ax, model):
+    def _plot_signal(self, aln, ax, track):
 
         samp_min, samp_max = aln.get_samp_bounds()
         sys.stdout.flush()
         raw_norm = self.read.get_norm_signal(samp_min, samp_max)
+        model_current = track.model[aln.aln['kmer']]
 
-        ymin = np.min(raw_norm[raw_norm>0])
-        ymax = np.max(raw_norm[raw_norm>0])
+        ymin = min(np.min(model_current), np.min(raw_norm[raw_norm>0]))
+        ymax = max(np.max(model_current), np.max(raw_norm[raw_norm>0]))
 
         starts = aln.aln['start']
         ends = starts+aln.aln['length']
@@ -183,7 +184,10 @@ class Dotplot:
             ax.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color)
 
         ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, c="black")
-        ax.step(aln.aln['start'], model[aln.aln['kmer']], color='white', linewidth=2, where="post")
+        ax.step(aln.aln['start'], model_current, color='white', linewidth=2, where="post")
+
+        skips = aln.aln[np.diff(aln.aln.start, append=-1)==0].index
+        ax.vlines(aln.aln.loc[skips, "start"]-1, ymin, ymax, colors="red", linestyles="dashed", linewidth=3)
 
 
     def _plot_aln(self, i):
@@ -199,7 +203,7 @@ class Dotplot:
             **self.prms.style["aln_kws"][i]
         )
 
-        self._plot_signal(aln, self.sig_axs[i], self.tracks[i].model)
+        self._plot_signal(aln, self.sig_axs[i], self.tracks[i])
 
 
     def set_cursor(self, ref_coord):
