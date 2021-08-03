@@ -74,7 +74,7 @@ def tombo(conf):
     
     fast5_files = f5reader.prms.fast5_files
 
-    if len(fast5_files) > conf.fast5_reader.max_reads:
+    if conf.fast5_reader.max_reads > 0 and len(fast5_files) > conf.fast5_reader.max_reads:
         fast5_files = fast5_files[:conf.fast5_reader.max_reads]
     
     pbar = progbar.ProgressBar(
@@ -126,13 +126,11 @@ def tombo(conf):
             
             raw_len = len(read.get_raw_data())
             starts = tombo_events["start"]
-            #refs = np.arange(st, en)
 
-            K = 5
-            shift = 1
-            bases = tombo_events["base"].to_numpy().astype(str)
-            kmers_old = [nt.str_to_kmer("".join(bases[i:i+K]), 0) for i in range(len(bases)-K+1)]
-            kmers_old = shift*[kmers_old[0]] + kmers_old + (K-shift-1)*[kmers_old[-1]]
+            #shift = 1
+            #bases = tombo_events["base"].to_numpy().astype(str)
+            #kmers_old = [nt.str_to_kmer("".join(bases[i:i+K]), 0) for i in range(len(bases)-K+1)]
+            #kmers_old = shift*[kmers_old[0]] + kmers_old + (K-shift-1)*[kmers_old[-1]]
             kmers = track.load_aln_kmers(store=False)
 
             currents = tombo_events["norm_mean"]
@@ -143,21 +141,14 @@ def tombo(conf):
                 currents = np.flip(currents)
                 lengths = np.flip(lengths)
 
-                kmers_old = np.flip(nt.kmer_rev(kmers_old))
+                #kmers_old = np.flip(nt.kmer_rev(kmers_old))
 
-                #kmers = np.flip(kmers)
-
-            #print(len(kmers), list(kmers))
-            #print(len(kmers_old), list(kmers_old))
-            
             lr = scipy.stats.linregress(currents, model[kmers])
-
             currents = lr.slope * currents + lr.intercept
 
             track.read_aln.set_aln(pd.DataFrame({
                 "refmirs"    : track.read_aln.refmirs,
                 "start"  : starts,
-            #    "kmer"   : kmers,
                 "length" : lengths,
                 "current"   : currents
             }).set_index("refmirs"))
