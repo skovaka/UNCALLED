@@ -12,4 +12,4 @@ Nature Biotechnology (2020)
 
 ### Coming soon: Uncalled4
 
-We are actively developing our next major release titled Uncalled4: a toolkit for nanopore signal alignment, analysis, and visualization for raw nanopore DNA and RNA signal. A poorly documented development version of Uncalled4 is currently availible on [the "drna" branch](https://github.com/skovaka/UNCALLED/tree/drna).
+We are actively developing our next major release titled Uncalled4: a toolkit for alignment, analysis, and visualization of raw nanopore DNA and RNA signal. A poorly documented development version of Uncalled4 is currently availible on [the "drna" branch](https://github.com/skovaka/UNCALLED/tree/drna).
