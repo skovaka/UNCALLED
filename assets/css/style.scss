@@ -4,7 +4,7 @@
 @import "{{ site.theme }}";
 
 .site-title::before {
-	content: url("/uncalled_logo_small.png");
+	content: url("/logo.png");
 	display: inline-block;
 	position: relative;
 	width: 37px;
