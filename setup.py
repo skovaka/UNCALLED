@@ -158,6 +158,7 @@ setup(
         'pandas>=1.1.5',
         'matplotlib>=3.3.4',
         'scipy>=1.5.4',
+        'toml>=0.10.2',
     ],
 
     packages=find_packages(),

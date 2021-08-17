@@ -24,6 +24,7 @@
 #include <queue>
 #include <limits>
 #include <type_traits>
+#include <array>
 
 /// Original HDF5 C API.
 #ifndef DOXY
