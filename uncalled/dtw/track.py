@@ -187,8 +187,8 @@ class Track:
             self._refmirs = list()
             self._kmers = list()
             for fwd in [False, True]:
-                refmirs = self._ref_coords_to_refmirs(ref_bounds, fwd)
-                kmers = self.index.get_kmers(r.start, r.stop, fwd)
+                r = self._ref_coords_to_refmirs(ref_bounds, fwd)
+                k = self.index.get_kmers(r.start, r.stop, fwd)
                 #start,end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end-nt.K+1, fwd, self.conf.is_rna)
                 #r = pd.RangeIndex(start, end)
                 if fwd == self.conf.is_rna:

@@ -16,7 +16,9 @@ def kmer_array(kmer):
             raise RuntimeError("All k-mers must be %d bases long" % nt.K)
 
         arr = str_to_kmer(arr)
-    return KmerArray(arr)
+    print(arr.dtype)
+    return KmerArray(arr.astype("uint16"))
+    #return arr
 
 def kmer_to_str(kmer, dtype=str):
     if isinstance(kmer, (Sequence, KmerArray, np.ndarray)):
