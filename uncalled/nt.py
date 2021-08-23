@@ -16,7 +16,6 @@ def kmer_array(kmer):
             raise RuntimeError("All k-mers must be %d bases long" % nt.K)
 
         arr = str_to_kmer(arr)
-    print(arr.dtype)
     return KmerArray(arr.astype("uint16"))
     #return arr
 
