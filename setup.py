@@ -138,6 +138,16 @@ uncalled = Pybind11Extension(
     define_macros = [("PYBIND", None)]#, ("PYDEBUG", None)]
 )
 
+requires=[
+    'pybind11>=2.6.0', 
+    'read-until==3.0.0',
+    'pandas>=1.1.5',
+    'matplotlib>=3.3.4',
+    'scipy>=1.5.4',
+    'toml>=0.10.2',
+    'h5py'
+],
+
 setup(
     name = about["__title__"],
     version = about["__version__"],
@@ -152,14 +162,8 @@ setup(
 
     python_requires=">=3.6",
 
-    setup_requires=[
-        'pybind11>=2.6.0', 
-        'read-until==3.0.0',
-        'pandas>=1.1.5',
-        'matplotlib>=3.3.4',
-        'scipy>=1.5.4',
-        'toml>=0.10.2',
-    ],
+    setup_requires=requires,
+    install_requires=requires,
 
     packages=find_packages(),
     include_package_data=True,

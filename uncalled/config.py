@@ -345,7 +345,7 @@ class ArgParser:
 
         args = self.parser.parse_args(argv)
 
-        cmd_name, cmd = getattr(args, "_cmd", None)
+        cmd_name, cmd = getattr(args, "_cmd", (None,None))
 
         fns =  getattr(args, "_fns", None)
         if fns is not None:
