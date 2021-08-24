@@ -322,8 +322,8 @@ class Browser:
             #ys = scipy.stats.norm.pdf(xs, exp_mean, exp_stdv)
             self.axs.pa_hist.plot(xs, ys, color="red", linewidth=2)
 
-        self.axs.pa_hist.set_xlabel(self.LAYER_META[self.PA_LAYER][0])
-        self.axs.dwell_hist.set_xlabel(self.LAYER_META[self.DWELL_LAYER][0])
+        self.axs.pa_hist.set_xlabel(self.LAYER_META[self.PA_LAYER].label)
+        self.axs.dwell_hist.set_xlabel(self.LAYER_META[self.DWELL_LAYER].label)
 
         self.axs.pa_hist.set_yticks([])
         self.axs.dwell_hist.set_yticks([])
@@ -567,8 +567,8 @@ class Browser:
             interpolation='none'
         )
 
-        ax.set_yticks(np.arange(len(self.KS_LAYERS)))
-        ax.set_yticklabels([LAYER_META[l][0].split()[0] for l in self.KS_LAYERS])
+        ax.set_yticks(np.arange(len(Track.CMP_LAYERS)))
+        ax.set_yticklabels([LAYER_META[l].label.split()[0] for l in Track.CMP_LAYERS])
             
     def _init_sumstat_mean(self, gspec, track):
         self._init_sumstat(gspec)

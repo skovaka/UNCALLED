@@ -491,11 +491,12 @@ class Track:
     def calc_ks(self, track_b):
         ks_stats = np.zeros((len(self.CMP_LAYERS), self.width))
 
-        for i,l in enumerate(self.CMP_LAYERS):
-            for rf in range(self.width):
+        for i,l in enumerate(Track.CMP_LAYERS):
+            for j,rf in enumerate(self.ref_coords.index):
                 a = self[l,:,rf]
                 b = track_b[l,:,rf]
-                ks_stats[i,rf] = scipy.stats.ks_2samp(a,b,mode="asymp")[0]
+                ks = scipy.stats.mstats.ks_2samp(a,b,mode="asymp")
+                ks_stats[i][j] = ks[0]
 
         return ks_stats
 
@@ -550,12 +551,19 @@ class Track:
 
 def _load_track_arg(arg_track, conf_track, conf):                                       
     track = arg_track if arg_track is not None else conf_track                          
-    if isinstance(track, str):                                                          
+    if isinstance(track, str):
         return Track(track, conf=conf)                                                  
-    elif isinstance(track, Track):                                                      
-        return track                                                                    
+    elif isinstance(track, Track):
+        return track
     raise RuntimeError("Track must either be path to alignment track or Track instance")
 
+class CompareParams(config.ParamGroup):
+    _name = "compare"
+CompareParams._def_params(
+    ("track_a", None, None, "DTW Track A"),
+    ("track_b", None, None, "DTW Track B"),
+    ("subcmd", "ks", str, "Analysis to perform")
+)
 
 COMPARE_OPTS = (
     Opt("ref_bounds", "track", type=ref_coords),
@@ -565,17 +573,13 @@ COMPARE_OPTS = (
     #Opt(("-o", "--outfile"), type=str, default=None),
 )
 
-def compare(track_a=None, track_b=None, full_overlap=None, conf=None):
+#def compare(track_a=None, track_b=None, full_overlap=None, conf=None):
+def compare(*args, **kwargs):
     """Outputs a TSV file conaining Kolmogorov–Smirnov test statistics comparing the current and dwell time of two alignment tracks"""
+    conf, prms = config._init_group("compare", *args, **kwargs)
 
-    if conf is None:
-        conf = conf if conf is not None else Config()
-
-    if full_overlap is not None:
-        conf.browser.full_overlap = full_overlap
-
-    track_a = _load_track_arg(track_a, conf.track_a, conf)
-    track_b = _load_track_arg(track_b, conf.track_b, conf)
+    track_a = _load_track_arg(None, prms.track_a, conf)
+    track_b = _load_track_arg(None, prms.track_b, conf)
 
     ks_stats = np.recarray(
         track_a.width,
@@ -583,11 +587,11 @@ def compare(track_a=None, track_b=None, full_overlap=None, conf=None):
     )
 
     for i,l in enumerate(Track.CMP_LAYERS):
-        for rf in range(track_a.width):
+        for j,rf in enumerate(track_a.ref_coords.index):
             a = track_a[l,:,rf]
             b = track_b[l,:,rf]
             ks = scipy.stats.mstats.ks_2samp(a,b,mode="asymp")
-            ks_stats[rf][i] = ks[0]
+            ks_stats[j][i] = ks[0]
 
     return pd.DataFrame(
         ks_stats, 
