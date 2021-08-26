@@ -16,10 +16,11 @@ from sklearn.decomposition import PCA
 
 import matplotlib.pyplot as plt
 
-from . import ReadAln, RefCoord, LayerMeta, LAYER_META
+from .read_aln import ReadAln, RefCoord, LayerMeta, LAYER_META
 
 from ..pafstats import parse_paf, PafEntry
-from ..config import Config, Opt
+from ..config import Config
+from ..argparse import Opt
 from .. import nt, PoreModel, config, index 
 from ..index import load_index
 
@@ -144,7 +145,7 @@ class Track:
 
         self.set_ref_bounds(self.prms.ref_bounds)
 
-        if self.conf.align.mm2_paf is not None:
+        if self.conf.dtw.mm2_paf is not None:
             read_filter = set(self.conf.fast5_reader.read_filter)
 
         if not self.in_mem:
@@ -602,7 +603,7 @@ def compare(*args, **kwargs):
 METHOD_COMPARE_OPTS = (
     Opt("track_a", "browser"),
     Opt("track_b", "browser"),
-    #Opt(("-R", "--ref-bounds"), "align", type=ref_coords),
+    #Opt(("-R", "--ref-bounds"), "dtw", type=ref_coords),
     Opt(("-f", "--full-overlap"), "browser", action="store_true"),
 )
 

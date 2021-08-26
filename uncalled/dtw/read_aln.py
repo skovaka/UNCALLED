@@ -14,7 +14,8 @@ import copy
 import matplotlib.pyplot as plt
 
 from ..pafstats import parse_paf, PafEntry
-from ..config import Config, Opt
+from ..config import Config
+from ..argparse import Opt
 from .. import nt, PoreModel
 
 LayerMeta = namedtuple("LayerMeta", ["type", "label"])

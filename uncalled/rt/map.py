@@ -25,10 +25,10 @@
 import sys            
 import time
 
-from .index import check_prefix
-from .config import Opt, CONFIG_PARAM
-from .index import BWA_OPTS
-from .fast5 import FAST5_OPTS
+from ..index import check_prefix
+from ..argparse import Opt, CONFIG_PARAM
+from ..index import BWA_OPTS
+from ..fast5 import FAST5_OPTS
 from _uncalled import MapPoolOrd
 
 MAPPER_OPTS = (

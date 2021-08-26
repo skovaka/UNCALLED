@@ -30,6 +30,8 @@ import uncalled as unc
 from bisect import bisect_left, bisect_right
 from typing import NamedTuple
 from _uncalled import _RefIndex
+from .argparse import Opt
+from .config import ParamGroup
 
 class RefIndex(_RefIndex):
     pass
@@ -49,7 +51,7 @@ def load_index(prefix, load_pacseq=True, load_bwt=False, cache=True):
     return idx
 
 #Index parameter group
-class IndexParams(unc.config.ParamGroup):
+class IndexParams(ParamGroup):
     _name = "index"
 IndexParams._def_params(
     ("fasta_filename", None, str, "FASTA file to index"),
@@ -67,7 +69,6 @@ IndexParams._def_params(
     ("speeds", None, str, "Find parameters with specified speed coefficents (comma separated)"),
 )
 
-from uncalled.config import Opt
 BWA_OPTS = (
     Opt("bwa_prefix", "mapper"),
     Opt(("-p", "--idx-preset"), "mapper"),

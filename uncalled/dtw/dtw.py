@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 
 from ..pafstats import parse_paf
-from ..config import Config, ArgParser, ParamGroup, Opt
+from ..config import Config, ParamGroup
+from ..argparse import ArgParser, Opt 
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..sigproc import ProcRead
@@ -13,8 +14,8 @@ from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 
 from _uncalled._nt import KmerArray
 
-from .dotplot import Dotplot
-from . import PoreModel, BcFast5Aln, ReadAln, Track, RefCoord
+from .. import PoreModel
+from ..dtw import BcFast5Aln, ReadAln, Track, RefCoord
 
 #TODO make this better
 METHODS = {
@@ -24,7 +25,7 @@ METHODS = {
 }
 
 class AlignParams(ParamGroup):
-    _name = "align"
+    _name = "dtw"
 
 AlignParams._def_params(
     ("method", "GuidedBDTW", str, "DTW method"),
@@ -36,14 +37,14 @@ AlignParams._def_params(
 )
 
 OPTS = (Opt("index_prefix", "track"),) + FAST5_OPTS + (
-    Opt(("-m", "--mm2-paf"), "align", required=True),
-    Opt(("-o", "--out-path"), "align"),
+    Opt(("-m", "--mm2-paf"), "dtw", required=True),
+    Opt(("-o", "--out-path"), "dtw"),
     Opt(("-f", "--overwrite"), "track", action="store_true", help="Will overwrite alignment track if one already exists"),
     Opt("--rna", fn="set_r94_rna"),
     Opt(("-R", "--ref-bounds"), "track"),
-    Opt("--method", "align", choices=METHODS.keys()),
-    Opt(("-b", "--band-width"), "align"),
-    Opt(("-s", "--band-shift"), "align"),
+    Opt("--method", "dtw", choices=METHODS.keys()),
+    Opt(("-b", "--band-width"), "dtw"),
+    Opt(("-s", "--band-shift"), "dtw"),
     Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
 )
 
@@ -55,14 +56,14 @@ def main(conf):
 
     fast5s = Fast5Processor(conf=conf)
 
-    #if conf.align.out_path is not None:
+    #if conf.dtw.out_path is not None:
     #else:
     #    track = None
-    track = Track(conf.align.out_path, mode="w", conf=conf)
+    track = Track(conf.dtw.out_path, mode="w", conf=conf)
 
     mm2s = {p.qr_name : p
          for p in parse_paf(
-            conf.align.mm2_paf,
+            conf.dtw.mm2_paf,
             ref_bounds=conf.track.ref_bounds,
             full_overlap=conf.track.full_overlap,
     )}
@@ -80,11 +81,7 @@ def main(conf):
         if dtw.empty:
             continue
 
-        if conf.align.out_path is None:
-            dplt = Dotplot(track, conf=conf)
-            dplt.show(fast5_read=read)
-        else:
-            track.save_read(read.f5.filename)
+        track.save_read(read.f5.filename)
         
 
     if not track is None:
@@ -95,7 +92,7 @@ class GuidedDTW:
     #TODO do more in constructor using prms, not in main
     def __init__(self, track, read, paf, conf=None, **kwargs):
         self.conf = read.conf if conf is None else conf
-        self.prms = self.conf.align
+        self.prms = self.conf.dtw
 
         self.track = track
 

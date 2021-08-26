@@ -23,10 +23,8 @@ from ..sigproc import ProcRead
 
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
-from .align import GuidedDTW, BcFast5Aln
 from .dotplot import Dotplot
-
-from . import Track, ref_coords, LAYER_META
+from ..dtw.track import Track, ref_coords, LAYER_META
 
 CMAP = "viridis"
 #CMAP = "plasma"
@@ -47,7 +45,7 @@ BrowserParams._def_params(
 def comma_split(s):
     return s.split(",")
 
-from ..config import Opt
+from ..argparse import Opt
 OPTS = (
     Opt("ref_bounds", "track", type=ref_coords),
     Opt("track_a", "browser", type=str),

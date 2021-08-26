@@ -27,10 +27,10 @@ import sys
 import os
 import numpy as np
 
-from . import index
+from .. import index
 from .map import MAPPER_OPTS
-from .config import Opt, MutexOpts
-from . import ReadUntilClient
+from ..argparse import Opt, MutexOpts
+from .read_until import ReadUntilClient
 
 
 REALTIME_OPTS = (

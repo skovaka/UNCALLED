@@ -4,8 +4,8 @@ import sys
 import numpy as np
 import re
 import uncalled as unc
+from .argparse import Opt
 
-Opt = unc.config.Opt
 OPTS = (
     Opt("infile",  
         type = str, 

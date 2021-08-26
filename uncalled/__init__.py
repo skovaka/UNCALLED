@@ -9,11 +9,13 @@ from .__about__ import (
     __license__,  
     __copyright__,
 )
+
 from _uncalled import *
 
-from .read_until import ReadUntilClient
+from .rt import ReadUntilClient
 
-from .config import Config, ArgParser
+from .config import Config
+from .argparse import ArgParser
 from .fast5 import Fast5Reader
 from .index import RefIndex
 
@@ -21,8 +23,16 @@ from .pore_model import PoreModel
 from .sigproc import ProcRead
 
 from . import dtw
-from . import config
-from . import nt
+from . import vis
+#from . import 
 
 config._DEFAULTS = Config()
 config.rc = Config()
+
+
+#SUBCMDS = [
+#    dtw, dotplot, sigplot, browser, convert, 
+#    (compare, COMPARE_OPTS), 
+#    (method_compare, METHOD_COMPARE_OPTS),
+#    (refstats, REFSTATS_OPTS),
+#]

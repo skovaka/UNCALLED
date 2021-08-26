@@ -31,8 +31,8 @@ from collections import Counter
 
 from . import realtime
 from _uncalled import Simulator
-from .config import Opt
-from .index import BWA_OPTS
+from ..argparse import Opt
+from ..index import BWA_OPTS
 from .map import MAPPER_OPTS
 
 SAMP_RATE = 4000

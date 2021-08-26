@@ -13,10 +13,11 @@ import types
 
 from .. import nt, config
 
-from .align import Fast5Processor
+from ..dtw.dtw import Fast5Processor
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
-from . import RefCoord, Track, ref_coords, BcFast5Aln, method_compare_aln
+from ..dtw import RefCoord, Track, ref_coords, BcFast5Aln
+from ..dtw.track import  method_compare_aln
 
 from _uncalled import _RefIndex
 
@@ -39,7 +40,7 @@ SigplotParams._def_params(
 def comma_split(s):
     return s.split(",")
 
-from ..config import Opt
+from ..argparse import Opt
 OPTS = [
     Opt("tracks", "sigplot", type=str, nargs="+"),
     Opt(("-l", "--reads"), "sigplot", type=parse_read_ids),
@@ -50,7 +51,7 @@ OPTS = [
 ]
 
 def main(conf):
-    """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
+    """Plot dotplots of alignments from tracks produced by `dtw` or `convert`"""
     Sigplot(conf=conf).show()
     #if conf.out_prefix is None:
     #    d.show_all()

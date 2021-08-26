@@ -1,16 +1,4 @@
-"""DTW alignment and analysis methods"""
-
-from .read_aln import *
-from .track import *
-from .browser import Browser
-from .dotplot import Dotplot
-from .sigplot import Sigplot
-from . import align, convert #refstats #compare, 
-
-SUBCMDS = [
-    align, dotplot, sigplot, browser, convert, 
-    (compare, COMPARE_OPTS), 
-    (method_compare, METHOD_COMPARE_OPTS),
-    (refstats, REFSTATS_OPTS),
-]
-
+#from . import dtw, convert
+from .read_aln import ReadAln, RefCoord, LAYER_META, BcFast5Aln
+from .track import Track, ref_coords
+from .dtw import Fast5Processor #TODO move this to main module (eventually sigproc, then to C++)

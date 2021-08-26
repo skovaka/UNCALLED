@@ -15,17 +15,15 @@ import types
 import pandas as pd
 
 from ..sigproc import ProcRead
-from ..config import Config, ParamGroup, Opt
+from ..config import Config, ParamGroup
+from ..argparse import Opt
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
-from .dtw import Track, ref_coords
-from .align import GuidedDTW, BcFast5Aln
-from .dotplot import Dotplot
-from _uncalled import nt
+from ..dtw import Track, ref_coords
 
 #BWA_OPTS + 
 OPTS = (
-    Opt("ref_bounds", "align", type=ref_coords),
+    Opt("ref_bounds", "dtw", type=ref_coords),
     Opt("track_in", type=str),
     Opt(("-m", "--pore-model"), "mapper", default=None),
     Opt("--rna", fn="set_r94_rna"),

@@ -15,7 +15,8 @@ from .. import nt, config
 from ..sigproc import ProcRead
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
-from . import RefCoord, Track, ref_coords, BcFast5Aln, method_compare_aln
+from ..dtw.track import Track, RefCoord, ref_coords, method_compare_aln
+from ..dtw.read_aln import BcFast5Aln
 
 from _uncalled import _RefIndex
 
@@ -42,7 +43,7 @@ DotplotParams._def_params(
 def comma_split(s):
     return s.split(",")
 
-from ..config import Opt
+from ..argparse import Opt
 OPTS = [
     Opt("track_a", "dotplot", type=str),
     Opt("track_b", "dotplot", nargs="?", type=str),
@@ -55,7 +56,7 @@ OPTS = [
 ]
 
 def main(conf):
-    """Plot dotplots of alignments from tracks produced by `align` or `convert`"""
+    """Plot dotplots of alignments from tracks produced by `dtw` or `convert`"""
     matplotlib.use("TkAgg")
     d = Dotplot(conf=conf)
     _RefIndex.index_test(d.tracks[0].index)

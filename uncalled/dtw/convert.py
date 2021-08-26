@@ -9,7 +9,8 @@ from ont_fast5_api.fast5_interface import get_fast5_file
 import scipy.stats
 
 from . import ReadAln, Track, RefCoord
-from ..config import Config, ArgParser, ParamGroup, Opt
+from ..config import Config, ParamGroup
+from ..argparse import ArgParser, Opt
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..index import BWA_OPTS
 from .. import nt, PoreModel
@@ -17,7 +18,7 @@ from .. import nt, PoreModel
 import progressbar as progbar
 
 CONVERT_OPTS = (Opt("index_prefix", "track"),) + FAST5_OPTS + (
-    Opt(("-m", "--mm2-paf"), "align", required=True),
+    Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt("--rna", fn="set_r94_rna"),
     Opt(("-R", "--ref-bounds"), "track", type=RefCoord),
     Opt(("-f", "--overwrite"), "track", action="store_true"),
