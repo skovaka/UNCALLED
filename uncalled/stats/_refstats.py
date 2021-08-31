@@ -19,7 +19,7 @@ from ..dtw.track import _load_tracks
 class RefstatsParams(config.ParamGroup):
     _name = "refstats"
 RefstatsParams._def_params(
-    ("layers", ["current", "dwell"], list, "Statistics to compute and/or layers to compute summary statistics of for each reference position"),
+    ("layers", ["current", "dwell"], list, "Layers over which to compute summary statistics"),
     ("stats", ["mean"], list, "Summary statistics to compute for layers specified in \"stats\""),
     ("tracks", None, None, "DTW Alignment Track(s)"),
 )
@@ -32,8 +32,6 @@ OPTS = (
 )
 
 class _Refstats:
-
-
     LAYER_STATS = {"cov", "min", "max", "mean", "stdv", "var", "skew", "kurt"}
     COMPARE_STATS = {"ks"}
     ALL_STATS = LAYER_STATS | COMPARE_STATS

@@ -475,7 +475,6 @@ class Track:
 
         return ks_stats
 
-
     def calc_pca(self, layer, ref_start, ref_end, n_components=2):
         x = self[layer,:,ref_start:ref_end].T
         pc = PCA(n_components=n_components).fit_transform(x)
@@ -524,7 +523,8 @@ class Track:
     def pa_diff(self):
         return self.mat[self.PA_DIFF_LAYER]
 
-def _load_tracks(tracks, conf):
+#TODO turn into "TrackIO"
+def _load_tracks(tracks, conf, force_list=False):
 
     is_list = isinstance(tracks, list)
     if not is_list:
@@ -538,7 +538,7 @@ def _load_tracks(tracks, conf):
         elif not isinstance(track, Track):
             raise RuntimeError("Track must either be path to alignment track or Track instance")
         
-        if is_list:
+        if is_list or force_list:
             ret.append(track)
         else:
             return track

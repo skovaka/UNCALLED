@@ -44,7 +44,7 @@ class _Dtwstats:
             tracks = [tracks]
 
         if not isinstance(prms.stats, list):
-            prms.stats = [stats]
+            prms.stats = [prms.stats]
         
         layer_stats = [s for s in prms.stats if s in self.LAYER_STATS]
         compare_stats = [s for s in prms.stats if s in self.COMPARE_STATS]
@@ -115,5 +115,4 @@ dtwstats = _Dtwstats()
 
 def main(*args, **argv):
     """Outputs statistics for each reference position over one or more tracks"""
-    layer = dtwstats(*args, **argv)
-    print(df.to_csv(sep="\t"))
+    print(dtwstats(*args, **argv))
