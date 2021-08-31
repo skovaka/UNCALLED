@@ -296,9 +296,6 @@ class Track:
     def set_layers(self, layers):
         if layers is not None:
             self.prms.layers = layers
-        self.layers_split = [
-            tuple(l.split(".")) if "." in l else ("aln", l) 
-            for l in self.prms.layers]
         self.layer_idxs = {layer : i for i,layer in enumerate(self.prms.layers)}
 
     #TODO parse mm2 every time to enable changing bounds
@@ -387,6 +384,10 @@ class Track:
             )
 
         return mat
+
+    def add_layer(self, name, mat):
+        self.mat = np.ma.concatenate([self.mat, [mat]])
+        self.set_layers(self.prms.layers + [name])
 
     def get_pileup(self, layer):
         return np.flip(np.sort(self[layer], axis=0), axis=0)
