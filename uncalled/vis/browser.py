@@ -42,10 +42,7 @@ BrowserParams._def_params(
     }, dict, "Plotting style options")
 )
 
-def comma_split(s):
-    return s.split(",")
-
-from ..argparse import Opt
+from ..argparse import Opt, comma_split
 OPTS = (
     Opt("ref_bounds", "track", type=ref_coords),
     Opt("track_a", "browser", type=str),

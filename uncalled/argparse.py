@@ -39,6 +39,21 @@ FAST5_PARAM = "fast5_files"
 CONFIG_PARAM = "config_toml"
 SPECIAL_PARAMS = {FAST5_PARAM, CONFIG_PARAM}
 
+def comma_split(s):
+    return s.split(",")
+ 
+def ref_coords(coord_str):             
+    spl = coord_str.split(":")         
+    ch = spl[0]                        
+    st,en = spl[1].split("-")          
+                                       
+    coord = (ch, int(st), int(en))     
+                                       
+    if len(spl) == 2:                  
+        return coord                   
+    else:                              
+        return coord + (spl[2] == "+",)
+
 class ArgParser:
     def __init__(self, 
             subcmds=None, 
@@ -74,7 +89,7 @@ class ArgParser:
                 opts = getattr(subcmd, "OPTS", None)
                 main_func = getattr(subcmd, "main", None)
 
-            subcmd_name = subcmd.__name__.split(".")[-1]
+            subcmd_name = subcmd.__name__.split(".")[-1].strip("_")
 
             if main_func is not None:
                 desc = main_func.__doc__

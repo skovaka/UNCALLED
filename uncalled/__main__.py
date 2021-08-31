@@ -10,14 +10,14 @@ from . import index, pafstats
 from .rt import realtime, map, sim
 from .dtw import dtw, convert
 from .vis import browser, dotplot, sigplot
-from .stats import refstats, dtwstats
+from .stats import _refstats, dtwstats
 
 SUBCMDS = [
     index, 
     realtime, map, sim, pafstats,
     dtw, convert,
     browser, dotplot, sigplot,
-    #refstats, dtwstats
+    _refstats#, dtwstats
 ]
 #    (compare, COMPARE_OPTS), 
 #    (method_compare, METHOD_COMPARE_OPTS),

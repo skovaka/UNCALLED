@@ -24,7 +24,7 @@ from .sigproc import ProcRead
 
 from . import dtw
 from . import vis
-#from . import 
+from . import stats 
 
 config._DEFAULTS = Config()
 config.rc = Config()

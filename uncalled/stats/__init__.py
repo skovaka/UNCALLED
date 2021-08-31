@@ -1,1 +1,1 @@
-from . import refstats, dtwstats
+from ._refstats import refstats

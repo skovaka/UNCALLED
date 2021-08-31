@@ -19,8 +19,7 @@ import matplotlib.pyplot as plt
 from .read_aln import ReadAln, RefCoord, LayerMeta, LAYER_META
 
 from ..pafstats import parse_paf, PafEntry
-from ..config import Config
-from ..argparse import Opt
+from ..argparse import Opt, ref_coords
 from .. import nt, PoreModel, config, index 
 from ..index import load_index
 
@@ -35,18 +34,6 @@ LAYER_META.update({
     "model_diff" : LayerMeta(float, "Model pA Difference"),
     "bcerr"      : LayerMeta(float, "BC Alignment Errors")
 })
- 
-def ref_coords(coord_str):             
-    spl = coord_str.split(":")         
-    ch = spl[0]                        
-    st,en = spl[1].split("-")          
-                                       
-    coord = (ch, int(st), int(en))     
-                                       
-    if len(spl) == 2:                  
-        return coord                   
-    else:                              
-        return coord + (spl[2] == "+",)
 
 class TrackParams(config.ParamGroup):
     _name = "track"
@@ -331,20 +318,6 @@ class Track:
 
         ##TODO make index take RefCoord (combine with RefLoc)
         self.set_ref_bounds(self.prms.ref_bounds)
-
-        #self.ref_coords = pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1)
-        #self._refmirs = list()
-        #self._kmers = list()
-        #for fwd in [False, True]:
-        #    start,end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end-nt.K+1, fwd, self.conf.is_rna)
-        #    r = pd.RangeIndex(start, end)
-        #    k = self.index.get_kmers(r.start, r.stop, fwd)
-        #    if fwd == self.conf.is_rna:
-        #        r = r[::-1]
-        #        k = k[::-1]
-        #    self._refmirs.append(r)
-        #    self._kmers.append(k)
-        #print(self._kmers) 
         
         self.ref_coords = pd.Series(
                 np.arange(self.width, dtype=int),
@@ -550,6 +523,26 @@ class Track:
     def pa_diff(self):
         return self.mat[self.PA_DIFF_LAYER]
 
+def _load_tracks(tracks, conf):
+
+    is_list = isinstance(tracks, list)
+    if not is_list:
+        tracks = [tracks]
+    else:
+        ret = list()
+    
+    for track in tracks:
+        if isinstance(track, str):
+            track = Track(track, conf=conf)
+        elif not isinstance(track, Track):
+            raise RuntimeError("Track must either be path to alignment track or Track instance")
+        
+        if is_list:
+            ret.append(track)
+        else:
+            return track
+    return ret
+
 def _load_track_arg(arg_track, conf_track, conf):                                       
     track = arg_track if arg_track is not None else conf_track                          
     if isinstance(track, str):
@@ -609,7 +602,7 @@ METHOD_COMPARE_OPTS = (
 
 def method_compare(track_a=None, track_b=None, full_overlap=None, conf=None):
     if conf is None:
-        conf = conf if conf is not None else Config()
+        conf = conf if conf is not None else config.Config()
     if full_overlap is not None:
         conf.browser.full_overlap = full_overlap
     track_a = _load_track_arg(track_a, conf.browser.track_a, conf)
@@ -674,7 +667,7 @@ def refstats(
         conf=None):
 
     if conf is None:
-        conf = conf if conf is not None else Config()
+        conf = conf if conf is not None else config.Config()
     if full_overlap is not None:
         conf.browser.full_overlap = full_overlap
     track = _load_track_arg(track, getattr(conf, "track_in", None), conf)

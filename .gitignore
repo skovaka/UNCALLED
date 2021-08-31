@@ -5,6 +5,5 @@
 build
 dist
 bin
-uncalled/__pycache__
-uncalled/dtw/__pycache__
+uncalled/**/__pycache__
 uncalled.egg-info
