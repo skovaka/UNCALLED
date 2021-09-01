@@ -187,8 +187,8 @@ class Dotplot:
         ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, c="black")
         ax.step(aln.aln['start'], model_current, color='white', linewidth=2, where="post")
 
-        skips = aln.aln[np.diff(aln.aln.start, append=-1)==0].index
-        ax.vlines(aln.aln.loc[skips, "start"]-1, ymin, ymax, colors="red", linestyles="dashed", linewidth=3)
+        #skips = aln.aln[np.diff(aln.aln.start, append=-1)==0].index
+        #ax.vlines(aln.aln.loc[skips, "start"]-1, ymin, ymax, colors="red", linestyles="dashed", linewidth=3)
 
 
     def _plot_aln(self, i):

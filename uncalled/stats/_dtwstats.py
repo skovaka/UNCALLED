@@ -12,7 +12,7 @@ from .. import config
 from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split, ref_coords
 from ..index import BWA_OPTS
-from ..fast5 import Fast5Reader
+from ..fast5 import parse_read_ids
 from ..dtw import Track, ref_coords, LAYER_META
 from ..dtw.track import _load_tracks
 
@@ -28,16 +28,19 @@ OPTS = (
     Opt("stats", "dtwstats", type=comma_split),
     Opt("tracks", "dtwstats", nargs="+", type=str),
     Opt(("-R", "--ref-bounds"), "track", type=ref_coords, required=True),
+    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
 )
 
 class _Dtwstats:
-    LAYER_STATS = {"model_diff", "dwell"}
+    LAYER_STATS = set(LAYER_META.keys())
     COMPARE_STATS = {"overlap"}
     ALL_STATS = LAYER_STATS | COMPARE_STATS
 
     def __call__(self, *args, **kwargs):
         conf, prms = config._init_group("dtwstats", *args, **kwargs)
         
+        conf.track.layers = prms.stats
+
         tracks = _load_tracks(prms.tracks, conf)
 
         if not isinstance(tracks, list):
@@ -61,16 +64,20 @@ class _Dtwstats:
         for stat in layer_stats:
             for track in tracks:
                 name = ".".join([os.path.basename(track.prms.path), stat])
-                fn = getattr(self, stat)
+                fn = getattr(self, stat, None)
+                if fn is None:
+                    continue
                 mat = fn(track, prms.store)
                 layers[name] = mat
 
         for stat in compare_stats:
-            fn = getattr(self, stat)
+            fn = getattr(self, stat, None)
+            if fn is None:
+                continue
             mat = fn(*tracks, prms.store)
             layers[stat] = mat
                 
-        return layers
+        return tracks #layers
 
     @staticmethod
     def _add_layer(track, name, layer, store):
@@ -113,6 +120,17 @@ class _Dtwstats:
 
 dtwstats = _Dtwstats()
 
-def main(*args, **argv):
+def main(conf):
     """Outputs statistics for each reference position over one or more tracks"""
-    print(dtwstats(*args, **argv))
+    tracks = dtwstats(conf=conf)
+
+    layers = conf.dtwstats.stats
+
+    for track in tracks:
+        print("#" + track.prms.path)
+        for i, read_id in enumerate(track.reads["id"]):
+            print("##" + read_id)
+            for j in track.ref_coords.index:
+                for layer in layers:
+                    sys.stdout.write("%.3f\t"%track[layer,i,j])
+                sys.stdout.write("\n")

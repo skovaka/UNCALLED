@@ -17,7 +17,7 @@ SUBCMDS = [
     realtime, map, sim, pafstats,
     dtw, convert,
     browser, dotplot, sigplot,
-    _refstats, _readstats
+    _refstats, _readstats, _dtwstats
 ]
 #    (compare, COMPARE_OPTS), 
 #    (method_compare, METHOD_COMPARE_OPTS),
