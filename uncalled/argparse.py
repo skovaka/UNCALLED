@@ -54,6 +54,9 @@ def ref_coords(coord_str):
     else:                              
         return coord + (spl[2] == "+",)
 
+class Formatter(argparse.ArgumentDefaultsHelpFormatter,argparse.RawDescriptionHelpFormatter):
+    pass
+
 class ArgParser:
     def __init__(self, 
             subcmds, 
@@ -100,7 +103,7 @@ class ArgParser:
 
             sp = subparsers.add_parser(
                 subcmd_name, prog=" ".join([__title__, subcmd_name]), 
-                description=desc, formatter_class=argparse.ArgumentDefaultsHelpFormatter
+                description=desc, formatter_class=Formatter
             )
 
             if main_func is not None:

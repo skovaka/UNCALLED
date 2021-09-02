@@ -22,6 +22,8 @@ SUBCMDS = [
 _help_lines = [
     "Utility for Nanopore Read ALignment to Large Expanses of DNA", "",
     "subcommand options:",
+    "General:",
+    "\tindex      " + index.main.__doc__.split(".")[0],"",
     "Real-Time Enrichment (ReadUntil/Adaptive Sampling):",
     "\trealtime   " + realtime.main.__doc__,
     "\tmap        " + map.main.__doc__,

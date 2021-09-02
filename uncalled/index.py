@@ -90,7 +90,9 @@ OPTS = (
 )
 
 def main(conf):
-    """Builds an UNCALLED index from a FASTA reference"""
+    """Build an index from a FASTA reference"""
+        
+#       Uses BWA to generate pacseq and FM index files, then computes reference-specific probability thresholds. The FM index and probability thresholds are only required for Real-Time Enrichment subcommands (see --no-bwt if only interested in DTW analysis)"""
 
     prms = conf.index
 
