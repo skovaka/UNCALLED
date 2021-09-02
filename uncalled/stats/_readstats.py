@@ -20,7 +20,7 @@ from ..dtw.track import _load_tracks
 class ReadstatsParams(config.ParamGroup):
     _name = "readstats"
 ReadstatsParams._def_params(
-    ("stats", ["mean"], None, "Which statistics to compute and output"),
+    ("stats", ["model_diff"], None, "Which statistics to compute and output"),
     ("tracks", None, None, "DTW Alignment Track(s)"),
     ("pca_layer", "current", str, "Which statistics to use for PCA"),
     ("pca_components", 2, int, "Number of principle components to output for the \"pca\" command."),
@@ -110,6 +110,6 @@ class _Readstats:
 readstats = _Readstats()
 
 def main(*args, **argv):
-    """Outputs statistics for each reference position over one or more tracks"""
+    """Perform per-read analyses of DTW alignments"""
     df = readstats(*args, **argv)
     print(df.to_csv(sep="\t"))

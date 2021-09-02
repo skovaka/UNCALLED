@@ -56,8 +56,8 @@ def ref_coords(coord_str):
 
 class ArgParser:
     def __init__(self, 
-            subcmds=None, 
-            desc="Rapidly maps raw nanopore signal to DNA references",
+            subcmds, 
+            desc,
             config=None):
 
         if config is None:
@@ -70,16 +70,18 @@ class ArgParser:
 
         self.parser = argparse.ArgumentParser(
                 description=desc, 
-                formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                prog=__title__
+                #formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                formatter_class=argparse.RawDescriptionHelpFormatter,
+                prog=__title__,
+                usage="%(prog)s [subcommand] [-h] [-v]"
         )
 
         self.parser.add_argument("-v", "--version", action="version", version=__version__)
 
-        self._add_subcmds(self.parser, subcmds)
+        self._add_subcmds(self.parser, subcmds, None)
 
-    def _add_subcmds(self, parser, subcmds):
-        subparsers = parser.add_subparsers(title="subcommands")
+    def _add_subcmds(self, parser, subcmds, desc=None):
+        subparsers = parser.add_subparsers(title="Subcommands", description=desc, help=argparse.SUPPRESS)
         for subcmd in subcmds:
 
             if isinstance(subcmd, tuple):
@@ -97,8 +99,8 @@ class ArgParser:
                 desc = subcmd.__doc__
 
             sp = subparsers.add_parser(
-                subcmd_name, help=desc, 
-                formatter_class=argparse.ArgumentDefaultsHelpFormatter
+                subcmd_name, prog=" ".join([__title__, subcmd_name]), 
+                description=desc, formatter_class=argparse.ArgumentDefaultsHelpFormatter
             )
 
             if main_func is not None:
@@ -110,7 +112,7 @@ class ArgParser:
                         self._add_mutex_opts(subcmd_name, sp, opt)
 
             elif hasattr(subcmd, "SUBCMDS"):
-                self._add_subcmds(sp, subcmd.SUBCMDS)
+                self._add_subcmds(sp, subcmd.SUBCMDS, desc)
 
             else:
                 raise RuntimeError("Subcommand module \"%s\" does not contain \"main\" function or \"SUBCMDS\" list" % subcmd.__name__)
@@ -176,12 +178,13 @@ class ArgParser:
         self.parser.print_help()
 
 class Opt:
-    def __init__(self, args, group_name=None, param=None, fn=None, **kwargs):
+    def __init__(self, args, group_name=None, param=None, fn=None, help_suffix=None, **kwargs):
         self.args = args if type(args) == tuple else (args,)
 
         self.group_name = group_name
         self.param = param
         self.fn = fn
+        self.help_suffix = help_suffix
         
         self.has_fn = fn is not None
         self.has_dest = group_name is not None
@@ -223,13 +226,15 @@ class Opt:
             param_name = flag_to_var(self.args[-1])
 
         default = getattr(group, param_name)
-        doc = getattr(type(group), param_name).__doc__
 
         if hasattr(group, "_types"):
             _type = getattr(group, "_types")[param_name]
         else:
             _type = type(default)
 
+        doc = getattr(type(group), param_name).__doc__
+        if self.help_suffix != None:
+            doc = doc + self.help_suffix
         kwargs = {"help" : doc}
 
         if _type != bool:

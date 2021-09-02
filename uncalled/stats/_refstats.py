@@ -21,15 +21,9 @@ class RefstatsParams(config.ParamGroup):
 RefstatsParams._def_params(
     ("layers", ["current", "dwell"], list, "Layers over which to compute summary statistics"),
     ("stats", ["mean"], list, "Summary statistics to compute for layers specified in \"stats\""),
-    ("tracks", None, None, "DTW Alignment Track(s)"),
+    ("tracks", None, None, "DTW alignment tracks"),
 )
 
-OPTS = (
-    Opt("layers", "refstats", type=comma_split),
-    Opt("stats", "refstats", type=comma_split),
-    Opt("tracks", "refstats", nargs="+", type=str),
-    Opt(("-R", "--ref-bounds"), "track", type=ref_coords, required=True),
-)
 
 class _Refstats:
     LAYER_STATS = {"cov", "min", "max", "mean", "stdv", "var", "skew", "kurt"}
@@ -115,7 +109,16 @@ class _Refstats:
 
 refstats = _Refstats()
 
+OPTS = (
+    Opt("layers", "refstats", type=comma_split,
+        help="Comma-separated list of layers over which to compute summary statistics {%s}" % ",".join(LAYER_META.keys())),
+    Opt("stats", "refstats", type=comma_split,
+        help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(_Refstats.ALL_STATS)),
+    Opt("tracks", "refstats", nargs="+", type=str),
+    Opt(("-R", "--ref-bounds"), "track", type=ref_coords, required=True),
+)
+
 def main(*args, **argv):
-    """Outputs statistics for each reference position over one or more tracks"""
+    """Summarize and compare DTW stats over reference coordinates"""
     df = refstats(*args, **argv)
     print(df.to_csv(sep="\t"))

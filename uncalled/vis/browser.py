@@ -52,7 +52,7 @@ OPTS = (
 )
 
 def main(conf):
-    """Plot, analyze, and compare dtw alignment tracks interactively or to SVG"""
+    """Display interactive signal-based genome browser"""
 
     matplotlib.use("TkAgg")
     browser = Browser(conf=conf)

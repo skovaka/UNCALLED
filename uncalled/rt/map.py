@@ -49,7 +49,7 @@ MAPPER_OPTS = (
 OPTS = BWA_OPTS + FAST5_OPTS + MAPPER_OPTS
 
 def main(conf):
-    """Map fast5 files to a DNA reference"""
+    """Rapidly map fast5 read signal to a reference"""
     check_prefix(conf.bwa_prefix)
 
     mapper = MapPoolOrd(conf)

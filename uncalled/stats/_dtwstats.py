@@ -13,51 +13,46 @@ from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split, ref_coords
 from ..index import BWA_OPTS
 from ..fast5 import parse_read_ids
-from ..dtw import Track, ref_coords, LAYER_META
+from ..dtw import LAYER_META
 from ..dtw.track import _load_tracks
 
 class DtwstatsParams(config.ParamGroup):
     _name = "dtwstats"
 DtwstatsParams._def_params(
-    ("stats", ["model_diff"], list, "Which statistics to compute as new track layers"),
-    ("tracks", None, None, "DTW Alignment Track(s)"),
-    ("store", True, bool, "Will store layer in track, otherwise just return new layer"),
+    ("layers", ["model_diff"], None, "Which layers to retrieve or compute"),
+    ("tracks", None, None, "DTW alignment tracks"),
+    #("store", True, bool, "Will store layer in track, otherwise just return new layer"),
 )
 
-OPTS = (
-    Opt("stats", "dtwstats", type=comma_split),
-    Opt("tracks", "dtwstats", nargs="+", type=str),
-    Opt(("-R", "--ref-bounds"), "track", type=ref_coords, required=True),
-    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
-)
 
 class _Dtwstats:
-    LAYER_STATS = set(LAYER_META.keys())
-    COMPARE_STATS = {"overlap"}
-    ALL_STATS = LAYER_STATS | COMPARE_STATS
+    LAYERS = set(LAYER_META.keys())
+    #COMPARE_STATS = {"cmp"}
+    #ALL_STATS = LAYER_STATS | COMPARE_STATS
 
     def __call__(self, *args, **kwargs):
         conf, prms = config._init_group("dtwstats", *args, **kwargs)
         
-        conf.track.layers = prms.stats
+        conf.track.layers = prms.layers
 
         tracks = _load_tracks(prms.tracks, conf)
 
         if not isinstance(tracks, list):
             tracks = [tracks]
 
-        if not isinstance(prms.stats, list):
-            prms.stats = [prms.stats]
+        if not isinstance(prms.layers, list):
+            prms.layers = [prms.layers]
         
-        layer_stats = [s for s in prms.stats if s in self.LAYER_STATS]
-        compare_stats = [s for s in prms.stats if s in self.COMPARE_STATS]
+        layer_stats = [s for s in prms.layers if s in self.LAYERS]
+        #compare_stats = [s for s in prms.layers if s in self.COMPARE_STATS]
 
-        if len(layer_stats) + len(compare_stats) != len(prms.stats):
-            bad_stats = [s for s in prms.stats if s not in self.ALL_STATS]
-            raise ValueError("Unknown stats: " + ", ".join(bad_stats))
+        #if len(layer_stats) + len(compare_stats) != len(prms.layers):
+        if len(layer_stats) != len(prms.layers):
+            bad_stats = [s for s in prms.layers if s not in self.LAYERS]
+            raise ValueError("Unknown layers: " + ", ".join(bad_stats))
 
-        if len(compare_stats) > 0 and len(tracks) != 2:
-            raise ValueError("\"%s\" stats can only be computed using exactly two tracks" % "\", \"".join(cmp_stats))
+        #if len(compare_stats) > 0 and len(tracks) != 2:
+        #    raise ValueError("\"%s\" layers can only be computed using exactly two tracks" % "\", \"".join(cmp_stats))
 
         layers = dict()
 
@@ -67,15 +62,14 @@ class _Dtwstats:
                 fn = getattr(self, stat, None)
                 if fn is None:
                     continue
-                mat = fn(track, prms.store)
-                layers[name] = mat
+                fn(track)
 
-        for stat in compare_stats:
-            fn = getattr(self, stat, None)
-            if fn is None:
-                continue
-            mat = fn(*tracks, prms.store)
-            layers[stat] = mat
+        #for stat in compare_stats:
+        #    fn = getattr(self, stat, None)
+        #    if fn is None:
+        #        continue
+        #    mat = fn(*tracks, prms.store)
+        #    layers[stat] = mat
                 
         return tracks #layers
 
@@ -111,26 +105,31 @@ class _Dtwstats:
     #    #    lambda self,a: a.id),
     #    "kmer" : (
     #        lambda self,a: self.load_aln_kmers(a)),
-    #    "current" : (
-    #        lambda self,a: a.aln["current"]),
     #    "dwell" : (
     #        lambda self,a: 1000 * a.aln['length'] / self.conf.read_buffer.sample_rate),
     #    "model_diff" : (
     #    "bcerr" : get_bcerr_layer,
 
+OPTS = (
+    Opt("layers", "dtwstats", type=comma_split, 
+        help="Comma-separated list of which layers to retrieve or compute {%s}" % ",".join(_Dtwstats.LAYERS)),
+    Opt("tracks", "dtwstats", nargs="+", type=str),
+    Opt(("-R", "--ref-bounds"), "track", type=ref_coords, required=True),
+    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
+)
+
 dtwstats = _Dtwstats()
 
 def main(conf):
-    """Outputs statistics for each reference position over one or more tracks"""
-    tracks = dtwstats(conf=conf)
+    """Output DTW alignment paths, statistics, and comparisons"""
 
-    layers = conf.dtwstats.stats
+    tracks = dtwstats(conf=conf)
 
     for track in tracks:
         print("#" + track.prms.path)
         for i, read_id in enumerate(track.reads["id"]):
             print("##" + read_id)
             for j in track.ref_coords.index:
-                for layer in layers:
+                for layer in conf.dtwstats.layers:
                     sys.stdout.write("%.3f\t"%track[layer,i,j])
                 sys.stdout.write("\n")

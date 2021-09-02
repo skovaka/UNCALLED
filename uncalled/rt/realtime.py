@@ -51,7 +51,7 @@ OPTS = index.BWA_OPTS + MAPPER_OPTS + (
 ) + REALTIME_OPTS
 
 def main(config, client=None):
-    """Perform real-time targeted (ReadUntil) sequencing"""
+    """Perform real-time targeted sequencing"""
 
     index.check_prefix(config.bwa_prefix)
 

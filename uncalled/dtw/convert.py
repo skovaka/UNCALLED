@@ -1,4 +1,4 @@
-"""Converts tombo or nanopolish alignments to uncalled DTW track format"""
+"""Import DTW alignments produced by other tools"""
 
 import sys, os
 import numpy as np

@@ -56,7 +56,7 @@ OPTS = [
 ]
 
 def main(conf):
-    """Plot dotplots of alignments from tracks produced by `dtw` or `convert`"""
+    """Plot dotplots of individual DTW alignments"""
     matplotlib.use("TkAgg")
     d = Dotplot(conf=conf)
     _RefIndex.index_test(d.tracks[0].index)

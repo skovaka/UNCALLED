@@ -61,7 +61,7 @@ OPTS = BWA_OPTS + (
 ) + MAPPER_OPTS
 
 def main(config):
-    """Simulate real-time targeted sequencing."""
+    """Simulate real-time targeted sequencing"""
     client = Simulator(config)
     load_sim(client, config)
 

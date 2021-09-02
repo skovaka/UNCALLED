@@ -202,7 +202,7 @@ def paf_ref_compare(qry, ref, ret_qry=True, check_locs=True, ext=1.5):
 
 
 def main(conf):
-    """Computes speed and accuracy of UNCALLED mappings."""
+    """Estimate speed and accuracy from an Uncalled PAF file"""
     locs = [p for p in parse_paf(conf.infile, max_reads=conf.max_reads)]
 
     num_mapped = sum([p.is_mapped for p in locs])

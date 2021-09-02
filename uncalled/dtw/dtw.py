@@ -49,7 +49,7 @@ OPTS = (Opt("index_prefix", "track"),) + FAST5_OPTS + (
 )
 
 def main(conf):
-    """Performs DTW alignment and either outputs as alignment Track or displays dotplots"""
+    """Perform DTW alignment guided by basecalled alignments"""
     conf.fast5_reader.load_bc = True
     conf.proc_read.detect_events = True
     conf.export_static()

@@ -51,7 +51,7 @@ OPTS = [
 ]
 
 def main(conf):
-    """Plot dotplots of alignments from tracks produced by `dtw` or `convert`"""
+    """Plot read signal annotated by DTW alignments"""
     Sigplot(conf=conf).show()
     #if conf.out_prefix is None:
     #    d.show_all()
