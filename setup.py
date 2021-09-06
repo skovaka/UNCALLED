@@ -145,6 +145,7 @@ requires=[
     'matplotlib>=3.3.4',
     'scipy>=1.5.4',
     'toml>=0.10.2',
+    'ont_fast5_api',
     'h5py'
 ],
 
