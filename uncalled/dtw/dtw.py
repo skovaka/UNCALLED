@@ -96,9 +96,9 @@ class GuidedDTW:
 
         self.track = track
 
-        #paf_st, paf_en = self.track.index.ref_to_refmir(
+        #paf_st, paf_en = self.track.index.ref_to_mref(
         #    paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd, self.conf.is_rna)
-        #refmirs = pd.RangeIndex(paf_st+nt.K-1, paf_en)
+        #mrefs = pd.RangeIndex(paf_st+nt.K-1, paf_en)
 
         ref_bounds = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
         if not self.track.init_read_aln(read.id, ref_bounds):
@@ -106,14 +106,14 @@ class GuidedDTW:
 
         self.ref_kmers = self.track.load_aln_kmers(store=False)
 
-        self.bcaln = BcFast5Aln(self.track.index, read, paf, self.track.read_aln.refmirs)
+        self.bcaln = BcFast5Aln(self.track.index, read, paf, self.track.read_aln.mrefs)
         if self.bcaln.empty:
             self.empty = True
             return
 
         if self.bcaln.errs is not None:
-            bcerr = self.bcaln.errs[["refmir", "type", "seq"]]#.dropna()
-            bcerr.set_index("refmir", drop=True, inplace=True)
+            bcerr = self.bcaln.errs[["mref", "type", "seq"]]#.dropna()
+            bcerr.set_index("mref", drop=True, inplace=True)
             bcerr["type"].astype("category", copy=False)
             bcerr = bcerr[~bcerr.index.duplicated(keep="first")]
             self.track.read_aln.set_bcerr(bcerr.sort_index())
@@ -159,36 +159,36 @@ class GuidedDTW:
             samp_st = bc.loc[st,'sample']
             samp_en = bc.loc[en-1,'sample']
 
-            refmir_st = st#+nt.K-1#bc.loc[st,"refmir"]+nt.K-1
-            refmir_en = en+1#bc.loc[en-1,"refmir"]+1
+            mref_st = st#+nt.K-1#bc.loc[st,"mref"]+nt.K-1
+            mref_en = en+1#bc.loc[en-1,"mref"]+1
 
             read_block = self.read.sample_range(samp_st, samp_en)
 
             block_signal = read_block['norm_sig'].to_numpy()
-            block_kmers = self.ref_kmers.loc[refmir_st:refmir_en]
+            block_kmers = self.ref_kmers.loc[mref_st:mref_en]
 
-            args = self._get_dtw_args(bc, read_block, refmir_st, block_kmers)
+            args = self._get_dtw_args(bc, read_block, mref_st, block_kmers)
 
             dtw = self.dtw_fn(*args)
 
             path = np.flip(dtw.path)
             #TODO shouldn't need to clip, error in bdtw
             path_qrys.append(read_block.index[np.clip(path['qry'], 0, len(read_block))])
-            path_refs.append(refmir_st + path['ref'])
+            path_refs.append(mref_st + path['ref'])
 
             if hasattr(dtw, "ll"):
                 band_blocks.append(
-                    self._ll_to_df(dtw.ll, read_block, refmir_st, len(block_kmers))
+                    self._ll_to_df(dtw.ll, read_block, mref_st, len(block_kmers))
                 )
 
-        df = pd.DataFrame({'refmir': np.concatenate(path_refs)}, 
+        df = pd.DataFrame({'mref': np.concatenate(path_refs)}, 
                                index = np.concatenate(path_qrys),
                                dtype='Int32') \
                   .join(self.read.df) \
                   .drop(columns=['mean', 'stdv', 'mask'], errors='ignore') \
                   .rename(columns={'norm_sig' : 'current'})
 
-        #df['kmer'] = self.ref_kmers.loc[df['refmir']].to_numpy()
+        #df['kmer'] = self.ref_kmers.loc[df['mref']].to_numpy()
 
         self.track.read_aln.set_subevent_aln(df, True)
 
@@ -199,7 +199,7 @@ class GuidedDTW:
         else:
             self.track.read_aln.bands = pd.DataFrame(band_blocks[0])
 
-    def _get_dtw_args(self, bc, read_block, refmir_start, ref_kmers):
+    def _get_dtw_args(self, bc, read_block, mref_start, ref_kmers):
         common = (
             read_block['norm_sig'].to_numpy(), 
             nt.kmer_array(ref_kmers), 
@@ -220,7 +220,7 @@ class GuidedDTW:
                 band_lls.append( (int(q+shift), int(r-shift)) )
 
                 tgt = starts[q] if q < len(starts) else starts[-1]
-                if r <= tgt - refmir_start:
+                if r <= tgt - mref_start:
                     r += 1
                 else:
                     q += 1

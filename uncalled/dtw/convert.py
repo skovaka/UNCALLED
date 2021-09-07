@@ -148,11 +148,11 @@ def tombo(conf):
             currents = lr.slope * currents + lr.intercept
 
             track.read_aln.set_aln(pd.DataFrame({
-                "refmirs"    : track.read_aln.refmirs,
+                "mrefs"    : track.read_aln.mrefs,
                 "start"  : starts,
                 "length" : lengths,
                 "current"   : currents
-            }).set_index("refmirs"))
+            }).set_index("mrefs"))
 
             track.save_read(fast5_basename)
 

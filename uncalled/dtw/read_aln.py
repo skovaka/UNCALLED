@@ -26,7 +26,7 @@ LAYER_META = {
     "length"  : LayerMeta(int, "Sample Length"),
     "current" : LayerMeta(float, "Mean Current (pA)"),
     "kmer"    : LayerMeta(int, "Reference K-mer"),
-    "refmir"  : LayerMeta(int, "Mirrored Packed Ref. Coord."),
+    "mref"  : LayerMeta(int, "Mirrored Packed Ref. Coord."),
     "id"      : LayerMeta(int, "Alignment ID"),
 }
 
@@ -96,7 +96,7 @@ class RefCoord:
 class ReadAln:
 
     #def __init__(self, index, aln, df=None, is_rna=False, ref_bounds=None, aln_id=None):
-    def __init__(self, aln_id, read_id, refmirs=None, index=None, is_rna=False):
+    def __init__(self, aln_id, read_id, mrefs=None, index=None, is_rna=False):
         #if not isinstance(aln, PafEntry):
         #    raise RuntimeError("ReadAlns can only be initialized from PafEntrys currently")
 
@@ -107,30 +107,30 @@ class ReadAln:
 
         self.dfs = set()
 
-        self.refmirs = refmirs
-        if refmirs is not None:
-            self.set_coords(refmirs)
+        self.mrefs = mrefs
+        if mrefs is not None:
+            self.set_coords(mrefs)
 
         #if dtw is not None:
         #    self.set_aln(dtw)
 
             #has_ref = self.aln.index.name == "ref"
-            #has_refmir = "refmir" in self.aln.columns
+            #has_mref = "mref" in self.aln.columns
 
             ##TODO check for required columns
-            #if not has_ref and not has_refmir:
-            #    raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % ("ref", "refmir"))
+            #if not has_ref and not has_mref:
+            #    raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % ("ref", "mref"))
             #
-            #if has_ref and not has_refmir:
-            #    self.aln["refmir"] = self.index.ref_to_refmir(self.ref_id, self.aln.index, self.is_fwd, self.is_rna)
+            #if has_ref and not has_mref:
+            #    self.aln["mref"] = self.index.ref_to_mref(self.ref_id, self.aln.index, self.is_fwd, self.is_rna)
 
-            #elif not has_ref and has_refmir:
-            #    self.aln[REF_COL] = self.index.mirref_to_ref(self.aln["refmir"])
+            #elif not has_ref and has_mref:
+            #    self.aln[REF_COL] = self.index.mirref_to_ref(self.aln["mref"])
 
-            #self.aln.sort_values("refmir", inplace=True)
+            #self.aln.sort_values("mref", inplace=True)
         
     def set_coords(self, coords):
-        loc = self.index.refmir_to_ref_bound(self.refmir_start,self.refmir_end,not self.is_rna)
+        loc = self.index.mref_to_ref_bound(self.mref_start,self.mref_end,not self.is_rna)
         self.ref_bounds = RefCoord(loc.ref_name, loc.start, loc.end, loc.fwd)
         self.ref_id = loc.ref_id
 
@@ -139,12 +139,12 @@ class ReadAln:
         return not hasattr(self, "aln") or len(self.aln) == 0
 
     @property
-    def refmir_start(self):
-        return self.refmirs.min()
+    def mref_start(self):
+        return self.mrefs.min()
 
     @property
-    def refmir_end(self):
-        return self.refmirs.max()+1
+    def mref_end(self):
+        return self.mrefs.max()+1
     
     @property
     def ref_start(self):
@@ -187,28 +187,28 @@ class ReadAln:
 
     #TODO ReadAln stores RefCoords, handles all this conversion?
 
-    def refmir_to_ref(self, refmir):
-        return self.index.refmir_to_ref(refmir) 
+    def mref_to_ref(self, mref):
+        return self.index.mref_to_ref(mref) 
 
-    def ref_to_refmir(self, ref):
-        return self.index.ref_to_refmir(self.ref_name, ref, ref, self.is_fwd, self.is_rna)[0]
+    def ref_to_mref(self, ref):
+        return self.index.ref_to_mref(self.ref_name, ref, ref, self.is_fwd, self.is_rna)[0]
 
     def ref_to_samp(self, ref):
-        return self.refmir_to_samp(self.ref_to_refmir(ref))
+        return self.mref_to_samp(self.ref_to_mref(ref))
         
-    def refmir_to_samp(self, refmir):
-        i = np.clip(self.aln['refmir'].searchsorted(refmir), 0, len(self.aln)-1)
+    def mref_to_samp(self, mref):
+        i = np.clip(self.aln['mref'].searchsorted(mref), 0, len(self.aln)-1)
         return self.aln['sample'][i]
     
-    def calc_refmir(self):
-        self.aln["refmir"] = self.index.ref_to_refmir(self.ref_id, self.aln.index, self.is_fwd, self.is_rna)
+    def calc_mref(self):
+        self.aln["mref"] = self.index.ref_to_mref(self.ref_id, self.aln.index, self.is_fwd, self.is_rna)
 
     @property
     def is_fwd(self):
         return self.ref_bounds.fwd
 
-    def sort_refmir(self):
-        self.aln.sort_values("refmir", inplace=True)
+    def sort_mref(self):
+        self.aln.sort_values("mref", inplace=True)
 
     def get_samp_bounds(self):
         pd.set_option('display.max_rows', None)
@@ -219,11 +219,11 @@ class ReadAln:
     
     #def set_bands(self, bands):
     def set_df(self, df, name):
-        if self.refmirs is None:
-            self.refmirs = df.index
+        if self.mrefs is None:
+            self.mrefs = df.index
             self.set_coords(df.index)
         else:
-            index = df.index.intersection(self.refmirs)
+            index = df.index.intersection(self.mrefs)
             df = df.reindex(index=index, copy=False)
 
         self.dfs.add(name)
@@ -232,8 +232,8 @@ class ReadAln:
 
         #print(name, df)
 
-        #df = df.loc[self.refmir_start+nt.K-1:self.refmir_end]
-        #mask = (df.index >= self.refmir_start+nt.K-1) & (df.index < self.refmir_end)
+        #df = df.loc[self.mref_start+nt.K-1:self.mref_end]
+        #mask = (df.index >= self.mref_start+nt.K-1) & (df.index < self.mref_end)
         #if not np.all(mask):
         #    df = df.loc[mask].copy()
 
@@ -246,7 +246,7 @@ class ReadAln:
     def set_bcerr(self, df):
         self.set_df(df, "bcerr")
 
-    def set_subevent_aln(self, aln, ref_mirrored=False, kmer_str=False, ref_col="refmir", start_col="start", length_col="length", mean_col="current", kmer_col="kmer"):
+    def set_subevent_aln(self, aln, ref_mirrored=False, kmer_str=False, ref_col="mref", start_col="start", length_col="length", mean_col="current", kmer_col="kmer"):
 
         aln["cuml_mean"] = aln[length_col] * aln[mean_col]
 
@@ -260,11 +260,11 @@ class ReadAln:
         else:
             kmers = None
 
-        if ref_col == "refmir":
-            refmirs = grp[ref_col].first()
+        if ref_col == "mref":
+            mrefs = grp[ref_col].first()
         else:
-            refmirs = self.ref_to_refmir(grp[ref_col].first())
-        #    refs = self.refmir_to_ref(refmirs)
+            mrefs = self.ref_to_mref(grp[ref_col].first())
+        #    refs = self.mref_to_ref(mrefs)
         #else:
         #    refs = grp[ref_col].first()
 
@@ -272,7 +272,7 @@ class ReadAln:
 
         aln = pd.DataFrame({
             #"ref"    : refs.astype("int64"),
-            "refmir"    : refmirs.astype("int64"),
+            "mref"    : mrefs.astype("int64"),
             "start"  : grp[start_col].min().astype("uint32"),
             "length" : lengths.astype("uint32"),
             "current"   : grp["cuml_mean"].sum() / lengths
@@ -282,21 +282,21 @@ class ReadAln:
             aln["kmer"] = kmers.astype("uint16")
         
         #if ref_mirrored:
-        #    aln["refmir"] = refmirs
+        #    aln["mref"] = mrefs
 
-        aln = aln.set_index("refmir").sort_index()
+        aln = aln.set_index("mref").sort_index()
         self.set_aln(aln)
 
     def get_index_kmers(self, index, kmer_shift=4):
         """Returns the k-mer sequence at the alignment reference coordinates"""
-        #start = max(0, self.refmir_start - kmer_shift)
-        start = self.refmir_start
+        #start = max(0, self.mref_start - kmer_shift)
+        start = self.mref_start
 
         return pd.Series(
-            index.get_kmers(self.refmir_start, self.refmir_end, self.is_rna),
-            pd.RangeIndex(self.refmir_start+nt.K-1, self.refmir_end)
+            index.get_kmers(self.mref_start, self.mref_end, self.is_rna),
+            pd.RangeIndex(self.mref_start+nt.K-1, self.mref_end)
         )
-        #kmers = index.get_kmers(start, self.refmir_end, self.is_rna)
+        #kmers = index.get_kmers(start, self.mref_end, self.is_rna)
         #return np.array(kmers)
 
 class BcFast5Aln(ReadAln):
@@ -318,10 +318,10 @@ class BcFast5Aln(ReadAln):
 
     #Error = pd.Caegorical(["SUB", "INS", "DEL"])
 
-    def __init__(self, index, read, paf, refmirs=None):
+    def __init__(self, index, read, paf, mrefs=None):
         self.seq_fwd = read.conf.read_buffer.seq_fwd #TODO just store is_rna
         
-        ReadAln.__init__(self, 0, read.id, refmirs, index=index, is_rna=read.conf.is_rna)
+        ReadAln.__init__(self, 0, read.id, mrefs, index=index, is_rna=read.conf.is_rna)
 
         #if self.empty: 
         #    return
@@ -349,10 +349,10 @@ class BcFast5Aln(ReadAln):
             'bp'     : np.cumsum(read.f5.moves),#[moves],
         })
 
-        df = samp_bps.join(self.bp_refmir_aln, on='bp').dropna()
-        #df["ref"] = self.refmir_to_ref(df["refmir"])
-        df['refmir'] = df['refmir'].astype("Int64")
-        df = df.set_index("refmir", drop=True) \
+        df = samp_bps.join(self.bp_mref_aln, on='bp').dropna()
+        #df["ref"] = self.mref_to_ref(df["mref"])
+        df['mref'] = df['mref'].astype("Int64")
+        df = df.set_index("mref", drop=True) \
                .sort_index() 
         df = df[~df.index.duplicated(keep="last")]
         self.set_aln(df)
@@ -361,7 +361,7 @@ class BcFast5Aln(ReadAln):
         if self.err_bps is not None:
             self.errs = samp_bps.join(self.err_bps.set_index('bp'), on='bp').dropna()
             self.errs.reset_index(inplace=True, drop=True)
-            #self.errs["ref"] = self.refmir_to_ref(self.errs["refmir"])
+            #self.errs["ref"] = self.mref_to_ref(self.errs["mref"])
             #self.errs.set_index("ref", inplace=True)
         else:
             self.errs = None
@@ -382,7 +382,7 @@ class BcFast5Aln(ReadAln):
         if cs is None: return False
 
         #TODO rename to general cig/cs
-        bp_refmir_aln = list()
+        bp_mref_aln = list()
         err_bps = list()
 
         if self.seq_fwd:
@@ -392,11 +392,11 @@ class BcFast5Aln(ReadAln):
             qr_i = paf.qr_len - paf.qr_en 
             #rf_i = -paf.rf_en+1
 
-        #mr_i = self.refmir_start
+        #mr_i = self.mref_start
         if self.flip_ref:
-            mr_i = self.ref_to_refmir(paf.rf_en)
+            mr_i = self.ref_to_mref(paf.rf_en)
         else:
-            mr_i = self.ref_to_refmir(paf.rf_st)
+            mr_i = self.ref_to_mref(paf.rf_st)
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
 
@@ -407,13 +407,13 @@ class BcFast5Aln(ReadAln):
             c = op[0]
             if c in {'=',':'}:
                 l = len(op[1]) if c == '=' else int(op[1])
-                bp_refmir_aln += zip(range(qr_i, qr_i+l), range(mr_i, mr_i+l))
+                bp_mref_aln += zip(range(qr_i, qr_i+l), range(mr_i, mr_i+l))
                 qr_i += l
                 mr_i += l
 
             elif c == '*':
                 self.sub_bps.append(qr_i)
-                bp_refmir_aln.append((qr_i,mr_i))
+                bp_mref_aln.append((qr_i,mr_i))
                 err_bps.append( (qr_i,mr_i,"SUB",op[1][1].upper()) )
                 qr_i += 1
                 mr_i += 1
@@ -439,11 +439,11 @@ class BcFast5Aln(ReadAln):
             else:
                 print("UNIMPLEMENTED ", op)
 
-        self.bp_refmir_aln = pd.DataFrame(bp_refmir_aln, columns=["bp","refmir"], dtype='Int64')
-        self.bp_refmir_aln.set_index("bp", inplace=True)
+        self.bp_mref_aln = pd.DataFrame(bp_mref_aln, columns=["bp","mref"], dtype='Int64')
+        self.bp_mref_aln.set_index("bp", inplace=True)
 
         #TODO type shouldn't have to be 64 bit
-        self.err_bps = pd.DataFrame(err_bps, columns=["bp","refmir","type","seq"])#, dtype='Int64')
+        self.err_bps = pd.DataFrame(err_bps, columns=["bp","mref","type","seq"])#, dtype='Int64')
 
         return True        
 
@@ -451,21 +451,21 @@ class BcFast5Aln(ReadAln):
         cig = paf.tags.get('cg', (None,)*2)[0]
         if cig is None: return False
 
-        bp_refmir_aln = list()#defaultdict(list)
+        bp_mref_aln = list()#defaultdict(list)
         self.refgap_bps = list()
 
-        #mr_i = self.refmir_start
+        #mr_i = self.mref_start
         if self.seq_fwd:
             qr_i = paf.qr_st
         else:
             qr_i = paf.qr_len - paf.qr_en 
 
         if self.flip_ref:
-            mr_i = self.ref_to_refmir(paf.rf_en)
+            mr_i = self.ref_to_mref(paf.rf_en)
         else:
-            mr_i = self.ref_to_refmir(paf.rf_st)
+            mr_i = self.ref_to_mref(paf.rf_st)
 
-        mr_bounds = range(self.refmir_start, self.refmir_end)
+        mr_bounds = range(self.mref_start, self.mref_end)
 
         cig_ops = self.CIG_RE.findall(cig)
 
@@ -482,11 +482,11 @@ class BcFast5Aln(ReadAln):
             if c == "M":
                 for qr, mr in zip(range(qr_i, qr_j), range(mr_i, mr_j)):
                     if mr in mr_bounds:
-                        bp_refmir_aln.append((qr,mr))
-                #bp_refmir_aln += zip(range(qr_i, qr_j), range(mr_i, mr_j))
+                        bp_mref_aln.append((qr,mr))
+                #bp_mref_aln += zip(range(qr_i, qr_j), range(mr_i, mr_j))
             elif c == "N":
                 if mr_i in mr_bounds:
-                    bp_refmir_aln.append((qr_i,mr))
+                    bp_mref_aln.append((qr_i,mr))
 
             if incr_qr:
                 qr_i = qr_j 
@@ -494,8 +494,8 @@ class BcFast5Aln(ReadAln):
             if incr_rf:
                 mr_i = mr_j 
 
-        self.bp_refmir_aln = pd.DataFrame(bp_refmir_aln, columns=["bp","refmir"], dtype='Int64')
-        self.bp_refmir_aln.set_index("bp", inplace=True)
+        self.bp_mref_aln = pd.DataFrame(bp_mref_aln, columns=["bp","mref"], dtype='Int64')
+        self.bp_mref_aln.set_index("bp", inplace=True)
 
         return True
 

@@ -193,9 +193,9 @@ class Dotplot:
 
     def _plot_aln(self, i):
         aln = self.alns[i]
-        #if not "refmir" in aln.aln:
-        #    aln.calc_refmir()
-        #aln.sort_refmir()
+        #if not "mref" in aln.aln:
+        #    aln.calc_mref()
+        #aln.sort_mref()
 
         if getattr(aln, "bands", None) is not None:
             self.ax_dot.fill_between(aln.bands['samp'], aln.bands['ref_st']-1, aln.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
@@ -209,15 +209,15 @@ class Dotplot:
 
     def set_cursor(self, ref_coord):
         aln,_,_ = self.alns[list(self.focus)[0]]
-        refmir = aln.ref_to_refmir(ref_coord)
+        mref = aln.ref_to_mref(ref_coord)
 
-        i = aln.aln['refmir'].searchsorted(refmir)
+        i = aln.aln['mref'].searchsorted(mref)
         samp = aln.aln.iloc[i]['start'] + aln.aln.iloc[i]['length']/2
 
-        self.cursor = (samp, refmir)
+        self.cursor = (samp, mref)
 
     def _tick_formatter(self, x, pos):
-        return self.index.refmir_to_ref(int(x))
+        return self.index.mref_to_ref(int(x))
 
     def _load_read(self, read_id, fast5_read=None):
         if read_id is None and fast5_read is None:
@@ -244,7 +244,7 @@ class Dotplot:
         if np.any([a.empty for a in self.alns]):
             return False
 
-        #self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], refmirs=self.alns[0].refmirs)
+        #self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], mrefs=self.alns[0].mrefs)
 
         for t in self.tracks:
             t.load_aln_kmers(store=True)
@@ -325,9 +325,9 @@ class Dotplot:
                 'color' : 'red', 
                 'alpha' : 0.5
             }
-            samp, refmir = cursor
+            samp, mref = cursor
             self.ax_dot.axvline(samp, **cursor_kw),
-            self.ax_dot.axhline(refmir,  **cursor_kw)
+            self.ax_dot.axhline(mref,  **cursor_kw)
 
         xmin = np.inf
         xmax = -np.inf

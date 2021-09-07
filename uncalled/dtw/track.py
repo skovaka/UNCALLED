@@ -159,42 +159,42 @@ class Track:
             self.read_ids = self.read_ids & set(self.conf.fast5_reader.read_filter)
 
     #TODO move to RefIndex python wrapper? 
-    def _ref_coords_to_refmirs(self, ref_coords, fwd=None):
+    def _ref_coords_to_mrefs(self, ref_coords, fwd=None):
         if fwd is None:
             fwd = ref_coords.fwd
-        start, end = self.index.ref_to_refmir(
+        start, end = self.index.ref_to_mref(
             ref_coords.name, ref_coords.start, ref_coords.end-nt.K+1, fwd, self.conf.is_rna)
         return pd.RangeIndex(start, end)
 
 
     def set_ref_bounds(self, ref_bounds):
         if ref_bounds == None:
-            self._refmirs = None
+            self._mrefs = None
             self._kmers = None
         else:
-            self._refmirs = list()
+            self._mrefs = list()
             self._kmers = list()
             for fwd in [False, True]:
-                r = self._ref_coords_to_refmirs(ref_bounds, fwd)
+                r = self._ref_coords_to_mrefs(ref_bounds, fwd)
                 k = self.index.get_kmers(r.start, r.stop, fwd)
-                #start,end = self.index.ref_to_refmir(self.ref_name, self.ref_start, self.ref_end-nt.K+1, fwd, self.conf.is_rna)
+                #start,end = self.index.ref_to_mref(self.ref_name, self.ref_start, self.ref_end-nt.K+1, fwd, self.conf.is_rna)
                 #r = pd.RangeIndex(start, end)
                 if fwd == self.conf.is_rna:
                     r = r[::-1]
                     k = k[::-1]
-                self._refmirs.append(r)
+                self._mrefs.append(r)
                 self._kmers.append(k)
 
     def init_read_aln(self, read_id, bounds):
         aln_id = len(self.aln_reads)
 
         if isinstance(bounds, RefCoord):
-            bounds = self._ref_coords_to_refmirs(bounds)
+            bounds = self._ref_coords_to_mrefs(bounds)
         elif not isinstance(bounds, pd.RangeIndex):
             raise ValueError("ReadAlns can only be initialized with RangeIndex or RefCoord bounds")
 
-        if self._refmirs is not None:
-            fwd = self.index.is_refmir_fwd(bounds.min(), self.conf.is_rna)
+        if self._mrefs is not None:
+            fwd = self.index.is_mref_fwd(bounds.min(), self.conf.is_rna)
             bounds = bounds.intersection(self._bounds[fwd])
             if len(bounds) == 0: return False
 
@@ -214,9 +214,9 @@ class Track:
             aln = self.read_aln
 
         kmers = pd.Series(
-            self.index.get_kmers(aln.refmir_start-nt.K+1, aln.refmir_end, aln.is_rna),
-            #aln.refmirs
-            pd.RangeIndex(aln.refmir_start, aln.refmir_end)
+            self.index.get_kmers(aln.mref_start-nt.K+1, aln.mref_end, aln.is_rna),
+            #aln.mrefs
+            pd.RangeIndex(aln.mref_start, aln.mref_end)
         )
 
         if store:
@@ -238,7 +238,7 @@ class Track:
 
         for name in self.read_aln.dfs:
             df = getattr(self.read_aln, name)
-            df = df.drop(columns=["refmir"], errors="ignore").sort_index()
+            df = df.drop(columns=["mref"], errors="ignore").sort_index()
             self.hdf.put("_%d/%s" % (aln_i, name), df, format="fixed")
 
         aln_fname = self.aln_fname(self.read_aln.read_id)
@@ -268,13 +268,13 @@ class Track:
         #    end = self.prms.ref_bounds.end
         #    where = "index >= self.prms.ref_bounds.start & index < self.prms.ref_bounds.end"
 
-        if self._refmirs != None:
-            refmirs = self._refmirs[coords.fwd]
-            if len(refmirs) == 0: return False
+        if self._mrefs != None:
+            mrefs = self._mrefs[coords.fwd]
+            if len(mrefs) == 0: return False
         else:
-            refmirs = None
+            mrefs = None
 
-        self.read_aln = ReadAln(aln_id, read_id, refmirs, index=self.index, is_rna=self.conf.is_rna)
+        self.read_aln = ReadAln(aln_id, read_id, mrefs, index=self.index, is_rna=self.conf.is_rna)
 
         #if self.read_aln.empty: return None
 
@@ -334,7 +334,7 @@ class Track:
             if aln is None: continue 
 
             xs = np.flip(self.ref_coords.reindex(
-                self.ref_coords.index.intersection(aln.refmir_to_ref(aln.aln.index))
+                self.ref_coords.index.intersection(aln.mref_to_ref(aln.aln.index))
             ))
 
             mask_row = np.ones(self.width)#, dtype=bool)
@@ -345,7 +345,7 @@ class Track:
                 #row = np.zeros(self.width)
                 #row = np.zeros(self.width)
                 #row[xs] = aln.aln[layer]
-                row = aln.aln[layer].reindex(self._refmirs[aln.is_fwd])
+                row = aln.aln[layer].reindex(self._mrefs[aln.is_fwd])
                 read_rows[layer].append(row.to_numpy().astype(float))
 
             read_meta['ref_start'].append(aln.ref_start)
@@ -620,7 +620,7 @@ def method_compare(track_a=None, track_b=None, full_overlap=None, conf=None):
         print (method_compare_aln(aln_a, aln_b))
 
 def method_compare_aln(aln_a, aln_b):
-    merge = aln_a.aln.join(aln_b.aln, lsuffix="_a", rsuffix="_b").dropna().set_index("refmir_a")
+    merge = aln_a.aln.join(aln_b.aln, lsuffix="_a", rsuffix="_b").dropna().set_index("mref_a")
 
     def get_ends(suff):
         return merge["start_"+suff]+merge["length_"+suff]
