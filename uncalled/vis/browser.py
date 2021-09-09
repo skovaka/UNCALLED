@@ -569,11 +569,11 @@ class Browser:
         self._init_sumstat(gspec)
         self.axs.sumstat.set_ylabel("Mean Value", fontsize=15) #TODO use rcparams
 
-        if track.has_fwd:
-            self.layer_fwd_plot, = self.axs.sumstat.plot(track.ref_coords, self.layer_means(track, self.active_layer, True), color='royalblue')
+        #if track.has_fwd:
+        #    self.layer_fwd_plot, = self.axs.sumstat.plot(track.ref_coords, self.layer_means(track, self.active_layer, True), color='royalblue')
 
-        if track.has_rev:
-            self.layer_rev_plot, = self.axs.sumstat.plot(track.ref_coords, self.layer_means(track, self.active_layer, False), color='crimson')
+        #if track.has_rev:
+        #    self.layer_rev_plot, = self.axs.sumstat.plot(track.ref_coords, self.layer_means(track, self.active_layer, False), color='crimson')
 
     def _init_info(self, gspec):
         self.axs.info  = self.fig.add_subplot(gspec)

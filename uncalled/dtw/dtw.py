@@ -39,6 +39,7 @@ AlignParams._def_params(
 OPTS = (Opt("index_prefix", "track"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt(("-o", "--out-path"), "dtw"),
+    Opt("--name", "track"),
     Opt(("-f", "--overwrite"), "track", action="store_true", help="Will overwrite alignment track if one already exists"),
     Opt("--rna", fn="set_r94_rna"),
     Opt(("-R", "--ref-bounds"), "track"),

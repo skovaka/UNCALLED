@@ -10,7 +10,6 @@ from typing import NamedTuple
 from matplotlib.colors import Normalize
 import pandas as pd
 import copy
-import sqlite3
 
 import scipy.stats
 from sklearn.decomposition import PCA
@@ -41,7 +40,6 @@ class TrackParams(config.ParamGroup):
 TrackParams._def_params(
     ("path", None, None, "Path to directory where alignments are stored"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
-    ("name", None, str, "Short unique identifier for the track"),
     ("index_prefix", None, str, "BWA index prefix"),
     ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
@@ -52,9 +50,10 @@ TrackParams._def_params(
 )
 
 class Track:
-    DB_FNAME = "alns.db"
+    HDF_FNAME = "alns.h5"
     CONF_FNAME = "conf.toml"
     ALN_DIR = "alns"
+    ALN_SUFFIX = ".pkl"
 
     INDEX_FNAME = "filename_mapping.txt"
     INDEX_HEADER = "read_id\tfilename\taln_file"
@@ -67,6 +66,17 @@ class Track:
     MODES = {WRITE_MODE, READ_MODE}
 
     CMP_LAYERS = [CURRENT_LAYER, DWELL_LAYER]
+
+    #LAYER_FNS = {
+    #    "kmer" : (
+    #        lambda self,df: df["kmer"]),
+    #    "current" : (
+    #        lambda self,df: df["current"]),
+    #    "dwell" : (
+    #        lambda self,df: 1000 * df['length'] / self.conf.read_buffer.sample_rate),
+    #    "model_diff" : (
+    #        lambda self,df: df["current"] - self.model[df["kmer"]]),
+    #}
 
     def get_bcerr_layer(self, aln):
         bcerr = aln.bcerr#.reindex(aln.aln.index)
@@ -99,16 +109,13 @@ class Track:
         self.read_ids = set()
         self.aln_reads = dict()
 
-        if self.prms.name is None:
-            self.prms.name = os.path.basename(self.prms.path)
 
         if not self.in_mem:
             if self.prms.mode == self.WRITE_MODE:
-                os.makedirs(self.prms.path, exist_ok=self.prms.overwrite)
+                os.makedirs(self.aln_dir, exist_ok=self.prms.overwrite)
 
             self.fname_mapping_file = open(self.fname_mapping_filename, self.prms.mode)
-            #self.hdf = pd.HDFStore(self.hdf_filename, mode=self.prms.mode, complib="lzo")
-            self.con = sqlite3.connect(self.db_filename)
+            self.hdf = pd.HDFStore(self.hdf_filename, mode=self.prms.mode, complib="lzo")
 
             if self.prms.mode == self.READ_MODE:
                 self.conf.load_toml(self.config_filename)
@@ -137,37 +144,10 @@ class Track:
 
                 self.conf.to_toml(self.config_filename)
                 self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
-                self._init_tables()
 
-    def _init_tables(self):
-        cur = self.con.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS "%s.alns" (
-                aln_id INTEGER PRIMARY KEY,
-                read_id TEXT,
-                ref_name TEXT,
-                ref_start INTEGER,
-                ref_end INTEGER,
-                fwd INTEGER
-            );""" % self.prms.name)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS "%s.dtw" (
-                mref INTEGER,
-                aln_id INTEGER,
-                start INTEGER,
-                length INTEGER,
-                current REAL,
-                PRIMARY KEY (mref, aln_id),
-                FOREIGN KEY (aln_id) REFERENCES "%s.dtw" (aln_id)
-            );""" % (self.prms.name, self.prms.name))
-        self.con.commit()
-
-    def _init_aln(self, aln):
-        cur = self.con.cursor()
-        cur.execute("INSERT INTO \"%s.alns\" VALUES (?,?,?,?,?,?)" % self.prms.name,
-                     (aln.aln_id, aln.read_id, aln.ref_name, aln.ref_start, aln.ref_end, aln.is_fwd))
-        print(cur.lastrowid)
-                     #("\"%s.alns\"" % self.prms.name, aln.id, aln.read_id, aln.ref_name, aln.ref_start, aln.ref_end, aln.is_fwd)))
+    #@property
+    #def read_ids(self):
+    #    return list(self.fname_mapping.index)
 
     def __contains__(self, read_id):
         return read_id in self.read_ids
@@ -188,40 +168,22 @@ class Track:
 
 
     def set_ref_bounds(self, ref_bounds):
-
-        self.width = self.ref_end-self.ref_start-nt.K+1
-        self.height = None
-        
-        self.ref_coords = pd.Series(
-                np.arange(self.width, dtype=int),
-                index=pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1)
-        )
-        
         if ref_bounds == None:
             self._mrefs = None
             self._kmers = None
         else:
             self._mrefs = list()
             self._kmers = list()
-            mref_to_ref = list()
-
             for fwd in [False, True]:
                 r = self._ref_coords_to_mrefs(ref_bounds, fwd)
                 k = self.index.get_kmers(r.start, r.stop, fwd)
-
+                #start,end = self.index.ref_to_mref(self.ref_name, self.ref_start, self.ref_end-nt.K+1, fwd, self.conf.is_rna)
+                #r = pd.RangeIndex(start, end)
                 if fwd == self.conf.is_rna:
                     r = r[::-1]
                     k = k[::-1]
-
                 self._mrefs.append(r)
                 self._kmers.append(k)
-
-                mref_to_ref.append(
-                    pd.Series(index=r, data=self.ref_coords.index)
-                )
-            self.mref_to_ref = pd.concat(mref_to_ref).sort_index()
-
-            
 
     def init_read_aln(self, read_id, bounds):
         aln_id = len(self.aln_reads)
@@ -237,7 +199,6 @@ class Track:
             if len(bounds) == 0: return False
 
         self.read_aln = ReadAln(aln_id, read_id, bounds, index=self.index, is_rna=self.conf.is_rna)
-        self._init_aln(self.read_aln)
 
         self.aln_reads[aln_id] = read_id
 
@@ -275,13 +236,12 @@ class Track:
             (aln_i, self.read_aln.read_id, self.read_aln.ref_id, self.read_aln.ref_start, self.read_aln.ref_end, self.read_aln.is_fwd, True)
         )
 
-        #for name in self.read_aln.dfs:
-        #    df = getattr(self.read_aln, name)
-        #    df = df.drop(columns=["mref"], errors="ignore").sort_index()
-        #    self.hdf.put("_%d/%s" % (aln_i, name), df, format="fixed")
-        df = self.read_aln.aln
-        #print(df)
-        df.to_sql("%s.dtw" % self.prms.name, self.con, if_exists="append", index=True, index_label="mref")
+        for name in self.read_aln.dfs:
+            df = getattr(self.read_aln, name)
+            df = df.drop(columns=["mref"], errors="ignore").sort_index()
+            self.hdf.put("_%d/%s" % (aln_i, name), df, format="fixed")
+
+        aln_fname = self.aln_fname(self.read_aln.read_id)
 
         s = "\t".join([self.read_aln.read_id, fast5_fname, "-"]) + "\n"
         self.fname_mapping_file.write(s)
@@ -345,66 +305,67 @@ class Track:
         if ref_bounds is not None:
             self.prms.ref_bounds = ref_bounds
 
+        self.width = self.ref_end-self.ref_start-nt.K+1
+        self.height = None
+
         read_meta = defaultdict(list)
 
         read_rows = defaultdict(list)
         mask_rows = list()
 
         ##TODO make index take RefCoord (combine with RefLoc)
-
         self.set_ref_bounds(self.prms.ref_bounds)
-
-        #print(self._mrefs[0].min(), self._mrefs[0].max(), self._mrefs[1].min(), self._mrefs[1].max())
-
-        t = time.time()
-
-        select = "SELECT mref, \"%s.dtw\".aln_id, start, length, current FROM \"%s.dtw\"" 
-        where = " WHERE (mref >= ? AND mref <= ?)"
-        params = [self._mrefs[1].min(), self._mrefs[1].max()]
-        name_count = 2
-
-
-        if self.prms.full_overlap:
-            select = select + " JOIN \"%s.alns\" ON \"%s.alns\".aln_id = \"%s.dtw\".aln_id"
-            where = where + " AND (ref_start < ? AND ref_end > ?)"
-            params += [self.ref_coords.index[0], self.ref_coords.index[-1]]
-            name_count += 3
-
-        query = select + where
-        fmt = ((self.prms.name,)*name_count)
-
-        mat_df = pd.read_sql_query(
-            query % fmt, self.con, params=params,
-        ).pivot(index="aln_id", columns="mref") \
-         .rename(columns=self.mref_to_ref, level="mref") \
-         .rename_axis(["layer","ref"], axis=1) \
-         .sort_index(axis=1, level=1)
-
-        #TODO deal with multiple strands
-        #add OR clause to WHERE, compute ref, pivot, return one df/mat?
-        #or two queries, pivot seperately, return two dfs/mats?
-        self.reads = pd.read_sql_query(
-            "SELECT * FROM \"%s.alns\" WHERE aln_id IN (%s)" 
-            % (self.prms.name, ",".join(["?"]*len(mat_df))),
-            self.con, params=mat_df.index
-        ).rename(columns={"read_id" : "id"}).sort_values("ref_start")
-        mat_df = mat_df.reindex(self.reads["aln_id"], copy=False)
         
-        self.mat = np.ma.masked_invalid(np.stack([
-            mat_df[l].to_numpy() for l in self.prms.layers
-        ]))
+        self.ref_coords = pd.Series(
+                np.arange(self.width, dtype=int),
+                index=pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1)
+        )
+
+        ref_id = self.ref_id
+        where = (
+            "ref_id == ref_id & "
+            "(ref_start < self.ref_start & ref_end > self.ref_end)" 
+        )
+        coords = self.hdf.select("/coords", where=where)
+
+        #for read_id,read in self.fname_mapping.iterrows():
+        for coord in coords.itertuples():
+            aln = self.load_read(coords=coord)
+            if aln is None: continue 
+
+            xs = np.flip(self.ref_coords.reindex(
+                self.ref_coords.index.intersection(aln.mref_to_ref(aln.aln.index))
+            ))
+
+            mask_row = np.ones(self.width)#, dtype=bool)
+            mask_row[xs] = False
+            mask_rows.append(mask_row)
+
+            for layer in self.prms.layers:
+                #row = np.zeros(self.width)
+                #row = np.zeros(self.width)
+                #row[xs] = aln.aln[layer]
+                row = aln.aln[layer].reindex(self._mrefs[aln.is_fwd])
+                read_rows[layer].append(row.to_numpy().astype(float))
+
+            read_meta['ref_start'].append(aln.ref_start)
+            read_meta['id'].append(aln.read_id)
+            read_meta['fwd'].append(aln.is_fwd)
+
+        self.reads = pd.DataFrame(read_meta) \
+                     .sort_values(['fwd', 'ref_start'], ascending=[False, True])
 
         self.has_fwd = np.any(self.reads['fwd'])
         self.has_rev = not np.all(self.reads['fwd'])
 
-        #read_order = self.reads.index.to_numpy()
+        read_order = self.reads.index.to_numpy()
 
-        #mat = np.stack([
-        #    np.stack(read_rows[l])[read_order] for l in self.prms.layers
-        #])
-        #mask = np.stack([np.stack(mask_rows)[read_order].astype(bool) for _ in self.prms.layers])
+        mat = np.stack([
+            np.stack(read_rows[l])[read_order] for l in self.prms.layers
+        ])
+        mask = np.stack([np.stack(mask_rows)[read_order].astype(bool) for _ in self.prms.layers])
 
-        #self.mat = np.ma.masked_array(mat, mask=mask)
+        self.mat = np.ma.masked_array(mat, mask=mask)
 
         self.height = len(self.reads)
 
@@ -415,14 +376,14 @@ class Track:
         #TODO define get_soft_minmax(num_stdvs):
 
         self.norms = {layer: Normalize(np.min(self[layer]), np.max(self[layer])) for layer in self.prms.layers}
-        for l in ["current"]:#, "dwell"]:
+        for l in ["current", "dwell"]:
             layer = self[l]
             self.norms[l].vmax = min(
                 layer.max(),
                 np.ma.median(layer) + 2 * layer.std()
             )
 
-        return self.mat
+        return mat
 
     def add_layer(self, name, mat):
         self.mat = np.ma.concatenate([self.mat, [mat]])
@@ -440,10 +401,9 @@ class Track:
 
     def close(self):
         if self.in_mem: return
-        #if self.prms.mode == "w":
-        #    self.write_coords()
-        #self.hdf.close()
-        self.con.close()
+        if self.prms.mode == "w":
+            self.write_coords()
+        self.hdf.close()
         self.fname_mapping_file.close()
 
     #@property
@@ -453,8 +413,8 @@ class Track:
     #    return self.prms.path.split("/")[-1]
 
     @property
-    def db_filename(self):
-        return os.path.join(self.prms.path, self.DB_FNAME)
+    def hdf_filename(self):
+        return os.path.join(self.prms.path, self.HDF_FNAME)
 
     @property
     def config_filename(self):
@@ -465,9 +425,18 @@ class Track:
         return os.path.join(self.prms.path, self.INDEX_FNAME)
     
     @property
+    def aln_dir(self):
+        if self.prms.path is None: return None
+        return os.path.join(self.prms.path, self.ALN_DIR)
+    
+    @property
     def read_count(self):
         return len(self.fname_mapping)
     
+    def aln_fname(self, read_id):
+        if self.prms.path is None: return None
+        return os.path.join(self.aln_dir, read_id+self.ALN_SUFFIX)
+
     def sort_coord(self, layer, ref):
         #if isinstance(layer, str):
         #    layer = self.layer_idxs[layer]

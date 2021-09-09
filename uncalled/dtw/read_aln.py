@@ -27,7 +27,7 @@ LAYER_META = {
     "current" : LayerMeta(float, "Mean Current (pA)"),
     "kmer"    : LayerMeta(int, "Reference K-mer"),
     "mref"  : LayerMeta(int, "Mirrored Packed Ref. Coord."),
-    "id"      : LayerMeta(int, "Alignment ID"),
+    "aln_id"      : LayerMeta(int, "Alignment ID"),
 }
 
 class RefCoord:
@@ -100,7 +100,7 @@ class ReadAln:
         #if not isinstance(aln, PafEntry):
         #    raise RuntimeError("ReadAlns can only be initialized from PafEntrys currently")
 
-        self.id = aln_id
+        self.aln_id = aln_id
         self.read_id = read_id
         self.index = index
         self.is_rna = is_rna
@@ -227,8 +227,8 @@ class ReadAln:
             df = df.reindex(index=index, copy=False)
 
         self.dfs.add(name)
-        if not "id" in df:
-            df["id"] = self.id
+        if not "aln_id" in df:
+            df["aln_id"] = self.aln_id
 
         #print(name, df)
 
