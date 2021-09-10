@@ -8,7 +8,7 @@ import pandas as pd
 from ont_fast5_api.fast5_interface import get_fast5_file
 import scipy.stats
 
-from . import ReadAln, Track, RefCoord
+from . import ReadAln, AlnTrack, RefCoord
 from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt
 from ..fast5 import Fast5Reader, FAST5_OPTS
@@ -49,7 +49,7 @@ def nanopolish(conf):
 
     sys.stderr.write("Writing alignments\n")
 
-    track = Track(mode="w", conf=conf)
+    track = AlnTrack(mode="w", conf=conf)
 
     for (contig, read_id), rows in read_groups.groups.items():
         #mm2 =  track.mm2s[read_id]
@@ -71,7 +71,7 @@ def tombo(conf):
     conf.fast5_reader.load_bc = True
     conf.pore_model.name = "r94_rna_tombo"
 
-    track = Track(mode="w", conf=conf)
+    track = AlnTrack(mode="w", conf=conf)
     
     fast5_files = f5reader.prms.fast5_files
 

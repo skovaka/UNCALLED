@@ -13,7 +13,7 @@ from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split, ref_coords
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
-from ..dtw import Track, ref_coords, LAYER_META
+from ..dtw import AlnTrack, ref_coords, LAYER_META
 from ..dtw.track import _load_tracks
 
 class RefstatsParams(config.ParamGroup):

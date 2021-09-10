@@ -16,7 +16,7 @@ class PoreModel(_PoreModel):
 
     @staticmethod
     def _param_defaults():
-        return _PoreModel.Params(config.DEFAULTS.pore_model)
+        return _PoreModel.Params(config._DEFAULTS.pore_model)
 
     def __init__(self, model=None, name=None, reverse=None, complement=None, df=None):
         if model is not None: 

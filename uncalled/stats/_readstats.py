@@ -14,14 +14,14 @@ from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split, ref_coords
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
-from ..dtw import Track, ref_coords, LAYER_META
+from ..dtw import AlnTrack, ref_coords, LAYER_META
 from ..dtw.track import _load_tracks
 
 class ReadstatsParams(config.ParamGroup):
     _name = "readstats"
 ReadstatsParams._def_params(
     ("stats", ["model_diff"], None, "Which statistics to compute and output"),
-    ("tracks", None, None, "DTW Alignment Track(s)"),
+    ("tracks", None, None, "DTW Alignment AlnTrack(s)"),
     ("pca_layer", "current", str, "Which statistics to use for PCA"),
     ("pca_components", 2, int, "Number of principle components to output for the \"pca\" command."),
     ("summary_stats", ["mean"], None, "Summary statistics to compute for \"model_diff\" command."),

@@ -16,7 +16,7 @@ from .. import nt, config
 from ..dtw.dtw import Fast5Processor
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
-from ..dtw import RefCoord, Track, ref_coords, BcFast5Aln
+from ..dtw import RefCoord, AlnTrack, ref_coords, BcFast5Aln
 from ..dtw.track import  method_compare_aln
 
 from _uncalled import _RefIndex
@@ -73,7 +73,7 @@ class Sigplot:
         self.tracks = list()
         for t in self.prms.tracks:
             if isinstance(t, str):
-                t = Track(t, conf=self.conf)
+                t = AlnTrack(t, conf=self.conf)
             t.fast5s = Fast5Processor(conf=t.conf)
             self.tracks.append(t)
 

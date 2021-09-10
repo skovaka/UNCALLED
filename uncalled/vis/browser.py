@@ -24,7 +24,7 @@ from ..sigproc import ProcRead
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
 from .dotplot import Dotplot
-from ..dtw.track import Track, ref_coords, LAYER_META
+from ..dtw.track import AlnTrack, ref_coords, LAYER_META
 
 CMAP = "viridis"
 #CMAP = "plasma"
@@ -78,8 +78,8 @@ class Browser:
 
         for track in [self.prms.track_a, self.prms.track_b]:
             if track is None: continue
-            if not isinstance(track, Track):
-                track = Track(track, conf=self.conf)
+            if not isinstance(track, AlnTrack):
+                track = AlnTrack(track, conf=self.conf)
             self.tracks.append(track)
         self.single_track = len(self.tracks) == 1
 
@@ -235,14 +235,19 @@ class Browser:
 
     def set_info(self, trk, rf, rd):
 
-        read = trk.reads.iloc[rd]
+        aln_id = trk.reads.index[rd]
 
-        print(read['id'])
+        read = trk.reads.iloc[rd]
+        aln_id = read["aln_id"]
+        print(rf,rd, aln_id)
+        print(read)
 
         self.set_info_cell(0,  self.ref_coord(trk, rf, read['fwd']))
         self.set_info_cell(1, read['id'])
 
-        for i,val in enumerate(trk[:,rd,self.ref_start+rf]):
+        mref = trk._mrefs[1][rf]
+        print(mref,aln_id)
+        for i,val in enumerate(trk.df.loc[mref,aln_id]):
             self.set_info_cell(i+2, val)
         #self.set_info_cell(self.INFO_KMER, nt.kmer_to_str(int(kmer)))
         #self.set_info_cell(self.INFO_PA,   "%.4f" % pa)
@@ -379,8 +384,8 @@ class Browser:
 
     #TODO put inside track 
     def layer_means(self, track, layer, fwd):
-        strand = track.reads['fwd'] == fwd
-        return np.mean(track[layer,strand], axis=0)
+        #strand = track.reads['fwd'] == fwd
+        return np.mean(track.mat[layer], axis=0)
         #return np.sum(track[layer,strand], axis=0) / np.sum(track.mask[strand], axis=0)
 
     #TODO refactor into _init_fig(), show(), and save()
@@ -487,10 +492,10 @@ class Browser:
         mins = list()
         maxs = list()
         for track in self.tracks:
-            std = np.std(track[layer])
-            med = np.median(track[layer])
-            mins.append(max(np.min(track[layer]), med - std*3))
-            maxs.append(min(np.max(track[layer]), med + std*3))
+            std = track.df[layer].std()
+            med = track.df[layer].median()
+            mins.append(min(track.df[layer].min(), med - std*3))
+            maxs.append(min(track.df[layer].max(), med + std*3))
 
         vmin = min(mins)
         vmax = max(maxs)
@@ -562,18 +567,18 @@ class Browser:
             interpolation='none'
         )
 
-        ax.set_yticks(np.arange(len(Track.CMP_LAYERS)))
-        ax.set_yticklabels([LAYER_META[l].label.split()[0] for l in Track.CMP_LAYERS])
+        ax.set_yticks(np.arange(len(AlnTrack.CMP_LAYERS)))
+        ax.set_yticklabels([LAYER_META[l].label.split()[0] for l in AlnTrack.CMP_LAYERS])
             
     def _init_sumstat_mean(self, gspec, track):
         self._init_sumstat(gspec)
         self.axs.sumstat.set_ylabel("Mean Value", fontsize=15) #TODO use rcparams
 
-        #if track.has_fwd:
-        #    self.layer_fwd_plot, = self.axs.sumstat.plot(track.ref_coords, self.layer_means(track, self.active_layer, True), color='royalblue')
+        if track.has_fwd:
+            self.layer_fwd_plot, = self.axs.sumstat.plot(track.ref_coords, self.layer_means(track, self.active_layer, True), color='royalblue')
 
-        #if track.has_rev:
-        #    self.layer_rev_plot, = self.axs.sumstat.plot(track.ref_coords, self.layer_means(track, self.active_layer, False), color='crimson')
+        if track.has_rev:
+            self.layer_rev_plot, = self.axs.sumstat.plot(track.ref_coords, self.layer_means(track, self.active_layer, False), color='crimson')
 
     def _init_info(self, gspec):
         self.axs.info  = self.fig.add_subplot(gspec)

@@ -36,9 +36,9 @@ LAYER_META.update({
     "bcerr"      : LayerMeta(float, "BC Alignment Errors")
 })
 
-class TrackParams(config.ParamGroup):
+class AlnTrackParams(config.ParamGroup):
     _name = "track"
-TrackParams._def_params(
+AlnTrackParams._def_params(
     ("path", None, None, "Path to directory where alignments are stored"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("name", None, str, "Short unique identifier for the track"),
@@ -51,7 +51,7 @@ TrackParams._def_params(
     ignore_toml={"mode", "overwrite"}
 )
 
-class Track:
+class AlnTrack:
     DB_FNAME = "alns.db"
     CONF_FNAME = "conf.toml"
     ALN_DIR = "alns"
@@ -292,7 +292,7 @@ class Track:
             return self.read_aln
 
         if read_id is None and coords is None:
-            raise ValueError("read_id or coords must be specified for Track.load_read")
+            raise ValueError("read_id or coords must be specified for AlnTrack.load_read")
         elif coords is not None:
             read_id = coords.read_id
         else:
@@ -373,26 +373,29 @@ class Track:
         query = select + where
         fmt = ((self.prms.name,)*name_count)
 
-        mat_df = pd.read_sql_query(
+        self.df = pd.read_sql_query(
             query % fmt, self.con, params=params,
-        ).pivot(index="aln_id", columns="mref") \
-         .rename(columns=self.mref_to_ref, level="mref") \
-         .rename_axis(["layer","ref"], axis=1) \
-         .sort_index(axis=1, level=1)
+        )#.rename(index=self.mref_to_ref) \
+         #.rename_axis("ref", axis=0).sort_index()
+
+        self.mat = self.df.pivot(index="aln_id", columns="mref") \
+                   .rename(columns=self.mref_to_ref) \
+                   .rename_axis("ref", axis=0).sort_index()
+
+        self.df.set_index(["mref", "aln_id"], inplace=True)
+
+        print(self.df)
 
         #TODO deal with multiple strands
         #add OR clause to WHERE, compute ref, pivot, return one df/mat?
         #or two queries, pivot seperately, return two dfs/mats?
         self.reads = pd.read_sql_query(
             "SELECT * FROM \"%s.alns\" WHERE aln_id IN (%s)" 
-            % (self.prms.name, ",".join(["?"]*len(mat_df))),
-            self.con, params=mat_df.index
+            % (self.prms.name, ",".join(["?"]*len(self.mat))),
+            self.con, params=self.mat.index
         ).rename(columns={"read_id" : "id"}).sort_values("ref_start")
-        mat_df = mat_df.reindex(self.reads["aln_id"], copy=False)
-        
-        self.mat = np.ma.masked_invalid(np.stack([
-            mat_df[l].to_numpy() for l in self.prms.layers
-        ]))
+
+        self.mat = self.mat.reindex(self.reads["aln_id"], copy=False)
 
         self.has_fwd = np.any(self.reads['fwd'])
         self.has_rev = not np.all(self.reads['fwd'])
@@ -408,19 +411,6 @@ class Track:
 
         self.height = len(self.reads)
 
-        #self.layer_extrema = np.array([
-        #    [np.min(layer), np.max(layer)]
-        #    for layer in self.mat
-        #])
-        #TODO define get_soft_minmax(num_stdvs):
-
-        self.norms = {layer: Normalize(np.min(self[layer]), np.max(self[layer])) for layer in self.prms.layers}
-        for l in ["current"]:#, "dwell"]:
-            layer = self[l]
-            self.norms[l].vmax = min(
-                layer.max(),
-                np.ma.median(layer) + 2 * layer.std()
-            )
 
         return self.mat
 
@@ -475,7 +465,7 @@ class Track:
         self.sort(order)
 
     def sort(self, order):
-        self.mat = self.mat[:,order,:]
+        self.mat = self.mat.iloc[order]
         self.reads = self.reads.iloc[order]
 
     @property
@@ -497,7 +487,7 @@ class Track:
     def calc_ks(self, track_b):
         ks_stats = np.zeros((len(self.CMP_LAYERS), self.width))
 
-        for i,l in enumerate(Track.CMP_LAYERS):
+        for i,l in enumerate(AlnTrack.CMP_LAYERS):
             for j,rf in enumerate(self.ref_coords.index):
                 a = self[l,:,rf]
                 b = track_b[l,:,rf]
@@ -522,21 +512,12 @@ class Track:
 
     def __getitem__(self, key):
         if isinstance(key, str):
-            key = self.layer_idxs[key]
-        elif isinstance(key, tuple): 
-            ikey = list()
-            if isinstance(key[0], str):
-                ikey.append(self.layer_idxs[key[0]])
-            else:
-                ikey.append(key[0])
-            if len(key) > 1: ikey.append(key[1])
-            if len(key) > 2:
-                ikey.append(self.ref_coords.loc[key[2]])
-
-            key = tuple(ikey)
-        elif isinstance(key, list):
-            key = [self.layer_idxs[l] if isinstance(l, str) else l for l in key]
-        return self.mat.__getitem__(key)
+            #key = self.layer_idxs[key]
+            return self.mat[key]
+        if len(key) == 3:
+            return self.mat[key[0],key[2]][key[1]]
+        print(self.mat)
+        return self.mat[key[0]][key[1]]
     
     @property
     def kmer(self):
@@ -554,7 +535,7 @@ class Track:
     def pa_diff(self):
         return self.mat[self.PA_DIFF_LAYER]
 
-#TODO turn into "TrackIO"
+#TODO turn into "AlnTrackIO"
 def _load_tracks(tracks, conf, force_list=False):
 
     is_list = isinstance(tracks, list)
@@ -565,9 +546,9 @@ def _load_tracks(tracks, conf, force_list=False):
     
     for track in tracks:
         if isinstance(track, str):
-            track = Track(track, conf=conf)
-        elif not isinstance(track, Track):
-            raise RuntimeError("Track must either be path to alignment track or Track instance")
+            track = AlnTrack(track, conf=conf)
+        elif not isinstance(track, AlnTrack):
+            raise RuntimeError("AlnTrack must either be path to alignment track or AlnTrack instance")
         
         if is_list or force_list:
             ret.append(track)
@@ -578,16 +559,16 @@ def _load_tracks(tracks, conf, force_list=False):
 def _load_track_arg(arg_track, conf_track, conf):                                       
     track = arg_track if arg_track is not None else conf_track                          
     if isinstance(track, str):
-        return Track(track, conf=conf)                                                  
-    elif isinstance(track, Track):
+        return AlnTrack(track, conf=conf)                                                  
+    elif isinstance(track, AlnTrack):
         return track
-    raise RuntimeError("Track must either be path to alignment track or Track instance")
+    raise RuntimeError("AlnTrack must either be path to alignment track or AlnTrack instance")
 
 class CompareParams(config.ParamGroup):
     _name = "compare"
 CompareParams._def_params(
-    ("track_a", None, None, "DTW Track A"),
-    ("track_b", None, None, "DTW Track B"),
+    ("track_a", None, None, "DTW AlnTrack A"),
+    ("track_b", None, None, "DTW AlnTrack B"),
     ("subcmd", "ks", str, "Analysis to perform")
 )
 
@@ -609,10 +590,10 @@ def compare(*args, **kwargs):
 
     ks_stats = np.recarray(
         track_a.width,
-        dtype=[(l, '<f8') for l in Track.CMP_LAYERS]
+        dtype=[(l, '<f8') for l in AlnTrack.CMP_LAYERS]
     )
 
-    for i,l in enumerate(Track.CMP_LAYERS):
+    for i,l in enumerate(AlnTrack.CMP_LAYERS):
         for j,rf in enumerate(track_a.ref_coords.index):
             a = track_a[l,:,rf]
             b = track_b[l,:,rf]
@@ -676,7 +657,7 @@ def method_compare_aln(aln_a, aln_b):
     })
     return df
         
-#class TrackParams(config.ParamGroup):
+#class AlnTrackParams(config.ParamGroup):
 #    _name = "track"
 #BrowserParams._def_params(
 #    ("track_a", None, str, "Path to directory where alignments are stored"),

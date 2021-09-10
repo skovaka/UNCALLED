@@ -15,7 +15,7 @@ from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 from _uncalled._nt import KmerArray
 
 from .. import PoreModel
-from ..dtw import BcFast5Aln, ReadAln, Track, RefCoord
+from ..dtw import BcFast5Aln, ReadAln, AlnTrack, RefCoord
 
 #TODO make this better
 METHODS = {
@@ -60,7 +60,7 @@ def main(conf):
     #if conf.dtw.out_path is not None:
     #else:
     #    track = None
-    track = Track(conf.dtw.out_path, mode="w", conf=conf)
+    track = AlnTrack(conf.dtw.out_path, mode="w", conf=conf)
 
     mm2s = {p.qr_name : p
          for p in parse_paf(

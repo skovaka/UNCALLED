@@ -15,7 +15,7 @@ from .. import nt, config
 from ..sigproc import ProcRead
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
-from ..dtw.track import Track, RefCoord, ref_coords, method_compare_aln
+from ..dtw.track import AlnTrack, RefCoord, ref_coords, method_compare_aln
 from ..dtw.read_aln import BcFast5Aln
 
 from _uncalled import _RefIndex
@@ -78,19 +78,19 @@ class Dotplot:
         self.conf.track.load_mat = False
         self.conf.track.layers = self.conf.dotplot.layers
 
-        if isinstance(self.prms.track_a, Track):
+        if isinstance(self.prms.track_a, AlnTrack):
             self.tracks = [self.prms.track_a]
         else:
-            self.tracks = [Track(self.prms.track_a, conf=self.conf)]
+            self.tracks = [AlnTrack(self.prms.track_a, conf=self.conf)]
         #self.colors = [self.prms.styles["color_a"]]
 
         self.conf.load_config(self.tracks[0].conf)
 
         if self.conf.dotplot.track_b is not None:
-            if isinstance(self.prms.track_b, Track):
+            if isinstance(self.prms.track_b, AlnTrack):
                 self.tracks.append(self.prms.track_b)
             else:
-                self.tracks.append(Track(self.prms.track_b, conf=self.conf))
+                self.tracks.append(AlnTrack(self.prms.track_b, conf=self.conf))
             #self.colors.append(self.prms.styles["color_b"])
 
             self.read_ids = self.tracks[0].read_ids & self.tracks[1].read_ids
