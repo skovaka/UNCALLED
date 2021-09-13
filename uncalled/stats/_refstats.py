@@ -3,7 +3,6 @@ import numpy as np
 import argparse
 import re
 import time
-import scipy.stats.mstats as mstats
 import types
 import pandas as pd
 import scipy.stats
@@ -84,7 +83,7 @@ class _Refstats:
     def describe(track, layers, stats):
         df = {}
         for layer in layers:
-            desc = mstats.describe(track[layer], axis=0)
+            desc = scipy.stats.describe(track[layer], axis=0, nan_policy="omit")
             for stat in stats:
                 name = ".".join([layer, stat])
                 fn = _Refstats._DESC_FNS[stat]
@@ -101,7 +100,7 @@ class _Refstats:
             for i,rf in enumerate(track_a.ref_coords.index):
                 a = track_a[layer,:,rf]
                 b = track_b[layer,:,rf]
-                ks = scipy.stats.mstats.ks_2samp(a,b,mode="asymp")
+                ks = scipy.stats.stats.ks_2samp(a,b,mode="asymp")
                 layer_stats[i] = ks[0]
             df[layer + ".ks"] = layer_stats
 

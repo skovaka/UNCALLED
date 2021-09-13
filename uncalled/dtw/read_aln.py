@@ -95,11 +95,7 @@ class RefCoord:
 
 class ReadAln:
 
-    #def __init__(self, index, aln, df=None, is_rna=False, ref_bounds=None, aln_id=None):
     def __init__(self, aln_id, read_id, mrefs=None, index=None, is_rna=False):
-        #if not isinstance(aln, PafEntry):
-        #    raise RuntimeError("ReadAlns can only be initialized from PafEntrys currently")
-
         self.aln_id = aln_id
         self.read_id = read_id
         self.index = index
@@ -111,24 +107,6 @@ class ReadAln:
         if mrefs is not None:
             self.set_coords(mrefs)
 
-        #if dtw is not None:
-        #    self.set_aln(dtw)
-
-            #has_ref = self.aln.index.name == "ref"
-            #has_mref = "mref" in self.aln.columns
-
-            ##TODO check for required columns
-            #if not has_ref and not has_mref:
-            #    raise RuntimeError("ReadAln DataFrame must include a column named \"%s\" or \"%s\"" % ("ref", "mref"))
-            #
-            #if has_ref and not has_mref:
-            #    self.aln["mref"] = self.index.ref_to_mref(self.ref_id, self.aln.index, self.is_fwd, self.is_rna)
-
-            #elif not has_ref and has_mref:
-            #    self.aln[REF_COL] = self.index.mirref_to_ref(self.aln["mref"])
-
-            #self.aln.sort_values("mref", inplace=True)
-        
     def set_coords(self, coords):
         loc = self.index.mref_to_ref_bound(self.mref_start,self.mref_end,not self.is_rna)
         self.ref_bounds = RefCoord(loc.ref_name, loc.start, loc.end, loc.fwd)
@@ -158,33 +136,6 @@ class ReadAln:
     def ref_name(self):
         return self.ref_bounds.name
 
-
-    #def set_ref_bounds(self, aln, ref_bounds):
-    #    if ref_bounds is None:
-    #        self.ref_bounds = RefCoord(aln.rf_name, aln.rf_st, aln.rf_en, aln.is_fwd)
-    #    else:
-    #        if aln.rf_st < ref_bounds.start:
-    #            ref_st = ref_bounds.start
-    #            clipped = True
-    #        else:
-    #            ref_st = aln.rf_st
-
-    #        if aln.rf_en > ref_bounds.end:
-    #            ref_en = ref_bounds.end
-    #            clipped = True
-    #        else:
-    #            ref_en = aln.rf_en
-
-    #        if ref_en-ref_st < nt.K:#ref_st > ref_en:
-    #            self.empty = True
-    #            return
-
-    #        self.ref_bounds = RefCoord(aln.rf_name, ref_st, ref_en, aln.is_fwd)
-
-    #    self.ref_id = self.index.get_ref_id(self.ref_name)
-
-    #    self.empty = False
-
     #TODO ReadAln stores RefCoords, handles all this conversion?
 
     def mref_to_ref(self, mref):
@@ -211,7 +162,6 @@ class ReadAln:
         self.aln.sort_values("mref", inplace=True)
 
     def get_samp_bounds(self):
-        pd.set_option('display.max_rows', None)
         samp_min = int(self.aln['start'].min())
         max_i = self.aln['start'].argmax()
         samp_max = int(self.aln['start'].iloc[max_i] + self.aln['length'].iloc[max_i])
@@ -230,15 +180,7 @@ class ReadAln:
         if not "aln_id" in df:
             df["aln_id"] = self.aln_id
 
-        #print(name, df)
-
-        #df = df.loc[self.mref_start+nt.K-1:self.mref_end]
-        #mask = (df.index >= self.mref_start+nt.K-1) & (df.index < self.mref_end)
-        #if not np.all(mask):
-        #    df = df.loc[mask].copy()
-
         setattr(self, name, df)
-
 
     def set_aln(self, df):
         self.set_df(df, "aln")
