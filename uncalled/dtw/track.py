@@ -380,7 +380,8 @@ class AlnTrack:
 
         self.mat = self.df.pivot(index="aln_id", columns="mref") \
                    .rename(columns=self.mref_to_ref) \
-                   .rename_axis("ref", axis=0).sort_index()
+                   .rename_axis(("layer","ref"), axis=1) \
+                   .sort_index(axis=1,level=1) 
 
         self.df.set_index(["mref", "aln_id"], inplace=True)
 
@@ -461,7 +462,7 @@ class AlnTrack:
     def sort_coord(self, layer, ref):
         #if isinstance(layer, str):
         #    layer = self.layer_idxs[layer]
-        order = np.argsort(-self[layer,:,ref])
+        order = (-self.mat[layer,ref].fillna(0)).argsort()
         self.sort(order)
 
     def sort(self, order):
