@@ -194,12 +194,13 @@ class AlnTrack:
             self.mref_coords = None
             return
 
-        ref_index = pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1)
+        ref_index = pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1).rename("ref")
 
         self.width = len(ref_index)
         self.height = None
 
-        ref_coords = list()
+        self.mref_coords = pd.DataFrame(index=ref_index)
+        self.ref_coords = list()
         kmers = list()
 
         for fwd in [False, True]:
@@ -210,24 +211,16 @@ class AlnTrack:
                 mref = mref[::-1]
                 kmer = kmer[::-1]
 
-            ref_coords.append(
+            self.mref_coords[fwd] = mref
+            self.ref_coords.append(
                 pd.DataFrame(index=mref, data={"ref" : ref_index, "fwd" : fwd})
             )
             kmers.append(pd.Series(index=mref, data=kmer))
 
         #TODO rename coords to something better
-        self.ref_coords = pd.concat(ref_coords).sort_index()
-        self.mref_coords = self.ref_coords.reset_index().set_index(["fwd", "ref"])["mref"].unstack(level=0)
+        self.ref_coords = pd.concat(self.ref_coords).sort_index()
         self.kmers = pd.concat(kmers).sort_index()
 
-        print(self.mref_coords)
-
-        #print("MREF")
-        #print(self.mrefs)
-        #print("COORD")
-        #print(self.coords)
-
-            
 
     def init_read_aln(self, read_id, bounds):
         aln_id = len(self.aln_reads)
@@ -381,10 +374,6 @@ class AlnTrack:
         )#.rename(index=self.mref_to_ref) \
          #.rename_axis("ref", axis=0).sort_index()
 
-        print(query)
-        print(params)
-        print(self.df)
-
         ids = self.df["aln_id"][~self.df["aln_id"].duplicated()].to_numpy(dtype=str)
 
         #TODO deal with multiple strands
@@ -394,7 +383,7 @@ class AlnTrack:
             "SELECT * FROM \"%s.alns\" WHERE aln_id IN (%s)" 
             % (self.prms.name, ",".join(["?"]*len(ids))),
             self.con, params=ids#list(self.mat.index)
-        ).rename(columns={"read_id" : "id"}).sort_values("ref_start")
+        ).sort_values("ref_start")
 
         self.df.set_index(["mref", "aln_id"], inplace=True)
 

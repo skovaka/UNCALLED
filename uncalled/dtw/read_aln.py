@@ -95,8 +95,9 @@ class RefCoord:
 
 class ReadAln:
 
-    def __init__(self, aln_id, read_id, mrefs=None, index=None, is_rna=False):
+    def __init__(self, aln_id, track_id, read_id, mrefs=None, index=None, is_rna=False):
         self.aln_id = aln_id
+        self.track_id = track_id
         self.read_id = read_id
         self.index = index
         self.is_rna = is_rna
