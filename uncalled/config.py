@@ -170,8 +170,11 @@ class Config(_Conf):
             with open(filename, "w") as fout:
                 toml.dump(out, fout)
 
-    def load_toml(self, filename):
-        toml_dict = toml.load(filename)
+    def load_toml(self, filename=None, text=None):
+        if filename is not None:
+            toml_dict = toml.load(filename)
+        elif text is not None:
+            toml_dict = toml.loads(text)
 
         for name, val in toml_dict.items():
             if isinstance(val, dict):

@@ -95,8 +95,8 @@ class RefCoord:
 
 class ReadAln:
 
-    def __init__(self, aln_id, track_id, read_id, mrefs=None, index=None, is_rna=False):
-        self.aln_id = aln_id
+    def __init__(self, track_id, read_id, mrefs=None, index=None, is_rna=False):
+        self.id = None
         self.track_id = track_id
         self.read_id = read_id
         self.index = index
@@ -115,7 +115,7 @@ class ReadAln:
 
     @property
     def empty(self):
-        return not hasattr(self, "aln") or len(self.aln) == 0
+        return not hasattr(self, "dtw") or len(self.dtw) == 0
 
     @property
     def mref_start(self):
@@ -149,23 +149,23 @@ class ReadAln:
         return self.mref_to_samp(self.ref_to_mref(ref))
         
     def mref_to_samp(self, mref):
-        i = np.clip(self.aln['mref'].searchsorted(mref), 0, len(self.aln)-1)
-        return self.aln['sample'][i]
+        i = np.clip(self.dtw['mref'].searchsorted(mref), 0, len(self.dtw)-1)
+        return self.dtw['sample'][i]
     
     def calc_mref(self):
-        self.aln["mref"] = self.index.ref_to_mref(self.ref_id, self.aln.index, self.is_fwd, self.is_rna)
+        self.dtw["mref"] = self.index.ref_to_mref(self.ref_id, self.dtw.index, self.is_fwd, self.is_rna)
 
     @property
     def is_fwd(self):
         return self.ref_bounds.fwd
 
     def sort_mref(self):
-        self.aln.sort_values("mref", inplace=True)
+        self.dtw.sort_values("mref", inplace=True)
 
     def get_samp_bounds(self):
-        samp_min = int(self.aln['start'].min())
-        max_i = self.aln['start'].argmax()
-        samp_max = int(self.aln['start'].iloc[max_i] + self.aln['length'].iloc[max_i])
+        samp_min = int(self.dtw['start'].min())
+        max_i = self.dtw['start'].argmax()
+        samp_max = int(self.dtw['start'].iloc[max_i] + self.dtw['length'].iloc[max_i])
         return samp_min, samp_max
     
     #def set_bands(self, bands):
@@ -179,23 +179,23 @@ class ReadAln:
 
         self.dfs.add(name)
         if not "aln_id" in df:
-            df["aln_id"] = self.aln_id
+            df["aln_id"] = self.id
 
         setattr(self, name, df)
 
-    def set_aln(self, df):
-        self.set_df(df, "aln")
+    def set_dtw(self, df):
+        self.set_df(df, "dtw")
 
     def set_bcerr(self, df):
         self.set_df(df, "bcerr")
 
-    def set_subevent_aln(self, aln, ref_mirrored=False, kmer_str=False, ref_col="mref", start_col="start", length_col="length", mean_col="current", kmer_col="kmer"):
+    def set_subevent_aln(self, dtw, ref_mirrored=False, kmer_str=False, ref_col="mref", start_col="start", length_col="length", mean_col="current", kmer_col="kmer"):
 
-        aln["cuml_mean"] = aln[length_col] * aln[mean_col]
+        dtw["cuml_mean"] = dtw[length_col] * dtw[mean_col]
 
-        grp = aln.groupby(ref_col)
+        grp = dtw.groupby(ref_col)
 
-        if kmer_col in aln:
+        if kmer_col in dtw:
             if kmer_str:
                 kmers = [nt.kmer_rev(nt.str_to_kmer(k,0)) for k in grp[kmer_col].first()]
             else:
@@ -213,7 +213,7 @@ class ReadAln:
 
         lengths = grp[length_col].sum()
 
-        aln = pd.DataFrame({
+        dtw = pd.DataFrame({
             #"ref"    : refs.astype("int64"),
             "mref"    : mrefs.astype("int64"),
             "start"  : grp[start_col].min().astype("uint32"),
@@ -222,13 +222,13 @@ class ReadAln:
         })
 
         if kmers is not None:
-            aln["kmer"] = kmers.astype("uint16")
+            dtw["kmer"] = kmers.astype("uint16")
         
         #if ref_mirrored:
-        #    aln["mref"] = mrefs
+        #    dtw["mref"] = mrefs
 
-        aln = aln.set_index("mref").sort_index()
-        self.set_aln(aln)
+        dtw = dtw.set_index("mref").sort_index()
+        self.set_dtw(dtw)
 
     def get_index_kmers(self, index, kmer_shift=4):
         """Returns the k-mer sequence at the alignment reference coordinates"""
@@ -298,7 +298,7 @@ class BcFast5Aln(ReadAln):
         df = df.set_index("mref", drop=True) \
                .sort_index() 
         df = df[~df.index.duplicated(keep="last")]
-        self.set_aln(df)
+        self.set_df(df, "aln")
         #self.aln.reset_index(inplace=True, drop=True)
 
         if self.err_bps is not None:
@@ -319,6 +319,10 @@ class BcFast5Aln(ReadAln):
         #self.empty = len(self.aln) == 0
         #if self.empty: 
         #    return
+
+    @property
+    def empty(self):
+        return not hasattr(self, "aln") or len(self.aln) == 0
 
     def parse_cs(self, paf):
         cs = paf.tags.get('cs', (None,)*2)[0]

@@ -1,19 +1,35 @@
 #!/usr/bin/env python3
 
 import sys, os
-import numpy as np
 import sqlite3
+import numpy as np
+import pandas as pd
 
 #class TrackIOParams(ParamGroup):
 #    _name = "track_io"
 #TrackIOParams.def_params(
-#    ("path", None, None, "Path to directory where alignments are stored"),
+#    ("tracks", None, None, ""),
+#    ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
+#    ("index_prefix", None, str, "BWA index prefix"),
+#    ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
+#    ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
+#    ("layers", DEFAULT_LAYERS, list, "Layers to load"),
+#    ("mode", "r", str, "Read (r) or write (w) mode"),
+#    ignore_toml={"mode", "overwrite"}
 #)
+#
+#class TrackIO:
+#    def __init__(self, *args, **kwargs):
+
+
 
 class TrackSQL:
     def __init__(self, sqlite_db):
-        self.con = sqlite3.connect(self.db_filename)
+        self.con = sqlite3.connect(sqlite_db)
         #self.prms = track_io_prms
+
+    def close(self):
+        self.con.close()
 
     def init_tables(self):
         cur = self.con.cursor()
@@ -24,17 +40,20 @@ class TrackSQL:
                 desc TEXT,
                 config TEXT,
                 groups TEXT
-            );
+            );""")
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS read (
                 id TEXT PRIMARY KEY,
                 name TEXT,
                 desc TEXT,
                 config TEXT
-            );
+            );""")
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS fast5 (
                 id INTEGER PRIMARY KEY,
                 filename TEXT
-            );
+            );""")
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS alignment (
                 id INTEGER PRIMARY KEY,
                 track_id INTEGER,
@@ -48,7 +67,8 @@ class TrackSQL:
                 tags TEXT,
                 FOREIGN KEY (track_id) REFERENCES track (id),
                 FOREIGN KEY (read_id) REFERENCES read (id)
-            );
+            );""")
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS dtw (
                 mref INTEGER,
                 aln_id INTEGER,
@@ -57,7 +77,8 @@ class TrackSQL:
                 current REAL,
                 PRIMARY KEY (mref, aln_id),
                 FOREIGN KEY (aln_id) REFERENCES alignment (id)
-            );
+            );""")
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS bcaln (
                 mref INTEGER,
                 aln_id INTEGER,
@@ -66,32 +87,43 @@ class TrackSQL:
                 error TEXT,
                 PRIMARY KEY (mref, aln_id),
                 FOREIGN KEY (aln_id) REFERENCES alignment (id)
-            );
-            """
+            );""")
+        self.con.commit()
 
-    def write_track(self, track):
+    def init_track(self, track):
         cur = self.con.cursor()
         cur.execute(
             "INSERT INTO track (name,desc,config,groups) VALUES (?,?,?,?)",
-            (track.name, track.desc, track.config.to_toml(), "dtw")
+            (track.prms.name, track.prms.name, track.conf.to_toml(), "dtw")
+            #(track.name, track.desc, track.config.to_toml(), "dtw")
         )
+        track.id = cur.lastrowid
         self.con.commit()
+        return track.id
 
-    def write_aln(self, aln):
+    def init_alignment(self, aln):
         cur = self.con.cursor()
-        samp_st, samp_end = get_samp_bounds(self)
+        #samp_st, samp_end = aln.get_samp_bounds()
         cur.execute(
-            "INSERT INTO alignment (track_id, read_id, ref_name, ref_start, ref_end, fwd, samp_start, samp_end) VALUES (?,?,?,?,?,?,?,?)",
-            (aln.track_id, aln.read_id, aln.ref_name, aln.ref_start, aln.ref_end, aln.is_fwd, samp_start, samp_end)
+            "INSERT INTO alignment (track_id, read_id, ref_name, ref_start, ref_end, fwd) VALUES (?,?,?,?,?,?)",
+            (aln.track_id, aln.read_id, aln.ref_name, aln.ref_start, aln.ref_end, aln.is_fwd)
         )
         aln.id = cur.lastrowid
-        self.write_layers("dtw", aln.dtw)
         self.con.commit()
+        return aln.id
 
     def write_layers(self, table, df):
         df.to_sql(table, self.con, if_exists="append", index=True, index_label="mref")
+        #self.con.commit()
 
-    def query(self, track_id, mref_coords, full_overlap):
+    def query_track(self, name):
+        cur = self.con.cursor()
+        return cur.execute(
+            "SELECT id, desc, config, groups FROM track WHERE name == ?", 
+            (name,)).fetchone()
+        
+
+    def query_alns(self, track_id, mref_coords, full_overlap):
 
         select = "SELECT mref, aln_id, start, length, current FROM dtw"
         where = " WHERE (mref >= ? AND mref <= ?)"
@@ -109,7 +141,7 @@ class TrackSQL:
         ids = dtw["aln_id"][~dtw["aln_id"].duplicated()].to_numpy(dtype=str)
 
         alns = pd.read_sql_query(
-            "SELECT * FROM alignment WHERE id IN (%s)" % ",".join(["?"]*len(ids),
+            "SELECT * FROM alignment WHERE id IN (%s)" % ",".join(["?"]*len(ids)),
             self.con, params=ids
         ).sort_values("ref_start")
 

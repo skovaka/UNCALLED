@@ -75,11 +75,13 @@ def main(conf):
         paf = mm2s.get(read.id, None)
 
         if paf is None:
+            print("NO PAF")
             continue
 
         dtw = GuidedDTW(track, read, paf, conf)
 
         if dtw.empty:
+            print("NO DTW")
             continue
 
         track.save_read(read.f5.filename)

@@ -18,6 +18,7 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
 from .read_aln import ReadAln, RefCoord, LayerMeta, LAYER_META
+from .track_io import TrackSQL
 
 from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
@@ -97,7 +98,6 @@ class AlnTrack:
         self.in_mem = self.prms.path is None
 
         self.read_ids = set()
-        self.aln_reads = dict()
 
         if self.prms.name is None:
             self.prms.name = os.path.basename(self.prms.path)
@@ -108,10 +108,13 @@ class AlnTrack:
 
             self.fname_mapping_file = open(self.fname_mapping_filename, self.prms.mode)
 
-            self.con = sqlite3.connect(self.db_filename)
+            #self.con = sqlite3.connect(self.db_filename)
+            self.db = TrackSQL(self.db_filename)
 
             if self.prms.mode == self.READ_MODE:
-                self.conf.load_toml(self.config_filename)
+                self.id, self.desc, toml, groups = self.db.query_track(self.prms.name)
+                self.conf.load_toml(text=toml)
+                #self.conf.load_toml(self.config_filename)
 
                 if len(self.conf.fast5_reader.fast5_index) == 0:
                     self.conf.fast5_reader.fast5_index = self.fname_mapping_filename
@@ -137,7 +140,9 @@ class AlnTrack:
 
                 self.conf.to_toml(self.config_filename)
                 self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
-                self._init_tables()
+                self.db.init_tables()
+                self.id = self.db.init_track(self)
+                #self._init_tables()
 
     def _init_tables(self):
         cur = self.con.cursor()
@@ -223,8 +228,6 @@ class AlnTrack:
 
 
     def init_read_aln(self, read_id, bounds):
-        aln_id = len(self.aln_reads)
-
         if isinstance(bounds, RefCoord):
             bounds = self._ref_coords_to_mrefs(bounds)
         elif not isinstance(bounds, pd.RangeIndex):
@@ -235,10 +238,8 @@ class AlnTrack:
             bounds = bounds.intersection(self._bounds[fwd])
             if len(bounds) == 0: return False
 
-        self.read_aln = ReadAln(aln_id, read_id, bounds, index=self.index, is_rna=self.conf.is_rna)
-        self._init_aln(self.read_aln)
-
-        self.aln_reads[aln_id] = read_id
+        self.read_aln = ReadAln(self.id, read_id, bounds, index=self.index, is_rna=self.conf.is_rna)
+        self.db.init_alignment(self.read_aln)
 
         if self.in_mem:
             self.read_ids = {read_id}
@@ -274,17 +275,10 @@ class AlnTrack:
             (aln_i, self.read_aln.read_id, self.read_aln.ref_id, self.read_aln.ref_start, self.read_aln.ref_end, self.read_aln.is_fwd, True)
         )
 
-        #for name in self.read_aln.dfs:
-        #    df = getattr(self.read_aln, name)
-        #    df = df.drop(columns=["mref"], errors="ignore").sort_index()
-        #    self.hdf.put("_%d/%s" % (aln_i, name), df, format="fixed")
-        df = self.read_aln.aln
-        #print(df)
-        df.to_sql("%s.dtw" % self.prms.name, self.con, if_exists="append", index=True, index_label="mref")
+        self.db.write_layers("dtw", self.read_aln.dtw)
 
         s = "\t".join([self.read_aln.read_id, fast5_fname, "-"]) + "\n"
         self.fname_mapping_file.write(s)
-
 
     def load_read(self, read_id=None, coords=None, load_kmers=True):
         if self.read_aln is not None and read_id == self.read_aln.read_id: 
@@ -351,49 +345,18 @@ class AlnTrack:
 
         self.set_ref_bounds(self.prms.ref_bounds)
 
-
-        t = time.time()
-
-        select = "SELECT mref, \"%s.dtw\".aln_id, start, length, current FROM \"%s.dtw\"" 
-        where = " WHERE (mref >= ? AND mref <= ?)"
-        params = [int(self.mref_coords[True].min()), str(self.mref_coords[True].max())]
-        name_count = 2
-
-        if self.prms.full_overlap:
-            select = select + " JOIN \"%s.alns\" ON \"%s.alns\".aln_id = \"%s.dtw\".aln_id"
-            where = where + " AND (ref_start < ? AND ref_end > ?)"
-            params += [int(self.mref_coords.index[0]), int(self.mref_coords.index[-1])]
-            name_count += 3
-
-
-        query = select + where
-        fmt = ((self.prms.name,)*name_count)
-
-        self.df = pd.read_sql_query(
-            query % fmt, self.con, params=params,
-        )#.rename(index=self.mref_to_ref) \
-         #.rename_axis("ref", axis=0).sort_index()
-
-        ids = self.df["aln_id"][~self.df["aln_id"].duplicated()].to_numpy(dtype=str)
-
-        #TODO deal with multiple strands
-        #add OR clause to WHERE, compute ref, pivot, return one df/mat?
-        #or two queries, pivot seperately, return two dfs/mats?
-        self.reads = pd.read_sql_query(
-            "SELECT * FROM \"%s.alns\" WHERE aln_id IN (%s)" 
-            % (self.prms.name, ",".join(["?"]*len(ids))),
-            self.con, params=ids#list(self.mat.index)
-        ).sort_values("ref_start")
+        self.reads, self.df = self.db.query_alns(self.id, self.mref_coords, self.prms.full_overlap)
 
         self.df.set_index(["mref", "aln_id"], inplace=True)
+
+        self.reads.sort_values("ref_start", inplace=True)
 
         self.mat = self.df.reset_index().pivot(index="aln_id", columns="mref") \
                    .rename(columns=self.ref_coords["ref"]) \
                    .rename_axis(("layer","ref"), axis=1) \
                    .sort_index(axis=1,level=1) 
 
-
-        self.mat = self.mat.reindex(self.reads["aln_id"], copy=False)
+        self.mat = self.mat.reindex(self.reads["id"], copy=False)
 
         self.has_fwd = np.any(self.reads['fwd'])
         self.has_rev = not np.all(self.reads['fwd'])
@@ -410,19 +373,9 @@ class AlnTrack:
     def get_pileup(self, layer):
         return np.flip(np.sort(self[layer], axis=0), axis=0)
 
-    def write_coords(self):
-        df = pd.DataFrame(
-                self.read_coords, 
-                columns=["aln_id", "read_id", "ref_id", "ref_start", "ref_end", "fwd", "primary"]
-        ).set_index(["ref_id", "ref_start", "ref_end"]).sort_index()
-        self.hdf.put("coords", df, data_columns=["read_id"], format="table")
-
     def close(self):
         if self.in_mem: return
-        #if self.prms.mode == "w":
-        #    self.write_coords()
-        #self.hdf.close()
-        self.con.close()
+        self.db.close()
         self.fname_mapping_file.close()
 
     #@property
