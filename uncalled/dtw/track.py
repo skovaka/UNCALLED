@@ -259,7 +259,7 @@ class AlnTrack:
         )
 
         if store:
-            self.read_aln.aln["kmer"] = kmers
+            self.read_aln.dtw["kmer"] = kmers
         return kmers
 
     def save_read(self, fast5_fname, aln=None):
@@ -280,19 +280,19 @@ class AlnTrack:
         s = "\t".join([self.read_aln.read_id, fast5_fname, "-"]) + "\n"
         self.fname_mapping_file.write(s)
 
-    def load_read(self, read_id=None, coords=None, load_kmers=True):
+    def load_read(self, read_id=None, load_kmers=True):
         if self.read_aln is not None and read_id == self.read_aln.read_id: 
             return self.read_aln
 
-        if read_id is None and coords is None:
-            raise ValueError("read_id or coords must be specified for AlnTrack.load_read")
-        elif coords is not None:
-            read_id = coords.read_id
-        else:
-            coords = self.hdf.select("/coords", "read_id=read_id").iloc[0]
+        #if read_id is None and coords is None:
+        #    raise ValueError("read_id or coords must be specified for AlnTrack.load_read")
+        #elif coords is not None:
+        #    read_id = coords.read_id
+        #else:
+        #    coords = self.hdf.select("/coords", "read_id=read_id").iloc[0]
 
-        aln_id = coords.aln_id
-        group = "/_%d" % aln_id
+        #aln_id = coords.aln_id
+        #group = "/_%d" % aln_id
 
         #if self.prms.ref_bounds is None:
         #    where = None
@@ -300,27 +300,31 @@ class AlnTrack:
         #    start = self.prms.ref_bounds.start
         #    end = self.prms.ref_bounds.end
         #    where = "index >= self.prms.ref_bounds.start & index < self.prms.ref_bounds.end"
+        #if self.mref_coords != None:
+        #    mrefs = self.mref_coords[coords.fwd]
+        #    if len(mrefs) == 0: return False
+        #else:
+        #    mrefs = None
+        #for (path, subgroups, subkeys) in self.hdf.walk(group):
+        #    for name in subkeys:
+        #        df = self.hdf.select(os.path.join(group, name))#, where=where)
+        #        self.read_aln.set_df(df, name)
 
-        if self.mref_coords != None:
-            mrefs = self.mref_coords[coords.fwd]
-            if len(mrefs) == 0: return False
-        else:
-            mrefs = None
+        aln, dtw = self.db.query_read(read_id, self.mref_coords)
 
-        self.read_aln = ReadAln(aln_id, read_id, mrefs, index=self.index, is_rna=self.conf.is_rna)
+        print(self.conf.is_rna)
 
-        for (path, subgroups, subkeys) in self.hdf.walk(group):
-            for name in subkeys:
-                df = self.hdf.select(os.path.join(group, name))#, where=where)
-                self.read_aln.set_df(df, name)
+        self.read_aln = ReadAln(self.id, read_id, index=self.index, is_rna=self.conf.is_rna)
+        self.read_aln.set_dtw(dtw)
 
+        print(dtw)
         if not self.read_aln.empty:
             if load_kmers:
                 self.load_aln_kmers()
 
             for layer in self.prms.layers:
-                if not layer in self.read_aln.aln.columns:
-                    self.read_aln.aln[layer] = self.LAYER_FNS[layer](self, self.read_aln)
+                if not layer in self.read_aln.dtw.columns:
+                    self.read_aln.dtw[layer] = self.LAYER_FNS[layer](self, self.read_aln)
 
         return self.read_aln
 

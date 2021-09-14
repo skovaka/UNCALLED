@@ -5,22 +5,50 @@ import sqlite3
 import numpy as np
 import pandas as pd
 
-#class TrackIOParams(ParamGroup):
+from .. import config
+
+#class TrackIOParams(config.ParamGroup):
 #    _name = "track_io"
 #TrackIOParams.def_params(
-#    ("tracks", None, None, ""),
+#    ("input", None, None, "Input track(s)"),
+#    ("output", str, None, "Output track"),
 #    ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
 #    ("index_prefix", None, str, "BWA index prefix"),
 #    ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
 #    ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
 #    ("layers", DEFAULT_LAYERS, list, "Layers to load"),
-#    ("mode", "r", str, "Read (r) or write (w) mode"),
+#    #("mode", "r", str, "Read (r) or write (w) mode"),
 #    ignore_toml={"mode", "overwrite"}
 #)
 #
 #class TrackIO:
 #    def __init__(self, *args, **kwargs):
-
+#        self.conf, self.prms = config._init_group("track_io", *args, **kwargs)
+#        
+#        self.dbs = list()
+#
+#        if self.prms.input is None:
+#            self.in_dbs = None
+#        else:
+#            if not isinstance(self.prms.input, list):
+#                self.prms.input = [self.prms.input]
+#            self.in_dbs = list()
+#            for db in self.prms.input:
+#                track_names = self.open_db(db)
+#                self.in_dbs.append()
+#
+#    def open_db(self, db_str):
+#        spl = db_str.split(":")
+#        if len(spl) == 2:
+#            filename = spl[0]
+#            track_names = spl[1].split(",")
+#        elif len(spl) == 1:
+#            filename = db_str
+#            track_names = None
+#        else:
+#            raise ValueError("Incorrect database specifier format: " + db_str)
+#
+#        db = TrackSQL(filename)
 
 
 class TrackSQL:
@@ -44,9 +72,8 @@ class TrackSQL:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS read (
                 id TEXT PRIMARY KEY,
-                name TEXT,
-                desc TEXT,
-                config TEXT
+                fast5_id INTEGER,
+                FOREIGN KEY (fast5_id) REFERENCE fast5 (id)
             );""")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS fast5 (
@@ -122,6 +149,26 @@ class TrackSQL:
             "SELECT id, desc, config, groups FROM track WHERE name == ?", 
             (name,)).fetchone()
         
+    def query_read(self, read_id, mref_coords=None):
+        query = """
+            SELECT mref, aln_id, start, length, current FROM dtw
+            JOIN alignment ON id = aln_id
+            WHERE read_id = ?"""
+        params = [read_id]
+
+        if mref_coords is not None:
+            query = select + " AND (mref >= ? AND mref <= ?)"
+            params += [int(mref_coords[True].min()), str(mref_coords[True].max())]
+
+        dtw = pd.read_sql_query(query, self.con, params=params).set_index("mref")
+        aln_id = str(dtw["aln_id"].iloc[0])
+
+        aln = pd.read_sql_query(
+            "SELECT * FROM alignment WHERE id = ?",
+            self.con, params=(aln_id,)
+        )
+
+        return aln, dtw
 
     def query_alns(self, track_id, mref_coords, full_overlap):
 

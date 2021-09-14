@@ -164,20 +164,20 @@ class Dotplot:
         samp_min, samp_max = aln.get_samp_bounds()
         sys.stdout.flush()
         raw_norm = self.read.get_norm_signal(samp_min, samp_max)
-        model_current = track.model[aln.aln['kmer']]
+        model_current = track.model[aln.dtw['kmer']]
 
         ymin = min(np.min(model_current), np.min(raw_norm[raw_norm>0]))
         ymax = max(np.max(model_current), np.max(raw_norm[raw_norm>0]))
 
-        starts = aln.aln['start']
-        ends = starts+aln.aln['length']
+        starts = aln.dtw['start']
+        ends = starts+aln.dtw['length']
 
-        aln_bases = nt.kmer_base(aln.aln['kmer'], 2)
+        aln_bases = nt.kmer_base(aln.dtw['kmer'], 2)
         samp_bases = np.full(samp_max-samp_min, -1)
 
-        for i in range(len(aln.aln)):
-            st = int(aln.aln.iloc[i]['start'] - samp_min)
-            en = int(st + aln.aln.iloc[i]['length']) - 1
+        for i in range(len(aln.dtw)):
+            st = int(aln.dtw.iloc[i]['start'] - samp_min)
+            en = int(st + aln.dtw.iloc[i]['length']) - 1
             samp_bases[st:en] = aln_bases[i]
 
         samps = np.arange(samp_min, samp_max)
@@ -185,22 +185,22 @@ class Dotplot:
             ax.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color)
 
         ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, c="black")
-        ax.step(aln.aln['start'], model_current, color='white', linewidth=2, where="post")
+        ax.step(aln.dtw['start'], model_current, color='white', linewidth=2, where="post")
 
-        #skips = aln.aln[np.diff(aln.aln.start, append=-1)==0].index
-        #ax.vlines(aln.aln.loc[skips, "start"]-1, ymin, ymax, colors="red", linestyles="dashed", linewidth=3)
+        #skips = aln.dtw[np.diff(aln.dtw.start, append=-1)==0].index
+        #ax.vlines(aln.dtw.loc[skips, "start"]-1, ymin, ymax, colors="red", linestyles="dashed", linewidth=3)
 
 
     def _plot_aln(self, i):
         aln = self.alns[i]
-        #if not "mref" in aln.aln:
+        #if not "mref" in aln.dtw:
         #    aln.calc_mref()
         #aln.sort_mref()
 
         if getattr(aln, "bands", None) is not None:
             self.ax_dot.fill_between(aln.bands['samp'], aln.bands['ref_st']-1, aln.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
 
-        self.ax_dot.step(aln.aln['start'], aln.aln.index, where="post", linewidth=3,
+        self.ax_dot.step(aln.dtw['start'], aln.dtw.index, where="post", linewidth=3,
             **self.prms.style["aln_kws"][i]
         )
 
@@ -211,8 +211,8 @@ class Dotplot:
         aln,_,_ = self.alns[list(self.focus)[0]]
         mref = aln.ref_to_mref(ref_coord)
 
-        i = aln.aln['mref'].searchsorted(mref)
-        samp = aln.aln.iloc[i]['start'] + aln.aln.iloc[i]['length']/2
+        i = aln.dtw['mref'].searchsorted(mref)
+        samp = aln.dtw.iloc[i]['start'] + aln.dtw.iloc[i]['length']/2
 
         self.cursor = (samp, mref)
 
@@ -343,7 +343,7 @@ class Dotplot:
         for ax,layer in zip(self.layer_axs, self.prms.layers):
             for i,aln in enumerate(self.alns):
                 ax.step(
-                    aln.aln[layer], aln.aln.index+0.5, 
+                    aln.dtw[layer], aln.dtw.index+0.5, 
                     where="post",
                     **self.prms.style["aln_kws"][i]
                 )
