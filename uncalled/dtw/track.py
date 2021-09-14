@@ -190,8 +190,8 @@ class AlnTrack:
     def set_ref_bounds(self, ref_bounds):
 
         if ref_bounds == None:
-            self.coords = None
-            self.mrefs = None
+            self.ref_coords = None
+            self.mref_coords = None
             return
 
         ref_index = pd.RangeIndex(self.ref_start, self.ref_end-nt.K+1)
@@ -199,28 +199,28 @@ class AlnTrack:
         self.width = len(ref_index)
         self.height = None
 
-        self.ref_coords = pd.Series(
-                np.arange(self.width, dtype=int),
-                index=ref_index
-        )
-
-        mref_to_ref = list()
+        ref_coords = list()
+        kmers = list()
 
         for fwd in [False, True]:
-            mrefs = self._ref_coords_to_mrefs(ref_bounds, fwd)
-            kmers = self.index.get_kmers(mrefs.start, mrefs.stop+nt.K-1, fwd)
+            mref = self._ref_coords_to_mrefs(ref_bounds, fwd)
+            kmer = self.index.get_kmers(mref.start, mref.stop+nt.K-1, fwd)
 
             if fwd == self.conf.is_rna:
-                mrefs = mrefs[::-1]
-                kmers = kmers[::-1]
+                mref = mref[::-1]
+                kmer = kmer[::-1]
 
-            mref_to_ref.append(
-                pd.DataFrame(index=mrefs, data={"ref" : ref_index, "fwd" : fwd, "kmer" : kmers})
+            ref_coords.append(
+                pd.DataFrame(index=mref, data={"ref" : ref_index, "fwd" : fwd})
             )
+            kmers.append(pd.Series(index=mref, data=kmer))
 
         #TODO rename coords to something better
-        self.coords = pd.concat(mref_to_ref).sort_index()
-        self.mrefs = self.coords.reset_index().set_index(["fwd", "ref"])["mref"].unstack(level=0)
+        self.ref_coords = pd.concat(ref_coords).sort_index()
+        self.mref_coords = self.ref_coords.reset_index().set_index(["fwd", "ref"])["mref"].unstack(level=0)
+        self.kmers = pd.concat(kmers).sort_index()
+
+        print(self.mref_coords)
 
         #print("MREF")
         #print(self.mrefs)
@@ -237,7 +237,7 @@ class AlnTrack:
         elif not isinstance(bounds, pd.RangeIndex):
             raise ValueError("ReadAlns can only be initialized with RangeIndex or RefCoord bounds")
 
-        if self.coords is not None:
+        if self.ref_coords is not None:
             fwd = self.index.is_mref_fwd(bounds.min(), self.conf.is_rna)
             bounds = bounds.intersection(self._bounds[fwd])
             if len(bounds) == 0: return False
@@ -314,8 +314,8 @@ class AlnTrack:
         #    end = self.prms.ref_bounds.end
         #    where = "index >= self.prms.ref_bounds.start & index < self.prms.ref_bounds.end"
 
-        if self.mrefs != None:
-            mrefs = self.mrefs[coords.fwd]
+        if self.mref_coords != None:
+            mrefs = self.mref_coords[coords.fwd]
             if len(mrefs) == 0: return False
         else:
             mrefs = None
@@ -363,13 +363,13 @@ class AlnTrack:
 
         select = "SELECT mref, \"%s.dtw\".aln_id, start, length, current FROM \"%s.dtw\"" 
         where = " WHERE (mref >= ? AND mref <= ?)"
-        params = [int(self.mrefs[True].min()), str(self.mrefs[True].max())]
+        params = [int(self.mref_coords[True].min()), str(self.mref_coords[True].max())]
         name_count = 2
 
         if self.prms.full_overlap:
             select = select + " JOIN \"%s.alns\" ON \"%s.alns\".aln_id = \"%s.dtw\".aln_id"
             where = where + " AND (ref_start < ? AND ref_end > ?)"
-            params += [self.coords["ref"].min(), self.coords["ref"].max()]
+            params += [int(self.mref_coords.index[0]), int(self.mref_coords.index[-1])]
             name_count += 3
 
 
@@ -399,7 +399,7 @@ class AlnTrack:
         self.df.set_index(["mref", "aln_id"], inplace=True)
 
         self.mat = self.df.reset_index().pivot(index="aln_id", columns="mref") \
-                   .rename(columns=self.coords["ref"]) \
+                   .rename(columns=self.ref_coords["ref"]) \
                    .rename_axis(("layer","ref"), axis=1) \
                    .sort_index(axis=1,level=1) 
 
@@ -488,7 +488,7 @@ class AlnTrack:
         ks_stats = np.zeros((len(self.CMP_LAYERS), self.width))
 
         for i,l in enumerate(AlnTrack.CMP_LAYERS):
-            for j,rf in enumerate(self.mrefs[True]):
+            for j,rf in enumerate(self.mref_coords[True]):
                 a = self[l,:,rf]
                 b = track_b[l,:,rf]
                 ks = scipy.stats.mstats.ks_2samp(a,b,mode="asymp")
