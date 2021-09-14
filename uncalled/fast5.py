@@ -92,14 +92,25 @@ class Fast5Reader:
         if reads is not None: 
             self.prms.read_filter = parse_read_ids(reads)
 
-        if index is not None: self.prms.fast5_index = index
+        if isinstance(index, str): 
+            self._load_index_file(index)
+        elif isinstance(index, pd.DataFrame):
+            self._load_index_df(index)
+        elif index is None:
+            self.indexed = False
+        else:
+            raise ValueError("Unknown fast5 index format")
 
-        self.indexed = len(self.prms.fast5_index) != 0
-
-        if self.indexed:
-            self._load_index()
+    def _load_index_df(self, df):
+        groups = df.groupby("filename").groups
+        groups = {
+            fast5 : list(df.loc[rows, "read_id"])
+            for fast5,rows in groups.items()
+        }
+        self._dict = _Fast5Dict(groups, self.prms)
+        self.indexed = True
             
-    def _load_index(self):
+    def _load_index_file(self):
         index = None
         names = None
 
@@ -142,8 +153,8 @@ class Fast5Reader:
             for fast5,rows in groups.items()
         }
 
-
         self._dict = _Fast5Dict(groups, self.prms)
+        self.indexed = True
     
     def get_read_file(self, read_id):
         if not self.indexed:

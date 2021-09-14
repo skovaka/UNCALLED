@@ -53,12 +53,8 @@ AlnTrackParams._def_params(
 )
 
 class AlnTrack:
-    DB_FNAME = "alns.db"
     CONF_FNAME = "conf.toml"
     ALN_DIR = "alns"
-
-    INDEX_FNAME = "filename_mapping.txt"
-    INDEX_HEADER = "read_id\tfilename\taln_file"
 
     #TODO make fast5_file alias for filename in Fast5Reader
     #also, in fast5 reader make static fast5 filename parser
@@ -103,23 +99,12 @@ class AlnTrack:
             self.prms.name = os.path.basename(self.prms.path)
 
         if not self.in_mem:
-            if self.prms.mode == self.WRITE_MODE:
-                os.makedirs(self.prms.path, exist_ok=self.prms.overwrite)
-
-            self.fname_mapping_file = open(self.fname_mapping_filename, self.prms.mode)
-
-            #self.con = sqlite3.connect(self.db_filename)
-            self.db = TrackSQL(self.db_filename)
+            self.db = TrackSQL(self.prms.path)
 
             if self.prms.mode == self.READ_MODE:
                 self.id, self.desc, toml, groups = self.db.query_track(self.prms.name)
                 self.conf.load_toml(text=toml)
-                #self.conf.load_toml(self.config_filename)
 
-                if len(self.conf.fast5_reader.fast5_index) == 0:
-                    self.conf.fast5_reader.fast5_index = self.fname_mapping_filename
-
-                self._load_fast5_index()
 
         self.index = load_index(self.prms.index_prefix)
         self.model = PoreModel(self.conf.pore_model)
@@ -136,10 +121,9 @@ class AlnTrack:
                 self.load_region(self.prms.ref_bounds)
 
             elif self.prms.mode == self.WRITE_MODE:
-                self.read_coords = list()
+                self.prev_fast5 = (None, None)
+                self.prev_read = None
 
-                self.conf.to_toml(self.config_filename)
-                self.fname_mapping_file.write(self.INDEX_HEADER + "\n")
                 self.db.init_tables()
                 self.id = self.db.init_track(self)
                 #self._init_tables()
@@ -178,7 +162,6 @@ class AlnTrack:
         return read_id in self.read_ids
 
     def _load_fast5_index(self):
-        self.fname_mapping = pd.read_csv(self.fname_mapping_file, sep="\t", index_col="read_id")
         self.read_ids = set(self.fname_mapping.index)
         if len(self.conf.fast5_reader.read_filter) > 0:
             self.read_ids = self.read_ids & set(self.conf.fast5_reader.read_filter)
@@ -227,26 +210,41 @@ class AlnTrack:
         self.kmers = pd.concat(kmers).sort_index()
 
 
-    def init_read_aln(self, read_id, bounds):
+    def init_read_aln(self, read, bounds):
         if isinstance(bounds, RefCoord):
             bounds = self._ref_coords_to_mrefs(bounds)
         elif not isinstance(bounds, pd.RangeIndex):
             raise ValueError("ReadAlns can only be initialized with RangeIndex or RefCoord bounds")
 
+        read_id = read.id
+        fast5 = read.f5.filename
+
         if self.ref_coords is not None:
             fwd = self.index.is_mref_fwd(bounds.min(), self.conf.is_rna)
             bounds = bounds.intersection(self._bounds[fwd])
-            if len(bounds) == 0: return False
+            if len(bounds) == 0: 
+                return None
+
+        #TODO iterate hierarchically through fast5s/reads
+        if fast5 == self.prev_fast5[0]:
+            fast5_id = self.prev_fast5[1]
+        else:
+            fast5_id = self.db.init_fast5(fast5)
+            self.prev_fast5 = (fast5, fast5_id)
+
+        if self.prev_read != read_id:
+            self.db.init_read(read_id, fast5_id)
+            self.prev_read = read_id
 
         self.read_aln = ReadAln(self.id, read_id, bounds, index=self.index, is_rna=self.conf.is_rna)
-        self.db.init_alignment(self.read_aln)
+        aln_id = self.db.init_alignment(self.read_aln, fast5)
 
         if self.in_mem:
             self.read_ids = {read_id}
         else:
             self.read_ids.add(read_id)
 
-        return True
+        return self.read_aln
 
     def load_aln_kmers(self, aln=None, store=True):
         if aln is None:
@@ -262,23 +260,15 @@ class AlnTrack:
             self.read_aln.dtw["kmer"] = kmers
         return kmers
 
-    def save_read(self, fast5_fname, aln=None):
+    def save_aln(self, aln=None):
         if self.prms.mode != "w":
             raise RuntimeError("Must be write mode to add read to track")
         
         if aln is not None:
             self.read_aln = aln
 
-        #columns=["aln_id", "read_id", "ref_id", "ref_start", "ref_end", "fwd", "primary"]
-        aln_i = len(self.read_coords)
-        self.read_coords.append(
-            (aln_i, self.read_aln.read_id, self.read_aln.ref_id, self.read_aln.ref_start, self.read_aln.ref_end, self.read_aln.is_fwd, True)
-        )
-
         self.db.write_layers("dtw", self.read_aln.dtw)
 
-        s = "\t".join([self.read_aln.read_id, fast5_fname, "-"]) + "\n"
-        self.fname_mapping_file.write(s)
 
     def load_read(self, read_id=None, load_kmers=True):
         if self.read_aln is not None and read_id == self.read_aln.read_id: 
@@ -380,7 +370,6 @@ class AlnTrack:
     def close(self):
         if self.in_mem: return
         self.db.close()
-        self.fname_mapping_file.close()
 
     #@property
     #def name(self):
@@ -388,18 +377,6 @@ class AlnTrack:
     #        return self.fast5s
     #    return self.prms.path.split("/")[-1]
 
-    @property
-    def db_filename(self):
-        return os.path.join(self.prms.path, self.DB_FNAME)
-
-    @property
-    def config_filename(self):
-        return os.path.join(self.prms.path, self.CONF_FNAME)
-
-    @property
-    def fname_mapping_filename(self):
-        return os.path.join(self.prms.path, self.INDEX_FNAME)
-    
     @property
     def read_count(self):
         return len(self.fname_mapping)

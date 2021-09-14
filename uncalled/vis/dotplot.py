@@ -98,9 +98,10 @@ class Dotplot:
             if len(self.read_ids) == 0:
                 raise RuntimeError("Dotplot tracks must have reads in common")
         else:
-            self.read_ids = self.tracks[0].read_ids
+            self.read_ids = self.tracks[0].db.get_read_ids()
         
-        self.fast5s = Fast5Reader(reads=self.read_ids, conf=self.tracks[0].conf)
+        fast5_index = self.tracks[0].db.get_fast5_index()
+        self.fast5s = Fast5Reader(reads=self.read_ids, index=fast5_index, conf=self.tracks[0].conf)
 
         self.index = self.tracks[0].index
         #self.mm2s = self.tracks[0].mm2s
@@ -115,7 +116,6 @@ class Dotplot:
             if not self._plot(read_id):
                 continue
             print(read_id)
-
 
             suffix = read_id + "." + fmt
             if os.path.isdir(out_prefix):

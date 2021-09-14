@@ -3,6 +3,7 @@ import time
 import re
 import numpy as np
 import pandas as pd
+from collections import defaultdict
 
 from ..pafstats import parse_paf
 from ..config import Config, ParamGroup
@@ -57,9 +58,6 @@ def main(conf):
 
     fast5s = Fast5Processor(conf=conf)
 
-    #if conf.dtw.out_path is not None:
-    #else:
-    #    track = None
     track = AlnTrack(conf.dtw.out_path, mode="w", conf=conf)
 
     mm2s = {p.qr_name : p
@@ -69,26 +67,46 @@ def main(conf):
             full_overlap=conf.track.full_overlap,
     )}
 
+    t = time.time()
     for read in fast5s:
-        print(read.id)
+        db_time = dtw_time = 0
+        t = time.time()
 
         paf = mm2s.get(read.id, None)
 
         if paf is None:
-            print("NO PAF")
+            continue
+
+        ref_bounds = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
+        track.init_read_aln(read, ref_bounds)
+
+        db_time += time.time() - t
+        t = time.time()
+
+        if track.read_aln is None:
+            sys.stderr.write("Should not happen")
             continue
 
         dtw = GuidedDTW(track, read, paf, conf)
 
         if dtw.empty:
-            print("NO DTW")
+            sys.stderr.write("Should not happen?")
             continue
 
-        track.save_read(read.f5.filename)
+        dtw_time += time.time() - t
+        t = time.time()
+
+        track.save_aln()
+
+        db_time += time.time() - t
+        t = time.time()
         
+        print("%s\t%f\t%f" % (read.id, dtw_time, db_time))
 
     if not track is None:
+        t = time.time()
         track.close()
+        print("end\t0\t%f" % (time.time()-t))
 
 class GuidedDTW:
 
@@ -102,10 +120,6 @@ class GuidedDTW:
         #paf_st, paf_en = self.track.index.ref_to_mref(
         #    paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd, self.conf.is_rna)
         #mrefs = pd.RangeIndex(paf_st+nt.K-1, paf_en)
-
-        ref_bounds = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
-        if not self.track.init_read_aln(read.id, ref_bounds):
-            return
 
         self.ref_kmers = self.track.load_aln_kmers(store=False)
 

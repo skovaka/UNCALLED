@@ -73,7 +73,7 @@ class TrackSQL:
             CREATE TABLE IF NOT EXISTS read (
                 id TEXT PRIMARY KEY,
                 fast5_id INTEGER,
-                FOREIGN KEY (fast5_id) REFERENCE fast5 (id)
+                FOREIGN KEY (fast5_id) REFERENCES fast5 (id)
             );""")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS fast5 (
@@ -128,9 +128,9 @@ class TrackSQL:
         self.con.commit()
         return track.id
 
-    def init_alignment(self, aln):
+    def init_alignment(self, aln, fast5):
         cur = self.con.cursor()
-        #samp_st, samp_end = aln.get_samp_bounds()
+
         cur.execute(
             "INSERT INTO alignment (track_id, read_id, ref_name, ref_start, ref_end, fwd) VALUES (?,?,?,?,?,?)",
             (aln.track_id, aln.read_id, aln.ref_name, aln.ref_start, aln.ref_end, aln.is_fwd)
@@ -139,9 +139,35 @@ class TrackSQL:
         self.con.commit()
         return aln.id
 
+    def init_fast5(self, filename):
+        cur = self.con.cursor()
+
+        row = cur.execute("SELECT id FROM fast5 WHERE filename = ?", (filename,)).fetchone()
+        if row is not None:
+            return row[0]
+            
+        cur.execute("INSERT INTO fast5 (filename) VALUES (?)", (filename,))
+        fast5_id = cur.lastrowid
+        self.con.commit()
+
+        return fast5_id
+
+    def init_read(self, read_id, fast5_id):
+        cur = self.con.cursor()
+        cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
+        self.con.commit()
+
     def write_layers(self, table, df):
         df.to_sql(table, self.con, if_exists="append", index=True, index_label="mref")
         #self.con.commit()
+
+    def get_fast5_index(self):
+        return pd.read_sql_query("""
+            SELECT read.id AS read_id, filename FROM read
+            JOIN fast5 ON fast5.id = fast5_id""", self.con)
+
+    def get_read_ids(self):
+        return set(pd.read_sql_query("SELECT id FROM read", self.con)["id"])
 
     def query_track(self, name):
         cur = self.con.cursor()
