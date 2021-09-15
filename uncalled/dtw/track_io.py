@@ -54,14 +54,15 @@ from .. import config
 class TrackSQL:
     def __init__(self, sqlite_db):
         self.con = sqlite3.connect(sqlite_db)
+        self.cur = self.con.cursor()
         #self.prms = track_io_prms
 
     def close(self):
+        self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON DTW (mref, aln_id);")
         self.con.close()
 
     def init_tables(self):
-        cur = self.con.cursor()
-        cur.execute("""
+        self.cur.execute("""
             CREATE TABLE IF NOT EXISTS track (
                 id INTEGER PRIMARY KEY,
                 name TEXT,
@@ -69,18 +70,18 @@ class TrackSQL:
                 config TEXT,
                 groups TEXT
             );""")
-        cur.execute("""
+        self.cur.execute("""
             CREATE TABLE IF NOT EXISTS read (
                 id TEXT PRIMARY KEY,
                 fast5_id INTEGER,
                 FOREIGN KEY (fast5_id) REFERENCES fast5 (id)
             );""")
-        cur.execute("""
+        self.cur.execute("""
             CREATE TABLE IF NOT EXISTS fast5 (
                 id INTEGER PRIMARY KEY,
                 filename TEXT
             );""")
-        cur.execute("""
+        self.cur.execute("""
             CREATE TABLE IF NOT EXISTS alignment (
                 id INTEGER PRIMARY KEY,
                 track_id INTEGER,
@@ -95,17 +96,16 @@ class TrackSQL:
                 FOREIGN KEY (track_id) REFERENCES track (id),
                 FOREIGN KEY (read_id) REFERENCES read (id)
             );""")
-        cur.execute("""
+        self.cur.execute("""
             CREATE TABLE IF NOT EXISTS dtw (
                 mref INTEGER,
                 aln_id INTEGER,
                 start INTEGER,
                 length INTEGER,
                 current REAL,
-                PRIMARY KEY (mref, aln_id),
                 FOREIGN KEY (aln_id) REFERENCES alignment (id)
             );""")
-        cur.execute("""
+        self.cur.execute("""
             CREATE TABLE IF NOT EXISTS bcaln (
                 mref INTEGER,
                 aln_id INTEGER,
@@ -115,50 +115,50 @@ class TrackSQL:
                 PRIMARY KEY (mref, aln_id),
                 FOREIGN KEY (aln_id) REFERENCES alignment (id)
             );""")
-        self.con.commit()
+        #self.con.commit()
 
     def init_track(self, track):
-        cur = self.con.cursor()
-        cur.execute(
+        self.cur.execute(
             "INSERT INTO track (name,desc,config,groups) VALUES (?,?,?,?)",
             (track.prms.name, track.prms.name, track.conf.to_toml(), "dtw")
             #(track.name, track.desc, track.config.to_toml(), "dtw")
         )
-        track.id = cur.lastrowid
-        self.con.commit()
+        track.id = self.cur.lastrowid
+        #self.con.commit()
         return track.id
 
     def init_alignment(self, aln, fast5):
-        cur = self.con.cursor()
 
-        cur.execute(
+        self.cur.execute(
             "INSERT INTO alignment (track_id, read_id, ref_name, ref_start, ref_end, fwd) VALUES (?,?,?,?,?,?)",
             (aln.track_id, aln.read_id, aln.ref_name, aln.ref_start, aln.ref_end, aln.is_fwd)
         )
-        aln.id = cur.lastrowid
-        self.con.commit()
+        aln.id = self.cur.lastrowid
+        #self.con.commit()
         return aln.id
 
     def init_fast5(self, filename):
-        cur = self.con.cursor()
 
-        row = cur.execute("SELECT id FROM fast5 WHERE filename = ?", (filename,)).fetchone()
+        row = self.cur.execute("SELECT id FROM fast5 WHERE filename = ?", (filename,)).fetchone()
         if row is not None:
             return row[0]
             
-        cur.execute("INSERT INTO fast5 (filename) VALUES (?)", (filename,))
-        fast5_id = cur.lastrowid
-        self.con.commit()
+        self.cur.execute("INSERT INTO fast5 (filename) VALUES (?)", (filename,))
+        fast5_id = self.cur.lastrowid
+        #self.con.commit()
 
         return fast5_id
 
     def init_read(self, read_id, fast5_id):
-        cur = self.con.cursor()
-        cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
-        self.con.commit()
+        self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
+        #self.con.commit()
 
     def write_layers(self, table, df):
-        df.to_sql(table, self.con, if_exists="append", index=True, index_label="mref")
+        df.to_sql(
+            table, self.con, 
+            if_exists="append", 
+            method="multi",# chunksize=5000,
+            index=True, index_label="mref")
         #self.con.commit()
 
     def get_fast5_index(self):
@@ -170,8 +170,7 @@ class TrackSQL:
         return set(pd.read_sql_query("SELECT id FROM read", self.con)["id"])
 
     def query_track(self, name):
-        cur = self.con.cursor()
-        return cur.execute(
+        return self.cur.execute(
             "SELECT id, desc, config, groups FROM track WHERE name == ?", 
             (name,)).fetchone()
         

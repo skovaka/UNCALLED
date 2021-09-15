@@ -69,7 +69,7 @@ def main(conf):
 
     t = time.time()
     for read in fast5s:
-        db_time = dtw_time = 0
+        db1_time = db2_time = dtw_time = 0
         t = time.time()
 
         paf = mm2s.get(read.id, None)
@@ -80,7 +80,7 @@ def main(conf):
         ref_bounds = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
         track.init_read_aln(read, ref_bounds)
 
-        db_time += time.time() - t
+        db1_time += time.time() - t
         t = time.time()
 
         if track.read_aln is None:
@@ -98,15 +98,15 @@ def main(conf):
 
         track.save_aln()
 
-        db_time += time.time() - t
+        db2_time += time.time() - t
         t = time.time()
         
-        print("%s\t%f\t%f" % (read.id, dtw_time, db_time))
+        print("%s\t%f\t%f\t%f" % (read.id, dtw_time, db1_time, db2_time))
 
     if not track is None:
         t = time.time()
         track.close()
-        print("end\t0\t%f" % (time.time()-t))
+        print("end\t0\t0\t%f" % (time.time()-t))
 
 class GuidedDTW:
 
