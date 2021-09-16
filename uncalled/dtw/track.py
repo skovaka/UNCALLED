@@ -49,7 +49,7 @@ AlnTrackParams._def_params(
     ("layers", DEFAULT_LAYERS, list, "Layers to load"),
     ("mode", "r", str, "Read (r) or write (w) mode"),
     ("overwrite", False, bool, "Will overwrite existing directories if True"),
-    ignore_toml={"mode", "overwrite"}
+    ignore_toml={"mode", "overwrite", "load_mat"}
 )
 
 
@@ -155,7 +155,7 @@ class AlnTrack:
         self.height = None
 
 
-    def init_read_aln(self, read, bounds):
+    def init_alignment(self, read, bounds):
         if isinstance(bounds, RefCoord):
             bounds = self._ref_coords_to_mrefs(bounds)
         elif not isinstance(bounds, pd.RangeIndex):
@@ -166,7 +166,7 @@ class AlnTrack:
 
         if self.coords is not None:
             fwd = self.index.is_mref_fwd(bounds.min(), self.conf.is_rna)
-            bounds = bounds.intersection(self._bounds[fwd])
+            bounds = bounds.intersection(self.coords.mrefs[fwd])
             if len(bounds) == 0: 
                 return None
 
@@ -182,6 +182,7 @@ class AlnTrack:
             self.prev_read = read_id
 
         self.read_aln = ReadAln(self.id, read_id, bounds, index=self.index, is_rna=self.conf.is_rna)
+
         aln_id = self.db.init_alignment(self.read_aln, fast5)
 
         if self.in_mem:
@@ -255,22 +256,22 @@ class AlnTrack:
 
         self.set_ref_bounds(self.prms.ref_bounds)
 
-        self.reads, self.df = self.db.query_alns(self.id, self.coords, self.prms.full_overlap)
+        self.alignments, self.df = self.db.query_alns(self.id, self.coords, self.prms.full_overlap)
 
         self.df.set_index(["mref", "aln_id"], inplace=True)
-        self.reads.sort_values("ref_start", inplace=True)
+        self.alignments.sort_values("ref_start", inplace=True)
 
         self.mat = self.df.reset_index().pivot(index="aln_id", columns="mref") \
                    .rename(columns=self.coords.mref_to_ref, level=1) \
                    .rename_axis(("layer","ref"), axis=1) \
                    .sort_index(axis=1,level=1) 
 
-        self.mat = self.mat.reindex(self.reads["id"], copy=False)
+        self.mat = self.mat.reindex(self.alignments["id"], copy=False)
 
-        self.has_fwd = np.any(self.reads['fwd'])
-        self.has_rev = not np.all(self.reads['fwd'])
+        self.has_fwd = np.any(self.alignments['fwd'])
+        self.has_rev = not np.all(self.alignments['fwd'])
 
-        self.height = len(self.reads)
+        self.height = len(self.alignments)
 
 
         return self.mat
@@ -304,7 +305,7 @@ class AlnTrack:
 
     def sort(self, order):
         self.mat = self.mat.iloc[order]
-        self.reads = self.reads.iloc[order]
+        self.alignments = self.alignments.iloc[order]
 
     @property
     def ref_id(self):
@@ -337,7 +338,7 @@ class AlnTrack:
     def calc_pca(self, layer, ref_start, ref_end, n_components=2):
         x = self[layer,:,ref_start:ref_end].T
         pc = PCA(n_components=n_components).fit_transform(x)
-        data = {"read_id" : self.reads["id"]}
+        data = {"read_id" : self.alignments["id"]}
         for c in range(n_components):
             data["pc%d" % (c+1)] = pc[:,c]
         return pd.DataFrame(data).set_index("read_id")

@@ -58,7 +58,7 @@ def main(conf):
 
     fast5s = Fast5Processor(conf=conf)
 
-    track = AlnTrack(conf.dtw.out_path, mode="w", conf=conf)
+    track = AlnTrack(conf.dtw.out_path, mode="w", conf=conf, load_mat=False)
 
     mm2s = {p.qr_name : p
          for p in parse_paf(
@@ -67,10 +67,7 @@ def main(conf):
             full_overlap=conf.track.full_overlap,
     )}
 
-    t = time.time()
     for read in fast5s:
-        db1_time = db2_time = dtw_time = 0
-        t = time.time()
 
         paf = mm2s.get(read.id, None)
 
@@ -78,10 +75,7 @@ def main(conf):
             continue
 
         ref_bounds = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
-        track.init_read_aln(read, ref_bounds)
-
-        db1_time += time.time() - t
-        t = time.time()
+        track.init_alignment(read, ref_bounds)
 
         if track.read_aln is None:
             sys.stderr.write("Should not happen")
@@ -93,20 +87,13 @@ def main(conf):
             sys.stderr.write("Should not happen?")
             continue
 
-        dtw_time += time.time() - t
-        t = time.time()
-
         track.save_aln()
 
-        db2_time += time.time() - t
-        t = time.time()
-        
-        print("%s\t%f\t%f\t%f" % (read.id, dtw_time, db1_time, db2_time))
+        print(read.id)
 
     if not track is None:
         t = time.time()
         track.close()
-        print("end\t0\t0\t%f" % (time.time()-t))
 
 class GuidedDTW:
 
@@ -270,6 +257,35 @@ class GuidedDTW:
             'ref_en': ref_st + band_ref_en
         })
 
+def collapse_events(self, dtw, kmer_str=False, start_col="start", length_col="length", mean_col="current", kmer_col="kmer"):
+
+    dtw["cuml_mean"] = dtw[length_col] * dtw[mean_col]
+
+    grp = dtw.groupby("mref")
+
+    if kmer_col in dtw:
+        if kmer_str:
+            kmers = [nt.kmer_rev(nt.str_to_kmer(k,0)) for k in grp[kmer_col].first()]
+        else:
+            kmers = grp[kmer_col].first()
+    else:
+        kmers = None
+
+    mrefs = grp[ref_col].first()
+
+    lengths = grp[length_col].sum()
+
+    dtw = pd.DataFrame({
+        "mref"    : mrefs.astype("int64"),
+        "start"  : grp[start_col].min().astype("uint32"),
+        "length" : lengths.astype("uint32"),
+        "current"   : grp["cuml_mean"].sum() / lengths
+    })
+
+    if kmers is not None:
+        dtw["kmer"] = kmers.astype("uint16")
+
+    return dtw.set_index("mref").sort_index()
 
 class Fast5Processor(Fast5Reader):
     def __next__(self):

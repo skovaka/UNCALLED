@@ -207,14 +207,10 @@ class ReadAln:
             mrefs = grp[ref_col].first()
         else:
             mrefs = self.ref_to_mref(grp[ref_col].first())
-        #    refs = self.mref_to_ref(mrefs)
-        #else:
-        #    refs = grp[ref_col].first()
 
         lengths = grp[length_col].sum()
 
         dtw = pd.DataFrame({
-            #"ref"    : refs.astype("int64"),
             "mref"    : mrefs.astype("int64"),
             "start"  : grp[start_col].min().astype("uint32"),
             "length" : lengths.astype("uint32"),
@@ -223,9 +219,6 @@ class ReadAln:
 
         if kmers is not None:
             dtw["kmer"] = kmers.astype("uint16")
-        
-        #if ref_mirrored:
-        #    dtw["mref"] = mrefs
 
         dtw = dtw.set_index("mref").sort_index()
         self.set_dtw(dtw)

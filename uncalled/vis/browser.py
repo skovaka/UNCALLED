@@ -79,7 +79,7 @@ class Browser:
         for track in [self.prms.track_a, self.prms.track_b]:
             if track is None: continue
             if not isinstance(track, AlnTrack):
-                track = AlnTrack(track, conf=self.conf)
+                track = AlnTrack(track, load_mat=True, conf=self.conf)
             self.tracks.append(track)
         self.single_track = len(self.tracks) == 1
 
@@ -129,7 +129,7 @@ class Browser:
         tr,rf,rd = self.cursor
         track = self.tracks[tr]
 
-        read = track.reads.iloc[rd]
+        read = track.alignments.iloc[rd]
 
         #fast5_read = self.fast5s[read.id]
         #proc_read = ProcRead(fast5_read, conf=self.conf)
@@ -235,9 +235,9 @@ class Browser:
 
     def set_info(self, trk, rf, rd):
 
-        aln_id = trk.reads.index[rd]
+        aln_id = trk.alignments.index[rd]
 
-        read = trk.reads.iloc[rd]
+        read = trk.alignments.iloc[rd]
         aln_id = read["id"]
 
         self.set_info_cell(0,  self.ref_coord(trk, rf, read['fwd']))
@@ -264,7 +264,7 @@ class Browser:
         self.axs.pa_hist.cla()
         self.axs.dwell_hist.cla()
 
-        fwds = track.reads['fwd']
+        fwds = track.alignments['fwd']
 
         pa    = track[self.PA_LAYER,   :,rf]
         pa_fwd = pa[fwds]
@@ -296,7 +296,7 @@ class Browser:
             self.axs.pa_hist.hist(pa_fwd, bins=pa_bins, **fwd_kw)
             self.axs.dwell_hist.hist(dwell_fwd, bins=dwell_bins, **fwd_kw)
 
-            kmer = int(scipy.stats.mode(track[self.KMER_LAYER,track.reads['fwd'],rf]).mode[0])
+            kmer = int(scipy.stats.mode(track[self.KMER_LAYER,track.alignments['fwd'],rf]).mode[0])
             exp_mean = track.model.means[kmer]
             exp_stdv = track.model.stdvs[kmer]
 
