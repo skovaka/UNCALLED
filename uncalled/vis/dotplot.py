@@ -59,7 +59,6 @@ def main(conf):
     """Plot dotplots of individual DTW alignments"""
     matplotlib.use("TkAgg")
     d = Dotplot(conf=conf)
-    _RefIndex.index_test(d.tracks[0].index)
     if conf.out_prefix is None:
         d.show_all()
     else:

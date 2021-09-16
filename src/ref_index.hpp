@@ -522,14 +522,8 @@ class RefIndex {
     #define PY_BWA_INDEX_METH(P) c.def(#P, &RefIndex<KLEN>::P);
     #define PY_BWA_INDEX_VEC(P) c.def(#P, py::vectorize(&RefIndex<KLEN>::P));
 
-    static void index_test(const RefIndex<KLEN> &idx) {
-        std::cout << idx.size() << " size!\n";
-    }
-
     static void pybind_defs(pybind11::module_ m) {
         py::class_<RefIndex<KLEN>> c(m, "_RefIndex");
-
-        c.def_static("index_test", &RefIndex<KLEN>::index_test);
 
         c.def(py::init<>());
         c.def(py::init<const std::string &>());
@@ -556,6 +550,7 @@ class RefIndex {
         PY_BWA_INDEX_METH(get_pac_shift);
         PY_BWA_INDEX_METH(range_to_fms);
         PY_BWA_INDEX_METH(is_mref_fwd);
+        PY_BWA_INDEX_METH(is_mref_flipped);
         PY_BWA_INDEX_VEC(get_base);
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::get_ref_id) );
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(const std::string &)> (&RefIndex::get_ref_id));

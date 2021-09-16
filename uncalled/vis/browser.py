@@ -238,12 +238,12 @@ class Browser:
         aln_id = trk.reads.index[rd]
 
         read = trk.reads.iloc[rd]
-        aln_id = read["aln_id"]
+        aln_id = read["id"]
 
         self.set_info_cell(0,  self.ref_coord(trk, rf, read['fwd']))
         self.set_info_cell(1, read['read_id'])
 
-        mref = trk.mref_coords[True][rf]
+        mref = trk.coords.ref_to_mref([rf], True)[0]
         for i,val in enumerate(trk.df.loc[mref,aln_id]):
             self.set_info_cell(i+2, val)
         #self.set_info_cell(self.INFO_KMER, nt.kmer_to_str(int(kmer)))

@@ -174,16 +174,16 @@ class TrackSQL:
             "SELECT id, desc, config, groups FROM track WHERE name == ?", 
             (name,)).fetchone()
         
-    def query_read(self, read_id, mref_coords=None):
+    def query_read(self, read_id, coords=None):
         query = """
             SELECT mref, aln_id, start, length, current FROM dtw
             JOIN alignment ON id = aln_id
             WHERE read_id = ?"""
         params = [read_id]
 
-        if mref_coords is not None:
+        if coords is not None:
             query = select + " AND (mref >= ? AND mref <= ?)"
-            params += [int(mref_coords[True].min()), str(mref_coords[True].max())]
+            params += [int(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
 
         dtw = pd.read_sql_query(query, self.con, params=params).set_index("mref")
         aln_id = str(dtw["aln_id"].iloc[0])
@@ -195,16 +195,16 @@ class TrackSQL:
 
         return aln, dtw
 
-    def query_alns(self, track_id, mref_coords, full_overlap):
+    def query_alns(self, track_id, coords, full_overlap):
 
         select = "SELECT mref, aln_id, start, length, current FROM dtw"
         where = " WHERE (mref >= ? AND mref <= ?)"
-        params = [int(mref_coords[True].min()), str(mref_coords[True].max())]
+        params = [int(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
 
         if full_overlap:
             select = select + " JOIN alignment ON id = aln_id"
             where = where + " AND (ref_start < ? AND ref_end > ?)"
-            params += [int(mref_coords.index[0]), int(mref_coords.index[-1])]
+            params += [int(coords.refs.min()), int(coords.refs.max())]
 
         query = select + where
 

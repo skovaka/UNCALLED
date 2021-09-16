@@ -29,12 +29,83 @@ import numpy as np
 import uncalled as unc
 from bisect import bisect_left, bisect_right
 from typing import NamedTuple
+import collections.abc
+
+import pandas as pd
+
 from _uncalled import _RefIndex
 from .argparse import Opt
 from .config import ParamGroup
+from . import nt
 
 class RefIndex(_RefIndex):
-    pass
+    class CoordSpace:
+        def __init__(self, index, ref_bounds, is_rna, load_kmers=False):
+            self.ref_name = ref_bounds.name
+
+            #TODO get of -nt.K+1
+            self.refs = pd.RangeIndex(ref_bounds.start, ref_bounds.end-nt.K+1)
+            self.mrefs = tuple( (self._init_mrefs(index, fwd, is_rna) for fwd in [False, True]) )
+
+            if load_kmers:
+                self.kmers = list()
+                for fwd in [False, True]:
+                    kmers = index.get_kmers(self.mrefs[fwd].min(), self.mrefs[fwd].max()+nt.K, fwd)
+                    if self.mrefs[fwd].step < 0:
+                        kmers = kmers[::-1]
+                    self.kmers.append(pd.Series(index=self.mrefs[fwd], data=kmers))
+
+        def _init_mrefs(self, index, fwd, is_rna):
+            st,en = index.ref_to_mref(self.ref_name, self.refs.start, self.refs.stop, fwd, is_rna)
+            mrefs = pd.RangeIndex(st,en)
+            if index.is_mref_flipped(mrefs.start):
+                return mrefs[::-1]
+            return mrefs
+
+        def ref_to_mref(self, ref, fwd):
+            if isinstance(ref, (collections.abc.Sequence, np.ndarray)):
+                i = self.refs.get_indexer(ref)
+            else:
+                i = self.refs.get_loc(ref)
+            return self.mrefs[fwd][i]
+        
+        def mref_to_ref(self, mref):
+            if isinstance(mref, (collections.abc.Sequence, np.ndarray)):
+                fwd = mref[0] in self.mrefs[True]
+                i = self.mrefs[fwd].get_indexer(mref)
+            else:
+                fwd = mref in self.mrefs[True]
+                i = self.mrefs[fwd].get_loc(mref)
+            return self.refs[i]
+                
+        def all_mrefs_fwd(self, mrefs):
+            return len(self.mrefs[True].intersection(mrefs)) == len(mrefs)
+                
+        def all_mrefs_rev(self, mrefs):
+            return len(self.mrefs[False].intersection(mrefs)) == len(mrefs)
+
+        def validate_refs(self, refs):
+            return len(self.refs.intersection(refs)) == len(refs)
+
+        def validate_mrefs(self, mrefs):
+            return all_mrefs_fwd(mrefs) or all_mrefs_rev(mrefs)
+
+        def __len__(self):
+            return len(self.refs)
+
+        def __repr__(self):
+            return "%s:%d-%d (fwd %d-%d, rev %d-%d)" % (
+                self.ref_name, self.refs.start, self.refs.stop,
+                self.mrefs[True].start, self.mrefs[True].stop,
+                self.mrefs[False].start, self.mrefs[False].stop,
+            )
+
+    def get_coord_space(self, ref_bounds, is_rna):
+        rid = self.get_ref_id(ref_bounds.name)
+        length = self.get_ref_len(rid)
+        if ref_bounds.start < 0 or ref_bounds.end > length:
+            raise ValueError("Reference coordinates %s out of bounds for sequence of length %d" % (ref_bounds, length))
+        return self.CoordSpace(self, ref_bounds, is_rna)
 
 _index_cache = dict()
 
