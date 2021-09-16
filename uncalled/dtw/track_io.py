@@ -58,7 +58,8 @@ class TrackSQL:
         #self.prms = track_io_prms
 
     def close(self):
-        self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON DTW (mref, aln_id);")
+        self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
+        self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (mref, aln_id);")
         self.con.close()
 
     def init_tables(self):
@@ -112,7 +113,6 @@ class TrackSQL:
                 start INTEGER,
                 length INTEGER,
                 error TEXT,
-                PRIMARY KEY (mref, aln_id),
                 FOREIGN KEY (aln_id) REFERENCES alignment (id)
             );""")
         #self.con.commit()
