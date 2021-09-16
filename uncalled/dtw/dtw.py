@@ -104,10 +104,6 @@ class GuidedDTW:
 
         self.track = track
 
-        #paf_st, paf_en = self.track.index.ref_to_mref(
-        #    paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd, self.conf.is_rna)
-        #mrefs = pd.RangeIndex(paf_st+nt.K-1, paf_en)
-
         self.ref_kmers = self.track.load_aln_kmers(store=False)
 
         self.bcaln = BcFast5Aln(self.track.index, read, paf, self.track.read_aln.mrefs)
@@ -192,9 +188,7 @@ class GuidedDTW:
                   .drop(columns=['mean', 'stdv', 'mask'], errors='ignore') \
                   .rename(columns={'norm_sig' : 'current'})
 
-        #df['kmer'] = self.ref_kmers.loc[df['mref']].to_numpy()
-
-        self.track.read_aln.set_subevent_aln(df, True)
+        self.track.read_aln.set_dtw(collapse_events(df, True))
 
         if len(band_blocks) == 0:
             self.track.read_aln.bands = None
@@ -257,7 +251,7 @@ class GuidedDTW:
             'ref_en': ref_st + band_ref_en
         })
 
-def collapse_events(self, dtw, kmer_str=False, start_col="start", length_col="length", mean_col="current", kmer_col="kmer"):
+def collapse_events(dtw, kmer_str=False, start_col="start", length_col="length", mean_col="current", kmer_col="kmer"):
 
     dtw["cuml_mean"] = dtw[length_col] * dtw[mean_col]
 
@@ -271,7 +265,7 @@ def collapse_events(self, dtw, kmer_str=False, start_col="start", length_col="le
     else:
         kmers = None
 
-    mrefs = grp[ref_col].first()
+    mrefs = grp["mref"].first()
 
     lengths = grp[length_col].sum()
 
