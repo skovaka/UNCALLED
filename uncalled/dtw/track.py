@@ -124,6 +124,7 @@ class AlnTrack:
             elif self.prms.mode == self.WRITE_MODE:
                 self.prev_fast5 = (None, None)
                 self.prev_read = None
+                self.prev_aln = -1
 
                 self.db.init_tables()
                 self.id = self.db.init_track(self)
@@ -155,21 +156,48 @@ class AlnTrack:
         self.width = len(self.coords)
         self.height = None
 
+    def _group_layers(self, name, df):
+        return pd.concat({name : df}, names=["group", "layer"], axis=1)
+        
 
-    def init_alignment(self, read, bounds):
-        if isinstance(bounds, RefCoord):
-            bounds = self._ref_coords_to_mrefs(bounds)
-        elif not isinstance(bounds, pd.RangeIndex):
-            raise ValueError("ReadAlns can only be initialized with RangeIndex or RefCoord bounds")
+    def init_alignment(self, read, group_name, layers):
 
-        read_id = read.id
+        #TODO do this here instead of in bcaln or whatever
+        #if self.coords is not None:
+        #    mrefs = self.coords.mrefs.intersection(layers.index)
+        #    if len(mrefs) == 0: 
+        #        return None
+        #    layers = layers.reindex(index=mrefs)
+
         fast5 = read.f5.filename
+        read_id = read.id
 
-        if self.coords is not None:
-            fwd = self.index.is_mref_fwd(bounds.min(), self.conf.is_rna)
-            bounds = bounds.intersection(self.coords.mrefs[fwd])
-            if len(bounds) == 0: 
-                return None
+        print(layers)
+        mref_start = layers.index.min()
+        mref_end = layers.index.max()
+        samp_start = layers["sample"].min()
+        samp_end = layers["sample"].max()
+
+        ref_bounds = self.index.mref_to_ref_bound(mref_start, mref_end, not self.conf.is_rna)
+
+        self.prev_aln += 1
+        aln_id = self.prev_aln
+
+        self.alignments = pd.DataFrame({
+                "id" : [aln_id],
+                "track_id" : [self.id],
+                "read_id" : [read_id],
+                "ref_name" : [ref_bounds.ref_name],
+                "ref_start" : [ref_bounds.start],
+                "ref_end" : [ref_bounds.end],
+                "fwd" :     [ref_bounds.fwd],
+                "samp_start" : [samp_start],
+                "samp_end" : [samp_end],
+                "tags" : [""]}).set_index("id")
+
+        self.layers = self._group_layers(group_name, layers)
+        self.layers.index = pd.MultiIndex.from_product([self.layers.index, [aln_id]], names=["mref", "aln_id"])
+        print(self.layers)
 
         #TODO iterate hierarchically through fast5s/reads
         if fast5 == self.prev_fast5[0]:
@@ -182,16 +210,10 @@ class AlnTrack:
             self.db.init_read(read_id, fast5_id)
             self.prev_read = read_id
 
-        self.read_aln = ReadAln(self.id, read_id, bounds, index=self.index, is_rna=self.conf.is_rna)
+        self.db.init_alignment(self.alignments)
+        self.db.write_layers(group_name, self.layers[group_name])
 
-        aln_id = self.db.init_alignment(self.read_aln, fast5)
-
-        if self.in_mem:
-            self.read_ids = {read_id}
-        else:
-            self.read_ids.add(read_id)
-
-        return self.read_aln
+        return aln_id
 
     def load_aln_kmers(self, aln=None, store=True):
         if aln is None:

@@ -74,13 +74,6 @@ def main(conf):
         if paf is None:
             continue
 
-        ref_bounds = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
-        track.init_alignment(read, ref_bounds)
-
-        if track.read_aln is None:
-            sys.stderr.write("read aln init failed\n")
-            continue
-
         dtw = GuidedDTW(track, read, paf, conf)
 
         if dtw.empty:
@@ -104,9 +97,17 @@ class GuidedDTW:
 
         self.track = track
 
+        self.bcaln = Bcaln(self.track.index, read, paf, self.track.coords)
+
+        #ref_bounds = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
+        track.init_alignment(read, "bcaln", self.bcaln.df)
+
+        if track.read_aln is None:
+            sys.stderr.write("read aln init failed\n")
+            return 
+
         self.ref_kmers = self.track.load_aln_kmers(store=False)
 
-        self.bcaln = Bcaln(self.track.index, read, paf, self.track.coords)
         if self.bcaln.empty:
             self.empty = True
             return

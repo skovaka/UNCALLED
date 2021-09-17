@@ -110,8 +110,8 @@ class TrackSQL:
             CREATE TABLE IF NOT EXISTS bcaln (
                 mref INTEGER,
                 aln_id INTEGER,
-                start INTEGER,
-                length INTEGER,
+                sample INTEGER,
+                bp INTEGER,
                 error TEXT,
                 FOREIGN KEY (aln_id) REFERENCES alignment (id)
             );""")
@@ -127,15 +127,19 @@ class TrackSQL:
         #self.con.commit()
         return track.id
 
-    def init_alignment(self, aln, fast5):
+    def init_alignment(self, aln_df):
+        aln_df.to_sql(
+            "alignment", self.con, 
+            if_exists="append", 
+            method="multi",# chunksize=5000,
+            index=True, index_label="id")
 
-        self.cur.execute(
-            "INSERT INTO alignment (track_id, read_id, ref_name, ref_start, ref_end, fwd) VALUES (?,?,?,?,?,?)",
-            (aln.track_id, aln.read_id, aln.ref_name, aln.ref_start, aln.ref_end, aln.is_fwd)
-        )
-        aln.id = self.cur.lastrowid
+        #self.cur.execute(
+        #    "INSERT INTO alignment (track_id, read_id, ref_name, ref_start, ref_end, fwd) VALUES (?,?,?,?,?,?)",
+        #    (aln.track_id, aln.read_id, aln.ref_name, aln.ref_start, aln.ref_end, aln.is_fwd)
+        #)
+        #aln.id = self.cur.lastrowid
         #self.con.commit()
-        return aln.id
 
     def init_fast5(self, filename):
 
@@ -158,7 +162,7 @@ class TrackSQL:
             table, self.con, 
             if_exists="append", 
             method="multi",# chunksize=5000,
-            index=True, index_label="mref")
+            index=True, index_label=["mref","aln_id"])
         #self.con.commit()
 
     def get_fast5_index(self):
