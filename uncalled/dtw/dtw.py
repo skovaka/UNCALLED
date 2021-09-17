@@ -16,7 +16,8 @@ from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 from _uncalled._nt import KmerArray
 
 from .. import PoreModel
-from ..dtw import BcFast5Aln, ReadAln, AlnTrack, RefCoord
+from . import BcFast5Aln, ReadAln, AlnTrack, RefCoord
+from .bcaln import Bcaln
 
 #TODO make this better
 METHODS = {
@@ -78,13 +79,13 @@ def main(conf):
         track.init_alignment(read, ref_bounds)
 
         if track.read_aln is None:
-            sys.stderr.write("Should not happen")
+            sys.stderr.write("read aln init failed\n")
             continue
 
         dtw = GuidedDTW(track, read, paf, conf)
 
         if dtw.empty:
-            sys.stderr.write("Should not happen?")
+            sys.stderr.write("dtw failed\n")
             continue
 
         track.save_aln()
@@ -106,7 +107,7 @@ class GuidedDTW:
 
         self.ref_kmers = self.track.load_aln_kmers(store=False)
 
-        self.bcaln = BcFast5Aln(self.track.index, read, paf, self.track.read_aln.mrefs)
+        self.bcaln = Bcaln(self.track.index, read, paf, self.track.coords)
         if self.bcaln.empty:
             self.empty = True
             return
@@ -130,8 +131,8 @@ class GuidedDTW:
 
         self.model = PoreModel(self.conf.pore_model)
 
-        self.samp_min = self.bcaln.aln['sample'].min()
-        self.samp_max = self.bcaln.aln['sample'].max()
+        self.samp_min = self.bcaln.bcaln['sample'].min()
+        self.samp_max = self.bcaln.bcaln['sample'].max()
 
         self._calc_dtw()
 
@@ -146,9 +147,9 @@ class GuidedDTW:
 
         band_blocks = list()
 
-        bc = self.bcaln.aln#.sort_values("sample").reset_index()
-        block_min = int(bc.index[bc['sample'].searchsorted(self.samp_min)])
-        block_max = int(bc.index[bc['sample'].searchsorted(self.samp_max)])
+        bc = self.bcaln.bcaln
+        block_min = bc.index[0]
+        block_max = bc.index[-1]
 
         #TODO for spliced RNA, must find gaps in mref index
         #block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)

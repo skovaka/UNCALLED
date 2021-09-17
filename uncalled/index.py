@@ -40,27 +40,42 @@ from . import nt
 
 class RefIndex(_RefIndex):
     class CoordSpace:
-        def __init__(self, index, ref_bounds, is_rna, load_kmers=False):
-            self.ref_name = ref_bounds.name
+        def __init__(self, ref_name, refs, mrefs=None, index=None, is_rna=None, load_kmers=False):
+            self.ref_name = ref_name
 
-            #TODO get of -nt.K+1
-            self.refs = pd.RangeIndex(ref_bounds.start, ref_bounds.end-nt.K+1)
-            self.mrefs = tuple( (self._init_mrefs(index, fwd, is_rna) for fwd in [False, True]) )
+            self.refs = refs#pd.RangeIndex(ref_bounds.start, ref_bounds.end-nt.K+1)
+
+            if mrefs is None:
+                self.mrefs = tuple( (self._init_mrefs(index, fwd, is_rna) for fwd in [False, True]) )
+            else:
+                self.mrefs = mrefs
 
             if load_kmers:
-                self.kmers = list()
-                for fwd in [False, True]:
-                    kmers = index.get_kmers(self.mrefs[fwd].min(), self.mrefs[fwd].max()+nt.K, fwd)
-                    if self.mrefs[fwd].step < 0:
-                        kmers = kmers[::-1]
-                    self.kmers.append(pd.Series(index=self.mrefs[fwd], data=kmers))
-
+                self.load_kmers(index)
+            else:
+                self.kmers = None
+            
         def _init_mrefs(self, index, fwd, is_rna):
             st,en = index.ref_to_mref(self.ref_name, self.refs.start, self.refs.stop, fwd, is_rna)
             mrefs = pd.RangeIndex(st,en)
             if index.is_mref_flipped(mrefs.start):
                 return mrefs[::-1]
             return mrefs
+
+        def load_kmers(self, index):
+            self.kmers = list()
+            for fwd in [False, True]:
+                kmers = index.get_kmers(self.mrefs[fwd].min(), self.mrefs[fwd].max()+nt.K, fwd)
+                if self.mrefs[fwd].step < 0:
+                    kmers = kmers[::-1]
+                self.kmers.append(pd.Series(index=self.mrefs[fwd], data=kmers))
+
+        def intersect(self, coords):
+            if self.ref_name != coords.ref_name:
+                raise ValueError("Cannot intersect CoordSpaces from different reference sequences")
+            refs = self.refs.intersection(coords.refs)
+            mrefs = [s.intersection(c) for s,c in zip(self.mrefs, coords.mrefs)]
+            return CoordSpace(self.ref_name, refs, mrefs=mrefs)
 
         def ref_to_mref(self, ref, fwd):
             if isinstance(ref, (collections.abc.Sequence, np.ndarray)):
@@ -100,12 +115,15 @@ class RefIndex(_RefIndex):
                 self.mrefs[False].start, self.mrefs[False].stop,
             )
 
-    def get_coord_space(self, ref_bounds, is_rna):
+    def get_coord_space(self, ref_bounds, is_rna, kmer_shift=nt.K-1):
         rid = self.get_ref_id(ref_bounds.name)
         length = self.get_ref_len(rid)
         if ref_bounds.start < 0 or ref_bounds.end > length:
             raise ValueError("Reference coordinates %s out of bounds for sequence of length %d" % (ref_bounds, length))
-        return self.CoordSpace(self, ref_bounds, is_rna)
+
+        #TODO get of -nt.K+1
+        refs = pd.RangeIndex(ref_bounds.start, ref_bounds.end-kmer_shift)
+        return self.CoordSpace(ref_bounds.name, refs, index=self, is_rna=is_rna)
 
 _index_cache = dict()
 

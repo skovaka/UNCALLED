@@ -291,6 +291,7 @@ class BcFast5Aln(ReadAln):
         df = df.set_index("mref", drop=True) \
                .sort_index() 
         df = df[~df.index.duplicated(keep="last")]
+        print(df)
         self.set_df(df, "aln")
         #self.aln.reset_index(inplace=True, drop=True)
 

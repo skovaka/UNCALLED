@@ -17,6 +17,7 @@ from ..pafstats import parse_paf, PafEntry
 from ..config import Config
 from ..argparse import Opt
 from .. import nt, PoreModel
+from . import RefCoord
 
 class Bcaln:
     BCE_K = 4
@@ -36,16 +37,21 @@ class Bcaln:
     ERR_WIDTHS = [0,0,5]
 
 
-    def __init__(self, index, read, paf, mrefs=None):
+    def __init__(self, index, read, paf, clip_coords=None):
 
         self.index = index
         self.is_rna = read.conf.is_rna
 
         self.dfs = set()
 
-        self.mrefs = mrefs
-        if mrefs is not None:
-            self.set_coords(mrefs)
+
+        self.clip_coords = clip_coords
+
+        self.coords = index.get_coord_space(RefCoord(paf.rf_name, paf.rf_st, paf.rf_en), self.is_rna)#, kmer_shift=0)
+        #if coords is None:
+        #    self.coords = paf_coords
+        #else:
+        #    self.coords = coords.intersect(paf_coords)
 
         self.refgap_bps = list()
         self.sub_bps = list()
@@ -53,7 +59,8 @@ class Bcaln:
         self.del_bps = list()
         self.err_bps = None
 
-        self.flip_ref = paf.is_fwd != self.seq_fwd
+        self.is_fwd = paf.is_fwd
+        self.flip_ref = paf.is_fwd == self.is_rna
 
         if not read.f5.bc_loaded or (not self.parse_cs(paf) and not self.parse_cigar(paf)):
             return
@@ -77,27 +84,22 @@ class Bcaln:
                .sort_index() 
         df = df[~df.index.duplicated(keep="last")]
 
-        
-
         if self.err_bps is not None:
             self.errs = samp_bps.join(self.err_bps.set_index('bp'), on='bp').dropna()
             self.errs.reset_index(inplace=True, drop=True)
-            #self.errs["ref"] = self.mref_to_ref(self.errs["mref"])
-            #self.errs.set_index("ref", inplace=True)
         else:
             self.errs = None
 
         self.set_df(df, "bcaln")
 
-        self.ref_gaps = self.aln[self.aln['bp'].isin(self.refgap_bps)].index
+        print(df)
+        #print(self.errs)
 
-        self.subs = self.aln[self.aln['bp'].isin(self.sub_bps)].index
-        self.inss = self.aln[self.aln['bp'].isin(self.ins_bps)].index
-        self.dels = self.aln[self.aln['bp'].isin(self.del_bps)].index
+        #self.ref_gaps = self.aln[self.aln['bp'].isin(self.refgap_bps)].index
 
     @property
     def empty(self):
-        return not hasattr(self, "aln") or len(self.aln) == 0
+        return not hasattr(self, "bcaln") or len(self.bcaln) == 0
 
     def parse_cs(self, paf):
         cs = paf.tags.get('cs', (None,)*2)[0]
@@ -107,7 +109,7 @@ class Bcaln:
         bp_mref_aln = list()
         err_bps = list()
 
-        if self.seq_fwd:
+        if not self.is_rna:
             qr_i = paf.qr_st
             #rf_i = paf.rf_st
         else:
@@ -115,14 +117,18 @@ class Bcaln:
             #rf_i = -paf.rf_en+1
 
         #mr_i = self.mref_start
-        if self.flip_ref:
-            mr_i = self.ref_to_mref(paf.rf_en)
-        else:
-            mr_i = self.ref_to_mref(paf.rf_st)
+        #if self.flip_ref:
+        #    print(paf.rf_en)
+        #    print(self.coords)
+        #    mr_i = self.coords.ref_to_mref(paf.rf_en, self.is_fwd)
+        #else:
+        #    mr_i = self.coords.ref_to_mref(paf.rf_st, self.is_fwd)
+
+        mr_i = self.coords.mrefs[self.is_fwd].min()
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
 
-        if paf.is_fwd != self.seq_fwd:
+        if self.flip_ref:
             cs_ops = reversed(cs_ops)
 
         for op in cs_ops:
@@ -183,9 +189,9 @@ class Bcaln:
             qr_i = paf.qr_len - paf.qr_en 
 
         if self.flip_ref:
-            mr_i = self.ref_to_mref(paf.rf_en)
+            mr_i = self.coords.ref_to_mref(paf.rf_en, self.is_fwd)
         else:
-            mr_i = self.ref_to_mref(paf.rf_st)
+            mr_i = self.coords.ref_to_mref(paf.rf_st, self.is_fwd)
 
         mr_bounds = range(self.mref_start, self.mref_end)
 
@@ -258,15 +264,13 @@ class Bcaln:
         
     #def set_bands(self, bands):
     def set_df(self, df, name):
-        if self.mrefs is None:
-            self.mrefs = df.index
-            self.set_coords(df.index)
-        else:
-            index = df.index.intersection(self.mrefs)
+        if self.clip_coords is not None:
+            print(self.clip_coords)
+            index = df.index.intersection(self.clip_coords.mrefs[self.is_fwd])
             df = df.reindex(index=index, copy=False)
 
         self.dfs.add(name)
-        if not "aln_id" in df:
-            df["aln_id"] = self.id
+        #if not "aln_id" in df:
+        #    df["aln_id"] = self.id
 
         setattr(self, name, df)
