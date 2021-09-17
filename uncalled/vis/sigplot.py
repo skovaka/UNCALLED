@@ -16,7 +16,7 @@ from .. import nt, config
 from ..dtw.dtw import Fast5Processor
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
-from ..dtw import RefCoord, AlnTrack, ref_coords, BcFast5Aln
+from ..dtw import RefCoord, AlnTrack, ref_coords
 from ..dtw.track import  method_compare_aln
 
 from _uncalled import _RefIndex

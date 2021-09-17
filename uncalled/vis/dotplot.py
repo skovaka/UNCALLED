@@ -16,7 +16,6 @@ from ..sigproc import ProcRead
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
 from ..dtw.track import AlnTrack, RefCoord, ref_coords, method_compare_aln
-from ..dtw.read_aln import BcFast5Aln
 
 from _uncalled import _RefIndex
 

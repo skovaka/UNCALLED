@@ -16,8 +16,7 @@ from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 from _uncalled._nt import KmerArray
 
 from .. import PoreModel
-from . import BcFast5Aln, ReadAln, AlnTrack, RefCoord
-from .bcaln import Bcaln
+from . import Bcaln, ReadAln, AlnTrack, RefCoord
 
 #TODO make this better
 METHODS = {
@@ -131,8 +130,8 @@ class GuidedDTW:
 
         self.model = PoreModel(self.conf.pore_model)
 
-        self.samp_min = self.bcaln.bcaln['sample'].min()
-        self.samp_max = self.bcaln.bcaln['sample'].max()
+        self.samp_min = self.bcaln.df['sample'].min()
+        self.samp_max = self.bcaln.df['sample'].max()
 
         self._calc_dtw()
 
@@ -147,7 +146,7 @@ class GuidedDTW:
 
         band_blocks = list()
 
-        bc = self.bcaln.bcaln
+        bc = self.bcaln.df
         block_min = bc.index[0]
         block_max = bc.index[-1]
 
