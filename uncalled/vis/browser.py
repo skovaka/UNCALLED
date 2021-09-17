@@ -381,9 +381,9 @@ class Browser:
 
     #TODO put inside track 
     def layer_means(self, track, layer, fwd):
-        #strand = track.reads['fwd'] == fwd
-        return np.mean(track.mat[layer], axis=0)
-        #return np.sum(track[layer,strand], axis=0) / np.sum(track.mask[strand], axis=0)
+        #return np.mean(track.mat[layer], axis=0)
+        x = track.mat[layer].mean(axis=0)#.reindex(track.coords.refs)
+        return x
 
     #TODO refactor into _init_fig(), show(), and save()
     def show(self):
@@ -530,7 +530,7 @@ class Browser:
     def get_img(self, track):
         if self.pileup:
             return track.get_pileup(self.active_layer)
-        return track[self.active_layer]
+        return track.mat[self.active_layer]
 
     def _init_cursor(self, track):
         cursor_kw = {
@@ -572,11 +572,10 @@ class Browser:
         self.axs.sumstat.set_ylabel("Mean Value", fontsize=15) #TODO use rcparams
 
         if track.has_fwd:
-            self.layer_fwd_plot, = self.axs.sumstat.plot(range(track.width), self.layer_means(track, self.active_layer, True), color='royalblue')
+            self.layer_fwd_plot, = self.axs.sumstat.plot(np.arange(track.width), self.layer_means(track, self.active_layer, True), color='royalblue')
 
         if track.has_rev:
-            print(track.mrefs.index)
-            self.layer_rev_plot, = self.axs.sumstat.plot(range(track.width), self.layer_means(track, self.active_layer, False), color='crimson')
+            self.layer_rev_plot, = self.axs.sumstat.plot(np.arange(track.width), self.layer_means(track, self.active_layer, False), color='crimson')
 
     def _init_info(self, gspec):
         self.axs.info  = self.fig.add_subplot(gspec)

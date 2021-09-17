@@ -150,12 +150,12 @@ class GuidedDTW:
         block_min = int(bc.index[bc['sample'].searchsorted(self.samp_min)])
         block_max = int(bc.index[bc['sample'].searchsorted(self.samp_max)])
 
-        block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
-        block_ends   = np.append(self.bcaln.ref_gaps, block_max)
-
-        #TODO make this actually do something for spliced RNA
-        for st, en in [(block_min, block_max)]:
+        #TODO for spliced RNA, must find gaps in mref index
+        #block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
+        #block_ends   = np.append(self.bcaln.ref_gaps, block_max)
         #for st, en in zip(block_starts, block_ends):
+
+        for st, en in [(block_min, block_max)]:
             samp_st = bc.loc[st,'sample']
             samp_en = bc.loc[en-1,'sample']
 

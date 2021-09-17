@@ -112,6 +112,8 @@ class AlnTrack:
         self.mat = None
         self.coords = None
 
+        self.set_ref_bounds(self.prms.ref_bounds)
+
         if self.conf.dtw.mm2_paf is not None:
             read_filter = set(self.conf.fast5_reader.read_filter)
 
@@ -146,7 +148,6 @@ class AlnTrack:
     def set_ref_bounds(self, ref_bounds):
 
         if ref_bounds == None:
-            self.coords = None
             return
 
         self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
@@ -261,10 +262,12 @@ class AlnTrack:
         self.df.set_index(["mref", "aln_id"], inplace=True)
         self.alignments.sort_values("ref_start", inplace=True)
 
+        mat_index = pd.MultiIndex.from_product([["current", "start", "length"], self.coords.refs])
+
         self.mat = self.df.reset_index().pivot(index="aln_id", columns="mref") \
                    .rename(columns=self.coords.mref_to_ref, level=1) \
                    .rename_axis(("layer","ref"), axis=1) \
-                   .sort_index(axis=1,level=1) 
+                   .reindex(mat_index, axis=1)
 
         self.mat = self.mat.reindex(self.alignments["id"], copy=False)
 
@@ -467,7 +470,6 @@ def method_compare(track_a=None, track_b=None, full_overlap=None, conf=None):
     for read in common_reads:
         aln_a = track_a.load_read(read)
         aln_b = track_b.load_read(read)
-        print (method_compare_aln(aln_a, aln_b))
 
 def method_compare_aln(aln_a, aln_b):
     merge = aln_a.aln.join(aln_b.aln, lsuffix="_a", rsuffix="_b").dropna().set_index("mref_a")
