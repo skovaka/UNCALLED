@@ -43,14 +43,14 @@ class Bcaln:
 
         self.dfs = set()
 
-
         self.clip_coords = clip_coords
 
-        self.coords = ref_index.get_coord_space(RefCoord(paf.rf_name, paf.rf_st, paf.rf_en), self.is_rna)#, kmer_shift=0)
+        ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
+        self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna)#, kmer_shift=0)
         #if coords is None:
-        #    self.coords = paf_coords
+        #    self.paf_coords = paf_coords
         #else:
-        #    self.coords = coords.intersect(paf_coords)
+        #    self.paf_coords = coords.intersect(paf_coords)
 
         self.refgap_bps = list()
         self.sub_bps = list()
@@ -91,6 +91,8 @@ class Bcaln:
 
         if self.clip_coords is not None:
             mrefs = df.index.intersection(self.clip_coords.mrefs[self.is_fwd])
+            #self.corods.index.get_coord_space(mrefs=mrefs
+            #mrefs = df.index.intersect(self.clip_coords.mrefs[self.is_fwd])
             df = df.reindex(index=mrefs, copy=False)
 
         self.df = df
@@ -115,7 +117,7 @@ class Bcaln:
             qr_i = paf.qr_len - paf.qr_en 
             #rf_i = -paf.rf_en+1
 
-        mr_i = self.coords.mrefs[self.is_fwd].min()
+        mr_i = self.paf_coords.mrefs.min()
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
 
@@ -179,7 +181,7 @@ class Bcaln:
         else:
             qr_i = paf.qr_len - paf.qr_en 
 
-        mrefs = self.coords.mrefs[self.is_fwd]
+        mrefs = self.paf_coords.mrefs
         mr_i = mrefs.min()
 
         cig_ops = self.CIG_RE.findall(cig)

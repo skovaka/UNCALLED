@@ -80,7 +80,7 @@ def main(conf):
             sys.stderr.write("dtw failed\n")
             continue
 
-        track.save_aln()
+        #track.save_aln()
 
         print(read.id)
 
@@ -97,27 +97,16 @@ class GuidedDTW:
 
         self.track = track
 
-        self.bcaln = Bcaln(self.track.index, read, paf, self.track.coords)
-
-        #ref_bounds = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
-        track.init_alignment(read, "bcaln", self.bcaln.df)
-
-        if track.read_aln is None:
-            sys.stderr.write("read aln init failed\n")
-            return 
-
-        self.ref_kmers = self.track.load_aln_kmers(store=False)
-
-        if self.bcaln.empty:
-            self.empty = True
+        bcaln = Bcaln(self.track.index, read, paf, self.track.coords)
+        if bcaln.empty:
+            self.df = None
             return
 
-        if self.bcaln.errs is not None:
-            bcerr = self.bcaln.errs[["mref", "type", "seq"]]#.dropna()
-            bcerr.set_index("mref", drop=True, inplace=True)
-            bcerr["type"].astype("category", copy=False)
-            bcerr = bcerr[~bcerr.index.duplicated(keep="first")]
-            self.track.read_aln.set_bcerr(bcerr.sort_index())
+        self.aln_id = track.init_alignment(read, "bcaln", bcaln.df)
+
+        self.bcaln = bcaln.df.sort_index()
+
+        self.ref_kmers = self.track.load_aln_kmers(self.aln_id).sort_index()
 
         self.read = read
 
@@ -131,8 +120,8 @@ class GuidedDTW:
 
         self.model = PoreModel(self.conf.pore_model)
 
-        self.samp_min = self.bcaln.df['sample'].min()
-        self.samp_max = self.bcaln.df['sample'].max()
+        self.samp_min = self.bcaln['sample'].min()
+        self.samp_max = self.bcaln['sample'].max()
 
         self._calc_dtw()
 
@@ -147,9 +136,9 @@ class GuidedDTW:
 
         band_blocks = list()
 
-        bc = self.bcaln.df
-        block_min = bc.index[0]
-        block_max = bc.index[-1]
+        #bc = self.bcaln.df.sort_index()
+        block_min = self.bcaln.index[0]
+        block_max = self.bcaln.index[-1]
 
         #TODO for spliced RNA, must find gaps in mref index
         #block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
@@ -157,18 +146,18 @@ class GuidedDTW:
         #for st, en in zip(block_starts, block_ends):
 
         for st, en in [(block_min, block_max)]:
-            samp_st = bc.loc[st,'sample']
-            samp_en = bc.loc[en-1,'sample']
+            samp_st = self.bcaln.loc[st,'sample']
+            samp_en = self.bcaln.loc[en-1,'sample']
 
-            mref_st = st#+nt.K-1#bc.loc[st,"mref"]+nt.K-1
-            mref_en = en+1#bc.loc[en-1,"mref"]+1
+            mref_st = st
+            mref_en = en+1
 
             read_block = self.read.sample_range(samp_st, samp_en)
 
             block_signal = read_block['norm_sig'].to_numpy()
             block_kmers = self.ref_kmers.loc[mref_st:mref_en]
 
-            args = self._get_dtw_args(bc, read_block, mref_st, block_kmers)
+            args = self._get_dtw_args(read_block, mref_st, block_kmers)
 
             dtw = self.dtw_fn(*args)
 
@@ -189,16 +178,18 @@ class GuidedDTW:
                   .drop(columns=['mean', 'stdv', 'mask'], errors='ignore') \
                   .rename(columns={'norm_sig' : 'current'})
 
-        self.track.read_aln.set_dtw(collapse_events(df, True))
+        #def self, aln_id, group, layers):
+        df = collapse_events(df, True)
+        self.track.add_aln_group(self.aln_id, "dtw", df)
 
-        if len(band_blocks) == 0:
-            self.track.read_aln.bands = None
-        elif len(band_blocks) > 1:
-            self.track.read_aln.bands = pd.concat(band_blocks)
-        else:
-            self.track.read_aln.bands = pd.DataFrame(band_blocks[0])
+        #if len(band_blocks) == 0:
+        #    self.track.read_aln.bands = None
+        #elif len(band_blocks) > 1:
+        #    self.track.read_aln.bands = pd.concat(band_blocks)
+        #else:
+        #    self.track.read_aln.bands = pd.DataFrame(band_blocks[0])
 
-    def _get_dtw_args(self, bc, read_block, mref_start, ref_kmers):
+    def _get_dtw_args(self, read_block, mref_start, ref_kmers):
         common = (
             read_block['norm_sig'].to_numpy(), 
             nt.kmer_array(ref_kmers), 
@@ -211,7 +202,7 @@ class GuidedDTW:
             band_count = qry_len + ref_len
             band_lls = list()
 
-            starts = bc.index[bc['sample'].searchsorted(read_block['start'])]
+            starts = self.bcaln.index[self.bcaln['sample'].searchsorted(read_block['start'])]
 
             q = r = 0
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))

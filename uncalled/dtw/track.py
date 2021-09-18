@@ -156,27 +156,17 @@ class AlnTrack:
         self.width = len(self.coords)
         self.height = None
 
-    def _group_layers(self, name, df):
-        return pd.concat({name : df}, names=["group", "layer"], axis=1)
-        
 
     def init_alignment(self, read, group_name, layers):
-
-        #TODO do this here instead of in bcaln or whatever
-        #if self.coords is not None:
-        #    mrefs = self.coords.mrefs.intersection(layers.index)
-        #    if len(mrefs) == 0: 
-        #        return None
-        #    layers = layers.reindex(index=mrefs)
 
         fast5 = read.f5.filename
         read_id = read.id
 
-        print(layers)
         mref_start = layers.index.min()
-        mref_end = layers.index.max()
+        mref_end = layers.index.max()+1
         samp_start = layers["sample"].min()
         samp_end = layers["sample"].max()
+
 
         ref_bounds = self.index.mref_to_ref_bound(mref_start, mref_end, not self.conf.is_rna)
 
@@ -195,11 +185,6 @@ class AlnTrack:
                 "samp_end" : [samp_end],
                 "tags" : [""]}).set_index("id")
 
-        self.layers = self._group_layers(group_name, layers)
-        self.layers.index = pd.MultiIndex.from_product([self.layers.index, [aln_id]], names=["mref", "aln_id"])
-        print(self.layers)
-
-        #TODO iterate hierarchically through fast5s/reads
         if fast5 == self.prev_fast5[0]:
             fast5_id = self.prev_fast5[1]
         else:
@@ -211,23 +196,55 @@ class AlnTrack:
             self.prev_read = read_id
 
         self.db.init_alignment(self.alignments)
-        self.db.write_layers(group_name, self.layers[group_name])
+
+        #self.init_layers(group_name, layers)
+
+        self.layers = self._init_aln_group(aln_id, group_name, layers)
 
         return aln_id
 
-    def load_aln_kmers(self, aln=None, store=True):
-        if aln is None:
-            aln = self.read_aln
+    def _init_aln_group(self, aln_id, group, layers):
+        df = pd.concat({group : layers}, names=["group", "layer"], axis=1)
+        df.index = pd.MultiIndex.from_product(
+                        [df.index, [aln_id]], 
+                        names=["mref", "aln_id"])
+        self.db.write_layers(group, df[group])
+        return df
+        
+    def add_aln_group(self, aln_id, group, layers):
+        df = self._init_aln_group(aln_id, group, layers)
+        self.layers = pd.concat([self.layers, df], axis=1)
 
-        kmers = pd.Series(
-            self.index.get_kmers(aln.mref_start-nt.K+1, aln.mref_end, aln.is_rna),
-            #aln.mrefs
-            pd.RangeIndex(aln.mref_start, aln.mref_end)
-        )
+    def _aln_coords(self, aln_id):
+        ref_coord = RefCoord(
+            *self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
+        return self.index.get_coord_space(ref_coord, self.conf.is_rna, kmer_shift=0)
+
+
+    def load_aln_kmers(self, aln_id=None, store=False):
+        if aln_id is None:
+            if len(self.alignments) == 1:
+                aln_id = self.alignments.index[0]
+            else:
+                raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
+        coords = self._aln_coords(aln_id)
+        kmers = coords.load_kmers(self.index)
 
         if store:
             self.read_aln.dtw["kmer"] = kmers
+
         return kmers
+
+        #    if aln is None:
+        #        aln = self.read_aln
+
+        #    kmers = pd.Series(
+        #        self.index.get_kmers(aln.mref_start-nt.K+1, aln.mref_end, aln.is_rna),
+        #        #aln.mrefs
+        #        pd.RangeIndex(aln.mref_start, aln.mref_end)
+        #    )
+
+        #return kmers
 
     def save_aln(self, aln=None):
         if self.prms.mode != "w":
@@ -243,7 +260,7 @@ class AlnTrack:
         if self.read_aln is not None and read_id == self.read_aln.read_id: 
             return self.read_aln
 
-        aln, dtw = self.db.query_read(read_id, self.coords)
+        self.alignments, dtw = self.db.query_read(read_id, self.coords)
 
         self.read_aln = ReadAln(self.id, read_id, index=self.index, is_rna=self.conf.is_rna)
         self.read_aln.set_dtw(dtw)

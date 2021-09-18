@@ -195,7 +195,7 @@ class TrackSQL:
         aln = pd.read_sql_query(
             "SELECT * FROM alignment WHERE id = ?",
             self.con, params=(aln_id,)
-        )
+        ).set_index("id")
 
         return aln, dtw
 

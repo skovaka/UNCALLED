@@ -40,18 +40,29 @@ from . import nt
 
 class RefIndex(_RefIndex):
     class CoordSpace:
-        def __init__(self, ref_name, refs, mrefs=None, index=None, is_rna=None, load_kmers=False):
+        def __init__(self, ref_name, refs, fwd=None, mrefs=None, index=None, is_rna=None, load_kmers=False):
             self.ref_name = ref_name
 
             self.refs = refs#pd.RangeIndex(ref_bounds.start, ref_bounds.end-nt.K+1)
+            self.fwd = fwd
 
             if mrefs is None:
-                self.mrefs = tuple( (self._init_mrefs(index, fwd, is_rna) for fwd in [False, True]) )
+                if self.fwd is None:
+                    self.mrefs = tuple( (self._init_mrefs(index, fwd, is_rna) for fwd in range(2)) )
+                else:
+                    self.mrefs = self._init_mrefs(index, self.fwd, is_rna)
             else:
                 self.mrefs = mrefs
 
+            if isinstance(self.mrefs, pd.Index):
+                self.stranded = True
+            elif isinstance(self.mrefs, tuple):
+                self.stranded = False
+            else:
+                raise ValueError("Coord space mref can only be initialized using pandas.RangeIndex or tuple of two RangeIndexes")
+
             if load_kmers:
-                self.load_kmers(index)
+                self.kmers = self.load_kmers(index)
             else:
                 self.kmers = None
             
@@ -63,47 +74,88 @@ class RefIndex(_RefIndex):
             return mrefs
 
         def load_kmers(self, index):
-            self.kmers = list()
-            for fwd in [False, True]:
-                kmers = index.get_kmers(self.mrefs[fwd].min(), self.mrefs[fwd].max()+nt.K, fwd)
-                if self.mrefs[fwd].step < 0:
-                    kmers = kmers[::-1]
-                self.kmers.append(pd.Series(index=self.mrefs[fwd], data=kmers))
+            if self.stranded:
+                return self._mrefs_to_kmers(index, self.mrefs, self.fwd)
+            return tuple( (self._mrefs_to_kmers(index, mrefs, fwd) 
+                            for fwd,mrefs in enumerate(self.mrefs)) )
+
+        def _mrefs_to_kmers(self, index, mrefs, fwd):
+            kmers = index.get_kmers(mrefs.min(), mrefs.max()+nt.K, fwd)
+            if self.mrefs.step < 0:
+                kmers = kmers[::-1]
+            return pd.Series(index=mrefs, data=kmers)
 
         def intersect(self, coords):
             if self.ref_name != coords.ref_name:
                 raise ValueError("Cannot intersect CoordSpaces from different reference sequences")
-            refs = self.refs.intersection(coords.refs)
-            mrefs = [s.intersection(c) for s,c in zip(self.mrefs, coords.mrefs)]
-            return CoordSpace(self.ref_name, refs, mrefs=mrefs)
 
-        def ref_to_mref(self, ref, fwd):
+            ref_min = max(self.refs.min(), coords.refs.min())
+            ref_max = min(self.refs.max(), coords.refs.max())
+            ref_len = ref_max - ref_min + 1
+
+            st = self.refs.get_loc(ref_min)
+            en = st + ref_len
+
+            refs = self.refs[st:en]#self.refs.intersection(coords.refs)
+
+            if self.stranded:
+                mrefs = self.mrefs[st:en] #.intersection(coords.mrefs)
+            else:
+                mrefs = tuple( (m[st:en] for m in self.mrefs) )
+
+            print(refs, mrefs)
+            return RefIndex.CoordSpace(self.ref_name, refs, mrefs=mrefs)
+
+        def ref_to_mref(self, ref, fwd=None):
             if isinstance(ref, (collections.abc.Sequence, np.ndarray)):
                 i = self.refs.get_indexer(ref)
             else:
                 i = self.refs.get_loc(ref)
+
+            if self.stranded:
+                if fwd is not None and fwd != self.fwd:
+                    raise ValueError("Invalid 'fwd' value or stranded CoordSpace")
+                return self.mrefs[i]
+
+            # not stranded
+            if fwd is None:
+                return tuple( (mrefs[i] for mrefs in self.mrefs) )
             return self.mrefs[fwd][i]
-        
-        def mref_to_ref(self, mref):
+
+        def is_mref_fwd(self, mref):
             if isinstance(mref, (collections.abc.Sequence, np.ndarray)):
-                fwd = mref[0] in self.mrefs[True]
-                i = self.mrefs[fwd].get_indexer(mref)
+                mref = mref[0]
+
+            if self.stranded:
+                return self.fwd and mref in self.mrefs
             else:
-                fwd = mref in self.mrefs[True]
-                i = self.mrefs[fwd].get_loc(mref)
-            return self.refs[i]
+                return mref in self.mrefs[1]
                 
+        #TODO make single private method with fwd param. Also probably merge with above
         def all_mrefs_fwd(self, mrefs):
             return len(self.mrefs[True].intersection(mrefs)) == len(mrefs)
                 
         def all_mrefs_rev(self, mrefs):
             return len(self.mrefs[False].intersection(mrefs)) == len(mrefs)
+        
+        def mref_to_ref(self, mref):
+            if self.stranded:
+                mrefs = self.mrefs
+            else:
+                mrefs = self.mrefs[self.is_mref_fwd(mref)]
 
-        def validate_refs(self, refs):
-            return len(self.refs.intersection(refs)) == len(refs)
+            if isinstance(mref, (collections.abc.Sequence, np.ndarray)):
+                i = mrefs.get_indexer(mref)
+            else:
+                i = mrefs.get_loc(mref)
 
-        def validate_mrefs(self, mrefs):
-            return all_mrefs_fwd(mrefs) or all_mrefs_rev(mrefs)
+            return self.refs[i]
+
+        #def validate_refs(self, refs):
+        #    return len(self.refs.intersection(refs)) == len(refs)
+
+        #def validate_mrefs(self, mrefs):
+        #    return all_mrefs_fwd(mrefs) or all_mrefs_rev(mrefs)
 
         def __len__(self):
             return len(self.refs)
@@ -123,7 +175,7 @@ class RefIndex(_RefIndex):
 
         #TODO get of -nt.K+1
         refs = pd.RangeIndex(ref_bounds.start, ref_bounds.end-kmer_shift)
-        return self.CoordSpace(ref_bounds.name, refs, index=self, is_rna=is_rna)
+        return self.CoordSpace(ref_bounds.name, refs, fwd=ref_bounds.fwd, index=self, is_rna=is_rna)
 
 _index_cache = dict()
 
