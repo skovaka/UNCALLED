@@ -17,13 +17,14 @@ from sklearn.decomposition import PCA
 
 import matplotlib.pyplot as plt
 
-from .read_aln import ReadAln, RefCoord, LayerMeta, LAYER_META
+from . import RefCoord, LayerMeta, LAYER_META
 from .track_io import TrackSQL
 
 from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
 from .. import nt, PoreModel, config, index 
 from ..index import load_index
+
 
 KMER_LAYER       = "kmer"
 CURRENT_LAYER    = "current"
@@ -108,9 +109,9 @@ class AlnTrack:
 
         self.index = load_index(self.prms.index_prefix)
         self.model = PoreModel(self.conf.pore_model)
-        self.read_aln = None
         self.mat = None
         self.coords = None
+        self.layers = None
 
         self.set_ref_bounds(self.prms.ref_bounds)
 
@@ -167,9 +168,7 @@ class AlnTrack:
         samp_start = layers["sample"].min()
         samp_end = layers["sample"].max()
 
-        print(mref_start, mref_end, "pre")
         ref_bounds = self.index.mref_to_ref_bound(mref_start, mref_end, not self.conf.is_rna)
-        print(ref_bounds.start, ref_bounds.end, "write")
 
         self.prev_aln += 1
         aln_id = self.prev_aln
@@ -200,26 +199,35 @@ class AlnTrack:
 
         #self.init_layers(group_name, layers)
 
-        self.layers = self._init_aln_group(aln_id, group_name, layers)
+        self.layers = None
+        self.write_aln_group(aln_id, group_name, layers)
 
         return aln_id
 
-    def _init_aln_group(self, aln_id, group, layers):
-        df = pd.concat({group : layers}, names=["group", "layer"], axis=1)
+    def _group_layers(self, group, layers):
+        return pd.concat({group : layers}, names=["group", "layer"], axis=1)
+        
+    def write_aln_group(self, aln_id, group, layers):
+        df = self._group_layers(group, layers)#pd.concat({group : layers}, names=["group", "layer"], axis=1)
+
         df.index = pd.MultiIndex.from_product(
                         [df.index, [aln_id]], 
                         names=["mref", "aln_id"])
+
         self.db.write_layers(group, df[group])
-        return df
-        
-    def add_aln_group(self, aln_id, group, layers):
-        df = self._init_aln_group(aln_id, group, layers)
-        self.layers = pd.concat([self.layers, df], axis=1)
+
+        if self.layers is None:
+            self.layers = df
+        else:
+            self.layers = pd.concat([self.layers, df], axis=1)
+
+    def aln_ref_coord(self, aln_id):
+        return RefCoord(*self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
 
     def _aln_coords(self, aln_id):
-        ref_coord = RefCoord(
-            *self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
-        return self.index.get_coord_space(ref_coord, self.conf.is_rna, kmer_shift=0)
+        #ref_coord = RefCoord(
+        #    *self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
+        return self.index.get_coord_space(self.aln_ref_coord(aln_id), self.conf.is_rna, kmer_shift=0)
 
 
     def load_aln_kmers(self, aln_id=None, store=False):
@@ -229,11 +237,7 @@ class AlnTrack:
             else:
                 raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
         coords = self._aln_coords(aln_id)
-        print(coords)
         kmers = coords.load_kmers(self.index)
-
-        if store:
-            self.read_aln.dtw["kmer"] = kmers
 
         return kmers
 
@@ -248,36 +252,14 @@ class AlnTrack:
 
         #return kmers
 
-    def save_aln(self, aln=None):
-        if self.prms.mode != "w":
-            raise RuntimeError("Must be write mode to add read to track")
-        
-        if aln is not None:
-            self.read_aln = aln
-
-        self.db.write_layers("dtw", self.read_aln.dtw)
-
 
     def load_read(self, read_id=None, load_kmers=True):
-        if self.read_aln is not None and read_id == self.read_aln.read_id: 
-            return self.read_aln
+        self.alignments = self.db.query_alignments(self.id, read_id, coords=self.coords, full_overlap=self.prms.full_overlap)
+        
+        dtw = self.db.query_layers("dtw", self.coords, str(self.alignments.index[0])).droplevel(1)
+        dtw["kmer"] = self.load_aln_kmers()
+        self.layers = self._group_layers("dtw",dtw)
 
-        self.alignments, dtw = self.db.query_read(read_id, self.coords)
-
-        #dtw = 
-
-        self.read_aln = ReadAln(self.id, read_id, index=self.index, is_rna=self.conf.is_rna)
-        self.read_aln.set_dtw(dtw)
-
-        if not self.read_aln.empty:
-            if load_kmers:
-                self.load_aln_kmers()
-
-            for layer in self.prms.layers:
-                if not layer in self.read_aln.dtw.columns:
-                    self.read_aln.dtw[layer] = self.LAYER_FNS[layer](self, self.read_aln)
-
-        return self.read_aln
 
     def set_layers(self, layers):
         if layers is not None:
@@ -307,16 +289,21 @@ class AlnTrack:
         else:
             ids = None
 
-        self.df = self.db.query_layers("dtw", self.coords, ids)
+        dtw = self.db.query_layers("dtw", self.coords, ids)
+        self.layers = self._group_layers("dtw",dtw)
+
+        #self.write_aln_group(aln_id, group, layers)
 
         self.alignments.sort_values("ref_start", inplace=True)
 
-        mat_index = pd.MultiIndex.from_product([["current", "start", "length"], self.coords.refs])
+        #print(self.layers.columns)
+        #mat_index = pd.MultiIndex.from_list([self.layers.columns, self.coords.refs])
+        #print(mat_index)
 
-        self.mat = self.df.reset_index().pivot(index="aln_id", columns="mref") \
-                   .rename(columns=self.coords.mref_to_ref, level=1) \
-                   .rename_axis(("layer","ref"), axis=1) \
-                   .reindex(mat_index, axis=1)
+        self.mat = self.layers.reset_index().pivot(index="aln_id", columns="mref") \
+                   .rename(columns=self.coords.mref_to_ref, level=2) \
+                   .rename_axis(("group","layer","ref"), axis=1) #\
+                   #.reindex(mat_index, axis=1)
 
         self.mat = self.mat.reindex(self.alignments.index, copy=False)
 

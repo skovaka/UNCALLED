@@ -16,7 +16,7 @@ from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 from _uncalled._nt import KmerArray
 
 from .. import PoreModel
-from . import Bcaln, ReadAln, AlnTrack, RefCoord
+from . import Bcaln, AlnTrack, RefCoord
 
 #TODO make this better
 METHODS = {
@@ -77,7 +77,7 @@ def main(conf):
         print(read.id)
         dtw = GuidedDTW(track, read, paf, conf)
 
-        if dtw.empty:
+        if dtw.df is None:
             sys.stderr.write("dtw failed\n")
             continue
 
@@ -105,6 +105,7 @@ class GuidedDTW:
         self.aln_id = track.init_alignment(read, "bcaln", bcaln.df)
 
         self.bcaln = bcaln.df.sort_index()
+
 
         self.ref_kmers = self.track.load_aln_kmers(self.aln_id).sort_index()
 
@@ -179,8 +180,8 @@ class GuidedDTW:
                   .rename(columns={'norm_sig' : 'current'})
 
         #def self, aln_id, group, layers):
-        df = collapse_events(df, True)
-        self.track.add_aln_group(self.aln_id, "dtw", df)
+        self.df = collapse_events(df, True)
+        self.track.write_aln_group(self.aln_id, "dtw", self.df)
 
         #if len(band_blocks) == 0:
         #    self.track.read_aln.bands = None

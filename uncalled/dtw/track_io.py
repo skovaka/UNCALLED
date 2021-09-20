@@ -225,7 +225,7 @@ class TrackSQL:
         return alns, dtw
     
     def _add_where(self, wheres, params, name, val):
-        if isinstance(val, (collections.abc.Sequence, np.ndarray)):
+        if not isinstance(val, str) and isinstance(val, (collections.abc.Sequence, np.ndarray)):
             wheres.append("%s in (%s)" % (name, ",".join(["?"]*len(val))))
             params += map(str, val)
         else:

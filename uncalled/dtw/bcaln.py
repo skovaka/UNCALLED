@@ -96,7 +96,7 @@ class Bcaln:
 
     @property
     def empty(self):
-        return not hasattr(self, "df") or len(self.df) == 0
+        return not hasattr(self, "df") or len(self.df) <= 1
 
     def parse_cs(self, paf):
         cs = paf.tags.get('cs', (None,)*2)[0]

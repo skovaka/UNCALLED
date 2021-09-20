@@ -238,13 +238,16 @@ class Browser:
         aln_id = trk.alignments.index[rd]
 
         read = trk.alignments.iloc[rd]
-        aln_id = read["id"]
+        #aln_id = trk.aln
 
         self.set_info_cell(0,  self.ref_coord(trk, rf, read['fwd']))
         self.set_info_cell(1, read['read_id'])
 
         mref = trk.coords.ref_to_mref([rf], True)[0]
-        for i,val in enumerate(trk.df.loc[mref,aln_id]):
+
+        print(mref)
+        print(aln_id)
+        for i,val in enumerate(trk.layers.loc[mref,aln_id]):
             self.set_info_cell(i+2, val)
         #self.set_info_cell(self.INFO_KMER, nt.kmer_to_str(int(kmer)))
         #self.set_info_cell(self.INFO_PA,   "%.4f" % pa)
@@ -382,7 +385,7 @@ class Browser:
     #TODO put inside track 
     def layer_means(self, track, layer, fwd):
         #return np.mean(track.mat[layer], axis=0)
-        x = track.mat[layer].mean(axis=0)#.reindex(track.coords.refs)
+        x = track.mat["dtw"][layer].mean(axis=0)#.reindex(track.coords.refs)
         return x
 
     #TODO refactor into _init_fig(), show(), and save()
@@ -489,10 +492,10 @@ class Browser:
         mins = list()
         maxs = list()
         for track in self.tracks:
-            std = track.df[layer].std()
-            med = track.df[layer].median()
-            mins.append(min(track.df[layer].min(), med - std*3))
-            maxs.append(min(track.df[layer].max(), med + std*3))
+            std = track.layers["dtw"][layer].std()
+            med = track.layers["dtw"][layer].median()
+            mins.append(min(track.layers["dtw"][layer].min(), med - std*3))
+            maxs.append(min(track.layers["dtw"][layer].max(), med + std*3))
 
         vmin = min(mins)
         vmax = max(maxs)
@@ -530,7 +533,7 @@ class Browser:
     def get_img(self, track):
         if self.pileup:
             return track.get_pileup(self.active_layer)
-        return track.mat[self.active_layer]
+        return track.mat["dtw"][self.active_layer]
 
     def _init_cursor(self, track):
         cursor_kw = {

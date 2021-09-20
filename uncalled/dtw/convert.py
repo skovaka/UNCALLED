@@ -8,7 +8,7 @@ import pandas as pd
 from ont_fast5_api.fast5_interface import get_fast5_file
 import scipy.stats
 
-from . import ReadAln, AlnTrack, RefCoord
+from . import AlnTrack, RefCoord
 from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt
 from ..fast5 import Fast5Reader, FAST5_OPTS

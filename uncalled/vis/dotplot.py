@@ -134,25 +134,30 @@ class Dotplot:
 
         return True
 
-    def _plot_signal(self, aln, ax, track):
+    def _plot_signal(self, ax, track):
 
-        samp_min, samp_max = aln.get_samp_bounds()
-        sys.stdout.flush()
+        dtw = track.layers["dtw"]
+
+        samp_min = dtw["start"].min()
+        max_i = dtw["start"].argmax()
+        samp_max = dtw["start"].iloc[max_i] + dtw["length"].iloc[max_i]
+        #samp_min, samp_max = aln.get_samp_bounds()
+
         raw_norm = self.read.get_norm_signal(samp_min, samp_max)
-        model_current = track.model[aln.dtw['kmer']]
+        model_current = track.model[dtw["kmer"]]
 
         ymin = min(np.min(model_current), np.min(raw_norm[raw_norm>0]))
         ymax = max(np.max(model_current), np.max(raw_norm[raw_norm>0]))
 
-        starts = aln.dtw['start']
-        ends = starts+aln.dtw['length']
+        starts = dtw['start']
+        ends = starts+dtw['length']
 
-        aln_bases = nt.kmer_base(aln.dtw['kmer'], 2)
+        aln_bases = nt.kmer_base(dtw['kmer'], 2)
         samp_bases = np.full(samp_max-samp_min, -1)
 
-        for i in range(len(aln.dtw)):
-            st = int(aln.dtw.iloc[i]['start'] - samp_min)
-            en = int(st + aln.dtw.iloc[i]['length']) - 1
+        for i in range(len(dtw)):
+            st = int(dtw.iloc[i]['start'] - samp_min)
+            en = int(st + dtw.iloc[i]['length']) - 1
             samp_bases[st:en] = aln_bases[i]
 
         samps = np.arange(samp_min, samp_max)
@@ -160,26 +165,31 @@ class Dotplot:
             ax.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color)
 
         ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, c="black")
-        ax.step(aln.dtw['start'], model_current, color='white', linewidth=2, where="post")
+        ax.step(dtw['start'], model_current, color='white', linewidth=2, where="post")
+
+        return samp_min, samp_max
 
         #skips = aln.dtw[np.diff(aln.dtw.start, append=-1)==0].index
         #ax.vlines(aln.dtw.loc[skips, "start"]-1, ymin, ymax, colors="red", linestyles="dashed", linewidth=3)
 
 
     def _plot_aln(self, i):
-        aln = self.alns[i]
+        track = self.tracks[i]
+        #aln = self.alns[i]
         #if not "mref" in aln.dtw:
         #    aln.calc_mref()
         #aln.sort_mref()
 
-        if getattr(aln, "bands", None) is not None:
-            self.ax_dot.fill_between(aln.bands['samp'], aln.bands['ref_st']-1, aln.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
+        #if getattr(aln, "bands", None) is not None:
+        #    self.ax_dot.fill_between(aln.bands['samp'], aln.bands['ref_st']-1, aln.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
 
-        self.ax_dot.step(aln.dtw['start'], aln.dtw.index, where="post", linewidth=3,
+        mrefs = track.layers.index.get_level_values("mref")
+
+        self.ax_dot.step(track.layers["dtw"]["start"], mrefs, where="post", linewidth=3,
             **self.prms.style["aln_kws"][i]
         )
 
-        self._plot_signal(aln, self.sig_axs[i], self.tracks[i])
+        return self._plot_signal(self.sig_axs[i], self.tracks[i])
 
 
     def set_cursor(self, ref_coord):
@@ -211,25 +221,25 @@ class Dotplot:
         else:
             self.read = ProcRead(fast5_read, conf=self.conf)
 
-        self.alns = [
+        empty = False
+        for track in self.tracks:
             track.load_read(read_id)#, ref_bounds=self.conf.track.ref_bounds)
-            for track in self.tracks
-        ]
+            empty = empty or len(track.layers) == 0
 
-        if np.any([a.empty for a in self.alns]):
+        if empty:
             return False
 
         #self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], mrefs=self.alns[0].mrefs)
 
-        for t in self.tracks:
-            t.load_aln_kmers(store=True)
+        #for t in self.tracks:
+        #    t.load_aln_kmers(store=True)
         #self.aln_kmers = [
         #    track.get_aln_kmers(read_id)#, ref_bounds=self.conf.track.ref_bounds)
         #    for track in self.tracks
         #]
 
         #TODO improve this
-        self.ref_bounds = self.alns[0].ref_bounds
+        self.ref_bounds = self.tracks[0].aln_ref_coord(self.tracks[0].alignments.index[0])
 
         return True
     
@@ -303,8 +313,7 @@ class Dotplot:
         xmin = np.inf
         xmax = -np.inf
         for i in range(self.track_count):
-            self._plot_aln(i)
-            samp_min, samp_max = self.alns[i].get_samp_bounds()
+            samp_min, samp_max = self._plot_aln(i)
             xmin = min(xmin, samp_min)
             xmax = max(xmax, samp_max)
 
@@ -312,9 +321,10 @@ class Dotplot:
         self.ax_dot.set_xlim(xmin-xslop, xmax+xslop)
 
         for ax,layer in zip(self.layer_axs, self.prms.layers):
-            for i,aln in enumerate(self.alns):
+            for i,track in enumerate(self.tracks):
+                mrefs = track.layers.index.get_level_values("mref")
                 ax.step(
-                    aln.dtw[layer], aln.dtw.index+0.5, 
+                    track.layers["dtw"][layer], mrefs+0.5, 
                     where="post",
                     **self.prms.style["aln_kws"][i]
                 )
