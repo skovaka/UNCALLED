@@ -47,10 +47,6 @@ class Bcaln:
 
         ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
         self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna)#, kmer_shift=0)
-        #if coords is None:
-        #    self.paf_coords = paf_coords
-        #else:
-        #    self.paf_coords = coords.intersect(paf_coords)
 
         self.refgap_bps = list()
         self.sub_bps = list()
@@ -117,7 +113,8 @@ class Bcaln:
             qr_i = paf.qr_len - paf.qr_en 
             #rf_i = -paf.rf_en+1
 
-        mr_i = self.paf_coords.mrefs.min()
+        mrefs = self.paf_coords.mrefs
+        mr_i = mrefs.min()
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
 
@@ -128,7 +125,10 @@ class Bcaln:
             c = op[0]
             if c in {'=',':'}:
                 l = len(op[1]) if c == '=' else int(op[1])
-                bp_mref_aln += zip(range(qr_i, qr_i+l), range(mr_i, mr_i+l))
+                for qr, mr in zip(range(qr_i, qr_i+l), range(mr_i, mr_i+l)):
+                    if mr in mrefs:
+                        bp_mref_aln.append((qr,mr))
+                #bp_mref_aln += zip(range(qr_i, qr_i+l), range(mr_i, mr_i+l))
                 qr_i += l
                 mr_i += l
 
@@ -200,7 +200,6 @@ class Bcaln:
                 for qr, mr in zip(range(qr_i, qr_j), range(mr_i, mr_j)):
                     if mr in mrefs:
                         bp_mref_aln.append((qr,mr))
-                #bp_mref_aln += zip(range(qr_i, qr_j), range(mr_i, mr_j))
             elif c == "N":
                 if mr_i in mrefs:
                     bp_mref_aln.append((qr_i,mr))

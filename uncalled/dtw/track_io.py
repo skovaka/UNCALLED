@@ -4,6 +4,7 @@ import sys, os
 import sqlite3
 import numpy as np
 import pandas as pd
+import collections
 
 from .. import config
 
@@ -186,7 +187,7 @@ class TrackSQL:
         params = [read_id]
 
         if coords is not None:
-            query = select + " AND (mref >= ? AND mref <= ?)"
+            query = query + " AND (mref >= ? AND mref <= ?)"
             params += [int(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
 
         dtw = pd.read_sql_query(query, self.con, params=params).set_index("mref")
@@ -207,7 +208,7 @@ class TrackSQL:
 
         if full_overlap:
             select = select + " JOIN alignment ON id = aln_id"
-            where = where + " AND (ref_start < ? AND ref_end > ?)"
+            where = where + " AND (ref_start <= ? AND ref_end > ?)"
             params += [int(coords.refs.min()), int(coords.refs.max())]
 
         query = select + where
@@ -219,6 +220,68 @@ class TrackSQL:
         alns = pd.read_sql_query(
             "SELECT * FROM alignment WHERE id IN (%s)" % ",".join(["?"]*len(ids)),
             self.con, params=ids
-        ).sort_values("ref_start")
+        ).set_index("id")#.sort_values("ref_start")
 
         return alns, dtw
+    
+    def _add_where(self, wheres, params, name, val):
+        if isinstance(val, (collections.abc.Sequence, np.ndarray)):
+            wheres.append("%s in (%s)" % (name, ",".join(["?"]*len(val))))
+            params += map(str, val)
+        else:
+            wheres.append("%s = ?" % name)
+            params.append(str(val))
+
+    def query_alignments(self, track_id=None, read_id=None, coords=None, full_overlap=False):
+        select = "SELECT * FROM alignment"
+        wheres = list()
+        params = list()
+
+        if track_id is not None:
+            self._add_where(wheres, params, "track_id", track_id)
+
+        if read_id is not None:
+            self._add_where(wheres, params, "read_id", read_id)
+
+        if coords is not None:
+            ref_start = int(coords.refs.min())
+            ref_end = int(coords.refs.max())+1
+            wheres.append("ref_name = ? AND ref_start < ? AND ref_end > ?")
+            params.append(coords.ref_name)
+            if full_overlap:
+                params += [ref_start, ref_end]
+            else:
+                params += [ref_end, ref_start]
+
+        if len(wheres) == 0:
+            query = select
+        else:
+            query = select + " WHERE " + " AND ".join(wheres)
+
+        print(query)
+        
+        return pd.read_sql_query(query, self.con, params=params).set_index("id")
+        
+
+    def query_layers(self, table, coords=None, aln_id=None, order="mref"):
+        select = "SELECT mref, aln_id, start, length, current FROM dtw"
+
+        wheres = list()
+        params = list()
+
+        if coords is not None:
+            wheres.append("mref >= ? AND mref <= ?")
+            params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
+
+        if aln_id is not None:
+            print(aln_id)
+            self._add_where(wheres, params, "aln_id", aln_id)
+
+        if len(wheres) == 0:
+            query = select
+        else:
+            query = select + " WHERE " + " AND ".join(wheres)
+
+        print(query)
+        
+        return pd.read_sql_query(query, self.con, params=params).set_index(["mref","aln_id"])

@@ -167,8 +167,9 @@ class AlnTrack:
         samp_start = layers["sample"].min()
         samp_end = layers["sample"].max()
 
-
+        print(mref_start, mref_end, "pre")
         ref_bounds = self.index.mref_to_ref_bound(mref_start, mref_end, not self.conf.is_rna)
+        print(ref_bounds.start, ref_bounds.end, "write")
 
         self.prev_aln += 1
         aln_id = self.prev_aln
@@ -228,6 +229,7 @@ class AlnTrack:
             else:
                 raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
         coords = self._aln_coords(aln_id)
+        print(coords)
         kmers = coords.load_kmers(self.index)
 
         if store:
@@ -261,6 +263,8 @@ class AlnTrack:
             return self.read_aln
 
         self.alignments, dtw = self.db.query_read(read_id, self.coords)
+
+        #dtw = 
 
         self.read_aln = ReadAln(self.id, read_id, index=self.index, is_rna=self.conf.is_rna)
         self.read_aln.set_dtw(dtw)
@@ -296,9 +300,15 @@ class AlnTrack:
 
         self.set_ref_bounds(self.prms.ref_bounds)
 
-        self.alignments, self.df = self.db.query_alns(self.id, self.coords, self.prms.full_overlap)
+        self.alignments = self.db.query_alignments(self.id, coords=self.coords, full_overlap=self.prms.full_overlap)
 
-        self.df.set_index(["mref", "aln_id"], inplace=True)
+        if self.prms.full_overlap:
+            ids = self.alignments.index.to_numpy()
+        else:
+            ids = None
+
+        self.df = self.db.query_layers("dtw", self.coords, ids)
+
         self.alignments.sort_values("ref_start", inplace=True)
 
         mat_index = pd.MultiIndex.from_product([["current", "start", "length"], self.coords.refs])
@@ -308,7 +318,7 @@ class AlnTrack:
                    .rename_axis(("layer","ref"), axis=1) \
                    .reindex(mat_index, axis=1)
 
-        self.mat = self.mat.reindex(self.alignments["id"], copy=False)
+        self.mat = self.mat.reindex(self.alignments.index, copy=False)
 
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])

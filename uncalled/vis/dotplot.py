@@ -134,29 +134,6 @@ class Dotplot:
 
         return True
 
-    def add_aln(self, aln, focus=False, color="purple", model=None):
-        if self.read.id is not None and self.read.id != aln.read_id:
-            raise RuntimeError("All Dotplot alignments must be from same read")
-
-        if self.ref_bounds is None:
-            self.ref_bounds = aln.ref_bounds
-
-        elif self.ref_bounds.name != aln.ref_bounds.name:
-            raise RuntimeError("All Dotplot alignments must be on same reference sequence")
-        else:
-            self.ref_bounds = RefCoord(
-                self.ref_bounds.name,
-                min(self.ref_bounds.start, aln.ref_bounds.start), 
-                max(self.ref_bounds.end, aln.ref_bounds.end), 
-                self.ref_bounds.fwd)
-
-        if focus:
-            if len(self.focus) > 0:
-                raise RuntimeError("Dotplot can currently only have one focus alignment")
-            self.focus.add(len(self.alns))
-
-        self.alns.append((aln, color, model))
-
     def _plot_signal(self, aln, ax, track):
 
         samp_min, samp_max = aln.get_samp_bounds()
@@ -301,10 +278,6 @@ class Dotplot:
             ax.set_ylabel(
                 "Current (pA)", 
                 color=self.prms.style["aln_kws"][i]["color"])
-            #rax = ax.twinx()
-            #rax.set_ylabel(self.tracks[i].name)
-
-
 
         self.sig_axs[0].set_title(self.read.id)
         self.ax_dot.set_xlabel("Raw Sample")

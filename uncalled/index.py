@@ -80,7 +80,9 @@ class RefIndex(_RefIndex):
                             for fwd,mrefs in enumerate(self.mrefs)) )
 
         def _mrefs_to_kmers(self, index, mrefs, fwd):
-            kmers = index.get_kmers(mrefs.min(), mrefs.max()+nt.K, fwd)
+            #TODO bcaln index probably getting messed up
+            #look closely at bcaln DF
+            kmers = index.get_kmers(mrefs.min()-nt.K, mrefs.max(), fwd)
             if self.mrefs.step < 0:
                 kmers = kmers[::-1]
             return pd.Series(index=mrefs, data=kmers)
@@ -161,11 +163,12 @@ class RefIndex(_RefIndex):
             return len(self.refs)
 
         def __repr__(self):
-            return "%s:%d-%d (fwd %d-%d, rev %d-%d)" % (
-                self.ref_name, self.refs.start, self.refs.stop,
-                self.mrefs[True].start, self.mrefs[True].stop,
-                self.mrefs[False].start, self.mrefs[False].stop,
-            )
+            return ("%s:%d-%d " % (self.ref_name, self.refs.start, self.refs.stop)) + str(self.mrefs)
+            #return "%s:%d-%d (fwd %d-%d, rev %d-%d)" % (
+            #    self.ref_name, self.refs.start, self.refs.stop,
+            #    self.mrefs[True].start, self.mrefs[True].stop,
+            #    self.mrefs[False].start, self.mrefs[False].stop,
+            #)
 
     def get_coord_space(self, ref_bounds, is_rna, kmer_shift=nt.K-1):
         rid = self.get_ref_id(ref_bounds.name)

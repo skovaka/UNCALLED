@@ -74,6 +74,7 @@ def main(conf):
         if paf is None:
             continue
 
+        print(read.id)
         dtw = GuidedDTW(track, read, paf, conf)
 
         if dtw.empty:
@@ -82,7 +83,6 @@ def main(conf):
 
         #track.save_aln()
 
-        print(read.id)
 
     if not track is None:
         t = time.time()
@@ -147,7 +147,7 @@ class GuidedDTW:
 
         for st, en in [(block_min, block_max)]:
             samp_st = self.bcaln.loc[st,'sample']
-            samp_en = self.bcaln.loc[en-1,'sample']
+            samp_en = self.bcaln.loc[en,'sample']
 
             mref_st = st
             mref_en = en+1

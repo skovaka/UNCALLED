@@ -253,7 +253,7 @@ class RefIndex {
         bool flip = sa_start >= static_cast<i32>(size() / 2);
 
         i64 pac_st; //TODO rename
-        if (flip) pac_st = size() - sa_end + 1;
+        if (flip) pac_st = size() - sa_end;// + 1;
         else pac_st = sa_start;
 
         i32 rid = bns_pos2rid(bns_, pac_st);
