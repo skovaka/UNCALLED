@@ -83,7 +83,7 @@ class RefIndex(_RefIndex):
             #TODO bcaln index probably getting messed up
             #look closely at bcaln DF
             kmers = index.get_kmers(mrefs.min()-nt.K, mrefs.max(), fwd)
-            if self.mrefs.step < 0:
+            if mrefs.step < 0:
                 kmers = kmers[::-1]
             return pd.Series(index=mrefs, data=kmers)
 
@@ -170,7 +170,7 @@ class RefIndex(_RefIndex):
             #    self.mrefs[False].start, self.mrefs[False].stop,
             #)
 
-    def get_coord_space(self, ref_bounds, is_rna, kmer_shift=nt.K-1):
+    def get_coord_space(self, ref_bounds, is_rna, kmer_shift=nt.K-1, load_kmers=True):
         rid = self.get_ref_id(ref_bounds.name)
         length = self.get_ref_len(rid)
         if ref_bounds.start < 0 or ref_bounds.end > length:
@@ -178,7 +178,7 @@ class RefIndex(_RefIndex):
 
         #TODO get of -nt.K+1
         refs = pd.RangeIndex(ref_bounds.start, ref_bounds.end-kmer_shift)
-        return self.CoordSpace(ref_bounds.name, refs, fwd=ref_bounds.fwd, index=self, is_rna=is_rna)
+        return self.CoordSpace(ref_bounds.name, refs, fwd=ref_bounds.fwd, index=self, is_rna=is_rna, load_kmers=load_kmers)
 
 _index_cache = dict()
 

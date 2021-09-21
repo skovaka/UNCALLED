@@ -138,26 +138,29 @@ class AlnTrack2:
 
     #TODO parse mm2 every time to enable changing bounds
     #eventually use some kind of tabix-like indexing
-    def set_data(self, coords, alignments, layers):
+    def set_data(self, coords, alignments, layers, load_mat=False):
         self.coords = coords
         self.alignments = alignments
 
-        self.layers = pd.concat(layers, names=["group", "layer"], axis=1)
+        self.layers = layers#pd.concat(layers, names=["group", "layer"], axis=1)
 
         self.alignments.sort_values("ref_start", inplace=True)
 
-        self.mat = self.layers.reset_index().pivot(index="aln_id", columns="mref") \
-                   .rename(columns=self.coords.mref_to_ref, level=2) \
-                   .rename_axis(("group","layer","ref"), axis=1) #\
-                   #.reindex(mat_index, axis=1)
+        if load_mat:
+            self.mat = self.layers.reset_index().pivot(index="aln_id", columns="mref") \
+                       .rename(columns=self.coords.mref_to_ref, level=2) \
+                       .rename_axis(("group","layer","ref"), axis=1) \
+                       .sort_index(axis=1, level=2)
+                       #.reindex(mat_index, axis=1)
 
-        self.mat = self.mat.reindex(self.alignments.index, copy=False)
+            self.mat = self.mat.reindex(self.alignments.index, copy=False)
+
+            self.width = len(self.coords.refs)
+            self.height = len(self.alignments)
 
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
 
-        self.width = len(self.coords.refs)
-        self.height = len(self.alignments)
 
         return self.mat
 

@@ -49,7 +49,7 @@ OPTS = (
     Opt("input", "track_io", nargs="+"),
     #Opt("track_a", "browser", type=str),
     #Opt("track_b", "browser", type=str, nargs="?"),
-    Opt(("-f", "--full-overlap"), "track", action="store_true"),
+    Opt(("-f", "--full-overlap"), "track_io", action="store_true"),
     Opt(("-L", "--layers"), "track", type=comma_split),
 )
 

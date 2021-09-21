@@ -10,6 +10,7 @@ from . import RefCoord
 from .track2 import AlnTrack2
 from ..index import load_index
 from ..pore_model import PoreModel
+from ..fast5 import Fast5Reader, parse_read_ids
 from .. import config
 
 class TrackIOParams(config.ParamGroup):
@@ -21,6 +22,7 @@ TrackIOParams._def_params(
     ("index_prefix", None, str, "BWA index prefix"),
     ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
+    ("chunksize", 4000, int, "If true will only include reads which fully cover reference bounds"),
 #    ("layers", DEFAULT_LAYERS, list, "Layers to load"),
     #("mode", "r", str, "Read (r) or write (w) mode"),
     ignore_toml={"input", "output", "ref_bounds"}
@@ -32,7 +34,6 @@ class TrackIO:
 
         self.dbs = dict()
 
-        self.tracks = dict()
         self.track_dbs = dict()
         self.track_ids = dict()
 
@@ -48,6 +49,7 @@ class TrackIO:
 
         self.index = load_index(self.prms.index_prefix)
         self.model = PoreModel(self.conf.pore_model) 
+        self.fast5s = None
         self._set_ref_bounds(self.prms.ref_bounds)
 
     def _set_ref_bounds(self, ref_bounds):
@@ -103,7 +105,7 @@ class TrackIO:
             self._init_track(db, row.name)
 
             conf = config.Config(toml=row.config)
-            t = AlnTrack2(db, row.id, row.name, row.desc, row.groups, conf)
+            t = AlnTrack2(db, row["id"], row["name"], row["desc"], row["groups"], conf)
             self.input_tracks.append(t)
 
             self.conf.load_config(conf)
@@ -125,6 +127,14 @@ class TrackIO:
             track = AlnTrack2(db, None, name, name, "dtw", self.conf)
             self.output_tracks[name] = track
             db.init_track2(track)
+
+    def get_fast5_reader(self):
+        #TODO needs work for multiple DBs
+        if self.fast5s is None:
+            for db in self.dbs.values():
+                fast5_index = db.get_fast5_index()
+            self.fast5s = Fast5Reader(index=fast5_index, conf=self.conf)
+        return self.fast5s
 
     def init_alignment(self, read_id, fast5, group_name, layers, track_name=None):
         if track_name is None:
@@ -180,28 +190,79 @@ class TrackIO:
     def input_count(self):
         return len(self.input_tracks)
 
-    def load_refs(self, ref_bounds=None, full_overlap=False):
+    def load_refs(self, ref_bounds=None, full_overlap=None):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
         if self.coords is None:
             raise ValueError("Must set ref bounds")
+
+        if full_overlap is None:
+            full_overlap = self.prms.full_overlap
 
         for track in self.input_tracks:
             track.coords = self.coords
             alignments = track.db.query_alignments(track.id, coords=self.coords, full_overlap=full_overlap)
 
             if full_overlap:
-                ids = self.alignments.index.to_numpy()
+                ids = alignments.index.to_numpy()
             else:
                 ids = None
 
             layers = dict()
             for group in track.groups:
                 layers[group] = track.db.query_layers("dtw", self.coords, ids)
+            layers = pd.concat(layers, names=["group", "layer"], axis=1)
 
-            track.set_data(self.coords, alignments, layers)
+            track.set_data(self.coords, alignments, layers, load_mat=True)
 
         return self.input_tracks
+
+    def iter_reads(self, ref_bounds=None, full_overlap=False):
+        if ref_bounds is not None:
+            self._set_ref_bounds(ref_bounds)
+        
+        dbfile0,db0 = list(self.dbs.items())[0]
+
+        alns_iter = db0.query_alignments(
+            coords=self.coords, 
+            full_overlap=full_overlap, 
+            order=["read_id"],
+            chunksize=self.prms.chunksize)
+
+        end_alns = None
+        for chunk in alns_iter:
+            if end_alns is not None:
+                chunk = pd.concat([end_alns, chunk])
+
+            end = chunk["read_id"] == chunk["read_id"].iloc[-1]
+            end_alns = chunk[end]
+            chunk = chunk[~end]
+
+            for read_id, alns in chunk.groupby("read_id"):
+                self._fill_tracks(db0, alns)
+                yield (read_id, self.input_tracks)
+
+    def _fill_tracks(self, db, alns):
+        ids = list(alns.index)
+
+        layers = dict()
+        #TODO parse which track layers to import
+        for group in ["dtw"]: #self.groups:
+            layers[group] = db.query_layers("dtw", self.coords, ids)
+        layers = pd.concat(layers, names=["group", "layer"], axis=1)
+
+        for track in self.input_tracks:
+            track_alns = alns[alns["track_id"] == track.id]
+
+            i = layers.index.get_level_values("aln_id").isin(track_alns.index)
+            track_layers = layers.iloc[i]
+
+            #TODO deal with multimappers
+            ref_coord = RefCoord(*track_alns[["ref_name","ref_start","ref_end","fwd"]].iloc[0])
+            track_coords = self.index.get_coord_space(
+                ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)
+
+            track.set_data(track_coords, track_alns, track_layers)
     
     def close(self):
         for filename, db in self.dbs.items():
@@ -317,7 +378,6 @@ class TrackSQL:
 
     def init_read(self, read_id, fast5_id):
         self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
-        #self.con.commit()
 
     def write_layers(self, table, df):
         df.to_sql(
@@ -325,7 +385,6 @@ class TrackSQL:
             if_exists="append", 
             method="multi",# chunksize=5000,
             index=True, index_label=["mref","aln_id"])
-        #self.con.commit()
 
     def get_fast5_index(self):
         return pd.read_sql_query("""
@@ -353,9 +412,8 @@ class TrackSQL:
         query = self._join_query(select, wheres)
         return pd.read_sql_query(query, self.con, params=params)
         #return self.cur.execute(query,params).fetchone()
-        
 
-    def query_alignments(self, track_id=None, read_id=None, coords=None, full_overlap=False):
+    def query_alignments(self, track_id=None, read_id=None, coords=None, full_overlap=False, order=None, chunksize=None):
         select = "SELECT * FROM alignment"
         wheres = list()
         params = list()
@@ -373,17 +431,19 @@ class TrackSQL:
             else:
                 params += [ref_end, ref_start]
 
-        query = self._join_query(select, wheres)
+        query = self._join_query(select, wheres, order)
         
-        return pd.read_sql_query(query, self.con, params=params).set_index("id")
+        return pd.read_sql_query(query, self.con, index_col="id", params=params, chunksize=chunksize)
         
-    def _join_query(self, select, wheres):
-        if len(wheres) == 0:
-            return select
-        else:
-            return select + " WHERE " + " AND ".join(wheres)
+    def _join_query(self, select, wheres, order=None):
+        query = select
+        if len(wheres) > 0:
+            query += " WHERE " + " AND ".join(wheres)
+        if order is not None:
+            query += " ORDER BY " + ", ".join(order)
+        return query
 
-    def query_layers(self, table, coords=None, aln_id=None, order="mref"):
+    def query_layers(self, table, coords=None, aln_id=None, order=["mref"]):
         select = "SELECT mref, aln_id, start, length, current FROM dtw"
 
         wheres = list()
@@ -398,7 +458,7 @@ class TrackSQL:
         #if len(wheres) == 0:
         #else:
         #    query = select + " WHERE " + " AND ".join(wheres)
-        query = self._join_query(select, wheres)
+        query = self._join_query(select, wheres, order)
 
         
-        return pd.read_sql_query(query, self.con, params=params).set_index(["mref","aln_id"])
+        return pd.read_sql_query(query, self.con, index_col=["mref","aln_id"], params=params)

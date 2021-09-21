@@ -16,6 +16,7 @@ from ..sigproc import ProcRead
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
 from ..dtw.track import AlnTrack, RefCoord, ref_coords, method_compare_aln
+from ..dtw.track_io import TrackIO
 
 from _uncalled import _RefIndex
 
@@ -44,11 +45,12 @@ def comma_split(s):
 
 from ..argparse import Opt
 OPTS = [
-    Opt("track_a", "dotplot", type=str),
-    Opt("track_b", "dotplot", nargs="?", type=str),
+    #Opt("track_a", "dotplot", type=str),
+    #Opt("track_b", "dotplot", nargs="?", type=str),
+    Opt("input", "track_io", nargs="+"),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
-    Opt(("-R", "--ref-bounds"), "track", type=RefCoord),
+    Opt(("-R", "--ref-bounds"), "track_io", type=RefCoord),
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", type=comma_split),
     Opt(("-C", "--max-chunks"), "read_buffer"),
@@ -76,38 +78,19 @@ class Dotplot:
         self.conf.track.load_mat = False
         self.conf.track.layers = self.conf.dotplot.layers
 
-        if isinstance(self.prms.track_a, AlnTrack):
-            self.tracks = [self.prms.track_a]
-        else:
-            self.tracks = [AlnTrack(self.prms.track_a, conf=self.conf)]
-        #self.colors = [self.prms.styles["color_a"]]
+        self.track_io = TrackIO(conf=self.conf)
+        self.fast5s = self.track_io.get_fast5_reader()#Fast5Reader(reads=self.read_ids, index=fast5_index, conf=self.tracks[0].conf)
+        self.conf.load_config(self.track_io.conf)
 
-        self.conf.load_config(self.tracks[0].conf)
-
-        if self.conf.dotplot.track_b is not None:
-            if isinstance(self.prms.track_b, AlnTrack):
-                self.tracks.append(self.prms.track_b)
-            else:
-                self.tracks.append(AlnTrack(self.prms.track_b, conf=self.conf))
-            #self.colors.append(self.prms.styles["color_b"])
-
-            self.read_ids = self.tracks[0].read_ids & self.tracks[1].read_ids
-
-            if len(self.read_ids) == 0:
-                raise RuntimeError("Dotplot tracks must have reads in common")
-        else:
-            self.read_ids = self.tracks[0].db.get_read_ids()
-        
-        fast5_index = self.tracks[0].db.get_fast5_index()
-        self.fast5s = Fast5Reader(reads=self.read_ids, index=fast5_index, conf=self.tracks[0].conf)
-
-        self.index = self.tracks[0].index
+        self.index = self.track_io.index
         #self.mm2s = self.tracks[0].mm2s
 
     def show_all(self):
-        for read_id in self.read_ids:
-            print(read_id)
-            self.show(read_id)
+        for read_id, tracks in self.track_io.iter_reads():
+            self.read_id = read_id
+            self.tracks = tracks
+            print("TRACKSSS", tracks)
+            self.show(tracks)
 
     def save_all(self, out_prefix, fmt):
         for read_id in self.read_ids:
@@ -125,8 +108,8 @@ class Dotplot:
             self.fig.savefig(out_fname, dpi=200)
             plt.close()
 
-    def show(self, read_id=None, cursor=None, fast5_read=None):
-        if not self._plot(read_id, cursor, fast5_read):
+    def show(self, tracks=None, cursor=None, fast5_read=None):
+        if not self._plot(cursor, fast5_read):
             return False
 
         plt.show()
@@ -144,7 +127,9 @@ class Dotplot:
         #samp_min, samp_max = aln.get_samp_bounds()
 
         raw_norm = self.read.get_norm_signal(samp_min, samp_max)
-        model_current = track.model[dtw["kmer"]]
+
+        kmers = track.coords.kmers[dtw.index.get_level_values(0)]
+        model_current = self.track_io.model[kmers]
 
         ymin = min(np.min(model_current), np.min(raw_norm[raw_norm>0]))
         ymax = max(np.max(model_current), np.max(raw_norm[raw_norm>0]))
@@ -152,7 +137,7 @@ class Dotplot:
         starts = dtw['start']
         ends = starts+dtw['length']
 
-        aln_bases = nt.kmer_base(dtw['kmer'], 2)
+        aln_bases = nt.kmer_base(kmers, 2)
         samp_bases = np.full(samp_max-samp_min, -1)
 
         for i in range(len(dtw)):
@@ -204,39 +189,29 @@ class Dotplot:
     def _tick_formatter(self, x, pos):
         return self.index.mref_to_ref(int(x))
 
-    def _load_read(self, read_id, fast5_read=None):
-        if read_id is None and fast5_read is None:
-            raise ValueError("Must specify read to show")
-            #read_id = self.tracks[0].read_aln.read_id
+    def _load_read(self):#, read_id, fast5_read=None):
+        #if read_id is None and fast5_read is None:
+        #    raise ValueError("Must specify read to show")
+        #    #read_id = self.tracks[0].read_aln.read_id
 
         self.cursor = None
 
-        if fast5_read is None:
-            fast5_read = self.fast5s[read_id]
-        else:
-            read_id = fast5_read.id
+        fast5_read = self.fast5s[self.read_id]
 
         if isinstance(fast5_read, ProcRead):
             self.read = fast5_read
         else:
+            print("POOR MODEL", self.conf.pore_model.name)
             self.read = ProcRead(fast5_read, conf=self.conf)
 
         empty = False
         for track in self.tracks:
-            track.load_read(read_id)#, ref_bounds=self.conf.track.ref_bounds)
             empty = empty or len(track.layers) == 0
 
         if empty:
             return False
 
-        #self.aln_bc = BcFast5Aln(self.index, self.read, self.mm2s[read_id], mrefs=self.alns[0].mrefs)
-
-        #for t in self.tracks:
-        #    t.load_aln_kmers(store=True)
-        #self.aln_kmers = [
-        #    track.get_aln_kmers(read_id)#, ref_bounds=self.conf.track.ref_bounds)
-        #    for track in self.tracks
-        #]
+        print("TRACK", self.tracks)
 
         #TODO improve this
         self.ref_bounds = self.tracks[0].aln_ref_coord(self.tracks[0].alignments.index[0])
@@ -250,8 +225,8 @@ class Dotplot:
     def track_count(self):
         return len(self.tracks)
 
-    def _plot(self, read_id, cursor=None, fast5_read=None):
-        if not self._load_read(read_id, fast5_read):
+    def _plot(self, cursor=None, fast5_read=None):
+        if not self._load_read():#read_id, fast5_read):
             return False
 
         widths=[5]
