@@ -24,14 +24,11 @@ from ..argparse import Opt, ref_coords
 from .. import nt, PoreModel, config, index 
 from ..index import load_index
 
-
 KMER_LAYER       = "kmer"
 CURRENT_LAYER    = "current"
 DWELL_LAYER      = "dwell"
 MODEL_DIFF_LAYER = "model_diff"
 DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
-
-from .track_io import TrackSQL
 
 LAYER_META.update({
     "dwell" : LayerMeta(float, "Dwell Time (ms/nt)"),
@@ -39,97 +36,21 @@ LAYER_META.update({
     "bcerr"      : LayerMeta(float, "BC Alignment Errors")
 })
 
-class AlnTrackParams(config.ParamGroup):
-    _name = "track"
-AlnTrackParams._def_params(
-    ("path", None, None, "Path to directory where alignments are stored"),
-    ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
-    ("name", None, str, "Short unique identifier for the track"),
-    ("index_prefix", None, str, "BWA index prefix"),
-    ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
-    ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
-    ("layers", DEFAULT_LAYERS, list, "Layers to load"),
-    ("mode", "r", str, "Read (r) or write (w) mode"),
-    ("overwrite", False, bool, "Will overwrite existing directories if True"),
-    ignore_toml={"mode", "overwrite", "load_mat"}
-)
-
-
 class AlnTrack:
-    CONF_FNAME = "conf.toml"
-    ALN_DIR = "alns"
-
-    #TODO make fast5_file alias for filename in Fast5Reader
-    #also, in fast5 reader make static fast5 filename parser
-
-    WRITE_MODE = "w"
-    READ_MODE = "r"
-    MODES = {WRITE_MODE, READ_MODE}
-
-    CMP_LAYERS = [CURRENT_LAYER, DWELL_LAYER]
-
-    def get_bcerr_layer(self, aln):
-        bcerr = aln.bcerr#.reindex(aln.aln.index)
-        ret = pd.Series(np.nan, bcerr.index)
-        subs = bcerr[bcerr["type"]=="SUB"]
-        ret[subs.index] = subs["seq"].replace({"A":0,"C":1,"G":2,"T":3})
-        ret[bcerr["type"]=="DEL"] = 4
-        ret[bcerr["type"]=="INS"] = 5
-        return ret
-
-    LAYER_FNS = {
-        #"id" : (
-        #    lambda self,a: a.id),
-        "kmer" : (
-            lambda self,a: self.load_aln_kmers(a)),
-        "current" : (
-            lambda self,a: a.aln["current"]),
-        "dwell" : (
-            lambda self,a: 1000 * a.aln['length'] / self.conf.read_buffer.sample_rate),
-        "model_diff" : (
-            lambda self,a: a.aln["current"] - self.model[a.aln["kmer"]]),
-        "bcerr" : get_bcerr_layer,
-    }
-
-    def __init__(self, *args, **kwargs):
-        self.conf, self.prms = config._init_group("track", *args, **kwargs)
-
-        self.in_mem = self.prms.path is None
+    def __init__(self, db, track_id, name, desc, groups, conf):
+        self.db = db
+        #self.index = index
+        self.id = track_id
+        self.name = name
+        self.desc = desc
+        self.groups = groups.split(",")
+        self.conf = conf
 
         self.read_ids = set()
 
-        if self.prms.name is None:
-            self.prms.name = os.path.basename(self.prms.path)
-
-        if not self.in_mem:
-            self.db = TrackSQL(self.prms.path)
-
-            if self.prms.mode == self.READ_MODE:
-                self.id, _, self.desc, groups, toml = self.db.query_track("test").iloc[0]
-                self.conf.load_toml(text=toml)
-
-        self.index = load_index(self.conf.track_io.index_prefix)
-        self.model = PoreModel(self.conf.pore_model)
         self.mat = None
         self.coords = None
         self.layers = None
-
-        self.set_ref_bounds(self.conf.track_io.ref_bounds)
-
-        if self.conf.dtw.mm2_paf is not None:
-            read_filter = set(self.conf.fast5_reader.read_filter)
-
-        if not self.in_mem:
-            if self.prms.load_mat and self.prms.ref_bounds is not None:
-                self.load_region(self.prms.ref_bounds)
-
-            elif self.prms.mode == self.WRITE_MODE:
-                self.prev_fast5 = (None, None)
-                self.prev_read = None
-                self.prev_aln = -1
-
-                self.db.init_tables()
-                self.id = self.db.init_track(self)
 
     def __contains__(self, read_id):
         return read_id in self.read_ids
@@ -140,68 +61,21 @@ class AlnTrack:
             self.read_ids = self.read_ids & set(self.conf.fast5_reader.read_filter)
 
     #TODO move to RefIndex python wrapper? 
-    def _ref_coords_to_mrefs(self, ref_coords, fwd=None):
-        if fwd is None:
-            fwd = ref_coords.fwd
-        start, end = self.index.ref_to_mref(
-            ref_coords.name, ref_coords.start, ref_coords.end-nt.K+1, fwd, self.conf.is_rna)
-        return pd.RangeIndex(start, end).rename("mref")
+    #def _ref_coords_to_mrefs(self, ref_coords, fwd=None):
+    #    if fwd is None:
+    #        fwd = ref_coords.fwd
+    #    start, end = self.index.ref_to_mref(
+    #        ref_coords.name, ref_coords.start, ref_coords.end-nt.K+1, fwd, self.conf.is_rna)
+    #    return pd.RangeIndex(start, end).rename("mref")
 
+    #def set_ref_bounds(self, ref_bounds):
+    #    if ref_bounds == None:
+    #        return
 
-    def set_ref_bounds(self, ref_bounds):
+    #    self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
 
-        if ref_bounds == None:
-            return
-
-        self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
-
-        self.width = len(self.coords)
-        self.height = None
-
-    def init_alignment(self, read, group_name, layers):
-
-        fast5 = read.f5.filename
-        read_id = read.id
-
-        mref_start = layers.index.min()
-        mref_end = layers.index.max()+1
-        samp_start = layers["sample"].min()
-        samp_end = layers["sample"].max()
-
-        ref_bounds = self.index.mref_to_ref_bound(mref_start, mref_end, not self.conf.is_rna)
-
-        self.prev_aln += 1
-        aln_id = self.prev_aln
-
-        self.alignments = pd.DataFrame({
-                "id" : [aln_id],
-                "track_id" : [self.id],
-                "read_id" : [read_id],
-                "ref_name" : [ref_bounds.ref_name],
-                "ref_start" : [ref_bounds.start],
-                "ref_end" : [ref_bounds.end],
-                "fwd" :     [ref_bounds.fwd],
-                "samp_start" : [samp_start],
-                "samp_end" : [samp_end],
-                "tags" : [""]}).set_index("id")
-
-        if fast5 == self.prev_fast5[0]:
-            fast5_id = self.prev_fast5[1]
-        else:
-            fast5_id = self.db.init_fast5(fast5)
-            self.prev_fast5 = (fast5, fast5_id)
-
-        if self.prev_read != read_id:
-            self.db.init_read(read_id, fast5_id)
-            self.prev_read = read_id
-
-        self.db.init_alignment(self.alignments)
-
-        #self.init_layers(group_name, layers)
-
-        self.add_layer_group(group_name, layers)
-
-        return aln_id
+    #    self.width = len(self.coords)
+    #    self.height = None
 
     def _group_layers(self, group, layers):
         return pd.concat({group : layers}, names=["group", "layer"], axis=1)
@@ -224,11 +98,10 @@ class AlnTrack:
     def aln_ref_coord(self, aln_id):
         return RefCoord(*self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
 
-    def _aln_coords(self, aln_id):
-        #ref_coord = RefCoord(
-        #    *self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
-        return self.index.get_coord_space(self.aln_ref_coord(aln_id), self.conf.is_rna, kmer_shift=0)
-
+    #def _aln_coords(self, aln_id):
+    #    #ref_coord = RefCoord(
+    #    #    *self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
+    #    return self.index.get_coord_space(self.aln_ref_coord(aln_id), self.conf.is_rna, kmer_shift=0)
 
     def _default_id(self, aln_id):
         if aln_id is None:
@@ -236,12 +109,13 @@ class AlnTrack:
                 return self.alignments.index[0]
             raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
         return aln_id
-    
-    def load_aln_kmers(self, aln_id=None, store=False):
-        coords = self._aln_coords(self._default_id(aln_id))
-        kmers = coords.load_kmers(self.index)
 
-        return kmers
+    #def load_aln_kmers(self, aln_id=None, store=False):
+    #    aln_id = self._default_id(aln_id)
+    #    coords = self._aln_coords(aln_id)
+    #    kmers = coords.load_kmers(self.index)
+
+    #    return kmers
 
         #    if aln is None:
         #        aln = self.read_aln
@@ -270,49 +144,28 @@ class AlnTrack:
 
     #TODO parse mm2 every time to enable changing bounds
     #eventually use some kind of tabix-like indexing
-    def load_region(self, ref_bounds=None, layers=None):
-        self.set_layers(layers)
-        if ref_bounds is not None:
-            self.prms.ref_bounds = ref_bounds
+    def set_data(self, coords, alignments, layers, load_mat=False):
+        self.coords = coords
+        self.alignments = alignments
 
-        read_meta = defaultdict(list)
-
-        read_rows = defaultdict(list)
-        mask_rows = list()
-
-        ##TODO make index take RefCoord (combine with RefLoc)
-
-        self.set_ref_bounds(self.prms.ref_bounds)
-
-        self.alignments = self.db.query_alignments(self.id, coords=self.coords, full_overlap=self.prms.full_overlap)
-
-        if self.prms.full_overlap:
-            ids = self.alignments.index.to_numpy()
-        else:
-            ids = None
-
-        dtw = self.db.query_layers("dtw", self.coords, ids)
-        self.layers = self._group_layers("dtw",dtw)
-
-        #self.write_aln_group(aln_id, group, layers)
+        self.layers = layers#pd.concat(layers, names=["group", "layer"], axis=1)
 
         self.alignments.sort_values("ref_start", inplace=True)
 
-        #print(self.layers.columns)
-        #mat_index = pd.MultiIndex.from_list([self.layers.columns, self.coords.refs])
-        #print(mat_index)
+        if load_mat:
+            self.mat = self.layers.reset_index().pivot(index="aln_id", columns="mref") \
+                       .rename(columns=self.coords.mref_to_ref, level=2) \
+                       .rename_axis(("group","layer","ref"), axis=1) \
+                       .sort_index(axis=1, level=2)
+                       #.reindex(mat_index, axis=1)
 
-        self.mat = self.layers.reset_index().pivot(index="aln_id", columns="mref") \
-                   .rename(columns=self.coords.mref_to_ref, level=2) \
-                   .rename_axis(("group","layer","ref"), axis=1) #\
-                   #.reindex(mat_index, axis=1)
+            self.mat = self.mat.reindex(self.alignments.index, copy=False)
 
-        self.mat = self.mat.reindex(self.alignments.index, copy=False)
+            self.width = len(self.coords.refs)
+            self.height = len(self.alignments)
 
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
-
-        self.height = len(self.alignments)
 
 
         return self.mat
@@ -325,7 +178,6 @@ class AlnTrack:
         return np.flip(np.sort(self[layer], axis=0), axis=0)
 
     def close(self):
-        if self.in_mem: return
         self.db.close()
 
     #@property
@@ -348,21 +200,9 @@ class AlnTrack:
         self.mat = self.mat.iloc[order]
         self.alignments = self.alignments.iloc[order]
 
-    @property
-    def ref_id(self):
-        return self.index.get_ref_id(self.ref_name)
-
-    @property
-    def ref_name(self):
-        return self.prms.ref_bounds.name
-
-    @property
-    def ref_start(self):
-        return self.prms.ref_bounds.start
-
-    @property
-    def ref_end(self):
-        return self.prms.ref_bounds.end
+    #@property
+    #def ref_id(self):
+    #    return self.index.get_ref_id(self.ref_name)
 
     def calc_ks(self, track_b):
         ks_stats = np.zeros((len(self.CMP_LAYERS), self.width))
@@ -414,169 +254,3 @@ class AlnTrack:
     def pa_diff(self):
         return self.mat[self.PA_DIFF_LAYER]
 
-#TODO turn into "AlnTrackIO"
-def _load_tracks(tracks, conf, force_list=False):
-
-    is_list = isinstance(tracks, list)
-    if not is_list:
-        tracks = [tracks]
-    else:
-        ret = list()
-    
-    for track in tracks:
-        if isinstance(track, str):
-            track = AlnTrack(track, conf=conf)
-        elif not isinstance(track, AlnTrack):
-            raise RuntimeError("AlnTrack must either be path to alignment track or AlnTrack instance")
-        
-        if is_list or force_list:
-            ret.append(track)
-        else:
-            return track
-    return ret
-
-def _load_track_arg(arg_track, conf_track, conf):                                       
-    track = arg_track if arg_track is not None else conf_track                          
-    if isinstance(track, str):
-        return AlnTrack(track, conf=conf)                                                  
-    elif isinstance(track, AlnTrack):
-        return track
-    raise RuntimeError("AlnTrack must either be path to alignment track or AlnTrack instance")
-
-class CompareParams(config.ParamGroup):
-    _name = "compare"
-CompareParams._def_params(
-    ("track_a", None, None, "DTW AlnTrack A"),
-    ("track_b", None, None, "DTW AlnTrack B"),
-    ("subcmd", "ks", str, "Analysis to perform")
-)
-
-COMPARE_OPTS = (
-    Opt("ref_bounds", "track", type=ref_coords),
-    Opt("track_a", type=str),
-    Opt("track_b", type=str, nargs="?"),
-    Opt(("-f", "--full-overlap"), "track", action="store_true"),
-    #Opt(("-o", "--outfile"), type=str, default=None),
-)
-
-#def compare(track_a=None, track_b=None, full_overlap=None, conf=None):
-def compare(*args, **kwargs):
-    """Outputs a TSV file conaining Kolmogorov–Smirnov test statistics comparing the current and dwell time of two alignment tracks"""
-    conf, prms = config._init_group("compare", *args, **kwargs)
-
-    track_a = _load_track_arg(None, prms.track_a, conf)
-    track_b = _load_track_arg(None, prms.track_b, conf)
-
-    ks_stats = np.recarray(
-        track_a.width,
-        dtype=[(l, '<f8') for l in AlnTrack.CMP_LAYERS]
-    )
-
-    for i,l in enumerate(AlnTrack.CMP_LAYERS):
-        for j,rf in enumerate(track_a.ref_coords.index):
-            a = track_a[l,:,rf]
-            b = track_b[l,:,rf]
-            ks = scipy.stats.mstats.ks_2samp(a,b,mode="asymp")
-            ks_stats[j][i] = ks[0]
-
-    return pd.DataFrame(
-        ks_stats, 
-        index = track_a.ref_coords.index.rename("ref")
-    )
-
-
-METHOD_COMPARE_OPTS = (
-    Opt("track_a", "browser"),
-    Opt("track_b", "browser"),
-    #Opt(("-R", "--ref-bounds"), "dtw", type=ref_coords),
-    Opt(("-f", "--full-overlap"), "browser", action="store_true"),
-)
-
-def method_compare(track_a=None, track_b=None, full_overlap=None, conf=None):
-    if conf is None:
-        conf = conf if conf is not None else config.Config()
-    if full_overlap is not None:
-        conf.browser.full_overlap = full_overlap
-    track_a = _load_track_arg(track_a, conf.browser.track_a, conf)
-    track_b = _load_track_arg(track_b, conf.browser.track_b, conf)
-
-    common_reads = set(track_a.read_ids) & set(track_b.read_ids)
-    if len(common_reads) == 0:
-        sys.stderr.write("Error: method_compare tracks must have reads in common\n")
-        return
-
-    for read in common_reads:
-        aln_a = track_a.load_read(read)
-        aln_b = track_b.load_read(read)
-
-def method_compare_aln(aln_a, aln_b):
-    merge = aln_a.aln.join(aln_b.aln, lsuffix="_a", rsuffix="_b").dropna().set_index("mref_a")
-
-    def get_ends(suff):
-        return merge["start_"+suff]+merge["length_"+suff]
-
-    st_a = merge["start_a"]
-    st_b = merge["start_b"]
-    en_a = get_ends("a")
-    en_b = get_ends("b")
-
-    mid_a = st_a + merge["length_a"] 
-    mid_b = st_b + merge["length_b"] 
-
-    st_min = np.minimum(st_a, st_b)
-    st_max = np.maximum(st_a, st_b)
-    en_min = np.minimum(en_a, en_b)
-    en_max = np.maximum(en_a, en_b)
-
-    df = pd.DataFrame({
-        "jaccard" : np.maximum(0, en_min-st_max)/(en_max-st_min),
-        "centroid_diff" : mid_a-mid_b,
-        "dwell_diff" : merge["length_a"]-merge["length_b"],
-    })
-    return df
-        
-#class AlnTrackParams(config.ParamGroup):
-#    _name = "track"
-#BrowserParams._def_params(
-#    ("track_a", None, str, "Path to directory where alignments are stored"),
-#    ("track_b", None, str, "Path to directory where alignments are stored"),
-#    ("stats", None, str, "Path to directory where alignments are stored"),
-
-REFSTATS_OPTS = (
-    Opt("ref_bounds", "track", type=ref_coords),
-    Opt("track_in", type=str),
-    Opt(("-f", "--full-overlap"), "track", action="store_true"),
-    Opt(("-m", "--pore-model"), "mapper", default=None),
-    Opt("--rna", fn="set_r94_rna"),
-)
-
-def refstats(
-        track=None, 
-        full_overlap=None, 
-        layers=[CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER], #TODO use strings
-        stats=["mean", "variance", "skewness", "kurtosis"], 
-        conf=None):
-
-    if conf is None:
-        conf = conf if conf is not None else config.Config()
-    if full_overlap is not None:
-        conf.browser.full_overlap = full_overlap
-    track = _load_track_arg(track, getattr(conf, "track_in", None), conf)
-
-    vals = dict()
-    data = list()
-    names = list()
-
-    mask = ~track[0].mask
-    vals["cov"] = np.sum(mask, axis=0)
-    vals["kmer"] = [
-        nt.kmer_to_str(int(k)) 
-        for k in np.ma.median(track[KMER_LAYER], axis=0).data
-    ]
-
-    for l in layers:
-        desc = scipy.stats.mstats.describe(track[l], axis=0)
-        for stat in stats:
-            vals["%s_%s" % (l, stat)] = getattr(desc, stat)
-
-    return pd.DataFrame(vals, index=track.ref_coords.index.rename("ref"))

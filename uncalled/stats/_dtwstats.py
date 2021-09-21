@@ -14,7 +14,6 @@ from ..argparse import Opt, comma_split, ref_coords
 from ..index import BWA_OPTS
 from ..fast5 import parse_read_ids
 from ..dtw import LAYER_META
-from ..dtw.track import _load_tracks
 
 class DtwstatsParams(config.ParamGroup):
     _name = "dtwstats"
@@ -114,7 +113,7 @@ OPTS = (
     Opt("layers", "dtwstats", type=comma_split, 
         help="Comma-separated list of which layers to retrieve or compute {%s}" % ",".join(_Dtwstats.LAYERS)),
     Opt("tracks", "dtwstats", nargs="+", type=str),
-    Opt(("-R", "--ref-bounds"), "track", type=ref_coords, required=True),
+    Opt(("-R", "--ref-bounds"), "track_io", type=ref_coords, required=True),
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
 )
 

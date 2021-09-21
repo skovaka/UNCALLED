@@ -50,7 +50,7 @@ OPTS = (
     #Opt("track_a", "browser", type=str),
     #Opt("track_b", "browser", type=str, nargs="?"),
     Opt(("-f", "--full-overlap"), "track_io", action="store_true"),
-    Opt(("-L", "--layers"), "track", type=comma_split),
+    Opt(("-L", "--layers"), "track_io", type=comma_split),
 )
 
 def main(conf):
@@ -73,11 +73,6 @@ class Browser:
 
         self.tracks = io.load_refs() #list()
 
-        #for track in [self.prms.track_a, self.prms.track_b]:
-        #    if track is None: continue
-        #    if not isinstance(track, AlnTrack):
-        #        track = AlnTrack(track, load_mat=True, conf=self.conf)
-        #    self.tracks.append(track)
         self.single_track = len(self.tracks) == 1
 
         self.conf = self.tracks[0].conf
@@ -99,13 +94,13 @@ class Browser:
         self.pileup = False
 
         self.LAYER_IDS = dict()
-        for i,layer in enumerate(self.conf.track.layers):
+        for i,layer in enumerate(self.conf.track_io.layers):
             self.LAYER_IDS[LAYER_META[layer].label] = layer
 
-        self.active_layer = self.conf.track.layers[0] #TODO parameter
+        self.active_layer = self.conf.track_io.layers[0] #TODO parameter
 
         self.info_labels = ["Reference Coord", "Read ID"]
-        for layer in self.conf.track.layers:
+        for layer in self.conf.track_io.layers:
             self.info_labels.append(LAYER_META[layer].label)
 
         self.axs = types.SimpleNamespace()
@@ -469,7 +464,7 @@ class Browser:
         self._noticks(self.axs.opt)
 
         self.layer_radio = widgets.RadioButtons(
-            self.axs.opt, [LAYER_META[layer].label for layer in self.conf.track.layers],
+            self.axs.opt, [LAYER_META[layer].label for layer in self.conf.track_io.layers],
             0, #TODO hacky way to deal with hidden layers
             activecolor = 'red'
         )

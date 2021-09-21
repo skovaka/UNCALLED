@@ -198,6 +198,9 @@ class Config(_Conf):
         if group_name is None or len(group_name) == 0:
             return self
 
+        if not hasattr(self, group_name):
+            raise ValueError("Unknown Config group: " + group_name)
+
         return getattr(self, group_name)
     
     @property

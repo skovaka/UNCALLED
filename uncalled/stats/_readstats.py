@@ -11,11 +11,10 @@ from sklearn.decomposition import PCA
 
 from .. import config
 from ..sigproc import ProcRead
-from ..argparse import Opt, comma_split, ref_coords
+from ..argparse import Opt, comma_split#, ref_coords
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
-from ..dtw import AlnTrack, ref_coords, LAYER_META
-from ..dtw.track import _load_tracks
+from ..dtw import RefCoord, LAYER_META
 
 class ReadstatsParams(config.ParamGroup):
     _name = "readstats"
@@ -30,7 +29,7 @@ ReadstatsParams._def_params(
 OPTS = (
     Opt("stats", "readstats", type=comma_split),
     Opt("tracks", "readstats", nargs="+", type=str),
-    Opt(("-R", "--ref-bounds"), "track", type=ref_coords, required=True),
+    Opt(("-R", "--ref-bounds"), "track_io", type=RefCoord, required=True),
     Opt(("-p", "--pca-components"), "readstats"),
     Opt(("-L", "--pca-layer"), "readstats"),
     Opt(("-s", "--summary-stats"), "readstats", type=comma_split),

@@ -15,7 +15,7 @@ from .. import nt, config
 from ..sigproc import ProcRead
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
-from ..dtw.track import AlnTrack, RefCoord, ref_coords, method_compare_aln
+from ..dtw.track import AlnTrack, RefCoord
 from ..dtw.track_io import TrackIO
 
 from _uncalled import _RefIndex
@@ -75,8 +75,8 @@ class Dotplot:
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])
 
-        self.conf.track.load_mat = False
-        self.conf.track.layers = self.conf.dotplot.layers
+        self.conf.track_io.load_mat = False
+        self.conf.track_io.layers = self.conf.dotplot.layers
 
         self.track_io = TrackIO(conf=self.conf)
         self.fast5s = self.track_io.get_fast5_reader()#Fast5Reader(reads=self.read_ids, index=fast5_index, conf=self.tracks[0].conf)

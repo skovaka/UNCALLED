@@ -7,7 +7,7 @@ import pandas as pd
 import collections
 
 from . import RefCoord
-from .track2 import AlnTrack2
+from .track import AlnTrack, DEFAULT_LAYERS
 from ..index import load_index
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
@@ -21,9 +21,10 @@ TrackIOParams._def_params(
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("index_prefix", None, str, "BWA index prefix"),
     ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
+    ("overwrite", False, bool, "Overwrite existing databases"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("chunksize", 4000, int, "If true will only include reads which fully cover reference bounds"),
-#    ("layers", DEFAULT_LAYERS, list, "Layers to load"),
+    ("layers", DEFAULT_LAYERS, list, "Layers to load"),
     #("mode", "r", str, "Read (r) or write (w) mode"),
     ignore_toml={"input", "output", "ref_bounds"}
 )
@@ -105,7 +106,7 @@ class TrackIO:
             self._init_track(db, row.name)
 
             conf = config.Config(toml=row.config)
-            t = AlnTrack2(db, row["id"], row["name"], row["desc"], row["groups"], conf)
+            t = AlnTrack(db, row["id"], row["name"], row["desc"], row["groups"], conf)
             self.input_tracks.append(t)
 
             self.conf.load_config(conf)
@@ -124,7 +125,7 @@ class TrackIO:
             self.prev_read[name] = None
             self.prev_aln[name] = -1
 
-            track = AlnTrack2(db, None, name, name, "dtw", self.conf)
+            track = AlnTrack(db, None, name, name, "dtw", self.conf)
             self.output_tracks[name] = track
             db.init_track2(track)
 

@@ -16,8 +16,7 @@ from .. import nt, config
 from ..dtw.dtw import Fast5Processor
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
-from ..dtw import RefCoord, AlnTrack, ref_coords
-from ..dtw.track import  method_compare_aln
+from ..dtw import RefCoord
 
 from _uncalled import _RefIndex
 
@@ -44,7 +43,7 @@ from ..argparse import Opt
 OPTS = [
     Opt("tracks", "sigplot", type=str, nargs="+"),
     Opt(("-l", "--reads"), "sigplot", type=parse_read_ids),
-    Opt(("-R", "--ref-bounds"), "track", type=RefCoord),
+    Opt(("-R", "--ref-bounds"), "track_io", type=RefCoord),
     Opt(("-C", "--max-chunks"), "read_buffer"),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),

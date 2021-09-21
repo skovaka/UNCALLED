@@ -9,11 +9,10 @@ import scipy.stats
 
 from .. import config
 from ..sigproc import ProcRead
-from ..argparse import Opt, comma_split, ref_coords
+from ..argparse import Opt, comma_split
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
-from ..dtw import AlnTrack, ref_coords, LAYER_META
-from ..dtw.track import _load_tracks
+from ..dtw import LAYER_META, RefCoord
 
 class RefstatsParams(config.ParamGroup):
     _name = "refstats"
@@ -114,7 +113,7 @@ OPTS = (
     Opt("stats", "refstats", type=comma_split,
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(_Refstats.ALL_STATS)),
     Opt("tracks", "refstats", nargs="+", type=str),
-    Opt(("-R", "--ref-bounds"), "track", type=ref_coords, required=True),
+    Opt(("-R", "--ref-bounds"), "track_io", type=RefCoord, required=True),
 )
 
 def main(*args, **argv):

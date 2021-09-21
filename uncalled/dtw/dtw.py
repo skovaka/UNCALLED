@@ -16,7 +16,7 @@ from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 from _uncalled._nt import KmerArray
 
 from .. import PoreModel
-from . import Bcaln, AlnTrack, RefCoord, TrackIO
+from . import Bcaln, RefCoord, TrackIO
 
 #TODO make this better
 METHODS = {
@@ -40,8 +40,7 @@ AlignParams._def_params(
 OPTS = (Opt("index_prefix", "track_io"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt(("-o", "--out-path"), "dtw"),
-    Opt("--name", "track"),
-    Opt(("-f", "--overwrite"), "track", action="store_true", help="Will overwrite alignment track if one already exists"),
+    Opt(("-f", "--overwrite"), "track_io", action="store_true", help="Will overwrite alignment track if one already exists"),
     Opt("--rna", fn="set_r94_rna"),
     Opt(("-R", "--ref-bounds"), "track_io"),
     Opt("--method", "dtw", choices=METHODS.keys()),
@@ -58,7 +57,6 @@ def main(conf):
 
     fast5s = Fast5Processor(conf=conf)
 
-    #track = AlnTrack(conf.dtw.out_path, mode="w", conf=conf, load_mat=False)
     track_io = TrackIO(None, conf.dtw.out_path, conf=conf)
 
     mm2s = {p.qr_name : p
