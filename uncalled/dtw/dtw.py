@@ -64,8 +64,8 @@ def main(conf):
     mm2s = {p.qr_name : p
          for p in parse_paf(
             conf.dtw.mm2_paf,
-            ref_bounds=conf.track.ref_bounds,
-            full_overlap=conf.track.full_overlap,
+            ref_bounds=conf.track_io.ref_bounds,
+            full_overlap=conf.track_io.full_overlap,
     )}
 
     for read in fast5s:
@@ -105,7 +105,9 @@ class GuidedDTW:
 
         self.bcaln = bcaln.df.sort_index()
 
-        self.ref_kmers = self.track.load_aln_kmers().sort_index()
+        #self.ref_kmers = self.track.load_aln_kmers().sort_index()
+        #print(self.ref_kmers)
+        self.ref_kmers = self.track.coords.load_kmers(track_io.index).sort_index()
 
         self.read = read
 

@@ -16,29 +16,19 @@ class TrackIOParams(config.ParamGroup):
     _name = "track_io"
 TrackIOParams._def_params(
     ("input", None, None, "Input track(s)"),
-    ("output", str, None, "Output track"),
+    ("output", None, None,  "Output track"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("index_prefix", None, str, "BWA index prefix"),
     ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
 #    ("layers", DEFAULT_LAYERS, list, "Layers to load"),
     #("mode", "r", str, "Read (r) or write (w) mode"),
-    ignore_toml={"mode", "overwrite"}
+    ignore_toml={"input", "output", "ref_bounds"}
 )
 
 class TrackIO:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("track_io", *args, **kwargs)
-
-        #TODO load after updating from tracks?
-        self.index = load_index(self.prms.index_prefix)
-        self.model = PoreModel(self.conf.pore_model) 
-
-        print(self.prms.ref_bounds)
-        if self.prms.ref_bounds is not None:
-            self.coords = self.index.get_coord_space(self.prms.ref_bounds, self.conf.is_rna)
-        else:
-            self.coords = None
 
         self.dbs = dict()
 
@@ -46,14 +36,25 @@ class TrackIO:
         self.track_dbs = dict()
         self.track_ids = dict()
 
-        self.out_tracks = set()
+        self.input_tracks = list()
+        self.output_tracks = dict()
         self.prev_fast5 = dict()
         self.prev_read = dict()
         self.prev_aln = dict()
 
         self._load_dbs(self.prms.output, True)
         self._load_dbs(self.prms.input, False)
+        self.input_tracks = tuple(self.input_tracks)
 
+        self.index = load_index(self.prms.index_prefix)
+        self.model = PoreModel(self.conf.pore_model) 
+        self._set_ref_bounds(self.prms.ref_bounds)
+
+    def _set_ref_bounds(self, ref_bounds):
+        if ref_bounds is not None:
+            self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
+        else:
+            self.coords = None
 
     def _load_dbs(self, dbs, out):
         if dbs is None:
@@ -68,14 +69,14 @@ class TrackIO:
             db = self.dbs.get(db_file, None)
             
             if db is None:
-                print("Load", db_file)
                 db = TrackSQL(db_file)
                 self.dbs[db_file] = db
 
             if out:
-                self._init_tracks_out(db, track_names)
+                self._init_output_tracks(db, track_names)
             else:
-                self._init_tracks_in(db, track_names)
+                self._init_input_tracks(db, track_names)
+    
 
     def _db_track_split(self, db_str):
         spl = db_str.split(":")
@@ -96,39 +97,43 @@ class TrackIO:
 
         self.track_dbs[name] = db
 
-    def _init_tracks_in(self, db, track_names, write):
+    def _init_input_tracks(self, db, track_names):
         #TODO sort (reindex?) DF my specified track_names to maintain order
-        for row in db.query_track(track_names).iterrows():
+        for i,row in db.query_track(track_names).iterrows():
             self._init_track(db, row.name)
 
-            conf = config.Config(toml=toml)
-            self.tracks[row.name] = AlnTrack2(db, self.index, row.id, row.name, row.desc, row.groups, conf)
+            conf = config.Config(toml=row.config)
+            t = AlnTrack2(db, row.id, row.name, row.desc, row.groups, conf)
+            self.input_tracks.append(t)
 
-    def _init_tracks_out(self, db, track_names):
+            self.conf.load_config(conf)
+            #if self.prms.index_prefix is None:
+            #    self.prms.index_prefix = t.conf.track_io.index_prefix
+
+    def _init_output_tracks(self, db, track_names):
         if track_names is None:
             name = os.path.splitext(os.path.basename(db.filename))[0]
             track_names = [name]
 
         for name in track_names:
             self._init_track(db, name)
-            self.out_tracks.add(name)
 
             self.prev_fast5[name] = (None, None)
             self.prev_read[name] = None
             self.prev_aln[name] = -1
 
-            track = AlnTrack2(db, self.index, None, name, name, "dtw", self.conf)
-            self.tracks[name] = track
+            track = AlnTrack2(db, None, name, name, "dtw", self.conf)
+            self.output_tracks[name] = track
             db.init_track2(track)
 
     def init_alignment(self, read_id, fast5, group_name, layers, track_name=None):
         if track_name is None:
-            if len(self.out_tracks) == 1:
-                track_name, = self.out_tracks
+            if len(self.output_tracks) == 1:
+                track_name, = self.output_tracks
             else:
                 raise ValueError("Must specify track name when using multiple output tracks")
 
-        track = self.tracks[track_name]
+        track = self.output_tracks[track_name]
         db = track.db
 
         self.prev_aln[track_name] += 1
@@ -163,12 +168,40 @@ class TrackIO:
                 "samp_end" : [samp_end],
                 "tags" : [""]}).set_index("id")
 
-        aln_id = track.db.init_alignment(track.alignments)
+        track.db.init_alignment(track.alignments)
 
         track.layers = None
         track.add_layer_group(group_name, layers)
 
+        track.coords = self.index.get_coord_space(track.aln_ref_coord(aln_id), self.conf.is_rna, kmer_shift=0)
+
         return track #aln_id
+
+    def input_count(self):
+        return len(self.input_tracks)
+
+    def load_refs(self, ref_bounds=None, full_overlap=False):
+        if ref_bounds is not None:
+            self._set_ref_bounds(ref_bounds)
+        if self.coords is None:
+            raise ValueError("Must set ref bounds")
+
+        for track in self.input_tracks:
+            track.coords = self.coords
+            alignments = track.db.query_alignments(track.id, coords=self.coords, full_overlap=full_overlap)
+
+            if full_overlap:
+                ids = self.alignments.index.to_numpy()
+            else:
+                ids = None
+
+            layers = dict()
+            for group in track.groups:
+                layers[group] = track.db.query_layers("dtw", self.coords, ids)
+
+            track.set_data(self.coords, alignments, layers)
+
+        return self.input_tracks
     
     def close(self):
         for filename, db in self.dbs.items():
@@ -181,10 +214,7 @@ class TrackSQL:
         self.con = sqlite3.connect(sqlite_db)
         self.cur = self.con.cursor()
 
-        print("IN")
-
         if new_file:
-            print("INIT")
             self.init_tables()
 
     def close(self):
@@ -370,6 +400,5 @@ class TrackSQL:
         #    query = select + " WHERE " + " AND ".join(wheres)
         query = self._join_query(select, wheres)
 
-        #print(query)
         
         return pd.read_sql_query(query, self.con, params=params).set_index(["mref","aln_id"])

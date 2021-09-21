@@ -25,6 +25,7 @@ from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
 from .dotplot import Dotplot
 from ..dtw.track import AlnTrack, ref_coords, LAYER_META
+from ..dtw.track_io import TrackIO
 
 CMAP = "viridis"
 #CMAP = "plasma"
@@ -44,9 +45,10 @@ BrowserParams._def_params(
 
 from ..argparse import Opt, comma_split
 OPTS = (
-    Opt("ref_bounds", "track", type=ref_coords),
-    Opt("track_a", "browser", type=str),
-    Opt("track_b", "browser", type=str, nargs="?"),
+    Opt("ref_bounds", "track_io", type=ref_coords),
+    Opt("input", "track_io", nargs="+"),
+    #Opt("track_a", "browser", type=str),
+    #Opt("track_b", "browser", type=str, nargs="?"),
     Opt(("-f", "--full-overlap"), "track", action="store_true"),
     Opt(("-L", "--layers"), "track", type=comma_split),
 )
@@ -67,25 +69,20 @@ class Browser:
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])
 
-        #track_paths = [self.prms.track_a]
-        #if self.prms.track_b is not None:
-        #    track_paths.append(self.prms.track_b)
-        #    self.single_track = False
-        #else:
-        #    self.single_track = True
+        io = TrackIO(conf=self.conf)
 
-        self.tracks = list()
+        self.tracks = io.load_refs() #list()
 
-        for track in [self.prms.track_a, self.prms.track_b]:
-            if track is None: continue
-            if not isinstance(track, AlnTrack):
-                track = AlnTrack(track, load_mat=True, conf=self.conf)
-            self.tracks.append(track)
+        #for track in [self.prms.track_a, self.prms.track_b]:
+        #    if track is None: continue
+        #    if not isinstance(track, AlnTrack):
+        #        track = AlnTrack(track, load_mat=True, conf=self.conf)
+        #    self.tracks.append(track)
         self.single_track = len(self.tracks) == 1
 
         self.conf = self.tracks[0].conf
 
-        ref_bounds = self.conf.track.ref_bounds
+        ref_bounds = io.prms.ref_bounds
 
         self.ref_name = ref_bounds.name
         self.ref_start = ref_bounds.start
@@ -118,8 +115,7 @@ class Browser:
     @property
     def ref_coords(self):
         #TODO store and/or make sure they match
-        trk = self.tracks[0]
-        return "%s:%d-%d" % (trk.ref_name, trk.ref_start, trk.ref_end)
+        return "%s:%d-%d" % (self.ref_name, self.ref_start, self.ref_end)
     
     @property
     def cursor_coords(self):
@@ -226,8 +222,8 @@ class Browser:
 
     def ref_coord(self, track, i, fwd=None):
         coord = "%s:%d" % (
-                track.ref_name, 
-                track.ref_start + i
+                self.ref_name, 
+                self.ref_start + i
         )
         if fwd is not None:
             coord += " (%s)" % ("+" if fwd else "-")
@@ -245,8 +241,6 @@ class Browser:
 
         mref = trk.coords.ref_to_mref([rf], True)[0]
 
-        print(mref)
-        print(aln_id)
         for i,val in enumerate(trk.layers.loc[mref,aln_id]):
             self.set_info_cell(i+2, val)
         #self.set_info_cell(self.INFO_KMER, nt.kmer_to_str(int(kmer)))
@@ -379,7 +373,7 @@ class Browser:
 
 
     def ref_tick_fmt(self, x, pos=None):
-        return int(np.round(self.tracks[0].ref_start + x))
+        return int(np.round(self.ref_start + x))
     
 
     #TODO put inside track 
@@ -516,7 +510,7 @@ class Browser:
         self._noticks(track.ax, x=not ref_ticks)
 
         track.ax.set_xlabel(self.ref_coords, fontsize=15)
-        track.ax.set_ylabel("%s (%d reads)" % (track.prms.path, track.height), fontsize=15)
+        track.ax.set_ylabel("%s (%d reads)" % (track.name, track.height), fontsize=15)
 
         cmap, norm = self._layer_cmap(self.active_layer)
         track.img = track.ax.imshow(

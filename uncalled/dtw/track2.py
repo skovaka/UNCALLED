@@ -31,9 +31,9 @@ MODEL_DIFF_LAYER = "model_diff"
 DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
 
 class AlnTrack2:
-    def __init__(self, db, index, track_id, name, desc, groups, conf):
+    def __init__(self, db, track_id, name, desc, groups, conf):
         self.db = db
-        self.index = index
+        #self.index = index
         self.id = track_id
         self.name = name
         self.desc = desc
@@ -55,21 +55,21 @@ class AlnTrack2:
             self.read_ids = self.read_ids & set(self.conf.fast5_reader.read_filter)
 
     #TODO move to RefIndex python wrapper? 
-    def _ref_coords_to_mrefs(self, ref_coords, fwd=None):
-        if fwd is None:
-            fwd = ref_coords.fwd
-        start, end = self.index.ref_to_mref(
-            ref_coords.name, ref_coords.start, ref_coords.end-nt.K+1, fwd, self.conf.is_rna)
-        return pd.RangeIndex(start, end).rename("mref")
+    #def _ref_coords_to_mrefs(self, ref_coords, fwd=None):
+    #    if fwd is None:
+    #        fwd = ref_coords.fwd
+    #    start, end = self.index.ref_to_mref(
+    #        ref_coords.name, ref_coords.start, ref_coords.end-nt.K+1, fwd, self.conf.is_rna)
+    #    return pd.RangeIndex(start, end).rename("mref")
 
-    def set_ref_bounds(self, ref_bounds):
-        if ref_bounds == None:
-            return
+    #def set_ref_bounds(self, ref_bounds):
+    #    if ref_bounds == None:
+    #        return
 
-        self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
+    #    self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
 
-        self.width = len(self.coords)
-        self.height = None
+    #    self.width = len(self.coords)
+    #    self.height = None
 
     def _group_layers(self, group, layers):
         return pd.concat({group : layers}, names=["group", "layer"], axis=1)
@@ -92,10 +92,10 @@ class AlnTrack2:
     def aln_ref_coord(self, aln_id):
         return RefCoord(*self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
 
-    def _aln_coords(self, aln_id):
-        #ref_coord = RefCoord(
-        #    *self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
-        return self.index.get_coord_space(self.aln_ref_coord(aln_id), self.conf.is_rna, kmer_shift=0)
+    #def _aln_coords(self, aln_id):
+    #    #ref_coord = RefCoord(
+    #    #    *self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
+    #    return self.index.get_coord_space(self.aln_ref_coord(aln_id), self.conf.is_rna, kmer_shift=0)
 
     def _default_id(self, aln_id):
         if aln_id is None:
@@ -104,12 +104,12 @@ class AlnTrack2:
             raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
         return aln_id
 
-    def load_aln_kmers(self, aln_id=None, store=False):
-        aln_id = self._default_id(aln_id)
-        coords = self._aln_coords(aln_id)
-        kmers = coords.load_kmers(self.index)
+    #def load_aln_kmers(self, aln_id=None, store=False):
+    #    aln_id = self._default_id(aln_id)
+    #    coords = self._aln_coords(aln_id)
+    #    kmers = coords.load_kmers(self.index)
 
-        return kmers
+    #    return kmers
 
         #    if aln is None:
         #        aln = self.read_aln
@@ -138,37 +138,13 @@ class AlnTrack2:
 
     #TODO parse mm2 every time to enable changing bounds
     #eventually use some kind of tabix-like indexing
-    def load_region(self, ref_bounds=None, layers=None):
-        self.set_layers(layers)
-        if ref_bounds is not None:
-            self.prms.ref_bounds = ref_bounds
+    def set_data(self, coords, alignments, layers):
+        self.coords = coords
+        self.alignments = alignments
 
-        read_meta = defaultdict(list)
-
-        read_rows = defaultdict(list)
-        mask_rows = list()
-
-        ##TODO make index take RefCoord (combine with RefLoc)
-
-        self.set_ref_bounds(self.prms.ref_bounds)
-
-        self.alignments = self.db.query_alignments(self.id, coords=self.coords, full_overlap=self.prms.full_overlap)
-
-        if self.prms.full_overlap:
-            ids = self.alignments.index.to_numpy()
-        else:
-            ids = None
-
-        dtw = self.db.query_layers("dtw", self.coords, ids)
-        self.layers = self._group_layers("dtw",dtw)
-
-        #self.write_aln_group(aln_id, group, layers)
+        self.layers = pd.concat(layers, names=["group", "layer"], axis=1)
 
         self.alignments.sort_values("ref_start", inplace=True)
-
-        #print(self.layers.columns)
-        #mat_index = pd.MultiIndex.from_list([self.layers.columns, self.coords.refs])
-        #print(mat_index)
 
         self.mat = self.layers.reset_index().pivot(index="aln_id", columns="mref") \
                    .rename(columns=self.coords.mref_to_ref, level=2) \
@@ -180,8 +156,8 @@ class AlnTrack2:
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
 
+        self.width = len(self.coords.refs)
         self.height = len(self.alignments)
-
 
         return self.mat
 
@@ -193,7 +169,6 @@ class AlnTrack2:
         return np.flip(np.sort(self[layer], axis=0), axis=0)
 
     def close(self):
-        if self.in_mem: return
         self.db.close()
 
     #@property
@@ -216,21 +191,9 @@ class AlnTrack2:
         self.mat = self.mat.iloc[order]
         self.alignments = self.alignments.iloc[order]
 
-    @property
-    def ref_id(self):
-        return self.index.get_ref_id(self.ref_name)
-
-    @property
-    def ref_name(self):
-        return self.prms.ref_bounds.name
-
-    @property
-    def ref_start(self):
-        return self.prms.ref_bounds.start
-
-    @property
-    def ref_end(self):
-        return self.prms.ref_bounds.end
+    #@property
+    #def ref_id(self):
+    #    return self.index.get_ref_id(self.ref_name)
 
     def calc_ks(self, track_b):
         ks_stats = np.zeros((len(self.CMP_LAYERS), self.width))

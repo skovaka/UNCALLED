@@ -104,7 +104,7 @@ class Config(_Conf):
             self.load_config(conf)
         
         if toml is not None:
-            self.load_toml(toml)
+            self.load_toml(text=toml)
 
 
     def _param_writable(self, name, val, group=None):
