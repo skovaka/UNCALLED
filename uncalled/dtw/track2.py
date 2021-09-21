@@ -31,8 +31,10 @@ MODEL_DIFF_LAYER = "model_diff"
 DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
 
 class AlnTrack2:
-    def __init__(self, db, name, desc, groups, conf):
+    def __init__(self, db, index, track_id, name, desc, groups, conf):
         self.db = db
+        self.index = index
+        self.id = track_id
         self.name = name
         self.desc = desc
         self.groups = groups.split(",")
@@ -72,7 +74,8 @@ class AlnTrack2:
     def _group_layers(self, group, layers):
         return pd.concat({group : layers}, names=["group", "layer"], axis=1)
         
-    def write_aln_group(self, aln_id, group, layers):
+    def add_layer_group(self, group, layers, aln_id=None):
+        aln_id = self._default_id(aln_id)
         df = self._group_layers(group, layers)#pd.concat({group : layers}, names=["group", "layer"], axis=1)
 
         df.index = pd.MultiIndex.from_product(
@@ -94,13 +97,15 @@ class AlnTrack2:
         #    *self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
         return self.index.get_coord_space(self.aln_ref_coord(aln_id), self.conf.is_rna, kmer_shift=0)
 
-
-    def load_aln_kmers(self, aln_id=None, store=False):
+    def _default_id(self, aln_id):
         if aln_id is None:
             if len(self.alignments) == 1:
-                aln_id = self.alignments.index[0]
-            else:
-                raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
+                return self.alignments.index[0]
+            raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
+        return aln_id
+
+    def load_aln_kmers(self, aln_id=None, store=False):
+        aln_id = self._default_id(aln_id)
         coords = self._aln_coords(aln_id)
         kmers = coords.load_kmers(self.index)
 

@@ -37,13 +37,13 @@ AlignParams._def_params(
     ("out_path", None, str, "Path to directory where alignments will be stored. If not specified will display interactive dotplot for each read."),
 )
 
-OPTS = (Opt("index_prefix", "track"),) + FAST5_OPTS + (
+OPTS = (Opt("index_prefix", "track_io"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt(("-o", "--out-path"), "dtw"),
     Opt("--name", "track"),
     Opt(("-f", "--overwrite"), "track", action="store_true", help="Will overwrite alignment track if one already exists"),
     Opt("--rna", fn="set_r94_rna"),
-    Opt(("-R", "--ref-bounds"), "track"),
+    Opt(("-R", "--ref-bounds"), "track_io"),
     Opt("--method", "dtw", choices=METHODS.keys()),
     Opt(("-b", "--band-width"), "dtw"),
     Opt(("-s", "--band-shift"), "dtw"),
@@ -58,14 +58,8 @@ def main(conf):
 
     fast5s = Fast5Processor(conf=conf)
 
-    conf.track_io.ref_bounds   = conf.track.ref_bounds   
-    conf.track_io.index_prefix = conf.track.index_prefix
-    conf.track_io.load_mat     = conf.track.load_mat    
-    conf.track_io.full_overlap = conf.track.full_overlap
-
-    track = AlnTrack(conf.dtw.out_path, mode="w", conf=conf, load_mat=False)
-
-    #track_io = TrackIO(None, conf.dtw.out_path, conf=conf)
+    #track = AlnTrack(conf.dtw.out_path, mode="w", conf=conf, load_mat=False)
+    track_io = TrackIO(None, conf.dtw.out_path, conf=conf)
 
     mm2s = {p.qr_name : p
          for p in parse_paf(
@@ -82,36 +76,36 @@ def main(conf):
             continue
 
         print(read.id)
-        dtw = GuidedDTW(track, read, paf, conf)
+        dtw = GuidedDTW(track_io, read, paf, conf)
 
         if dtw.df is None:
             sys.stderr.write("dtw failed\n")
             continue
 
-    if not track is None:
-        t = time.time()
-        track.close()
+    track_io.close()
 
 class GuidedDTW:
 
     #TODO do more in constructor using prms, not in main
-    def __init__(self, track, read, paf, conf=None, **kwargs):
+    #def __init__(self, track, read, paf, conf=None, **kwargs):
+    def __init__(self, track_io, read, paf, conf=None, **kwargs):
         self.conf = read.conf if conf is None else conf
         self.prms = self.conf.dtw
 
-        self.track = track
+        #self.track = track
 
-        bcaln = Bcaln(self.track.index, read, paf, self.track.coords)
+        bcaln = Bcaln(track_io.index, read, paf, track_io.coords)
         if bcaln.empty:
             self.df = None
             return
 
+
         #TODO init_alignment(read_id, fast5, group, layers)
-        self.aln_id = track.init_alignment(read, "bcaln", bcaln.df)
+        self.track = track_io.init_alignment(read.id, read.f5.filename, "bcaln", bcaln.df)
 
         self.bcaln = bcaln.df.sort_index()
 
-        self.ref_kmers = self.track.load_aln_kmers(self.aln_id).sort_index()
+        self.ref_kmers = self.track.load_aln_kmers().sort_index()
 
         self.read = read
 
@@ -185,7 +179,7 @@ class GuidedDTW:
 
         #def self, aln_id, group, layers):
         self.df = collapse_events(df, True)
-        self.track.add_layer_group(self.aln_id, "dtw", self.df)
+        self.track.add_layer_group("dtw", self.df)
 
         #if len(band_blocks) == 0:
         #    self.track.read_aln.bands = None

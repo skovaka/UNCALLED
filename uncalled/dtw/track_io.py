@@ -34,8 +34,13 @@ class TrackIO:
         self.index = load_index(self.prms.index_prefix)
         self.model = PoreModel(self.conf.pore_model) 
 
-        self.db_ids = dict()
-        self.dbs = list()
+        print(self.prms.ref_bounds)
+        if self.prms.ref_bounds is not None:
+            self.coords = self.index.get_coord_space(self.prms.ref_bounds, self.conf.is_rna)
+        else:
+            self.coords = None
+
+        self.dbs = dict()
 
         self.tracks = dict()
         self.track_dbs = dict()
@@ -60,16 +65,12 @@ class TrackIO:
         for db_str in dbs:
             db_file, track_names = self._db_track_split(db_str)
 
-            db_id = self.db_ids.get(db_file, None)
+            db = self.dbs.get(db_file, None)
             
-            if db_id is None:
-                db_id = len(self.db_ids)
-                self.db_ids[db_file] = db_id
-
+            if db is None:
                 print("Load", db_file)
-                db = TrackSQL(db_id, db_file)
-            else:
-                db = self.dbs[id_id]
+                db = TrackSQL(db_file)
+                self.dbs[db_file] = db
 
             if out:
                 self._init_tracks_out(db, track_names)
@@ -101,7 +102,7 @@ class TrackIO:
             self._init_track(db, row.name)
 
             conf = config.Config(toml=toml)
-            self.tracks[row.name] = AlnTrack2(self, row.name, row.desc, row.groups, conf)
+            self.tracks[row.name] = AlnTrack2(db, self.index, row.id, row.name, row.desc, row.groups, conf)
 
     def _init_tracks_out(self, db, track_names):
         if track_names is None:
@@ -116,14 +117,14 @@ class TrackIO:
             self.prev_read[name] = None
             self.prev_aln[name] = -1
 
-            track = AlnTrack2(self, name, name, "dtw", self.conf)
+            track = AlnTrack2(db, self.index, None, name, name, "dtw", self.conf)
             self.tracks[name] = track
             db.init_track2(track)
 
     def init_alignment(self, read_id, fast5, group_name, layers, track_name=None):
         if track_name is None:
             if len(self.out_tracks) == 1:
-                track_name, = {self.out_tracks}
+                track_name, = self.out_tracks
             else:
                 raise ValueError("Must specify track name when using multiple output tracks")
 
@@ -136,11 +137,11 @@ class TrackIO:
         if fast5 == self.prev_fast5[track_name][0]:
             fast5_id = self.prev_fast5[track_name][1]
         else:
-            fast5_id = self.db.init_fast5(fast5)
+            fast5_id = db.init_fast5(fast5)
             self.prev_fast5[track_name] = (fast5, fast5_id)
 
         if self.prev_read[track_name] != read_id:
-            self.db.init_read(read_id, fast5_id)
+            db.init_read(read_id, fast5_id)
             self.prev_read[track_name] = read_id
 
         mref_start = layers.index.min()
@@ -152,7 +153,7 @@ class TrackIO:
 
         track.alignments = pd.DataFrame({
                 "id" : [aln_id],
-                "track_id" : [self.id],
+                "track_id" : [track.id],
                 "read_id" : [read_id],
                 "ref_name" : [ref_bounds.ref_name],
                 "ref_start" : [ref_bounds.start],
@@ -162,16 +163,19 @@ class TrackIO:
                 "samp_end" : [samp_end],
                 "tags" : [""]}).set_index("id")
 
-        aln_id = track.db.init_alignment(self.alignments)
+        aln_id = track.db.init_alignment(track.alignments)
 
         track.layers = None
-        track.add_layer_group(aln_id, group_name, layers)
+        track.add_layer_group(group_name, layers)
 
-        return aln_id
+        return track #aln_id
+    
+    def close(self):
+        for filename, db in self.dbs.items():
+            db.close()
             
 class TrackSQL:
-    def __init__(self, db_id, sqlite_db):
-        self.id = db_id
+    def __init__(self, sqlite_db):
         self.filename = sqlite_db
         new_file = not os.path.exists(sqlite_db)
         self.con = sqlite3.connect(sqlite_db)

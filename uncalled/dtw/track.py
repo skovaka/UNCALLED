@@ -102,19 +102,19 @@ class AlnTrack:
             self.prms.name = os.path.basename(self.prms.path)
 
         if not self.in_mem:
-            self.db = TrackSQL(0, self.prms.path)
+            self.db = TrackSQL(self.prms.path)
 
             if self.prms.mode == self.READ_MODE:
-                self.id, _, self.desc, groups, toml = self.db.query_track(self.prms.name).iloc[0]
+                self.id, _, self.desc, groups, toml = self.db.query_track("test").iloc[0]
                 self.conf.load_toml(text=toml)
 
-        self.index = load_index(self.prms.index_prefix)
+        self.index = load_index(self.conf.track_io.index_prefix)
         self.model = PoreModel(self.conf.pore_model)
         self.mat = None
         self.coords = None
         self.layers = None
 
-        self.set_ref_bounds(self.prms.ref_bounds)
+        self.set_ref_bounds(self.conf.track_io.ref_bounds)
 
         if self.conf.dtw.mm2_paf is not None:
             read_filter = set(self.conf.fast5_reader.read_filter)
@@ -199,14 +199,15 @@ class AlnTrack:
 
         #self.init_layers(group_name, layers)
 
-        self.add_layer_group(aln_id, group_name, layers)
+        self.add_layer_group(group_name, layers)
 
         return aln_id
 
     def _group_layers(self, group, layers):
         return pd.concat({group : layers}, names=["group", "layer"], axis=1)
         
-    def add_layer_group(self, aln_id, group, layers):
+    def add_layer_group(self, group, layers, aln_id=None):
+        aln_id = self._default_id(aln_id)
         df = self._group_layers(group, layers)#pd.concat({group : layers}, names=["group", "layer"], axis=1)
 
         df.index = pd.MultiIndex.from_product(
@@ -229,13 +230,15 @@ class AlnTrack:
         return self.index.get_coord_space(self.aln_ref_coord(aln_id), self.conf.is_rna, kmer_shift=0)
 
 
-    def load_aln_kmers(self, aln_id=None, store=False):
+    def _default_id(self, aln_id):
         if aln_id is None:
             if len(self.alignments) == 1:
-                aln_id = self.alignments.index[0]
-            else:
-                raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
-        coords = self._aln_coords(aln_id)
+                return self.alignments.index[0]
+            raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
+        return aln_id
+    
+    def load_aln_kmers(self, aln_id=None, store=False):
+        coords = self._aln_coords(self._default_id(aln_id))
         kmers = coords.load_kmers(self.index)
 
         return kmers
