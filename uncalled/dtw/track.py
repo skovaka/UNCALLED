@@ -18,7 +18,6 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
 from . import RefCoord, LayerMeta, LAYER_META
-from .track_io import TrackSQL
 
 from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
@@ -31,6 +30,8 @@ CURRENT_LAYER    = "current"
 DWELL_LAYER      = "dwell"
 MODEL_DIFF_LAYER = "model_diff"
 DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
+
+from .track_io import TrackSQL
 
 LAYER_META.update({
     "dwell" : LayerMeta(float, "Dwell Time (ms/nt)"),
@@ -101,10 +102,10 @@ class AlnTrack:
             self.prms.name = os.path.basename(self.prms.path)
 
         if not self.in_mem:
-            self.db = TrackSQL(self.prms.path)
+            self.db = TrackSQL(0, self.prms.path)
 
             if self.prms.mode == self.READ_MODE:
-                self.id, self.desc, toml, groups = self.db.query_track(self.prms.name)
+                self.id, _, self.desc, groups, toml = self.db.query_track(self.prms.name).iloc[0]
                 self.conf.load_toml(text=toml)
 
         self.index = load_index(self.prms.index_prefix)
@@ -157,7 +158,6 @@ class AlnTrack:
         self.width = len(self.coords)
         self.height = None
 
-
     def init_alignment(self, read, group_name, layers):
 
         fast5 = read.f5.filename
@@ -199,15 +199,14 @@ class AlnTrack:
 
         #self.init_layers(group_name, layers)
 
-        self.layers = None
-        self.write_aln_group(aln_id, group_name, layers)
+        self.add_layer_group(aln_id, group_name, layers)
 
         return aln_id
 
     def _group_layers(self, group, layers):
         return pd.concat({group : layers}, names=["group", "layer"], axis=1)
         
-    def write_aln_group(self, aln_id, group, layers):
+    def add_layer_group(self, aln_id, group, layers):
         df = self._group_layers(group, layers)#pd.concat({group : layers}, names=["group", "layer"], axis=1)
 
         df.index = pd.MultiIndex.from_product(

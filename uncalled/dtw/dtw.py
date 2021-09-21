@@ -16,7 +16,7 @@ from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 from _uncalled._nt import KmerArray
 
 from .. import PoreModel
-from . import Bcaln, AlnTrack, RefCoord
+from . import Bcaln, AlnTrack, RefCoord, TrackIO
 
 #TODO make this better
 METHODS = {
@@ -58,7 +58,14 @@ def main(conf):
 
     fast5s = Fast5Processor(conf=conf)
 
+    conf.track_io.ref_bounds   = conf.track.ref_bounds   
+    conf.track_io.index_prefix = conf.track.index_prefix
+    conf.track_io.load_mat     = conf.track.load_mat    
+    conf.track_io.full_overlap = conf.track.full_overlap
+
     track = AlnTrack(conf.dtw.out_path, mode="w", conf=conf, load_mat=False)
+
+    #track_io = TrackIO(None, conf.dtw.out_path, conf=conf)
 
     mm2s = {p.qr_name : p
          for p in parse_paf(
@@ -81,9 +88,6 @@ def main(conf):
             sys.stderr.write("dtw failed\n")
             continue
 
-        #track.save_aln()
-
-
     if not track is None:
         t = time.time()
         track.close()
@@ -102,10 +106,10 @@ class GuidedDTW:
             self.df = None
             return
 
+        #TODO init_alignment(read_id, fast5, group, layers)
         self.aln_id = track.init_alignment(read, "bcaln", bcaln.df)
 
         self.bcaln = bcaln.df.sort_index()
-
 
         self.ref_kmers = self.track.load_aln_kmers(self.aln_id).sort_index()
 
@@ -181,7 +185,7 @@ class GuidedDTW:
 
         #def self, aln_id, group, layers):
         self.df = collapse_events(df, True)
-        self.track.write_aln_group(self.aln_id, "dtw", self.df)
+        self.track.add_layer_group(self.aln_id, "dtw", self.df)
 
         #if len(band_blocks) == 0:
         #    self.track.read_aln.bands = None

@@ -6,57 +6,182 @@ import numpy as np
 import pandas as pd
 import collections
 
+from . import RefCoord
+from .track2 import AlnTrack2
+from ..index import load_index
+from ..pore_model import PoreModel
 from .. import config
 
-#class TrackIOParams(config.ParamGroup):
-#    _name = "track_io"
-#TrackIOParams.def_params(
-#    ("input", None, None, "Input track(s)"),
-#    ("output", str, None, "Output track"),
-#    ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
-#    ("index_prefix", None, str, "BWA index prefix"),
-#    ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
-#    ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
+class TrackIOParams(config.ParamGroup):
+    _name = "track_io"
+TrackIOParams._def_params(
+    ("input", None, None, "Input track(s)"),
+    ("output", str, None, "Output track"),
+    ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
+    ("index_prefix", None, str, "BWA index prefix"),
+    ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
+    ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
 #    ("layers", DEFAULT_LAYERS, list, "Layers to load"),
-#    #("mode", "r", str, "Read (r) or write (w) mode"),
-#    ignore_toml={"mode", "overwrite"}
-#)
-#
-#class TrackIO:
-#    def __init__(self, *args, **kwargs):
-#        self.conf, self.prms = config._init_group("track_io", *args, **kwargs)
-#        
-#        self.dbs = list()
-#
-#        if self.prms.input is None:
-#            self.in_dbs = None
-#        else:
-#            if not isinstance(self.prms.input, list):
-#                self.prms.input = [self.prms.input]
-#            self.in_dbs = list()
-#            for db in self.prms.input:
-#                track_names = self.open_db(db)
-#                self.in_dbs.append()
-#
-#    def open_db(self, db_str):
-#        spl = db_str.split(":")
-#        if len(spl) == 2:
-#            filename = spl[0]
-#            track_names = spl[1].split(",")
-#        elif len(spl) == 1:
-#            filename = db_str
-#            track_names = None
-#        else:
-#            raise ValueError("Incorrect database specifier format: " + db_str)
-#
-#        db = TrackSQL(filename)
+    #("mode", "r", str, "Read (r) or write (w) mode"),
+    ignore_toml={"mode", "overwrite"}
+)
+
+class TrackIO:
+    def __init__(self, *args, **kwargs):
+        self.conf, self.prms = config._init_group("track_io", *args, **kwargs)
+
+        #TODO load after updating from tracks?
+        self.index = load_index(self.prms.index_prefix)
+        self.model = PoreModel(self.conf.pore_model) 
+
+        self.db_ids = dict()
+        self.dbs = list()
+
+        self.tracks = dict()
+        self.track_dbs = dict()
+        self.track_ids = dict()
+
+        self.out_tracks = set()
+        self.prev_fast5 = dict()
+        self.prev_read = dict()
+        self.prev_aln = dict()
+
+        self._load_dbs(self.prms.output, True)
+        self._load_dbs(self.prms.input, False)
 
 
+    def _load_dbs(self, dbs, out):
+        if dbs is None:
+            return
+
+        if isinstance(dbs, str):
+            dbs = [dbs]
+
+        for db_str in dbs:
+            db_file, track_names = self._db_track_split(db_str)
+
+            db_id = self.db_ids.get(db_file, None)
+            
+            if db_id is None:
+                db_id = len(self.db_ids)
+                self.db_ids[db_file] = db_id
+
+                print("Load", db_file)
+                db = TrackSQL(db_id, db_file)
+            else:
+                db = self.dbs[id_id]
+
+            if out:
+                self._init_tracks_out(db, track_names)
+            else:
+                self._init_tracks_in(db, track_names)
+
+    def _db_track_split(self, db_str):
+        spl = db_str.split(":")
+        if len(spl) == 1:
+            filename = db_str
+            track_names = None
+        elif len(spl) == 2:
+            filename = spl[0]
+            track_names = spl[1].split(",")
+        else:
+            raise ValueError("Incorrect database specifier format: " + db_str)
+
+        return os.path.abspath(filename), track_names
+
+    def _init_track(self, db, name):
+        if name in self.track_dbs:
+            raise ValueError("Cannot load multiple tracks with the same name")
+
+        self.track_dbs[name] = db
+
+    def _init_tracks_in(self, db, track_names, write):
+        #TODO sort (reindex?) DF my specified track_names to maintain order
+        for row in db.query_track(track_names).iterrows():
+            self._init_track(db, row.name)
+
+            conf = config.Config(toml=toml)
+            self.tracks[row.name] = AlnTrack2(self, row.name, row.desc, row.groups, conf)
+
+    def _init_tracks_out(self, db, track_names):
+        if track_names is None:
+            name = os.path.splitext(os.path.basename(db.filename))[0]
+            track_names = [name]
+
+        for name in track_names:
+            self._init_track(db, name)
+            self.out_tracks.add(name)
+
+            self.prev_fast5[name] = (None, None)
+            self.prev_read[name] = None
+            self.prev_aln[name] = -1
+
+            track = AlnTrack2(self, name, name, "dtw", self.conf)
+            self.tracks[name] = track
+            db.init_track2(track)
+
+    def init_alignment(self, read_id, fast5, group_name, layers, track_name=None):
+        if track_name is None:
+            if len(self.out_tracks) == 1:
+                track_name, = {self.out_tracks}
+            else:
+                raise ValueError("Must specify track name when using multiple output tracks")
+
+        track = self.tracks[track_name]
+        db = track.db
+
+        self.prev_aln[track_name] += 1
+        aln_id = self.prev_aln[track_name]
+
+        if fast5 == self.prev_fast5[track_name][0]:
+            fast5_id = self.prev_fast5[track_name][1]
+        else:
+            fast5_id = self.db.init_fast5(fast5)
+            self.prev_fast5[track_name] = (fast5, fast5_id)
+
+        if self.prev_read[track_name] != read_id:
+            self.db.init_read(read_id, fast5_id)
+            self.prev_read[track_name] = read_id
+
+        mref_start = layers.index.min()
+        mref_end = layers.index.max()+1
+        samp_start = layers["sample"].min()
+        samp_end = layers["sample"].max()
+
+        ref_bounds = self.index.mref_to_ref_bound(mref_start, mref_end, not self.conf.is_rna)
+
+        track.alignments = pd.DataFrame({
+                "id" : [aln_id],
+                "track_id" : [self.id],
+                "read_id" : [read_id],
+                "ref_name" : [ref_bounds.ref_name],
+                "ref_start" : [ref_bounds.start],
+                "ref_end" : [ref_bounds.end],
+                "fwd" :     [ref_bounds.fwd],
+                "samp_start" : [samp_start],
+                "samp_end" : [samp_end],
+                "tags" : [""]}).set_index("id")
+
+        aln_id = track.db.init_alignment(self.alignments)
+
+        track.layers = None
+        track.add_layer_group(aln_id, group_name, layers)
+
+        return aln_id
+            
 class TrackSQL:
-    def __init__(self, sqlite_db):
+    def __init__(self, db_id, sqlite_db):
+        self.id = db_id
+        self.filename = sqlite_db
+        new_file = not os.path.exists(sqlite_db)
         self.con = sqlite3.connect(sqlite_db)
         self.cur = self.con.cursor()
-        #self.prms = track_io_prms
+
+        print("IN")
+
+        if new_file:
+            print("INIT")
+            self.init_tables()
 
     def close(self):
         self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
@@ -69,8 +194,8 @@ class TrackSQL:
                 id INTEGER PRIMARY KEY,
                 name TEXT,
                 desc TEXT,
-                config TEXT,
-                groups TEXT
+                groups TEXT,
+                config TEXT
             );""")
         self.cur.execute("""
             CREATE TABLE IF NOT EXISTS read (
@@ -118,6 +243,15 @@ class TrackSQL:
             );""")
         #self.con.commit()
 
+    def init_track2(self, track):
+        self.cur.execute(
+            "INSERT INTO track (name,desc,config,groups) VALUES (?,?,?,?)",
+            (track.name, track.desc, track.conf.to_toml(), "dtw")
+        )
+        track.id = self.cur.lastrowid
+        #self.con.commit()
+        return track.id
+
     def init_track(self, track):
         self.cur.execute(
             "INSERT INTO track (name,desc,config,groups) VALUES (?,?,?,?)",
@@ -134,13 +268,6 @@ class TrackSQL:
             if_exists="append", 
             method="multi",# chunksize=5000,
             index=True, index_label="id")
-
-        #self.cur.execute(
-        #    "INSERT INTO alignment (track_id, read_id, ref_name, ref_start, ref_end, fwd) VALUES (?,?,?,?,?,?)",
-        #    (aln.track_id, aln.read_id, aln.ref_name, aln.ref_start, aln.ref_end, aln.is_fwd)
-        #)
-        #aln.id = self.cur.lastrowid
-        #self.con.commit()
 
     def init_fast5(self, filename):
 
@@ -174,57 +301,9 @@ class TrackSQL:
     def get_read_ids(self):
         return set(pd.read_sql_query("SELECT id FROM read", self.con)["id"])
 
-    def query_track(self, name):
-        return self.cur.execute(
-            "SELECT id, desc, config, groups FROM track WHERE name == ?", 
-            (name,)).fetchone()
-        
-    def query_read(self, read_id, coords=None):
-        query = """
-            SELECT mref, aln_id, start, length, current FROM dtw
-            JOIN alignment ON id = aln_id
-            WHERE read_id = ?"""
-        params = [read_id]
-
-        if coords is not None:
-            query = query + " AND (mref >= ? AND mref <= ?)"
-            params += [int(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
-
-        dtw = pd.read_sql_query(query, self.con, params=params).set_index("mref")
-        aln_id = str(dtw["aln_id"].iloc[0])
-
-        aln = pd.read_sql_query(
-            "SELECT * FROM alignment WHERE id = ?",
-            self.con, params=(aln_id,)
-        ).set_index("id")
-
-        return aln, dtw
-
-    def query_alns(self, track_id, coords, full_overlap):
-
-        select = "SELECT mref, aln_id, start, length, current FROM dtw"
-        where = " WHERE (mref >= ? AND mref <= ?)"
-        params = [int(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
-
-        if full_overlap:
-            select = select + " JOIN alignment ON id = aln_id"
-            where = where + " AND (ref_start <= ? AND ref_end > ?)"
-            params += [int(coords.refs.min()), int(coords.refs.max())]
-
-        query = select + where
-
-        dtw = pd.read_sql_query(query, self.con, params=params)
-
-        ids = dtw["aln_id"][~dtw["aln_id"].duplicated()].to_numpy(dtype=str)
-
-        alns = pd.read_sql_query(
-            "SELECT * FROM alignment WHERE id IN (%s)" % ",".join(["?"]*len(ids)),
-            self.con, params=ids
-        ).set_index("id")#.sort_values("ref_start")
-
-        return alns, dtw
-    
     def _add_where(self, wheres, params, name, val):
+        if val is None: return
+
         if not isinstance(val, str) and isinstance(val, (collections.abc.Sequence, np.ndarray)):
             wheres.append("%s in (%s)" % (name, ",".join(["?"]*len(val))))
             params += map(str, val)
@@ -232,16 +311,23 @@ class TrackSQL:
             wheres.append("%s = ?" % name)
             params.append(str(val))
 
+    def query_track(self, name=None):
+        select = "SELECT * FROM track"
+        wheres = list()
+        params = list()
+        self._add_where(wheres,params,"name",name)
+        query = self._join_query(select, wheres)
+        return pd.read_sql_query(query, self.con, params=params)
+        #return self.cur.execute(query,params).fetchone()
+        
+
     def query_alignments(self, track_id=None, read_id=None, coords=None, full_overlap=False):
         select = "SELECT * FROM alignment"
         wheres = list()
         params = list()
 
-        if track_id is not None:
-            self._add_where(wheres, params, "track_id", track_id)
-
-        if read_id is not None:
-            self._add_where(wheres, params, "read_id", read_id)
+        self._add_where(wheres, params, "track_id", track_id)
+        self._add_where(wheres, params, "read_id", read_id)
 
         if coords is not None:
             ref_start = int(coords.refs.min())
@@ -253,15 +339,15 @@ class TrackSQL:
             else:
                 params += [ref_end, ref_start]
 
-        if len(wheres) == 0:
-            query = select
-        else:
-            query = select + " WHERE " + " AND ".join(wheres)
-
-        print(query)
+        query = self._join_query(select, wheres)
         
         return pd.read_sql_query(query, self.con, params=params).set_index("id")
         
+    def _join_query(self, select, wheres):
+        if len(wheres) == 0:
+            return select
+        else:
+            return select + " WHERE " + " AND ".join(wheres)
 
     def query_layers(self, table, coords=None, aln_id=None, order="mref"):
         select = "SELECT mref, aln_id, start, length, current FROM dtw"
@@ -273,15 +359,13 @@ class TrackSQL:
             wheres.append("mref >= ? AND mref <= ?")
             params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
 
-        if aln_id is not None:
-            print(aln_id)
-            self._add_where(wheres, params, "aln_id", aln_id)
+        self._add_where(wheres, params, "aln_id", aln_id)
 
-        if len(wheres) == 0:
-            query = select
-        else:
-            query = select + " WHERE " + " AND ".join(wheres)
+        #if len(wheres) == 0:
+        #else:
+        #    query = select + " WHERE " + " AND ".join(wheres)
+        query = self._join_query(select, wheres)
 
-        print(query)
+        #print(query)
         
         return pd.read_sql_query(query, self.con, params=params).set_index(["mref","aln_id"])
