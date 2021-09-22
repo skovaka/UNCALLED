@@ -23,7 +23,7 @@ TrackIOParams._def_params(
     ("overwrite", False, bool, "Overwrite existing databases"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("chunksize", 4000, int, "If true will only include reads which fully cover reference bounds"),
-    ("layers", ["current"], list, "Layers to load"),
+    ("layers", ["current", "dwell", "model_diff"], list, "Layers to load"),
     #("mode", "r", str, "Read (r) or write (w) mode"),
     ignore_toml={"input", "output", "ref_bounds", "layers"}
 )
@@ -35,22 +35,24 @@ class TrackIO:
         self.dbs = dict()
 
         self.track_dbs = dict()
-        self.track_ids = dict()
 
         self.input_tracks = list()
         self.output_tracks = dict()
         self.prev_fast5 = dict()
         self.prev_read = dict()
-        self.prev_aln = dict()
 
         self._load_dbs(self.prms.output, True)
         self._load_dbs(self.prms.input, False)
-        self.input_tracks = tuple(self.input_tracks)
 
-        self.index = load_index(self.prms.index_prefix)
+        self.input_track_ids = [t.id for t in self.input_tracks]
+        self.output_track_ids = [t.id for _,t in self.output_tracks.items()]
+
+        if self.prms.index_prefix is not None:
+            self.index = load_index(self.prms.index_prefix)
+            self._set_ref_bounds(self.prms.ref_bounds)
+
         self.model = PoreModel(self.conf.pore_model) 
         self.fast5s = None
-        self._set_ref_bounds(self.prms.ref_bounds)
 
     def _set_ref_bounds(self, ref_bounds):
         if ref_bounds is not None:
@@ -69,7 +71,6 @@ class TrackIO:
             db_file, track_names = self._db_track_split(db_str)
 
             db = self.dbs.get(db_file, None)
-            
             if db is None:
                 db = TrackSQL(db_file)
                 self.dbs[db_file] = db
@@ -100,17 +101,24 @@ class TrackIO:
         self.track_dbs[name] = db
 
     def _init_input_tracks(self, db, track_names):
-        #TODO sort (reindex?) DF my specified track_names to maintain order
-        for i,row in db.query_track(track_names).iterrows():
+        #TODO sort (reindex?) DF by specified track_names to maintain order
+        df = db.query_track(track_names).set_index("name").reindex(track_names)
+
+        missing = df["id"].isnull()
+        if missing.any():
+            bad_names = df[missing].index
+            all_names = db.query_track()["name"]
+            raise ValueError("alignment track not found: \"%s\" (tracks in database: \"%s\")" %
+                             ("\", \"".join(bad_names), "\", \"".join(all_names)))
+
+        for name,row in df.iterrows():
             self._init_track(db, row.name)
 
             conf = config.Config(toml=row.config)
-            t = AlnTrack(db, row["id"], row["name"], row["desc"], row["groups"], conf)
+            t = AlnTrack(db, row["id"], name, row["desc"], row["groups"], conf)
             self.input_tracks.append(t)
 
             self.conf.load_config(conf)
-            #if self.prms.index_prefix is None:
-            #    self.prms.index_prefix = t.conf.track_io.index_prefix
 
     def _init_output_tracks(self, db, track_names):
         if track_names is None:
@@ -122,11 +130,10 @@ class TrackIO:
 
             self.prev_fast5[name] = (None, None)
             self.prev_read[name] = None
-            self.prev_aln[name] = -1
 
             track = AlnTrack(db, None, name, name, "dtw", self.conf)
             self.output_tracks[name] = track
-            db.init_track2(track)
+            db.init_track(track)
 
     def get_fast5_reader(self):
         #TODO needs work for multiple DBs
@@ -146,8 +153,8 @@ class TrackIO:
         track = self.output_tracks[track_name]
         db = track.db
 
-        self.prev_aln[track_name] += 1
-        aln_id = self.prev_aln[track_name]
+        #self.prev_aln[track_name] += 1
+        aln_id = db.next_aln_id()
 
         if fast5 == self.prev_fast5[track_name][0]:
             fast5_id = self.prev_fast5[track_name][1]
@@ -242,6 +249,7 @@ class TrackIO:
         dbfile0,db0 = list(self.dbs.items())[0]
 
         alns_iter = db0.query_alignments(
+            self.input_track_ids,
             coords=self.coords, 
             full_overlap=full_overlap, 
             order=["read_id"],
@@ -293,14 +301,21 @@ class TrackSQL:
         new_file = not os.path.exists(sqlite_db)
         self.con = sqlite3.connect(sqlite_db)
         self.cur = self.con.cursor()
+        self.open = True
 
         if new_file:
             self.init_tables()
 
+        self.prev_aln_id = -1
+        for aln_id in self.cur.execute("SELECT MAX(id) FROM alignment"):
+            self.prev_aln_id = aln_id[0]
+
     def close(self):
-        self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
-        self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (mref, aln_id);")
-        self.con.close()
+        if self.open:
+            self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (mref, aln_id);")
+            self.con.close()
+            self.open = False
 
     def init_tables(self):
         self.cur.execute("""
@@ -357,20 +372,11 @@ class TrackSQL:
             );""")
         #self.con.commit()
 
-    def init_track2(self, track):
-        self.cur.execute(
-            "INSERT INTO track (name,desc,config,groups) VALUES (?,?,?,?)",
-            (track.name, track.desc, track.conf.to_toml(), "dtw")
-        )
-        track.id = self.cur.lastrowid
-        #self.con.commit()
-        return track.id
 
     def init_track(self, track):
         self.cur.execute(
             "INSERT INTO track (name,desc,config,groups) VALUES (?,?,?,?)",
-            (track.prms.name, track.prms.name, track.conf.to_toml(), "dtw")
-            #(track.name, track.desc, track.config.to_toml(), "dtw")
+            (track.name, track.desc, track.conf.to_toml(), "dtw")
         )
         track.id = self.cur.lastrowid
         #self.con.commit()
@@ -397,6 +403,10 @@ class TrackSQL:
 
     def init_read(self, read_id, fast5_id):
         self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
+
+    def next_aln_id(self):
+        self.prev_aln_id += 1
+        return self.prev_aln_id
 
     def write_layers(self, table, df):
         df.to_sql(

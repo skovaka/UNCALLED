@@ -69,15 +69,15 @@ class Browser:
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])
 
-        io = TrackIO(conf=self.conf)
+        self.io = TrackIO(conf=self.conf)
 
-        self.conf = io.conf
+        self.conf = self.io.conf
 
-        self.tracks = io.load_refs(load_mat=True) #list()
+        self.tracks = self.io.load_refs(load_mat=True) #list()
 
         self.single_track = len(self.tracks) == 1
 
-        ref_bounds = io.prms.ref_bounds
+        ref_bounds = self.io.prms.ref_bounds
 
         self.ref_name = ref_bounds.name
         self.ref_start = ref_bounds.start
@@ -236,7 +236,8 @@ class Browser:
 
         mref = trk.coords.ref_to_mref([rf], True)[0]
 
-        for i,val in enumerate(trk.layers.loc[mref,aln_id]):
+        for i,layer in enumerate(self.conf.track_io.layers):
+            val = trk.layers["dtw",layer].loc[mref,aln_id]
             self.set_info_cell(i+2, val)
         #self.set_info_cell(self.INFO_KMER, nt.kmer_to_str(int(kmer)))
         #self.set_info_cell(self.INFO_PA,   "%.4f" % pa)
@@ -619,8 +620,9 @@ class Browser:
         self.axs.dot_btn.set_visible(False)
 
     def on_close(self, event):
-        for t in self.tracks:
-            t.close()
+        self.io.close()
+        #for t in self.tracks:
+        #    t.close()
         sys.exit(0)
 
 

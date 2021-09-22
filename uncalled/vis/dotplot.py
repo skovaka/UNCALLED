@@ -89,7 +89,7 @@ class Dotplot:
         for read_id, tracks in self.track_io.iter_reads():
             self.read_id = read_id
             self.tracks = tracks
-            print("TRACKSSS", tracks)
+            print(read_id)
             self.show(tracks)
 
     def save_all(self, out_prefix, fmt):
@@ -201,7 +201,6 @@ class Dotplot:
         if isinstance(fast5_read, ProcRead):
             self.read = fast5_read
         else:
-            print("POOR MODEL", self.conf.pore_model.name)
             self.read = ProcRead(fast5_read, conf=self.conf)
 
         empty = False
@@ -210,8 +209,6 @@ class Dotplot:
 
         if empty:
             return False
-
-        print("TRACK", self.tracks)
 
         #TODO improve this
         self.ref_bounds = self.tracks[0].aln_ref_coord(self.tracks[0].alignments.index[0])

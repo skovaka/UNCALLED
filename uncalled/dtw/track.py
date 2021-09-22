@@ -41,6 +41,10 @@ LAYER_META = {
 }
 
 class AlnTrack:
+
+    #TODO get rid of htis
+    CMP_LAYERS = ["current", "dwell"]
+
     def __init__(self, db, track_id, name, desc, groups, conf):
         self.db = db
         #self.index = index
@@ -167,9 +171,6 @@ class AlnTrack:
     def get_pileup(self, layer):
         return np.flip(np.sort(self[layer], axis=0), axis=0)
 
-    def close(self):
-        self.db.close()
-
     #@property
     #def name(self):
     #    if self.prms.path is None:
@@ -199,8 +200,8 @@ class AlnTrack:
 
         for i,l in enumerate(AlnTrack.CMP_LAYERS):
             for j,rf in enumerate(self.coords.mrefs[True]):
-                a = self[l,:,rf]
-                b = track_b[l,:,rf]
+                a = self.layers["dtw",l].loc[rf]
+                b = track_b.layers["dtw",l].loc[rf]
                 ks = scipy.stats.mstats.ks_2samp(a,b,mode="asymp")
                 ks_stats[i][j] = ks[0]
 
