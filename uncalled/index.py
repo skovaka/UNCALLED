@@ -105,7 +105,6 @@ class RefIndex(_RefIndex):
             else:
                 mrefs = tuple( (m[st:en] for m in self.mrefs) )
 
-            print(refs, mrefs)
             return RefIndex.CoordSpace(self.ref_name, refs, mrefs=mrefs)
 
         def ref_to_mref(self, ref, fwd=None):

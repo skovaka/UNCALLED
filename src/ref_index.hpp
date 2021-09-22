@@ -217,7 +217,7 @@ class RefIndex {
         return is_mref_flipped(i) == is_rna;
     }
 
-    bool mref_to_pac(i64 mref) {
+    i64 mref_to_pac(i64 mref) {
         if (is_mref_flipped(mref)) {
             return size() - mref + 1;
         }
@@ -225,7 +225,8 @@ class RefIndex {
     }
 
     i32 get_ref_id(i64 ref) {
-        return bns_pos2rid(bns_, mref_to_pac(ref));
+        auto pac = mref_to_pac(ref);
+        return bns_pos2rid(bns_, pac);
     }
 
     std::string get_ref_name(u32 rid) {
@@ -484,8 +485,6 @@ class RefIndex {
             auto pst = i >> 2;
             u32 comb = *((u32 *) &pacseq_[pst]);
             auto shift = (i & 3) >> 1;
-            std::cout << comb << "\n";
-            //return (u16) ( (comb >> ((16-KLEN-shift)<<1)) & KMER_MASK );
             return (u16) ( (comb >> shift) & KMER_MASK );
         }
 

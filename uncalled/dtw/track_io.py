@@ -23,7 +23,8 @@ TrackIOParams._def_params(
     ("index_prefix", None, str, "BWA index prefix"),
     ("overwrite", False, bool, "Overwrite existing databases"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
-    ("chunksize", 4000, int, "If true will only include reads which fully cover reference bounds"),
+    ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
+    ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
     ("layers", ["current", "dwell", "model_diff"], list, "Layers to load"),
     #("mode", "r", str, "Read (r) or write (w) mode"),
     ignore_toml={"input", "output", "ref_bounds", "layers"}
@@ -195,13 +196,12 @@ class TrackIO:
 
         return track #aln_id
 
+    @property
     def input_count(self):
         return len(self.input_tracks)
 
 
     LAYER_FNS = {
-        #"kmer" : (
-        #    lambda self,a: self.load_aln_kmers(a)),
         "dwell" : (lambda self,track: 
             1000 * track.layers["dtw","length"] / self.conf.read_buffer.sample_rate),
         "model_diff" : (lambda self,track: 
@@ -213,10 +213,6 @@ class TrackIO:
             if not name in track.layers.columns.get_level_values(1):
                 track.layers["dtw",name] = self.LAYER_FNS[name](self,track)
 
-    #def iter_refs(self, ref_bounds=None):
-    #    if ref_bounds is not None:
-    #        self._set_ref_bounds(ref_bounds)
-
     def load_refs(self, ref_bounds=None, full_overlap=None, load_mat=False):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
@@ -225,8 +221,6 @@ class TrackIO:
 
         if full_overlap is None:
             full_overlap = self.prms.full_overlap
-
-        t = time.time()
 
         dbfile0,db0 = list(self.dbs.items())[0]
         alignments = db0.query_alignments(self.input_track_ids, coords=self.coords, full_overlap=full_overlap)
@@ -237,6 +231,7 @@ class TrackIO:
         for group in ["dtw"]:
             layers[group] = db0.query_layers(group, self.coords, ids)
         layers = pd.concat(layers, names=["group", "layer"], axis=1)
+        #layers = db.query_layers("dtw", self.coords, ids)
         
         for track in self.input_tracks:
             track_alns = alignments[alignments["track_id"] == track.id].copy()
@@ -248,10 +243,48 @@ class TrackIO:
             
             if load_mat:
                 track.load_mat()
-        
-        print(time.time()-t)
 
         return self.input_tracks
+
+    def iter_refs(self, ref_bounds=None):
+        if ref_bounds is not None:
+            self._set_ref_bounds(ref_bounds)
+
+        dbfile0,db0 = list(self.dbs.items())[0]
+        layer_iter = db0.query_layers(
+            self.input_track_ids, 
+            coords=self.coords, 
+            order=["mref"],
+            chunksize=self.prms.ref_chunksize)
+
+        end_layers = None
+        for chunk in layer_iter:
+            if end_layers is not None:
+                chunk = pd.concat([end_layers, chunk])
+
+            mrefs = chunk.index.get_level_values("mref")
+            end = mrefs == mrefs[-1]
+            end_layers = chunk[end]
+            chunk = chunk[~end]
+
+            
+            r = self.index.mref_to_ref_bound(mrefs[0], mrefs[-1], not self.conf.is_rna)
+            ref_coord = RefCoord(r.ref_name, r.start, r.end, r.fwd)
+            coords = self.index.get_coord_space(ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)
+
+            layers = pd.concat({"dtw":chunk}, names=["group", "layer"], axis=1)
+
+            aln_ids = chunk.index.unique("aln_id").to_numpy()
+            alns = db0.query_alignments(self.input_track_ids, aln_id=aln_ids)
+
+            for track in self.input_tracks:
+                track_alns = alns[alns["track_id"]==track.id].copy()
+                track_layers = layers[layers.index.isin(track_alns.index, 1)].copy()
+                track.set_data(coords, track_alns, track_layers)
+                self.compute_layers(track, self.prms.layers)
+
+            yield self.input_tracks
+
 
     def iter_reads(self, ref_bounds=None, full_overlap=False):
         if ref_bounds is not None:
@@ -259,15 +292,15 @@ class TrackIO:
         
         dbfile0,db0 = list(self.dbs.items())[0]
 
-        alns_iter = db0.query_alignments(
+        aln_iter = db0.query_alignments(
             self.input_track_ids,
             coords=self.coords, 
             full_overlap=full_overlap, 
             order=["read_id"],
-            chunksize=self.prms.chunksize)
+            chunksize=self.prms.aln_chunksize)
 
         end_alns = None
-        for chunk in alns_iter:
+        for chunk in aln_iter:
             if end_alns is not None:
                 chunk = pd.concat([end_alns, chunk])
 
@@ -287,6 +320,8 @@ class TrackIO:
         for group in ["dtw"]: #self.groups:
             layers[group] = db.query_layers("dtw", self.coords, ids)
         layers = pd.concat(layers, names=["group", "layer"], axis=1)
+
+        #layers = db.query_layers("dtw", self.coords, ids)
 
         for track in self.input_tracks:
             track_alns = alns[alns["track_id"] == track.id]
@@ -317,9 +352,9 @@ class TrackSQL:
         if new_file:
             self.init_tables()
 
-        self.prev_aln_id = -1
-        for aln_id in self.cur.execute("SELECT MAX(id) FROM alignment"):
-            self.prev_aln_id = aln_id[0]
+        self.prev_aln_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
+        if self.prev_aln_id is None:
+            self.prev_aln_id = -1
 
     def close(self):
         if self.open:
@@ -453,11 +488,12 @@ class TrackSQL:
         return pd.read_sql_query(query, self.con, params=params)
         #return self.cur.execute(query,params).fetchone()
 
-    def query_alignments(self, track_id=None, read_id=None, coords=None, full_overlap=False, order=None, chunksize=None):
+    def query_alignments(self, track_id=None, read_id=None, aln_id=None, coords=None, full_overlap=False, order=None, chunksize=None):
         select = "SELECT * FROM alignment"
         wheres = list()
         params = list()
 
+        self._add_where(wheres, params, "id", aln_id)
         self._add_where(wheres, params, "track_id", track_id)
         self._add_where(wheres, params, "read_id", read_id)
 
@@ -483,7 +519,7 @@ class TrackSQL:
             query += " ORDER BY " + ", ".join(order)
         return query
 
-    def query_layers(self, table, coords=None, aln_id=None, order=["mref"]):
+    def query_layers(self, table, coords=None, aln_id=None, order=["mref"], chunksize=None):
         select = "SELECT mref, aln_id, start, length, current FROM dtw"
 
         wheres = list()
@@ -495,10 +531,8 @@ class TrackSQL:
 
         self._add_where(wheres, params, "aln_id", aln_id)
 
-        #if len(wheres) == 0:
-        #else:
-        #    query = select + " WHERE " + " AND ".join(wheres)
         query = self._join_query(select, wheres, order)
 
-        
-        return pd.read_sql_query(query, self.con, index_col=["mref","aln_id"], params=params)
+        return pd.read_sql_query(query, self.con, index_col=["mref","aln_id"], params=params, chunksize=chunksize)
+
+        #return pd.concat({table : df}, names=["group", "layer"], axis=1)

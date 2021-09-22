@@ -30,8 +30,9 @@ class _Refstats:
         conf, prms = config._init_group("refstats", *args, **kwargs)
 
         io = TrackIO(conf=conf)
-        
-        tracks = _load_tracks(prms.tracks, conf)
+        conf = io.conf
+
+        #tracks = _load_tracks(prms.tracks, conf)
 
         layer_stats = [s for s in prms.stats if s in self.LAYER_STATS]
         compare_stats = [s for s in prms.stats if s in self.COMPARE_STATS]
@@ -40,28 +41,31 @@ class _Refstats:
             bad_stats = [s for s in prms.stats if s not in _ALL_STATS]
             raise ValueError("Unknown stats: " + ", ".join(bad_stats))
 
-        if len(compare_stats) > 0 and len(tracks) != 2:
+        if len(compare_stats) > 0 and io.input_count != 2:
             raise ValueError("\"%s\" stats can only be computed using exactly two tracks" % "\", \"".join(cmp_stats))
             
+        for tracks in io.iter_refs():
+            for t in tracks:
+                print(len(t.layers), len(t.alignments))
         
-        dfs = list()
-        labels = list()
+        #dfs = list()
+        #labels = list()
 
-        if len(layer_stats) > 0:
-            for track in tracks:
-                df = self.describe(track, prms.layers, layer_stats)
-                if len(tracks) > 1:
-                    df = df.add_prefix(os.path.basename(track.prms.path)+".")
-                dfs.append(df)
+        #if len(layer_stats) > 0:
+        #    for track in tracks:
+        #        df = self.describe(track, prms.layers, layer_stats)
+        #        if len(tracks) > 1:
+        #            df = df.add_prefix(os.path.basename(track.prms.path)+".")
+        #        dfs.append(df)
 
-        for stat in compare_stats:
-            fn = getattr(self, stat)
-            df = fn(*tracks, prms.layers)
-            dfs.append(df)
+        #for stat in compare_stats:
+        #    fn = getattr(self, stat)
+        #    df = fn(*tracks, prms.layers)
+        #    dfs.append(df)
 
-        df = pd.concat(dfs, axis=1)
+        #df = pd.concat(dfs, axis=1)
 
-        return df
+        #return df
 
         #for stat in cmp_stats:
         #    for layer in prms.layers:

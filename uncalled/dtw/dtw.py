@@ -64,7 +64,7 @@ def main(conf):
             conf.dtw.mm2_paf,
             ref_bounds=conf.track_io.ref_bounds,
             full_overlap=conf.track_io.full_overlap,
-    )}
+         ) if p.is_fwd}
 
     for read in fast5s:
 
