@@ -5,6 +5,7 @@ import sqlite3
 import numpy as np
 import pandas as pd
 import collections
+import time
 
 from . import RefCoord
 from .track import AlnTrack, DEFAULT_LAYERS
@@ -212,6 +213,10 @@ class TrackIO:
             if not name in track.layers.columns.get_level_values(1):
                 track.layers["dtw",name] = self.LAYER_FNS[name](self,track)
 
+    #def iter_refs(self, ref_bounds=None):
+    #    if ref_bounds is not None:
+    #        self._set_ref_bounds(ref_bounds)
+
     def load_refs(self, ref_bounds=None, full_overlap=None, load_mat=False):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
@@ -221,24 +226,30 @@ class TrackIO:
         if full_overlap is None:
             full_overlap = self.prms.full_overlap
 
+        t = time.time()
+
+        dbfile0,db0 = list(self.dbs.items())[0]
+        alignments = db0.query_alignments(self.input_track_ids, coords=self.coords, full_overlap=full_overlap)
+
+        ids = alignments.index.to_numpy()
+
+        layers = dict()
+        for group in ["dtw"]:
+            layers[group] = db0.query_layers(group, self.coords, ids)
+        layers = pd.concat(layers, names=["group", "layer"], axis=1)
+        
         for track in self.input_tracks:
-            track.coords = self.coords
-            alignments = track.db.query_alignments(track.id, coords=self.coords, full_overlap=full_overlap)
+            track_alns = alignments[alignments["track_id"] == track.id].copy()
+            i = layers.index.get_level_values("aln_id").isin(track_alns.index)
+            track_layers = layers.iloc[i].copy()
 
-            if full_overlap:
-                ids = alignments.index.to_numpy()
-            else:
-                ids = None
-
-            layers = dict()
-            for group in track.groups:
-                layers[group] = track.db.query_layers("dtw", self.coords, ids)
-            layers = pd.concat(layers, names=["group", "layer"], axis=1)
-
-            track.set_data(self.coords, alignments, layers)
+            track.set_data(self.coords, track_alns, track_layers)
             self.compute_layers(track, self.prms.layers)
+            
             if load_mat:
                 track.load_mat()
+        
+        print(time.time()-t)
 
         return self.input_tracks
 

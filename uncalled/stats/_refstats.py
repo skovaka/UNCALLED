@@ -12,16 +12,14 @@ from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split
 from ..index import BWA_OPTS
 from ..fast5 import Fast5Reader
-from ..dtw import LAYER_META, RefCoord
+from ..dtw import TrackIO, LAYER_META, RefCoord
 
 class RefstatsParams(config.ParamGroup):
     _name = "refstats"
 RefstatsParams._def_params(
     ("layers", ["current", "dwell"], list, "Layers over which to compute summary statistics"),
     ("stats", ["mean"], list, "Summary statistics to compute for layers specified in \"stats\""),
-    ("tracks", None, None, "DTW alignment tracks"),
 )
-
 
 class _Refstats:
     LAYER_STATS = {"cov", "min", "max", "mean", "stdv", "var", "skew", "kurt"}
@@ -30,6 +28,8 @@ class _Refstats:
 
     def __call__(self, *args, **kwargs):
         conf, prms = config._init_group("refstats", *args, **kwargs)
+
+        io = TrackIO(conf=conf)
         
         tracks = _load_tracks(prms.tracks, conf)
 
@@ -112,8 +112,8 @@ OPTS = (
         help="Comma-separated list of layers over which to compute summary statistics {%s}" % ",".join(LAYER_META.keys())),
     Opt("stats", "refstats", type=comma_split,
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(_Refstats.ALL_STATS)),
-    Opt("tracks", "refstats", nargs="+", type=str),
-    Opt(("-R", "--ref-bounds"), "track_io", type=RefCoord, required=True),
+    Opt("input", "track_io", nargs="+", type=str),
+    Opt(("-R", "--ref-bounds"), "track_io", type=RefCoord),
 )
 
 def main(*args, **argv):
