@@ -20,13 +20,12 @@ TrackIOParams._def_params(
     ("output", None, None,  "Output track"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("index_prefix", None, str, "BWA index prefix"),
-    ("load_mat", True, bool, "If true will load a matrix containing specified layers from all reads overlapping reference bounds"),
     ("overwrite", False, bool, "Overwrite existing databases"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("chunksize", 4000, int, "If true will only include reads which fully cover reference bounds"),
-    ("layers", DEFAULT_LAYERS, list, "Layers to load"),
+    ("layers", ["current"], list, "Layers to load"),
     #("mode", "r", str, "Read (r) or write (w) mode"),
-    ignore_toml={"input", "output", "ref_bounds"}
+    ignore_toml={"input", "output", "ref_bounds", "layers"}
 )
 
 class TrackIO:
@@ -191,7 +190,22 @@ class TrackIO:
     def input_count(self):
         return len(self.input_tracks)
 
-    def load_refs(self, ref_bounds=None, full_overlap=None):
+
+    LAYER_FNS = {
+        #"kmer" : (
+        #    lambda self,a: self.load_aln_kmers(a)),
+        "dwell" : (lambda self,track: 
+            1000 * track.layers["dtw","length"] / self.conf.read_buffer.sample_rate),
+        "model_diff" : (lambda self,track: 
+            track.layers["dtw","current"] - self.model[track.kmers])
+    }
+
+    def compute_layers(self, track, layer_names):
+        for name in layer_names:
+            if not name in track.layers.columns.get_level_values(1):
+                track.layers["dtw",name] = self.LAYER_FNS[name](self,track)
+
+    def load_refs(self, ref_bounds=None, full_overlap=None, load_mat=False):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
         if self.coords is None:
@@ -214,7 +228,10 @@ class TrackIO:
                 layers[group] = track.db.query_layers("dtw", self.coords, ids)
             layers = pd.concat(layers, names=["group", "layer"], axis=1)
 
-            track.set_data(self.coords, alignments, layers, load_mat=True)
+            track.set_data(self.coords, alignments, layers)
+            self.compute_layers(track, self.prms.layers)
+            if load_mat:
+                track.load_mat()
 
         return self.input_tracks
 
@@ -264,6 +281,7 @@ class TrackIO:
                 ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)
 
             track.set_data(track_coords, track_alns, track_layers)
+            self.compute_layers(track, self.prms.layers)
     
     def close(self):
         for filename, db in self.dbs.items():

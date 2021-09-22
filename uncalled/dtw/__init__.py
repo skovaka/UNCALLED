@@ -2,16 +2,6 @@
 from collections import namedtuple
 LayerMeta = namedtuple("LayerMeta", ["type", "label"])
 
-LAYER_META = {
-    "ref"     : LayerMeta(int, "Reference Coordinate"),
-    "start"   : LayerMeta(int, "Sample Start"),
-    "length"  : LayerMeta(int, "Sample Length"),
-    "current" : LayerMeta(float, "Mean Current (pA)"),
-    "kmer"    : LayerMeta(int, "Reference K-mer"),
-    "mref"  : LayerMeta(int, "Mirrored Packed Ref. Coord."),
-    "aln_id"      : LayerMeta(int, "Alignment ID"),
-}
-
 class RefCoord:
     def __init__(self, name=None, start=None, end=None, fwd=None):
         self.fwd = fwd
@@ -77,4 +67,5 @@ class RefCoord:
 
 from .bcaln import Bcaln
 from .track_io import TrackIO
+from .track import LAYER_META
 from .dtw import Fast5Processor #TODO move this to main module (eventually sigproc, then to C++)

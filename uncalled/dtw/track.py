@@ -17,7 +17,7 @@ from sklearn.decomposition import PCA
 
 import matplotlib.pyplot as plt
 
-from . import RefCoord, LayerMeta, LAYER_META
+from . import RefCoord, LayerMeta
 
 from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
@@ -30,11 +30,15 @@ DWELL_LAYER      = "dwell"
 MODEL_DIFF_LAYER = "model_diff"
 DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
 
-LAYER_META.update({
-    "dwell" : LayerMeta(float, "Dwell Time (ms/nt)"),
+LAYER_META = {
+    "start"   : LayerMeta(int, "Sample Start"),
+    "length"  : LayerMeta(int, "Sample Length"),
+    "current" : LayerMeta(float, "Mean Current (pA)"),
+    "kmer"    : LayerMeta(int, "Reference K-mer"),
+    "mref"    : LayerMeta(int, "Mirrored Packed Ref. Coord."),
+    "dwell"   : LayerMeta(float, "Dwell Time (ms/nt)"),
     "model_diff" : LayerMeta(float, "Model pA Difference"),
-    "bcerr"      : LayerMeta(float, "BC Alignment Errors")
-})
+}
 
 class AlnTrack:
     def __init__(self, db, track_id, name, desc, groups, conf):
@@ -110,23 +114,6 @@ class AlnTrack:
             raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
         return aln_id
 
-    #def load_aln_kmers(self, aln_id=None, store=False):
-    #    aln_id = self._default_id(aln_id)
-    #    coords = self._aln_coords(aln_id)
-    #    kmers = coords.load_kmers(self.index)
-
-    #    return kmers
-
-        #    if aln is None:
-        #        aln = self.read_aln
-
-        #    kmers = pd.Series(
-        #        self.index.get_kmers(aln.mref_start-nt.K+1, aln.mref_end, aln.is_rna),
-        #        #aln.mrefs
-        #        pd.RangeIndex(aln.mref_start, aln.mref_end)
-        #    )
-
-        #return kmers
 
 
     def load_read(self, read_id=None, load_kmers=True):
@@ -152,23 +139,26 @@ class AlnTrack:
 
         self.alignments.sort_values("ref_start", inplace=True)
 
-        if load_mat:
-            self.mat = self.layers.reset_index().pivot(index="aln_id", columns="mref") \
-                       .rename(columns=self.coords.mref_to_ref, level=2) \
-                       .rename_axis(("group","layer","ref"), axis=1) \
-                       .sort_index(axis=1, level=2)
-                       #.reindex(mat_index, axis=1)
-
-            self.mat = self.mat.reindex(self.alignments.index, copy=False)
-
-            self.width = len(self.coords.refs)
-            self.height = len(self.alignments)
-
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
 
+    def load_mat(self):
+        self.mat = self.layers.reset_index().pivot(index="aln_id", columns="mref") \
+                   .rename(columns=self.coords.mref_to_ref, level=2) \
+                   .rename_axis(("group","layer","ref"), axis=1) \
+                   .sort_index(axis=1, level=2)
+                   #.reindex(mat_index, axis=1)
 
-        return self.mat
+        self.mat = self.mat.reindex(self.alignments.index, copy=False)
+
+        self.width = len(self.coords.refs)
+        self.height = len(self.alignments)
+
+    @property
+    def kmers(self):
+        if self.coords.stranded:
+            return self.coords.kmers[self.layers.index.get_level_values(0)]
+        return self.coords.kmers[True][self.layers.index.get_level_values(0)]
 
     def add_layer(self, name, mat):
         self.mat = np.ma.concatenate([self.mat, [mat]])

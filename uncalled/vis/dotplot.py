@@ -128,7 +128,7 @@ class Dotplot:
 
         raw_norm = self.read.get_norm_signal(samp_min, samp_max)
 
-        kmers = track.coords.kmers[dtw.index.get_level_values(0)]
+        kmers = track.kmers
         model_current = self.track_io.model[kmers]
 
         ymin = min(np.min(model_current), np.min(raw_norm[raw_norm>0]))

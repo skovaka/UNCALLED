@@ -71,11 +71,11 @@ class Browser:
 
         io = TrackIO(conf=self.conf)
 
-        self.tracks = io.load_refs() #list()
+        self.conf = io.conf
+
+        self.tracks = io.load_refs(load_mat=True) #list()
 
         self.single_track = len(self.tracks) == 1
-
-        self.conf = self.tracks[0].conf
 
         ref_bounds = io.prms.ref_bounds
 
