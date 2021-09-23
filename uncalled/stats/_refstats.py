@@ -21,10 +21,32 @@ RefstatsParams._def_params(
     ("stats", ["mean"], list, "Summary statistics to compute for layers specified in \"stats\""),
 )
 
+_DESC_FNS = {
+    "cov"  : lambda d: d.nobs,
+    "mean" : lambda d: d.mean, 
+    "stdv" : lambda d: np.power(d.variance,2), 
+    "var"  : lambda d: d.variance, 
+    "skew" : lambda d: d.skewness, 
+    "kurt" : lambda d: d.kurtosis,
+    "min"  : lambda d: d.minmax.min, 
+    "max"  : lambda d: d.minmax.max}
+
+_AGG_FNS = {
+#    "cov"  : len,
+    "mean" : np.mean, 
+    "stdv" : np.std, 
+    "var"  : np.var,
+    "skew" : scipy.stats.skew,
+    "kurt" : scipy.stats.kurtosis,
+    "min"  : np.min, 
+    "max"  : np.min
+}
+
 class _Refstats:
     LAYER_STATS = {"cov", "min", "max", "mean", "stdv", "var", "skew", "kurt"}
     COMPARE_STATS = {"ks"}
     ALL_STATS = LAYER_STATS | COMPARE_STATS
+
 
     def __call__(self, *args, **kwargs):
         conf, prms = config._init_group("refstats", *args, **kwargs)
@@ -44,43 +66,24 @@ class _Refstats:
         if len(compare_stats) > 0 and io.input_count != 2:
             raise ValueError("\"%s\" stats can only be computed using exactly two tracks" % "\", \"".join(cmp_stats))
             
-        for tracks in io.iter_refs():
-            for t in tracks:
-                print(len(t.layers), len(t.alignments))
-        
-        #dfs = list()
-        #labels = list()
+        #for coords,tracks in io.iter_refs():
+        #    for t in tracks:
+        #        grouped = t.layers["dtw"][prms.layers].groupby("mref")
+        #        desc = grouped.aggregate(scipy.stats.describe)
 
-        #if len(layer_stats) > 0:
-        #    for track in tracks:
-        #        df = self.describe(track, prms.layers, layer_stats)
-        #        if len(tracks) > 1:
-        #            df = df.add_prefix(os.path.basename(track.prms.path)+".")
-        #        dfs.append(df)
 
-        #for stat in compare_stats:
-        #    fn = getattr(self, stat)
-        #    df = fn(*tracks, prms.layers)
-        #    dfs.append(df)
+        layer_agg = [_AGG_FNS[s] for s in layer_stats]
 
-        #df = pd.concat(dfs, axis=1)
+        t = time.time()
+        for coords,tracks in io.iter_refs():
+            stats = dict()
+            for track in tracks:
+                layers = track.layers["dtw"][prms.layers]
+                stats[track.name] = layers.groupby(level="mref").agg(layer_agg)
+            stats = pd.concat(stats, axis=1, names=["track", "layer", "stat"])
+            sys.stdout.write(stats.to_csv(sep="\t",header=True))
 
-        #return df
-
-        #for stat in cmp_stats:
-        #    for layer in prms.layers:
-        #        df = fn(*tracks, layer)
-        #        #track_dfs.append(fn(self, *tracks, layers))
-
-    _DESC_FNS = {
-        "cov"  : lambda d: d.nobs,
-        "mean" : lambda d: d.mean, 
-        "stdv" : lambda d: np.power(d.variance,2), 
-        "var"  : lambda d: d.variance, 
-        "skew" : lambda d: d.skewness, 
-        "kurt" : lambda d: d.kurtosis,
-        "min"  : lambda d: d.minmax.min, 
-        "max"  : lambda d: d.minmax.max}
+        print("#",time.time()-t)
 
     @staticmethod
     def describe(track, layers, stats):
@@ -118,9 +121,10 @@ OPTS = (
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(_Refstats.ALL_STATS)),
     Opt("input", "track_io", nargs="+", type=str),
     Opt(("-R", "--ref-bounds"), "track_io", type=RefCoord),
+    Opt(("-C", "--ref-chunksize"), "track_io"),
 )
 
 def main(*args, **argv):
     """Summarize and compare DTW stats over reference coordinates"""
     df = refstats(*args, **argv)
-    print(df.to_csv(sep="\t"))
+    #print(df.to_csv(sep="\t"))

@@ -267,8 +267,8 @@ class TrackIO:
             end_layers = chunk[end]
             chunk = chunk[~end]
 
-            
             r = self.index.mref_to_ref_bound(mrefs[0], mrefs[-1], not self.conf.is_rna)
+            
             ref_coord = RefCoord(r.ref_name, r.start, r.end, r.fwd)
             coords = self.index.get_coord_space(ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)
 
@@ -283,7 +283,7 @@ class TrackIO:
                 track.set_data(coords, track_alns, track_layers)
                 self.compute_layers(track, self.prms.layers)
 
-            yield self.input_tracks
+            yield (coords, self.input_tracks)
 
 
     def iter_reads(self, ref_bounds=None, full_overlap=False):

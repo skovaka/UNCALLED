@@ -1,6 +1,5 @@
 #from . import dtw, convert
 from collections import namedtuple
-LayerMeta = namedtuple("LayerMeta", ["type", "label"])
 
 class RefCoord:
     def __init__(self, name=None, start=None, end=None, fwd=None):

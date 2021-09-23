@@ -17,7 +17,7 @@ from sklearn.decomposition import PCA
 
 import matplotlib.pyplot as plt
 
-from . import RefCoord, LayerMeta
+from . import RefCoord
 
 from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
@@ -29,6 +29,8 @@ CURRENT_LAYER    = "current"
 DWELL_LAYER      = "dwell"
 MODEL_DIFF_LAYER = "model_diff"
 DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
+
+LayerMeta = namedtuple("LayerMeta", ["type", "label"])
 
 LAYER_META = {
     "start"   : LayerMeta(int, "Sample Start"),
