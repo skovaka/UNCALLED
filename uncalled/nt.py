@@ -1,4 +1,5 @@
 from collections import Sequence
+import pandas as pd
 
 import numpy as np 
 
@@ -20,7 +21,7 @@ def kmer_array(kmer):
     #return arr
 
 def kmer_to_str(kmer, dtype=str):
-    if isinstance(kmer, (Sequence, KmerArray, np.ndarray)):
+    if isinstance(kmer, (Sequence, KmerArray, np.ndarray, pd.Series)):
         return _kmer_to_arr(kmer).astype(dtype)
     return dtype(_kmer_to_str(kmer))
 

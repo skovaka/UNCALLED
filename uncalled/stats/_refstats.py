@@ -7,7 +7,7 @@ import types
 import pandas as pd
 import scipy.stats
 
-from .. import config
+from .. import config, nt
 from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split
 from ..index import BWA_OPTS
@@ -43,10 +43,9 @@ _AGG_FNS = {
 }
 
 class _Refstats:
-    LAYER_STATS = {"cov", "min", "max", "mean", "stdv", "var", "skew", "kurt"}
+    LAYER_STATS = {"min", "max", "mean", "stdv", "var", "skew", "kurt"}
     COMPARE_STATS = {"ks"}
     ALL_STATS = LAYER_STATS | COMPARE_STATS
-
 
     def __call__(self, *args, **kwargs):
         conf, prms = config._init_group("refstats", *args, **kwargs)
@@ -74,14 +73,27 @@ class _Refstats:
 
         layer_agg = [_AGG_FNS[s] for s in layer_stats]
 
+        columns = ["mref", "kmer"]
+        for track in io.input_tracks:
+            name = track.name
+            columns.append(".".join([track.name, "cov"]))
+            for layer in prms.layers:
+                for stat in layer_stats:
+                    columns.append(".".join([track.name, layer, stat]))
+
+        print("\t".join(columns))
+
         t = time.time()
         for coords,tracks in io.iter_refs():
             stats = dict()
             for track in tracks:
-                layers = track.layers["dtw"][prms.layers]
-                stats[track.name] = layers.groupby(level="mref").agg(layer_agg)
+                groups = track.layers["dtw"][prms.layers].groupby(level="mref")
+                stats[track.name] = groups.agg(layer_agg)
+                stats[track.name].insert(0, "cov", groups.size())
+
             stats = pd.concat(stats, axis=1, names=["track", "layer", "stat"])
-            sys.stdout.write(stats.to_csv(sep="\t",header=True))
+            stats.insert(0, "kmer", nt.kmer_to_str(coords.kmers))
+            sys.stdout.write(stats.to_csv(sep="\t",header=False))
 
         print("#",time.time()-t)
 
