@@ -42,6 +42,7 @@ def str_to_coord(coord_str):
     spl = coord_str.split(":")         
     name = spl[0]                        
     st,en = map(int, spl[1].split("-"))
+    
                                        
     if len(spl) == 2:                  
         return RefCoord(name,st,en)
@@ -49,148 +50,150 @@ def str_to_coord(coord_str):
         fwd = spl[2] == "+"
         return RefCoord(name,st,en,fwd)
 
+class CoordSpace:
+    #def __init__(self, ref_name, refs, fwd=None, mrefs=None, index=None, is_rna=None, load_kmers=False):
+    def __init__(self, ref_name, refs, mrefs, fwd, kmers):
+        self.ref_name = ref_name
+        self.refs = refs
+        self.mrefs = mrefs
+        self.fwd = fwd
+        self.kmers = kmers
+
+        if self.stranded and not isinstance(mrefs, pd.Index):
+            raise ValueError("mrefs must be pd.Index if fwd is not None")
+        if not self.stranded and not isinstance(mrefs, tuple):
+            raise ValueError("mrefs must be tuple if fwd is None")
+
+    @property
+    def stranded(self):
+        return self.fwd is not None
+
+    def intersect(self, coords):
+        if self.ref_name != coords.ref_name:
+            raise ValueError("Cannot intersect CoordSpaces from different reference sequences")
+
+        ref_min = max(self.refs.min(), coords.refs.min())
+        ref_max = min(self.refs.max(), coords.refs.max())
+        ref_len = ref_max - ref_min + 1
+
+        st = self.refs.get_loc(ref_min)
+        en = st + ref_len
+
+        refs = self.refs[st:en]#self.refs.intersection(coords.refs)
+
+        if self.stranded:
+            mrefs = self.mrefs[st:en] #.intersection(coords.mrefs)
+        else:
+            mrefs = tuple( (m[st:en] for m in self.mrefs) )
+
+        return CoordSpace(self.ref_name, refs, mrefs=mrefs)
+
+    def ref_to_mref(self, ref, fwd=None):
+        if isinstance(ref, (collections.abc.Sequence, np.ndarray)):
+            i = self.refs.get_indexer(ref)
+        else:
+            i = self.refs.get_loc(ref)
+
+        if self.stranded:
+            if fwd is not None and fwd != self.fwd:
+                raise ValueError("Invalid 'fwd' value or stranded CoordSpace")
+            return self.mrefs[i]
+
+        # not stranded
+        if fwd is None:
+            return tuple( (mrefs[i] for mrefs in self.mrefs) )
+        return self.mrefs[fwd][i]
+
+    def is_mref_fwd(self, mref):
+        if isinstance(mref, (collections.abc.Sequence, np.ndarray)):
+            mref = mref[0]
+
+        if self.stranded:
+            return self.fwd and mref in self.mrefs
+        else:
+            return mref in self.mrefs[1]
+            
+    #TODO make single private method with fwd param. Also probably merge with above
+    def all_mrefs_fwd(self, mrefs):
+        return len(self.mrefs[True].intersection(mrefs)) == len(mrefs)
+            
+    def all_mrefs_rev(self, mrefs):
+        return len(self.mrefs[False].intersection(mrefs)) == len(mrefs)
+    
+    def mref_to_ref(self, mref):
+        if self.stranded:
+            mrefs = self.mrefs
+        else:
+            mrefs = self.mrefs[self.is_mref_fwd(mref)]
+
+        if isinstance(mref, (collections.abc.Sequence, np.ndarray)):
+            i = mrefs.get_indexer(mref)
+        else:
+            i = mrefs.get_loc(mref)
+
+        return self.refs[i]
+
+    #def validate_refs(self, refs):
+    #    return len(self.refs.intersection(refs)) == len(refs)
+
+    #def validate_mrefs(self, mrefs):
+    #    return all_mrefs_fwd(mrefs) or all_mrefs_rev(mrefs)
+
+    def __len__(self):
+        return len(self.refs)
+
+    def __repr__(self):
+        return ("%s:%d-%d " % (self.ref_name, self.refs.start, self.refs.stop)) + str(self.mrefs)
+
 class RefIndex(_RefIndex):
-    class CoordSpace:
-        def __init__(self, ref_name, refs, fwd=None, mrefs=None, index=None, is_rna=None, load_kmers=False):
-            self.ref_name = ref_name
 
-            self.refs = refs#pd.RangeIndex(ref_bounds.start, ref_bounds.end-nt.K+1)
-            self.fwd = fwd
+    def mrefs_to_kmers(self, mrefs, is_rna):
+        kmers = self.get_kmers(mrefs.min()-nt.K, mrefs.max(), is_rna)
+        if mrefs.step < 0:
+            kmers = kmers[::-1]
+        return pd.Series(index=mrefs, data=kmers)
 
-            if mrefs is None:
-                if self.fwd is None:
-                    self.mrefs = tuple( (self._init_mrefs(index, fwd, is_rna) for fwd in range(2)) )
-                else:
-                    self.mrefs = self._init_mrefs(index, self.fwd, is_rna)
-            else:
-                self.mrefs = mrefs
+    def ref_coord_to_mrefs(self, ref_coord, is_rna, flip_rev=True):
+        st,en = self.ref_to_mref(ref_coord.name, ref_coord.start, ref_coord.end, ref_coord.fwd, is_rna)
+        mrefs = pd.RangeIndex(st,en)
+        if flip_rev and self.is_mref_flipped(mrefs.start):
+            return mrefs[::-1]
+        return mrefs
 
-            if isinstance(self.mrefs, pd.Index):
-                self.stranded = True
-            elif isinstance(self.mrefs, tuple):
-                self.stranded = False
-            else:
-                raise ValueError("Coord space mref can only be initialized using pandas.RangeIndex or tuple of two RangeIndexes")
-
-            if load_kmers:
-                self.kmers = self.load_kmers(index)
-            else:
-                self.kmers = None
-            
-        def _init_mrefs(self, index, fwd, is_rna):
-            st,en = index.ref_to_mref(self.ref_name, self.refs.start, self.refs.stop, fwd, is_rna)
-            mrefs = pd.RangeIndex(st,en)
-            if index.is_mref_flipped(mrefs.start):
-                return mrefs[::-1]
-            return mrefs
-
-        def load_kmers(self, index):
-            if self.stranded:
-                return self._mrefs_to_kmers(index, self.mrefs, self.fwd)
-            return tuple( (self._mrefs_to_kmers(index, mrefs, fwd) 
-                            for fwd,mrefs in enumerate(self.mrefs)) )
-
-        def _mrefs_to_kmers(self, index, mrefs, fwd):
-            #TODO bcaln index probably getting messed up
-            #look closely at bcaln DF
-            kmers = index.get_kmers(mrefs.min()-nt.K, mrefs.max(), fwd)
-            if mrefs.step < 0:
-                kmers = kmers[::-1]
-            return pd.Series(index=mrefs, data=kmers)
-
-        def intersect(self, coords):
-            if self.ref_name != coords.ref_name:
-                raise ValueError("Cannot intersect CoordSpaces from different reference sequences")
-
-            ref_min = max(self.refs.min(), coords.refs.min())
-            ref_max = min(self.refs.max(), coords.refs.max())
-            ref_len = ref_max - ref_min + 1
-
-            st = self.refs.get_loc(ref_min)
-            en = st + ref_len
-
-            refs = self.refs[st:en]#self.refs.intersection(coords.refs)
-
-            if self.stranded:
-                mrefs = self.mrefs[st:en] #.intersection(coords.mrefs)
-            else:
-                mrefs = tuple( (m[st:en] for m in self.mrefs) )
-
-            return RefIndex.CoordSpace(self.ref_name, refs, mrefs=mrefs)
-
-        def ref_to_mref(self, ref, fwd=None):
-            if isinstance(ref, (collections.abc.Sequence, np.ndarray)):
-                i = self.refs.get_indexer(ref)
-            else:
-                i = self.refs.get_loc(ref)
-
-            if self.stranded:
-                if fwd is not None and fwd != self.fwd:
-                    raise ValueError("Invalid 'fwd' value or stranded CoordSpace")
-                return self.mrefs[i]
-
-            # not stranded
-            if fwd is None:
-                return tuple( (mrefs[i] for mrefs in self.mrefs) )
-            return self.mrefs[fwd][i]
-
-        def is_mref_fwd(self, mref):
-            if isinstance(mref, (collections.abc.Sequence, np.ndarray)):
-                mref = mref[0]
-
-            if self.stranded:
-                return self.fwd and mref in self.mrefs
-            else:
-                return mref in self.mrefs[1]
-                
-        #TODO make single private method with fwd param. Also probably merge with above
-        def all_mrefs_fwd(self, mrefs):
-            return len(self.mrefs[True].intersection(mrefs)) == len(mrefs)
-                
-        def all_mrefs_rev(self, mrefs):
-            return len(self.mrefs[False].intersection(mrefs)) == len(mrefs)
-        
-        def mref_to_ref(self, mref):
-            if self.stranded:
-                mrefs = self.mrefs
-            else:
-                mrefs = self.mrefs[self.is_mref_fwd(mref)]
-
-            if isinstance(mref, (collections.abc.Sequence, np.ndarray)):
-                i = mrefs.get_indexer(mref)
-            else:
-                i = mrefs.get_loc(mref)
-
-            return self.refs[i]
-
-        #def validate_refs(self, refs):
-        #    return len(self.refs.intersection(refs)) == len(refs)
-
-        #def validate_mrefs(self, mrefs):
-        #    return all_mrefs_fwd(mrefs) or all_mrefs_rev(mrefs)
-
-        def __len__(self):
-            return len(self.refs)
-
-        def __repr__(self):
-            return ("%s:%d-%d " % (self.ref_name, self.refs.start, self.refs.stop)) + str(self.mrefs)
-            #return "%s:%d-%d (fwd %d-%d, rev %d-%d)" % (
-            #    self.ref_name, self.refs.start, self.refs.stop,
-            #    self.mrefs[True].start, self.mrefs[True].stop,
-            #    self.mrefs[False].start, self.mrefs[False].stop,
-            #)
-
-    def get_coord_space(self, ref_bounds, is_rna, kmer_shift=nt.K-1, load_kmers=True):
-        rid = self.get_ref_id(ref_bounds.name)
+    #TODO get of -nt.K+1?
+    def get_coord_space(self, ref_coord, is_rna, kmer_shift=nt.K-1, load_kmers=True):
+        rid = self.get_ref_id(ref_coord.name)
         length = self.get_ref_len(rid)
-        if ref_bounds.start < 0 or ref_bounds.end > length:
-            raise ValueError("Reference coordinates %s out of bounds for sequence of length %d" % (ref_bounds, length))
+        if ref_coord.start < 0 or ref_coord.end > length:
+            raise ValueError("Reference coordinates %s out of bounds for sequence of length %d" % (ref_coord, length))
 
-        #TODO get of -nt.K+1
-        refs = pd.RangeIndex(ref_bounds.start, ref_bounds.end-kmer_shift)
-        fwd = ref_bounds.fwd if ref_bounds.stranded else None
-            
-        return self.CoordSpace(ref_bounds.name, refs, fwd=fwd, index=self, is_rna=is_rna, load_kmers=load_kmers)
+        ref_coord = RefCoord(ref_coord)
+        ref_coord.end -= kmer_shift
+
+        refs = pd.RangeIndex(ref_coord.start, ref_coord.end)#-kmer_shift)
+
+        if ref_coord.stranded:
+            mrefs = self.ref_coord_to_mrefs(ref_coord, is_rna)
+        else:
+            mrefs = tuple((
+                self.ref_coord_to_mrefs(RefCoord(ref_coord, fwd), is_rna)
+                for fwd in range(2)
+            ))
+
+        if load_kmers:
+            if ref_coord.stranded:
+                kmers = self.mrefs_to_kmers(mrefs, is_rna)
+            else:
+                kmers = tuple(( 
+                    self.mrefs_to_kmers(m, is_rna) for m in mrefs
+                ))
+        else:
+            kmers = None
+
+        fwd = ref_coord.fwd if ref_coord.stranded else None 
+
+
+        return CoordSpace(ref_coord.name, refs, mrefs, fwd, kmers)
 
 _index_cache = dict()
 

@@ -173,7 +173,7 @@ class TrackIO:
         samp_start = layers["sample"].min()
         samp_end = layers["sample"].max()
 
-        ref_bounds = self.index.mref_to_ref_bound(mref_start, mref_end, not self.conf.is_rna)
+        ref_bounds = self.index.mrefs_to_ref_coord(mref_start, mref_end, not self.conf.is_rna)
 
         track.alignments = pd.DataFrame({
                 "id" : [aln_id],
@@ -192,7 +192,7 @@ class TrackIO:
         track.layers = None
         track.add_layer_group(group_name, layers)
 
-        track.coords = self.index.get_coord_space(track.aln_ref_coord(aln_id), self.conf.is_rna, kmer_shift=0)
+        track.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna, kmer_shift=0)
 
         return track #aln_id
 
@@ -267,7 +267,7 @@ class TrackIO:
             end_layers = chunk[end]
             chunk = chunk[~end]
 
-            r = self.index.mref_to_ref_bound(mrefs[0], mrefs[-1], not self.conf.is_rna)
+            r = self.index.mrefs_to_ref_coord(mrefs[0], mrefs[-1], not self.conf.is_rna)
             
             ref_coord = RefCoord(r.ref_name, r.start, r.end, r.fwd)
             coords = self.index.get_coord_space(ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)

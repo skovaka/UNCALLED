@@ -68,23 +68,6 @@ class AlnTrack:
         if len(self.conf.fast5_reader.read_filter) > 0:
             self.read_ids = self.read_ids & set(self.conf.fast5_reader.read_filter)
 
-    #TODO move to RefIndex python wrapper? 
-    #def _ref_coords_to_mrefs(self, ref_coords, fwd=None):
-    #    if fwd is None:
-    #        fwd = ref_coords.fwd
-    #    start, end = self.index.ref_to_mref(
-    #        ref_coords.name, ref_coords.start, ref_coords.end-nt.K+1, fwd, self.conf.is_rna)
-    #    return pd.RangeIndex(start, end).rename("mref")
-
-    #def set_ref_bounds(self, ref_bounds):
-    #    if ref_bounds == None:
-    #        return
-
-    #    self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
-
-    #    self.width = len(self.coords)
-    #    self.height = None
-
     def _group_layers(self, group, layers):
         return pd.concat({group : layers}, names=["group", "layer"], axis=1)
         
@@ -117,15 +100,6 @@ class AlnTrack:
                 return self.alignments.index[0]
             raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
         return aln_id
-
-
-
-    def load_read(self, read_id=None, load_kmers=True):
-        self.alignments = self.db.query_alignments(self.id, read_id, coords=self.coords, full_overlap=self.prms.full_overlap)
-        
-        dtw = self.db.query_layers("dtw", self.coords, str(self.alignments.index[0])).droplevel(1)
-        dtw["kmer"] = self.load_aln_kmers()
-        self.layers = self._group_layers("dtw",dtw)
 
 
     def set_layers(self, layers):
@@ -163,10 +137,6 @@ class AlnTrack:
         if self.coords.stranded:
             return self.coords.kmers[self.layers.index.get_level_values(0)]
         return self.coords.kmers[True][self.layers.index.get_level_values(0)]
-
-    def add_layer(self, name, mat):
-        self.mat = np.ma.concatenate([self.mat, [mat]])
-        self.set_layers(self.prms.layers + [name])
 
     def get_pileup(self, layer):
         return np.flip(np.sort(self[layer], axis=0), axis=0)

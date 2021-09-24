@@ -77,6 +77,9 @@ class RefCoord {
     RefCoord(std::string _name, i64 _start, i64 _end, bool fwd) :
         RefCoord(_name,_start,_end, fwd ? Strand::fwd : Strand::rev) {}
 
+    RefCoord(const RefCoord &rc, bool fwd) :
+        RefCoord(rc.name,rc.start,rc.end, fwd ? Strand::fwd : Strand::rev) {}
+
     RefCoord() : RefCoord("",-1,-1) {};
 
     bool fwd() const {
@@ -102,6 +105,8 @@ class RefCoord {
 
         c.def(py::init<std::string, i64, i64>());
         c.def(py::init<std::string, i64, i64, bool>());
+        c.def(py::init<const RefCoord &, bool>());
+        c.def(py::init<const RefCoord &>());
 
         c.def("__repr__", 
             [](RefCoord &c) -> std::string {
@@ -330,35 +335,24 @@ class RefIndex {
     }
 
 
-    //RefLoc mref_to_ref_bound(i64 sa_start, i64 sa_end, bool read_fwd) const {
-    RefCoord mref_to_ref_bound(i64 sa_start, i64 sa_end, bool read_fwd) const {
+    RefCoord mrefs_to_ref_coord(i64 mref_start, i64 mref_end, bool read_fwd) const {
 
-        bool flip = sa_start >= static_cast<i32>(size() / 2);
+        bool flip = mref_start >= static_cast<i32>(size() / 2);
 
         i64 pac_st; //TODO rename
-        if (flip) pac_st = size() - sa_end;// + 1;
-        else pac_st = sa_start;
+        if (flip) pac_st = size() - mref_end;// + 1;
+        else pac_st = mref_start;
 
         i32 rid = bns_pos2rid(bns_, pac_st);
         if (rid < 0) return RefCoord();
         //assert(rid >= 0);
 
-        //RefLoc ret {
-        //    ref_id   : rid,
-        //    ref_name : std::string(bns_->anns[rid].name),
-        //    ref_len  : bns_->anns[rid].len,
-        //    start    : pac_st - bns_->anns[rid].offset,
-        //    end      : ret.start + (sa_end-sa_start),
-        //    fwd      : (!flip && read_fwd) || (flip && !read_fwd)
-        //};
-
         auto name = std::string(bns_->anns[rid].name);
         auto start = pac_st - bns_->anns[rid].offset;
-        auto end = start + (sa_end-sa_start);
+        auto end = start + (mref_end-mref_start);
         auto strand = flip != read_fwd ? Strand::fwd : Strand::rev;
 
         return RefCoord(name,start,end,strand,rid,bns_->anns[rid].len);
-
     }
 
     std::vector< std::pair<std::string, i64> > get_seqs() const {
@@ -628,7 +622,7 @@ class RefIndex {
         PY_BWA_INDEX_METH(fm_to_pac);
         PY_BWA_INDEX_METH(fm_to_mref);
         PY_BWA_INDEX_METH(size);
-        PY_BWA_INDEX_METH(mref_to_ref_bound);
+        PY_BWA_INDEX_METH(mrefs_to_ref_coord);
         PY_BWA_INDEX_METH(get_seqs);
         PY_BWA_INDEX_METH(pacseq_loaded);
         PY_BWA_INDEX_METH(get_sa_loc);

@@ -8,7 +8,7 @@ from collections import defaultdict
 from ..pafstats import parse_paf
 from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt 
-from ..index import BWA_OPTS
+from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..sigproc import ProcRead
 from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
@@ -42,7 +42,7 @@ OPTS = (Opt("index_prefix", "track_io"),) + FAST5_OPTS + (
     Opt(("-o", "--out-path"), "dtw"),
     Opt(("-f", "--overwrite"), "track_io", action="store_true", help="Will overwrite alignment track if one already exists"),
     Opt("--rna", fn="set_r94_rna"),
-    Opt(("-R", "--ref-bounds"), "track_io"),
+    Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
     Opt("--method", "dtw", choices=METHODS.keys()),
     Opt(("-b", "--band-width"), "dtw"),
     Opt(("-s", "--band-shift"), "dtw"),
@@ -105,7 +105,7 @@ class GuidedDTW:
 
         #self.ref_kmers = self.track.load_aln_kmers().sort_index()
         #print(self.ref_kmers)
-        self.ref_kmers = self.track.coords.load_kmers(track_io.index).sort_index()
+        self.ref_kmers = self.track.coords.kmers.sort_index()
 
         self.read = read
 
