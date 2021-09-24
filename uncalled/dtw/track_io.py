@@ -8,7 +8,7 @@ import collections
 import time
 
 from .track import AlnTrack, DEFAULT_LAYERS
-from ..index import load_index, RefCoord
+from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
 from .. import config
@@ -57,7 +57,8 @@ class TrackIO:
 
     def _set_ref_bounds(self, ref_bounds):
         if ref_bounds is not None:
-            print("INIT", ref_bounds, ref_bounds.stranded)
+            if isinstance(ref_bounds, str):
+                ref_bounds = str_to_coord(ref_bounds)
             self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
         else:
             self.coords = None
@@ -285,8 +286,24 @@ class TrackIO:
 
             yield (coords, self.input_tracks)
 
+    def load_read(self, read_id, ref_bounds=None):
+        if ref_bounds is not None:
+            self._set_ref_bounds(ref_bounds)
+        else:
+            self.coords = None
+        
+        dbfile0,db0 = list(self.dbs.items())[0]
 
-    def iter_reads(self, ref_bounds=None, full_overlap=False):
+        alns = db0.query_alignments(
+            self.input_track_ids,
+            read_id=read_id,
+            coords=self.coords)
+
+        self._fill_tracks(db0, alns)
+
+        return self.input_tracks
+
+    def iter_reads(self, ref_bounds=None, full_overlap=False, max_reads=None):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
         
@@ -299,6 +316,8 @@ class TrackIO:
             order=["read_id"],
             chunksize=self.prms.aln_chunksize)
 
+        n = 0
+
         end_alns = None
         for chunk in aln_iter:
             if end_alns is not None:
@@ -310,6 +329,9 @@ class TrackIO:
 
             for read_id, alns in chunk.groupby("read_id"):
                 self._fill_tracks(db0, alns)
+                n += 1
+                if max_reads is not None and n >= max_reads:
+                    return (read_id, self.input_tracks)
                 yield (read_id, self.input_tracks)
 
     def _fill_tracks(self, db, alns):
@@ -321,15 +343,12 @@ class TrackIO:
             layers[group] = db.query_layers("dtw", self.coords, ids)
         layers = pd.concat(layers, names=["group", "layer"], axis=1)
 
-        #layers = db.query_layers("dtw", self.coords, ids)
-
         for track in self.input_tracks:
             track_alns = alns[alns["track_id"] == track.id]
 
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)
             track_layers = layers.iloc[i]
 
-            #TODO deal with multimappers
             ref_coord = RefCoord(*track_alns[["ref_name","ref_start","ref_end","fwd"]].iloc[0])
             track_coords = self.index.get_coord_space(
                 ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)

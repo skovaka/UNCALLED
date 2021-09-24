@@ -89,7 +89,7 @@ class CoordSpace:
         return CoordSpace(self.ref_name, refs, mrefs=mrefs)
 
     def ref_to_mref(self, ref, fwd=None):
-        if isinstance(ref, (collections.abc.Sequence, np.ndarray)):
+        if isinstance(ref, (collections.abc.Sequence, np.ndarray, pd.Index)):
             i = self.refs.get_indexer(ref)
         else:
             i = self.refs.get_loc(ref)
@@ -126,7 +126,7 @@ class CoordSpace:
         else:
             mrefs = self.mrefs[self.is_mref_fwd(mref)]
 
-        if isinstance(mref, (collections.abc.Sequence, np.ndarray)):
+        if isinstance(mref, (collections.abc.Sequence, np.ndarray, pd.Index)):
             i = mrefs.get_indexer(mref)
         else:
             i = mrefs.get_loc(mref)
@@ -151,7 +151,7 @@ class RefIndex(_RefIndex):
         kmers = self.get_kmers(mrefs.min()-nt.K, mrefs.max(), is_rna)
         if mrefs.step < 0:
             kmers = kmers[::-1]
-        return pd.Series(index=mrefs, data=kmers)
+        return pd.Series(index=mrefs, data=kmers, name="kmer")
 
     def ref_coord_to_mrefs(self, ref_coord, is_rna, flip_rev=True):
         st,en = self.ref_to_mref(ref_coord.name, ref_coord.start, ref_coord.end, ref_coord.fwd, is_rna)
