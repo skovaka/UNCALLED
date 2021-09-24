@@ -8,11 +8,10 @@ import pandas as pd
 from ont_fast5_api.fast5_interface import get_fast5_file
 import scipy.stats
 
-from . import RefCoord
 from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt
 from ..fast5 import Fast5Reader, FAST5_OPTS
-from ..index import BWA_OPTS
+from ..index import BWA_OPTS, str_to_coord, RefCoord
 from .. import nt, PoreModel
 
 import progressbar as progbar
@@ -20,7 +19,7 @@ import progressbar as progbar
 CONVERT_OPTS = (Opt("index_prefix", "track_io"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt("--rna", fn="set_r94_rna"),
-    Opt(("-R", "--ref-bounds"), "track_io", type=RefCoord),
+    Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
     Opt(("-f", "--overwrite"), "track_io", action="store_true"),
     Opt(("-o", "--output"), "track_io", required=True),
 )

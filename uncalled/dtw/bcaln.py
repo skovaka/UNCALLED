@@ -17,7 +17,7 @@ from ..pafstats import parse_paf, PafEntry
 from ..config import Config
 from ..argparse import Opt
 from .. import nt, PoreModel
-from . import RefCoord
+from ..index import RefCoord
 
 class Bcaln:
     BCE_K = 4

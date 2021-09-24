@@ -21,10 +21,10 @@ from .. import config, nt
 #from ..config import Config, ParamGroup, Opt
 from ..sigproc import ProcRead
 
-from ..index import BWA_OPTS
+from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader
 from .dotplot import Dotplot
-from ..dtw.track import AlnTrack, ref_coords, LAYER_META
+from ..dtw.track import AlnTrack, LAYER_META
 from ..dtw.track_io import TrackIO
 
 CMAP = "viridis"
@@ -45,7 +45,7 @@ BrowserParams._def_params(
 
 from ..argparse import Opt, comma_split
 OPTS = (
-    Opt("ref_bounds", "track_io", type=ref_coords),
+    Opt("ref_bounds", "track_io", type=str_to_coord),
     Opt("input", "track_io", nargs="+"),
     #Opt("track_a", "browser", type=str),
     #Opt("track_b", "browser", type=str, nargs="?"),

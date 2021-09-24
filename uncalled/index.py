@@ -33,10 +33,21 @@ import collections.abc
 
 import pandas as pd
 
-from _uncalled import _RefIndex
+from _uncalled import _RefIndex, RefCoord
 from .argparse import Opt
 from .config import ParamGroup
 from . import nt
+
+def str_to_coord(coord_str):
+    spl = coord_str.split(":")         
+    name = spl[0]                        
+    st,en = map(int, spl[1].split("-"))
+                                       
+    if len(spl) == 2:                  
+        return RefCoord(name,st,en)
+    else:                              
+        fwd = spl[2] == "+"
+        return RefCoord(name,st,en,fwd)
 
 class RefIndex(_RefIndex):
     class CoordSpace:
@@ -177,7 +188,9 @@ class RefIndex(_RefIndex):
 
         #TODO get of -nt.K+1
         refs = pd.RangeIndex(ref_bounds.start, ref_bounds.end-kmer_shift)
-        return self.CoordSpace(ref_bounds.name, refs, fwd=ref_bounds.fwd, index=self, is_rna=is_rna, load_kmers=load_kmers)
+        fwd = ref_bounds.fwd if ref_bounds.stranded else None
+            
+        return self.CoordSpace(ref_bounds.name, refs, fwd=fwd, index=self, is_rna=is_rna, load_kmers=load_kmers)
 
 _index_cache = dict()
 

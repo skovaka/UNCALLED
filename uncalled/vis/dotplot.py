@@ -15,8 +15,9 @@ from .. import nt, config
 from ..sigproc import ProcRead
 from ..fast5 import Fast5Reader, parse_read_ids
 from ..pafstats import parse_paf
-from ..dtw.track import AlnTrack, RefCoord
+from ..dtw.track import AlnTrack
 from ..dtw.track_io import TrackIO
+from ..index import str_to_coord
 
 from _uncalled import _RefIndex
 
@@ -50,7 +51,7 @@ OPTS = [
     Opt("input", "track_io", nargs="+"),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
-    Opt(("-R", "--ref-bounds"), "track_io", type=RefCoord),
+    Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", type=comma_split),
     Opt(("-C", "--max-chunks"), "read_buffer"),

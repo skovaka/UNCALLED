@@ -7,9 +7,8 @@ import pandas as pd
 import collections
 import time
 
-from . import RefCoord
 from .track import AlnTrack, DEFAULT_LAYERS
-from ..index import load_index
+from ..index import load_index, RefCoord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
 from .. import config
@@ -58,6 +57,7 @@ class TrackIO:
 
     def _set_ref_bounds(self, ref_bounds):
         if ref_bounds is not None:
+            print("INIT", ref_bounds, ref_bounds.stranded)
             self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
         else:
             self.coords = None
@@ -179,7 +179,7 @@ class TrackIO:
                 "id" : [aln_id],
                 "track_id" : [track.id],
                 "read_id" : [read_id],
-                "ref_name" : [ref_bounds.ref_name],
+                "ref_name" : [ref_bounds.name],
                 "ref_start" : [ref_bounds.start],
                 "ref_end" : [ref_bounds.end],
                 "fwd" :     [ref_bounds.fwd],

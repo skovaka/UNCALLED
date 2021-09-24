@@ -98,22 +98,37 @@ class RefCoord {
     #ifdef PYBIND
 
     static void pybind_defs(pybind11::module_ m) {
-        py::class_<RefCoord> c(m, "_RefCoord");
+        py::class_<RefCoord> c(m, "RefCoord");
 
         c.def(py::init<std::string, i64, i64>());
         c.def(py::init<std::string, i64, i64, bool>());
+
+        c.def("__repr__", 
+            [](RefCoord &c) -> std::string {
+                if (c.start < 0) {
+                    return c.name;
+                }
+                auto s = c.name + ":" + 
+                         std::to_string(c.start) + "-" +
+                         std::to_string(c.end);
+                if (c.stranded()) {
+                    return s + ":" + std::string(1, static_cast<char>(c.strand));
+                }
+                return s;
+        });
+
 
         c.def_readwrite("name", &RefCoord::name);
         c.def_readwrite("start", &RefCoord::start);
         c.def_readwrite("end", &RefCoord::end);
         c.def_property("fwd", &RefCoord::fwd, 
-        [](RefCoord &c, bool fwd) -> bool {
-            if (fwd) {
-                c.strand = Strand::fwd;
-                return true;
-            }
-            c.strand = Strand::rev;
-            return false;
+            [](RefCoord &c, bool fwd) -> bool {
+                if (fwd) {
+                    c.strand = Strand::fwd;
+                    return true;
+                }
+                c.strand = Strand::rev;
+                return false;
         });
         c.def_property_readonly("rev", &RefCoord::rev);
         c.def_property_readonly("stranded", &RefCoord::stranded);

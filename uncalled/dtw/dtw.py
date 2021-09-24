@@ -16,7 +16,7 @@ from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 from _uncalled._nt import KmerArray
 
 from .. import PoreModel
-from . import Bcaln, RefCoord, TrackIO
+from . import Bcaln, TrackIO
 
 #TODO make this better
 METHODS = {

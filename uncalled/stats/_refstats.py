@@ -10,9 +10,9 @@ import scipy.stats
 from .. import config, nt
 from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split
-from ..index import BWA_OPTS
+from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader
-from ..dtw import TrackIO, LAYER_META, RefCoord
+from ..dtw import TrackIO, LAYER_META
 
 class RefstatsParams(config.ParamGroup):
     _name = "refstats"
@@ -132,7 +132,7 @@ OPTS = (
     Opt("stats", "refstats", type=comma_split,
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(_Refstats.ALL_STATS)),
     Opt("input", "track_io", nargs="+", type=str),
-    Opt(("-R", "--ref-bounds"), "track_io", type=RefCoord),
+    Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
     Opt(("-C", "--ref-chunksize"), "track_io"),
 )
 
