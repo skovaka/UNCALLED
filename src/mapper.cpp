@@ -752,7 +752,7 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
             ref_id  : loc.ref_id, 
             start   : static_cast<i64>(loc.start), 
             end     : static_cast<i64>(loc.end), 
-            fwd     : loc.fwd,
+            fwd     : loc.fwd(),
             event   : event_i_-path_ended, 
             path    : path.id_, 
             cluster : clust.id_
@@ -792,7 +792,7 @@ void Mapper::set_ref_loc(const SeedCluster &seeds) {
 
     out_.set_read_len(rd_len);
     //TODO clean this up
-    out_.set_mapped(rd_st, rd_en, loc.ref_name, loc.start, loc.end, loc.ref_len, loc.fwd, match_count);
+    out_.set_mapped(rd_st, rd_en, loc.name, loc.start, loc.end, loc.ref_len, loc.fwd(), match_count);
 }
 
 std::vector<bool> Mapper::unpack_moves(u64 moves, u8 length) {

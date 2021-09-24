@@ -55,6 +55,73 @@ struct RefLoc {
     bool fwd;
 };
 
+enum class Strand {fwd='+', rev='-', na='*'};
+
+class RefCoord {
+    public:
+    std::string name;
+    i64 start, end, ref_len;
+    Strand strand;
+    i32 ref_id;
+    //bool fwd;
+    
+    RefCoord(std::string _name, i64 _start, i64 _end, Strand _strand=Strand::na, 
+              i32 _ref_id=-1, i64 _ref_len=-1) :
+        name(_name),
+        start(_start),
+        end(_end),
+        ref_len(_ref_len),
+        strand(_strand),
+        ref_id(_ref_id) {}
+
+    RefCoord(std::string _name, i64 _start, i64 _end, bool fwd) :
+        RefCoord(_name,_start,_end, fwd ? Strand::fwd : Strand::rev) {}
+
+    RefCoord() : RefCoord("",-1,-1) {};
+
+    bool fwd() const {
+        return strand == Strand::fwd;
+    }
+
+    bool rev() const {
+        return strand == Strand::rev;
+    }
+
+    bool stranded() const {
+        return strand != Strand::na;
+    }
+
+    i64 length() const {
+        return end-start;
+    }
+
+    #ifdef PYBIND
+
+    static void pybind_defs(pybind11::module_ m) {
+        py::class_<RefCoord> c(m, "_RefCoord");
+
+        c.def(py::init<std::string, i64, i64>());
+        c.def(py::init<std::string, i64, i64, bool>());
+
+        c.def_readwrite("name", &RefCoord::name);
+        c.def_readwrite("start", &RefCoord::start);
+        c.def_readwrite("end", &RefCoord::end);
+        c.def_property("fwd", &RefCoord::fwd, 
+        [](RefCoord &c, bool fwd) -> bool {
+            if (fwd) {
+                c.strand = Strand::fwd;
+                return true;
+            }
+            c.strand = Strand::rev;
+            return false;
+        });
+        c.def_property_readonly("rev", &RefCoord::rev);
+        c.def_property_readonly("stranded", &RefCoord::stranded);
+    }
+
+    #endif
+};
+
 //struct Coords {
 //    i64 start, end;
 //
@@ -248,8 +315,8 @@ class RefIndex {
     }
 
 
-    //auto ref_loc = fmi.translate_loc(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
-    RefLoc mref_to_ref_bound(i64 sa_start, i64 sa_end, bool read_fwd) const {
+    //RefLoc mref_to_ref_bound(i64 sa_start, i64 sa_end, bool read_fwd) const {
+    RefCoord mref_to_ref_bound(i64 sa_start, i64 sa_end, bool read_fwd) const {
 
         bool flip = sa_start >= static_cast<i32>(size() / 2);
 
@@ -258,19 +325,25 @@ class RefIndex {
         else pac_st = sa_start;
 
         i32 rid = bns_pos2rid(bns_, pac_st);
-        if (rid < 0) return {};
+        if (rid < 0) return RefCoord();
         //assert(rid >= 0);
 
-        RefLoc ret {
-            ref_id   : rid,
-            ref_name : std::string(bns_->anns[rid].name),
-            ref_len  : bns_->anns[rid].len,
-            start    : pac_st - bns_->anns[rid].offset,
-            end      : ret.start + (sa_end-sa_start),
-            fwd      : (!flip && read_fwd) || (flip && !read_fwd)
-        };
+        //RefLoc ret {
+        //    ref_id   : rid,
+        //    ref_name : std::string(bns_->anns[rid].name),
+        //    ref_len  : bns_->anns[rid].len,
+        //    start    : pac_st - bns_->anns[rid].offset,
+        //    end      : ret.start + (sa_end-sa_start),
+        //    fwd      : (!flip && read_fwd) || (flip && !read_fwd)
+        //};
 
-        return ret;
+        auto name = std::string(bns_->anns[rid].name);
+        auto start = pac_st - bns_->anns[rid].offset;
+        auto end = start + (sa_end-sa_start);
+        auto strand = flip != read_fwd ? Strand::fwd : Strand::rev;
+
+        return RefCoord(name,start,end,strand,rid,bns_->anns[rid].len);
+
     }
 
     std::vector< std::pair<std::string, i64> > get_seqs() const {
