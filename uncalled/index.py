@@ -51,7 +51,6 @@ def str_to_coord(coord_str):
         return RefCoord(name,st,en,fwd)
 
 class CoordSpace:
-    #def __init__(self, ref_name, refs, fwd=None, mrefs=None, index=None, is_rna=None, load_kmers=False):
     def __init__(self, ref_name, refs, mrefs, fwd, kmers):
         self.ref_name = ref_name
         self.refs = refs
@@ -60,33 +59,61 @@ class CoordSpace:
         self.kmers = kmers
 
         if self.stranded and not isinstance(mrefs, pd.Index):
-            raise ValueError("mrefs must be pd.Index if fwd is not None")
+            raise ValueError("mrefs must be pandas.Index for stranded CoordSpace")
         if not self.stranded and not isinstance(mrefs, tuple):
-            raise ValueError("mrefs must be tuple if fwd is None")
+            raise ValueError("mrefs must be tuple for stranded CoordSpace")
 
     @property
     def stranded(self):
         return self.fwd is not None
 
-    def intersect(self, coords):
-        if self.ref_name != coords.ref_name:
-            raise ValueError("Cannot intersect CoordSpaces from different reference sequences")
+    def _minmax_intersect(self, a, b):
+        insc = a.intersection(b)
+        return insc.min(),insc.max()
 
-        ref_min = max(self.refs.min(), coords.refs.min())
-        ref_max = min(self.refs.max(), coords.refs.max())
-        ref_len = ref_max - ref_min + 1
+    def mref_intersect(self, mrefs, stranded_out=True):
+        if self.stranded:
+            fwd_in = self.fwd
+            minmax = self._minmax_intersect(self.mrefs, mrefs)
+            if np.any(np.isnan(minmax)):
+                return None
+            bounds = self.mrefs.get_indexer(minmax)
+        else:
+            fwd_in = None
+            for i in range(2):
+                minmax = self._minmax_intersect(self.mrefs[i], mrefs)
+                if not np.any(np.isnan(minmax)):
+                    fwd_in = i
+                    break
+            if fwd_in is None:
+                return None
+            bounds = self.mrefs[fwd_in].get_indexer(minmax)
 
-        st = self.refs.get_loc(ref_min)
-        en = st + ref_len
+        st,en = sorted(bounds)
+        en += 1
 
-        refs = self.refs[st:en]#self.refs.intersection(coords.refs)
+        refs = self.refs[st:en]
+
+        kmers = None
 
         if self.stranded:
-            mrefs = self.mrefs[st:en] #.intersection(coords.mrefs)
-        else:
-            mrefs = tuple( (m[st:en] for m in self.mrefs) )
+            fwd = self.fwd
+            mrefs = self.mrefs[st:en]
+            if self.kmers is not None:
+                kmers = self.kmers[st:en]
 
-        return CoordSpace(self.ref_name, refs, mrefs=mrefs)
+        elif stranded_out:
+            fwd = fwd_in
+            mrefs = self.mrefs[fwd][st:en]
+            if self.kmers is not None:
+                kmers = self.kmers[fwd][st:en]
+
+        else:
+            fwd = None
+            mrefs = tuple( (m[st:en] for m in self.mrefs) )
+            kmers = tuple( (k[st:en] for k in self.kmers) )
+
+        return CoordSpace(self.ref_name, refs, mrefs, fwd, kmers)
 
     def ref_to_mref(self, ref, fwd=None):
         if isinstance(ref, (collections.abc.Sequence, np.ndarray, pd.Index)):
@@ -105,7 +132,7 @@ class CoordSpace:
         return self.mrefs[fwd][i]
 
     def is_mref_fwd(self, mref):
-        if isinstance(mref, (collections.abc.Sequence, np.ndarray)):
+        if isinstance(mref, (collections.abc.Sequence, np.ndarray, pd.Index)):
             mref = mref[0]
 
         if self.stranded:
@@ -114,11 +141,11 @@ class CoordSpace:
             return mref in self.mrefs[1]
             
     #TODO make single private method with fwd param. Also probably merge with above
-    def all_mrefs_fwd(self, mrefs):
-        return len(self.mrefs[True].intersection(mrefs)) == len(mrefs)
+    def any_mrefs_fwd(self, mrefs):
+        return len(self.mrefs[True].intersection(mrefs)) > 0
             
-    def all_mrefs_rev(self, mrefs):
-        return len(self.mrefs[False].intersection(mrefs)) == len(mrefs)
+    def any_mrefs_rev(self, mrefs):
+        return len(self.mrefs[False].intersection(mrefs)) > 0
     
     def mref_to_ref(self, mref):
         if self.stranded:
@@ -160,8 +187,11 @@ class RefIndex(_RefIndex):
             return mrefs[::-1]
         return mrefs
 
+    #def full_coord_space(self, rid):
+
     #TODO get of -nt.K+1?
     def get_coord_space(self, ref_coord, is_rna, kmer_shift=nt.K-1, load_kmers=True):
+
         rid = self.get_ref_id(ref_coord.name)
         length = self.get_ref_len(rid)
         if ref_coord.start < 0 or ref_coord.end > length:

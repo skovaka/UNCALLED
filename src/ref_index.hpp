@@ -126,6 +126,7 @@ class RefCoord {
         c.def_readwrite("name", &RefCoord::name);
         c.def_readwrite("start", &RefCoord::start);
         c.def_readwrite("end", &RefCoord::end);
+        c.def_readwrite("ref_len", &RefCoord::ref_len);
         c.def_property("fwd", &RefCoord::fwd, 
             [](RefCoord &c, bool fwd) -> bool {
                 if (fwd) {
@@ -340,7 +341,7 @@ class RefIndex {
         bool flip = mref_start >= static_cast<i32>(size() / 2);
 
         i64 pac_st; //TODO rename
-        if (flip) pac_st = size() - mref_end;// + 1;
+        if (flip) pac_st = size() - mref_end + 1;
         else pac_st = mref_start;
 
         i32 rid = bns_pos2rid(bns_, pac_st);

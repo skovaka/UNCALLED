@@ -87,16 +87,21 @@ class Bcaln:
 
         if self.clip_coords is not None:
             mrefs = df.index.intersection(self.clip_coords.mrefs[self.is_fwd])
-            #self.corods.index.get_coord_space(mrefs=mrefs
+
+            self.coords = self.clip_coords.mref_intersect(mrefs=df.index)
+
             #mrefs = df.index.intersect(self.clip_coords.mrefs[self.is_fwd])
             df = df.reindex(index=mrefs, copy=False)
+        else:
+            self.coords = self.paf_coords
+            #print(df.index)
 
         self.df = df
 
 
     @property
     def empty(self):
-        return not hasattr(self, "df") or len(self.df) <= 1
+        return not hasattr(self, "df") or len(self.df) <= 2
 
     def parse_cs(self, paf):
         cs = paf.tags.get('cs', (None,)*2)[0]

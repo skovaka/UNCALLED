@@ -146,7 +146,7 @@ class TrackIO:
             self.fast5s = Fast5Reader(index=fast5_index, conf=self.conf)
         return self.fast5s
 
-    def init_alignment(self, read_id, fast5, group_name, layers, track_name=None):
+    def init_alignment(self, read_id, fast5, coords, group_name, layers, track_name=None):
         if track_name is None:
             if len(self.output_tracks) == 1:
                 track_name, = self.output_tracks
@@ -174,16 +174,14 @@ class TrackIO:
         samp_start = layers["sample"].min()
         samp_end = layers["sample"].max()
 
-        ref_bounds = self.index.mrefs_to_ref_coord(mref_start, mref_end, not self.conf.is_rna)
-
         track.alignments = pd.DataFrame({
                 "id" : [aln_id],
                 "track_id" : [track.id],
                 "read_id" : [read_id],
-                "ref_name" : [ref_bounds.name],
-                "ref_start" : [ref_bounds.start],
-                "ref_end" : [ref_bounds.end],
-                "fwd" :     [ref_bounds.fwd],
+                "ref_name" : [coords.ref_name],
+                "ref_start" : [coords.refs.start],
+                "ref_end" : [coords.refs.stop],
+                "fwd" :     [coords.fwd],
                 "samp_start" : [samp_start],
                 "samp_end" : [samp_end],
                 "tags" : [""]}).set_index("id")
@@ -193,7 +191,7 @@ class TrackIO:
         track.layers = None
         track.add_layer_group(group_name, layers)
 
-        track.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna, kmer_shift=0)
+        track.coords = coords
 
         return track #aln_id
 
@@ -259,19 +257,32 @@ class TrackIO:
             chunksize=self.prms.ref_chunksize)
 
         end_layers = None
+        seq_coords = None
         for chunk in layer_iter:
             if end_layers is not None:
                 chunk = pd.concat([end_layers, chunk])
 
-            mrefs = chunk.index.get_level_values("mref")
-            end = mrefs == mrefs[-1]
-            end_layers = chunk[end]
-            chunk = chunk[~end]
+            chunk_mrefs = chunk.index.get_level_values("mref").unique()
 
-            r = self.index.mrefs_to_ref_coord(mrefs[0], mrefs[-1], not self.conf.is_rna)
-            
-            ref_coord = RefCoord(r.ref_name, r.start, r.end, r.fwd)
-            coords = self.index.get_coord_space(ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)
+            if seq_coords is not None:
+                coords = seq_coords.mref_intersect(chunk_mrefs[:-1])
+                
+            if seq_coords is None or coords is None:
+                chunk_refs = self.index.mrefs_to_ref_coord(chunk_mrefs[0], chunk_mrefs[-1], not self.conf.is_rna)
+                seq_refs = RefCoord(chunk_refs.name, 0, chunk_refs.ref_len, chunk_refs.fwd)
+                seq_coords = self.index.get_coord_space(seq_refs, self.conf.is_rna, kmer_shift=0, load_kmers=False)
+                print("#", seq_coords)
+                coords = seq_coords.mref_intersect(chunk_mrefs[:-1])
+
+            coords.kmers = self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna)
+
+            leftover = chunk_mrefs.difference(coords.mrefs)
+            end_layers = chunk.loc[leftover]
+            chunk = chunk.drop(index=leftover)
+
+            #r = self.index.mrefs_to_ref_coord(mrefs[0], mrefs[-1], not self.conf.is_rna)
+            #ref_coord = RefCoord(r.ref_name, r.start, r.end, r.fwd)
+            #coords = self.index.get_coord_space(ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)
 
             layers = pd.concat({"dtw":chunk}, names=["group", "layer"], axis=1)
 

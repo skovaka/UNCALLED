@@ -99,7 +99,7 @@ class GuidedDTW:
 
 
         #TODO init_alignment(read_id, fast5, group, layers)
-        self.track = track_io.init_alignment(read.id, read.f5.filename, "bcaln", bcaln.df)
+        self.track = track_io.init_alignment(read.id, read.f5.filename, bcaln.coords, "bcaln", bcaln.df)
 
         self.bcaln = bcaln.df.sort_index()
 
@@ -143,6 +143,7 @@ class GuidedDTW:
         #block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
         #block_ends   = np.append(self.bcaln.ref_gaps, block_max)
         #for st, en in zip(block_starts, block_ends):
+
 
         for st, en in [(block_min, block_max)]:
             samp_st = self.bcaln.loc[st,'sample']

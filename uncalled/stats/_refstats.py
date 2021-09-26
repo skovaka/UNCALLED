@@ -73,7 +73,7 @@ class _Refstats:
 
         layer_agg = [_AGG_FNS[s] for s in layer_stats]
 
-        columns = ["mref", "kmer"]
+        columns = ["ref_name", "ref", "kmer"]
         for track in io.input_tracks:
             name = track.name
             columns.append(".".join([track.name, "cov"]))
@@ -92,6 +92,9 @@ class _Refstats:
                 stats[track.name].insert(0, "cov", groups.size())
 
             stats = pd.concat(stats, axis=1, names=["track", "layer", "stat"])
+
+            stats.index = pd.MultiIndex.from_product([[coords.ref_name], coords.mref_to_ref(stats.index)], names=["ref_name", "ref"])
+
             stats.insert(0, "kmer", nt.kmer_to_str(coords.kmers))
             sys.stdout.write(stats.to_csv(sep="\t",header=False))
 
