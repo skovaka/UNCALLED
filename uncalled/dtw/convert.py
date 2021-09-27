@@ -8,6 +8,7 @@ import pandas as pd
 from ont_fast5_api.fast5_interface import get_fast5_file
 import scipy.stats
 
+from . import TrackIO
 from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt
 from ..fast5 import Fast5Reader, FAST5_OPTS
@@ -114,53 +115,61 @@ def tombo(conf):
             #aln = ReadAln(track.index, mm2, is_rna=is_rna)
 
             aln_attrs = dict(handle["Alignment"].attrs)
+
+            #TODO feels hacky
+            start = aln_attrs["mapped_start"]-2
+            end = aln_attrs["mapped_end"]+2
+            if start < 0:
+                clip = -start
+                start = 0
+            else:
+                clip = 0
+
             ref_bounds = RefCoord(
                 aln_attrs["mapped_chrom"],
-                aln_attrs["mapped_start"]-1,
-                aln_attrs["mapped_end"]+3,
+                start, end,
                 aln_attrs["mapped_strand"] == "+")
             sig_fwd = (ref_bounds.fwd != is_rna)
 
             #io.
-            track.init_read_aln(read.read_id, ref_bounds)
+            #track.init_alignment(read.read_id, ref_bounds)
+            coords = io.index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True)
+            track = io.init_alignment(read.read_id, fast5_name, coords)
 
-            tombo_events = pd.DataFrame(np.array(handle["Events"]))
+            tombo_events = pd.DataFrame(np.array(handle["Events"])).iloc[clip:]
             tombo_start = handle["Events"].attrs["read_start_rel_to_raw"]
             
             raw_len = len(read.get_raw_data())
             starts = tombo_events["start"]
 
-            #shift = 1
-            #bases = tombo_events["base"].to_numpy().astype(str)
-            #kmers_old = [nt.str_to_kmer("".join(bases[i:i+K]), 0) for i in range(len(bases)-K+1)]
-            #kmers_old = shift*[kmers_old[0]] + kmers_old + (K-shift-1)*[kmers_old[-1]]
-            kmers = track.load_aln_kmers(store=False)
+            kmers = coords.kmers#.sort_index()
 
-            currents = tombo_events["norm_mean"]
             lengths = tombo_events["length"]
+            currents = tombo_events["norm_mean"]
 
             if not sig_fwd:
-                starts = np.flip(raw_len - tombo_start - starts - tombo_events["length"] - 1)
-                currents = np.flip(currents)
-                lengths = np.flip(lengths)
-
-                #kmers_old = np.flip(nt.kmer_rev(kmers_old))
+                starts = raw_len - tombo_start - starts - tombo_events["length"] - 1
+                #starts = np.flip(raw_len - tombo_start - starts - tombo_events["length"] - 1)
+                #currents = np.flip(currents)
+                #lengths = np.flip(lengths)
 
             lr = scipy.stats.linregress(currents, model[kmers])
             currents = lr.slope * currents + lr.intercept
 
-            track.read_aln.set_aln(pd.DataFrame({
-                "mrefs"    : track.read_aln.mrefs,
-                "start"  : starts,
-                "length" : lengths,
-                "current"   : currents
-            }).set_index("mrefs"))
+            df = pd.DataFrame({
+                    "mref" : coords.mrefs,#.sort_values(),
+                    "start"  : starts,
+                    "length" : lengths,
+                    "current"   : currents
+                 }).set_index("mref")
 
-            track.save_read(fast5_basename)
+            track.add_layer_group("dtw", df)
+
+            #track.save_read(fast5_basename)
 
             pbar.update(pbar_count)
 
-    track.close()
+    io.close()
 
     pbar.finish()
 

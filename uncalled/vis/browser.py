@@ -86,6 +86,7 @@ class Browser:
 
 
         if not self.single_track:
+            self.tracks = self.tracks[:2]
             self.ks_stats = self.tracks[0].calc_ks(self.tracks[1])
 
         self.fast5s = Fast5Reader(conf=self.conf)

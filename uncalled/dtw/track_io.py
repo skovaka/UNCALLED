@@ -80,6 +80,7 @@ class TrackIO:
 
             if out:
                 self._init_output_tracks(db, track_names)
+                db.init_write()
             else:
                 self._init_input_tracks(db, track_names)
     
@@ -475,6 +476,9 @@ class TrackSQL:
             );""")
         #self.con.commit()
 
+    def init_write(self):
+        for table in ["dtw", "bcaln"]:
+            self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
 
     def init_track(self, track):
         self.cur.execute(
