@@ -120,38 +120,41 @@ class Dotplot:
 
     def _plot_signal(self, ax, track):
 
-        dtw = track.layers["dtw"]
+        samp_min = np.inf
+        samp_max = 0
+        for aln_id in track.alignments.index:
+            dtw = track.layers["dtw"].loc[aln_id]
 
-        samp_min = dtw["start"].min()
-        max_i = dtw["start"].argmax()
-        samp_max = dtw["start"].iloc[max_i] + dtw["length"].iloc[max_i]
-        #samp_min, samp_max = aln.get_samp_bounds()
+            samp_min = min(samp_min, dtw["start"].min())
+            max_i = dtw["start"].argmax()
+            samp_max = max(samp_max, dtw["start"].iloc[max_i] + dtw["length"].iloc[max_i])
+            #samp_min, samp_max = aln.get_samp_bounds()
 
-        raw_norm = self.read.get_norm_signal(samp_min, samp_max)
+            raw_norm = self.read.get_norm_signal(samp_min, samp_max)
 
-        kmers = track.kmers
-        model_current = self.track_io.model[kmers]
+            kmers = track.coords.kmers[dtw.index]
+            model_current = self.track_io.model[kmers]
 
-        ymin = min(np.min(model_current), np.min(raw_norm[raw_norm>0]))
-        ymax = max(np.max(model_current), np.max(raw_norm[raw_norm>0]))
+            ymin = min(np.min(model_current), np.min(raw_norm[raw_norm>0]))
+            ymax = max(np.max(model_current), np.max(raw_norm[raw_norm>0]))
 
-        starts = dtw['start']
-        ends = starts+dtw['length']
+            starts = dtw['start']
+            ends = starts+dtw['length']
 
-        aln_bases = nt.kmer_base(kmers, 2)
-        samp_bases = np.full(samp_max-samp_min, -1)
+            aln_bases = nt.kmer_base(kmers, 2)
+            samp_bases = np.full(samp_max-samp_min, -1)
 
-        for i in range(len(dtw)):
-            st = int(dtw.iloc[i]['start'] - samp_min)
-            en = int(st + dtw.iloc[i]['length']) - 1
-            samp_bases[st:en] = aln_bases[i]
+            for i in range(len(dtw)):
+                st = int(dtw.iloc[i]['start'] - samp_min)
+                en = int(st + dtw.iloc[i]['length']) - 1
+                samp_bases[st:en] = aln_bases[i]
 
-        samps = np.arange(samp_min, samp_max)
-        for base, color in enumerate(self.prms.style["base_colors"]):
-            ax.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color)
+            samps = np.arange(samp_min, samp_max)
+            for base, color in enumerate(self.prms.style["base_colors"]):
+                ax.fill_between(samps, ymin, ymax, where=samp_bases==base, color=color)
 
-        ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, c="black")
-        ax.step(dtw['start'], model_current, color='white', linewidth=2, where="post")
+            ax.scatter(samps[raw_norm > 0], raw_norm[raw_norm > 0], s=5, c="black")
+            ax.step(dtw['start'], model_current, color='white', linewidth=2, where="post")
 
         return samp_min, samp_max
 
@@ -161,21 +164,19 @@ class Dotplot:
 
     def _plot_aln(self, i):
         track = self.tracks[i]
-        #aln = self.alns[i]
-        #if not "mref" in aln.dtw:
-        #    aln.calc_mref()
-        #aln.sort_mref()
 
-        #if getattr(aln, "bands", None) is not None:
-        #    self.ax_dot.fill_between(aln.bands['samp'], aln.bands['ref_st']-1, aln.bands['ref_en'], zorder=1, color='#ccffdd', linewidth=1, edgecolor='black', alpha=0.5)
+        xmin = np.inf
+        xmax = 0
+        for aln_id in track.alignments.index:
+            mrefs = track.layers.loc[aln_id].index#.get_level_values("mref")
 
-        mrefs = track.layers.index.get_level_values("mref")
+            self.ax_dot.step(track.layers.loc[aln_id]["dtw"]["start"], mrefs, where="post", linewidth=3,
+                **self.prms.style["aln_kws"][i]
+            )
 
-        self.ax_dot.step(track.layers["dtw"]["start"], mrefs, where="post", linewidth=3,
-            **self.prms.style["aln_kws"][i]
-        )
+        xmin,xmax = self._plot_signal(self.sig_axs[i], self.tracks[i])
 
-        return self._plot_signal(self.sig_axs[i], self.tracks[i])
+        return xmin,xmax
 
 
     def set_cursor(self, ref_coord):

@@ -135,8 +135,8 @@ class AlnTrack:
     @property
     def kmers(self):
         if self.coords.stranded:
-            return self.coords.kmers[self.layers.index.get_level_values(0)]
-        return self.coords.kmers[True][self.layers.index.get_level_values(0)]
+            return self.coords.kmers[self.layers.index.get_level_values("mref")]
+        return self.coords.kmers[True][self.layers.index.get_level_values("mref")]
 
     def get_pileup(self, layer):
         return np.flip(np.sort(self[layer], axis=0), axis=0)

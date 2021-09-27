@@ -55,30 +55,39 @@ def main(conf):
     conf.proc_read.detect_events = True
     conf.export_static()
 
-    fast5s = Fast5Processor(conf=conf)
-
     track_io = TrackIO(None, conf.dtw.out_path, conf=conf)
 
-    mm2s = {p.qr_name : p
-         for p in parse_paf(
-            conf.dtw.mm2_paf,
-            ref_bounds=conf.track_io.ref_bounds,
-            full_overlap=conf.track_io.full_overlap,
-         ) if p.is_fwd}
+    pafs = parse_paf(
+        conf.dtw.mm2_paf, 
+        ref_bounds=conf.track_io.ref_bounds, 
+        full_overlap=conf.track_io.full_overlap)
+
+    mm2s = defaultdict(list)
+    for paf in pafs:
+        mm2s[paf.qr_name].append(paf)
+
+    fast5s = Fast5Processor(reads=mm2s.keys(), conf=conf)
+
+    #mm2s = {p.qr_name : p
+    #     for p in parse_paf(
+    #        conf.dtw.mm2_paf,
+    #        ref_bounds=conf.track_io.ref_bounds,
+    #        full_overlap=conf.track_io.full_overlap,
+    #     ) if p.is_fwd}
 
     for read in fast5s:
 
-        paf = mm2s.get(read.id, None)
+        #paf = mm2s.get(read.id, None)
+        #if paf is None:
+        #    continue
 
-        if paf is None:
-            continue
+        for paf in mm2s[read.id]:
+            print(read.id)
+            dtw = GuidedDTW(track_io, read, paf, conf)
 
-        print(read.id)
-        dtw = GuidedDTW(track_io, read, paf, conf)
-
-        if dtw.df is None:
-            sys.stderr.write("dtw failed\n")
-            continue
+            if dtw.df is None:
+                sys.stderr.write("dtw failed\n")
+                continue
 
     track_io.close()
 

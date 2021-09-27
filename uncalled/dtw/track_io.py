@@ -338,11 +338,21 @@ class TrackIO:
             chunk = chunk[~end]
 
             for read_id, alns in chunk.groupby("read_id"):
-                self._fill_tracks(db0, alns)
-                n += 1
-                if max_reads is not None and n >= max_reads:
-                    return (read_id, self.input_tracks)
-                yield (read_id, self.input_tracks)
+                overlap_groups = list()
+                prev = None
+                for i,aln in alns.sort_values("ref_start").iterrows():
+                    if prev is None or aln["ref_name"] != prev["ref_name"] or aln["ref_start"] > prev["ref_end"]:
+                        overlap_groups.append([i])
+                    else:
+                        overlap_groups[-1].append(i)
+                    prev = aln
+                    
+                for group in overlap_groups:
+                    self._fill_tracks(db0, alns.loc[group])
+                    n += 1
+                    if max_reads is not None and n >= max_reads:
+                        return (read_id, self.input_tracks)
+                    yield (read_id, self.input_tracks)
 
     def _fill_tracks(self, db, alns):
         ids = list(alns.index)
@@ -350,7 +360,7 @@ class TrackIO:
         layers = dict()
         #TODO parse which track layers to import
         for group in ["dtw"]: #self.groups:
-            layers[group] = db.query_layers("dtw", self.coords, ids)
+            layers[group] = db.query_layers("dtw", self.coords, ids, index=["aln_id","mref"])
         layers = pd.concat(layers, names=["group", "layer"], axis=1)
 
         for track in self.input_tracks:
@@ -359,7 +369,11 @@ class TrackIO:
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)
             track_layers = layers.iloc[i]
 
-            ref_coord = RefCoord(*track_alns[["ref_name","ref_start","ref_end","fwd"]].iloc[0])
+            name = track_alns["ref_name"].iloc[0]
+            fwd = track_alns["fwd"].iloc[0]
+            start = track_alns["ref_start"].min()
+            end = track_alns["ref_end"].max()
+            ref_coord = RefCoord(name, start, end, fwd)
             track_coords = self.index.get_coord_space(
                 ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)
 
@@ -548,7 +562,7 @@ class TrackSQL:
             query += " ORDER BY " + ", ".join(order)
         return query
 
-    def query_layers(self, table, coords=None, aln_id=None, order=["mref"], chunksize=None):
+    def query_layers(self, table, coords=None, aln_id=None, order=["mref"], index=["mref","aln_id"], chunksize=None):
         select = "SELECT mref, aln_id, start, length, current FROM dtw"
 
         wheres = list()
@@ -562,6 +576,6 @@ class TrackSQL:
 
         query = self._join_query(select, wheres, order)
 
-        return pd.read_sql_query(query, self.con, index_col=["mref","aln_id"], params=params, chunksize=chunksize)
+        return pd.read_sql_query(query, self.con, index_col=index, params=params, chunksize=chunksize)
 
         #return pd.concat({table : df}, names=["group", "layer"], axis=1)

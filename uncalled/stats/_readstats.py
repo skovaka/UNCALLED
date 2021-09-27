@@ -58,10 +58,8 @@ class _Readstats:
                     df = fn(read_id, track, prms=prms)
                     if len(tracks) > 1:
                         df = df.add_prefix(os.path.basename(track.prms.path)+".")
-                    sys.stdout.write(df.to_csv(sep="\t", header=False))
+                    sys.stdout.write(df.to_csv(sep="\t", header=False, index=False))
 
-
-        return pd.concat(dfs, axis=1)
 
     _DESC_FNS = {
         "length" : lambda d: d.mean, 
@@ -83,14 +81,17 @@ class _Readstats:
 
         layer = "model_diff"
 
-        desc = mstats.describe(track.layers["dtw",layer])
+        rows = list()
+        for aln_id,aln in track.alignments.iterrows():
+            desc = mstats.describe(track.layers["dtw",layer])
+            row = [aln_id, aln.read_id]
 
-        df = pd.DataFrame(index=[read_id])
-        for stat in summary_stats:
-            name = ".".join([layer, stat])
-            df[name] = _Readstats._DESC_FNS[stat](desc)
+            for stat in summary_stats:
+                name = ".".join([layer, stat])
+                row.append(_Readstats._DESC_FNS[stat](desc))
+            rows.append(row)
             
-        return df
+        return pd.DataFrame(rows, columns=["aln_id", "read_id"] + summary_stats)
 
     @staticmethod
     def pca(track, layer=None, components=True, prms=None):
@@ -114,4 +115,4 @@ readstats = _Readstats()
 def main(*args, **argv):
     """Perform per-read analyses of DTW alignments"""
     df = readstats(*args, **argv)
-    print(df.to_csv(sep="\t"))
+    #print(df.to_csv(sep="\t"))
