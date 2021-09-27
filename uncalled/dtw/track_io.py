@@ -136,7 +136,17 @@ class TrackIO:
 
             track = AlnTrack(db, None, name, name, "dtw", self.conf)
             self.output_tracks[name] = track
-            db.init_track(track)
+
+            try:
+                db.init_track(track)
+            except Exception as err:
+                #TODO add -f option (requires delete cascade)
+                if len(db.query_track(name)) > 0:
+                    raise ValueError("database already contains track named \"%s\". Specify a different name, write to a different file" % name)
+
+
+                raise err
+
 
     def get_fast5_reader(self):
         #TODO needs work for multiple DBs
@@ -146,7 +156,7 @@ class TrackIO:
             self.fast5s = Fast5Reader(index=fast5_index, conf=self.conf)
         return self.fast5s
 
-    def init_alignment(self, read_id, fast5, coords, group_name, layers, track_name=None):
+    def init_alignment(self, read_id, fast5, coords, group=None, layers=None, track_name=None):
         if track_name is None:
             if len(self.output_tracks) == 1:
                 track_name, = self.output_tracks
@@ -169,10 +179,11 @@ class TrackIO:
             db.init_read(read_id, fast5_id)
             self.prev_read[track_name] = read_id
 
-        mref_start = layers.index.min()
-        mref_end = layers.index.max()+1
-        samp_start = layers["sample"].min()
-        samp_end = layers["sample"].max()
+        if layers is not None:
+            samp_start = layers["sample"].min()
+            samp_end = layers["sample"].max()
+        else:
+            samp_start = samp_end = None
 
         track.alignments = pd.DataFrame({
                 "id" : [aln_id],
@@ -189,7 +200,9 @@ class TrackIO:
         track.db.init_alignment(track.alignments)
 
         track.layers = None
-        track.add_layer_group(group_name, layers)
+
+        if layers is not None:
+            track.add_layer_group(group, layers)
 
         track.coords = coords
 
@@ -392,8 +405,8 @@ class TrackSQL:
         self.cur = self.con.cursor()
         self.open = True
 
-        if new_file:
-            self.init_tables()
+        #if new_file:
+        self.init_tables()
 
         self.prev_aln_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
         if self.prev_aln_id is None:
@@ -415,6 +428,7 @@ class TrackSQL:
                 groups TEXT,
                 config TEXT
             );""")
+        self.cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS track_idx ON track (name);")
         self.cur.execute("""
             CREATE TABLE IF NOT EXISTS read (
                 id TEXT PRIMARY KEY,
@@ -497,12 +511,13 @@ class TrackSQL:
         self.prev_aln_id += 1
         return self.prev_aln_id
 
-    def write_layers(self, table, df):
-        df.to_sql(
-            table, self.con, 
-            if_exists="append", 
-            method="multi",# chunksize=5000,
-            index=True, index_label=["mref","aln_id"])
+    def write_layers(self, df):
+        for group in df.columns.levels[0]:
+            df[group].to_sql(
+                group, self.con, 
+                if_exists="append", 
+                method="multi",# chunksize=5000,
+                index=True, index_label=["mref","aln_id"])
 
     def get_fast5_index(self):
         return pd.read_sql_query("""

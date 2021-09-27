@@ -70,7 +70,9 @@ def tombo(conf):
     conf.fast5_reader.load_bc = True
     conf.pore_model.name = "r94_rna_tombo"
 
-    track = AlnTrack(mode="w", conf=conf)
+    io = TrackIO(conf=conf)
+
+    #track = AlnTrack(mode="w", conf=conf)
     
     fast5_files = f5reader.prms.fast5_files
 
@@ -119,6 +121,7 @@ def tombo(conf):
                 aln_attrs["mapped_strand"] == "+")
             sig_fwd = (ref_bounds.fwd != is_rna)
 
+            #io.
             track.init_read_aln(read.read_id, ref_bounds)
 
             tombo_events = pd.DataFrame(np.array(handle["Events"]))

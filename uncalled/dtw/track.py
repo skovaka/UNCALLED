@@ -71,15 +71,15 @@ class AlnTrack:
     def _group_layers(self, group, layers):
         return pd.concat({group : layers}, names=["group", "layer"], axis=1)
         
-    def add_layer_group(self, group, layers, aln_id=None):
+    def add_layer_group(self, group, df, aln_id=None):
         aln_id = self._default_id(aln_id)
-        df = self._group_layers(group, layers)#pd.concat({group : layers}, names=["group", "layer"], axis=1)
+        df = self._group_layers(group, df)#pd.concat({group : layers}, names=["group", "layer"], axis=1)
 
         df.index = pd.MultiIndex.from_product(
                         [df.index, [aln_id]], 
                         names=["mref", "aln_id"])
 
-        self.db.write_layers(group, df[group])
+        self.db.write_layers(df)
 
         if self.layers is None:
             self.layers = df

@@ -41,8 +41,6 @@ class Bcaln:
 
         self.is_rna = read.conf.is_rna
 
-        self.dfs = set()
-
         self.clip_coords = clip_coords
 
         ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
