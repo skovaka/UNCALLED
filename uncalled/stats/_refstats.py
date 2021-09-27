@@ -6,6 +6,7 @@ import time
 import types
 import pandas as pd
 import scipy.stats
+from collections import defaultdict
 
 from .. import config, nt
 from ..sigproc import ProcRead
@@ -59,8 +60,8 @@ class _Refstats:
         compare_stats = [s for s in prms.stats if s in self.COMPARE_STATS]
 
         if len(layer_stats) + len(compare_stats) != len(prms.stats):
-            bad_stats = [s for s in prms.stats if s not in _ALL_STATS]
-            raise ValueError("Unknown stats: " + ", ".join(bad_stats))
+            bad_stats = [s for s in prms.stats if s not in self.ALL_STATS]
+            raise ValueError("Unknown stats: %s (options: %s)" % (", ".join(bad_stats), ", ".join(self.ALL_STATS)))
 
         if len(compare_stats) > 0 and io.input_count != 2:
             raise ValueError("\"%s\" stats can only be computed using exactly two tracks" % "\", \"".join(cmp_stats))
@@ -73,27 +74,54 @@ class _Refstats:
 
         layer_agg = [_AGG_FNS[s] for s in layer_stats]
 
-        columns = ["ref_name", "ref", "kmer"]
+        columns = ["ref_name", "ref", "strand", "kmer"]
         for track in io.input_tracks:
             name = track.name
             columns.append(".".join([track.name, "cov"]))
             for layer in prms.layers:
                 for stat in layer_stats:
                     columns.append(".".join([track.name, layer, stat]))
+        for layer in prms.layers:
+            for stat in compare_stats:
+                columns.append(".".join(["cmp", layer, stat]))
 
         print("\t".join(columns))
 
         t = time.time()
         for coords,tracks in io.iter_refs():
             stats = dict()
-            for track in tracks:
-                groups = track.layers["dtw"][prms.layers].groupby(level="mref")
+            grouped = [t.layers["dtw"][prms.layers].groupby(level="mref") for t in tracks]
+            for track,groups in zip(tracks, grouped):
                 stats[track.name] = groups.agg(layer_agg)
                 stats[track.name].insert(0, "cov", groups.size())
 
+            if len(compare_stats) > 0:
+                mrefs = list()
+                cmps = {l : defaultdict(list) for l in prms.layers}
+                for (mref,track_a),(_,track_b) in zip(*grouped):
+                    mrefs.append(mref)
+                    for layer in prms.layers:
+                        a = track_a[layer]
+                        b = track_b[layer]
+                        for stat in compare_stats:
+                            cmps[layer][stat].append(
+                                scipy.stats.stats.ks_2samp(a,b,mode="asymp")[0]
+                            )
+                stats["cmp"] = pd.concat({k : pd.DataFrame(index=mrefs, data=c) for k,c in cmps.items()}, axis=1) 
+
+
+            #for i,rf in enumerate(track_a.ref_coords.index):
+            #    a = track_a[layer,:,rf]
+            #    b = track_b[layer,:,rf]
+            #    ks = scipy.stats.stats.ks_2samp(a,b,mode="asymp")
+            #    layer_stats[i] = ks[0]
+            #df[layer + ".ks"] = layer_stats
+                
+
             stats = pd.concat(stats, axis=1, names=["track", "layer", "stat"])
 
-            stats.index = pd.MultiIndex.from_product([[coords.ref_name], coords.mref_to_ref(stats.index)], names=["ref_name", "ref"])
+            stats.index = coords.mref_to_ref_index(stats.index)
+            #pd.MultiIndex.from_product([[coords.ref_name], coords.mref_to_ref(stats.index), ["+" if coords.fwd else "-"]], names=["ref_name", "ref", "strand"])
 
             stats.insert(0, "kmer", nt.kmer_to_str(coords.kmers))
             sys.stdout.write(stats.to_csv(sep="\t",header=False))

@@ -271,7 +271,6 @@ class TrackIO:
                 chunk_refs = self.index.mrefs_to_ref_coord(chunk_mrefs[0], chunk_mrefs[-1], not self.conf.is_rna)
                 seq_refs = RefCoord(chunk_refs.name, 0, chunk_refs.ref_len, chunk_refs.fwd)
                 seq_coords = self.index.get_coord_space(seq_refs, self.conf.is_rna, kmer_shift=0, load_kmers=False)
-                print("#", seq_coords)
                 coords = seq_coords.mref_intersect(chunk_mrefs[:-1])
 
             coords.kmers = self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna)

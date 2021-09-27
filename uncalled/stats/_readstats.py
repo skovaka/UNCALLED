@@ -14,13 +14,12 @@ from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split#, ref_coords
 from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader
-from ..dtw import LAYER_META
+from ..dtw import TrackIO
 
 class ReadstatsParams(config.ParamGroup):
     _name = "readstats"
 ReadstatsParams._def_params(
     ("stats", ["model_diff"], None, "Which statistics to compute and output"),
-    ("tracks", None, None, "DTW Alignment AlnTrack(s)"),
     ("pca_layer", "current", str, "Which statistics to use for PCA"),
     ("pca_components", 2, int, "Number of principle components to output for the \"pca\" command."),
     ("summary_stats", ["mean"], None, "Summary statistics to compute for \"model_diff\" command."),
@@ -28,10 +27,10 @@ ReadstatsParams._def_params(
 
 OPTS = (
     Opt("stats", "readstats", type=comma_split),
-    Opt("tracks", "readstats", nargs="+", type=str),
+    Opt("input", "track_io", nargs="+", type=str),
     Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord, required=True),
-    Opt(("-p", "--pca-components"), "readstats"),
-    Opt(("-L", "--pca-layer"), "readstats"),
+    #Opt(("-p", "--pca-components"), "readstats"),
+    #Opt(("-L", "--pca-layer"), "readstats"),
     Opt(("-s", "--summary-stats"), "readstats", type=comma_split),
 )
 
@@ -40,23 +39,27 @@ class _Readstats:
 
     def __call__(self, *args, **kwargs):
         conf, prms = config._init_group("readstats", *args, **kwargs)
-        
-        tracks = _load_tracks(prms.tracks, conf, True)
 
         if isinstance(prms.stats, list):
             stats = prms.stats
         else:
             stats = [prms.stats]
 
-        dfs = list()
         
-        for track in tracks:
-            for stat in stats:
-                fn = getattr(self, stat)
-                df = fn(track, prms=prms)
-                if len(tracks) > 1:
-                    df = df.add_prefix(os.path.basename(track.prms.path)+".")
-                dfs.append(df)
+        io = TrackIO(conf=conf)
+
+        save_reads = "pca" in prms.stats
+        reads = list()
+        
+        for read_id, tracks in io.iter_reads():
+            for track in tracks:
+                for stat in stats:
+                    fn = getattr(self, stat)
+                    df = fn(read_id, track, prms=prms)
+                    if len(tracks) > 1:
+                        df = df.add_prefix(os.path.basename(track.prms.path)+".")
+                    sys.stdout.write(df.to_csv(sep="\t", header=False))
+
 
         return pd.concat(dfs, axis=1)
 
@@ -72,7 +75,7 @@ class _Readstats:
     #def _summary_stats(track, layer, stats)
 
     @staticmethod
-    def model_diff(track, summary_stats=None, prms=None):
+    def model_diff(read_id, track, summary_stats=None, prms=None):
         if summary_stats is None:
             if prms is None:
                 raise ValueError("Must specify summary_stats or ReadstatsParams for readstats.model_diff")
@@ -80,12 +83,12 @@ class _Readstats:
 
         layer = "model_diff"
 
-        desc = mstats.describe(track[layer], axis=1)
+        desc = mstats.describe(track.layers["dtw",layer])
 
-        df = pd.DataFrame(index=track.reads["id"])
-        for stat in summary_stast:
-            name = ".".join(layer, stat)
-            df[name] = _DESC_FNS[stat](desc)
+        df = pd.DataFrame(index=[read_id])
+        for stat in summary_stats:
+            name = ".".join([layer, stat])
+            df[name] = _Readstats._DESC_FNS[stat](desc)
             
         return df
 
@@ -97,7 +100,7 @@ class _Readstats:
             layer = prms.pca_layer
             components = prms.pca_components
 
-        x = track[layer,:,:].T
+        x = track.layers["dtw",layer]
         pc = PCA(n_components=components).fit_transform(x)
         df = pd.DataFrame(index=track.reads["id"])
         for c in range(components):

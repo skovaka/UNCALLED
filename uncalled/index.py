@@ -160,6 +160,9 @@ class CoordSpace:
 
         return self.refs[i]
 
+    def mref_to_ref_index(self, mrefs):
+        return pd.MultiIndex.from_product([[self.ref_name], self.mref_to_ref(mrefs), ["+" if self.fwd else "-"]], names=["ref_name", "ref", "strand"])
+
     #def validate_refs(self, refs):
     #    return len(self.refs.intersection(refs)) == len(refs)
 

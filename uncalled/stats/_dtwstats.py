@@ -13,15 +13,15 @@ from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split, ref_coords
 from ..index import BWA_OPTS
 from ..fast5 import parse_read_ids
-from ..dtw import LAYER_META
+from ..dtw import TrackIO, LAYER_META
 
-class DtwstatsParams(config.ParamGroup):
-    _name = "dtwstats"
-DtwstatsParams._def_params(
-    ("layers", ["model_diff"], None, "Which layers to retrieve or compute"),
-    ("tracks", None, None, "DTW alignment tracks"),
-    #("store", True, bool, "Will store layer in track, otherwise just return new layer"),
-)
+#class DtwstatsParams(config.ParamGroup):
+#    _name = "dtwstats"
+#DtwstatsParams._def_params(
+#    ("layers", ["model_diff"], None, "Which layers to retrieve or compute"),
+#    ("tracks", None, None, "DTW alignment tracks"),
+#    #("store", True, bool, "Will store layer in track, otherwise just return new layer"),
+#)
 
 
 class _Dtwstats:
@@ -110,10 +110,10 @@ class _Dtwstats:
     #    "bcerr" : get_bcerr_layer,
 
 OPTS = (
-    Opt("layers", "dtwstats", type=comma_split, 
+    Opt("input", "track_io", nargs="+", type=str),
+    Opt(("-L", "--layers"), "track_io", type=comma_split, 
         help="Comma-separated list of which layers to retrieve or compute {%s}" % ",".join(_Dtwstats.LAYERS)),
-    Opt("tracks", "dtwstats", nargs="+", type=str),
-    Opt(("-R", "--ref-bounds"), "track_io", type=ref_coords, required=True),
+    Opt(("-R", "--ref-bounds"), "track_io", type=ref_coords),
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
 )
 
@@ -122,13 +122,17 @@ dtwstats = _Dtwstats()
 def main(conf):
     """Output DTW alignment paths, statistics, and comparisons"""
 
-    tracks = dtwstats(conf=conf)
+    io = TrackIO(conf=conf)
 
-    for track in tracks:
-        print("#" + track.prms.path)
-        for i, read_id in enumerate(track.reads["id"]):
-            print("##" + read_id)
-            for j in track.ref_coords.index:
-                for layer in conf.dtwstats.layers:
-                    sys.stdout.write("%.3f\t"%track[layer,i,j])
-                sys.stdout.write("\n")
+    for coords,tracks in io.iter_refs():
+        for track in tracks:
+            print(track.layers.to_csv(sep="\t"))
+
+    #for track in tracks:
+    #    print("#" + track.prms.path)
+    #    for i, read_id in enumerate(track.reads["id"]):
+    #        print("##" + read_id)
+    #        for j in track.ref_coords.index:
+    #            for layer in conf.dtwstats.layers:
+    #                sys.stdout.write("%.3f\t"%track[layer,i,j])
+    #            sys.stdout.write("\n")
