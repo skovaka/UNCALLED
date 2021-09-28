@@ -183,7 +183,7 @@ class TrackIO:
         if layers is not None:
             if "start" in layers.columns:
                 col = "start"
-            elif "sample" in layer.columns:
+            elif "sample" in layers.columns:
                 col = "sample"
             else:
                 raise ValueError("Must initialize alignment from DataFrame with sample or start column")

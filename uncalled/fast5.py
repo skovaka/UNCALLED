@@ -96,7 +96,8 @@ class Fast5Reader:
             index = self.prms.fast5_index
 
         if isinstance(index, str): 
-            self._load_index_file(index)
+            if len(index) > 0:
+                self._load_index_file(index)
         elif isinstance(index, pd.DataFrame):
             self._load_index_df(index)
         else:
