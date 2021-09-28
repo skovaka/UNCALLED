@@ -84,20 +84,21 @@ class Fast5Reader:
 
         if fast5s is None: 
             fast5s = self.prms.fast5_files
+        if recursive is not None: 
+            self.prms.recursive = recursive
 
-        if recursive is not None: self.prms.recursive = recursive
-
-        self.prms.fast5_files = parse_fast5_paths(fast5s, recursive)
+        self.fast5_files = parse_fast5_paths(fast5s, recursive)
 
         if reads is not None: 
             self.prms.read_filter = parse_read_ids(reads)
+
+        if index is None:
+            index = self.prms.fast5_index
 
         if isinstance(index, str): 
             self._load_index_file(index)
         elif isinstance(index, pd.DataFrame):
             self._load_index_df(index)
-        elif index is None:
-            self.indexed = False
         else:
             raise ValueError("Unknown fast5 index format")
 
@@ -110,13 +111,13 @@ class Fast5Reader:
         self._dict = _Fast5Dict(groups, self.prms)
         self.indexed = True
             
-    def _load_index_file(self):
+    def _load_index_file(self, filename):
         index = None
         names = None
 
         fast5_paths = {os.path.basename(path) : path for path in self.prms.fast5_files}
 
-        with open(self.prms.fast5_index) as infile:
+        with open(filename) as infile:
             head = infile.readline().split()
             if "filename" in head and "read_id" in head:
                 names = head

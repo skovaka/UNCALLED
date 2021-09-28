@@ -125,7 +125,6 @@ class Dotplot:
         for aln_id in track.alignments.index:
             dtw = track.layers["dtw"].loc[aln_id]
 
-            print(dtw["start"])
             samp_min = min(samp_min, dtw["start"].min())
             max_i = dtw["start"].argmax()
             samp_max = max(samp_max, dtw["start"].iloc[max_i] + dtw["length"].iloc[max_i])

@@ -181,8 +181,15 @@ class TrackIO:
             self.prev_read[track_name] = read_id
 
         if layers is not None:
-            samp_start = layers["sample"].min()
-            samp_end = layers["sample"].max()
+            if "start" in layers.columns:
+                col = "start"
+            elif "sample" in layer.columns:
+                col = "sample"
+            else:
+                raise ValueError("Must initialize alignment from DataFrame with sample or start column")
+
+            samp_start = layers[col].min()
+            samp_end = layers[col].max()
         else:
             samp_start = samp_end = None
 

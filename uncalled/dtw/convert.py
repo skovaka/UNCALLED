@@ -9,6 +9,7 @@ from ont_fast5_api.fast5_interface import get_fast5_file
 import scipy.stats
 
 from . import TrackIO
+from .dtw import collapse_events
 from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt
 from ..fast5 import Fast5Reader, FAST5_OPTS
@@ -35,34 +36,51 @@ def nanopolish(conf):
     sample_rate = conf.read_buffer.sample_rate
 
     sys.stderr.write("Parsing TSV\n")
-    alns = pd.read_csv(
-            conf.eventalign_tsv, sep="\t", 
-            usecols=["read_name", "contig","position","start_idx","event_level_mean","event_length","reference_kmer","model_kmer"]
-            )#.rename(columns={"start_idx" : "start", "event_length" : "length"})
+    csv_iter = pd.read_csv(
+        conf.eventalign_tsv, sep="\t", chunksize=10000,
+        usecols=["read_name","contig","position",
+                 "start_idx","event_level_mean",
+                 "event_length","strand"])
 
-    alns['event_length'] = np.round(alns['event_length'] * sample_rate).astype(int)
-    alns['sum'] = alns['event_level_mean'] * alns['event_length']
+    io = TrackIO(conf=conf)
 
-    sys.stderr.write("Grouping\n")
+    def add_alns(events):
+        groups = events.groupby(["contig", "read_name"])
+        for (contig,read_id), df in groups:
+            start = df["position"].min()-1
+            end = df["position"].max()
+            fwd = df["strand"].iloc[0] == "t"
+            ref_coord = RefCoord(contig, start, end, fwd)
+            coords = io.index.get_coord_space(ref_coord, conf.is_rna, kmer_shift=0)
 
-    read_groups = alns.groupby(["contig", "read_name"])
+            df["mref"] = coords.ref_to_mref(df["position"].to_numpy()-1)
+            df = collapse_events(df, start_col="start_idx", length_col="event_length", mean_col="event_level_mean")
 
-    sys.stderr.write("Writing alignments\n")
+            fast5_name = f5reader.get_read_file(read_id)
 
-    track = AlnTrack(mode="w", conf=conf)
+            io.init_alignment(read_id, fast5_name, coords, "dtw", df)
+            print(read_id)
 
-    for (contig, read_id), rows in read_groups.groups.items():
-        #mm2 =  track.mm2s[read_id]
-        #if contig != mm2.rf_name: continue
+    leftover = pd.DataFrame()
 
-        aln = ReadAln(track.index, mm2, is_rna=conf.is_rna)
-        df = alns.iloc[rows]
+    for events in csv_iter:
+        events['event_length'] = np.round(events['event_length'] * sample_rate).astype(int)
+        events['sum'] = events['event_level_mean'] * events['event_length']
 
-        aln.set_subevent_aln(df, kmer_str=True, ref_col="position", start_col="start_idx", length_col="event_length", mean_col="event_level_mean", kmer_col="reference_kmer")
+        events = pd.concat([leftover, events])
 
-        fast5_name = os.path.basename(f5reader.get_read_file(read_id))
+        i = events["read_name"] == events["read_name"].iloc[-1]
+        leftover = events[i]
+        events = events[~i]
 
-        track.save_aln(aln, fast5_name)
+        add_alns(events)
+
+    if len(leftover) > 0:
+        add_alns(leftover)
+    else:
+        print(leftover)
+
+    io.close()
 
 TOMBO_OPTS = CONVERT_OPTS 
 def tombo(conf):
