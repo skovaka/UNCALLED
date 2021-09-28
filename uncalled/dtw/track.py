@@ -111,32 +111,44 @@ class AlnTrack:
     #eventually use some kind of tabix-like indexing
     def set_data(self, coords, alignments, layers, load_mat=False):
         self.coords = coords
-        self.alignments = alignments
-
         self.layers = layers#pd.concat(layers, names=["group", "layer"], axis=1)
 
-        self.alignments.sort_values("ref_start", inplace=True)
+        self.alignments = alignments
+        self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
+
+        if self.coords.kmers is not None:
+            mrefs = self.layers.index.get_level_values("mref")
+            if self.coords.stranded:
+                self.kmers = self.coords.kmers[mrefs]
+            else:
+                self.kmers = pd.concat(self.coords.kmers)[mrefs]
 
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
 
     def load_mat(self):
-        self.mat = self.layers.reset_index().pivot(index="aln_id", columns="mref") \
-                   .rename(columns=self.coords.mref_to_ref, level=2) \
-                   .rename_axis(("group","layer","ref"), axis=1) \
-                   .sort_index(axis=1, level=2)
-                   #.reindex(mat_index, axis=1)
+
+        df = self.layers.copy()
+        df["aln_id"] = df.index.get_level_values("aln_id")
+        df.index = self.coords.mref_to_ref_index(df.index.get_level_values("mref"), multi=False)
+        df = df.reset_index()
+
+        self.mat = df.pivot(index="aln_id", columns=["ref"]) \
+                     .rename_axis(("group","layer","ref"), axis=1) \
+                     .sort_index(axis=1, level="ref")
+
+        print(self.mat)
 
         self.mat = self.mat.reindex(self.alignments.index, copy=False)
 
         self.width = len(self.coords.refs)
         self.height = len(self.alignments)
 
-    @property
-    def kmers(self):
-        if self.coords.stranded:
-            return self.coords.kmers[self.layers.index.get_level_values("mref")]
-        return self.coords.kmers[True][self.layers.index.get_level_values("mref")]
+    #@property
+    #def kmers(self):
+    #    if self.coords.stranded:
+    #        return self.coords.kmers[self.layers.index.get_level_values("mref")]
+    #    return self.coords.kmers[True][self.layers.index.get_level_values("mref")]
 
     def get_pileup(self, layer):
         return np.flip(np.sort(self[layer], axis=0), axis=0)

@@ -132,6 +132,7 @@ class Dotplot:
 
             raw_norm = self.read.get_norm_signal(samp_min, samp_max)
 
+            print(track.coords)
             kmers = track.coords.kmers[dtw.index]
             model_current = self.track_io.model[kmers]
 

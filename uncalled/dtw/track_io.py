@@ -300,10 +300,6 @@ class TrackIO:
             end_layers = chunk.loc[leftover]
             chunk = chunk.drop(index=leftover)
 
-            #r = self.index.mrefs_to_ref_coord(mrefs[0], mrefs[-1], not self.conf.is_rna)
-            #ref_coord = RefCoord(r.ref_name, r.start, r.end, r.fwd)
-            #coords = self.index.get_coord_space(ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)
-
             layers = pd.concat({"dtw":chunk}, names=["group", "layer"], axis=1)
 
             aln_ids = chunk.index.unique("aln_id").to_numpy()
@@ -527,7 +523,7 @@ class TrackSQL:
             df[group].to_sql(
                 group, self.con, 
                 if_exists="append", 
-                method="multi",# chunksize=5000,
+                method="multi", chunksize=50000,
                 index=True, index_label=["mref","aln_id"])
 
     def get_fast5_index(self):
@@ -588,15 +584,20 @@ class TrackSQL:
             query += " ORDER BY " + ", ".join(order)
         return query
 
-    def query_layers(self, table, coords=None, aln_id=None, order=["mref"], index=["mref","aln_id"], chunksize=None):
+    def query_layers(self, track_id=None, coords=None, aln_id=None, order=["mref"], index=["mref","aln_id"], chunksize=None):
         select = "SELECT mref, aln_id, start, length, current FROM dtw"
 
         wheres = list()
         params = list()
 
+        if track_id is not None:
+            select += " JOIN alignment ON id = aln_id"
+            self._add_where(wheres, params, "track_id", track_id)
+
         if coords is not None:
-            wheres.append("mref >= ? AND mref <= ?")
+            wheres.append("((mref >= ? AND mref <= ?) OR (mref >= ? AND mref <= ?))")
             params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
+            params += [str(coords.mrefs[False].min()), str(coords.mrefs[False].max())]
 
         self._add_where(wheres, params, "aln_id", aln_id)
 

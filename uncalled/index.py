@@ -131,6 +131,7 @@ class CoordSpace:
             return tuple( (mrefs[i] for mrefs in self.mrefs) )
         return self.mrefs[fwd][i]
 
+    #TODO check fwd and rev, return None if neither
     def is_mref_fwd(self, mref):
         if isinstance(mref, (collections.abc.Sequence, np.ndarray, pd.Index)):
             mref = mref[0]
@@ -141,27 +142,72 @@ class CoordSpace:
             return mref in self.mrefs[1]
             
     #TODO make single private method with fwd param. Also probably merge with above
-    def any_mrefs_fwd(self, mrefs):
-        return len(self.mrefs[True].intersection(mrefs)) > 0
             
-    def any_mrefs_rev(self, mrefs):
-        return len(self.mrefs[False].intersection(mrefs)) > 0
+    def all_mrefs_fwd(self, mrefs):
+        isin = lambda a,b: a.isin(b).all()
+        if self.stranded:
+            if isin(mrefs, self.mrefs):
+                return self.fwd
+            return None
+        for fwd,s_mrefs in enumerate(self.mrefs):
+            if isin(mrefs, s_mrefs):
+                return bool(fwd)
+        return None
     
     def mref_to_ref(self, mref):
+        fwd = self.all_mrefs_fwd(mref)
+
+        if fwd is None:
+            raise ValueError("mref coordinates outside of CoordSpace")
+
         if self.stranded:
             mrefs = self.mrefs
         else:
-            mrefs = self.mrefs[self.is_mref_fwd(mref)]
+            mrefs = self.mrefs[fwd]
 
         if isinstance(mref, (collections.abc.Sequence, np.ndarray, pd.Index)):
             i = mrefs.get_indexer(mref)
         else:
             i = mrefs.get_loc(mref)
 
-        return self.refs[i]
+        return fwd, self.refs[i]
 
-    def mref_to_ref_index(self, mrefs):
-        return pd.MultiIndex.from_product([[self.ref_name], self.mref_to_ref(mrefs), ["+" if self.fwd else "-"]], names=["ref_name", "ref", "strand"])
+    def mref_to_ref_index(self, mrefs, multi=False):
+        if self.stranded:
+            refs = self.mref_to_ref(mrefs)[1]
+            fwd_mask = np.full(len(refs), self.fwd)
+
+        else:
+            revs = self.mrefs[0].get_indexer(mrefs)
+            fwds = self.mrefs[1].get_indexer(mrefs)
+            rev_mask = revs >= 0
+            fwd_mask = fwds >= 0
+            if not np.all(fwd_mask | rev_mask):
+                raise ValueError("mrefs coordinates are outside of the CoordSpace")
+
+            refs = np.zeros(len(mrefs), dtype=int)
+            refs[rev_mask] = self.refs[revs[rev_mask]]
+            refs[fwd_mask] = self.refs[fwds[fwd_mask]]
+
+        if multi:
+            strands = np.full(len(refs), "-")
+            strands[fwd_mask] = "+"
+            df = pd.DataFrame({
+                "ref_name" : self.ref_name, 
+                "ref" : refs,
+                "strand" : strands})
+            return pd.MultiIndex.from_frame(df)
+        return pd.Index(refs, name="ref")
+
+        #strand,refs = self.mref_to_ref(mrefs)
+        #if str_strand:
+        #    strand_label = "strand"
+        #    strand = "+" if strand else "-"
+        #else:
+        #    strand_label = "fwd"
+        #ret = pd.MultiIndex.from_product(
+        #    [[self.ref_name], [, [strand]], 
+        #    names=["ref_name", "ref", strand_label])
 
     #def validate_refs(self, refs):
     #    return len(self.refs.intersection(refs)) == len(refs)
@@ -178,7 +224,12 @@ class CoordSpace:
 class RefIndex(_RefIndex):
 
     def mrefs_to_kmers(self, mrefs, is_rna):
-        kmers = self.get_kmers(mrefs.min()-nt.K, mrefs.max(), is_rna)
+        if (mrefs.step < 0) == is_rna:
+            #ref_coord.end -= kmer_shift
+            kmers = self.get_kmers(mrefs.min()-nt.K, mrefs.max(), is_rna)
+        else:
+           #ref_coord.start += kmer_shift
+            kmers = self.get_kmers(mrefs.min(), mrefs.max()+nt.K, is_rna)
         if mrefs.step < 0:
             kmers = kmers[::-1]
         return pd.Series(index=mrefs, data=kmers, name="kmer")
@@ -196,12 +247,19 @@ class RefIndex(_RefIndex):
     def get_coord_space(self, ref_coord, is_rna, kmer_shift=nt.K-1, load_kmers=True):
 
         rid = self.get_ref_id(ref_coord.name)
+        if rid < 0:
+            raise ValueError("Sequence not in reference: " + ref_coord.name)
+
         length = self.get_ref_len(rid)
         if ref_coord.start < 0 or ref_coord.end > length:
             raise ValueError("Reference coordinates %s out of bounds for sequence of length %d" % (ref_coord, length))
 
         ref_coord = RefCoord(ref_coord)
-        ref_coord.end -= kmer_shift
+        #if ref_coord.fwd is None or ref_coord.fwd == is_rna:
+        if is_rna:
+            ref_coord.end -= kmer_shift
+        elif kmer_shift > 0:
+            ref_coord.start += kmer_shift+1
 
         refs = pd.RangeIndex(ref_coord.start, ref_coord.end)#-kmer_shift)
 

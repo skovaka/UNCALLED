@@ -70,7 +70,6 @@ class Browser:
         matplotlib.rcParams.update(self.prms.style["rc"])
 
         self.io = TrackIO(conf=self.conf)
-
         self.conf = self.io.conf
 
         self.tracks = self.io.load_refs(load_mat=True) #list()

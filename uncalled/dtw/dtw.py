@@ -113,7 +113,6 @@ class GuidedDTW:
         self.bcaln = bcaln.df.sort_index()
 
         #self.ref_kmers = self.track.load_aln_kmers().sort_index()
-        #print(self.ref_kmers)
         self.ref_kmers = self.track.coords.kmers.sort_index()
 
         self.read = read

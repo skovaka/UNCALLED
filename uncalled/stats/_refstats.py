@@ -85,8 +85,6 @@ class _Refstats:
             for stat in compare_stats:
                 columns.append(".".join(["cmp", layer, stat]))
 
-        print("\t".join(columns))
-
         t = time.time()
         for coords,tracks in io.iter_refs():
             stats = dict()
@@ -116,11 +114,10 @@ class _Refstats:
             #    ks = scipy.stats.stats.ks_2samp(a,b,mode="asymp")
             #    layer_stats[i] = ks[0]
             #df[layer + ".ks"] = layer_stats
-                
 
             stats = pd.concat(stats, axis=1, names=["track", "layer", "stat"])
 
-            stats.index = coords.mref_to_ref_index(stats.index)
+            stats.index = coords.mref_to_ref_index(stats.index, multi=True)
             #pd.MultiIndex.from_product([[coords.ref_name], coords.mref_to_ref(stats.index), ["+" if coords.fwd else "-"]], names=["ref_name", "ref", "strand"])
 
             stats.insert(0, "kmer", nt.kmer_to_str(coords.kmers))

@@ -71,7 +71,6 @@ class Bcaln:
         })
 
         df = samp_bps.join(self.bp_mref_aln, on='bp').dropna()
-        #df["ref"] = self.mref_to_ref(df["mref"])
         df['mref'] = df['mref'].astype("Int64")
         df = df.set_index("mref", drop=True) \
                .sort_index() 
