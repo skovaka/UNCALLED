@@ -278,13 +278,17 @@ class TrackIO:
             order=["mref"],
             chunksize=self.prms.ref_chunksize)
 
-        end_layers = None
+        leftovers = None
         seq_coords = None
         for chunk in layer_iter:
-            if end_layers is not None:
-                chunk = pd.concat([end_layers, chunk])
+            if leftovers is not None:
+                chunk = pd.concat([leftovers, chunk])
 
             chunk_mrefs = chunk.index.get_level_values("mref").unique()
+
+            if len(chunk_mrefs) == 1:
+                leftovers = chunk
+                continue
 
             if seq_coords is not None:
                 coords = seq_coords.mref_intersect(chunk_mrefs[:-1])
@@ -297,9 +301,9 @@ class TrackIO:
 
             coords.kmers = self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna)
 
-            leftover = chunk_mrefs.difference(coords.mrefs)
-            end_layers = chunk.loc[leftover]
-            chunk = chunk.drop(index=leftover)
+            i = chunk_mrefs.difference(coords.mrefs)
+            leftovers = chunk.loc[i]
+            chunk = chunk.drop(index=i)
 
             layers = pd.concat({"dtw":chunk}, names=["group", "layer"], axis=1)
 

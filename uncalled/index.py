@@ -174,8 +174,8 @@ class CoordSpace:
 
     def mref_to_ref_index(self, mrefs, multi=False):
         if self.stranded:
-            refs = self.mref_to_ref(mrefs)[1]
-            fwd_mask = np.full(len(refs), self.fwd)
+            fwd,refs = self.mref_to_ref(mrefs)
+            fwd_mask = np.full(len(refs), fwd)
 
         else:
             revs = self.mrefs[0].get_indexer(mrefs)
