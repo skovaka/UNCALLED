@@ -64,7 +64,7 @@ class _Refstats:
             raise ValueError("Unknown stats: %s (options: %s)" % (", ".join(bad_stats), ", ".join(self.ALL_STATS)))
 
         if len(compare_stats) > 0 and io.input_count != 2:
-            raise ValueError("\"%s\" stats can only be computed using exactly two tracks" % "\", \"".join(cmp_stats))
+            raise ValueError("\"%s\" stats can only be computed using exactly two tracks" % "\", \"".join(compare_stats))
             
         #for coords,tracks in io.iter_refs():
         #    for t in tracks:

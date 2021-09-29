@@ -50,8 +50,7 @@ class ProcRead:
     #TODO breakup into more functions
     #implement a lot more
     def init_f5(self):
-        #TODO pass np array
-        signal = np.array(self.f5.signal)
+        signal = self.f5.signal
 
         if self.prms.detect_events:
             evdt = EventDetector(self.conf.event_detector)

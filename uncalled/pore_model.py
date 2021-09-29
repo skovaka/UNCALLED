@@ -96,8 +96,7 @@ class PoreModel(_PoreModel):
         return self._vals_from_df(df)
 
     def __getitem__(self, kmer):
-        return self.means[kmer]
-        #return self.means[nt.kmer_array(kmer)]
+        return self.means[nt.kmer_array(kmer)]
 
     def norm_pdf(self, current, kmer):
         return _PoreModel.norm_pdf(self, current, nt.kmer_array(kmer))

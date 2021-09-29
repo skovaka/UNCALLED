@@ -59,6 +59,8 @@ class TrackIO:
         if ref_bounds is not None:
             if isinstance(ref_bounds, str):
                 ref_bounds = str_to_coord(ref_bounds)
+            elif isinstance(ref_bounds, tuple):
+                ref_bounds = RefCoord(*ref_bounds)
             self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
         else:
             self.coords = None

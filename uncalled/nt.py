@@ -10,6 +10,9 @@ KMERS = np.arange(kmer_count())
 
 def kmer_array(kmer):
     arr = np.array(kmer)
+    if arr.shape == ():
+        arr.shape = 1
+
     if arr.dtype.type in {np.str_, np.bytes_}:
 
         #TODO add option to fully check BP validity

@@ -31,12 +31,14 @@ def parse_fast5_paths(fast5s, recursive):
         fast5_paths.append(path)
         return True
 
+    if isinstance(fast5s, str):
+        fast5s = [fast5s]
+
     for path in fast5s:
         path = path.strip()
 
         if not os.path.exists(path):
-            sys.stderr.write("Error: \"%s\" does not exist\n" % path)
-            sys.exit(1)
+            raise ValueError("Error: \"%s\" does not exist\n" % path)
 
         isdir = os.path.isdir(path)
 
@@ -87,10 +89,12 @@ class Fast5Reader:
         if recursive is not None: 
             self.prms.recursive = recursive
 
-        self.fast5_files = parse_fast5_paths(fast5s, recursive)
+        self.prms.fast5_files = parse_fast5_paths(fast5s, recursive)
 
         if reads is not None: 
             self.prms.read_filter = parse_read_ids(reads)
+
+        print(self.prms.fast5_files)
 
         if index is None:
             index = self.prms.fast5_index
