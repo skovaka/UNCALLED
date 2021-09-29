@@ -137,8 +137,6 @@ class AlnTrack:
                      .rename_axis(("group","layer","ref"), axis=1) \
                      .sort_index(axis=1, level="ref")
 
-        print(self.mat)
-
         self.mat = self.mat.reindex(self.alignments.index, copy=False)
 
         self.width = len(self.coords.refs)

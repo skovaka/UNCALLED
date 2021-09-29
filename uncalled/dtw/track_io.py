@@ -249,9 +249,8 @@ class TrackIO:
 
         layers = dict()
         for group in ["dtw"]:
-            layers[group] = db0.query_layers(group, self.coords, ids)
+            layers[group] = db0.query_layers(self.input_track_ids, self.coords, ids)
         layers = pd.concat(layers, names=["group", "layer"], axis=1)
-        #layers = db.query_layers("dtw", self.coords, ids)
         
         for track in self.input_tracks:
             track_alns = alignments[alignments["track_id"] == track.id].copy()
@@ -377,7 +376,7 @@ class TrackIO:
         layers = dict()
         #TODO parse which track layers to import
         for group in ["dtw"]: #self.groups:
-            layers[group] = db.query_layers("dtw", self.coords, ids, index=["aln_id","mref"])
+            layers[group] = db.query_layers(self.input_track_ids, self.coords, ids, index=["aln_id","mref"])
         layers = pd.concat(layers, names=["group", "layer"], axis=1)
 
         for track in self.input_tracks:

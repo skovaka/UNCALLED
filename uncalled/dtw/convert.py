@@ -50,11 +50,20 @@ def nanopolish(conf):
             start = df["position"].min()-1
             end = df["position"].max()
             fwd = df["strand"].iloc[0] == "t"
+
+            #start = aln_attrs["mapped_start"]-2
+            #end = aln_attrs["mapped_end"]+2
+            if start < 0:
+                clip = -start
+                start = 0
+            else:
+                clip = 0
+
             ref_coord = RefCoord(contig, start, end, fwd)
             coords = io.index.get_coord_space(ref_coord, conf.is_rna, kmer_shift=0)
 
             df["mref"] = coords.ref_to_mref(df["position"].to_numpy()-1)
-            df = collapse_events(df, start_col="start_idx", length_col="event_length", mean_col="event_level_mean")
+            df = collapse_events(df, start_col="start_idx", length_col="event_length", mean_col="event_level_mean")[clip:]
 
             fast5_name = f5reader.get_read_file(read_id)
 
@@ -77,8 +86,6 @@ def nanopolish(conf):
 
     if len(leftover) > 0:
         add_alns(leftover)
-    else:
-        print(leftover)
 
     io.close()
 

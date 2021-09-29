@@ -88,7 +88,8 @@ class Browser:
             self.tracks = self.tracks[:2]
             self.ks_stats = self.tracks[0].calc_ks(self.tracks[1])
 
-        self.fast5s = Fast5Reader(conf=self.conf)
+        #self.fast5s = #Fast5Reader(conf=self.conf)
+        self.fast5s = self.io.get_fast5_reader()#Fast5Reader(reads=self.read_ids, index=fast5_index, conf=self.tracks[0].conf)
 
         self.cursor = None
         self.pileup = False
