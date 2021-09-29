@@ -94,8 +94,6 @@ class Fast5Reader:
         if reads is not None: 
             self.prms.read_filter = parse_read_ids(reads)
 
-        print(self.prms.fast5_files)
-
         if index is None:
             index = self.prms.fast5_index
 
