@@ -57,7 +57,6 @@ class TrackIO:
             self.index = load_index(self.prms.index_prefix)
             self._set_ref_bounds(self.prms.ref_bounds)
 
-        self.model = PoreModel(self.conf.pore_model) 
         self.fast5s = None
 
     def _set_ref_bounds(self, ref_bounds):
@@ -232,7 +231,7 @@ class TrackIO:
         "dwell" : (lambda self,track: 
             1000 * track.layers["dtw","length"] / self.conf.read_buffer.sample_rate),
         "model_diff" : (lambda self,track: 
-            track.layers["dtw","current"] - self.model[track.kmers])
+            track.layers["dtw","current"] - track.model[track.kmers])
     }
 
     def compute_layers(self, track, layer_names):

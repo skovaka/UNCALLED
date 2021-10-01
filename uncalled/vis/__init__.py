@@ -1,2 +1,2 @@
-from .mpl import browser, dotplot, sigplot
-from .plotly import trackplot
+from .mpl import browser, sigplot
+from .plotly import trackplot, dotplot

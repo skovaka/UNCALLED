@@ -46,8 +46,6 @@ def comma_split(s):
     return s.split(",")
 
 OPTS = [
-    #Opt("track_a", "dotplot", type=str),
-    #Opt("track_b", "dotplot", nargs="?", type=str),
     Opt("input", "track_io", nargs="+"),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
@@ -65,7 +63,6 @@ def main(conf):
         d.show_all()
     else:
         d.save_all(conf.out_prefix, conf.out_format)
-
 
 class Dotplot:
     def __init__(self, *args, **kwargs):
@@ -128,12 +125,10 @@ class Dotplot:
             samp_min = min(samp_min, dtw["start"].min())
             max_i = dtw["start"].argmax()
             samp_max = max(samp_max, dtw["start"].iloc[max_i] + dtw["length"].iloc[max_i])
-            #samp_min, samp_max = aln.get_samp_bounds()
-
             raw_norm = self.read.get_norm_signal(samp_min, samp_max)
 
             kmers = track.coords.kmers[dtw.index]
-            model_current = self.track_io.model[kmers]
+            model_current = track.model[kmers]
 
             ymin = min(np.min(model_current), np.min(raw_norm[raw_norm>0]))
             ymax = max(np.max(model_current), np.max(raw_norm[raw_norm>0]))

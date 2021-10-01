@@ -60,13 +60,7 @@ class AlnTrack:
         self.coords = None
         self.layers = None
 
-    def __contains__(self, read_id):
-        return read_id in self.read_ids
-
-    def _load_fast5_index(self):
-        self.read_ids = set(self.fname_mapping.index)
-        if len(self.conf.fast5_reader.read_filter) > 0:
-            self.read_ids = self.read_ids & set(self.conf.fast5_reader.read_filter)
+        self.model = PoreModel(self.conf.pore_model) 
 
     def _group_layers(self, group, layers):
         return pd.concat({group : layers}, names=["group", "layer"], axis=1)
@@ -151,29 +145,13 @@ class AlnTrack:
     def get_pileup(self, layer):
         return np.flip(np.sort(self[layer], axis=0), axis=0)
 
-    #@property
-    #def name(self):
-    #    if self.prms.path is None:
-    #        return self.fast5s
-    #    return self.prms.path.split("/")[-1]
-
-    @property
-    def read_count(self):
-        return len(self.fname_mapping)
-    
     def sort_coord(self, layer, ref):
-        #if isinstance(layer, str):
-        #    layer = self.layer_idxs[layer]
         order = (-self.mat[layer,ref].fillna(0)).argsort()
         self.sort(order)
 
     def sort(self, order):
         self.mat = self.mat.iloc[order]
         self.alignments = self.alignments.iloc[order]
-
-    #@property
-    #def ref_id(self):
-    #    return self.index.get_ref_id(self.ref_name)
 
     def calc_ks(self, track_b):
         ks_stats = np.zeros((len(self.CMP_LAYERS), self.width))

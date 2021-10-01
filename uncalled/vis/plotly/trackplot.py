@@ -1,53 +1,13 @@
-# -*- coding: utf-8 -*-
-
-# Run this app with `python app.py` and
-# visit http://127.0.0.1:8050/ in your web browser.
-
-import dash
-#import dash_core_components as dcc
-#import dash_html_components as html
-#from dash.dependencies import Input, Output
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 
-#from ... import config
-
 from ...dtw.track import LAYER_META
 from ...index import str_to_coord
 from ...dtw.track_io import TrackIO
 from ...argparse import Opt, comma_split
-
-#external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-
-#app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-#
-#app.layout = html.Div(children=[
-#    html.H1(children='Track Test'),
-#
-#    dcc.Dropdown(
-#        options=[
-#            {'label': 'Current (pA)', 'value': 'current'},
-#            {'label': 'Dwell Time (ms)', 'value': 'dwell'},
-#            {'label': 'Model pA Difference', 'value': 'model_diff'},
-#        ],
-#        value='current',
-#        multi=False,
-#        id='selector'
-#    ),
-#
-#    dcc.Graph(
-#        id='track',
-#        #figure=fig
-#    )
-#])
-#@app.callback(
-#    Output('track', 'figure'),
-#    Input('selector', 'value'))
-#def update_figure(layer):
-#    return trackplot(track, layer)
 
 def trackplot(tracks, layer):
 
@@ -70,16 +30,14 @@ def trackplot(tracks, layer):
             layer_desc + ": %{z}"])
 
         fig.add_trace(go.Heatmap(
-                name=track.name,
-                x=mat.columns,
-                y=track.alignments["read_id"],
-                z=mat,
-                zsmooth=False,
-                hovertemplate=hover,
-                coloraxis="coloraxis",
-                ),
-                #colorscale="viridis"),
-            row=i+1, col=1)
+            name=track.name,
+            x=mat.columns,
+            y=track.alignments["read_id"],
+            z=mat,
+            zsmooth=False,
+            hovertemplate=hover,
+            coloraxis="coloraxis",
+        ), row=i+1, col=1)
 
     fig.update_layout(
         coloraxis={
@@ -94,7 +52,6 @@ def trackplot(tracks, layer):
     )
 
     fig.update_yaxes(showticklabels=False)#, title="Reads")
-    #fig.update_xaxes(title=track.coords.ref_name + " coordinates")
     return fig
 
 OPTS = (
