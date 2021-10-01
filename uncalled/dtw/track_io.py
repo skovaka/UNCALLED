@@ -19,6 +19,8 @@ TrackIOParams._def_params(
     ("input", None, None, "Input track(s)"),
     ("output", None, None,  "Output track"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
+    ("read_filter", None, None, "Only load reads which overlap these coordinates"),
+    ("max_reads", None, int, "Only load reads which overlap these coordinates"),
     ("index_prefix", None, str, "BWA index prefix"),
     ("overwrite", False, bool, "Overwrite existing databases"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
@@ -338,30 +340,25 @@ class TrackIO:
 
         return self.input_tracks
 
-    def iter_reads(self, ref_bounds=None, full_overlap=False, max_reads=None):
+    def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
+        if read_filter is None:
+            read_filter = self.prms.read_filter
+        if max_reads is None:
+            max_reads = self.prms.max_reads
         
         dbfile0,db0 = list(self.dbs.items())[0]
 
         aln_iter = db0.query_alignments(
             self.input_track_ids,
+            read_id=read_filter,
             coords=self.coords, 
             full_overlap=full_overlap, 
             order=["read_id"],
             chunksize=self.prms.aln_chunksize)
 
-        n = 0
-
-        end_alns = None
-        for chunk in aln_iter:
-            if end_alns is not None:
-                chunk = pd.concat([end_alns, chunk])
-
-            end = chunk["read_id"] == chunk["read_id"].iloc[-1]
-            end_alns = chunk[end]
-            chunk = chunk[~end]
-
+        def _iter_reads(chunk):
             for read_id, alns in chunk.groupby("read_id"):
                 overlap_groups = list()
                 prev = None
@@ -374,10 +371,29 @@ class TrackIO:
                     
                 for group in overlap_groups:
                     self._fill_tracks(db0, alns.loc[group])
-                    n += 1
-                    if max_reads is not None and n >= max_reads:
-                        return (read_id, self.input_tracks)
                     yield (read_id, self.input_tracks)
+
+        n = 0
+        leftovers = pd.DataFrame()
+        for chunk in aln_iter:
+            if leftovers is not None:
+                chunk = pd.concat([leftovers, chunk])
+
+            end = chunk["read_id"] == chunk["read_id"].iloc[-1]
+            leftovers = chunk[end]
+            chunk = chunk[~end]
+
+            for read in _iter_reads(chunk):
+                n += 1
+                if max_reads is not None and n >= max_reads:
+                    return read
+                yield read
+
+        for read in _iter_reads(leftovers):
+            n += 1
+            if max_reads is not None and n >= max_reads:
+                return read
+            yield read
 
     def _fill_tracks(self, db, alns):
         ids = list(alns.index)
@@ -581,7 +597,7 @@ class TrackSQL:
                 params += [ref_end, ref_start]
 
         query = self._join_query(select, wheres, order)
-        
+
         return pd.read_sql_query(query, self.con, index_col="id", params=params, chunksize=chunksize)
         
     def _join_query(self, select, wheres, order=None):

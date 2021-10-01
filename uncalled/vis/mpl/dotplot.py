@@ -52,7 +52,7 @@ OPTS = [
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
     Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
-    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
+    Opt(("-l", "--read-filter"), "track_io", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", type=comma_split),
     Opt(("-C", "--max-chunks"), "read_buffer"),
 ]
