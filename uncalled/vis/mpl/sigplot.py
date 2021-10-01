@@ -11,12 +11,13 @@ from matplotlib.ticker import NullFormatter, FuncFormatter
 from matplotlib.patches import Rectangle
 import types
 
-from .. import nt, config
+from ... import nt, config
 
-from ..dtw.dtw import Fast5Processor
-from ..fast5 import Fast5Reader, parse_read_ids
-from ..pafstats import parse_paf
-from ..index import str_to_coord
+from ...dtw.dtw import Fast5Processor
+from ...fast5 import Fast5Reader, parse_read_ids
+from ...pafstats import parse_paf
+from ...index import str_to_coord
+from ...argparse import Opt
 
 from _uncalled import _RefIndex
 
@@ -39,7 +40,6 @@ SigplotParams._def_params(
 def comma_split(s):
     return s.split(",")
 
-from ..argparse import Opt
 OPTS = [
     Opt("tracks", "sigplot", type=str, nargs="+"),
     Opt(("-l", "--reads"), "sigplot", type=parse_read_ids),

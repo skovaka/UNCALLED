@@ -8,14 +8,14 @@ from .argparse import ArgParser
 from . import index, pafstats
 from .rt import realtime, map, sim
 from .dtw import dtw, convert
-from .vis import browser, dotplot, sigplot
+from .vis import browser, dotplot, sigplot, trackplot
 from .stats import _refstats, _dtwstats, _readstats
 
 SUBCMDS = [
     index, 
     realtime, map, sim, pafstats,
     dtw, convert,
-    browser, dotplot, sigplot,
+    browser, dotplot, sigplot, trackplot,
     _refstats, _readstats, _dtwstats
 ]
 

@@ -24,7 +24,7 @@ TrackIOParams._def_params(
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
-    ("layers", ["current", "dwell", "model_diff"], list, "Layers to load"),
+    ("layers", ["current", "dwell", "model_diff"], None, "Layers to load"),
     #("mode", "r", str, "Read (r) or write (w) mode"),
     ignore_toml={"input", "output", "ref_bounds", "layers"}
 )
@@ -32,6 +32,9 @@ TrackIOParams._def_params(
 class TrackIO:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("track_io", *args, **kwargs)
+
+        if isinstance(self.prms.layers, str):
+            self.prms.layers = [self.prms.layers]
 
         self.dbs = dict()
 

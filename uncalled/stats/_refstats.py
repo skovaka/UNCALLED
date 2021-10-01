@@ -102,19 +102,6 @@ class _Refstats:
         #stats.insert(0, "kmer", nt.kmer_to_str(coords.kmers))
 
         return stats.dropna()
-
-
-    @staticmethod
-    def describe(track, layers, stats):
-        df = {}
-        for layer in layers:
-            desc = scipy.stats.describe(track[layer], axis=0, nan_policy="omit")
-            for stat in stats:
-                name = ".".join([layer, stat])
-                fn = _Refstats._DESC_FNS[stat]
-                df[name] = fn(desc)
-                
-        return pd.DataFrame(df, index=track.ref_coords.index)
         
     @staticmethod
     def ks(track_a=None, track_b=None):

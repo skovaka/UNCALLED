@@ -10,14 +10,15 @@ from matplotlib.ticker import NullFormatter, FuncFormatter
 from matplotlib.patches import Rectangle
 import types
 
-from .. import nt, config
+from ... import nt, config
 
-from ..sigproc import ProcRead
-from ..fast5 import Fast5Reader, parse_read_ids
-from ..pafstats import parse_paf
-from ..dtw.track import AlnTrack
-from ..dtw.track_io import TrackIO
-from ..index import str_to_coord
+from ...sigproc import ProcRead
+from ...fast5 import Fast5Reader, parse_read_ids
+from ...pafstats import parse_paf
+from ...dtw.track import AlnTrack
+from ...dtw.track_io import TrackIO
+from ...index import str_to_coord
+from ...argparse import Opt
 
 from _uncalled import _RefIndex
 
@@ -44,7 +45,6 @@ DotplotParams._def_params(
 def comma_split(s):
     return s.split(",")
 
-from ..argparse import Opt
 OPTS = [
     #Opt("track_a", "dotplot", type=str),
     #Opt("track_b", "dotplot", nargs="?", type=str),

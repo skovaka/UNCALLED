@@ -16,16 +16,17 @@ import matplotlib
 import scipy.stats
 import pandas as pd
 
-from .. import config, nt
+from ... import config, nt
 
 #from ..config import Config, ParamGroup, Opt
-from ..sigproc import ProcRead
+from ...sigproc import ProcRead
 
-from ..index import BWA_OPTS, str_to_coord
-from ..fast5 import Fast5Reader
-from .dotplot import Dotplot
-from ..dtw.track import AlnTrack, LAYER_META
-from ..dtw.track_io import TrackIO
+from ...index import BWA_OPTS, str_to_coord
+from ...fast5 import Fast5Reader
+from ..dotplot import Dotplot
+from ...dtw.track import AlnTrack, LAYER_META
+from ...dtw.track_io import TrackIO
+from ...argparse import Opt, comma_split
 
 CMAP = "viridis"
 #CMAP = "plasma"
@@ -43,7 +44,6 @@ BrowserParams._def_params(
     }, dict, "Plotting style options")
 )
 
-from ..argparse import Opt, comma_split
 OPTS = (
     Opt("ref_bounds", "track_io", type=str_to_coord),
     Opt("input", "track_io", nargs="+"),

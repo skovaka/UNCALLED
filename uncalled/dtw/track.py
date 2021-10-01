@@ -33,7 +33,7 @@ LayerMeta = namedtuple("LayerMeta", ["type", "label"])
 LAYER_META = {
     "start"   : LayerMeta(int, "Sample Start"),
     "length"  : LayerMeta(int, "Sample Length"),
-    "current" : LayerMeta(float, "Mean Current (pA)"),
+    "current" : LayerMeta(float, "Current (pA)"),
     "kmer"    : LayerMeta(int, "Reference K-mer"),
     "mref"    : LayerMeta(int, "Mirrored Packed Ref. Coord."),
     "dwell"   : LayerMeta(float, "Dwell Time (ms/nt)"),
