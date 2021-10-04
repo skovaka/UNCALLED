@@ -28,17 +28,56 @@ DWELL_LAYER      = "dwell"
 MODEL_DIFF_LAYER = "model_diff"
 DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
 
-LayerMeta = namedtuple("LayerMeta", ["type", "label"])
+LayerMeta = namedtuple("LayerMeta", ["type", "label", "derived"])
 
 LAYER_META = {
-    "start"   : LayerMeta(int, "Sample Start"),
-    "length"  : LayerMeta(int, "Sample Length"),
-    "current" : LayerMeta(float, "Current (pA)"),
-    "kmer"    : LayerMeta(int, "Reference K-mer"),
-    "mref"    : LayerMeta(int, "Mirrored Packed Ref. Coord."),
-    "dwell"   : LayerMeta(float, "Dwell Time (ms/nt)"),
-    "model_diff" : LayerMeta(float, "Model pA Difference"),
+    "start"   : LayerMeta(int, "Sample Start", False),
+    "length"  : LayerMeta(int, "Sample Length", False),
+    "current" : LayerMeta(float, "Current (pA)", False),
+    "kmer"    : LayerMeta(int, "Reference K-mer", True),
+    "mref"    : LayerMeta(int, "Mirrored Packed Ref. Coord.", False),
+    "dwell"   : LayerMeta(float, "Dwell Time (ms/nt)", True),
+    "model_diff" : LayerMeta(float, "Model pA Difference", True),
 }
+
+LAYERS = {
+    "dtw" : {
+        "start" : LayerMeta(int, "Sample Start", False),
+        "length" : LayerMeta(int, "Sample Length", False),
+        "current" : LayerMeta(float, "Current (pA)", False),
+        "dwell" : LayerMeta(float, "Dwell Time (ms/nt)", True),
+        "model_diff" : LayerMeta(float, "Model pA Difference", True)},
+    "bcaln" : { 
+        "sample" : LayerMeta(int, "Sample Start", False),
+        "bp" : LayerMeta(int, "Basecaller Base Index", False),
+        "err" : LayerMeta(str, "Basecalled Alignment Error", False)}
+}
+
+def parse_layers(layers):
+    if isinstance(layers, str):
+        layers = layers.split(",")
+
+    ret = list()
+
+    for layer in layers:
+        spl = layer.split(".")
+        if len(spl) == 2:
+            group,layer = spl
+        elif len(spl) == 1:
+            group = "dtw"
+            layer = spl[0]
+        else:
+            raise ValueError("Invalid layer specifier \"%s\", must contain at most one \".\"" % layer)
+
+        if not group in LAYERS:
+            raise ValueError("Invalid layer group \"%s\". Options: %s" % (group, LAYERS.keys()))
+
+        group_layers = LAYERS[group]
+
+        if not layer in group_layers:
+            raise ValueError("Invalid layer \"%s\". Options: %s" % (group, group_layers.keys()))
+
+        ret.append( (group, layer) )
 
 class AlnTrack:
 
