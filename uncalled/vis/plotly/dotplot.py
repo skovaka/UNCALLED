@@ -79,6 +79,8 @@ def dotplot(conf, read, tracks):
                 line={"color":"purple", "width":2, "shape" : "hv"}
             ), row=2, col=1)
 
+    fig.update_layout(yaxis={"fixedrange" : True}, dragmode="pan")#, scroll_zoom=True)
+
     #fig.update_layout(
     #    coloraxis={
     #        "colorscale": "balance", 
@@ -118,4 +120,6 @@ def main(conf):
 
         fig = dotplot(conf, read, tracks)
 
-        fig.write_html(conf.out_prefix + read_id + ".html")
+        #fig.show()
+
+        fig.write_html(conf.out_prefix + read_id + ".html", config={"scrollZoom" : True, "displayModeBar" : True})
