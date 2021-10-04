@@ -22,12 +22,12 @@ TrackIOParams._def_params(
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),
     ("max_reads", None, int, "Only load reads which overlap these coordinates"),
     ("index_prefix", None, str, "BWA index prefix"),
+    ("load_fast5s", bool, True, "Load fast5 files"),
     ("overwrite", False, bool, "Overwrite existing databases"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
     ("layers", ["current", "dwell", "model_diff"], None, "Layers to load"),
-    #("mode", "r", str, "Read (r) or write (w) mode"),
     ignore_toml={"input", "output", "ref_bounds", "layers"}
 )
 
@@ -88,6 +88,9 @@ class TrackIO:
                 self._init_output_tracks(db, track_names)
                 db.init_write()
             else:
+                #TODO don't store in DB
+                if self.prms.load_fast5s:
+                    db.fast5s = Fast5Reader(index=db.get_fast5_index(), conf=self.conf)
                 self._init_input_tracks(db, track_names)
     
 
@@ -111,7 +114,6 @@ class TrackIO:
         self.track_dbs[name] = db
 
     def _init_input_tracks(self, db, track_names):
-        #TODO sort (reindex?) DF by specified track_names to maintain order
         df = db.query_track(track_names).set_index("name").reindex(track_names)
 
         missing = df["id"].isnull()
@@ -126,6 +128,7 @@ class TrackIO:
 
             conf = config.Config(toml=row.config)
             t = AlnTrack(db, row["id"], name, row["desc"], row["groups"], conf)
+            t.fast5s = db.fast5s
             self.input_tracks.append(t)
 
             self.conf.load_config(conf)
@@ -153,7 +156,6 @@ class TrackIO:
 
 
                 raise err
-
 
     def get_fast5_reader(self):
         #TODO needs work for multiple DBs
@@ -550,10 +552,19 @@ class TrackSQL:
                 method="multi", chunksize=50000,
                 index=True, index_label=["mref","aln_id"])
 
-    def get_fast5_index(self):
-        return pd.read_sql_query("""
-            SELECT read.id AS read_id, filename FROM read
-            JOIN fast5 ON fast5.id = fast5_id""", self.con)
+    def get_fast5_index(self, track_id=None):
+        query = "SELECT read.id AS read_id, filename FROM read " +\
+                "JOIN fast5 ON fast5.id = fast5_id"
+
+        wheres = list()
+        params = list()
+
+        if track_id is not None:
+            query += " JOIN alignment ON read.id = alignment.read_id"
+            self._add_where(wheres, params, "track_id", track_id)
+        
+        query = self._join_query(query, wheres)
+        return pd.read_sql_query(query, self.con, params=params)
 
     def get_read_ids(self):
         return set(pd.read_sql_query("SELECT id FROM read", self.con)["id"])
