@@ -57,7 +57,19 @@ class TrackIO:
             self.index = load_index(self.prms.index_prefix)
             self._set_ref_bounds(self.prms.ref_bounds)
 
-        self.fast5s = None
+        if self.prms.load_fast5s:
+            fast5_reads = list()
+            for _,db in self.dbs.items():
+                fast5_reads.append(db.get_fast5_index(self.input_track_ids))
+            fast5_reads = pd.concat(fast5_reads)
+            self.fast5s = self.fast5s = Fast5Reader(index=fast5_reads, conf=self.conf)
+
+            reads = fast5_reads["read_id"]
+            self.reads = pd.Index(reads[~reads.duplicated()])
+            print(len(reads), len(self.reads))
+
+            for track in self.input_tracks:
+                track.fast5s = self.fast5s
 
     def _set_ref_bounds(self, ref_bounds):
         if ref_bounds is not None:
@@ -88,9 +100,6 @@ class TrackIO:
                 self._init_output_tracks(db, track_names)
                 db.init_write()
             else:
-                #TODO don't store in DB
-                if self.prms.load_fast5s:
-                    db.fast5s = Fast5Reader(index=db.get_fast5_index(), conf=self.conf)
                 self._init_input_tracks(db, track_names)
     
 
@@ -128,7 +137,6 @@ class TrackIO:
 
             conf = config.Config(toml=row.config)
             t = AlnTrack(db, row["id"], name, row["desc"], row["groups"], conf)
-            t.fast5s = db.fast5s
             self.input_tracks.append(t)
 
             self.conf.load_config(conf)
@@ -402,7 +410,7 @@ class TrackIO:
         layers = dict()
         #TODO parse which track layers to import
         for group in ["dtw"]: #self.groups:
-            layers[group] = db.query_layers(self.input_track_ids, self.coords, ids, index=["aln_id","mref"])
+            layers[group] = db.query_layers(self.input_track_ids, self.coords, ids) #, index=["aln_id","mref"])
 
         layers = pd.concat(layers, names=["group", "layer"], axis=1)
 
@@ -630,9 +638,13 @@ class TrackSQL:
             self._add_where(wheres, params, "track_id", track_id)
 
         if coords is not None:
-            wheres.append("((mref >= ? AND mref <= ?) OR (mref >= ? AND mref <= ?))")
-            params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
-            params += [str(coords.mrefs[False].min()), str(coords.mrefs[False].max())]
+            if coords.stranded:
+                wheres.append("(mref >= ? AND mref <= ?)")
+                params += [str(coords.mrefs.min()), str(coords.mrefs.max())]
+            else:
+                wheres.append("((mref >= ? AND mref <= ?) OR (mref >= ? AND mref <= ?))")
+                params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
+                params += [str(coords.mrefs[False].min()), str(coords.mrefs[False].max())]
 
         self._add_where(wheres, params, "aln_id", aln_id)
 

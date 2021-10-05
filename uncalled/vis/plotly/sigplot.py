@@ -20,7 +20,9 @@ SigplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
     #("ref_bounds", None, str_to_coord, "DTW aligment tracks"),
     #("reads", None, None, "Reads to plot"),
+    ("max_reads", 10, int, ""),
     ("track_colors", ["purple", "darkgreen", "royalblue", "crimson"], list, ""),
+    ("base_colors", ["#80ff80", "#6b93ff", "#ffbd00", "#ff8080"], list, "Colors for each base (A,C,G,T/U)"), 
     ("fill_layer", "base", str, ""),
     ("fill_track", 0, None, "")
 )
@@ -30,112 +32,147 @@ class Sigplot:
         self.conf, self.prms = config._init_group("sigplot", *args, **kwargs)
         self.tracks = self.prms.tracks #TODO do this better
 
-        alns = self.tracks[0].alignments.index
+        reads = pd.Index([])
         for t in self.tracks:
-            alns = alns.union(t.alignments.index)
-        self.alns = alns.sort_values()
-
+            reads = reads.union(t.alignments["read_id"])
+        if len(reads) > self.prms.max_reads:
+            reads = np.random.choice(reads, self.prms.max_reads, False)
+        self.reads = np.sort(reads)
+        
     def plot(self, fig=None, row=1, col=1):
         if fig is None:
             fig = make_subplots(
-                rows=len(self.alns), cols=1, 
-                vertical_spacing=0.01,
-                shared_xaxes=True)
+                rows=len(self.reads), cols=1, 
+                vertical_spacing=0.01)
+            fig.update_yaxes(fixedrange=True)
+            fig.update_layout(dragmode="pan")
 
-        for aln_id in self.alns:
-            self.plot_aln(fig, aln_id, row, col)
+        for read_id in self.reads:
+            self.plot_read(fig, read_id, row, col)
             row += 1
 
-        fig.update_layout(yaxis={"fixedrange" : True}, dragmode="pan")
+        
+        return fig
 
-    def plot_aln(self, fig, aln_id, row=1, col=1):
-        for i,track in enumerate(self.tracks):
-            track_color = self.prms.track_colors[i]
+    def _plot_signal(self, fig, read, samp_min, samp_max, row, col):
+        signal = read.get_norm_signal(samp_min, samp_max)
+
+        #TODO set global signal min/max
+        mask = ((signal >= 40) &
+                (signal <= self.conf.event_detector.max_mean))
+        
+        samps = np.arange(samp_min, samp_max)[mask]
+        signal = signal[mask]
+
+        fig.add_trace(go.Scattergl(
+            x=samps, y=signal,
+            hoverinfo="skip",
+            name="Raw Signal",
+            mode="markers",
+            marker={"size":2, "color":"black"}
+        ), row=row, col=col)
+
+        return signal.min(), signal.max()
+
             
-            if aln_id not in track.alignments.index:
-                print(aln_id)
-                print(track.alignments.index)
-                continue
+    def _plot_bases(self, fig, dtw, ymin, ymax, row, col):
+        bases = nt.kmer_base(dtw["kmers"], 2)
+        for base, color in enumerate(self.prms.base_colors):
+            base_dtw = dtw[bases == base]
+            starts = base_dtw['start']
+            ends = starts + base_dtw['length'] - 1
+            nones = [None]*len(base_dtw)
 
-            aln = track.alignments.loc[aln_id]
+            ys = [ymax,ymax,ymin,ymin,None]*len(base_dtw)
+            xs = np.dstack([starts, ends, ends, starts, nones]).reshape(len(ys))
 
-            read = ProcRead(track.fast5s[aln["read_id"]], conf=self.conf)
-
-            dtw = track.layers["dtw"].loc[aln_id]
-
-            samp_min = dtw["start"].min()
-            max_i = dtw["start"].argmax()
-            samp_max = dtw["start"].iloc[max_i] + dtw["length"].iloc[max_i]
-            samps = np.arange(samp_min, samp_max)
-            raw_norm = read.get_norm_signal(samp_min, samp_max)
-            mask = ((raw_norm >= 40) &
-                    (raw_norm <= self.conf.event_detector.max_mean))
-
-            kmers = track.coords.kmers[dtw.index]
-            model_current = track.model[kmers]
-
-            aln_bases = nt.kmer_base(kmers, 2)
-
-            ymin = min(np.min(model_current), np.min(raw_norm[mask]))
-            ymax = max(np.max(model_current), np.max(raw_norm[mask]))
-
-            base_colors = ["#80ff80", "#8080ff", "#ffbd00", "#ff8080"] #A,C,G,T
-            for base, color in enumerate(base_colors):
-                base_dtw = dtw[aln_bases == base]
-                starts = base_dtw['start']
-                ends = starts + base_dtw['length'] - 1
-                nones = [None]*len(base_dtw)
-
-                ys = [ymax,ymax,ymin,ymin,None]*len(base_dtw)
-                xs = np.dstack([starts, ends, ends, starts, nones]).reshape(len(ys))
-                
-                fig.add_trace(go.Scatter(
-                    x=xs,y=ys, fill="toself",
-                    fillcolor=color,
-                    hoverinfo="skip",
-                    line={"width" : 0},
-                    name=nt.base_to_char(base)
-                ), row=row, col=col)
-
-            fig.add_trace(go.Scattergl(
-                x=samps[mask], y=raw_norm[mask],
+            fig.add_trace(go.Scatter(
+                x=xs,y=ys, fill="toself",
+                fillcolor=color,
                 hoverinfo="skip",
-                name="Raw Signal",
-                mode="markers",
-                marker={"size":2, "color":"black"}
+                mode="none",
+                line={"width" : 0},
+                name=nt.base_to_char(base)
             ), row=row, col=col)
 
+    def plot_read(self, fig, read_id, row=1, col=1):
+
+        track_dtws  = list()
+        
+        current_min = samp_min = np.inf
+        current_max = samp_max = 0
+        for i,track in enumerate(self.tracks):
+            track_color = self.prms.track_colors[i]
+
+            alns = track.alignments.query("@read_id == read_id")
+            aln_ids = alns.index
+
+            dtws = list()
+            
+            for aln_id in aln_ids:
+                dtw = track.layers["dtw"].xs(aln_id, level="aln_id")
+                dtw["kmers"] = track.coords.kmers[dtw.index]
+                dtw["model_current"] = track.model[dtw["kmers"]]
+                dtws.append(dtw)
+
+                max_i = dtw["start"].argmax()
+                samp_min = min(samp_min, dtw["start"].min())
+                samp_max = max(samp_max, dtw["start"].iloc[max_i] + dtw["length"].iloc[max_i])
+
+                kmers = track.coords.kmers[dtw.index]
+                model_current = track.model[kmers]
+
+                current_min = min(current_min, model_current.min())
+                current_max = max(current_max, model_current.max())
+
+                #pd.DataFrame(
+                    #index=dtw["start"], 
+                    #data={"model_current" : model_current}))
+
+                #ymin = min(np.min(model_current), np.min(raw_norm[mask]))
+                #ymax = max(np.max(model_current), np.max(raw_norm[mask]))
+                #self._plot_bases(fig, dtw, kmers, ymin, ymax)
+
+            track_dtws.append(pd.concat(dtws).sort_index())
+
+        read = ProcRead(track.fast5s[read_id], conf=self.conf)
+        sig_min, sig_max = self._plot_signal(fig, read, samp_min, samp_max, row, col)
+
+        current_min = min(current_min, sig_min)
+        current_max = max(current_max, sig_max)
+
+        if len(self.tracks) == 1:
+            self._plot_bases(fig, track_dtws[0], current_min, current_max, row, col)
+            colors = ["white"]
+        else:
+            colors = self.prms.track_colors
+
+        for dtw,color in zip(track_dtws, colors):
             fig.add_trace(go.Scattergl(
                 name = "Model Current",
-                x=dtw["start"], y=model_current,
-                line={"color":"white", "width":2, "shape" : "hv"}
+                mode = "lines",
+                x=dtw["start"], y=dtw["model_current"],
+                line={"color":color, "width":2, "shape" : "hv"}
             ), row=row, col=col)
 
 
         return fig
 
 OPTS = (
+    Opt("ref_bounds", "track_io", type=str_to_coord),
     Opt("input", "track_io", nargs="+"),
-    Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
+    Opt(("-o", "--outfile"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
-    Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
     Opt(("-l", "--read-filter"), "track_io", type=parse_read_ids),
-    #Opt(("-L", "--layers"), "dotplot", type=comma_split),
+    Opt(("-n", "--max-reads"), "sigplot"),
 )
 
 def main(conf):
     """plot a dotplot"""
     io = TrackIO(conf=conf)
 
-    for read_id, tracks in io.iter_reads():
-        fast5_read = fast5s[read_id]
-        if isinstance(fast5_read, ProcRead):
-            read = fast5_read
-        else:
-            read = ProcRead(fast5_read, conf=io.conf)
+    tracks = io.load_refs()
 
-        fig = dotplot(conf, read, tracks)
+    fig = Sigplot(tracks, conf=conf).plot()
 
-        #fig.show()
-
-        fig.write_html(conf.out_prefix + read_id + ".html", config={"scrollZoom" : True, "displayModeBar" : True})
+    fig.write_html(conf.outfile, config={"scrollZoom" : True, "displayModeBar" : True})

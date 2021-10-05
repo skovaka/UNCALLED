@@ -15,6 +15,10 @@ from ...argparse import Opt, comma_split
 from ...fast5 import parse_read_ids
 from ...sigproc import ProcRead
 
+#cmap = px.colors.qualitative.Dark24[1:]
+cmap = ["#AA0DFE", "#1CA71C", "#6A76FC"]
+track_colors = cmap
+
 def dotplot(conf, tracks):
     fig = make_subplots(
         rows=2, cols=1, 
@@ -22,17 +26,15 @@ def dotplot(conf, tracks):
         vertical_spacing=0.01,
         shared_xaxes=True)
 
-    Sigplot(tracks, conf=conf).plot(fig)
+    Sigplot(tracks, track_colors=track_colors, conf=conf).plot(fig)
 
     for i,track in enumerate(tracks):
         for aln_id, aln in track.alignments.iterrows():
-
-            dtw = track.layers["dtw"].loc[aln_id]
-
+            dtw = track.layers["dtw"].xs(aln_id, level="aln_id")
             fig.add_trace(go.Scatter(
                 x=dtw["start"], y=dtw.index,
                 name=track.name,
-                line={"color":"purple", "width":2, "shape" : "hv"}
+                line={"color":track_colors[i], "width":2, "shape" : "hv"}
             ), row=2, col=1)
 
     fig.update_layout(yaxis={"fixedrange" : True}, dragmode="pan")#, scroll_zoom=True)

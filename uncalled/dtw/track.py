@@ -181,8 +181,6 @@ class AlnTrack:
     #        return self.coords.kmers[self.layers.index.get_level_values("mref")]
     #    return self.coords.kmers[True][self.layers.index.get_level_values("mref")]
 
-    def get_pileup(self, layer):
-        return np.flip(np.sort(self[layer], axis=0), axis=0)
 
     def sort_coord(self, layer, ref):
         order = (-self.mat[layer,ref].fillna(0)).argsort()
