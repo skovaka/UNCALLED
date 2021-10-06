@@ -6,12 +6,42 @@ import numpy as np
 import pandas as pd
 import collections
 import time
+from collections import defaultdict
 
-from .track import AlnTrack, DEFAULT_LAYERS
+from .track import AlnTrack, DEFAULT_LAYERS, LayerMeta
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
-from .. import config
+from .. import config, nt
+
+#TODO probably move this to AlnTrack
+LAYERS = {
+    "ref" : {
+        "coord" : LayerMeta(int, "Reference Coordinate", 
+            lambda track: track.coords.mref_to_ref(track.layers.index.get_level_values("mref"))[1]),
+        "name" : LayerMeta(str, "Reference Name",
+            lambda track: [track.coords.ref_name]*len(track.layers)),
+        "fwd" : LayerMeta(bool, "Is on fwd strand",
+            lambda track: [track.coords.fwd]*len(track.layers)),
+        "kmer" : LayerMeta(str, "Reference k-mer",
+            lambda track: track.coords.kmers[track.layers.index.get_level_values("mref")]),
+        "base" : LayerMeta(str, "Reference base",
+            lambda track: nt.kmer_base(track.coords.kmers[track.layers.index.get_level_values("mref")], 2)),
+    }, "dtw" : {
+        "start" : LayerMeta(int, "Sample Start", None),
+        "length" : LayerMeta(int, "Sample Length", None),
+        "current" : LayerMeta(float, "Current (pA)", None),
+        "middle" : LayerMeta(float, "Middle Sample",  
+            lambda track: track.layers["dtw","start"] + (track.layers["dtw","length"] / 2)),
+        "dwell" : LayerMeta(float, "Dwell Time (ms/nt)",
+            lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate),
+        "model_diff" : LayerMeta(float, "Model pA Difference",
+            lambda track: track.layers["dtw","current"] - track.model[track.kmers]),
+    }, "bcaln" : { 
+        "sample" : LayerMeta(int, "Sample Start", None),
+        "bp" : LayerMeta(int, "Basecaller Base Index", None),
+        "err" : LayerMeta(str, "Basecalled Alignment Error", None)}
+}
 
 class TrackIOParams(config.ParamGroup):
     _name = "track_io"
@@ -19,6 +49,7 @@ TrackIOParams._def_params(
     ("input", None, None, "Input track(s)"),
     ("output", None, None,  "Output track"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
+    ("layers", ["current", "dwell", "model_diff"], None, "Layers to load"),
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),
     ("max_reads", None, int, "Only load reads which overlap these coordinates"),
     ("index_prefix", None, str, "BWA index prefix"),
@@ -27,7 +58,6 @@ TrackIOParams._def_params(
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
-    ("layers", ["current", "dwell", "model_diff"], None, "Layers to load"),
     ignore_toml={"input", "output", "ref_bounds", "layers"}
 )
 
@@ -35,8 +65,10 @@ class TrackIO:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("track_io", *args, **kwargs)
 
-        if isinstance(self.prms.layers, str):
-            self.prms.layers = [self.prms.layers]
+        #if isinstance(self.prms.layers, str):
+        #    self.prms.layers = [self.prms.layers]
+
+        self.set_layers(self.prms.layers)
 
         self.dbs = dict()
 
@@ -66,7 +98,6 @@ class TrackIO:
 
             reads = fast5_reads["read_id"]
             self.reads = pd.Index(reads[~reads.duplicated()])
-            print(len(reads), len(self.reads))
 
             for track in self.input_tracks:
                 track.fast5s = self.fast5s
@@ -80,6 +111,49 @@ class TrackIO:
             self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
         else:
             self.coords = None
+
+    def set_layers(self, layers):
+        self.prms.layers = layers
+        self.db_layers = defaultdict(list)
+        self.fn_layers = defaultdict(list)
+
+        if layers is None:
+            return
+
+        if isinstance(layers, str):
+            layers = layers.split(",")
+
+        ret = list()
+
+        parsed = set()
+
+        for layer in layers:
+            spl = layer.split(".")
+            if len(spl) == 2:
+                group,layer = spl
+            elif len(spl) == 1:
+                group = "dtw"
+                layer = spl[0]
+            else:
+                raise ValueError("Invalid layer specifier \"%s\", must contain at most one \".\"" % layer)
+
+            if not group in LAYERS:
+                raise ValueError("Invalid layer group \"%s\". Options: %s" % (group, LAYERS.keys()))
+
+            group_layers = LAYERS[group]
+
+            if not layer in group_layers:
+                raise ValueError("Invalid layer \"%s\". Options: %s" % (group, group_layers.keys()))
+
+            if (group, layer) in parsed:
+                continue
+            parsed.add((group, layer))
+
+            if group_layers[layer].fn is None:
+                self.db_layers[group].append(layer)
+            else:
+                self.fn_layers[group].append(layer)
+
 
     def _load_dbs(self, dbs, out):
         if dbs is None:
@@ -244,10 +318,24 @@ class TrackIO:
             track.layers["dtw","current"] - track.model[track.kmers])
     }
 
+    #"ref":
+    #    "coord" : LayerMeta(int, "Reference Coordinate", True),
+    #    "name" : LayerMeta(str, "Reference Name", True),
+    #    "fwd" : LayerMeta(bool, "Is on fwd strand", True),
+    #    "kmer" : LayerMeta(str, "Reference k-mer", True),
+    #    "base" : LayerMeta(str, "Reference base", True),
+    #"dtw" : {
+    #    "dwell" : LayerMeta(float, "Dwell Time (ms/nt)", True),
+    #    "model_diff" : LayerMeta(float, "Model pA Difference", True)},
+
     def compute_layers(self, track, layer_names):
-        for name in layer_names:
-            if not name in track.layers.columns.get_level_values(1):
-                track.layers["dtw",name] = self.LAYER_FNS[name](self,track)
+        for group, layers in self.fn_layers.items():
+            for layer in layers:
+                vals = LAYERS[group][layer].fn(track)
+                track.layers[group,layer] = vals
+        #for name in layer_names:
+        #    if not name in track.layers.columns.get_level_values(1):
+        #        track.layers["dtw",name] = self.LAYER_FNS[name](self,track)
 
     def load_refs(self, ref_bounds=None, full_overlap=None, load_mat=False):
         if ref_bounds is not None:
@@ -418,7 +506,7 @@ class TrackIO:
             track_alns = alns[alns["track_id"] == track.id]
 
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)
-            track_layers = layers.iloc[i]
+            track_layers = layers.iloc[i].copy()
 
             name = track_alns["ref_name"].iloc[0]
             fwd = track_alns["fwd"].iloc[0]
