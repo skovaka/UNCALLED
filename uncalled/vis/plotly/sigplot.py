@@ -50,29 +50,8 @@ class Sigplot:
         for read_id in self.reads:
             self.plot_read(fig, read_id, row, col)
             row += 1
-
         
         return fig
-
-    def _plot_signal(self, fig, read, samp_min, samp_max, row, col):
-        signal = read.get_norm_signal(samp_min, samp_max)
-
-        #TODO set global signal min/max
-        mask = ((signal >= 40) &
-                (signal <= self.conf.event_detector.max_mean))
-        
-        samps = np.arange(samp_min, samp_max)[mask]
-        signal = signal[mask]
-
-        fig.add_trace(go.Scattergl(
-            x=samps, y=signal,
-            hoverinfo="skip",
-            name="Raw Signal",
-            mode="markers",
-            marker={"size":2, "color":"black"}
-        ), row=row, col=col)
-
-        return signal.min(), signal.max()
 
             
     def _plot_bases(self, fig, dtw, ymin, ymax, row, col):
@@ -86,11 +65,12 @@ class Sigplot:
             ys = [ymax,ymax,ymin,ymin,None]*len(base_dtw)
             xs = np.dstack([starts, ends, ends, starts, nones]).reshape(len(ys))
 
-            fig.add_trace(go.Scatter(
+            fig.add_trace(go.Scattergl(
                 x=xs,y=ys, fill="toself",
                 fillcolor=color,
                 hoverinfo="skip",
                 mode="none",
+                legendgroup="bases",
                 line={"width" : 0},
                 name=nt.base_to_char(base)
             ), row=row, col=col)
@@ -136,25 +116,46 @@ class Sigplot:
             track_dtws.append(pd.concat(dtws).sort_index())
 
         read = ProcRead(track.fast5s[read_id], conf=self.conf)
-        sig_min, sig_max = self._plot_signal(fig, read, samp_min, samp_max, row, col)
+        #sig_min, sig_max = self._plot_signal(fig, read, samp_min, samp_max, row, col)
+        signal = read.get_norm_signal(samp_min, samp_max)
 
-        current_min = min(current_min, sig_min)
-        current_max = max(current_max, sig_max)
+        #TODO set global signal min/max
+        mask = ((signal >= 40) &
+                (signal <= self.conf.event_detector.max_mean))
+        
+        samples = np.arange(samp_min, samp_max)[mask]
+        signal = signal[mask]
+
+        current_min = min(current_min, signal.min())
+        current_max = max(current_max, signal.max())
 
         if len(self.tracks) == 1:
             self._plot_bases(fig, track_dtws[0], current_min, current_max, row, col)
             colors = ["white"]
+            dtw_kws = [{}]
         else:
             colors = self.prms.track_colors
+            dtw_kws = [{"legendgroup" : t.desc, "showlegend" : False} for t in self.tracks]
 
-        for dtw,color in zip(track_dtws, colors):
+        fig.add_trace(go.Scattergl(
+            x=samples, y=signal,
+            hoverinfo="skip",
+            name="Raw Signal",
+            mode="markers",
+            marker={"size":2, "color":"black"}
+        ), row=row, col=col)
+
+        for dtw,color,kw in zip(track_dtws, colors, dtw_kws):
             fig.add_trace(go.Scattergl(
                 name = "Model Current",
                 mode = "lines",
                 x=dtw["start"], y=dtw["model_current"],
-                line={"color":color, "width":2, "shape" : "hv"}
+                line={"color":color, "width":2, "shape" : "hv"},
+                **kw
             ), row=row, col=col)
 
+        fig.update_yaxes(title_text="Current (pA)", row=row, col=col)
+        #fig.update_yaxes(fixedrange=True, row=row, col=col)
 
         return fig
 
