@@ -37,30 +37,31 @@ def dotplot(conf, tracks):
 
         track_df = list()
         
-        #TODO write AlnIO AlnTracks.tracks
         for aln_id, aln in track.alignments.iterrows():
             dtw = track.layers["dtw"].xs(aln_id, level="aln_id")
 
             fwd, refs = track.coords.mref_to_ref(dtw.index)
 
+            dtw["middle"] = dtw["start"] + (dtw["length"] / 2)
+
             track_df.append(pd.DataFrame({
                 "ref" : refs,
-                "sample_mid" : dtw["start"] + dtw["length"]/2,
+                "middle" : dtw["middle"],
                 "current" : dtw["current"],
                 "dwell" : dtw["dwell"],
                 "model_diff" : dtw["model_diff"],
             }).set_index("ref", drop=True))
 
             fig.add_trace(go.Scatter(
-                x=dtw["start"], y=refs,
+                x=dtw["middle"], y=refs,
                 name=track.name,
                 legendgroup=track.desc,
-                line={"color":track_colors[i], "width":2, "shape" : "hv"},
+                line={"color":track_colors[i], "width":2, "shape" : "hvh"},
                 hoverinfo="skip",
             ), row=2, col=1)
 
             fig.add_trace(go.Scatter(
-                x=dtw["model_diff"], y=refs-0.5, 
+                x=dtw["model_diff"], y=refs-0.5, #TODO try vhv
                 name=track.name, legendgroup=track.desc,
                 line={"color":track_colors[i], "width":2, "shape" : "hv"},
             ), row=2, col=2)
@@ -68,8 +69,8 @@ def dotplot(conf, tracks):
         hover_df[track.name] = pd.concat(track_df)
 
     hover_df = pd.concat(hover_df, axis=1)
-    hover_coords = hover_df.xs("sample_mid", axis=1, level=1).mean(axis=1)
-    hoverdata = hover_df.drop("sample_mid", axis=1, level=1).to_numpy()
+    hover_coords = hover_df.xs("middle", axis=1, level=1).mean(axis=1)
+    hoverdata = hover_df.drop("middle", axis=1, level=1).to_numpy()
 
     hover_rows = [
         track.coords.ref_name + ":%{y:,d}"
