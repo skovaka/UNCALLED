@@ -173,7 +173,7 @@ def tombo(conf):
             currents = tombo_events["norm_mean"]
 
             if not sig_fwd:
-                starts = raw_len - tombo_start - starts - tombo_events["length"] - 1
+                starts = raw_len - tombo_start - starts - tombo_events["length"] - 2
                 #starts = np.flip(raw_len - tombo_start - starts - tombo_events["length"] - 1)
                 #currents = np.flip(currents)
                 #lengths = np.flip(lengths)

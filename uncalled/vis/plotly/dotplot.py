@@ -31,7 +31,11 @@ class Dotplot:
         self.tracks = self.prms.tracks #TODO do this better
         #self.prms.layers = list(parse_layers(self.prms.layers))
 
-        column_widths=[5]+[1]*len(self.prms.dtw_layers)
+        compare = len(self.tracks) == 2
+        if compare:
+            self.tracks[0].compare(self.tracks[1])
+
+        column_widths=[5]+[1]*(len(self.prms.dtw_layers)+compare)
 
         self.fig = make_subplots(
             rows=2, cols=len(column_widths), 
@@ -44,9 +48,6 @@ class Dotplot:
 
         Sigplot(self.tracks, track_colors=self.prms.track_colors, conf=self.conf).plot(self.fig)
 
-
-        if len(self.tracks) == 2:
-            self.tracks[0].compare(self.tracks[1])
 
         hover_layers = ["middle","kmer","current","dwell"]#,"model_diff"]
         hover_layers += (l for l in self.prms.dtw_layers if l not in {"current","dwell"})
@@ -82,6 +83,20 @@ class Dotplot:
 
             hover_data[track.name] = pd.concat(track_hover)
                 #hover_data[track.name].drop("kmer", axis=1)
+
+        if compare:
+            jacolor="#005eff"
+            self.fig.add_trace(go.Bar(
+                x=self.tracks[0].layers["dtw","jaccard"], 
+                y=self.tracks[0].layer_refs, #TODO try vhv
+                name="DTW Compare",
+                orientation="h",
+                width=1,
+                marker={"color":jacolor,"line":{"color":jacolor,"width":1}},
+                legendgroup="compare"
+            ), row=2, col=len(column_widths))
+            self.fig.update_xaxes(row=2, col=i+2,
+                title_text="Sample Jaccard")
 
         hover_data = pd.concat(hover_data, axis=1)
         hover_coords = hover_data.xs("middle", axis=1, level=1).mean(axis=1)

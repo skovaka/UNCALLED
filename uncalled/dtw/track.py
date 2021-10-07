@@ -175,7 +175,13 @@ class AlnTrack:
                 dtw_a = self.get_aln_layers(id_a, "dtw", ["start","end"])
                 dtw_b = other.get_aln_layers(id_b, "dtw", ["start","end"])
                 merge = dtw_a.join(dtw_b, on="ref", lsuffix="_a", rsuffix="_b")
-                #print(merge)
+                starts = merge[["start_a", "start_b"]]
+                ends = merge[["end_a", "end_b"]]
+                jac = (
+                    (ends.min(axis=1) - starts.max(axis=1)).clip(0) /
+                    (ends.max(axis=1) - starts.min(axis=1)))
+
+                self.layers["dtw","jaccard"] = jac[self.layer_refs].to_numpy()
 
 
     @property
