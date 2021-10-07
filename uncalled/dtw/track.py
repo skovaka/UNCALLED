@@ -30,14 +30,33 @@ DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
 
 LayerMeta = namedtuple("LayerMeta", ["type", "label", "fn"])
 
-LAYER_META = {
-    "start"   : LayerMeta(int, "Sample Start", False),
-    "length"  : LayerMeta(int, "Sample Length", False),
-    "current" : LayerMeta(float, "Current (pA)", False),
-    "kmer"    : LayerMeta(int, "Reference K-mer", True),
-    "mref"    : LayerMeta(int, "Mirrored Packed Ref. Coord.", False),
-    "dwell"   : LayerMeta(float, "Dwell Time (ms/nt)", True),
-    "model_diff" : LayerMeta(float, "Model pA Difference", True),
+#TODO probably move this to AlnTrack
+LAYERS = {
+    "ref" : {
+        "coord" : LayerMeta(int, "Reference Coordinate", 
+            lambda track: track.coords.mref_to_ref(track.layer_mrefs)),
+        "name" : LayerMeta(str, "Reference Name",
+            lambda track: [track.coords.ref_name]*len(track.layers)),
+        "fwd" : LayerMeta(bool, "Is on fwd strand",
+            lambda track: [track.coords.fwd]*len(track.layers)),
+    }, "dtw" : {
+        "start" : LayerMeta(int, "Sample Start", None),
+        "length" : LayerMeta(int, "Sample Length", None),
+        "current" : LayerMeta(float, "Current (pA)", None),
+        "end" : LayerMeta(int, "Sample End",  
+            lambda track: track.layers["dtw","start"] + track.layers["dtw","length"]),
+        "middle" : LayerMeta(float, "Sample Middle",  
+            lambda track: track.layers["dtw","start"] + (track.layers["dtw","length"] / 2)),
+        "dwell" : LayerMeta(float, "Dwell Time (ms/nt)",
+            lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate),
+        "model_diff" : LayerMeta(float, "Model pA Difference",
+            lambda track: track.layers["dtw","current"] - track.model[track.kmers]),
+        "kmer" : LayerMeta(str, "Reference k-mer",
+            lambda track: track.coords.kmers[track.layer_mrefs].to_numpy()),
+        "base" : LayerMeta(str, "Reference base",
+            lambda track: nt.kmer_base(track.coords.kmers[track.layer_mrefs], 2)),
+        "bp" : LayerMeta(int, "Basecaller Base Index", None),
+        "err" : LayerMeta(str, "Basecalled Alignment Error", None)}
 }
 
 class AlnTrack:
@@ -83,11 +102,6 @@ class AlnTrack:
     def aln_ref_coord(self, aln_id):
         return RefCoord(*self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
 
-    #def _aln_coords(self, aln_id):
-    #    #ref_coord = RefCoord(
-    #    #    *self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
-    #    return self.index.get_coord_space(self.aln_ref_coord(aln_id), self.conf.is_rna, kmer_shift=0)
-
     def _default_id(self, aln_id):
         if aln_id is None:
             if len(self.alignments) == 1:
@@ -95,14 +109,6 @@ class AlnTrack:
             raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
         return aln_id
 
-
-    def set_layers(self, layers):
-        if layers is not None:
-            self.prms.layers = layers
-        self.layer_idxs = {layer : i for i,layer in enumerate(self.prms.layers)}
-
-    #TODO parse mm2 every time to enable changing bounds
-    #eventually use some kind of tabix-like indexing
     def set_data(self, coords, alignments, layers, load_mat=False):
         self.coords = coords
         self.layers = layers#pd.concat(layers, names=["group", "layer"], axis=1)
@@ -120,8 +126,13 @@ class AlnTrack:
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
 
-    def load_mat(self):
+    def calc_layers(self, layers):
+        for group, layer in layers:
+            if not group in self.layers or not layer in self.layers[group].columns:
+                vals = LAYERS[group][layer].fn(self)
+                self.layers[group,layer] = vals
 
+    def load_mat(self):
         df = self.layers.copy()
         df["aln_id"] = df.index.get_level_values("aln_id")
         df.index = self.coords.mref_to_ref_index(df.index.get_level_values("mref"), multi=False)
@@ -136,13 +147,6 @@ class AlnTrack:
         self.width = len(self.coords.refs)
         self.height = len(self.alignments)
 
-    #@property
-    #def kmers(self):
-    #    if self.coords.stranded:
-    #        return self.coords.kmers[self.layers.index.get_level_values("mref")]
-    #    return self.coords.kmers[True][self.layers.index.get_level_values("mref")]
-
-
     def sort_coord(self, layer, ref):
         order = (-self.mat[layer,ref].fillna(0)).argsort()
         self.sort(order)
@@ -151,53 +155,33 @@ class AlnTrack:
         self.mat = self.mat.iloc[order]
         self.alignments = self.alignments.iloc[order]
 
-    def calc_ks(self, track_b):
-        ks_stats = np.zeros((len(self.CMP_LAYERS), self.width))
+    def get_aln_layers(self, aln_id, group=None, layers=None):
+        #self.calc_layers([("re)])
+        if layers is not None:
+            self.calc_layers([(group, layer) for layer in layers])
+        df = self.layers.xs(aln_id, level="aln_id").set_index(self.layer_refs)
+        if group is None:
+            return df
+        if layers is None:
+            return df[group]
+        return df[group][layers]
 
-        for i,l in enumerate(AlnTrack.CMP_LAYERS):
-            for j,rf in enumerate(self.coords.mrefs[True]):
-                a = self.layers["dtw",l].loc[rf]
-                b = track_b.layers["dtw",l].loc[rf]
-                ks = scipy.stats.mstats.ks_2samp(a,b,mode="asymp")
-                ks_stats[i][j] = ks[0]
+    def compare(self, other):
+        groups_b = other.alignments.groupby("read_id")
 
-        return ks_stats
+        for id_a, aln_a in self.alignments.iterrows():
+            read_id = aln_a["read_id"]
+            for id_b, aln_b in groups_b.get_group(read_id).iterrows():
+                dtw_a = self.get_aln_layers(id_a, "dtw", ["start","end"])
+                dtw_b = other.get_aln_layers(id_b, "dtw", ["start","end"])
+                merge = dtw_a.join(dtw_b, on="ref", lsuffix="_a", rsuffix="_b")
+                #print(merge)
 
-    def calc_pca(self, layer, ref_start, ref_end, n_components=2):
-        x = self[layer,:,ref_start:ref_end].T
-        pc = PCA(n_components=n_components).fit_transform(x)
-        data = {"read_id" : self.alignments["id"]}
-        for c in range(n_components):
-            data["pc%d" % (c+1)] = pc[:,c]
-        return pd.DataFrame(data).set_index("read_id")
-    
-    
-    def sort_pca(self, layer, ref_start, ref_end):
-        pc = self.calc_pca(layer, ref_start, ref_end, 1)
-        self.sort(pc["pc1"].argsort())
-
-
-    def __getitem__(self, key):
-        if isinstance(key, str):
-            #key = self.layer_idxs[key]
-            return self.mat[key]
-        if len(key) == 3:
-            return self.mat[key[0],key[2]][key[1]]
-        return self.mat[key[0]][key[1]]
-    
-    @property
-    def kmer(self):
-        return self.mat[self.KMER_LAYER]
 
     @property
-    def pa(self):
-        return self.mat[self.PA_LAYER]
-    
-    @property
-    def dwell(self):
-        return self.mat[self.DWELL_LAYER]
-    
-    @property
-    def pa_diff(self):
-        return self.mat[self.PA_DIFF_LAYER]
+    def layer_mrefs(self):
+        return self.layers.index.get_level_values("mref")
 
+    @property
+    def layer_refs(self):
+        return self.coords.mref_to_ref_index(self.layer_mrefs)

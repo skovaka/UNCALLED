@@ -4,7 +4,7 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 
-from ...dtw.track import LAYER_META
+from ...dtw.track import LAYERS
 from ...index import str_to_coord
 from ...dtw.track_io import TrackIO
 from ...argparse import Opt, comma_split
@@ -20,7 +20,7 @@ def trackplot(tracks, layer):
         #y_title="Reads",
         vertical_spacing=0.125/len(tracks))
 
-    layer_desc = LAYER_META[layer].label
+    layer_desc = LAYERS[layer].label
 
     for i,track in enumerate(tracks):
         mat = track.mat["dtw"][layer]

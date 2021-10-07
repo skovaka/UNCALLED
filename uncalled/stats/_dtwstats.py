@@ -13,7 +13,7 @@ from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split, ref_coords
 from ..index import BWA_OPTS
 from ..fast5 import parse_read_ids
-from ..dtw import TrackIO, LAYER_META
+from ..dtw import TrackIO, LAYERS
 
 #class DtwstatsParams(config.ParamGroup):
 #    _name = "dtwstats"
@@ -25,7 +25,7 @@ from ..dtw import TrackIO, LAYER_META
 
 
 class _Dtwstats:
-    LAYERS = set(LAYER_META.keys())
+    LAYERS = set(LAYERS.keys())
     #COMPARE_STATS = {"cmp"}
     #ALL_STATS = LAYER_STATS | COMPARE_STATS
 

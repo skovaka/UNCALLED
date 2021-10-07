@@ -7,7 +7,7 @@ import numpy as np
 from ... import nt
 
 from ... import config
-from ...dtw.track import LAYER_META
+from ...dtw.track import LAYERS
 from ...index import str_to_coord
 from ...dtw.track_io import TrackIO
 from ...argparse import Opt, comma_split

@@ -13,7 +13,7 @@ from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split
 from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader
-from ..dtw import TrackIO, LAYER_META
+from ..dtw import TrackIO, LAYERS
 
 class RefstatsParams(config.ParamGroup):
     _name = "refstats"
@@ -135,7 +135,7 @@ refstats = _Refstats()
 
 OPTS = (
     Opt("layers", "refstats", type=comma_split,
-        help="Comma-separated list of layers over which to compute summary statistics {%s}" % ",".join(LAYER_META.keys())),
+        help="Comma-separated list of layers over which to compute summary statistics {%s}" % ",".join(LAYERS.keys())),
     Opt("stats", "refstats", type=comma_split,
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_STATS)),
     Opt("input", "track_io", nargs="+", type=str),

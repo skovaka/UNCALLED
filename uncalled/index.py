@@ -170,12 +170,12 @@ class CoordSpace:
         else:
             i = mrefs.get_loc(mref)
 
-        return fwd, self.refs[i]
+        return self.refs[i]
 
     def mref_to_ref_index(self, mrefs, multi=False):
         if self.stranded:
-            fwd,refs = self.mref_to_ref(mrefs)
-            fwd_mask = np.full(len(refs), fwd)
+            refs = self.mref_to_ref(mrefs)
+            fwd_mask = np.full(len(refs), self.fwd)
 
         else:
             revs = self.mrefs[0].get_indexer(mrefs)

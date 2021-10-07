@@ -24,7 +24,7 @@ from ...sigproc import ProcRead
 from ...index import BWA_OPTS, str_to_coord
 from ...fast5 import Fast5Reader
 from ..dotplot import Dotplot
-from ...dtw.track import AlnTrack, LAYER_META
+from ...dtw.track import AlnTrack, LAYERS
 from ...dtw.track_io import TrackIO
 from ...argparse import Opt, comma_split
 
@@ -96,13 +96,13 @@ class Browser:
 
         self.LAYER_IDS = dict()
         for i,layer in enumerate(self.conf.track_io.layers):
-            self.LAYER_IDS[LAYER_META[layer].label] = layer
+            self.LAYER_IDS[LAYERS[layer].label] = layer
 
         self.active_layer = self.conf.track_io.layers[0] #TODO parameter
 
         self.info_labels = ["Reference Coord", "Read ID"]
         for layer in self.conf.track_io.layers:
-            self.info_labels.append(LAYER_META[layer].label)
+            self.info_labels.append(LAYERS[layer].label)
 
         self.axs = types.SimpleNamespace()
 
@@ -313,8 +313,8 @@ class Browser:
             #ys = scipy.stats.norm.pdf(xs, exp_mean, exp_stdv)
             self.axs.pa_hist.plot(xs, ys, color="red", linewidth=2)
 
-        self.axs.pa_hist.set_xlabel(self.LAYER_META[self.PA_LAYER].label)
-        self.axs.dwell_hist.set_xlabel(self.LAYER_META[self.DWELL_LAYER].label)
+        self.axs.pa_hist.set_xlabel(self.LAYERS[self.PA_LAYER].label)
+        self.axs.dwell_hist.set_xlabel(self.LAYERS[self.DWELL_LAYER].label)
 
         self.axs.pa_hist.set_yticks([])
         self.axs.dwell_hist.set_yticks([])
@@ -345,7 +345,7 @@ class Browser:
         #self.cbar.update_normal(ScalarMappable(norm=track.norms[layer], cmap=CMAP))
         #self.cbar.update_normal(ScalarMappable(norm=norm, cmap=cmap))
         self.cbar.update_normal(ScalarMappable(norm=norm, cmap=cmap))
-        self.axs.cbar.set_ylabel(LAYER_META[layer].label) 
+        self.axs.cbar.set_ylabel(LAYERS[layer].label) 
         self.axs.cbar.yaxis.set_label_position('left') 
 
         self._update_sumstat()
@@ -457,7 +457,7 @@ class Browser:
         )
         self.cbar.outline.set_visible(False)
         self.axs.cbar.yaxis.set_label_position('left') 
-        self.axs.cbar.set_ylabel(LAYER_META[self.active_layer].label) 
+        self.axs.cbar.set_ylabel(LAYERS[self.active_layer].label) 
 
         self.axs.opt = self.fig.add_subplot(subspec[1])
 
@@ -466,7 +466,7 @@ class Browser:
         self._noticks(self.axs.opt)
 
         self.layer_radio = widgets.RadioButtons(
-            self.axs.opt, [LAYER_META[layer].label for layer in self.conf.track_io.layers],
+            self.axs.opt, [LAYERS[layer].label for layer in self.conf.track_io.layers],
             0, #TODO hacky way to deal with hidden layers
             activecolor = 'red'
         )
@@ -559,7 +559,7 @@ class Browser:
         )
 
         ax.set_yticks(np.arange(len(AlnTrack.CMP_LAYERS)))
-        ax.set_yticklabels([LAYER_META[l].label.split()[0] for l in AlnTrack.CMP_LAYERS])
+        ax.set_yticklabels([LAYERS[l].label.split()[0] for l in AlnTrack.CMP_LAYERS])
             
     def _init_sumstat_mean(self, gspec, track):
         self._init_sumstat(gspec)

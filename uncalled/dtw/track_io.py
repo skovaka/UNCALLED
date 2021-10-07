@@ -8,40 +8,11 @@ import collections
 import time
 from collections import defaultdict
 
-from .track import AlnTrack, DEFAULT_LAYERS, LayerMeta
+from .track import AlnTrack, LAYERS
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
 from .. import config, nt
-
-#TODO probably move this to AlnTrack
-LAYERS = {
-    "ref" : {
-        "coord" : LayerMeta(int, "Reference Coordinate", 
-            lambda track: track.coords.mref_to_ref(track.layers.index.get_level_values("mref"))[1]),
-        "name" : LayerMeta(str, "Reference Name",
-            lambda track: [track.coords.ref_name]*len(track.layers)),
-        "fwd" : LayerMeta(bool, "Is on fwd strand",
-            lambda track: [track.coords.fwd]*len(track.layers)),
-        "kmer" : LayerMeta(str, "Reference k-mer",
-            lambda track: track.coords.kmers[track.layers.index.get_level_values("mref")]),
-        "base" : LayerMeta(str, "Reference base",
-            lambda track: nt.kmer_base(track.coords.kmers[track.layers.index.get_level_values("mref")], 2)),
-    }, "dtw" : {
-        "start" : LayerMeta(int, "Sample Start", None),
-        "length" : LayerMeta(int, "Sample Length", None),
-        "current" : LayerMeta(float, "Current (pA)", None),
-        "middle" : LayerMeta(float, "Middle Sample",  
-            lambda track: track.layers["dtw","start"] + (track.layers["dtw","length"] / 2)),
-        "dwell" : LayerMeta(float, "Dwell Time (ms/nt)",
-            lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate),
-        "model_diff" : LayerMeta(float, "Model pA Difference",
-            lambda track: track.layers["dtw","current"] - track.model[track.kmers]),
-    }, "bcaln" : { 
-        "sample" : LayerMeta(int, "Sample Start", None),
-        "bp" : LayerMeta(int, "Basecaller Base Index", None),
-        "err" : LayerMeta(str, "Basecalled Alignment Error", None)}
-}
 
 def parse_layers(layers):
     db_layers = list() 
@@ -157,13 +128,13 @@ class TrackIO:
     def set_layers(self, layers):
         self.prms.layers = layers
 
-        self.db_layers = defaultdict(list)
-        self.fn_layers = defaultdict(list)
+        self.db_layers = list()
+        self.fn_layers = list()
         for group, layer in parse_layers(layers):
             if LAYERS[group][layer].fn is None:
-                self.db_layers[group].append(layer)
+                self.db_layers.append((group, layer))
             else:
-                self.fn_layers[group].append(layer)
+                self.fn_layers.append((group, layer))
 
     def _load_dbs(self, dbs, out):
         if dbs is None:
@@ -343,6 +314,7 @@ class TrackIO:
             for layer in layers:
                 vals = LAYERS[group][layer].fn(track)
                 track.layers[group,layer] = vals
+
         #for name in layer_names:
         #    if not name in track.layers.columns.get_level_values(1):
         #        track.layers["dtw",name] = self.LAYER_FNS[name](self,track)
@@ -372,7 +344,8 @@ class TrackIO:
             track_layers = layers.iloc[i].copy()
 
             track.set_data(self.coords, track_alns, track_layers)
-            self.compute_layers(track, self.prms.layers)
+            track.calc_layers(self.fn_layers)
+            #self.compute_layers(track, self.prms.layers)
             
             if load_mat:
                 track.load_mat()
@@ -426,7 +399,8 @@ class TrackIO:
                 track_alns = alns[alns["track_id"]==track.id].copy()
                 track_layers = layers[layers.index.isin(track_alns.index, 1)].copy()
                 track.set_data(coords, track_alns, track_layers)
-                self.compute_layers(track, self.prms.layers)
+                track.calc_layers(self.fn_layers)
+                #self.compute_layers(track, self.prms.layers)
 
             yield (coords, self.input_tracks)
 
@@ -527,7 +501,8 @@ class TrackIO:
                 ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)
 
             track.set_data(track_coords, track_alns, track_layers)
-            self.compute_layers(track, self.prms.layers)
+            track.calc_layers(self.fn_layers)
+            #self.compute_layers(track, self.prms.layers)
     
     def close(self):
         for filename, db in self.dbs.items():

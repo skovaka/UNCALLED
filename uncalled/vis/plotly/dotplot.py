@@ -8,7 +8,7 @@ from .sigplot import Sigplot
 
 from ... import config, nt
 
-from ...dtw.track import LAYER_META
+from ...dtw.track import LAYERS
 from ...index import str_to_coord
 from ...dtw.track_io import TrackIO, parse_layers, LAYERS
 from ...argparse import Opt, comma_split
@@ -44,24 +44,25 @@ class Dotplot:
 
         Sigplot(self.tracks, track_colors=self.prms.track_colors, conf=self.conf).plot(self.fig)
 
-        hover_df = dict()
+
+        if len(self.tracks) == 2:
+            self.tracks[0].compare(self.tracks[1])
+
+        hover_layers = ["middle","kmer","current","dwell","model_diff"]
+        hover_data = dict()
 
         for i,track in enumerate(self.tracks):
 
-            track_df = list()
+            track_hover = list()
             
             for aln_id, aln in track.alignments.iterrows():
                 layers = track.layers.xs(aln_id, level="aln_id")
-                dtw = layers["dtw"]
-                refs = layers["ref","coord"]
+                dtw = track.get_aln_layers(aln_id, "dtw")
 
-
-                df = layers["dtw"][["middle","current","dwell","model_diff"]].set_index(layers["ref","coord"])
-                
-                track_df.append(df)
+                track_hover.append(dtw[hover_layers])
 
                 self.fig.add_trace(go.Scatter(
-                    x=dtw["start"], y=refs,
+                    x=dtw["start"], y=dtw.index,
                     name=track.name,
                     legendgroup=track.desc,
                     line={"color":self.prms.track_colors[i], "width":2, "shape" : "hv"},
@@ -70,7 +71,7 @@ class Dotplot:
 
                 for j,layer in enumerate(self.prms.layers):
                     self.fig.add_trace(go.Scatter(
-                        x=dtw[layer[1]], y=refs-0.5, #TODO try vhv
+                        x=dtw[layer[1]], y=dtw.index-0.5, #TODO try vhv
                         name=track.name, 
                         line={
                             "color" : self.prms.track_colors[i], 
@@ -78,36 +79,46 @@ class Dotplot:
                         legendgroup=track.desc, showlegend=False,
                     ), row=2, col=j+2)
 
-            hover_df[track.name] = pd.concat(track_df)
+            hover_data[track.name] = pd.concat(track_hover)
+                #hover_data[track.name].drop("kmer", axis=1)
 
-        hover_df = pd.concat(hover_df, axis=1)
-        hover_coords = hover_df.xs("middle", axis=1, level=1).mean(axis=1)
-        hoverdata = hover_df.drop("middle", axis=1, level=1).to_numpy()
+        hover_data = pd.concat(hover_data, axis=1)
+        hover_coords = hover_data.xs("middle", axis=1, level=1).mean(axis=1)
+
+        hover_kmers = nt.kmer_to_str(
+            hover_data.xs("kmer", 1, 1)
+                      .fillna(method="pad", axis=1)
+                      .iloc[:,-1])
+
+
+        customdata = hover_data.drop(["kmer","middle"], axis=1, level=1).to_numpy()
 
         hover_rows = [
-            track.coords.ref_name + ":%{y:,d}"
+            "<b>" + track.coords.ref_name + ":%{y:,d} [%{text}]</b>"
         ]
         labels = [
             "Current (pA): ", 
             "Dwell (ms): ", 
             "Model pA Diff: "]
+
         for i,label in enumerate(labels):
-            s = "<b>"+label+"</b>"
-            #s = "<b style=\"font-family:mono\">"+label+"</b>"
+            s = label
             fields = list()
             for j in range(len(self.tracks)):
+                k = len(labels) * j + i
                 fields.append(
-                    '<span style="color:%s;float:right">%%{customdata[%d]:.2f}</span>' % 
-                    (self.prms.track_colors[j], j*3+i))
+                    '<span style="color:%s;float:right"><b>%%{customdata[%d]:.2f}</b></span>' % 
+                    (self.prms.track_colors[j], k))
             hover_rows.append(s + ", ".join(fields))
 
         self.fig.add_trace(go.Scatter(
             x=hover_coords, y=hover_coords.index,
             mode="markers", marker={"size":0,"color":"rgba(0,0,0,0)"},
             name="",
-            customdata=hoverdata,
-            hovertemplate="<b>"+"<br>".join(hover_rows)+"</b>",
+            customdata=customdata,
+            hovertemplate="<br>".join(hover_rows),
             hoverlabel={"bgcolor":"rgba(255,255,255,1)"},
+            text=hover_kmers,
             showlegend=False
         ), row=2,col=1)
             #customdata=hoverdata.to_numpy(),
@@ -158,11 +169,10 @@ OPTS = (
 
 def main(conf):
     """plot a dotplot"""
-    conf.track_io.layers = ["ref.coord", "start", "length", "middle", "current", "dwell"] + conf.dotplot.layers
+    conf.track_io.layers = ["start", "length", "middle", "current", "kmer", "base"] + conf.dotplot.layers
     io = TrackIO(conf=conf)
 
     for read_id, tracks in io.iter_reads():
-        print(read_id)
         fig = Dotplot(tracks, conf=io.conf).fig
 
         fig.write_html(conf.out_prefix + read_id + ".html", config={"scrollZoom" : True, "displayModeBar" : True})
