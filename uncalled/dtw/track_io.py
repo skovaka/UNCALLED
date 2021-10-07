@@ -43,6 +43,48 @@ LAYERS = {
         "err" : LayerMeta(str, "Basecalled Alignment Error", None)}
 }
 
+def parse_layers(layers):
+    db_layers = list() 
+    fn_layers = list() 
+
+    if isinstance(layers, str):
+        layers = layers.split(",")
+
+    ret = list()
+
+    parsed = set()
+
+    for layer in layers:
+        spl = layer.split(".")
+        if len(spl) == 2:
+            group,layer = spl
+        elif len(spl) == 1:
+            group = "dtw"
+            layer = spl[0]
+        else:
+            raise ValueError("Invalid layer specifier \"%s\", must contain at most one \".\"" % layer)
+
+        if not group in LAYERS:
+            raise ValueError("Invalid layer group \"%s\". Options: %s" % (group, LAYERS.keys()))
+
+        group_layers = LAYERS[group]
+
+        if not layer in group_layers:
+            raise ValueError("Invalid layer \"%s\". Options: %s" % (group, group_layers.keys()))
+
+        if (group, layer) in parsed:
+            continue
+        parsed.add((group, layer))
+
+        yield (group, layer)
+        #if group_layers[layer].fn is None:
+        #    db_layers.append((group, layer))
+        #else:
+        #    fn_layers.append((group, layer))
+
+    #return db_layers, fn_layers
+            
+
 class TrackIOParams(config.ParamGroup):
     _name = "track_io"
 TrackIOParams._def_params(
@@ -114,46 +156,14 @@ class TrackIO:
 
     def set_layers(self, layers):
         self.prms.layers = layers
+
         self.db_layers = defaultdict(list)
         self.fn_layers = defaultdict(list)
-
-        if layers is None:
-            return
-
-        if isinstance(layers, str):
-            layers = layers.split(",")
-
-        ret = list()
-
-        parsed = set()
-
-        for layer in layers:
-            spl = layer.split(".")
-            if len(spl) == 2:
-                group,layer = spl
-            elif len(spl) == 1:
-                group = "dtw"
-                layer = spl[0]
-            else:
-                raise ValueError("Invalid layer specifier \"%s\", must contain at most one \".\"" % layer)
-
-            if not group in LAYERS:
-                raise ValueError("Invalid layer group \"%s\". Options: %s" % (group, LAYERS.keys()))
-
-            group_layers = LAYERS[group]
-
-            if not layer in group_layers:
-                raise ValueError("Invalid layer \"%s\". Options: %s" % (group, group_layers.keys()))
-
-            if (group, layer) in parsed:
-                continue
-            parsed.add((group, layer))
-
-            if group_layers[layer].fn is None:
+        for group, layer in parse_layers(layers):
+            if LAYERS[group][layer].fn is None:
                 self.db_layers[group].append(layer)
             else:
                 self.fn_layers[group].append(layer)
-
 
     def _load_dbs(self, dbs, out):
         if dbs is None:

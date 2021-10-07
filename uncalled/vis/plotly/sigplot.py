@@ -21,6 +21,7 @@ SigplotParams._def_params(
     #("ref_bounds", None, str_to_coord, "DTW aligment tracks"),
     #("reads", None, None, "Reads to plot"),
     ("max_reads", 10, int, ""),
+    ("yaxis_fixed", True, bool, ""),
     ("track_colors", ["purple", "darkgreen", "royalblue", "crimson"], list, ""),
     ("base_colors", ["#80ff80", "#6b93ff", "#ffbd00", "#ff8080"], list, "Colors for each base (A,C,G,T/U)"), 
     ("fill_layer", "base", str, ""),
@@ -155,7 +156,7 @@ class Sigplot:
             ), row=row, col=col)
 
         fig.update_yaxes(title_text="Current (pA)", row=row, col=col)
-        #fig.update_yaxes(fixedrange=True, row=row, col=col)
+        fig.update_yaxes(fixedrange=self.prms.yaxis_fixed, row=row, col=col)
 
         return fig
 

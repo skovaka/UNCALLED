@@ -10,7 +10,7 @@ from ... import config, nt
 
 from ...dtw.track import LAYER_META
 from ...index import str_to_coord
-from ...dtw.track_io import TrackIO
+from ...dtw.track_io import TrackIO, parse_layers, LAYERS
 from ...argparse import Opt, comma_split
 from ...fast5 import parse_read_ids
 from ...sigproc import ProcRead
@@ -29,11 +29,14 @@ class Dotplot:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
         self.tracks = self.prms.tracks #TODO do this better
+        self.prms.layers = list(parse_layers(self.prms.layers))
+
+        column_widths=[5]+[1]*len(self.prms.layers)
 
         self.fig = make_subplots(
-            rows=2, cols=2, 
+            rows=2, cols=len(column_widths), 
             row_heights=[1,3],
-            column_widths=[3,1],
+            column_widths=column_widths,
             vertical_spacing=0.01,
             horizontal_spacing=0.01,
             shared_xaxes=True,
@@ -65,11 +68,15 @@ class Dotplot:
                     hoverinfo="skip",
                 ), row=2, col=1)
 
-                self.fig.add_trace(go.Scatter(
-                    x=dtw["model_diff"], y=refs-0.5, #TODO try vhv
-                    name=track.name, legendgroup=track.desc,
-                    line={"color":self.prms.track_colors[i], "width":2, "shape" : "hv"},
-                ), row=2, col=2)
+                for j,layer in enumerate(self.prms.layers):
+                    self.fig.add_trace(go.Scatter(
+                        x=dtw[layer[1]], y=refs-0.5, #TODO try vhv
+                        name=track.name, 
+                        line={
+                            "color" : self.prms.track_colors[i], 
+                            "width":2, "shape" : "hv"},
+                        legendgroup=track.desc, showlegend=False,
+                    ), row=2, col=j+2)
 
             hover_df[track.name] = pd.concat(track_df)
 
@@ -94,14 +101,6 @@ class Dotplot:
                     (self.prms.track_colors[j], j*3+i))
             hover_rows.append(s + ", ".join(fields))
 
-        #hovertemplate="<br>".join([
-        #    "<b>" + track.coords.ref_name + ":</b> %{customdata[0]:d}",
-        #    "<b>Raw Sample:</b> <span style=\"color:red\">%{customdata[1]:d}</span>",
-        #    "<b>Current (pA):</b> %{customdata[2]:.2f}",
-        #    "<b>Dwell Time (pA):</b> %{customdata[3]:.2f}",
-        #    "<b>Model pA Difference:</b> %{customdata[4]:.2f}"
-        #])
-
         self.fig.add_trace(go.Scatter(
             x=hover_coords, y=hover_coords.index,
             mode="markers", marker={"size":0,"color":"rgba(0,0,0,0)"},
@@ -118,10 +117,12 @@ class Dotplot:
             self.fig.update_yaxes(autorange="reversed", row=2, col=1)
             self.fig.update_yaxes(autorange="reversed", row=2, col=2)
 
-        self.fig.update_yaxes(
-            title_text="Reference (%s)" % aln["ref_name"], 
-            #showspikes=True,
-            row=2, col=1)
+        self.fig.update_yaxes(row=2, col=1,
+            title_text="Reference (%s)" % aln["ref_name"])
+
+        for i,layer in enumerate(self.prms.layers):
+            self.fig.update_xaxes(row=2, col=i+2,
+                title_text=LAYERS[layer[0]][layer[1]].label)
 
         axis_kw = dict(
             showspikes=True,
@@ -152,7 +153,7 @@ OPTS = (
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
     Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
     Opt(("-l", "--read-filter"), "track_io", type=parse_read_ids),
-    Opt(("-L", "--layers"), "track_io", type=comma_split),
+    Opt(("-L", "--layers"), "dotplot", type=comma_split),
 )
 
 def main(conf):
