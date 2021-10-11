@@ -85,18 +85,18 @@ class Dotplot:
                 #hover_data[track.name].drop("kmer", axis=1)
 
         if compare:
-            jacolor="#005eff"
+            jacolor="red"#"#005eff"
             self.fig.add_trace(go.Bar(
-                x=self.tracks[0].layers["dtw","jaccard"], 
+                x=self.tracks[0].layers["dtw","jac_dist"], 
                 y=self.tracks[0].layer_refs, #TODO try vhv
                 name="DTW Compare",
                 orientation="h",
-                width=1,
-                marker={"color":jacolor,"line":{"color":jacolor,"width":1}},
+                width=1.1,
+                marker={"color":jacolor,"line":{"color":jacolor,"width":0.5}},
                 legendgroup="compare"
             ), row=2, col=len(column_widths))
             self.fig.update_xaxes(row=2, col=i+2,
-                title_text="Sample Jaccard")
+                title_text="Signal Jaccard Distance")
 
         hover_data = pd.concat(hover_data, axis=1)
         hover_coords = hover_data.xs("middle", axis=1, level=1).mean(axis=1)
@@ -189,6 +189,6 @@ def main(conf):
     io = TrackIO(conf=conf)
 
     for read_id, tracks in io.iter_reads():
+        print(read_id)
         fig = Dotplot(tracks, conf=io.conf).fig
-
         fig.write_html(conf.out_prefix + read_id + ".html", config={"scrollZoom" : True, "displayModeBar" : True})

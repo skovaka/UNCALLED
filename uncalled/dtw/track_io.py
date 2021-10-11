@@ -146,6 +146,9 @@ class TrackIO:
         for db_str in dbs:
             db_file, track_names = self._db_track_split(db_str)
 
+            if not out and not os.path.exists(db_file):
+                raise OSError("Database file not found: " + db_file)
+
             db = self.dbs.get(db_file, None)
             if db is None:
                 db = TrackSQL(db_file)

@@ -116,7 +116,7 @@ bool EventDetector::add_sample(float s) {
     #endif
 
     if (p1 || p2) {
-        create_event(buf_mid-PRMS.window_length1+1);
+        create_event(buf_mid-PRMS.window_length1+1); //+3?
 
         if (event_.mean >= PRMS.min_mean && event_.mean <= PRMS.max_mean) {
             return true;
