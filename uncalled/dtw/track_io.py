@@ -76,7 +76,7 @@ TrackIOParams._def_params(
 
 class TrackIO:
     def __init__(self, *args, **kwargs):
-        self.conf, self.prms = config._init_group("track_io", *args, **kwargs)
+        self.conf, self.prms = config._init_group("track_io", copy_conf=True, *args, **kwargs)
 
         #if isinstance(self.prms.layers, str):
         #    self.prms.layers = [self.prms.layers]
@@ -87,15 +87,17 @@ class TrackIO:
 
         self.track_dbs = dict()
 
-        self.input_tracks = list()
+        self.aln_tracks = list()
         self.output_tracks = dict()
+        self.all = self.aln_tracks
+
         self.prev_fast5 = dict()
         self.prev_read = dict()
 
         self._load_dbs(self.prms.output, True)
         self._load_dbs(self.prms.input, False)
 
-        self.input_track_ids = [t.id for t in self.input_tracks]
+        self.input_track_ids = [t.id for t in self.aln_tracks]
         self.output_track_ids = [t.id for _,t in self.output_tracks.items()]
 
         if self.prms.index_prefix is not None:
@@ -112,7 +114,7 @@ class TrackIO:
             reads = fast5_reads["read_id"]
             self.reads = pd.Index(reads[~reads.duplicated()])
 
-            for track in self.input_tracks:
+            for track in self.aln_tracks:
                 track.fast5s = self.fast5s
 
     def _set_ref_bounds(self, ref_bounds):
@@ -135,6 +137,12 @@ class TrackIO:
                 self.db_layers.append((group, layer))
             else:
                 self.fn_layers.append((group, layer))
+
+    def __len__(self):
+        return len(self.all)
+
+    def __getitem__(self, i):
+        return self.all[i]
 
     def _load_dbs(self, dbs, out):
         if dbs is None:
@@ -195,7 +203,7 @@ class TrackIO:
 
             conf = config.Config(toml=row.config)
             t = AlnTrack(db, row["id"], name, row["desc"], row["groups"], conf)
-            self.input_tracks.append(t)
+            self.aln_tracks.append(t)
 
             self.conf.load_config(conf)
 
@@ -292,7 +300,7 @@ class TrackIO:
 
     @property
     def input_count(self):
-        return len(self.input_tracks)
+        return len(self.aln_tracks)
 
 
     LAYER_FNS = {
@@ -321,7 +329,7 @@ class TrackIO:
             layers[group] = db0.query_layers(self.input_track_ids, self.coords, ids)
         layers = pd.concat(layers, names=["group", "layer"], axis=1)
         
-        for track in self.input_tracks:
+        for track in self.aln_tracks:
             track_alns = alignments[alignments["track_id"] == track.id].copy()
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)
             track_layers = layers.iloc[i].copy()
@@ -332,7 +340,7 @@ class TrackIO:
             if load_mat:
                 track.load_mat()
 
-        return self.input_tracks
+        return self.aln_tracks
 
     def iter_refs(self, ref_bounds=None):
         if ref_bounds is not None:
@@ -377,13 +385,13 @@ class TrackIO:
             aln_ids = chunk.index.unique("aln_id").to_numpy()
             alns = db0.query_alignments(self.input_track_ids, aln_id=aln_ids)
 
-            for track in self.input_tracks:
+            for track in self.aln_tracks:
                 track_alns = alns[alns["track_id"]==track.id].copy()
                 track_layers = layers[layers.index.isin(track_alns.index, 1)].copy()
                 track.set_data(coords, track_alns, track_layers)
                 track.calc_layers(self.fn_layers)
 
-            yield (coords, self.input_tracks)
+            yield (coords, self.aln_tracks)
 
     def load_read(self, read_id, ref_bounds=None):
         if ref_bounds is not None:
@@ -400,7 +408,7 @@ class TrackIO:
 
         self._fill_tracks(db0, alns)
 
-        return self.input_tracks
+        return self.aln_tracks
 
     def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
         if ref_bounds is not None:
@@ -433,7 +441,7 @@ class TrackIO:
                     
                 for group in overlap_groups:
                     self._fill_tracks(db0, alns.loc[group])
-                    yield (read_id, self.input_tracks)
+                    yield (read_id, self.aln_tracks)
 
         n = 0
         leftovers = pd.DataFrame()
@@ -467,7 +475,7 @@ class TrackIO:
 
         layers = pd.concat(layers, names=["group", "layer"], axis=1)
 
-        for track in self.input_tracks:
+        for track in self.aln_tracks:
             track_alns = alns[alns["track_id"] == track.id]
 
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)

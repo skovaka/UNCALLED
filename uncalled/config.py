@@ -229,8 +229,11 @@ class Config(_Conf):
 
 CONF_KW = "conf"
 
-def _init_group(name, *args, **kwargs):
-    conf = Config(kwargs.get(CONF_KW, rc))
+def _init_group(name, *args, copy_conf=True, **kwargs):
+    if not copy_conf and CONF_KW in kwargs:
+        conf = kwargs[CONF_KW]
+    else:
+        conf = Config(kwargs.get(CONF_KW, rc))
 
     if not hasattr(conf, name):
         raise ValueError("Invalid parameter group: " + str(name))

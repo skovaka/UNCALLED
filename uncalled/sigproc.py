@@ -158,7 +158,6 @@ class ProcRead:
             [ [e.start, e.length, e.mean, e.stdv] for e in events ],
             columns = ['start','length','mean','stdv']
         )
-        print(self.df)
 
     def sample_range(self, start, end):
         return self.df.loc[(self.df['start'] >= start) & (self.df['start'] <= end) & self.df['mask']]

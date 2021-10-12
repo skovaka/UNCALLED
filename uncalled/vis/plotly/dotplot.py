@@ -198,5 +198,6 @@ def main(conf):
 
     for read_id, tracks in io.iter_reads():
         print(read_id)
+        print(tracks)
         fig = Dotplot(tracks, conf=io.conf).fig
         fig.write_html(conf.out_prefix + read_id + ".html", config={"scrollZoom" : True, "displayModeBar" : True})

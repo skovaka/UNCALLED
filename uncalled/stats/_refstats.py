@@ -157,7 +157,7 @@ def main(*args, **kwargs):
     conf.refstats = prms
 
     columns = ["ref_name", "ref", "strand", "kmer"]
-    for track in io.input_tracks:
+    for track in io.aln_tracks:
         name = track.name
         columns.append(".".join([track.name, "cov"]))
         for layer in prms.layers:
