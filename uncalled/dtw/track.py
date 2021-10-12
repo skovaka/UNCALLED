@@ -59,11 +59,29 @@ LAYERS = {
         "err" : LayerMeta(str, "Basecalled Alignment Error", None)}
 }
 
+class Tracks:
+    def __init__(self, coords):
+        self.coords = coords
+
+        self.tracks = list()
+        self.aln_tracks = list()
+        self.track_idxs = dict()
+
+    def add_track(self, track):
+        i = len(self.tracks)
+
+        if isinstance(track, AlnTrack):
+            self.aln_tracks.append(i)
+        else:
+            raise ValueError("Unknown track type" + str(type(track)))
+
+        self.tracks.append(track)
+        self.track_idxs[track.name] = i
+
+    def iter_reads(self):
+        pass
+
 class AlnTrack:
-
-    #TODO get rid of htis
-    CMP_LAYERS = ["current", "dwell"]
-
     def __init__(self, db, track_id, name, desc, groups, conf):
         self.db = db
         #self.index = index
@@ -159,7 +177,9 @@ class AlnTrack:
         #self.calc_layers([("re)])
         if layers is not None:
             self.calc_layers([(group, layer) for layer in layers])
-        df = self.layers.xs(aln_id, level="aln_id").set_index(self.layer_refs)
+        df = self.layers.xs(aln_id, level="aln_id")#.set_index(self.layer_refs)
+        df.index = self.coords.mref_to_ref(df.index)
+
         if group is None:
             return df
         if layers is None:

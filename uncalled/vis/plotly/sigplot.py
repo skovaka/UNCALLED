@@ -35,7 +35,7 @@ class Sigplot:
 
         reads = pd.Index([])
         for t in self.tracks:
-            reads = reads.union(t.alignments["read_id"])
+            reads = reads.union(t.alignments["read_id"]).unique()
         if len(reads) > self.prms.max_reads:
             reads = np.random.choice(reads, self.prms.max_reads, False)
         self.reads = np.sort(reads)
@@ -106,18 +106,9 @@ class Sigplot:
                 current_min = min(current_min, model_current.min())
                 current_max = max(current_max, model_current.max())
 
-                #pd.DataFrame(
-                    #index=dtw["start"], 
-                    #data={"model_current" : model_current}))
-
-                #ymin = min(np.min(model_current), np.min(raw_norm[mask]))
-                #ymax = max(np.max(model_current), np.max(raw_norm[mask]))
-                #self._plot_bases(fig, dtw, kmers, ymin, ymax)
-
             track_dtws.append(pd.concat(dtws).sort_index())
 
         read = ProcRead(track.fast5s[read_id], conf=self.conf)
-        #sig_min, sig_max = self._plot_signal(fig, read, samp_min, samp_max, row, col)
         signal = read.get_norm_signal(samp_min, samp_max)
 
         #TODO set global signal min/max
@@ -147,6 +138,7 @@ class Sigplot:
         ), row=row, col=col)
 
         for dtw,color,kw in zip(track_dtws, colors, dtw_kws):
+            dtw = dtw.sort_values("start")
             fig.add_trace(go.Scattergl(
                 name = "Model Current",
                 mode = "lines",

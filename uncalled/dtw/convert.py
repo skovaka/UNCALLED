@@ -108,7 +108,7 @@ def tombo(conf):
     pbar = progbar.ProgressBar(
             widgets=[progbar.Percentage(), progbar.Bar(), progbar.ETA()], 
             maxval=len(fast5_files)).start()
-    pbar_count = 0
+    read_count = 0
 
     model = PoreModel(conf.pore_model)
 
@@ -117,7 +117,7 @@ def tombo(conf):
         fast5_basename = os.path.basename(fast5_name)
 
         with get_fast5_file(fast5_name, mode="r") as fast5:
-            pbar_count += 1
+            read_count += 1
 
             read, = fast5.get_reads()
 
@@ -192,11 +192,14 @@ def tombo(conf):
 
             #track.save_read(fast5_basename)
 
-            pbar.update(pbar_count)
+            pbar.update(read_count)
 
     io.close()
 
     pbar.finish()
+
+    if read_count == 0:
+        sys.stderr.write("Warning: no reads were found (try including the --recursive option?)\n")
 
 SUBCMDS = [
     (nanopolish, NANOPOLISH_OPTS), 

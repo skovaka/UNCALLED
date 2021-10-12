@@ -26,10 +26,15 @@ DotplotParams._def_params(
 )
 
 class Dotplot:
+
+    #TODO
+    #plot_all(outfile) -> outfiles
+    #iter_plots() -> figs
+    #plot_read(read_id) -> fig
+
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
         self.tracks = self.prms.tracks #TODO do this better
-        #self.prms.layers = list(parse_layers(self.prms.layers))
 
         compare = len(self.tracks) == 2
         if compare:
@@ -48,7 +53,6 @@ class Dotplot:
 
         Sigplot(self.tracks, track_colors=self.prms.track_colors, conf=self.conf).plot(self.fig)
 
-
         hover_layers = ["middle","kmer","current","dwell"]#,"model_diff"]
         hover_layers += (l for l in self.prms.dtw_layers if l not in {"current","dwell"})
         hover_data = dict()
@@ -56,7 +60,8 @@ class Dotplot:
         for i,track in enumerate(self.tracks):
 
             track_hover = list()
-            
+
+            first_aln = True
             for aln_id, aln in track.alignments.iterrows():
                 layers = track.layers.xs(aln_id, level="aln_id")
                 dtw = track.get_aln_layers(aln_id, "dtw")
@@ -69,7 +74,10 @@ class Dotplot:
                     legendgroup=track.desc,
                     line={"color":self.prms.track_colors[i], "width":2, "shape" : "hv"},
                     hoverinfo="skip",
+                    showlegend=first_aln
                 ), row=2, col=1)
+
+                first_aln = False
 
                 for j,layer in enumerate(self.prms.dtw_layers):
                     self.fig.add_trace(go.Scatter(

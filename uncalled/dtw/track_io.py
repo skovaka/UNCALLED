@@ -302,26 +302,6 @@ class TrackIO:
             track.layers["dtw","current"] - track.model[track.kmers])
     }
 
-    #"ref":
-    #    "coord" : LayerMeta(int, "Reference Coordinate", True),
-    #    "name" : LayerMeta(str, "Reference Name", True),
-    #    "fwd" : LayerMeta(bool, "Is on fwd strand", True),
-    #    "kmer" : LayerMeta(str, "Reference k-mer", True),
-    #    "base" : LayerMeta(str, "Reference base", True),
-    #"dtw" : {
-    #    "dwell" : LayerMeta(float, "Dwell Time (ms/nt)", True),
-    #    "model_diff" : LayerMeta(float, "Model pA Difference", True)},
-
-    def compute_layers(self, track, layer_names):
-        for group, layers in self.fn_layers.items():
-            for layer in layers:
-                vals = LAYERS[group][layer].fn(track)
-                track.layers[group,layer] = vals
-
-        #for name in layer_names:
-        #    if not name in track.layers.columns.get_level_values(1):
-        #        track.layers["dtw",name] = self.LAYER_FNS[name](self,track)
-
     def load_refs(self, ref_bounds=None, full_overlap=None, load_mat=False):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
@@ -348,7 +328,6 @@ class TrackIO:
 
             track.set_data(self.coords, track_alns, track_layers)
             track.calc_layers(self.fn_layers)
-            #self.compute_layers(track, self.prms.layers)
             
             if load_mat:
                 track.load_mat()
@@ -403,7 +382,6 @@ class TrackIO:
                 track_layers = layers[layers.index.isin(track_alns.index, 1)].copy()
                 track.set_data(coords, track_alns, track_layers)
                 track.calc_layers(self.fn_layers)
-                #self.compute_layers(track, self.prms.layers)
 
             yield (coords, self.input_tracks)
 
@@ -505,7 +483,6 @@ class TrackIO:
 
             track.set_data(track_coords, track_alns, track_layers)
             track.calc_layers(self.fn_layers)
-            #self.compute_layers(track, self.prms.layers)
     
     def close(self):
         for filename, db in self.dbs.items():
