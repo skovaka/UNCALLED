@@ -43,26 +43,43 @@ def browser(tracks, conf):
 
         html.Div([
             html.Div([
-                dcc.Graph(
+                dcc.Graph(#[dcc.Loading(type="circle"),
                     id="trackplot",
                     config = {"scrollZoom" : True, "displayModeBar" : True}
-                )],
-            className="w3-container w3-twothird w3-card"),
+            )], className="w3-container w3-twothird w3-card"),
 
             html.Div([
-                html.B("Active layer: "), 
-                dcc.Dropdown(
-                    options=[
-                        {"label": "Current (pA)", "value": "current"},
-                        {"label": "Dwell Time (ms)", "value": "dwell"},
-                        {"label": "Model pA Difference", "value": "model_diff"},
-                    ],
-                    value=conf.trackplot.layer, 
-                    clearable=False, multi=False,
-                    id="trackplot-layer"),
-                html.Div([], id="click-info", className="w3-container w3-card"),
-            ], className="w3-container w3-third")
-        ])
+                html.Div([
+                    html.B("Active layer: "), 
+                    dcc.Dropdown(
+                        options=[
+                            {"label": "Current (pA)", "value": "current"},
+                            {"label": "Dwell Time (ms)", "value": "dwell"},
+                            {"label": "Model pA Difference", "value": "model_diff"},
+                        ],
+                        value=conf.trackplot.layer, 
+                        clearable=False, multi=False,
+                        id="trackplot-layer"),
+                ]),
+
+                html.Div([
+                    html.Table([], id="info-table"),
+                    html.Button("View Dotplot", id="dotplot-btn", style={"margin" : "5px"})
+                    ], style={"display" : "none"},
+                    id="selection-card", className="w3-container w3-card"),
+
+            ], className="w3-container w3-third"),
+
+            html.Div([
+                dcc.Graph(
+                    id="dotplot",
+                    config = {"scrollZoom" : True, "displayModeBar" : True}
+            )], id="dotplot-div", 
+                style={"display" : "none"},
+                className="w3-container w3-twothird w3-card"),
+        ]),
+        html.Div(style={"display" : "none"}, id="selected-read"),
+        html.Div(style={"display" : "none"}, id="selected-ref"),
     ])
 
     #@app.callback(
@@ -74,13 +91,17 @@ def browser(tracks, conf):
 
     @app.callback(
         Output("trackplot", "figure"),
-        Output("click-info", "children"),
+        Output("info-table", "children"),
+        Output("selection-card", "style"),
+        Output("selected-ref", "children"),
+        Output("selected-read", "children"),
         Input("trackplot-layer", "value"),
         Input("trackplot", "clickData"))
     def update_trackplot(layer, click):
+        table = list()
         if click is None:
             ref = aln = read = None
-            info = ""
+            card_style = {"display" : "none"}
         else:
             coord = click["points"][0]
             ref = coord["x"]
@@ -91,7 +112,6 @@ def browser(tracks, conf):
 
             layers = track.layers.loc[(mref, aln.name)]["dtw"]
 
-            table = list()
             table.append(html.Tr(html.Td(html.B("%s:%d" % (tracks.coords.ref_name, ref)), colSpan=2)))
             table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
             for l in ["current", "dwell", "model_diff"]:
@@ -99,14 +119,25 @@ def browser(tracks, conf):
                     html.Td(html.B(LAYERS["dtw"][l].label)), 
                     html.Td("%.3f"%layers[l], style={"text-align":"right"})]))
 
-            info = [html.Table(table)]
-            
+            card_style = {"display" : "block"}
+
         fig = Trackplot(
             tracks, layer, 
             select_ref=ref, select_read=read, 
             conf=conf).fig
         fig.update_layout(uirevision=True)
 
-        return fig, info
+        return fig, table, card_style, ref, read
+
+    @app.callback(
+        #Output("dotplot", "figure"),
+        Output("dotplot-div", "style"),
+        State("selected-read", "children"),
+        Input("dotplot-btn", "n_clicks"))
+    def update_trackplot(read, n_clicks):
+        if n_clicks is None:
+            return {"display" : "hidden"}
+        print(read)
+        return {"display" : "block"}
 
     app.run_server(debug=True)
