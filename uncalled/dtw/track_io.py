@@ -7,6 +7,7 @@ import pandas as pd
 import collections
 import time
 from collections import defaultdict
+import scipy
 
 from .track import AlnTrack, LAYERS
 from ..index import load_index, RefCoord, str_to_coord
@@ -63,6 +64,8 @@ TrackIOParams._def_params(
     ("output", None, None,  "Output track"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("layers", ["current", "dwell", "model_diff"], None, "Layers to load"),
+    ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
+    ("refstats_layers", ["current", "dwell", "model_diff"], None, "Layers to compute refstats"),
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),
     ("max_reads", None, int, "Only load reads which overlap these coordinates"),
     ("index_prefix", None, str, "BWA index prefix"),
@@ -73,6 +76,34 @@ TrackIOParams._def_params(
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
     ignore_toml={"input", "output", "ref_bounds", "layers"}
 )
+
+_REFSTAT_AGGS = {
+    "mean" : np.mean, 
+    "stdv" : np.std, 
+    "var"  : np.var,
+    "skew" : scipy.stats.skew,
+    "kurt" : scipy.stats.kurtosis,
+    "min"  : np.min, 
+    "max"  : np.min
+}
+
+LAYER_REFSTATS = {"min", "max", "mean", "stdv", "var", "skew", "kurt"}
+COMPARE_REFSTATS = {"ks"}
+ALL_REFSTATS = LAYER_REFSTATS | COMPARE_REFSTATS
+
+class RefstatSplit:
+    def __init__(self, stats, track_count):
+        self.layer = [s for s in stats if s in LAYER_REFSTATS]
+        self.compare = [s for s in stats if s in COMPARE_REFSTATS]
+
+        self.layer_agg = [_REFSTAT_AGGS[s] for s in self.layer]
+
+        if len(self.layer) + len(self.compare) != len(stats):
+            bad_stats = [s for s in stats if s not in ALL_REFSTATS]
+            raise ValueError("Unknown stats: %s (options: %s)" % (", ".join(bad_stats), ", ".join(ALL_REFSTATS)))
+
+        if len(self.compare) > 0 and track_count != 2:
+            raise ValueError("\"%s\" stats can only be computed using exactly two tracks" % "\", \"".join(self.compare))
 
 class TrackIO:
     def __init__(self, *args, **kwargs):
@@ -340,7 +371,51 @@ class TrackIO:
             if load_mat:
                 track.load_mat()
 
+        self.calc_refstats()
+
         return self.aln_tracks
+
+    def calc_refstats(self, verbose_refs=False, cov=False):
+        if self.prms.refstats is None:
+            self.refstats = None
+            return None
+
+        stats = RefstatSplit(self.prms.refstats, len(self.aln_tracks))
+
+        refstats = dict()
+        grouped = [t.layers["dtw"][self.prms.refstats_layers].groupby(level="mref") for t in self.aln_tracks]
+
+        for track,groups in zip(self.aln_tracks, grouped):
+            refstats[track.name] = groups.agg(stats.layer_agg)
+            if cov:
+                refstats[track.name].insert(0, "cov", groups.size())
+
+        if len(stats.compare) > 0:
+            groups_a, groups_b = grouped
+            mrefs_a = self.aln_tracks[0].layers.index.unique("mref")
+            mrefs_b = self.aln_tracks[1].layers.index.unique("mref")
+            mrefs = mrefs_a.intersection(mrefs_b)
+            cmps = {l : defaultdict(list) for l in self.prms.refstats_layers}
+            for mref in mrefs:
+                track_a = groups_a.get_group(mref)
+                track_b = groups_b.get_group(mref)
+                for layer in self.prms.refstats_layers:
+                    a = track_a[layer]
+                    b = track_b[layer]
+                    for stat in stats.compare:
+                        ks = scipy.stats.stats.ks_2samp(a,b,mode="asymp")
+                        cmps[layer]["stat"].append(ks.statistic)
+                        cmps[layer]["pval"].append(ks.pvalue)
+
+            refstats["ks"] = pd.concat({k : pd.DataFrame(index=mrefs, data=c) for k,c in cmps.items()}, axis=1) 
+
+        refstats = pd.concat(refstats, axis=1, names=["track", "layer", "stat"])
+
+        refstats.index = self.coords.mref_to_ref_index(refstats.index, multi=verbose_refs)
+
+        self.refstats = refstats.dropna()
+
+        return refstats
 
     def iter_refs(self, ref_bounds=None):
         if ref_bounds is not None:

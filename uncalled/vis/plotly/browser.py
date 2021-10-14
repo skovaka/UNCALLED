@@ -17,7 +17,8 @@ from ...argparse import Opt, comma_split
 OPTS = (
     Opt("ref_bounds", "track_io", type=str_to_coord),
     Opt("input", "track_io", nargs="+"),
-    Opt("layer", "trackplot", default="model_diff", nargs="?"),
+    Opt("layer", "trackplot", default="current", nargs="?"),
+    Opt(("-r", "--refstats"), "track_io", default="mean", type=comma_split),
     Opt(("-f", "--full-overlap"), "track_io", action="store_true"),
     Opt(("-o", "--outfile"), "trackplot"),
 )
@@ -82,13 +83,6 @@ def browser(tracks, conf):
         html.Div(style={"display" : "none"}, id="selected-ref"),
     ])
 
-    #@app.callback(
-    #    Output("trackplot", "figure"),
-    #    Input("trackplot-layer", "value"))
-    #def update_trackplot(layer):
-    #    fig = Trackplot(tracks, layer, conf=conf).fig
-    #    return fig
-
     @app.callback(
         Output("trackplot", "figure"),
         Output("info-table", "children"),
@@ -99,27 +93,28 @@ def browser(tracks, conf):
         Input("trackplot", "clickData"))
     def update_trackplot(layer, click):
         table = list()
-        if click is None:
-            ref = aln = read = None
-            card_style = {"display" : "none"}
-        else:
+        ref = aln = read = None
+        card_style = {"display" : "none"}
+        if click is not None:
             coord = click["points"][0]
             ref = coord["x"]
-            track = tracks.all[coord["curveNumber"]]
-            aln = track.alignments.iloc[coord["y"]]
-            mref = track.coords.ref_to_mref(ref, aln.fwd)
-            read = aln["read_id"]
 
-            layers = track.layers.loc[(mref, aln.name)]["dtw"]
+            if coord["curveNumber"] < len(tracks):
+                track = tracks.all[coord["curveNumber"]]
+                aln = track.alignments.iloc[coord["y"]]
+                read = aln["read_id"]
+                mref = tracks.coords.ref_to_mref(ref, aln.fwd)
 
-            table.append(html.Tr(html.Td(html.B("%s:%d" % (tracks.coords.ref_name, ref)), colSpan=2)))
-            table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
-            for l in ["current", "dwell", "model_diff"]:
-                table.append(html.Tr([
-                    html.Td(html.B(LAYERS["dtw"][l].label)), 
-                    html.Td("%.3f"%layers[l], style={"text-align":"right"})]))
+                layers = track.layers.loc[(mref, aln.name)]["dtw"]
 
-            card_style = {"display" : "block"}
+                table.append(html.Tr(html.Td(html.B("%s:%d" % (tracks.coords.ref_name, ref)), colSpan=2)))
+                table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
+                for l in ["current", "dwell", "model_diff"]:
+                    table.append(html.Tr([
+                        html.Td(html.B(LAYERS["dtw"][l].label)), 
+                        html.Td("%.3f"%layers[l], style={"text-align":"right"})]))
+
+                card_style = {"display" : "block"}
 
         fig = Trackplot(
             tracks, layer, 
@@ -137,7 +132,6 @@ def browser(tracks, conf):
     def update_trackplot(read, n_clicks):
         if n_clicks is None:
             return {"display" : "hidden"}
-        print(read)
         return {"display" : "block"}
 
     app.run_server(debug=True)
