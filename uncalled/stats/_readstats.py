@@ -14,7 +14,7 @@ from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split#, ref_coords
 from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader
-from ..dtw import TrackIO
+from ..dtw import Tracks
 
 class ReadstatsParams(config.ParamGroup):
     _name = "readstats"
@@ -46,7 +46,7 @@ class _Readstats:
             stats = [prms.stats]
 
         
-        io = TrackIO(conf=conf)
+        io = Tracks(conf=conf)
 
         save_reads = "pca" in prms.stats
         reads = list()

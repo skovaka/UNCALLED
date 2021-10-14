@@ -1,4 +1,8 @@
-"""Import DTW alignments produced by other tools"""
+"""Import DTW alignments produced by other tools into a database
+
+subcommand options:
+nanopolish  Convert alignments produced by nanopolish eventalign
+tombo       Convert alignments produced by tomobo resquiggle"""
 
 import sys, os
 import numpy as np
@@ -8,7 +12,7 @@ import pandas as pd
 from ont_fast5_api.fast5_interface import get_fast5_file
 import scipy.stats
 
-from . import TrackIO
+from . import Tracks
 from .dtw import collapse_events
 from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt
@@ -19,7 +23,6 @@ from .. import nt, PoreModel
 import progressbar as progbar
 
 CONVERT_OPTS = (Opt("index_prefix", "track_io"),) + FAST5_OPTS + (
-    Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt("--rna", fn="set_r94_rna"),
     Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
     Opt(("-f", "--overwrite"), "track_io", action="store_true"),
@@ -33,6 +36,8 @@ def nanopolish(conf):
     f5reader = Fast5Reader(conf=conf)
     conf.fast5_reader.load_bc = True
 
+    read_filter = f5reader.get_read_filter()
+
     sample_rate = conf.read_buffer.sample_rate
 
     sys.stderr.write("Parsing TSV\n")
@@ -42,11 +47,15 @@ def nanopolish(conf):
                  "start_idx","event_level_mean",
                  "event_length","strand"])
 
-    io = TrackIO(conf=conf)
+    io = Tracks(conf=conf)
 
     def add_alns(events):
         groups = events.groupby(["contig", "read_name"])
         for (contig,read_id), df in groups:
+
+            if not (read_filter is None or read_id in read_filter):
+                continue
+
             start = df["position"].min()-1
             end = df["position"].max()
             fwd = df["strand"].iloc[0] == "t"
@@ -95,10 +104,9 @@ def tombo(conf):
     f5reader = Fast5Reader(conf=conf)
     conf.fast5_reader.load_bc = True
     conf.pore_model.name = "r94_rna_tombo"
+    read_filter = f5reader.get_read_filter()
 
-    io = TrackIO(conf=conf)
-
-    #track = AlnTrack(mode="w", conf=conf)
+    io = Tracks(conf=conf)
     
     fast5_files = f5reader.prms.fast5_files
 
@@ -121,7 +129,8 @@ def tombo(conf):
 
             read, = fast5.get_reads()
 
-            #if read.read_id not in track.mm2s: continue
+            if not (read_filter is None or read.read_id in read_filter): 
+                continue
 
             if not 'BaseCalled_template' in read.handle['Analyses']['RawGenomeCorrected_000']:
                 #TODO debug logs
@@ -136,8 +145,6 @@ def tombo(conf):
             is_rna = handle.attrs["rna"]
             if is_rna != conf.is_rna:
                 raise RuntimeError("Reads appear to be RNA but --rna not specified")
-
-            #aln = ReadAln(track.index, mm2, is_rna=is_rna)
 
             aln_attrs = dict(handle["Alignment"].attrs)
 

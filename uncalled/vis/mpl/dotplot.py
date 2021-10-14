@@ -16,7 +16,7 @@ from ...sigproc import ProcRead
 from ...fast5 import Fast5Reader, parse_read_ids
 from ...pafstats import parse_paf
 from ...dtw.track import AlnTrack
-from ...dtw.track_io import TrackIO
+from ...dtw.track_io import Tracks
 from ...index import str_to_coord
 from ...argparse import Opt
 
@@ -76,7 +76,7 @@ class Dotplot:
         self.conf.track_io.load_mat = False
         self.conf.track_io.layers = self.conf.dotplot.layers
 
-        self.track_io = TrackIO(conf=self.conf)
+        self.track_io = Tracks(conf=self.conf)
         self.fast5s = self.track_io.get_fast5_reader()#Fast5Reader(reads=self.read_ids, index=fast5_index, conf=self.tracks[0].conf)
         self.conf.load_config(self.track_io.conf)
 

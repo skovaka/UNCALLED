@@ -7,16 +7,16 @@ from .argparse import ArgParser
 #from . import index, map, realtime, sim, pafstats, dtw
 from . import index, pafstats
 from .rt import realtime, map, sim
-from .dtw import dtw, convert
+from .dtw import dtw, convert, db
 from .vis import browser, dotplot, sigplot, trackplot
 from .stats import _refstats, _dtwstats, _readstats
 
 SUBCMDS = [
     index, 
     realtime, map, sim, pafstats,
-    dtw, convert,
+    dtw, convert, db,
     browser, dotplot, sigplot, trackplot,
-    _refstats, _readstats, _dtwstats
+    _refstats, _readstats, _dtwstats,
 ]
 
 _help_lines = [
@@ -32,6 +32,7 @@ _help_lines = [
     "Dynamic Time Warping (DTW) Alignment:",
     "\tdtw        " + dtw.main.__doc__,
     "\tconvert    " + convert.__doc__, "",
+    "\tdb         " + db.__doc__, "",
     "DTW Analysis:",
     "\tdtwstats   " + _dtwstats.main.__doc__,
     "\trefstats   " + _refstats.main.__doc__,

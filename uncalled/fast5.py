@@ -159,6 +159,11 @@ class Fast5Reader:
 
         self._dict = _Fast5Dict(groups, self.prms)
         self.indexed = True
+
+    def get_read_filter(self):
+        if len(self.prms.read_filter) > 0:
+            return set(self.prms.read_filter)
+        return None
     
     def get_read_file(self, read_id):
         if not self.indexed:

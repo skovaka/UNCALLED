@@ -10,7 +10,7 @@ from ... import config, nt
 
 from ...dtw.track import LAYERS
 from ...index import str_to_coord
-from ...dtw.track_io import TrackIO, parse_layers, LAYERS
+from ...dtw.track_io import Tracks, parse_layers, LAYERS
 from ...argparse import Opt, comma_split
 from ...fast5 import parse_read_ids
 from ...sigproc import ProcRead
@@ -194,7 +194,7 @@ OPTS = (
 def main(conf):
     """plot a dotplot"""
     conf.track_io.layers = ["start", "length", "middle", "current", "dwell", "kmer", "base"] + conf.dotplot.dtw_layers
-    io = TrackIO(conf=conf)
+    io = Tracks(conf=conf)
 
     for read_id, tracks in io.iter_reads():
         print(read_id)

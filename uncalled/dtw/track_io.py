@@ -9,6 +9,7 @@ import time
 from collections import defaultdict
 import scipy
 
+from .db import TrackSQL
 from .track import AlnTrack, LAYERS
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
@@ -57,9 +58,9 @@ def parse_layers(layers):
     #return db_layers, fn_layers
             
 
-class TrackIOParams(config.ParamGroup):
+class TracksParams(config.ParamGroup):
     _name = "track_io"
-TrackIOParams._def_params(
+TracksParams._def_params(
     ("input", None, None, "Input track(s)"),
     ("output", None, None,  "Output track"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
@@ -105,7 +106,7 @@ class RefstatSplit:
         if len(self.compare) > 0 and track_count != 2:
             raise ValueError("\"%s\" stats can only be computed using exactly two tracks" % "\", \"".join(self.compare))
 
-class TrackIO:
+class Tracks:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("track_io", copy_conf=True, *args, **kwargs)
 
@@ -570,222 +571,3 @@ class TrackIO:
     def close(self):
         for filename, db in self.dbs.items():
             db.close()
-            
-class TrackSQL:
-    def __init__(self, sqlite_db):
-        self.filename = sqlite_db
-        new_file = not os.path.exists(sqlite_db)
-        self.con = sqlite3.connect(sqlite_db)
-        self.cur = self.con.cursor()
-        self.open = True
-
-        #if new_file:
-        self.init_tables()
-
-        self.prev_aln_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
-        if self.prev_aln_id is None:
-            self.prev_aln_id = -1
-
-    def close(self):
-        if self.open:
-            self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (mref, aln_id);")
-            self.con.close()
-            self.open = False
-
-    def init_tables(self):
-        self.cur.execute("""
-            CREATE TABLE IF NOT EXISTS track (
-                id INTEGER PRIMARY KEY,
-                name TEXT,
-                desc TEXT,
-                groups TEXT,
-                config TEXT
-            );""")
-        self.cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS track_idx ON track (name);")
-        self.cur.execute("""
-            CREATE TABLE IF NOT EXISTS read (
-                id TEXT PRIMARY KEY,
-                fast5_id INTEGER,
-                FOREIGN KEY (fast5_id) REFERENCES fast5 (id)
-            );""")
-        self.cur.execute("""
-            CREATE TABLE IF NOT EXISTS fast5 (
-                id INTEGER PRIMARY KEY,
-                filename TEXT
-            );""")
-        self.cur.execute("""
-            CREATE TABLE IF NOT EXISTS alignment (
-                id INTEGER PRIMARY KEY,
-                track_id INTEGER,
-                read_id TEXT,
-                ref_name TEXT,
-                ref_start INTEGER,
-                ref_end INTEGER,
-                fwd INTEGER,
-                samp_start INTEGER,
-                samp_end INTEGER,
-                tags TEXT,
-                FOREIGN KEY (track_id) REFERENCES track (id),
-                FOREIGN KEY (read_id) REFERENCES read (id)
-            );""")
-        self.cur.execute("""
-            CREATE TABLE IF NOT EXISTS dtw (
-                mref INTEGER,
-                aln_id INTEGER,
-                start INTEGER,
-                length INTEGER,
-                current REAL,
-                FOREIGN KEY (aln_id) REFERENCES alignment (id)
-            );""")
-        self.cur.execute("""
-            CREATE TABLE IF NOT EXISTS bcaln (
-                mref INTEGER,
-                aln_id INTEGER,
-                sample INTEGER,
-                bp INTEGER,
-                error TEXT,
-                FOREIGN KEY (aln_id) REFERENCES alignment (id)
-            );""")
-        #self.con.commit()
-
-    def init_write(self):
-        for table in ["dtw", "bcaln"]:
-            self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
-
-    def init_track(self, track):
-        self.cur.execute(
-            "INSERT INTO track (name,desc,config,groups) VALUES (?,?,?,?)",
-            (track.name, track.desc, track.conf.to_toml(), "dtw")
-        )
-        track.id = self.cur.lastrowid
-        #self.con.commit()
-        return track.id
-
-    def init_alignment(self, aln_df):
-        aln_df.to_sql(
-            "alignment", self.con, 
-            if_exists="append", 
-            method="multi",# chunksize=5000,
-            index=True, index_label="id")
-
-    def init_fast5(self, filename):
-
-        row = self.cur.execute("SELECT id FROM fast5 WHERE filename = ?", (filename,)).fetchone()
-        if row is not None:
-            return row[0]
-            
-        self.cur.execute("INSERT INTO fast5 (filename) VALUES (?)", (filename,))
-        fast5_id = self.cur.lastrowid
-        #self.con.commit()
-
-        return fast5_id
-
-    def init_read(self, read_id, fast5_id):
-        self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
-
-    def next_aln_id(self):
-        self.prev_aln_id += 1
-        return self.prev_aln_id
-
-    def write_layers(self, df):
-        for group in df.columns.levels[0]:
-            df[group].to_sql(
-                group, self.con, 
-                if_exists="append", 
-                method="multi", chunksize=50000,
-                index=True, index_label=["mref","aln_id"])
-
-    def get_fast5_index(self, track_id=None):
-        query = "SELECT read.id AS read_id, filename FROM read " +\
-                "JOIN fast5 ON fast5.id = fast5_id"
-
-        wheres = list()
-        params = list()
-
-        if track_id is not None:
-            query += " JOIN alignment ON read.id = alignment.read_id"
-            self._add_where(wheres, params, "track_id", track_id)
-        
-        query = self._join_query(query, wheres)
-        return pd.read_sql_query(query, self.con, params=params)
-
-    def get_read_ids(self):
-        return set(pd.read_sql_query("SELECT id FROM read", self.con)["id"])
-
-    def _add_where(self, wheres, params, name, val):
-        if val is None: return
-
-        if not isinstance(val, str) and isinstance(val, (collections.abc.Sequence, np.ndarray)):
-            wheres.append("%s in (%s)" % (name, ",".join(["?"]*len(val))))
-            params += map(str, val)
-        else:
-            wheres.append("%s = ?" % name)
-            params.append(str(val))
-
-    def query_track(self, name=None):
-        select = "SELECT * FROM track"
-        wheres = list()
-        params = list()
-        self._add_where(wheres,params,"name",name)
-        query = self._join_query(select, wheres)
-        return pd.read_sql_query(query, self.con, params=params)
-        #return self.cur.execute(query,params).fetchone()
-
-    def query_alignments(self, track_id=None, read_id=None, aln_id=None, coords=None, full_overlap=False, order=None, chunksize=None):
-        select = "SELECT * FROM alignment"
-        wheres = list()
-        params = list()
-
-        self._add_where(wheres, params, "id", aln_id)
-        self._add_where(wheres, params, "track_id", track_id)
-        self._add_where(wheres, params, "read_id", read_id)
-
-        if coords is not None:
-            ref_start = int(coords.refs.min())
-            ref_end = int(coords.refs.max())+1
-            wheres.append("ref_name = ? AND ref_start < ? AND ref_end > ?")
-            params.append(coords.ref_name)
-            if full_overlap:
-                params += [ref_start, ref_end]
-            else:
-                params += [ref_end, ref_start]
-
-        query = self._join_query(select, wheres, order)
-
-        return pd.read_sql_query(query, self.con, index_col="id", params=params, chunksize=chunksize)
-        
-    def _join_query(self, select, wheres, order=None):
-        query = select
-        if len(wheres) > 0:
-            query += " WHERE " + " AND ".join(wheres)
-        if order is not None:
-            query += " ORDER BY " + ", ".join(order)
-        return query
-
-    def query_layers(self, track_id=None, coords=None, aln_id=None, order=["mref"], index=["mref","aln_id"], chunksize=None):
-        select = "SELECT mref, aln_id, start, length, current FROM dtw"
-
-        wheres = list()
-        params = list()
-
-        if track_id is not None:
-            select += " JOIN alignment ON id = aln_id"
-            self._add_where(wheres, params, "track_id", track_id)
-
-        if coords is not None:
-            if coords.stranded:
-                wheres.append("(mref >= ? AND mref <= ?)")
-                params += [str(coords.mrefs.min()), str(coords.mrefs.max())]
-            else:
-                wheres.append("((mref >= ? AND mref <= ?) OR (mref >= ? AND mref <= ?))")
-                params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
-                params += [str(coords.mrefs[False].min()), str(coords.mrefs[False].max())]
-
-        self._add_where(wheres, params, "aln_id", aln_id)
-
-        query = self._join_query(select, wheres, order)
-
-        return pd.read_sql_query(query, self.con, index_col=index, params=params, chunksize=chunksize)
-
-        #return pd.concat({table : df}, names=["group", "layer"], axis=1)

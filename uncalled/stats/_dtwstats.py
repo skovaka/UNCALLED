@@ -13,7 +13,7 @@ from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split, ref_coords
 from ..index import BWA_OPTS
 from ..fast5 import parse_read_ids
-from ..dtw import TrackIO, LAYERS
+from ..dtw import Tracks, LAYERS
 
 #class DtwstatsParams(config.ParamGroup):
 #    _name = "dtwstats"
@@ -122,7 +122,7 @@ dtwstats = _Dtwstats()
 def main(conf):
     """Output DTW alignment paths, statistics, and comparisons"""
 
-    io = TrackIO(conf=conf)
+    io = Tracks(conf=conf)
 
     for coords,tracks in io.iter_refs():
         for track in tracks:

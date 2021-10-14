@@ -25,7 +25,7 @@ from ...index import BWA_OPTS, str_to_coord
 from ...fast5 import Fast5Reader
 from ..dotplot import Dotplot
 from ...dtw.track import AlnTrack, LAYERS
-from ...dtw.track_io import TrackIO
+from ...dtw.track_io import Tracks
 from ...argparse import Opt, comma_split
 
 CMAP = "viridis"
@@ -69,7 +69,7 @@ class Browser:
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])
 
-        self.io = TrackIO(conf=self.conf)
+        self.io = Tracks(conf=self.conf)
         self.conf = self.io.conf
 
         self.tracks = self.io.load_refs(load_mat=True) #list()

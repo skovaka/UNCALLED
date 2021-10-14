@@ -16,7 +16,7 @@ from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
 from _uncalled._nt import KmerArray
 
 from .. import PoreModel
-from . import Bcaln, TrackIO
+from . import Bcaln, Tracks
 
 #TODO make this better
 METHODS = {
@@ -55,32 +55,23 @@ def main(conf):
     conf.proc_read.detect_events = True
     conf.export_static()
 
-    track_io = TrackIO(None, conf.dtw.out_path, conf=conf)
+    track_io = Tracks(None, conf.dtw.out_path, conf=conf)
+
+    fast5s = Fast5Processor(conf=conf)
+
+    read_filter = fast5s.get_read_filter()
 
     pafs = parse_paf(
         conf.dtw.mm2_paf, 
         ref_bounds=conf.track_io.ref_bounds, 
+        read_filter=read_filter,
         full_overlap=conf.track_io.full_overlap)
 
     mm2s = defaultdict(list)
     for paf in pafs:
         mm2s[paf.qr_name].append(paf)
 
-    fast5s = Fast5Processor(reads=mm2s.keys(), conf=conf)
-
-    #mm2s = {p.qr_name : p
-    #     for p in parse_paf(
-    #        conf.dtw.mm2_paf,
-    #        ref_bounds=conf.track_io.ref_bounds,
-    #        full_overlap=conf.track_io.full_overlap,
-    #     ) if p.is_fwd}
-
     for read in fast5s:
-
-        #paf = mm2s.get(read.id, None)
-        #if paf is None:
-        #    continue
-
         for paf in mm2s[read.id]:
             print(read.id)
             dtw = GuidedDTW(track_io, read, paf, conf)

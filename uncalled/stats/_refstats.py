@@ -110,12 +110,12 @@ OPTS = (
 
 def main(*args, **kwargs):
     """Summarize and compare DTW stats over reference coordinates"""
-    from ..dtw import TrackIO
+    from ..dtw import Tracks
     conf, prms = config._init_group("refstats", *args, **kwargs)
 
     t0 = time.time()
 
-    io = TrackIO(conf=conf)
+    io = Tracks(conf=conf)
     conf = io.conf
 
     if not isinstance(prms.stats, SplitStats):

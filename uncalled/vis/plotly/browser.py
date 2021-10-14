@@ -9,7 +9,7 @@ from dash.dependencies import Input, Output, State
 from .trackplot import Trackplot
 from ... import config
 from ...index import str_to_coord
-from ...dtw.track_io import TrackIO
+from ...dtw.track_io import Tracks
 from ...dtw.track import LAYERS
 from ...argparse import Opt, comma_split
 
@@ -25,7 +25,7 @@ OPTS = (
 
 def main(conf):
     """Nanopore DTW genome browser"""
-    tracks = TrackIO(conf=conf)
+    tracks = Tracks(conf=conf)
     print("Loading tracks...")
     tracks.load_refs(load_mat=True)
     print("Done")

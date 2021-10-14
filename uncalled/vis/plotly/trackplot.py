@@ -8,7 +8,7 @@ import time
 from ... import config
 from ...dtw.track import LAYERS
 from ...index import str_to_coord
-from ...dtw.track_io import TrackIO
+from ...dtw.track_io import Tracks
 from ...argparse import Opt, comma_split
 
 class TrackplotParams(config.ParamGroup):
@@ -35,7 +35,7 @@ class Trackplot:
         self.conf, self.prms = config._init_group("trackplot", *args, **kwargs)
 
         if self.prms.tracks is None:
-            self.tracks = TrackIO(conf=self.conf)
+            self.tracks = Tracks(conf=self.conf)
             self.tracks.load_refs(load_mat=True)
         else:
             self.tracks = self.prms.tracks

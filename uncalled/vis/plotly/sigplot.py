@@ -9,7 +9,7 @@ from ... import nt
 from ... import config
 from ...dtw.track import LAYERS
 from ...index import str_to_coord
-from ...dtw.track_io import TrackIO
+from ...dtw.track_io import Tracks
 from ...argparse import Opt, comma_split
 from ...fast5 import parse_read_ids
 from ...sigproc import ProcRead
@@ -163,7 +163,7 @@ OPTS = (
 
 def main(conf):
     """plot a dotplot"""
-    io = TrackIO(conf=conf)
+    io = Tracks(conf=conf)
 
     tracks = io.load_refs()
 
