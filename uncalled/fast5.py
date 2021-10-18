@@ -81,7 +81,7 @@ def parse_read_ids(reads):
 class Fast5Reader:
 
     def __init__(self, fast5s=None, index=None, reads=None, recursive=None, conf=None):
-        self.conf = unc.Config() if conf is None else conf
+        self.conf = unc.Config(conf)# if conf is None else conf
         self.prms = self.conf.fast5_reader
 
         if fast5s is None: 

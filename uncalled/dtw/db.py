@@ -11,8 +11,10 @@ import os
 import collections
 import numpy as np
 import pandas as pd
+import sys
 
-from ..argparse import Opt
+from ..argparse import Opt, comma_split
+from ..fast5 import parse_fast5_paths
 
 
 class TrackSQL:
@@ -43,7 +45,6 @@ class TrackSQL:
                 id INTEGER PRIMARY KEY,
                 name TEXT,
                 desc TEXT,
-                fast5_dir TEXT,
                 config TEXT
             );""")
         self.cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS track_idx ON track (name);")
@@ -55,7 +56,7 @@ class TrackSQL:
             );""")
         self.cur.execute("""
             CREATE TABLE IF NOT EXISTS fast5 (
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY ON CONFLICT REPLACE,
                 filename TEXT
             );""")
         self.cur.execute("""
@@ -100,9 +101,9 @@ class TrackSQL:
 
     def init_track(self, track):
         self.cur.execute(
-            "INSERT INTO track (name,desc,config,fast5_dir) VALUES (?,?,?,?)",
+            "INSERT INTO track (name,desc,config) VALUES (?,?,?)",
             (track.name, track.desc, 
-             track.conf.to_toml(), "fast5")
+             track.conf.to_toml())
         )
         track.id = self.cur.lastrowid
         #self.con.commit()
@@ -312,10 +313,11 @@ def ls(conf, con=None):
     con.commit()
 
 def _verify_track(cur, track_name):
-    existing = cur.execute("SELECT name FROM track WHERE name == ?", (track_name,))
-    if len(existing.fetchall()) == 0:
+    ids = cur.execute("SELECT id FROM track WHERE name == ?", (track_name,)).fetchall()
+    if len(ids) == 0:
         sys.stderr.write("Track does not exist: \"%s\"\n" % conf.track_name)
         sys.exit(1)
+    return ids[0][0]
 
 DELETE_OPTS = (
     DB_OPT,
@@ -337,11 +339,14 @@ EDIT_OPTS = (
     Opt("track_name", help="Current track name"),
     Opt(("-N", "--new-name"), default=None, help="New track name"),
     Opt(("-D", "--description"), default=None, help="New track description"),
+    Opt(("-F", "--fast5-files"), "fast5_reader", type=comma_split),
+    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
 )
 def edit(conf, con=None):
     if con is None: con = sqlite3.connect(conf.db_file)
     cur = con.cursor()
-    _verify_track(cur, conf.track_name)
+    track_id = _verify_track(cur, conf.track_name)
+    print(track_id)
 
     updates = []
     params = []
@@ -359,8 +364,39 @@ def edit(conf, con=None):
     query = "UPDATE track SET " + ", ".join(updates) + " WHERE name == ?"
     print(query)
     cur.execute(query, params)
+
+    if len(conf.fast5_files) > 0:
+        _set_fast5s(track_id, conf.fast5_reader, con, cur)
+        
+
     con.commit()
     con.close()
+
+def _set_fast5s(track_id, prms, con, cur):
+    fast5s = pd.read_sql_query(
+        "SELECT fast5.id, filename FROM fast5 " \
+        "JOIN read ON fast5.id = fast5_id " \
+        "JOIN alignment ON read.id = read_id " \
+        "WHERE track_id = ?",
+        con, index_col="id", params=(track_id,))
+
+    basenames = fast5s["filename"].map(os.path.basename)
+
+    new_paths = {os.path.basename(path) : path for path in parse_fast5_paths(prms.fast5_files, prms.recursive)}
+
+    fast5s["filename"] = basenames.map(new_paths)
+
+    na = fast5s["filename"].isna()
+    if na.any():
+        missing = basenames[na].to_numpy() 
+        if len(missing) > 10:
+            missing = missing[:10] + ["..."]
+        raise ValueError("Fast5 files found: " + ", ".join(missing))
+    
+    fast5s.to_sql(
+        "fast5", con=con,
+        if_exists="append",
+        index_label="id")
 
 SUBCMDS = [
     (ls, LS_OPTS), 
