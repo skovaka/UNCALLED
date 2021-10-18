@@ -10,54 +10,13 @@ from collections import defaultdict
 import scipy
 
 from .db import TrackSQL
-from .track import AlnTrack, LAYERS
+from .track import AlnTrack, LAYERS, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
 from .. import config, nt
 
-def parse_layers(layers):
-    db_layers = list() 
-    fn_layers = list() 
-
-    if isinstance(layers, str):
-        layers = layers.split(",")
-
-    ret = list()
-
-    parsed = set()
-
-    for layer in layers:
-        spl = layer.split(".")
-        if len(spl) == 2:
-            group,layer = spl
-        elif len(spl) == 1:
-            group = "dtw"
-            layer = spl[0]
-        else:
-            raise ValueError("Invalid layer specifier \"%s\", must contain at most one \".\"" % layer)
-
-        if not group in LAYERS:
-            raise ValueError("Invalid layer group \"%s\". Options: %s" % (group, LAYERS.keys()))
-
-        group_layers = LAYERS[group]
-
-        if not layer in group_layers:
-            raise ValueError("Invalid layer \"%s\". Options: %s" % (group, group_layers.keys()))
-
-        if (group, layer) in parsed:
-            continue
-        parsed.add((group, layer))
-
-        yield (group, layer)
-        #if group_layers[layer].fn is None:
-        #    db_layers.append((group, layer))
-        #else:
-        #    fn_layers.append((group, layer))
-
-    #return db_layers, fn_layers
             
-
 class TracksParams(config.ParamGroup):
     _name = "track_io"
 TracksParams._def_params(
@@ -71,7 +30,8 @@ TracksParams._def_params(
     ("max_reads", None, int, "Only load reads which overlap these coordinates"),
     ("index_prefix", None, str, "BWA index prefix"),
     ("load_fast5s", bool, True, "Load fast5 files"),
-    ("overwrite", False, bool, "Overwrite existing databases"),
+    ("overwrite", False, bool, "Overwrite existing tracks"),
+    ("append", False, bool, "Append reads to existing tracks"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
@@ -92,7 +52,7 @@ LAYER_REFSTATS = {"min", "max", "mean", "stdv", "var", "skew", "kurt"}
 COMPARE_REFSTATS = {"ks"}
 ALL_REFSTATS = LAYER_REFSTATS | COMPARE_REFSTATS
 
-class RefstatSplit:
+class RefstatsSplit:
     def __init__(self, stats, track_count):
         self.layer = [s for s in stats if s in LAYER_REFSTATS]
         self.compare = [s for s in stats if s in COMPARE_REFSTATS]
@@ -234,7 +194,7 @@ class Tracks:
             self._init_track(db, row.name)
 
             conf = config.Config(toml=row.config)
-            t = AlnTrack(db, row["id"], name, row["desc"], row["groups"], conf)
+            t = AlnTrack(db, row["id"], name, row["desc"], conf)
             self.aln_tracks.append(t)
 
             self.conf.load_config(conf)
@@ -250,7 +210,7 @@ class Tracks:
             self.prev_fast5[name] = (None, None)
             self.prev_read[name] = None
 
-            track = AlnTrack(db, None, name, name, "dtw", self.conf)
+            track = AlnTrack(db, None, name, name, self.conf)
             self.output_tracks[name] = track
 
             try:
@@ -297,10 +257,10 @@ class Tracks:
         if layers is not None:
             if "start" in layers.columns:
                 col = "start"
-            elif "sample" in layers.columns:
-                col = "sample"
+            #elif "sample" in layers.columns:
+            #    col = "sample"
             else:
-                raise ValueError("Must initialize alignment from DataFrame with sample or start column")
+                raise ValueError("Must initialize alignment from DataFrame with start column")
 
             samp_start = layers[col].min()
             samp_end = layers[col].max()
@@ -358,7 +318,7 @@ class Tracks:
 
         layers = dict()
         for group in ["dtw"]:
-            layers[group] = db0.query_layers(self.input_track_ids, self.coords, ids)
+            layers[group] = db0.query_layers(self.db_layers, self.input_track_ids, self.coords, ids)
         layers = pd.concat(layers, names=["group", "layer"], axis=1)
         
         for track in self.aln_tracks:
@@ -381,7 +341,7 @@ class Tracks:
             self.refstats = None
             return None
 
-        stats = RefstatSplit(self.prms.refstats, len(self.aln_tracks))
+        stats = RefstatsSplit(self.prms.refstats, len(self.aln_tracks))
 
         refstats = dict()
         grouped = [t.layers["dtw"][self.prms.refstats_layers].groupby(level="mref") for t in self.aln_tracks]
@@ -412,7 +372,7 @@ class Tracks:
 
         refstats = pd.concat(refstats, axis=1, names=["track", "layer", "stat"])
 
-        refstats.index = self.coords.mref_to_ref_index(refstats.index, multi=verbose_refs)
+        refstats.index = self.aln_tracks[0].coords.mref_to_ref_index(refstats.index, multi=verbose_refs)
 
         self.refstats = refstats.dropna()
 
@@ -424,6 +384,7 @@ class Tracks:
 
         dbfile0,db0 = list(self.dbs.items())[0]
         layer_iter = db0.query_layers(
+            self.db_layers, 
             self.input_track_ids, 
             coords=self.coords, 
             order=["mref"],
@@ -544,18 +505,13 @@ class Tracks:
     def _fill_tracks(self, db, alns):
         ids = list(alns.index)
 
-        layers = dict()
-        #TODO parse which track layers to import
-        for group in ["dtw"]: #self.groups:
-            layers[group] = db.query_layers(self.input_track_ids, self.coords, ids) #, index=["aln_id","mref"])
-
-        layers = pd.concat(layers, names=["group", "layer"], axis=1)
+        layers = db.query_layer_groups(self.db_layers, self.input_track_ids, self.coords, ids)
 
         for track in self.aln_tracks:
             track_alns = alns[alns["track_id"] == track.id]
 
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)
-            track_layers = layers.iloc[i].copy()
+            track_layers = layers.iloc[i].dropna(axis=1, how="all") #.set_index(self.layer_refs)
 
             name = track_alns["ref_name"].iloc[0]
             fwd = track_alns["fwd"].iloc[0]

@@ -14,78 +14,7 @@ import pandas as pd
 
 from ..argparse import Opt
 
-DB_OPT = Opt("db_file", help="Track database file")
 
-LS_OPTS = (DB_OPT,)
-_LS_QUERY = "SELECT name,desc,COUNT(alignment.id) FROM track " \
-            "JOIN alignment ON track.id == track_id GROUP BY name"
-def ls(conf, con=None):
-    if con is None:
-        con = sqlite3.connect(conf.db_file)
-    cur = con.cursor()
-    print("\t".join(["Name", "Description", "Alignments"]))
-    
-    for row in cur.execute(_LS_QUERY).fetchall():
-        print("\t".join(map(str, row)))
-    con.commit()
-
-def _verify_track(cur, track_name):
-    existing = cur.execute("SELECT name FROM track WHERE name == ?", (track_name,))
-    if len(existing.fetchall()) == 0:
-        sys.stderr.write("Track does not exist: \"%s\"\n" % conf.track_name)
-        sys.exit(1)
-
-DELETE_OPTS = (
-    DB_OPT,
-    Opt("track_name", help="Name of the track to delete"),
-)
-def delete(conf, con=None):
-    if con is None:
-        con = sqlite3.connect(conf.db_file)
-    cur = con.cursor()
-    _verify_track(cur, conf.track_name)
-
-    cur.execute("PRAGMA foreign_keys = ON")
-    cur.execute("DELETE FROM track WHERE name == ?", (conf.track_name,))
-    con.commit()
-    print("Deleted track \"%s\"" % conf.track_name)
-
-EDIT_OPTS = (
-    Opt("db_file", help="Track database file"),
-    Opt("track_name", help="Current track name"),
-    Opt(("-N", "--new-name"), default=None, help="New track name"),
-    Opt(("-D", "--description"), default=None, help="New track description"),
-)
-def edit(conf, con=None):
-    if con is None: con = sqlite3.connect(conf.db_file)
-    cur = con.cursor()
-    _verify_track(cur, conf.track_name)
-
-    updates = []
-    params = []
-    if conf.new_name:
-        updates.append("name = ?")
-        params.append(conf.new_name)
-    if conf.description:
-        updates.append("desc = ?")
-        params.append(conf.description)
-    if len(updates) == 0:
-        sys.stderr.write("No changes made. Must specify new name (-N) or description (-D)\n")
-        return
-    params.append(conf.track_name)
-        
-    query = "UPDATE track SET " + ", ".join(updates) + " WHERE name == ?"
-    cur.execute(query, params)
-    con.close()
-
-SUBCMDS = [
-    (ls, LS_OPTS), 
-    (delete, DELETE_OPTS), 
-    (edit, EDIT_OPTS), 
-]
-
-
-            
 class TrackSQL:
     def __init__(self, sqlite_db):
         self.filename = sqlite_db
@@ -114,7 +43,7 @@ class TrackSQL:
                 id INTEGER PRIMARY KEY,
                 name TEXT,
                 desc TEXT,
-                groups TEXT,
+                fast5_dir TEXT,
                 config TEXT
             );""")
         self.cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS track_idx ON track (name);")
@@ -157,7 +86,8 @@ class TrackSQL:
             CREATE TABLE IF NOT EXISTS bcaln (
                 mref INTEGER,
                 aln_id INTEGER,
-                sample INTEGER,
+                start INTEGER,
+                length INTEGER,
                 bp INTEGER,
                 error TEXT,
                 FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE
@@ -170,8 +100,9 @@ class TrackSQL:
 
     def init_track(self, track):
         self.cur.execute(
-            "INSERT INTO track (name,desc,config,groups) VALUES (?,?,?,?)",
-            (track.name, track.desc, track.conf.to_toml(), "dtw")
+            "INSERT INTO track (name,desc,config,fast5_dir) VALUES (?,?,?,?)",
+            (track.name, track.desc, 
+             track.conf.to_toml(), "fast5")
         )
         track.id = self.cur.lastrowid
         #self.con.commit()
@@ -278,7 +209,68 @@ class TrackSQL:
             query += " ORDER BY " + ", ".join(order)
         return query
 
-    def query_layers(self, track_id=None, coords=None, aln_id=None, order=["mref"], index=["mref","aln_id"], chunksize=None):
+    def query_layer_groups(self, layers, track_id=None, coords=None, aln_id=None, order=["mref"], chunksize=None):
+
+        group_layers = collections.defaultdict(list)
+        renames = dict()
+        fields = list()
+        tables = list()
+        for group,layer in layers:
+            field = group + "." + layer
+            name = group + "_" + layer
+            group_layers[group].append(name)
+            renames[name] = layer
+            fields.append(field + " AS " + name)
+            if group not in tables:
+                tables.append(group)
+
+        fields += ["%s.%s AS idx_%s" % (tables[0],idx,idx) for idx in ("mref", "aln_id")]
+
+        select = "SELECT " + ", ".join(fields) + " FROM " + tables[0]
+        for table in tables[1:]:
+            select += " LEFT JOIN %s ON %s.aln_id == idx_aln_id AND %s.mref == idx_mref" % ((table,)*3)
+
+        wheres = list()
+        params = list()
+
+        if track_id is not None:
+            select += " JOIN alignment ON id = idx_aln_id"
+            self._add_where(wheres, params, "track_id", track_id)
+
+        if coords is not None:
+            if coords.stranded:
+                wheres.append("(idx_mref >= ? AND idx_mref <= ?)")
+                params += [str(coords.mrefs.min()), str(coords.mrefs.max())]
+            else:
+                wheres.append("((idx_mref >= ? AND idx_mref <= ?) OR (idx_mref >= ? AND idx_mref <= ?))")
+
+                params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
+                params += [str(coords.mrefs[False].min()), str(coords.mrefs[False].max())]
+
+        self._add_where(wheres, params, "idx_aln_id", aln_id)
+
+        query = self._join_query(select, wheres, ["idx_"+o for o in order])
+
+        ret = pd.read_sql_query(
+            query, self.con, 
+            index_col=["idx_mref", "idx_aln_id"], 
+            params=params, chunksize=chunksize)
+
+        def make_groups(df):
+            grouped = dict()
+            for group, layers in group_layers.items():
+                gdf = df[layers]
+                grouped[group] = df[layers].rename(columns=renames)
+            df = pd.concat(grouped, names=("group", "layer"), axis=1)
+            df.index.names = ("mref", "aln_id")
+            return df
+                
+        if chunksize is None:
+            return make_groups(ret)
+
+        return (make_groups(df) for df in ret)
+
+    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, order=["mref"], index=["mref","aln_id"], chunksize=None):
         select = "SELECT mref, aln_id, start, length, current FROM dtw"
 
         wheres = list()
@@ -294,6 +286,7 @@ class TrackSQL:
                 params += [str(coords.mrefs.min()), str(coords.mrefs.max())]
             else:
                 wheres.append("((mref >= ? AND mref <= ?) OR (mref >= ? AND mref <= ?))")
+
                 params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
                 params += [str(coords.mrefs[False].min()), str(coords.mrefs[False].max())]
 
@@ -303,4 +296,76 @@ class TrackSQL:
 
         return pd.read_sql_query(query, self.con, index_col=index, params=params, chunksize=chunksize)
 
-        #return pd.concat({table : df}, names=["group", "layer"], axis=1)
+DB_OPT = Opt("db_file", help="Track database file")
+
+LS_OPTS = (DB_OPT,)
+_LS_QUERY = "SELECT name,desc,COUNT(alignment.id) FROM track " \
+            "JOIN alignment ON track.id == track_id GROUP BY name"
+def ls(conf, con=None):
+    if con is None:
+        con = sqlite3.connect(conf.db_file)
+    cur = con.cursor()
+    print("\t".join(["Name", "Description", "Alignments"]))
+    
+    for row in cur.execute(_LS_QUERY).fetchall():
+        print("\t".join(map(str, row)))
+    con.commit()
+
+def _verify_track(cur, track_name):
+    existing = cur.execute("SELECT name FROM track WHERE name == ?", (track_name,))
+    if len(existing.fetchall()) == 0:
+        sys.stderr.write("Track does not exist: \"%s\"\n" % conf.track_name)
+        sys.exit(1)
+
+DELETE_OPTS = (
+    DB_OPT,
+    Opt("track_name", help="Name of the track to delete"),
+)
+def delete(conf, con=None):
+    if con is None:
+        con = sqlite3.connect(conf.db_file)
+    cur = con.cursor()
+    _verify_track(cur, conf.track_name)
+
+    cur.execute("PRAGMA foreign_keys = ON")
+    cur.execute("DELETE FROM track WHERE name == ?", (conf.track_name,))
+    con.commit()
+    print("Deleted track \"%s\"" % conf.track_name)
+
+EDIT_OPTS = (
+    Opt("db_file", help="Track database file"),
+    Opt("track_name", help="Current track name"),
+    Opt(("-N", "--new-name"), default=None, help="New track name"),
+    Opt(("-D", "--description"), default=None, help="New track description"),
+)
+def edit(conf, con=None):
+    if con is None: con = sqlite3.connect(conf.db_file)
+    cur = con.cursor()
+    _verify_track(cur, conf.track_name)
+
+    updates = []
+    params = []
+    if conf.new_name:
+        updates.append("name = ?")
+        params.append(conf.new_name)
+    if conf.description:
+        updates.append("desc = ?")
+        params.append(conf.description)
+    if len(updates) == 0:
+        sys.stderr.write("No changes made. Must specify new name (-N) or description (-D)\n")
+        return
+    params.append(conf.track_name)
+        
+    query = "UPDATE track SET " + ", ".join(updates) + " WHERE name == ?"
+    print(query)
+    cur.execute(query, params)
+    con.commit()
+    con.close()
+
+SUBCMDS = [
+    (ls, LS_OPTS), 
+    (delete, DELETE_OPTS), 
+    (edit, EDIT_OPTS), 
+]
+
+

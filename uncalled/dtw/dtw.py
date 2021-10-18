@@ -118,8 +118,8 @@ class GuidedDTW:
 
         self.model = PoreModel(self.conf.pore_model)
 
-        self.samp_min = self.bcaln['sample'].min()
-        self.samp_max = self.bcaln['sample'].max()
+        self.samp_min = self.bcaln["start"].min()
+        self.samp_max = self.bcaln["start"].max()
 
         self._calc_dtw()
 
@@ -145,8 +145,8 @@ class GuidedDTW:
 
 
         for st, en in [(block_min, block_max)]:
-            samp_st = self.bcaln.loc[st,'sample']
-            samp_en = self.bcaln.loc[en,'sample']
+            samp_st = self.bcaln.loc[st,"start"]
+            samp_en = self.bcaln.loc[en,"start"]
 
             mref_st = st
             mref_en = en+1
@@ -201,7 +201,7 @@ class GuidedDTW:
             band_count = qry_len + ref_len
             band_lls = list()
 
-            starts = self.bcaln.index[self.bcaln['sample'].searchsorted(read_block['start'])]
+            starts = self.bcaln.index[self.bcaln["start"].searchsorted(read_block['start'])]
 
             q = r = 0
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))

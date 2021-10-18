@@ -20,7 +20,7 @@ from .. import nt, PoreModel
 from ..index import RefCoord
 
 class Bcaln:
-    BCE_K = 4
+    K = 4
     CIG_OPS_STR = "MIDNSHP=X"
     CIG_RE = re.compile("(\d+)(["+CIG_OPS_STR+"])")
     CIG_OPS = set(CIG_OPS_STR)
@@ -66,18 +66,27 @@ class Bcaln:
         bce_samps = read.f5.template_start + np.arange(len(bce_qrs)) * read.f5.bce_stride
 
         samp_bps = pd.DataFrame({
-            'sample' : bce_samps,#[moves],
-            'bp'     : np.cumsum(read.f5.moves),#[moves],
+            "start" : bce_samps,
+            "length" : read.f5.bce_stride,
+            "bp"     : np.cumsum(read.f5.moves),
         })
 
-        df = samp_bps.join(self.bp_mref_aln, on='bp').dropna()
-        df['mref'] = df['mref'].astype("Int64")
-        df = df.set_index("mref", drop=True) \
-               .sort_index() 
-        df = df[~df.index.duplicated(keep="last")]
+        df = samp_bps.join(self.bp_mref_aln, on="bp").dropna()
+        #df["mref"] = df["mref"].astype("Int64")
+
+        grp = df.groupby("mref")
+
+        df = pd.DataFrame({
+            "mref"    : grp["mref"].first().astype("int64"),
+            "start"  : grp["start"].min().astype("uint32"),
+            "length" : grp["length"].sum().astype("uint32"),
+            "bp"   : grp["bp"].first()
+        }).set_index("mref")
+        print(df)
+        print("HERE")
 
         if self.err_bps is not None:
-            self.errs = samp_bps.join(self.err_bps.set_index('bp'), on='bp').dropna()
+            self.errs = samp_bps.join(self.err_bps.set_index("bp"), on="bp").dropna()
             self.errs.reset_index(inplace=True, drop=True)
         else:
             self.errs = None

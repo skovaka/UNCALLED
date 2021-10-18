@@ -55,40 +55,60 @@ LAYERS = {
             lambda track: track.coords.kmers[track.layer_mrefs].to_numpy()),
         "base" : LayerMeta(str, "Reference base",
             lambda track: nt.kmer_base(track.coords.kmers[track.layer_mrefs], 2)),
+    }, "bcaln" : {
+        "start" : LayerMeta(int, "Basecalled Sample", None),
         "bp" : LayerMeta(int, "Basecaller Base Index", None),
         "err" : LayerMeta(str, "Basecalled Alignment Error", None)}
 }
 
-class Tracks:
-    def __init__(self, coords):
-        self.coords = coords
+def parse_layers(layers):
+    db_layers = list() 
+    fn_layers = list() 
 
-        self.tracks = list()
-        self.aln_tracks = list()
-        self.track_idxs = dict()
+    if isinstance(layers, str):
+        layers = layers.split(",")
 
-    def add_track(self, track):
-        i = len(self.tracks)
+    ret = list()
 
-        if isinstance(track, AlnTrack):
-            self.aln_tracks.append(i)
+    parsed = set()
+
+    for layer in layers:
+        spl = layer.split(".")
+        if len(spl) == 2:
+            group,layer = spl
+        elif len(spl) == 1:
+            group = "dtw"
+            layer = spl[0]
         else:
-            raise ValueError("Unknown track type" + str(type(track)))
+            raise ValueError("Invalid layer specifier \"%s\", must contain at most one \".\"" % layer)
 
-        self.tracks.append(track)
-        self.track_idxs[track.name] = i
+        if not group in LAYERS:
+            raise ValueError("Invalid layer group \"%s\". Options: %s" % (group, LAYERS.keys()))
 
-    def iter_reads(self):
-        pass
+        group_layers = LAYERS[group]
+
+        if not layer in group_layers:
+            raise ValueError("Invalid layer \"%s\". Options: %s" % (group, group_layers.keys()))
+
+        if (group, layer) in parsed:
+            continue
+        parsed.add((group, layer))
+
+        yield (group, layer)
+        #if group_layers[layer].fn is None:
+        #    db_layers.append((group, layer))
+        #else:
+        #    fn_layers.append((group, layer))
+
+    #return db_layers, fn_layers
 
 class AlnTrack:
-    def __init__(self, db, track_id, name, desc, groups, conf):
+    def __init__(self, db, track_id, name, desc, conf):
         self.db = db
         #self.index = index
         self.id = track_id
         self.name = name
         self.desc = desc
-        self.groups = groups.split(",")
         self.conf = conf
 
         self.read_ids = set()
@@ -127,7 +147,7 @@ class AlnTrack:
             raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
         return aln_id
 
-    def set_data(self, coords, alignments, layers, load_mat=False):
+    def set_data(self, coords, alignments, layers):
         self.coords = coords
         self.layers = layers#pd.concat(layers, names=["group", "layer"], axis=1)
 
@@ -177,6 +197,7 @@ class AlnTrack:
         #self.calc_layers([("re)])
         if layers is not None:
             self.calc_layers([(group, layer) for layer in layers])
+        print(self.layers)
         df = self.layers.xs(aln_id, level="aln_id")#.set_index(self.layer_refs)
         df.index = self.coords.mref_to_ref(df.index).rename("ref")
 

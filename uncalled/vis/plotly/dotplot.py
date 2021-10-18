@@ -8,9 +8,10 @@ from .sigplot import Sigplot
 
 from ... import config, nt
 
-from ...dtw.track import LAYERS
+from ...dtw.track import LAYERS, parse_layers
 from ...index import str_to_coord
-from ...dtw.track_io import Tracks, parse_layers, LAYERS
+from ...dtw.track_io import Tracks
+from ...dtw.bcaln import Bcaln
 from ...argparse import Opt, comma_split
 from ...fast5 import parse_read_ids
 from ...sigproc import ProcRead
@@ -22,7 +23,7 @@ class DotplotParams(config.ParamGroup):
 DotplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
     ("dtw_layers", ["model_diff"], None, ""),
-    ("track_colors", ["#AA0DFE", "#1CA71C", "#6A76FC"], list, ""),
+    ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF"], list, ""),
 )
 
 class Dotplot:
@@ -32,17 +33,38 @@ class Dotplot:
     #iter_plots() -> figs
     #plot_read(read_id) -> fig
 
-    def __init__(self, *args, **kwargs):
-        self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
-        self.tracks = self.prms.tracks #TODO do this better
+    _req_layers = [
+        "start", "length", "middle", 
+        "current", "dwell", "kmer", "base", 
+        "bcaln.start"
+    ]
 
-        compare = len(self.tracks) == 2
+    def __init__(self, *args, **kwargs):
+        conf, self.prms = config._init_group("dotplot", *args, **kwargs)
+
+        if isinstance(self.prms.tracks, str) or self.prms.tracks is None:
+            self.tracks = Tracks(conf=conf)
+        elif isinstance(self.prms.tracks, Tracks):
+            self.tracks = self.prms.tracks
+        else:
+            raise ValueError("Dotplot tracks parameter must be string or Tracks instance")
+
+        self.conf = self.tracks.conf
+
+        self.tracks.set_layers(self._req_layers + conf.dotplot.dtw_layers)
+
+    def iter_plots(self):
+        for read_id, tracks in self.tracks.iter_reads():
+            yield read_id, self.plot(tracks)
+
+    def plot(self, tracks):
+        compare = len(tracks) == 2
         if compare:
-            self.tracks[0].compare(self.tracks[1])
+            tracks[0].compare(tracks[1])
 
         column_widths=[5]+[1]*(len(self.prms.dtw_layers)+compare)
 
-        self.fig = make_subplots(
+        fig = make_subplots(
             rows=2, cols=len(column_widths), 
             row_heights=[1,3],
             column_widths=column_widths,
@@ -51,38 +73,52 @@ class Dotplot:
             shared_xaxes=True,
             shared_yaxes=True)
 
-        Sigplot(self.tracks, track_colors=self.prms.track_colors, conf=self.conf).plot(self.fig)
+        Sigplot(tracks, track_colors=self.prms.track_colors, conf=self.conf).plot(fig)
 
         hover_layers = ["middle","kmer","current","dwell"]#,"model_diff"]
         hover_layers += (l for l in self.prms.dtw_layers if l not in {"current","dwell"})
         hover_data = dict()
 
-        for i,track in enumerate(self.tracks):
+        for i,track in enumerate(tracks):
 
             track_hover = list()
 
+            has_bcaln = "bcaln" in track.layers.columns.get_level_values("group")
+
             first_aln = True
             for aln_id, aln in track.alignments.iterrows():
-                layers = track.layers.xs(aln_id, level="aln_id")
-                dtw = track.get_aln_layers(aln_id, "dtw")
+                #layers = track.layers.xs(aln_id, level="aln_id")
+                layers = track.get_aln_layers(aln_id)
+                dtw = layers["dtw"]#track.get_aln_layers(aln_id, "dtw")
 
                 track_hover.append(dtw[hover_layers])
+                
+                if has_bcaln:
+                    fig.add_trace(go.Scatter(
+                        x=layers["bcaln","start"], y=layers.index+Bcaln.K-1,
+                        name="Basecalled Alignment",
+                        mode="markers", marker={"size":5,"color":"orange"},
+                        legendgroup="bcaln",
+                        hoverinfo="skip",
+                        showlegend=first_aln
+                    ), row=2, col=1)
 
-                self.fig.add_trace(go.Scatter(
+                fig.add_trace(go.Scatter(
                     x=dtw["start"], y=dtw.index,
-                    name=track.name,
+                    name=track.desc,
                     legendgroup=track.desc,
                     line={"color":self.prms.track_colors[i], "width":2, "shape" : "hv"},
                     hoverinfo="skip",
                     showlegend=first_aln
                 ), row=2, col=1)
+                    
 
                 first_aln = False
 
                 for j,layer in enumerate(self.prms.dtw_layers):
-                    self.fig.add_trace(go.Scatter(
+                    fig.add_trace(go.Scatter(
                         x=dtw[layer], y=dtw.index-0.5, #TODO try vhv
-                        name=track.name, 
+                        name=track.desc, 
                         line={
                             "color" : self.prms.track_colors[i], 
                             "width":2, "shape" : "hv"},
@@ -94,16 +130,16 @@ class Dotplot:
 
         if compare:
             jacolor="red"#"#005eff"
-            self.fig.add_trace(go.Bar(
-                x=self.tracks[0].layers["dtw","jac_dist"], 
-                y=self.tracks[0].layer_refs, #TODO try vhv
+            fig.add_trace(go.Bar(
+                x=tracks[0].layers["dtw","jac_dist"], 
+                y=tracks[0].layer_refs, #TODO try vhv
                 name="DTW Compare",
                 orientation="h",
                 width=1.1,
                 marker={"color":jacolor,"line":{"color":jacolor,"width":0.5}},
                 legendgroup="compare"
             ), row=2, col=len(column_widths))
-            self.fig.update_xaxes(row=2, col=i+2,
+            fig.update_xaxes(row=2, col=i+2,
                 title_text="Signal Jaccard Distance")
 
         hover_data = pd.concat(hover_data, axis=1)
@@ -128,14 +164,14 @@ class Dotplot:
         for i,label in enumerate(labels):
             s = label
             fields = list()
-            for j in range(len(self.tracks)):
+            for j in range(len(tracks)):
                 k = len(labels) * j + i
                 fields.append(
                     '<span style="color:%s;float:right"><b>%%{customdata[%d]:.2f}</b></span>' % 
                     (self.prms.track_colors[j], k))
             hover_rows.append(s + ": " + ", ".join(fields))
 
-        self.fig.add_trace(go.Scatter(
+        fig.add_trace(go.Scatter(
             x=hover_coords, y=hover_coords.index,
             mode="markers", marker={"size":0,"color":"rgba(0,0,0,0)"},
             name="",
@@ -147,16 +183,15 @@ class Dotplot:
         ), row=2,col=1)
             #customdata=hoverdata.to_numpy(),
 
-
         if track.coords.fwd == self.conf.is_rna:
-            self.fig.update_yaxes(autorange="reversed", row=2, col=1)
-            self.fig.update_yaxes(autorange="reversed", row=2, col=2)
+            fig.update_yaxes(autorange="reversed", row=2, col=1)
+            fig.update_yaxes(autorange="reversed", row=2, col=2)
 
-        self.fig.update_yaxes(row=2, col=1,
+        fig.update_yaxes(row=2, col=1,
             title_text="Reference (%s)" % aln["ref_name"])
 
         for i,layer in enumerate(self.prms.dtw_layers):
-            self.fig.update_xaxes(row=2, col=i+2,
+            fig.update_xaxes(row=2, col=i+2,
                 title_text=LAYERS["dtw"][layer].label)
 
         axis_kw = dict(
@@ -165,21 +200,23 @@ class Dotplot:
             spikecolor="darkgray",
             spikethickness=1)
 
-        self.fig.update_xaxes(**axis_kw)
-        self.fig.update_yaxes(**axis_kw)
-        #self.fig.update_yaxes(showspikes=True)
+        fig.update_xaxes(**axis_kw)
+        fig.update_yaxes(**axis_kw)
+        #fig.update_yaxes(showspikes=True)
 
-        self.fig.update_xaxes(
+        fig.update_xaxes(
             title_text="Raw Sample", 
             tickformat="d", 
             #showspikes=True,
             row=2, col=1)
 
-        self.fig.update_layout(
+        fig.update_layout(
             #hovermode="x unified",
             hoverdistance=20,
             dragmode="pan", 
             legend={"bgcolor" : "#e6edf6"})#, scroll_zoom=True)
+
+        return fig
 
 
 OPTS = (
@@ -193,11 +230,9 @@ OPTS = (
 
 def main(conf):
     """plot a dotplot"""
-    conf.track_io.layers = ["start", "length", "middle", "current", "dwell", "kmer", "base"] + conf.dotplot.dtw_layers
-    io = Tracks(conf=conf)
 
-    for read_id, tracks in io.iter_reads():
-        print(read_id)
-        print(tracks)
-        fig = Dotplot(tracks, conf=io.conf).fig
-        fig.write_html(conf.out_prefix + read_id + ".html", config={"scrollZoom" : True, "displayModeBar" : True})
+    dotplots = Dotplot(conf=conf)
+    for read_id, fig in dotplots.iter_plots():
+        fig.write_html(
+            conf.out_prefix + read_id + ".html", 
+            config={"scrollZoom" : True, "displayModeBar" : True})
