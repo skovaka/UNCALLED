@@ -91,8 +91,7 @@ def main(conf):
 
         if aligned:
             pbar.update(n_reads)
-
-        n_reads += 1
+            n_reads += 1
 
     tracks.close()
 
