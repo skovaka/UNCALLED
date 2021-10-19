@@ -23,6 +23,7 @@ class TrackSQL:
         new_file = not os.path.exists(sqlite_db)
         self.con = sqlite3.connect(sqlite_db)
         self.cur = self.con.cursor()
+        self.cur.execute("PRAGMA foreign_keys = ON")
         self.open = True
 
         #if new_file:
@@ -323,16 +324,22 @@ DELETE_OPTS = (
     DB_OPT,
     Opt("track_name", help="Name of the track to delete"),
 )
-def delete(conf, con=None):
+def delete(track_name=None, con=None, conf=None):
+    if track_name is None:
+        track_name = conf.track_name
     if con is None:
         con = sqlite3.connect(conf.db_file)
-    cur = con.cursor()
-    _verify_track(cur, conf.track_name)
+        cur.execute("PRAGMA foreign_keys = ON")
 
-    cur.execute("PRAGMA foreign_keys = ON")
-    cur.execute("DELETE FROM track WHERE name == ?", (conf.track_name,))
+    cur = con.cursor()
+    _verify_track(cur, track_name)
+
     con.commit()
-    print("Deleted track \"%s\"" % conf.track_name)
+    cur.execute("DELETE FROM track WHERE name == ?", (track_name,))
+    #con.commit()
+    #cur.execute("PRAGMA foreign_keys = OFF")
+    con.commit()
+    print("Deleted track \"%s\"" % track_name)
 
 EDIT_OPTS = (
     Opt("db_file", help="Track database file"),

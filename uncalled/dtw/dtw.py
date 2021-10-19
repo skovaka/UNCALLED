@@ -40,12 +40,13 @@ AlignParams._def_params(
 OPTS = (Opt("index_prefix", "track_io"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt(("-o", "--out-path"), "dtw"),
-    Opt(("-f", "--overwrite"), "track_io", action="store_true", help="Will overwrite alignment track if one already exists"),
+    Opt(("-f", "--overwrite"), "track_io", action="store_true"),
+    Opt(("-a", "--append"), "track_io", action="store_true"),
     Opt("--rna", fn="set_r94_rna"),
     Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
-    Opt("--method", "dtw", choices=METHODS.keys()),
-    Opt(("-b", "--band-width"), "dtw"),
-    Opt(("-s", "--band-shift"), "dtw"),
+    #Opt("--method", "dtw", choices=METHODS.keys()),
+    #Opt(("-b", "--band-width"), "dtw"),
+    #Opt(("-s", "--band-shift"), "dtw"),
     Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
 )
 

@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 import scipy
 
-from .db import TrackSQL
+from .db import TrackSQL, delete
 from .track import AlnTrack, LAYERS, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
@@ -216,9 +216,17 @@ class Tracks:
             try:
                 db.init_track(track)
             except Exception as err:
-                #TODO add -f option (requires delete cascade)
                 if len(db.query_track(name)) > 0:
-                    raise ValueError("database already contains track named \"%s\". Specify a different name, write to a different file" % name)
+                    if self.prms.append:
+                        continue
+                    elif self.prms.overwrite:
+                        sys.stderr.write("Deleting existing track...\n")
+                        delete(name, db.con)
+                        db.init_track(track)
+                        continue
+                    else:
+                        print("HERE")
+                        raise ValueError("database already contains track named \"%s\". Specify a different name, write to a different file" % name)
 
 
                 raise err
