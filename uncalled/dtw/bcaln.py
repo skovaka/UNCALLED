@@ -82,8 +82,6 @@ class Bcaln:
             "length" : grp["length"].sum().astype("uint32"),
             "bp"   : grp["bp"].first()
         }).set_index("mref")
-        print(df)
-        print("HERE")
 
         if self.err_bps is not None:
             self.errs = samp_bps.join(self.err_bps.set_index("bp"), on="bp").dropna()
@@ -100,7 +98,6 @@ class Bcaln:
             df = df.reindex(index=mrefs, copy=False)
         else:
             self.coords = self.paf_coords
-            #print(df.index)
 
         self.df = df
 

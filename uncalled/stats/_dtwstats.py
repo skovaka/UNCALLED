@@ -110,10 +110,10 @@ class _Dtwstats:
     #    "bcerr" : get_bcerr_layer,
 
 OPTS = (
-    Opt("input", "track_io", nargs="+", type=str),
-    Opt(("-L", "--layers"), "track_io", type=comma_split, 
+    Opt("input", "tracks", nargs="+", type=str),
+    Opt(("-L", "--layers"), "tracks", type=comma_split, 
         help="Comma-separated list of which layers to retrieve or compute {%s}" % ",".join(_Dtwstats.LAYERS)),
-    Opt(("-R", "--ref-bounds"), "track_io", type=ref_coords),
+    Opt(("-R", "--ref-bounds"), "tracks", type=ref_coords),
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
 )
 

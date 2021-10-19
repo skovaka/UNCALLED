@@ -9,7 +9,7 @@ import scipy.stats
 from collections import defaultdict
 
 from .. import config, nt
-from ..dtw.track_io import RefstatsSplit, ALL_REFSTATS
+from ..dtw.tracks import RefstatsSplit, ALL_REFSTATS
 from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split
 from ..index import BWA_OPTS, str_to_coord
@@ -60,13 +60,13 @@ refstats = _Refstats()
 
 
 OPTS = (
-    Opt("refstats_layers", "track_io", type=comma_split,
+    Opt("refstats_layers", "tracks", type=comma_split,
         help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
-    Opt("refstats", "track_io", type=comma_split,
+    Opt("refstats", "tracks", type=comma_split,
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
-    Opt("input", "track_io", nargs="+", type=str),
-    Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
-    Opt(("-C", "--ref-chunksize"), "track_io"),
+    Opt("input", "tracks", nargs="+", type=str),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
+    Opt(("-C", "--ref-chunksize"), "tracks"),
     Opt(("-c", "--cov"), action="store_true"),
     Opt(("-v", "--verbose-refs"), action="store_true"),
 )
@@ -80,7 +80,7 @@ def main(conf):
     io = Tracks(conf=conf)
     conf = io.conf
 
-    stats = RefstatsSplit(conf.track_io.refstats, len(io.aln_tracks))
+    stats = RefstatsSplit(conf.tracks.refstats, len(io.aln_tracks))
 
     if conf.verbose_refs:
         columns = ["ref_name", "ref", "strand"]
@@ -91,11 +91,11 @@ def main(conf):
         name = track.name
         if conf.cov:
             columns.append(".".join([track.name, "cov"]))
-        for layer in conf.track_io.refstats_layers:
+        for layer in conf.tracks.refstats_layers:
             for stat in stats.layer:
                 columns.append(".".join([track.name, layer, stat]))
 
-    for layer in conf.track_io.refstats_layers:
+    for layer in conf.tracks.refstats_layers:
         for stat in stats.compare:
             columns.append(".".join([stat, layer, "stat"]))
 

@@ -22,11 +22,12 @@ from .. import nt, PoreModel
 
 import progressbar as progbar
 
-CONVERT_OPTS = (Opt("index_prefix", "track_io"),) + FAST5_OPTS + (
+CONVERT_OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt("--rna", fn="set_r94_rna"),
-    Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
-    Opt(("-f", "--overwrite"), "track_io", action="store_true"),
-    Opt(("-o", "--output"), "track_io", required=True),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
+    Opt(("-f", "--overwrite"), "tracks", action="store_true"),
+    Opt(("-a", "--append"), "tracks", action="store_true"),
+    Opt(("-o", "--output"), "tracks", required=True),
 )
 
 NANOPOLISH_OPTS = CONVERT_OPTS + (Opt("eventalign_tsv", type=str, default=None),)

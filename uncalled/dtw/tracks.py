@@ -18,7 +18,7 @@ from .. import config, nt
 
             
 class TracksParams(config.ParamGroup):
-    _name = "track_io"
+    _name = "tracks"
 TracksParams._def_params(
     ("input", None, None, "Input track(s)"),
     ("output", None, None,  "Output track"),
@@ -68,7 +68,7 @@ class RefstatsSplit:
 
 class Tracks:
     def __init__(self, *args, **kwargs):
-        self.conf, self.prms = config._init_group("track_io", copy_conf=True, *args, **kwargs)
+        self.conf, self.prms = config._init_group("tracks", copy_conf=True, *args, **kwargs)
 
         #if isinstance(self.prms.layers, str):
         #    self.prms.layers = [self.prms.layers]
@@ -225,7 +225,6 @@ class Tracks:
                         db.init_track(track)
                         continue
                     else:
-                        print("HERE")
                         raise ValueError("database already contains track named \"%s\". Specify a different name, write to a different file" % name)
 
 

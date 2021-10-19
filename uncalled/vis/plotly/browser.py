@@ -9,17 +9,17 @@ from dash.dependencies import Input, Output, State
 from .trackplot import Trackplot
 from ... import config
 from ...index import str_to_coord
-from ...dtw.track_io import Tracks
+from ...dtw.tracks import Tracks
 from ...dtw.track import LAYERS
 from ...argparse import Opt, comma_split
 
 
 OPTS = (
-    Opt("ref_bounds", "track_io", type=str_to_coord),
-    Opt("input", "track_io", nargs="+"),
+    Opt("ref_bounds", "tracks", type=str_to_coord),
+    Opt("input", "tracks", nargs="+"),
     Opt("layer", "trackplot", default="current", nargs="?"),
-    Opt(("-r", "--refstats"), "track_io", default="mean", type=comma_split),
-    Opt(("-f", "--full-overlap"), "track_io", action="store_true"),
+    Opt(("-r", "--refstats"), "tracks", default="mean", type=comma_split),
+    Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-o", "--outfile"), "trackplot"),
 )
 

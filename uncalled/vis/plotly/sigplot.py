@@ -9,7 +9,7 @@ from ... import nt
 from ... import config
 from ...dtw.track import LAYERS
 from ...index import str_to_coord
-from ...dtw.track_io import Tracks
+from ...dtw.tracks import Tracks
 from ...argparse import Opt, comma_split
 from ...fast5 import parse_read_ids
 from ...sigproc import ProcRead
@@ -153,11 +153,11 @@ class Sigplot:
         return fig
 
 OPTS = (
-    Opt("ref_bounds", "track_io", type=str_to_coord),
-    Opt("input", "track_io", nargs="+"),
+    Opt("ref_bounds", "tracks", type=str_to_coord),
+    Opt("input", "tracks", nargs="+"),
     Opt(("-o", "--outfile"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
-    Opt(("-l", "--read-filter"), "track_io", type=parse_read_ids),
+    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-n", "--max-reads"), "sigplot"),
 )
 

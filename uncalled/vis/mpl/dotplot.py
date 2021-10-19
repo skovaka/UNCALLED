@@ -16,7 +16,7 @@ from ...sigproc import ProcRead
 from ...fast5 import Fast5Reader, parse_read_ids
 from ...pafstats import parse_paf
 from ...dtw.track import AlnTrack
-from ...dtw.track_io import Tracks
+from ...dtw.tracks import Tracks
 from ...index import str_to_coord
 from ...argparse import Opt
 
@@ -46,11 +46,11 @@ def comma_split(s):
     return s.split(",")
 
 OPTS = [
-    Opt("input", "track_io", nargs="+"),
+    Opt("input", "tracks", nargs="+"),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
-    Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
-    Opt(("-l", "--read-filter"), "track_io", type=parse_read_ids),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
+    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", type=comma_split),
     Opt(("-C", "--max-chunks"), "read_buffer"),
 ]
@@ -73,18 +73,18 @@ class Dotplot:
         plt.style.use(['seaborn'])
         matplotlib.rcParams.update(self.prms.style["rc"])
 
-        self.conf.track_io.load_mat = False
-        self.conf.track_io.layers = self.conf.dotplot.layers
+        self.conf.tracks.load_mat = False
+        self.conf.tracks.layers = self.conf.dotplot.layers
 
-        self.track_io = Tracks(conf=self.conf)
-        self.fast5s = self.track_io.get_fast5_reader()#Fast5Reader(reads=self.read_ids, index=fast5_index, conf=self.tracks[0].conf)
-        self.conf.load_config(self.track_io.conf)
+        self.tracks = Tracks(conf=self.conf)
+        self.fast5s = self.tracks.get_fast5_reader()#Fast5Reader(reads=self.read_ids, index=fast5_index, conf=self.tracks[0].conf)
+        self.conf.load_config(self.tracks.conf)
 
-        self.index = self.track_io.index
+        self.index = self.tracks.index
         #self.mm2s = self.tracks[0].mm2s
 
     def show_all(self):
-        for read_id, tracks in self.track_io.iter_reads():
+        for read_id, tracks in self.tracks.iter_reads():
             self.read_id = read_id
             self.tracks = tracks
             print(read_id)

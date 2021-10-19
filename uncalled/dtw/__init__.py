@@ -2,6 +2,6 @@
 from collections import namedtuple
 
 from .bcaln import Bcaln
-from .track_io import Tracks
+from .tracks import Tracks
 from .track import LAYERS
 from .dtw import Fast5Processor #TODO move this to main module (eventually sigproc, then to C++)

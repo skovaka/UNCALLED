@@ -4,6 +4,7 @@ import re
 import numpy as np
 import pandas as pd
 from collections import defaultdict
+import progressbar as progbar
 
 from ..pafstats import parse_paf
 from ..config import Config, ParamGroup
@@ -37,13 +38,13 @@ AlignParams._def_params(
     ("out_path", None, str, "Path to directory where alignments will be stored. If not specified will display interactive dotplot for each read."),
 )
 
-OPTS = (Opt("index_prefix", "track_io"),) + FAST5_OPTS + (
+OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt(("-o", "--out-path"), "dtw"),
-    Opt(("-f", "--overwrite"), "track_io", action="store_true"),
-    Opt(("-a", "--append"), "track_io", action="store_true"),
+    Opt(("-f", "--overwrite"), "tracks", action="store_true"),
+    Opt(("-a", "--append"), "tracks", action="store_true"),
     Opt("--rna", fn="set_r94_rna"),
-    Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt("--method", "dtw", choices=METHODS.keys()),
     #Opt(("-b", "--band-width"), "dtw"),
     #Opt(("-s", "--band-shift"), "dtw"),
@@ -56,7 +57,7 @@ def main(conf):
     conf.proc_read.detect_events = True
     conf.export_static()
 
-    track_io = Tracks(None, conf.dtw.out_path, conf=conf)
+    tracks = Tracks(None, conf.dtw.out_path, conf=conf)
 
     fast5s = Fast5Processor(conf=conf)
 
@@ -64,43 +65,57 @@ def main(conf):
 
     pafs = parse_paf(
         conf.dtw.mm2_paf, 
-        ref_bounds=conf.track_io.ref_bounds, 
+        ref_bounds=conf.tracks.ref_bounds, 
         read_filter=read_filter,
-        full_overlap=conf.track_io.full_overlap)
+        full_overlap=conf.tracks.full_overlap)
 
     mm2s = defaultdict(list)
     for paf in pafs:
         mm2s[paf.qr_name].append(paf)
 
+    pbar = progbar.ProgressBar(
+            widgets=[progbar.Percentage(), progbar.Bar(), progbar.ETA()], 
+            maxval=len(mm2s)).start()
+
+    n_reads = 0
+
     for read in fast5s:
+        aligned = False
         for paf in mm2s[read.id]:
-            print(read.id)
-            dtw = GuidedDTW(track_io, read, paf, conf)
+            dtw = GuidedDTW(tracks, read, paf, conf)
 
             if dtw.df is None:
                 sys.stderr.write("dtw failed\n")
                 continue
+            aligned = True
 
-    track_io.close()
+        if aligned:
+            pbar.update(n_reads)
+
+        n_reads += 1
+
+    tracks.close()
+
+    pbar.finish()
 
 class GuidedDTW:
 
     #TODO do more in constructor using prms, not in main
     #def __init__(self, track, read, paf, conf=None, **kwargs):
-    def __init__(self, track_io, read, paf, conf=None, **kwargs):
+    def __init__(self, tracks, read, paf, conf=None, **kwargs):
         self.conf = read.conf if conf is None else conf
         self.prms = self.conf.dtw
 
         #self.track = track
 
-        bcaln = Bcaln(track_io.index, read, paf, track_io.coords)
+        bcaln = Bcaln(tracks.index, read, paf, tracks.coords)
         if bcaln.empty:
             self.df = None
             return
 
 
         #TODO init_alignment(read_id, fast5, group, layers)
-        self.track = track_io.init_alignment(read.id, read.f5.filename, bcaln.coords, "bcaln", bcaln.df)
+        self.track = tracks.init_alignment(read.id, read.f5.filename, bcaln.coords, "bcaln", bcaln.df)
 
         self.bcaln = bcaln.df.sort_index()
 

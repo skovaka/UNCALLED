@@ -8,7 +8,7 @@ import time
 from ... import config
 from ...dtw.track import LAYERS
 from ...index import str_to_coord
-from ...dtw.track_io import Tracks
+from ...dtw.tracks import Tracks
 from ...argparse import Opt, comma_split
 
 class TrackplotParams(config.ParamGroup):
@@ -167,15 +167,15 @@ class Trackplot:
             self.fig.show(config=fig_conf)
 
 OPTS = (
-    Opt("ref_bounds", "track_io", type=str_to_coord),
-    Opt("input", "track_io", nargs="+"),
+    Opt("ref_bounds", "tracks", type=str_to_coord),
+    Opt("input", "tracks", nargs="+"),
     Opt("layer", "trackplot"),
-    Opt(("-r", "--refstats"), "track_io", default="mean", type=comma_split),
-    Opt(("-f", "--full-overlap"), "track_io", action="store_true"),
+    Opt(("-r", "--refstats"), "tracks", default="mean", type=comma_split),
+    Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-o", "--outfile"), "trackplot"),
 )
 
 def main(conf):
-    conf.track_io.layers.append(conf.trackplot.layer)
-    conf.track_io.refstats_layers = [conf.trackplot.layer]
+    conf.tracks.layers.append(conf.trackplot.layer)
+    conf.tracks.refstats_layers = [conf.trackplot.layer]
     Trackplot(conf=conf).show()

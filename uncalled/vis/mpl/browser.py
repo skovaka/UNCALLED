@@ -25,7 +25,7 @@ from ...index import BWA_OPTS, str_to_coord
 from ...fast5 import Fast5Reader
 from ..dotplot import Dotplot
 from ...dtw.track import AlnTrack, LAYERS
-from ...dtw.track_io import Tracks
+from ...dtw.tracks import Tracks
 from ...argparse import Opt, comma_split
 
 CMAP = "viridis"
@@ -45,12 +45,12 @@ BrowserParams._def_params(
 )
 
 OPTS = (
-    Opt("ref_bounds", "track_io", type=str_to_coord),
-    Opt("input", "track_io", nargs="+"),
+    Opt("ref_bounds", "tracks", type=str_to_coord),
+    Opt("input", "tracks", nargs="+"),
     #Opt("track_a", "browser", type=str),
     #Opt("track_b", "browser", type=str, nargs="?"),
-    Opt(("-f", "--full-overlap"), "track_io", action="store_true"),
-    Opt(("-L", "--layers"), "track_io", type=comma_split),
+    Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
+    Opt(("-L", "--layers"), "tracks", type=comma_split),
 )
 
 def main(conf):
@@ -95,13 +95,13 @@ class Browser:
         self.pileup = False
 
         self.LAYER_IDS = dict()
-        for i,layer in enumerate(self.conf.track_io.layers):
+        for i,layer in enumerate(self.conf.tracks.layers):
             self.LAYER_IDS[LAYERS[layer].label] = layer
 
-        self.active_layer = self.conf.track_io.layers[0] #TODO parameter
+        self.active_layer = self.conf.tracks.layers[0] #TODO parameter
 
         self.info_labels = ["Reference Coord", "Read ID"]
-        for layer in self.conf.track_io.layers:
+        for layer in self.conf.tracks.layers:
             self.info_labels.append(LAYERS[layer].label)
 
         self.axs = types.SimpleNamespace()
@@ -237,7 +237,7 @@ class Browser:
 
         mref = trk.coords.ref_to_mref([rf], True)[0]
 
-        for i,layer in enumerate(self.conf.track_io.layers):
+        for i,layer in enumerate(self.conf.tracks.layers):
             val = trk.layers["dtw",layer].loc[mref,aln_id]
             self.set_info_cell(i+2, val)
         #self.set_info_cell(self.INFO_KMER, nt.kmer_to_str(int(kmer)))
@@ -466,7 +466,7 @@ class Browser:
         self._noticks(self.axs.opt)
 
         self.layer_radio = widgets.RadioButtons(
-            self.axs.opt, [LAYERS[layer].label for layer in self.conf.track_io.layers],
+            self.axs.opt, [LAYERS[layer].label for layer in self.conf.tracks.layers],
             0, #TODO hacky way to deal with hidden layers
             activecolor = 'red'
         )

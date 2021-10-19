@@ -27,8 +27,8 @@ ReadstatsParams._def_params(
 
 OPTS = (
     Opt("stats", "readstats", type=comma_split),
-    Opt("input", "track_io", nargs="+", type=str),
-    Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord, required=True),
+    Opt("input", "tracks", nargs="+", type=str),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord, required=True),
     #Opt(("-p", "--pca-components"), "readstats"),
     #Opt(("-L", "--pca-layer"), "readstats"),
     Opt(("-s", "--summary-stats"), "readstats", type=comma_split),

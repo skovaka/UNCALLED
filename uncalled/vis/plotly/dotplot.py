@@ -10,7 +10,7 @@ from ... import config, nt
 
 from ...dtw.track import LAYERS, parse_layers
 from ...index import str_to_coord
-from ...dtw.track_io import Tracks
+from ...dtw.tracks import Tracks
 from ...dtw.bcaln import Bcaln
 from ...argparse import Opt, comma_split
 from ...fast5 import parse_read_ids
@@ -220,11 +220,11 @@ class Dotplot:
 
 
 OPTS = (
-    Opt("input", "track_io", nargs="+"),
+    Opt("input", "tracks", nargs="+"),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
-    Opt(("-R", "--ref-bounds"), "track_io", type=str_to_coord),
-    Opt(("-l", "--read-filter"), "track_io", type=parse_read_ids),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
+    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", "dtw_layers", type=comma_split),
 )
 

@@ -197,7 +197,6 @@ class AlnTrack:
         #self.calc_layers([("re)])
         if layers is not None:
             self.calc_layers([(group, layer) for layer in layers])
-        print(self.layers)
         df = self.layers.xs(aln_id, level="aln_id")#.set_index(self.layer_refs)
         df.index = self.coords.mref_to_ref(df.index).rename("ref")
 
