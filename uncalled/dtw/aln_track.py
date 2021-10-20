@@ -58,7 +58,11 @@ LAYERS = {
     }, "bcaln" : {
         "start" : LayerMeta(int, "Basecalled Sample", None),
         "bp" : LayerMeta(int, "Basecaller Base Index", None),
-        "err" : LayerMeta(str, "Basecalled Alignment Error", None)}
+        "err" : LayerMeta(str, "Basecalled Alignment Error", None),
+    }, "cmp" : {
+        "jaccard" : LayerMeta(int, "Jaccard Distance", None),
+        "mean_ref_dist" : LayerMeta(int, "Mean Ref. Distance", None),
+    }
 }
 
 def parse_layers(layers):
@@ -151,6 +155,12 @@ class AlnTrack:
         self.coords = coords
         self.layers = layers#pd.concat(layers, names=["group", "layer"], axis=1)
 
+        #TODO convert to reference coordinates here (or maybe upstream?)
+        #store bitvector of fwd alignments
+        #refs = coords.mref_to_ref_index(self.layers.index.get_level_values("mref"), multi=True)
+        #self.layers.index = self.layers.index.set_levels(refs, level=0, verify_integrity=False)
+        #self.layers.index.names = ("ref", "aln_id")
+
         self.alignments = alignments
         self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
 
@@ -193,12 +203,18 @@ class AlnTrack:
         self.mat = self.mat.iloc[order]
         self.alignments = self.alignments.iloc[order]
 
-    def get_aln_layers(self, aln_id, group=None, layers=None):
-        #self.calc_layers([("re)])
+    def get_aln_layers(self, aln_id, group=None, layers=None, ref_index=True):
         if layers is not None:
             self.calc_layers([(group, layer) for layer in layers])
-        df = self.layers.xs(aln_id, level="aln_id")#.set_index(self.layer_refs)
-        df.index = self.coords.mref_to_ref(df.index).rename("ref")
+
+        #TODO try
+        #df_new = self.layers.loc[(slice(None), id_a),:]
+
+        df = self.layers.xs(aln_id, level="aln_id", drop_level=ref_index)#.set_index(self.layer_refs)
+
+        #TODO need to do upstream
+        if ref_index:
+            df.index = self.coords.mref_to_ref(df.index).rename("ref")
 
         if group is None:
             return df
@@ -209,23 +225,70 @@ class AlnTrack:
     def compare(self, other):
         groups_b = other.alignments.groupby("read_id")
 
+        df = pd.DataFrame(
+            columns=["aln_b", "mean_ref_dist", "jaccard"],
+            index = self.layers.index
+        )
+
         for id_a, aln_a in self.alignments.iterrows():
             read_id = aln_a["read_id"]
-            for id_b, aln_b in groups_b.get_group(read_id).iterrows():
-                dtw_a = self.get_aln_layers(id_a, "dtw", ["start","end"])
-                dtw_b = other.get_aln_layers(id_b, "dtw", ["start","end"])
-                merge = dtw_a.join(dtw_b, on="ref", lsuffix="_a", rsuffix="_b")
+            dtw_a = self.get_aln_layers(id_a, "dtw", ["start","end"], False)
 
-                #intv_a = pd.IntervalIndex.from_arrays(dtw_a["start"], dtw_a["end"])
-                #intv_b = pd.IntervalIndex.from_arrays(dtw_b["start"], dtw_b["end"])
+            intvs_a = pd.IntervalIndex.from_arrays(dtw_a["start"], dtw_a["end"])
+            
+            for id_b, aln_b in groups_b.get_group(read_id).iterrows():
+                #dtw_new = self.layers.loc[(slice(None), id_a),:]["dtw"]["start","end"] # , "dtw", ["start","end"], False)
+
+                dtw_b = other.get_aln_layers(id_b, "dtw", ["start","end"], False) \
+                             .reset_index(level="aln_id") \
+                             .rename(columns={"aln_id" : "aln_b"})
+
+                intvs_a = pd.IntervalIndex.from_arrays(dtw_a["start"], dtw_a["end"])
+
+                merge = dtw_a.join(dtw_b, on="mref", lsuffix="_a", rsuffix="_b").dropna()
 
                 starts = merge[["start_a", "start_b"]]
                 ends = merge[["end_a", "end_b"]]
-                jac = 1 - (
+                jaccard = 1 - (
                     (ends.min(axis=1) - starts.max(axis=1)).clip(0) /
                     (ends.max(axis=1) - starts.min(axis=1)))
 
-                self.layers["dtw","jac_dist"] = jac[self.layer_refs].to_numpy()
+                intvs_a = pd.IntervalIndex.from_arrays(merge["start_a"], merge["end_a"])
+                intvs_b = pd.IntervalIndex.from_arrays(merge["start_b"], merge["end_b"])
+
+                mean_ref_dist = pd.Series(index=merge.index)
+                refs = merge.index.get_level_values(0)
+
+                def weighted_dist(idxs, idx_b, swap):
+                    if swap:
+                        a = "b"
+                        b = "a"
+                    else:
+                        a = "a"
+                        b = "b"
+                    samp_overlaps = merge.loc[idxs]["end_"+a].clip(upper=merge.loc[idx_b]["end_"+b]) - merge.loc[idxs]["start_"+a].clip(lower=merge.loc[idx_b]["start_"+b])
+                    ref_dists = np.abs(idxs.get_level_values(0).to_numpy()-idx_b[0])
+                    return np.sum(samp_overlaps), np.sum(ref_dists * samp_overlaps)
+
+                for i,idx in enumerate(merge.index):
+                    ref,_ = idx
+                    ovr_a = merge.index[intvs_a.overlaps(intvs_b[i])]
+                    ovr_b = merge.index[intvs_b.overlaps(intvs_a[i])]
+
+                    weight_a, sum_a = weighted_dist(ovr_a,idx, False)
+                    weight_b, sum_b = weighted_dist(ovr_b,idx, True)
+
+                    mean_ref_dist[idx] = (sum_a+sum_b) / (weight_a+weight_b)
+
+
+                df.loc[merge.index, "aln_b"] = id_b
+                df.loc[merge.index, "jaccard"] = jaccard
+                df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
+
+        df = self._group_layers("cmp", df)
+        self.layers = pd.concat([self.layers, df], axis=1)
+        #TODO optionally write to db 
+
 
 
     @property

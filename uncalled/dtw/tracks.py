@@ -10,7 +10,7 @@ from collections import defaultdict
 import scipy
 
 from .db import TrackSQL, delete
-from .track import AlnTrack, LAYERS, parse_layers
+from .aln_track import AlnTrack, LAYERS, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
@@ -474,6 +474,7 @@ class Tracks:
 
         def _iter_reads(chunk):
             for read_id, alns in chunk.groupby("read_id"):
+                print(read_id)
                 overlap_groups = list()
                 prev = None
                 for i,aln in alns.sort_values("ref_start").iterrows():

@@ -8,7 +8,7 @@ from .sigplot import Sigplot
 
 from ... import config, nt
 
-from ...dtw.track import LAYERS, parse_layers
+from ...dtw.aln_track import LAYERS, parse_layers
 from ...index import str_to_coord
 from ...dtw.tracks import Tracks
 from ...dtw.bcaln import Bcaln
@@ -58,11 +58,15 @@ class Dotplot:
             yield read_id, self.plot(tracks)
 
     def plot(self, tracks):
-        compare = len(tracks) == 2
-        if compare:
-            tracks[0].compare(tracks[1])
 
-        column_widths=[5]+[1]*(len(self.prms.dtw_layers)+compare)
+        if len(tracks) == 2:
+            tracks[0].compare(tracks[1])
+            cmp_stats = list(tracks[0].layers["cmp"].columns[1:])
+        else:
+            cmp_stats = []
+
+
+        column_widths=[5]+[1]*(len(self.prms.dtw_layers)+len(cmp_stats))
 
         fig = make_subplots(
             rows=2, cols=len(column_widths), 
@@ -125,22 +129,26 @@ class Dotplot:
                         legendgroup=track.desc, showlegend=False,
                     ), row=2, col=j+2)
 
-            hover_data[track.name] = pd.concat(track_hover)
-                #hover_data[track.name].drop("kmer", axis=1)
+            #hover_data[track.name] = pd.concat(track_hover)#.reset_index()
+            hover_data[track.name] = track_hover[0]#.reset_index()
 
-        if compare:
-            jacolor="red"#"#005eff"
+        cmp_col = len(self.prms.dtw_layers)+2
+        for i,stat in enumerate(cmp_stats):
+            color= "rgba(255,0,0,1)"
+            label = LAYERS["cmp"][stat].label
             fig.add_trace(go.Bar(
-                x=tracks[0].layers["dtw","jac_dist"], 
+                x=tracks[0].layers["cmp",stat], 
                 y=tracks[0].layer_refs, #TODO try vhv
+                base=0,
                 name="DTW Compare",
                 orientation="h",
                 width=1.1,
-                marker={"color":jacolor,"line":{"color":jacolor,"width":0.5}},
-                legendgroup="compare"
-            ), row=2, col=len(column_widths))
-            fig.update_xaxes(row=2, col=i+2,
-                title_text="Signal Jaccard Distance")
+                marker={"color":color,"line":{"color":color,"width":0.5}},
+                legendgroup="cmp",
+                showlegend=i==0
+            ), row=2, col=cmp_col + i)
+            fig.update_xaxes(row=2, col=cmp_col + i,
+                title_text=label)
 
         hover_data = pd.concat(hover_data, axis=1)
         hover_coords = hover_data.xs("middle", axis=1, level=1).mean(axis=1)
@@ -171,8 +179,9 @@ class Dotplot:
                     (self.prms.track_colors[j], k))
             hover_rows.append(s + ": " + ", ".join(fields))
 
+
         fig.add_trace(go.Scatter(
-            x=hover_coords, y=hover_coords.index,
+            x=hover_coords, y=hover_data.index,
             mode="markers", marker={"size":0,"color":"rgba(0,0,0,0)"},
             name="",
             customdata=customdata,

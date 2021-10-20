@@ -329,9 +329,11 @@ def delete(track_name=None, con=None, conf=None):
         track_name = conf.track_name
     if con is None:
         con = sqlite3.connect(conf.db_file)
+        cur = con.cursor()
         cur.execute("PRAGMA foreign_keys = ON")
+    else:
+        cur = con.cursor()
 
-    cur = con.cursor()
     _verify_track(cur, track_name)
 
     con.commit()
