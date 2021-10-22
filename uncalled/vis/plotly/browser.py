@@ -10,7 +10,7 @@ from .trackplot import Trackplot
 from ... import config
 from ...index import str_to_coord
 from ...dtw.tracks import Tracks
-from ...dtw.track import LAYERS
+from ...dtw.aln_track import LAYERS, parse_layer
 from ...argparse import Opt, comma_split
 
 
@@ -25,6 +25,8 @@ OPTS = (
 
 def main(conf):
     """Nanopore DTW genome browser"""
+    conf.tracks.layers.append("cmp.mean_ref_dist")
+    conf.tracks.refstats_layers.append("cmp.mean_ref_dist")
     tracks = Tracks(conf=conf)
     print("Loading tracks...")
     tracks.load_refs(load_mat=True)
@@ -57,6 +59,7 @@ def browser(tracks, conf):
                             {"label": "Current (pA)", "value": "current"},
                             {"label": "Dwell Time (ms)", "value": "dwell"},
                             {"label": "Model pA Difference", "value": "model_diff"},
+                            {"label": "Mean Ref. Dist", "value": "cmp.mean_ref_dist"},
                         ],
                         value=conf.trackplot.layer, 
                         clearable=False, multi=False,
@@ -116,11 +119,18 @@ def browser(tracks, conf):
 
                 card_style = {"display" : "block"}
 
+        print(layer)
+
+        layer = parse_layer(layer)
+
+        print(layer)
         fig = Trackplot(
             tracks, layer, 
             select_ref=ref, select_read=read, 
             conf=conf).fig
         fig.update_layout(uirevision=True)
+
+        print("DONE")
 
         return fig, table, card_style, ref, read
 

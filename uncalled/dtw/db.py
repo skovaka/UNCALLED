@@ -26,7 +26,6 @@ class TrackSQL:
         self.cur.execute("PRAGMA foreign_keys = ON")
         self.open = True
 
-        #if new_file:
         self.init_tables()
 
         self.prev_aln_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
@@ -37,6 +36,7 @@ class TrackSQL:
         if self.open:
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (mref, aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (mref, aln_id, aln_b, group_b);")
             self.con.close()
             self.open = False
 
@@ -82,6 +82,7 @@ class TrackSQL:
                 start INTEGER,
                 length INTEGER,
                 current REAL,
+                stdv REAL,
                 FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE
             );""")
         self.cur.execute("""
@@ -94,10 +95,21 @@ class TrackSQL:
                 error TEXT,
                 FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE
             );""")
+        self.cur.execute("""
+            CREATE TABLE IF NOT EXISTS cmp (
+                mref INTEGER,
+                aln_id INTEGER,
+                aln_b INTEGER,
+                group_b TEXT DEFAULT "dtw",
+                mean_ref_dist REAL, 
+                jaccard REAL, 
+                FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE,
+                FOREIGN KEY (aln_b) REFERENCES alignment (id) ON DELETE CASCADE
+            );""")
         #self.con.commit()
 
     def init_write(self):
-        for table in ["dtw", "bcaln"]:
+        for table in ["dtw", "bcaln", "cmp"]:
             self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
 
     def init_track(self, track):
@@ -136,13 +148,13 @@ class TrackSQL:
         self.prev_aln_id += 1
         return self.prev_aln_id
 
-    def write_layers(self, df):
+    def write_layers(self, df, index=["mref","aln_id"]):
         for group in df.columns.levels[0]:
             df[group].to_sql(
                 group, self.con, 
                 if_exists="append", 
                 method="multi", chunksize=50000,
-                index=True, index_label=["mref","aln_id"])
+                index=True, index_label=index)
 
     def get_fast5_index(self, track_id=None):
         query = "SELECT read.id AS read_id, filename FROM read " +\
@@ -218,6 +230,8 @@ class TrackSQL:
         fields = list()
         tables = list()
         for group,layer in layers:
+            if group == "bc_cmp":
+                group = "cmp"
             field = group + "." + layer
             name = group + "_" + layer
             group_layers[group].append(name)
@@ -231,6 +245,15 @@ class TrackSQL:
         select = "SELECT " + ", ".join(fields) + " FROM " + tables[0]
         for table in tables[1:]:
             select += " LEFT JOIN %s ON %s.aln_id == idx_aln_id AND %s.mref == idx_mref" % ((table,)*3)
+        #for table in tables[1:]:
+        #    if table == "bc_cmp":
+        #        table = "cmp"
+        #        extra = " AND layer_group == \"bcaln\""
+        #    elif table == "cmp":
+        #        extra = " AND layer_group == \"dtw\""
+        #    else:
+        #        extra = ""
+        #    select += (" LEFT JOIN %s ON %s.aln_id == idx_aln_id AND %s.mref == idx_mref" + extra) % ((table,)*3)
 
         wheres = list()
         params = list()
@@ -238,6 +261,8 @@ class TrackSQL:
         if track_id is not None:
             select += " JOIN alignment ON id = idx_aln_id"
             self._add_where(wheres, params, "track_id", track_id)
+
+        #self._add_where(wheres, params, "group_b", "bcaln")
 
         if coords is not None:
             if coords.stranded:

@@ -15,19 +15,8 @@ from ..index import BWA_OPTS
 from ..fast5 import parse_read_ids
 from ..dtw import Tracks, LAYERS
 
-#class DtwstatsParams(config.ParamGroup):
-#    _name = "dtwstats"
-#DtwstatsParams._def_params(
-#    ("layers", ["model_diff"], None, "Which layers to retrieve or compute"),
-#    ("tracks", None, None, "DTW alignment tracks"),
-#    #("store", True, bool, "Will store layer in track, otherwise just return new layer"),
-#)
-
-
 class _Dtwstats:
     LAYERS = set(LAYERS.keys())
-    #COMPARE_STATS = {"cmp"}
-    #ALL_STATS = LAYER_STATS | COMPARE_STATS
 
     def __call__(self, *args, **kwargs):
         conf, prms = config._init_group("dtwstats", *args, **kwargs)
@@ -43,15 +32,10 @@ class _Dtwstats:
             prms.layers = [prms.layers]
         
         layer_stats = [s for s in prms.layers if s in self.LAYERS]
-        #compare_stats = [s for s in prms.layers if s in self.COMPARE_STATS]
 
-        #if len(layer_stats) + len(compare_stats) != len(prms.layers):
         if len(layer_stats) != len(prms.layers):
             bad_stats = [s for s in prms.layers if s not in self.LAYERS]
             raise ValueError("Unknown layers: " + ", ".join(bad_stats))
-
-        #if len(compare_stats) > 0 and len(tracks) != 2:
-        #    raise ValueError("\"%s\" layers can only be computed using exactly two tracks" % "\", \"".join(cmp_stats))
 
         layers = dict()
 
@@ -63,13 +47,6 @@ class _Dtwstats:
                     continue
                 fn(track)
 
-        #for stat in compare_stats:
-        #    fn = getattr(self, stat, None)
-        #    if fn is None:
-        #        continue
-        #    mat = fn(*tracks, prms.store)
-        #    layers[stat] = mat
-                
         return tracks #layers
 
     @staticmethod
@@ -88,33 +65,14 @@ class _Dtwstats:
     def dwell(track, store=True):
         layer = 1000 * track['length'] / track.conf.read_buffer.sample_rate
         return _Dtwstats._add_layer(track, "dwell", layer, store)
-        
-    #@staticmethod
-    #def bcerr(self, aln):
-    #    bcerr = aln.bcerr#.reindex(aln.aln.index)
-    #    ret = pd.Series(np.nan, bcerr.index)
-    #    subs = bcerr[bcerr["type"]=="SUB"]
-    #    ret[subs.index] = subs["seq"].replace({"A":0,"C":1,"G":2,"T":3})
-    #    ret[bcerr["type"]=="DEL"] = 4
-    #    ret[bcerr["type"]=="INS"] = 5
-    #    return ret
 
-    #LAYER_FNS = {
-    #    #"id" : (
-    #    #    lambda self,a: a.id),
-    #    "kmer" : (
-    #        lambda self,a: self.load_aln_kmers(a)),
-    #    "dwell" : (
-    #        lambda self,a: 1000 * a.aln['length'] / self.conf.read_buffer.sample_rate),
-    #    "model_diff" : (
-    #    "bcerr" : get_bcerr_layer,
 
 OPTS = (
     Opt("input", "tracks", nargs="+", type=str),
-    Opt(("-L", "--layers"), "tracks", type=comma_split, 
-        help="Comma-separated list of which layers to retrieve or compute {%s}" % ",".join(_Dtwstats.LAYERS)),
+    Opt("layers", nargs="+",  help="Layers to retrieve or compute"),
     Opt(("-R", "--ref-bounds"), "tracks", type=ref_coords),
-    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
+    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
+    Opt(("-o", "--output"), choices=["db", "tsv"], help="If \"db\" will output into the track database. If \"tsv\" will output a tab-delimited file to stdout."),
 )
 
 dtwstats = _Dtwstats()
@@ -122,17 +80,30 @@ dtwstats = _Dtwstats()
 def main(conf):
     """Output DTW alignment paths, statistics, and comparisons"""
 
-    io = Tracks(conf=conf)
+    tracks = Tracks(conf=conf)
+    #TODO add layer dependencies (compare requires start/length)
+    tracks.set_layers(["start", "length", "bcaln.start", "bcaln.length"] + conf.layers)
 
-    for coords,tracks in io.iter_refs():
+    need_cmp = False
+    need_bc_cmp = False
+    for group, layer in tracks.db_layers:
+        need_cmp = need_cmp or group == "cmp"
+        need_bc_cmp = need_bc_cmp or group == "bc_cmp"
+
+    for read_id,tracks in tracks.iter_reads():
+
+        if need_cmp and not np.any([t.has_group("cmp") for t in tracks]):
+            if len(tracks) != 2:
+                raise ValueError("\"cmp\" can only be computed with two alignment tracks")
+            if len(tracks[0].alignments) == 0 or len(tracks[1].alignments) == 0:
+                continue
+            tracks[0].cmp(tracks[1], write=False)
+
+            tracks = [tracks[0]]
+
+        if need_bc_cmp and not np.all([t.has_group("bc_cmp") for t in tracks]):
+            for track in tracks:
+                track.bc_cmp(write=True)
+
         for track in tracks:
             print(track.layers.to_csv(sep="\t"))
-
-    #for track in tracks:
-    #    print("#" + track.prms.path)
-    #    for i, read_id in enumerate(track.reads["id"]):
-    #        print("##" + read_id)
-    #        for j in track.ref_coords.index:
-    #            for layer in conf.dtwstats.layers:
-    #                sys.stdout.write("%.3f\t"%track[layer,i,j])
-    #            sys.stdout.write("\n")

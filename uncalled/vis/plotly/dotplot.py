@@ -36,7 +36,7 @@ class Dotplot:
     _req_layers = [
         "start", "length", "middle", 
         "current", "dwell", "kmer", "base", 
-        "bcaln.start"
+        "bcaln.start", "cmp.mean_ref_dist"
     ]
 
     def __init__(self, *args, **kwargs):
@@ -55,18 +55,18 @@ class Dotplot:
 
     def iter_plots(self):
         for read_id, tracks in self.tracks.iter_reads():
-            yield read_id, self.plot(tracks)
+            print(read_id)
+            yield read_id, self._plot(read_id, tracks)
 
-    def plot(self, tracks):
+    def _plot(self, read_id, tracks):
 
-        if len(tracks) == 2:
-            tracks[0].compare(tracks[1])
-            cmp_stats = list(tracks[0].layers["cmp"].columns[1:])
+        if tracks[0].has_group("cmp"):
+            cmp_stats = list(tracks[0].layers["cmp"].columns)
+            print(tracks[0].layers.columns)
         else:
             cmp_stats = []
 
-
-        column_widths=[5]+[1]*(len(self.prms.dtw_layers)+len(cmp_stats))
+        column_widths=[6]+[1]*(len(self.prms.dtw_layers)+len(cmp_stats))
 
         fig = make_subplots(
             rows=2, cols=len(column_widths), 
@@ -74,6 +74,7 @@ class Dotplot:
             column_widths=column_widths,
             vertical_spacing=0.01,
             horizontal_spacing=0.01,
+            subplot_titles = [read_id], #+ None*(2*len(column_widths)-1)
             shared_xaxes=True,
             shared_yaxes=True)
 
@@ -110,7 +111,7 @@ class Dotplot:
                 fig.add_trace(go.Scatter(
                     x=dtw["start"], y=dtw.index,
                     name=track.desc,
-                    legendgroup=track.desc,
+                    legendgroup=track.name,
                     line={"color":self.prms.track_colors[i], "width":2, "shape" : "hv"},
                     hoverinfo="skip",
                     showlegend=first_aln
@@ -120,13 +121,27 @@ class Dotplot:
                 first_aln = False
 
                 for j,layer in enumerate(self.prms.dtw_layers):
+                    #fig.add_trace(go.Bar(
+                    #    x=dtw[layer], y=dtw.index,
+                    #    #base=0,
+                    #    name=track.desc,
+                    #    orientation="h",
+                    #    width=1.1,
+                    #    opacity=0.5,
+                    #    marker={
+                    #        "color":self.prms.track_colors[i],
+                    #        "line":{"color":self.prms.track_colors[i],"width":0.5}},
+                    #    legendgroup=track.name, 
+                    #    showlegend=False
+                    #), row=2, col=j+2)
+
                     fig.add_trace(go.Scatter(
                         x=dtw[layer], y=dtw.index-0.5, #TODO try vhv
                         name=track.desc, 
                         line={
                             "color" : self.prms.track_colors[i], 
                             "width":2, "shape" : "hv"},
-                        legendgroup=track.desc, showlegend=False,
+                        legendgroup=track.name, showlegend=False,
                     ), row=2, col=j+2)
 
             #hover_data[track.name] = pd.concat(track_hover)#.reset_index()
@@ -142,7 +157,7 @@ class Dotplot:
                 base=0,
                 name="DTW Compare",
                 orientation="h",
-                width=1.1,
+                width=1,
                 marker={"color":color,"line":{"color":color,"width":0.5}},
                 legendgroup="cmp",
                 showlegend=i==0
@@ -221,6 +236,7 @@ class Dotplot:
 
         fig.update_layout(
             #hovermode="x unified",
+            barmode="overlay",
             hoverdistance=20,
             dragmode="pan", 
             legend={"bgcolor" : "#e6edf6"})#, scroll_zoom=True)
@@ -244,4 +260,7 @@ def main(conf):
     for read_id, fig in dotplots.iter_plots():
         fig.write_html(
             conf.out_prefix + read_id + ".html", 
-            config={"scrollZoom" : True, "displayModeBar" : True})
+            config={
+                "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None},
+                "scrollZoom" : True, 
+                "displayModeBar" : True})

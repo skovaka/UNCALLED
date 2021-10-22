@@ -23,7 +23,7 @@ TracksParams._def_params(
     ("input", None, None, "Input track(s)"),
     ("output", None, None,  "Output track"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
-    ("layers", ["current", "dwell", "model_diff"], None, "Layers to load"),
+    ("layers", ["length", "current", "dwell", "model_diff"], None, "Layers to load"),
     ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
     ("refstats_layers", ["current", "dwell", "model_diff"], None, "Layers to compute refstats"),
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),
@@ -40,7 +40,7 @@ TracksParams._def_params(
 
 _REFSTAT_AGGS = {
     "mean" : np.mean, 
-    "stdv" : np.std, 
+    "std" : np.std, 
     "var"  : np.var,
     "skew" : scipy.stats.skew,
     "kurt" : scipy.stats.kurtosis,
@@ -48,9 +48,20 @@ _REFSTAT_AGGS = {
     "max"  : np.min
 }
 
-LAYER_REFSTATS = {"min", "max", "mean", "stdv", "var", "skew", "kurt"}
+LAYER_REFSTATS = {"min", "max", "mean", "std", "var", "skew", "kurt"}
 COMPARE_REFSTATS = {"ks"}
 ALL_REFSTATS = LAYER_REFSTATS | COMPARE_REFSTATS
+
+REFSTAT_LABELS = {
+    "min" : "Minimum", 
+    "max" : "Maximum", 
+    "mean" : "Mean", 
+    "std" : "Std. Dev.", 
+    "var" : "Variance", 
+    "skew" : "Skewness", 
+    "kurt" : "Kurtosis",
+    "ks" : "KS"
+}
 
 class RefstatsSplit:
     def __init__(self, stats, track_count):
@@ -73,7 +84,9 @@ class Tracks:
         #if isinstance(self.prms.layers, str):
         #    self.prms.layers = [self.prms.layers]
 
+        print(self.prms.layers)
         self.set_layers(self.prms.layers)
+        self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers))
 
         self.dbs = dict()
 
@@ -323,10 +336,11 @@ class Tracks:
 
         ids = alignments.index.to_numpy()
 
-        layers = dict()
-        for group in ["dtw"]:
-            layers[group] = db0.query_layers(self.db_layers, self.input_track_ids, self.coords, ids)
-        layers = pd.concat(layers, names=["group", "layer"], axis=1)
+        #layers = dict()
+        #for group in ["dtw"]:
+        #    layers[group] = db0.query_layers(self.db_layers, self.input_track_ids, self.coords, ids)
+        #layers = pd.concat(layers, names=["group", "layer"], axis=1)
+        layers = db0.query_layer_groups(self.db_layers, self.input_track_ids, self.coords, ids)
         
         for track in self.aln_tracks:
             track_alns = alignments[alignments["track_id"] == track.id].copy()
@@ -343,6 +357,9 @@ class Tracks:
 
         return self.aln_tracks
 
+    #def calc_dtwstats(self):
+    #    if self.need_cmp:
+
     def calc_refstats(self, verbose_refs=False, cov=False):
         if self.prms.refstats is None:
             self.refstats = None
@@ -351,7 +368,12 @@ class Tracks:
         stats = RefstatsSplit(self.prms.refstats, len(self.aln_tracks))
 
         refstats = dict()
-        grouped = [t.layers["dtw"][self.prms.refstats_layers].groupby(level="mref") for t in self.aln_tracks]
+        for t in self.aln_tracks:
+            print(t.name)
+            print(t.layers)
+        grouped = [
+            t.layers[self.prms.refstats_layers].groupby(level="mref")
+            for t in self.aln_tracks]
 
         for track,groups in zip(self.aln_tracks, grouped):
             refstats[track.name] = groups.agg(stats.layer_agg)
@@ -376,8 +398,8 @@ class Tracks:
                         cmps[layer]["pval"].append(ks.pvalue)
 
             refstats["ks"] = pd.concat({k : pd.DataFrame(index=mrefs, data=c) for k,c in cmps.items()}, axis=1) 
-
-        refstats = pd.concat(refstats, axis=1, names=["track", "layer", "stat"])
+        
+        refstats = pd.concat(refstats, axis=1, names=["track", "group", "layer", "stat"])
 
         refstats.index = self.aln_tracks[0].coords.mref_to_ref_index(refstats.index, multi=verbose_refs)
 
@@ -521,16 +543,21 @@ class Tracks:
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)
             track_layers = layers.iloc[i].dropna(axis=1, how="all") #.set_index(self.layer_refs)
 
-            name = track_alns["ref_name"].iloc[0]
-            fwd = track_alns["fwd"].iloc[0]
-            start = track_alns["ref_start"].min()
-            end = track_alns["ref_end"].max()
-            ref_coord = RefCoord(name, start, end, fwd)
-            track_coords = self.index.get_coord_space(
-                ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)
+            if len(track_alns) > 0:
+                name = track_alns["ref_name"].iloc[0]
+                fwd = track_alns["fwd"].iloc[0]
+                start = track_alns["ref_start"].min()
+                end = track_alns["ref_end"].max()
+                ref_coord = RefCoord(name, start, end, fwd)
+                track_coords = self.index.get_coord_space(
+                    ref_coord, self.conf.is_rna, kmer_shift=0, load_kmers=True)
+            else:
+                track_coords = None
 
             track.set_data(track_coords, track_alns, track_layers)
+            print(track.name, track_layers, self.fn_layers)
             track.calc_layers(self.fn_layers)
+
     
     def close(self):
         for filename, db in self.dbs.items():
