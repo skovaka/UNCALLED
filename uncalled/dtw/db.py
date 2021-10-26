@@ -23,7 +23,7 @@ class TrackSQL:
         new_file = not os.path.exists(sqlite_db)
         self.con = sqlite3.connect(sqlite_db)
         self.cur = self.con.cursor()
-        self.cur.execute("PRAGMA foreign_keys = ON")
+        #self.cur.execute("PRAGMA foreign_keys = ON")
         self.open = True
 
         self.init_tables()
@@ -36,7 +36,7 @@ class TrackSQL:
         if self.open:
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (mref, aln_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (mref, aln_id, aln_b, group_b);")
+            #self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (mref, aln_id, aln_b, group_b);")
             self.con.close()
             self.open = False
 
@@ -262,7 +262,8 @@ class TrackSQL:
             select += " JOIN alignment ON id = idx_aln_id"
             self._add_where(wheres, params, "track_id", track_id)
 
-        #self._add_where(wheres, params, "group_b", "bcaln")
+        if "cmp" in group_layers:
+            self._add_where(wheres, params, "group_b", "bcaln")
 
         if coords is not None:
             if coords.stranded:
@@ -277,6 +278,8 @@ class TrackSQL:
         self._add_where(wheres, params, "idx_aln_id", aln_id)
 
         query = self._join_query(select, wheres, ["idx_"+o for o in order])
+
+        print(query)
 
         ret = pd.read_sql_query(
             query, self.con, 

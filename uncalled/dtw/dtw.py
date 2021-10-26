@@ -42,6 +42,7 @@ OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt(("-o", "--out-path"), "dtw"),
     Opt(("-f", "--overwrite"), "tracks", action="store_true"),
+    Opt("--full-overlap", "tracks", action="store_true"),
     Opt(("-a", "--append"), "tracks", action="store_true"),
     Opt("--rna", fn="set_r94_rna"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),

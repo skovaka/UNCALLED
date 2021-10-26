@@ -192,7 +192,6 @@ class AlnTrack:
     def calc_layers(self, layers):
         for group, layer in layers:
             if not group in self.layers or not layer in self.layers[group].columns:
-                print(group, layer, LAYERS[group][layer])
                 vals = LAYERS[group][layer].fn(self)
                 self.layers[group,layer] = vals
 
@@ -220,11 +219,11 @@ class AlnTrack:
         self.alignments = self.alignments.iloc[order]
 
     def get_aln_layers(self, aln_id, group=None, layers=None, ref_index=True):
+        if aln_id not in self.layers.index.get_level_values("aln_id"):
+            return None
+
         if layers is not None:
             self.calc_layers([(group, layer) for layer in layers])
-
-        #TODO try
-        #df_new = self.layers.loc[(slice(None), id_a),:]
 
         df = self.layers.xs(aln_id, level="aln_id", drop_level=ref_index)#.set_index(self.layer_refs)
 
@@ -272,16 +271,18 @@ class AlnTrack:
             index = self.layers.index
         )
 
+        print(self.alignments)
         for id_a, aln_a in self.alignments.iterrows():
             dtw = self.get_aln_layers(id_a, "dtw", ["start","end"], False)
+            if dtw is None:
+                continue
+
             if other is None:
-                bcaln = self.get_aln_layers(id_a, "bcaln", ["start","end"], False) \
-                            .reset_index(level="aln_id") \
-                            .rename(columns={"aln_id" : "aln_b"})
-                bcaln.index = bcaln.index-Bcaln.K+1
-                self._compare_alns(dtw, bcaln, df)
+                self._compare_alns(dtw, self, id_a, "bcaln", df)
             else:
-                print("SNOT IMPLEMENTED")
+                read_id = aln_a["read_id"]
+                for id_b, aln_b in groups_b.get_group(read_id).iterrows():
+                    self._compare_alns(dtw, other, id_b, "bcaln", df)
 
         df["group_b"] = "bcaln"
         df = self._group_layers("cmp", df)
@@ -291,8 +292,16 @@ class AlnTrack:
             self.db.write_layers(df)
         
 
-    def _compare_alns(self, aln_a, aln_b, df):
-        merge = aln_a.join(aln_b, on="mref", lsuffix="_a", rsuffix="_b").dropna()
+    def _compare_alns(self, aln_a, other, id_b, group, df): # aln_b, df):
+        aln_b = other.get_aln_layers(id_b, group, ["start","end"], False) \
+                     .reset_index(level="aln_id") \
+                     .rename(columns={"aln_id" : "aln_b"})
+        if group == "bcaln":
+            aln_b.index = aln_b.index-Bcaln.K+1
+
+        merge = aln_a.join(aln_b, on="mref", lsuffix="_a", rsuffix="_b")\
+                     .dropna(how="all")
+                     
         starts = merge[["start_a", "start_b"]]
         ends = merge[["end_a", "end_b"]]
         jaccard = 1 - (
@@ -301,17 +310,6 @@ class AlnTrack:
 
         intvs_a = pd.IntervalIndex.from_arrays(merge["start_a"], merge["end_a"])
         intvs_b = pd.IntervalIndex.from_arrays(merge["start_b"], merge["end_b"])
-
-        #dtw_a["track"] = "a"
-        #dtw_b["track"] = "b"
-        #concat = pd.concat([
-        #    dtw_a.droplevel("aln_id"), 
-        #    dtw_b.drop(columns="aln_b")]) \
-        #    .sort_values("start")
-        #print(concat)
-
-        #TODO make invt->(ref,a/b) dfs, concat and sort
-        #iterate with two 
 
         mean_ref_dist = pd.Series(index=merge.index)
         refs = merge.index.get_level_values(0)
@@ -331,15 +329,23 @@ class AlnTrack:
 
         for i,idx in enumerate(merge.index):
             ref,_ = idx
-            ovr_a = merge.index[intvs_a.overlaps(intvs_b[i])]
-            ovr_b = merge.index[intvs_b.overlaps(intvs_a[i])]
 
-            weight_a, sum_a = weighted_dist(ovr_a,idx, False)
-            weight_b, sum_b = weighted_dist(ovr_b,idx, True)
+            if not pd.isnull(intvs_b[i]):
+                ovr_a = merge.index[intvs_a.overlaps(intvs_b[i])]
+                weight_a, sum_a = weighted_dist(ovr_a,idx, False)
+            else:
+                weight_a = sum_a = 0
 
-            mean_ref_dist[idx] = (sum_a+sum_b) / (weight_a+weight_b)
+            if not pd.isnull(intvs_a[i]):
+                ovr_b = merge.index[intvs_b.overlaps(intvs_a[i])]
+                weight_b, sum_b = weighted_dist(ovr_b,idx, True)
+            else:
+                weight_b = sum_b = 0
 
-        df.loc[merge.index, "aln_b"] = merge["aln_b"].astype(int)
+            if weight_a + weight_b > 0:
+                mean_ref_dist[idx] = (sum_a+sum_b) / (weight_a+weight_b)
+
+        df.loc[merge.index, "aln_b"] = merge["aln_b"]
         df.loc[merge.index, "jaccard"] = jaccard
         df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
 

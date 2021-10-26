@@ -14,6 +14,7 @@ from ..argparse import Opt, comma_split, ref_coords
 from ..index import BWA_OPTS
 from ..fast5 import parse_read_ids
 from ..dtw import Tracks, LAYERS
+from ..dtw.aln_track import parse_layers
 
 class _Dtwstats:
     LAYERS = set(LAYERS.keys())
@@ -82,13 +83,12 @@ def main(conf):
 
     tracks = Tracks(conf=conf)
     #TODO add layer dependencies (compare requires start/length)
-    tracks.set_layers(["start", "length", "bcaln.start", "bcaln.length"] + conf.layers)
+    tracks.set_layers(["start", "length", "bcaln.start", "bcaln.length"])# + conf.layers)
 
-    need_cmp = False
-    need_bc_cmp = False
-    for group, layer in tracks.db_layers:
-        need_cmp = need_cmp or group == "cmp"
-        need_bc_cmp = need_bc_cmp or group == "bc_cmp"
+    layer_groups = {group for group,_ in parse_layers(conf.layers)}
+
+    need_cmp = "cmp" in layer_groups
+    need_bc_cmp = "bc_cmp" in layer_groups
 
     for read_id,tracks in tracks.iter_reads():
 
@@ -102,8 +102,17 @@ def main(conf):
             tracks = [tracks[0]]
 
         if need_bc_cmp and not np.all([t.has_group("bc_cmp") for t in tracks]):
-            for track in tracks:
-                track.bc_cmp(write=True)
-
+            if len(tracks) == 1:
+                other = None
+            elif len(tracks[1].alignments) > 0:
+                other = tracks[1]
+            else:
+                continue
+            print("ERE", tracks[0], other, len(tracks))
+            tracks[0].bc_cmp(other, write=True)
+            if len(tracks[0].alignments) == 0:
+                continue
+            tracks = [tracks[0]]
+        
         for track in tracks:
             print(track.layers.to_csv(sep="\t"))

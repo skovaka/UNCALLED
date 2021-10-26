@@ -35,11 +35,12 @@ TracksParams._def_params(
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
-    ignore_toml={"input", "output", "ref_bounds", "layers"}
+    ignore_toml={"input", "output", "ref_bounds", "layers", "full_overlap", "overwrite", "append","refstats", "refstats_layers", "read_filter"}
 )
 
 _REFSTAT_AGGS = {
     "mean" : np.mean, 
+    "median" : np.median, 
     "std" : np.std, 
     "var"  : np.var,
     "skew" : scipy.stats.skew,
@@ -48,7 +49,7 @@ _REFSTAT_AGGS = {
     "max"  : np.min
 }
 
-LAYER_REFSTATS = {"min", "max", "mean", "std", "var", "skew", "kurt"}
+LAYER_REFSTATS = {"min", "max", "mean", "median", "std", "var", "skew", "kurt"}
 COMPARE_REFSTATS = {"ks"}
 ALL_REFSTATS = LAYER_REFSTATS | COMPARE_REFSTATS
 
@@ -56,6 +57,7 @@ REFSTAT_LABELS = {
     "min" : "Minimum", 
     "max" : "Maximum", 
     "mean" : "Mean", 
+    "median" : "Median", 
     "std" : "Std. Dev.", 
     "var" : "Variance", 
     "skew" : "Skewness", 
@@ -84,7 +86,6 @@ class Tracks:
         #if isinstance(self.prms.layers, str):
         #    self.prms.layers = [self.prms.layers]
 
-        print(self.prms.layers)
         self.set_layers(self.prms.layers)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers))
 
@@ -349,7 +350,7 @@ class Tracks:
 
             track.set_data(self.coords, track_alns, track_layers)
             track.calc_layers(self.fn_layers)
-            
+
             if load_mat:
                 track.load_mat()
 
@@ -368,9 +369,6 @@ class Tracks:
         stats = RefstatsSplit(self.prms.refstats, len(self.aln_tracks))
 
         refstats = dict()
-        for t in self.aln_tracks:
-            print(t.name)
-            print(t.layers)
         grouped = [
             t.layers[self.prms.refstats_layers].groupby(level="mref")
             for t in self.aln_tracks]
@@ -555,7 +553,6 @@ class Tracks:
                 track_coords = None
 
             track.set_data(track_coords, track_alns, track_layers)
-            print(track.name, track_layers, self.fn_layers)
             track.calc_layers(self.fn_layers)
 
     

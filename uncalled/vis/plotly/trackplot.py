@@ -16,9 +16,12 @@ class TrackplotParams(config.ParamGroup):
 TrackplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
     ("layer", "current", None, "Layer to plot"),
-    ("track_colors", ["#AA0DFE", "#1CA71C", "#6A76FC"], list, ""),
+    ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF", "red"], list, ""),
     ("select_ref", None, str, "Reference Selection"),
     ("select_read", None, str, "Read Selection"),
+    ("width", None, int, "Figure width"),
+    ("min_height", 700, int, "Minimum figure height"),
+    ("track_height", 100, int, "Minimum per-track figure height"),
     ("outfile", None, str, "Output file"),
     #("track_colors", ["#AA0DFE", "#1CA71C", "#6A76FC"], list, ""),
 )
@@ -27,7 +30,7 @@ LAYER_COLORS = {
     ("dtw", "model_diff") : {"colorscale" : "RdBu", "cmid" : 0, "cmax" : 20, "cmin" : -20, "reversescale":True},
     ("dtw", "current") : {"colorscale" : "viridis"},
     ("dtw", "dwell") : {"colorscale" : "viridis", "cmin" : 0, "cmax" : 25},
-    ("cmp", "mean_ref_dist") : {"colorscale" : "RdYlGn", "cmin" : 0, "cmid" :2, "cmax" : 20, "reversescale":True},
+    ("cmp", "mean_ref_dist") : {"colorscale" : "RdYlGn", "cmin" : 0, "cmid" :5, "cmax" : 10, "reversescale":True},
 }
 
 class Trackplot:
@@ -46,6 +49,7 @@ class Trackplot:
         if self.tracks.refstats is None:
             refstat_tracks = pd.Index([])
             layer_stats = pd.Index([])
+            cmp_stats = []
         else:
             refstat_tracks = self.tracks.refstats.columns.get_level_values("track").unique()
             cmp_stats = refstat_tracks.difference(names)
@@ -55,7 +59,7 @@ class Trackplot:
                 layer_stats = pd.Index([])
 
         n_stats = len(layer_stats)+len(cmp_stats)
-        row_heights = [1]*n_stats + [4]*len(self.tracks)
+        row_heights = [1]*n_stats + [2]*len(self.tracks)
         n_rows = len(row_heights)
 
         t0 = time.time()
@@ -74,7 +78,7 @@ class Trackplot:
 
         t0 = time.time()
         for i,track in enumerate(self.tracks.all):
-            mat = track.mat[self.prms.layer]
+            mat = track.mat[self.prms.layer].dropna(how="all")
             hover = "<br>".join([
                 track.coords.ref_name + ":%{x}",
                 #"Read: %{y}",
@@ -92,8 +96,8 @@ class Trackplot:
             ), row=row, col=1)
 
             self.fig.update_yaxes(
-                title_text="<b>"+track.desc+"</b>", 
-                title_font_color=self.prms.track_colors[i], 
+                title_text=track.desc, 
+                #title_font_color=self.prms.track_colors[i], 
                 showticklabels=False,
                 row=row, col=1)
 
@@ -124,7 +128,9 @@ class Trackplot:
                     showlegend=i==0,
                     x=stats.index,
                     y=stats,
-                    line={"color":self.prms.track_colors[j]},
+                    opacity=0.5,
+                    mode="markers", marker={"size":3,"color":self.prms.track_colors[j]},
+                    #line={"color":self.prms.track_colors[j]},
                 ), row=row, col=1)
                 print("y")
             print("z")
@@ -153,9 +159,8 @@ class Trackplot:
 
         cax = {"colorbar" : {
             "title" : layer_label,
-             "len" : 250, "y" : 0.5,
-             "lenmode" : "pixels",
-             "yanchor" : "bottom"}}
+             "y" : 0.5, "len" : 0.5, 
+             "yanchor" : "top"}}
 
         if self.prms.layer in LAYER_COLORS:
             cax.update(LAYER_COLORS[self.prms.layer])
@@ -163,11 +168,11 @@ class Trackplot:
         self.fig.update_xaxes(side='top', showticklabels=True, row=1, col=1)
         self.fig.update_xaxes(showticklabels=True, row=n_rows, col=1)
 
-        height = max(700, 100*np.sum(row_heights))
+        #height = max(700, 100*np.sum(row_heights))
 
         self.fig.update_layout(
             coloraxis=cax, dragmode="pan", 
-            autosize=True, height=height,
+            autosize=True, #height=height,
             margin={"t":50},
             legend={"x":1,"y":1,"xanchor":"left"}
         )
@@ -177,7 +182,7 @@ class Trackplot:
 
     def show(self):
         fig_conf = {
-            "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None},
+            "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None, "scale" : 2},
             "scrollZoom" : True, 
             "displayModeBar" : True}
 
@@ -190,7 +195,7 @@ OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
     Opt("input", "tracks", nargs="+"),
     Opt("layer", "trackplot", type=parse_layer),
-    Opt(("-r", "--refstats"), "tracks", default="mean", type=comma_split),
+    Opt(("-r", "--refstats"), "tracks", default=None, type=comma_split),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-o", "--outfile"), "trackplot"),
 )
@@ -198,4 +203,5 @@ OPTS = (
 def main(conf):
     conf.tracks.layers.append(conf.trackplot.layer)
     conf.tracks.refstats_layers = [conf.trackplot.layer]
+    print(conf.tracks.refstats_layers)
     Trackplot(conf=conf).show()
