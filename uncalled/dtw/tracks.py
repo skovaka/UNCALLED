@@ -41,15 +41,19 @@ TracksParams._def_params(
 _REFSTAT_AGGS = {
     "mean" : np.mean, 
     "median" : np.median, 
-    "std" : np.std, 
+    "q5" : (lambda x: np.quantile(x, 0.05)),
+    "q95" : (lambda x: np.quantile(x, 0.95)),
+    "q25" : (lambda x: np.quantile(x, 0.25)),
+    "q75" : (lambda x: np.quantile(x, 0.75)),
+    "stdv" : np.std, 
     "var"  : np.var,
     "skew" : scipy.stats.skew,
     "kurt" : scipy.stats.kurtosis,
     "min"  : np.min, 
-    "max"  : np.min
+    "max"  : np.min,
 }
 
-LAYER_REFSTATS = {"min", "max", "mean", "median", "std", "var", "skew", "kurt"}
+LAYER_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95"}
 COMPARE_REFSTATS = {"ks"}
 ALL_REFSTATS = LAYER_REFSTATS | COMPARE_REFSTATS
 
@@ -58,11 +62,15 @@ REFSTAT_LABELS = {
     "max" : "Maximum", 
     "mean" : "Mean", 
     "median" : "Median", 
-    "std" : "Std. Dev.", 
+    "stdv" : "Std. Dev.", 
     "var" : "Variance", 
     "skew" : "Skewness", 
     "kurt" : "Kurtosis",
-    "ks" : "KS"
+    "ks" : "KS",
+    "q5" : "5% Quantile",
+    "q25" : "25% Quantile",
+    "q75" : "75% Quantile",
+    "q95" : "95% Quantile",
 }
 
 class RefstatsSplit:
@@ -375,6 +383,11 @@ class Tracks:
 
         for track,groups in zip(self.aln_tracks, grouped):
             refstats[track.name] = groups.agg(stats.layer_agg)
+            rename = ({
+                old[-1] : new
+                for old,new in zip(refstats[track.name].columns, stats.layer)
+            })
+            refstats[track.name].rename(columns=rename, inplace=True)
             if cov:
                 refstats[track.name].insert(0, "cov", groups.size())
 
@@ -396,6 +409,8 @@ class Tracks:
                         cmps[layer]["pval"].append(ks.pvalue)
 
             refstats["ks"] = pd.concat({k : pd.DataFrame(index=mrefs, data=c) for k,c in cmps.items()}, axis=1) 
+
+        print(refstats)
         
         refstats = pd.concat(refstats, axis=1, names=["track", "group", "layer", "stat"])
 

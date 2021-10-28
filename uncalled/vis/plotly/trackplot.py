@@ -53,10 +53,13 @@ class Trackplot:
         else:
             refstat_tracks = self.tracks.refstats.columns.get_level_values("track").unique()
             cmp_stats = refstat_tracks.difference(names)
-            if len(refstat_tracks.intersection(names)) == len(names):
-                layer_stats = self.tracks.refstats[names].columns.get_level_values("stat").unique()
-            else:
-                layer_stats = pd.Index([])
+
+            layer_stats = ["box"]
+            #if len(refstat_tracks.intersection(names)) == len(names):
+            #    layer_stats = self.tracks.refstats[names].columns.get_level_values("stat").unique()
+            #    print(self.tracks.refstats)
+            #else:
+            #    layer_stats = pd.Index([])
 
         n_stats = len(layer_stats)+len(cmp_stats)
         row_heights = [1]*n_stats + [2]*len(self.tracks)
@@ -78,7 +81,7 @@ class Trackplot:
 
         t0 = time.time()
         for i,track in enumerate(self.tracks.all):
-            mat = track.mat[self.prms.layer].dropna(how="all")
+            mat = track.mat[self.prms.layer]#.dropna(how="all")
             hover = "<br>".join([
                 track.coords.ref_name + ":%{x}",
                 #"Read: %{y}",
@@ -106,22 +109,39 @@ class Trackplot:
                 for y in ys:
                     self.fig.add_hline(y=y, line_color="red", row=row, col=1)
 
-        print("A", time.time()-t0)
         t0 = time.time()
         
 
         row = 1
         for i,stat in enumerate(layer_stats):
-            print(stat)
+
+            if stat == "box":
+                self.fig.update_yaxes(title_text=layer_label, row=row, col=1)
+                for j,track in enumerate(self.tracks.aln_tracks):
+                    stats = self.tracks.refstats[track.name,group,layer]
+                    print(stats)
+                    for idx in stats.index[:-1]:
+                        self.fig.add_vline(x=idx-0.5, line_color="black", row=row, col=1)
+                    self.fig.add_trace(go.Box(
+                        x=stats.index - 0.25 + j*0.5,
+                        median=stats["median"],
+                        lowerfence=stats["q5"],
+                        q1=stats["q25"],
+                        q3=stats["q75"],
+                        upperfence=stats["q95"],
+                        #sd=stats["stdv"],
+                        name=track.desc,
+                        #fillcolor=self.prms.track_colors[j],
+                        line_color=self.prms.track_colors[j]
+                    ), row=row, col=1)
+                row += 1
+                continue
+
+            print(i,stat)
             self.fig.update_yaxes(title_text=REFSTAT_LABELS[stat], row=row, col=1)
             for j,track in enumerate(self.tracks.aln_tracks):
                 group,layer = self.prms.layer
-                print("ASDF")
-                print(layer,group)
-                print(track.name,group,layer,stat)
-                print(self.tracks.refstats)
                 stats = self.tracks.refstats[track.name,group,layer,stat]
-                print("x")
                 self.fig.add_trace(go.Scattergl(
                     name=track.desc,
                     legendgroup=track.desc,
@@ -132,26 +152,23 @@ class Trackplot:
                     mode="markers", marker={"size":3,"color":self.prms.track_colors[j]},
                     #line={"color":self.prms.track_colors[j]},
                 ), row=row, col=1)
-                print("y")
-            print("z")
             row += 1
 
-        print("B", time.time()-t0)
         t0 = time.time()
 
         for stat in cmp_stats:
             self.fig.update_yaxes(title_text=REFSTAT_LABELS[stat] + " Stat", row=row, col=1)
-            layer,group = self.prms.layer
+            group,layer = self.prms.layer
             stats = self.tracks.refstats[stat,group,layer,"stat"]
             self.fig.add_trace(go.Scattergl(
                 name="Compare",
                 x=stats.index,
                 y=stats,
+                mode="lines",
                 line={"color":"red"},
             ), row=row, col=1)
             row += 1
 
-        print("C", time.time()-t0)
         t0 = time.time()
 
         if self.prms.select_ref is not None:
@@ -168,17 +185,15 @@ class Trackplot:
         self.fig.update_xaxes(side='top', showticklabels=True, row=1, col=1)
         self.fig.update_xaxes(showticklabels=True, row=n_rows, col=1)
 
-        #height = max(700, 100*np.sum(row_heights))
+        height = max(700, 100*np.sum(row_heights))
 
         self.fig.update_layout(
             coloraxis=cax, dragmode="pan", 
-            autosize=True, #height=height,
+            autosize=True, height=height,
             margin={"t":50},
             legend={"x":1,"y":1,"xanchor":"left"}
         )
         self.fig.update_layout()
-
-        print("D", time.time()-t0)
 
     def show(self):
         fig_conf = {
@@ -203,5 +218,4 @@ OPTS = (
 def main(conf):
     conf.tracks.layers.append(conf.trackplot.layer)
     conf.tracks.refstats_layers = [conf.trackplot.layer]
-    print(conf.tracks.refstats_layers)
     Trackplot(conf=conf).show()

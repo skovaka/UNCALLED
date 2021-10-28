@@ -18,7 +18,7 @@ OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
     Opt("input", "tracks", nargs="+"),
     Opt("layer", "trackplot", default="current", nargs="?"),
-    Opt(("-r", "--refstats"), "tracks", default="mean", type=comma_split),
+    Opt(("-r", "--refstats"), "tracks", default=None, type=comma_split),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-o", "--outfile"), "trackplot"),
 )

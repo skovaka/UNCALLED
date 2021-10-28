@@ -263,7 +263,7 @@ class TrackSQL:
             self._add_where(wheres, params, "track_id", track_id)
 
         if "cmp" in group_layers:
-            self._add_where(wheres, params, "group_b", "bcaln")
+            self._add_where(wheres, params, "group_b", "dtw")
 
         if coords is not None:
             if coords.stranded:
@@ -278,8 +278,6 @@ class TrackSQL:
         self._add_where(wheres, params, "idx_aln_id", aln_id)
 
         query = self._join_query(select, wheres, ["idx_"+o for o in order])
-
-        print(query)
 
         ret = pd.read_sql_query(
             query, self.con, 
@@ -399,7 +397,6 @@ def edit(conf, con=None):
     params.append(conf.track_name)
         
     query = "UPDATE track SET " + ", ".join(updates) + " WHERE name == ?"
-    print(query)
     cur.execute(query, params)
 
     if len(conf.fast5_files) > 0:

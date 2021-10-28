@@ -50,7 +50,7 @@ LAYERS = {
             lambda track: track.layers["dtw","start"] + (track.layers["dtw","length"] / 2)),
         "dwell" : LayerMeta(float, "Dwell Time (ms/nt)",
             lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate),
-        "model_diff" : LayerMeta(float, "Model pA Difference",
+        "model_diff" : LayerMeta(float, "Model pA Diff.",
             lambda track: track.layers["dtw","current"] - track.model[track.kmers]),
         "kmer" : LayerMeta(str, "Reference k-mer",
             lambda track: track.coords.kmers[track.layer_mrefs].to_numpy()),
