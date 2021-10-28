@@ -36,7 +36,7 @@ class Dotplot:
     _req_layers = [
         "start", "length", "middle", 
         "current", "dwell", "kmer", "base", 
-        "bcaln.start", "cmp.mean_ref_dist"
+        "bcaln.start"#, "cmp.mean_ref_dist"
     ]
 
     def __init__(self, *args, **kwargs):

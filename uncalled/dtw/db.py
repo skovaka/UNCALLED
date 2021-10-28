@@ -263,7 +263,7 @@ class TrackSQL:
             self._add_where(wheres, params, "track_id", track_id)
 
         if "cmp" in group_layers:
-            self._add_where(wheres, params, "group_b", "dtw")
+            self._add_where(wheres, params, "group_b", "bcaln")
 
         if coords is not None:
             if coords.stranded:

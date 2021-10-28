@@ -90,9 +90,11 @@ class Sigplot:
 
             dtws = list()
             
-            for aln_id in aln_ids:
+            for aln_id,aln in alns.iterrows():
                 dtw = track.layers["dtw"].xs(aln_id, level="aln_id")
-                dtw["kmers"] = track.coords.kmers[dtw.index]
+                #dtw["kmers"] = track.coords.ref_kmers.loc[(aln.fwd, dtw.index)]
+                dtw["kmers"] = track.kmers.xs(aln_id, level="aln_id")
+                print(dtw["kmers"])
                 dtw["model_current"] = track.model[dtw["kmers"]]
                 dtws.append(dtw)
 
@@ -100,11 +102,8 @@ class Sigplot:
                 samp_min = min(samp_min, dtw["start"].min())
                 samp_max = max(samp_max, dtw["start"].iloc[max_i] + dtw["length"].iloc[max_i])
 
-                kmers = track.coords.kmers[dtw.index]
-                model_current = track.model[kmers]
-
-                current_min = min(current_min, model_current.min())
-                current_max = max(current_max, model_current.max())
+                current_min = min(current_min, dtw["model_current"].min())
+                current_max = max(current_max, dtw["model_current"].max())
 
             track_dtws.append(pd.concat(dtws).sort_index())
 

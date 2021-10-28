@@ -345,10 +345,6 @@ class Tracks:
 
         ids = alignments.index.to_numpy()
 
-        #layers = dict()
-        #for group in ["dtw"]:
-        #    layers[group] = db0.query_layers(self.db_layers, self.input_track_ids, self.coords, ids)
-        #layers = pd.concat(layers, names=["group", "layer"], axis=1)
         layers = db0.query_layer_groups(self.db_layers, self.input_track_ids, self.coords, ids)
         
         for track in self.aln_tracks:
@@ -378,7 +374,7 @@ class Tracks:
 
         refstats = dict()
         grouped = [
-            t.layers[self.prms.refstats_layers].groupby(level="mref")
+            t.layers[self.prms.refstats_layers].groupby(level="ref")
             for t in self.aln_tracks]
 
         for track,groups in zip(self.aln_tracks, grouped):
@@ -393,13 +389,13 @@ class Tracks:
 
         if len(stats.compare) > 0:
             groups_a, groups_b = grouped
-            mrefs_a = self.aln_tracks[0].layers.index.unique("mref")
-            mrefs_b = self.aln_tracks[1].layers.index.unique("mref")
-            mrefs = mrefs_a.intersection(mrefs_b)
+            refs_a = self.aln_tracks[0].layers.index.unique("ref")
+            refs_b = self.aln_tracks[1].layers.index.unique("ref")
+            refs = refs_a.intersection(refs_b)
             cmps = {l : defaultdict(list) for l in self.prms.refstats_layers}
-            for mref in mrefs:
-                track_a = groups_a.get_group(mref)
-                track_b = groups_b.get_group(mref)
+            for ref in refs:
+                track_a = groups_a.get_group(ref)
+                track_b = groups_b.get_group(ref)
                 for layer in self.prms.refstats_layers:
                     a = track_a[layer]
                     b = track_b[layer]
@@ -408,13 +404,14 @@ class Tracks:
                         cmps[layer]["stat"].append(ks.statistic)
                         cmps[layer]["pval"].append(ks.pvalue)
 
-            refstats["ks"] = pd.concat({k : pd.DataFrame(index=mrefs, data=c) for k,c in cmps.items()}, axis=1) 
+            refstats["ks"] = pd.concat({k : pd.DataFrame(index=refs, data=c) for k,c in cmps.items()}, axis=1) 
 
         print(refstats)
         
         refstats = pd.concat(refstats, axis=1, names=["track", "group", "layer", "stat"])
 
-        refstats.index = self.aln_tracks[0].coords.mref_to_ref_index(refstats.index, multi=verbose_refs)
+        #TODO make verbose ref indexing
+        #refstats.index = self.aln_tracks[0].coords.mref_to_ref_index(refstats.index, multi=verbose_refs)
 
         self.refstats = refstats.dropna()
 

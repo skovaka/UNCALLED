@@ -58,6 +58,17 @@ class CoordSpace:
         self.fwd = fwd
         self.kmers = kmers
 
+        if self.stranded:
+            self.ref_kmers = pd.concat(
+                {int(fwd) : self.kmers.set_axis(self.refs)})
+            print("RAEDFKL")
+            print(self.ref_kmers)
+        else:
+            self.ref_kmers = pd.concat(
+                {0 : self.kmers[0].set_axis(self.refs), 
+                 1 : self.kmers[1].set_axis(self.refs)}
+            )
+
         if self.stranded and not isinstance(mrefs, pd.Index):
             raise ValueError("mrefs must be pandas.Index for stranded CoordSpace")
         if not self.stranded and not isinstance(mrefs, tuple):
@@ -144,7 +155,12 @@ class CoordSpace:
     #TODO make single private method with fwd param. Also probably merge with above
             
     def all_mrefs_fwd(self, mrefs):
-        isin = lambda a,b: a.isin(b).all()
+
+        if isinstance(mrefs, (collections.abc.Sequence, np.ndarray, pd.Index)):
+            isin = lambda a,b: a.isin(b).all()
+        else:
+            isin = lambda a,b: a in b
+
         if self.stranded:
             if isin(mrefs, self.mrefs):
                 return self.fwd

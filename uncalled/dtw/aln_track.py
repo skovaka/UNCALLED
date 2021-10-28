@@ -169,22 +169,25 @@ class AlnTrack:
     def set_data(self, coords, alignments, layers):
         self.coords = coords
         self.layers = layers#pd.concat(layers, names=["group", "layer"], axis=1)
+        self.alignments = alignments
 
         #TODO convert to reference coordinates here (or maybe upstream?)
         #store bitvector of fwd alignments
-        #refs = coords.mref_to_ref_index(self.layers.index.get_level_values("mref"), multi=True)
-        #self.layers.index = self.layers.index.set_levels(refs, level=0, verify_integrity=False)
-        #self.layers.index.names = ("ref", "aln_id")
+        mrefs = self.layers.index.get_level_values("mref")
+        refs = coords.mref_to_ref_index(self.layers.index.get_level_values("mref"), multi=False)
+        self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
 
-        self.alignments = alignments
+        self.layers.rename(index=coords.mref_to_ref, level=0, inplace=True)
+        self.layers.index.names = ("ref", "aln_id")
+
         self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
 
         if not (self.coords is None or self.coords.kmers is None):
-            mrefs = self.layers.index.get_level_values("mref")
-            if self.coords.stranded:
-                self.kmers = self.coords.kmers[mrefs]
-            else:
-                self.kmers = pd.concat(self.coords.kmers)[mrefs]
+            kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
+            self.kmers = self.coords.ref_kmers.reindex(kidx)
+            self.kmers.index = self.layers.index
+            print("BALDJFADSF")
+            print(self.kmers)
 
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
@@ -197,9 +200,9 @@ class AlnTrack:
 
     def load_mat(self):
         df = self.layers.copy()
-        df["aln_id"] = df.index.get_level_values("aln_id")
-        df.index = self.coords.mref_to_ref_index(df.index.get_level_values("mref"), multi=False)
+        #df["aln_id"] = df.index.get_level_values("aln_id")
         df = df.reset_index()
+        print(df)
 
         self.mat = df.pivot(index="aln_id", columns=["ref"]) \
                      .rename_axis(("group","layer","ref"), axis=1) \
@@ -218,18 +221,14 @@ class AlnTrack:
         self.mat = self.mat.iloc[order]
         self.alignments = self.alignments.iloc[order]
 
-    def get_aln_layers(self, aln_id, group=None, layers=None, ref_index=True):
+    def get_aln_layers(self, aln_id, group=None, layers=None, drop_level=True):
         if aln_id not in self.layers.index.get_level_values("aln_id"):
             return None
 
         if layers is not None:
             self.calc_layers([(group, layer) for layer in layers])
 
-        df = self.layers.xs(aln_id, level="aln_id", drop_level=ref_index)#.set_index(self.layer_refs)
-
-        #TODO need to do upstream
-        if ref_index:
-            df.index = self.coords.mref_to_ref(df.index).rename("ref")
+        df = self.layers.xs(aln_id, level="aln_id", drop_level=drop_level)#.set_index(self.layer_refs)
 
         if group is None:
             return df
@@ -349,11 +348,16 @@ class AlnTrack:
         df.loc[merge.index, "jaccard"] = jaccard
         df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
 
+    @property
+    def layer_aln_ids(self):
+        return self.layers.index.get_level_values("aln_id")
 
     @property
     def layer_mrefs(self):
-        return self.layers.index.get_level_values("mref")
+        return self.coords.ref_to_mref(self.layer_refs)
+        #return self.layers.index.get_level_values("mref")
 
     @property
     def layer_refs(self):
-        return self.coords.mref_to_ref_index(self.layer_mrefs)
+        #return self.coords.mref_to_ref_index(self.layer_mrefs)
+        return self.layers.index.get_level_values("ref")
