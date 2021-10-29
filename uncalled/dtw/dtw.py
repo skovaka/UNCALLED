@@ -83,6 +83,7 @@ def main(conf):
     for read in fast5s:
         aligned = False
         for paf in mm2s[read.id]:
+            print(read.id)
             dtw = GuidedDTW(tracks, read, paf, conf)
 
             if dtw.df is None:
@@ -109,18 +110,18 @@ class GuidedDTW:
         #self.track = track
 
         bcaln = Bcaln(tracks.index, read, paf, tracks.coords)
+        print(bcaln.df)
         if bcaln.empty:
             self.df = None
             return
 
-
         #TODO init_alignment(read_id, fast5, group, layers)
         self.track = tracks.init_alignment(read.id, read.f5.filename, bcaln.coords, "bcaln", bcaln.df)
 
-        self.bcaln = bcaln.df.sort_index()
-
         #self.ref_kmers = self.track.load_aln_kmers().sort_index()
         self.ref_kmers = self.track.coords.kmers.sort_index()
+
+        self.bcaln = bcaln.df[bcaln.df.index.isin(self.ref_kmers.index)].sort_index()
 
         self.read = read
 
@@ -161,16 +162,22 @@ class GuidedDTW:
 
 
         for st, en in [(block_min, block_max)]:
+            mref_st = st
+            mref_en = en+1
+            block_kmers = self.ref_kmers.loc[mref_st:mref_en]
+            #mref_st = st = block_kmers.index[0]
+            #en = block_kmers.index[-1]
+
             samp_st = self.bcaln.loc[st,"start"]
             samp_en = self.bcaln.loc[en,"start"]
 
-            mref_st = st
-            mref_en = en+1
 
             read_block = self.read.sample_range(samp_st, samp_en)
 
             block_signal = read_block['norm_sig'].to_numpy()
-            block_kmers = self.ref_kmers.loc[mref_st:mref_en]
+            
+            print("BAL", mref_st, mref_en)
+            print(block_kmers)
 
             args = self._get_dtw_args(read_block, mref_st, block_kmers)
 

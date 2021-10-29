@@ -177,8 +177,11 @@ class AlnTrack:
         refs = coords.mref_to_ref_index(self.layers.index.get_level_values("mref"), multi=False)
         self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
 
+
         self.layers.rename(index=coords.mref_to_ref, level=0, inplace=True)
         self.layers.index.names = ("ref", "aln_id")
+        print(layers.index)
+        print(refs)
 
         self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
 
@@ -186,6 +189,8 @@ class AlnTrack:
             kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
             self.kmers = self.coords.ref_kmers.reindex(kidx)
             self.kmers.index = self.layers.index
+            print("ASDFADSF")
+            print(self.kmers)
 
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])

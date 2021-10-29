@@ -62,7 +62,6 @@ class Dotplot:
 
         if tracks[0].has_group("cmp"):
             cmp_stats = list(tracks[0].layers["cmp"].columns)
-            print(tracks[0].layers.columns)
         else:
             cmp_stats = []
 

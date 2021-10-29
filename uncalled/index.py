@@ -51,6 +51,7 @@ def str_to_coord(coord_str):
         return RefCoord(name,st,en,fwd)
 
 class CoordSpace:
+
     def __init__(self, ref_name, refs, mrefs, fwd, kmers):
         self.ref_name = ref_name
         self.refs = refs
@@ -70,12 +71,13 @@ class CoordSpace:
             self.ref_kmers = None
         elif self.stranded:
             self.ref_kmers = pd.concat(
-                {int(self.fwd) : self.kmers.set_axis(self.refs)})
+                {int(self.fwd) : self.kmers.set_axis(self.mref_to_ref(self.kmers.index))})
         else:
             self.ref_kmers = pd.concat(
-                {0 : self.kmers[0].set_axis(self.refs), 
-                 1 : self.kmers[1].set_axis(self.refs)}
+                {0 : self.kmers[0].set_axis(self.mref_to_ref(self.kmers[0].index)), 
+                 1 : self.kmers[1].set_axis(self.mref_to_ref(self.kmers[1].index))}
             )
+        print(self.ref_kmers)
 
     @property
     def stranded(self):
@@ -245,13 +247,14 @@ class RefIndex(_RefIndex):
     def mrefs_to_kmers(self, mrefs, is_rna):
         if (mrefs.step < 0) == is_rna:
             #ref_coord.end -= kmer_shift
-            kmers = self.get_kmers(mrefs.min()-nt.K, mrefs.max(), is_rna)
+            kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
         else:
            #ref_coord.start += kmer_shift
-            kmers = self.get_kmers(mrefs.min(), mrefs.max()+nt.K, is_rna)
+            kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
         if mrefs.step < 0:
             kmers = kmers[::-1]
-        return pd.Series(index=mrefs, data=kmers, name="kmer")
+        ret = pd.Series(index=mrefs[3:-1], data=kmers, name="kmer")
+        return ret
 
     def ref_coord_to_mrefs(self, ref_coord, is_rna, flip_rev=True):
         st,en = self.ref_to_mref(ref_coord.name, ref_coord.start, ref_coord.end, ref_coord.fwd, is_rna)
@@ -263,7 +266,7 @@ class RefIndex(_RefIndex):
     #def full_coord_space(self, rid):
 
     #TODO get of -nt.K+1?
-    def get_coord_space(self, ref_coord, is_rna, kmer_shift=nt.K-1, load_kmers=True):
+    def get_coord_space(self, ref_coord, is_rna, load_kmers=True):
 
         rid = self.get_ref_id(ref_coord.name)
         if rid < 0:
@@ -275,12 +278,12 @@ class RefIndex(_RefIndex):
 
         ref_coord = RefCoord(ref_coord)
         #if ref_coord.fwd is None or ref_coord.fwd == is_rna:
-        if is_rna:
-            ref_coord.end -= kmer_shift
-        elif kmer_shift > 0:
-            ref_coord.start += kmer_shift+1
+        #if is_rna:
+        #    ref_coord.end -= kmer_shift
+        #elif kmer_shift > 0:
+        #    ref_coord.start += kmer_shift+1
 
-        refs = pd.RangeIndex(ref_coord.start, ref_coord.end)#-kmer_shift)
+        refs = pd.RangeIndex(ref_coord.start, ref_coord.end)
 
         if ref_coord.stranded:
             mrefs = self.ref_coord_to_mrefs(ref_coord, is_rna)

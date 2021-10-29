@@ -45,6 +45,7 @@ class Bcaln:
 
         ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
         self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna)#, kmer_shift=0)
+        print(self.paf_coords)
 
         self.refgap_bps = list()
         self.sub_bps = list()

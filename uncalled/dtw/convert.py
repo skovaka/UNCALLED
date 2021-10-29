@@ -57,8 +57,8 @@ def nanopolish(conf):
             if not (read_filter is None or read_id in read_filter):
                 continue
 
-            start = df["position"].min()-1
-            end = df["position"].max()
+            start = df["position"].min()
+            end = df["position"].max()+1
             fwd = df["strand"].iloc[0] == "t"
 
             #start = aln_attrs["mapped_start"]-2
@@ -70,9 +70,9 @@ def nanopolish(conf):
                 clip = 0
 
             ref_coord = RefCoord(contig, start, end, fwd)
-            coords = io.index.get_coord_space(ref_coord, conf.is_rna, kmer_shift=0)
+            coords = io.index.get_coord_space(ref_coord, conf.is_rna)
 
-            df["mref"] = coords.ref_to_mref(df["position"].to_numpy()-1)
+            df["mref"] = coords.ref_to_mref(df["position"].to_numpy()+3)
             df = collapse_events(df, start_col="start_idx", length_col="event_length", mean_col="event_level_mean")[clip:]
 
             fast5_name = f5reader.get_read_file(read_id)
@@ -150,8 +150,8 @@ def tombo(conf):
             aln_attrs = dict(handle["Alignment"].attrs)
 
             #TODO feels hacky
-            start = aln_attrs["mapped_start"]-2
-            end = aln_attrs["mapped_end"]+2
+            start = aln_attrs["mapped_start"]-1
+            end = aln_attrs["mapped_end"]+3
             if start < 0:
                 clip = -start
                 start = 0
@@ -182,15 +182,12 @@ def tombo(conf):
 
             if not sig_fwd:
                 starts = raw_len - tombo_start - starts - tombo_events["length"] - 2
-                #starts = np.flip(raw_len - tombo_start - starts - tombo_events["length"] - 1)
-                #currents = np.flip(currents)
-                #lengths = np.flip(lengths)
 
             lr = scipy.stats.linregress(currents, model[kmers])
             currents = lr.slope * currents + lr.intercept
 
             df = pd.DataFrame({
-                    "mref" : coords.mrefs,#.sort_values(),
+                    "mref" : kmers.index,
                     "start"  : starts,
                     "length" : lengths,
                     "current"   : currents
