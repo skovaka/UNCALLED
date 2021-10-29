@@ -420,7 +420,7 @@ class RefIndex {
 
     u8 get_base(i64 pac, bool comp=false) {
         if (pac < 0 || pac > static_cast<i64>(size() / 2)) { //TODO better size definition
-            throw std::invalid_argument("Base out of range");
+            throw std::out_of_range("Base out of range");
         }
         size_t i = pac >> 2,
                shift = ((pac & 3) ^ 3) << 1;
@@ -434,7 +434,6 @@ class RefIndex {
 
     void next_kmer(std::vector<kmer_t> &kmers, i64 pac, bool comp) {
         kmers.push_back(next_kmer(kmers.back(), pac, comp));
-        //return kmer_neighbor<KLEN>(kmer, get_base(pac, comp));
     }
 
     public:
@@ -452,13 +451,11 @@ class RefIndex {
             ret.push_back(get_kmer(pac_start, comp));
             for (auto i = pac_start+KLEN; i < pac_end; i++) {
                 next_kmer(ret, i, comp);
-                //ret.push_back(next_kmer(ret.back(), i, comp));
             }
         } else {
             ret.push_back(kmer_rev<KLEN>(get_kmer(pac_end-KLEN, comp)));
             for (auto i = pac_end-KLEN-1; i >= pac_start; i--) {
                 next_kmer(ret, i, comp);
-                //ret.push_back(next_kmer(ret.back(), i, comp));
             }
         }
         return ret;
@@ -469,10 +466,6 @@ class RefIndex {
             pac_end = ref_to_pac(name, end);
         return get_kmers(pac_start, pac_end, rev, comp);
     }
-
-    //u16 get_kmer(i64 mref, bool rev, bool comp) {
-    //    
-    //}
     
     std::vector<kmer_t> get_kmers(i64 mref_start, i64 mref_end, bool is_rna) {
         bool rev = is_mref_flipped(mref_end-1);

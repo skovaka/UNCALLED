@@ -54,12 +54,12 @@ class Trackplot:
             refstat_tracks = self.tracks.refstats.columns.get_level_values("track").unique()
             cmp_stats = refstat_tracks.difference(names)
 
-            layer_stats = ["box"]
-            #if len(refstat_tracks.intersection(names)) == len(names):
-            #    layer_stats = self.tracks.refstats[names].columns.get_level_values("stat").unique()
-            #    print(self.tracks.refstats)
-            #else:
-            #    layer_stats = pd.Index([])
+            #layer_stats = ["box"]
+            if len(refstat_tracks.intersection(names)) == len(names):
+                layer_stats = self.tracks.refstats[names].columns.get_level_values("stat").unique()
+                print(self.tracks.refstats)
+            else:
+                layer_stats = pd.Index([])
 
         n_stats = len(layer_stats)+len(cmp_stats)
         row_heights = [1]*n_stats + [2]*len(self.tracks)

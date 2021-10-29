@@ -91,13 +91,13 @@ def main(conf):
         name = track.name
         if conf.cov:
             columns.append(".".join([track.name, "cov"]))
-        for layer in conf.tracks.refstats_layers:
+        for group, layer in conf.tracks.refstats_layers:
             for stat in stats.layer:
-                columns.append(".".join([track.name, layer, stat]))
+                columns.append(".".join([track.name, group, layer, stat]))
 
-    for layer in conf.tracks.refstats_layers:
+    for group,layer in conf.tracks.refstats_layers:
         for stat in stats.compare:
-            columns.append(".".join([stat, layer, "stat"]))
+            columns.append(".".join([stat, group, layer, "stat"]))
 
     print("\t".join(columns))
 

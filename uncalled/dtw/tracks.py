@@ -405,8 +405,6 @@ class Tracks:
                         cmps[layer]["pval"].append(ks.pvalue)
 
             refstats["ks"] = pd.concat({k : pd.DataFrame(index=refs, data=c) for k,c in cmps.items()}, axis=1) 
-
-        print(refstats)
         
         refstats = pd.concat(refstats, axis=1, names=["track", "group", "layer", "stat"])
 
@@ -450,7 +448,7 @@ class Tracks:
                 seq_coords = self.index.get_coord_space(seq_refs, self.conf.is_rna, kmer_shift=0, load_kmers=False)
                 coords = seq_coords.mref_intersect(chunk_mrefs[:-1])
 
-            coords.kmers = self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna)
+            coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna))
 
             i = chunk_mrefs.difference(coords.mrefs)
             leftovers = chunk.loc[i]

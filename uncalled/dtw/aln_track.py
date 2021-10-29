@@ -53,9 +53,9 @@ LAYERS = {
         "model_diff" : LayerMeta(float, "Model pA Diff.",
             lambda track: track.layers["dtw","current"] - track.model[track.kmers]),
         "kmer" : LayerMeta(str, "Reference k-mer",
-            lambda track: track.coords.kmers[track.layer_mrefs].to_numpy()),
+            lambda track: track.kmers),
         "base" : LayerMeta(str, "Reference base",
-            lambda track: nt.kmer_base(track.coords.kmers[track.layer_mrefs], 2)),
+            lambda track: nt.kmer_base(track.kmers, 2)),
     }, "bcaln" : {
         "start" : LayerMeta(int, "Basecalled Sample Start", None),
         "length" : LayerMeta(int, "Basecalled Sample Length", None),
@@ -182,12 +182,10 @@ class AlnTrack:
 
         self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
 
-        if not (self.coords is None or self.coords.kmers is None):
+        if not (self.coords is None or self.coords.ref_kmers is None):
             kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
             self.kmers = self.coords.ref_kmers.reindex(kidx)
             self.kmers.index = self.layers.index
-            print("BALDJFADSF")
-            print(self.kmers)
 
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
@@ -202,7 +200,6 @@ class AlnTrack:
         df = self.layers.copy()
         #df["aln_id"] = df.index.get_level_values("aln_id")
         df = df.reset_index()
-        print(df)
 
         self.mat = df.pivot(index="aln_id", columns=["ref"]) \
                      .rename_axis(("group","layer","ref"), axis=1) \
@@ -270,7 +267,6 @@ class AlnTrack:
             index = self.layers.index
         )
 
-        print(self.alignments)
         for id_a, aln_a in self.alignments.iterrows():
             dtw = self.get_aln_layers(id_a, "dtw", ["start","end"], False)
             if dtw is None:
