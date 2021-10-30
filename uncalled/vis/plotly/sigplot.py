@@ -94,7 +94,6 @@ class Sigplot:
                 dtw = track.layers["dtw"].xs(aln_id, level="aln_id")
                 #dtw["kmers"] = track.coords.ref_kmers.loc[(aln.fwd, dtw.index)]
                 dtw["kmers"] = track.kmers.xs(aln_id, level="aln_id")
-                print(dtw["kmers"])
                 dtw["model_current"] = track.model[dtw["kmers"]]
                 dtws.append(dtw)
 

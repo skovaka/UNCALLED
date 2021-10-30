@@ -1,10 +1,9 @@
-"""Subcommands to alter DTW track databases
+"""Query and edit DTW databases
 
 subcommand options:
-ls        List all tracks in a database
-delete    Delete a track from a database
-edit     Rename and/or set the description of a track"""
-#copy      Copy a track from one database to another"""
+ls       List all tracks in a database
+delete   Delete a track from a database
+edit     Rename, change fast5 paths, or set description"""
 
 import sqlite3
 import os
@@ -23,7 +22,7 @@ class TrackSQL:
         new_file = not os.path.exists(sqlite_db)
         self.con = sqlite3.connect(sqlite_db)
         self.cur = self.con.cursor()
-        #self.cur.execute("PRAGMA foreign_keys = ON")
+        self.cur.execute("PRAGMA foreign_keys = ON")
         self.open = True
 
         self.init_tables()

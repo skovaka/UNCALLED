@@ -180,8 +180,6 @@ class AlnTrack:
 
         self.layers.rename(index=coords.mref_to_ref, level=0, inplace=True)
         self.layers.index.names = ("ref", "aln_id")
-        print(layers.index)
-        print(refs)
 
         self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
 
@@ -189,8 +187,6 @@ class AlnTrack:
             kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
             self.kmers = self.coords.ref_kmers.reindex(kidx)
             self.kmers.index = self.layers.index
-            print("ASDFADSF")
-            print(self.kmers)
 
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
@@ -209,6 +205,11 @@ class AlnTrack:
         self.mat = df.pivot(index="aln_id", columns=["ref"]) \
                      .rename_axis(("group","layer","ref"), axis=1) \
                      .sort_index(axis=1, level="ref")
+
+        #print(self.mat.columns.get_level_values("ref").unique())
+
+        print("KMERS")
+        print(nt.base_to_char(nt.kmer_base(self.coords.ref_kmers[1], 2)).tostring().decode("ascii"))
 
         self.mat = self.mat.reindex(self.alignments.index, copy=False)
 

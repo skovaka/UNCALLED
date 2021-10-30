@@ -84,7 +84,8 @@ class ArgParser:
         self._add_subcmds(self.parser, subcmds, None)
 
     def _add_subcmds(self, parser, subcmds, desc=None):
-        subparsers = parser.add_subparsers(title="Subcommands", description=desc, help=argparse.SUPPRESS)
+        subparsers = parser.add_subparsers(title="Subcommands", description=desc, help=argparse.SUPPRESS
+        )
         for subcmd in subcmds:
 
             if isinstance(subcmd, tuple):

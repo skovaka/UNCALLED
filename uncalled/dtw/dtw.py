@@ -83,7 +83,6 @@ def main(conf):
     for read in fast5s:
         aligned = False
         for paf in mm2s[read.id]:
-            print(read.id)
             dtw = GuidedDTW(tracks, read, paf, conf)
 
             if dtw.df is None:
@@ -110,7 +109,6 @@ class GuidedDTW:
         #self.track = track
 
         bcaln = Bcaln(tracks.index, read, paf, tracks.coords)
-        print(bcaln.df)
         if bcaln.empty:
             self.df = None
             return
@@ -176,9 +174,6 @@ class GuidedDTW:
 
             block_signal = read_block['norm_sig'].to_numpy()
             
-            print("BAL", mref_st, mref_en)
-            print(block_kmers)
-
             args = self._get_dtw_args(read_block, mref_st, block_kmers)
 
             dtw = self.dtw_fn(*args)

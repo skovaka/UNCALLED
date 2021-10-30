@@ -77,7 +77,6 @@ class CoordSpace:
                 {0 : self.kmers[0].set_axis(self.mref_to_ref(self.kmers[0].index)), 
                  1 : self.kmers[1].set_axis(self.mref_to_ref(self.kmers[1].index))}
             )
-        print(self.ref_kmers)
 
     @property
     def stranded(self):
@@ -245,15 +244,16 @@ class CoordSpace:
 class RefIndex(_RefIndex):
 
     def mrefs_to_kmers(self, mrefs, is_rna):
-        if (mrefs.step < 0) == is_rna:
-            #ref_coord.end -= kmer_shift
-            kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
-        else:
-           #ref_coord.start += kmer_shift
-            kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
+        #if (mrefs.step < 0) == is_rna:
+        #    #ref_coord.end -= kmer_shift
+        #    kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
+        #else:
+        #   #ref_coord.start += kmer_shift
+
+        kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
         if mrefs.step < 0:
             kmers = kmers[::-1]
-        ret = pd.Series(index=mrefs[3:-1], data=kmers, name="kmer")
+        ret = pd.Series(index=mrefs[2:-2], data=kmers, name="kmer")
         return ret
 
     def ref_coord_to_mrefs(self, ref_coord, is_rna, flip_rev=True):
@@ -293,6 +293,8 @@ class RefIndex(_RefIndex):
                 for fwd in range(2)
             ))
 
+        #print(ref_coord, mrefs, is_rna)
+
         if load_kmers:
             if ref_coord.stranded:
                 kmers = self.mrefs_to_kmers(mrefs, is_rna)
@@ -302,6 +304,7 @@ class RefIndex(_RefIndex):
                 ))
         else:
             kmers = None
+
 
         fwd = ref_coord.fwd if ref_coord.stranded else None 
 

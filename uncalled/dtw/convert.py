@@ -72,7 +72,8 @@ def nanopolish(conf):
             ref_coord = RefCoord(contig, start, end, fwd)
             coords = io.index.get_coord_space(ref_coord, conf.is_rna)
 
-            df["mref"] = coords.ref_to_mref(df["position"].to_numpy()+3)
+            df["mref"] = coords.ref_to_mref(df["position"].to_numpy()+2)
+
             df = collapse_events(df, start_col="start_idx", length_col="event_length", mean_col="event_level_mean")[clip:]
 
             fast5_name = f5reader.get_read_file(read_id)

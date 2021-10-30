@@ -504,7 +504,6 @@ class Tracks:
 
         def _iter_reads(chunk):
             for read_id, alns in chunk.groupby("read_id"):
-                print(read_id)
                 overlap_groups = list()
                 prev = None
                 for i,aln in alns.sort_values("ref_start").iterrows():
