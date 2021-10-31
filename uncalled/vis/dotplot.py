@@ -98,7 +98,7 @@ class Dotplot:
                 
                 if has_bcaln:
                     fig.add_trace(go.Scatter(
-                        x=layers["bcaln","start"], y=layers.index+Bcaln.K-1,
+                        x=layers["bcaln","start"], y=layers.index+Bcaln.K-2,
                         name="Basecalled Alignment",
                         mode="markers", marker={"size":5,"color":"orange"},
                         legendgroup="bcaln",

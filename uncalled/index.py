@@ -243,17 +243,24 @@ class CoordSpace:
 
 class RefIndex(_RefIndex):
 
-    def mrefs_to_kmers(self, mrefs, is_rna):
+    def mrefs_to_kmers(self, mrefs, is_rna, kmer_trim):
         #if (mrefs.step < 0) == is_rna:
         #    #ref_coord.end -= kmer_shift
         #    kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
         #else:
         #   #ref_coord.start += kmer_shift
 
-        kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
-        if mrefs.step < 0:
-            kmers = kmers[::-1]
-        ret = pd.Series(index=mrefs[2:-2], data=kmers, name="kmer")
+
+        if kmer_trim:
+            kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
+            if mrefs.step < 0:
+                kmers = kmers[::-1]
+            ret = pd.Series(index=mrefs[2:-2], data=kmers, name="kmer")
+        else:
+            kmers = self.get_kmers(mrefs.min()-2, mrefs.max()+3, is_rna)
+            if mrefs.step < 0:
+                kmers = kmers[::-1]
+            ret = pd.Series(index=mrefs, data=kmers, name="kmer")
         return ret
 
     def ref_coord_to_mrefs(self, ref_coord, is_rna, flip_rev=True):
@@ -266,22 +273,25 @@ class RefIndex(_RefIndex):
     #def full_coord_space(self, rid):
 
     #TODO get of -nt.K+1?
-    def get_coord_space(self, ref_coord, is_rna, load_kmers=True):
+    def get_coord_space(self, ref_coord, is_rna, load_kmers=True, kmer_trim=False):
 
         rid = self.get_ref_id(ref_coord.name)
         if rid < 0:
             raise ValueError("Sequence not in reference: " + ref_coord.name)
 
-        length = self.get_ref_len(rid)
-        if ref_coord.start < 0 or ref_coord.end > length:
-            raise ValueError("Reference coordinates %s out of bounds for sequence of length %d" % (ref_coord, length))
-
-        ref_coord = RefCoord(ref_coord)
+        #if kmer_trim:
+        #    ref_coord = RefCoord(ref_coord)
+        #    ref_coord.start += 2
+        #    ref_coord.end -= 2
         #if ref_coord.fwd is None or ref_coord.fwd == is_rna:
         #if is_rna:
         #    ref_coord.end -= kmer_shift
         #elif kmer_shift > 0:
         #    ref_coord.start += kmer_shift+1
+
+        length = self.get_ref_len(rid)
+        if ref_coord.start < 0 or ref_coord.end > length:
+            raise ValueError("Reference coordinates %s out of bounds for sequence of length %d" % (ref_coord, length))
 
         refs = pd.RangeIndex(ref_coord.start, ref_coord.end)
 
@@ -293,14 +303,12 @@ class RefIndex(_RefIndex):
                 for fwd in range(2)
             ))
 
-        #print(ref_coord, mrefs, is_rna)
-
         if load_kmers:
             if ref_coord.stranded:
-                kmers = self.mrefs_to_kmers(mrefs, is_rna)
+                kmers = self.mrefs_to_kmers(mrefs, is_rna, kmer_trim)
             else:
                 kmers = tuple(( 
-                    self.mrefs_to_kmers(m, is_rna) for m in mrefs
+                    self.mrefs_to_kmers(m, is_rna, kmer_trim) for m in mrefs
                 ))
         else:
             kmers = None

@@ -463,7 +463,7 @@ class Tracks:
                 seq_coords = self.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=False)
                 coords = seq_coords.mref_intersect(chunk_mrefs[:-1])
 
-            coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna))
+            coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
 
             i = chunk_mrefs.difference(coords.mrefs)
             leftovers = chunk.loc[i]
@@ -572,7 +572,7 @@ class Tracks:
                 end = track_alns["ref_end"].max()
                 ref_coord = RefCoord(name, start, end, fwd)
                 track_coords = self.index.get_coord_space(
-                    ref_coord, self.conf.is_rna, load_kmers=True)
+                    ref_coord, self.conf.is_rna, load_kmers=True, kmer_trim=True)
             else:
                 track_coords = None
 

@@ -60,11 +60,11 @@ refstats = _Refstats()
 
 
 OPTS = (
+    Opt("input", "tracks", nargs="+", type=str),
     Opt("refstats_layers", "tracks", type=comma_split,
         help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
     Opt("refstats", "tracks", type=comma_split,
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
-    Opt("input", "tracks", nargs="+", type=str),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-C", "--ref-chunksize"), "tracks"),
     Opt(("-c", "--cov"), action="store_true"),

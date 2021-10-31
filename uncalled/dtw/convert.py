@@ -70,7 +70,7 @@ def nanopolish(conf):
                 clip = 0
 
             ref_coord = RefCoord(contig, start, end, fwd)
-            coords = io.index.get_coord_space(ref_coord, conf.is_rna)
+            coords = io.index.get_coord_space(ref_coord, conf.is_rna, kmer_trim=True)
 
             df["mref"] = coords.ref_to_mref(df["position"].to_numpy()+2)
 
@@ -167,7 +167,7 @@ def tombo(conf):
 
             #io.
             #track.init_alignment(read.read_id, ref_bounds)
-            coords = io.index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True)
+            coords = io.index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True, kmer_trim=True)
             track = io.init_alignment(read.read_id, fast5_name, coords)
 
             tombo_events = pd.DataFrame(np.array(handle["Events"])).iloc[clip:]

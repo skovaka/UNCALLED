@@ -120,7 +120,6 @@ def parse_layers(layers):
 
     parsed = set()
 
-    print("PARSING", layers)
     for layer in layers:
         layer = parse_layer(layer)
 
@@ -130,7 +129,6 @@ def parse_layers(layers):
             deps = LAYERS[layer[0]][layer[1]].deps
             if deps is not None:
                 for dep in deps:
-                    print("DEP", dep)
                     if not dep in parsed:
                         parsed.add(dep)
                         yield dep
@@ -228,10 +226,6 @@ class AlnTrack:
         self.mat = df.pivot(index="aln_id", columns=["ref"]) \
                      .rename_axis(("group","layer","ref"), axis=1) \
                      .sort_index(axis=1, level="ref")
-
-        #print(self.mat.columns.get_level_values("ref").unique())
-
-        #print(nt.base_to_char(nt.kmer_base(self.coords.ref_kmers[1], 2)).tostring().decode("ascii"))
 
         self.mat = self.mat.reindex(self.alignments.index, copy=False)
 
