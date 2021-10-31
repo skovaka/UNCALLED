@@ -23,7 +23,7 @@ TracksParams._def_params(
     ("input", None, None, "Input track(s)"),
     ("output", None, None,  "Output track"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
-    ("layers", ["length", "current", "dwell", "model_diff"], None, "Layers to load"),
+    ("layers", ["length", "current", "dwell", "model_diff"], None, "Layers to load (e.g. current, dwell, model_diff)"),
     ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
     ("refstats_layers", ["current", "dwell", "model_diff"], None, "Layers to compute refstats"),
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),
@@ -130,6 +130,13 @@ class Tracks:
 
             for track in self.aln_tracks:
                 track.fast5s = self.fast5s
+
+    @property
+    def empty(self):
+        for t in self.aln_tracks:
+            if not t.empty:
+                return False
+        return True
 
     def _set_ref_bounds(self, ref_bounds):
         if ref_bounds is not None:
@@ -330,8 +337,14 @@ class Tracks:
         "model_diff" : (lambda self,track: 
             track.layers["dtw","current"] - track.model[track.kmers])
     }
+    
+    def _verify_read(self):
+        if len(self.input_track_ids) == 0:
+            raise RuntimeError("No input tracks have been loaded")
 
     def load_refs(self, ref_bounds=None, full_overlap=None, load_mat=False):
+        self._verify_read()
+
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
         if self.coords is None:
@@ -346,6 +359,8 @@ class Tracks:
         ids = alignments.index.to_numpy()
 
         layers = db0.query_layer_groups(self.db_layers, self.input_track_ids, self.coords, ids)
+
+        all_empty = True
         
         for track in self.aln_tracks:
             track_alns = alignments[alignments["track_id"] == track.id].copy()
@@ -366,7 +381,7 @@ class Tracks:
     #    if self.need_cmp:
 
     def calc_refstats(self, verbose_refs=False, cov=False):
-        if self.prms.refstats is None:
+        if self.prms.refstats is None or len(self.prms.refstats) == 0 or len(self.prms.refstats_layers) == 0:
             self.refstats = None
             return None
 

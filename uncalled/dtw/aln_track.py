@@ -29,46 +29,55 @@ DWELL_LAYER      = "dwell"
 MODEL_DIFF_LAYER = "model_diff"
 DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
 
-LayerMeta = namedtuple("LayerMeta", ["type", "label", "fn"])
+LayerMeta = namedtuple("LayerMeta", ["type", "label", "fn", "deps"])
 
 #TODO probably move this to AlnTrack
 LAYERS = {
     "ref" : {
         "coord" : LayerMeta(int, "Reference Coordinate", 
-            lambda track: track.coords.mref_to_ref(track.layer_mrefs)),
+            lambda track: track.coords.mref_to_ref(track.layer_mrefs), None),
         "name" : LayerMeta(str, "Reference Name",
-            lambda track: [track.coords.ref_name]*len(track.layers)),
+            lambda track: [track.coords.ref_name]*len(track.layers), None),
         "fwd" : LayerMeta(bool, "Is on fwd strand",
-            lambda track: [track.coords.fwd]*len(track.layers)),
+            lambda track: [track.coords.fwd]*len(track.layers), None),
     }, "dtw" : {
-        "start" : LayerMeta(int, "Sample Start", None),
-        "length" : LayerMeta(int, "Sample Length", None),
-        "current" : LayerMeta(float, "Current (pA)", None),
+        "start" : LayerMeta(int, "Sample Start", None, None),
+        "length" : LayerMeta(int, "Sample Length", None, None),
+        "current" : LayerMeta(float, "Current (pA)", None, None),
         "end" : LayerMeta(int, "Sample End",  
-            lambda track: track.layers["dtw","start"] + track.layers["dtw","length"]),
+            lambda track: track.layers["dtw","start"] + track.layers["dtw","length"],
+            [("dtw", "start"), ("dtw", "length")]),
         "middle" : LayerMeta(float, "Sample Middle",  
-            lambda track: track.layers["dtw","start"] + (track.layers["dtw","length"] / 2)),
+            lambda track: track.layers["dtw","start"] + (track.layers["dtw","length"] / 2),
+            [("dtw", "start"), ("dtw", "length")]),
         "dwell" : LayerMeta(float, "Dwell Time (ms/nt)",
-            lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate),
+            lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate,
+            [("dtw", "length")]),
         "model_diff" : LayerMeta(float, "Model pA Diff.",
-            lambda track: track.layers["dtw","current"] - track.model[track.kmers]),
+            lambda track: track.layers["dtw","current"] - track.model[track.kmers],
+            [("dtw", "current")]),
         "kmer" : LayerMeta(str, "Reference k-mer",
-            lambda track: track.kmers),
+            lambda track: track.kmers, None),
         "base" : LayerMeta(str, "Reference base",
-            lambda track: nt.kmer_base(track.kmers, 2)),
+            lambda track: nt.kmer_base(track.kmers, 2), None),
     }, "bcaln" : {
-        "start" : LayerMeta(int, "Basecalled Sample Start", None),
-        "length" : LayerMeta(int, "Basecalled Sample Length", None),
+        "start" : LayerMeta(int, "Basecalled Sample Start", None, None),
+        "length" : LayerMeta(int, "Basecalled Sample Length", None, None),
         "end" : LayerMeta(int, "Sample End",  
-            lambda track: track.layers["bcaln","start"] + track.layers["bcaln","length"]),
-        "bp" : LayerMeta(int, "Basecaller Base Index", None),
-        "err" : LayerMeta(str, "Basecalled Alignment Error", None),
+            lambda track: track.layers["bcaln","start"] + track.layers["bcaln","length"],
+            [("dtw", "start"), ("dtw", "length")]),
+        "bp" : LayerMeta(int, "Basecaller Base Index", None, None),
+        "err" : LayerMeta(str, "Basecalled Alignment Error", None, None),
     }, "cmp" : {
-        "jaccard" : LayerMeta(int, "Jaccard Distance", None),
-        "mean_ref_dist" : LayerMeta(int, "Mean Ref. Distance", None),
+        "jaccard" : LayerMeta(int, "Jaccard Distance", None, 
+            [("dtw", "start"), ("dtw", "length")]),
+        "mean_ref_dist" : LayerMeta(int, "Mean Ref. Distance", None,
+            [("dtw", "start"), ("dtw", "length")]),
     }, "bc_cmp" : {
-        "jaccard" : LayerMeta(int, "Jaccard Distance", None),
-        "mean_ref_dist" : LayerMeta(int, "Mean Ref. Distance", None),
+        "jaccard" : LayerMeta(int, "Jaccard Distance", None, 
+            [("dtw", "start"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end")]),
+        "mean_ref_dist" : LayerMeta(int, "Mean Ref. Distance", None, 
+            [("dtw", "start"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end")]),
     }
 }
 
@@ -111,11 +120,21 @@ def parse_layers(layers):
 
     parsed = set()
 
+    print("PARSING", layers)
     for layer in layers:
         layer = parse_layer(layer)
 
         if not layer in parsed:
             parsed.add(layer)
+
+            deps = LAYERS[layer[0]][layer[1]].deps
+            if deps is not None:
+                for dep in deps:
+                    print("DEP", dep)
+                    if not dep in parsed:
+                        parsed.add(dep)
+                        yield dep
+
             yield layer
 
 class AlnTrack:
@@ -134,6 +153,34 @@ class AlnTrack:
         self.layers = None
 
         self.model = PoreModel(self.conf.pore_model) 
+
+    def set_data(self, coords, alignments, layers):
+        self.coords = coords
+        self.layers = layers#pd.concat(layers, names=["group", "layer"], axis=1)
+        self.alignments = alignments
+
+        #TODO convert to reference coordinates here (or maybe upstream?)
+        #store bitvector of fwd alignments
+        mrefs = self.layers.index.get_level_values("mref")
+        refs = coords.mref_to_ref_index(self.layers.index.get_level_values("mref"), multi=False)
+        self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
+
+        self.layers.rename(index=coords.mref_to_ref, level=0, inplace=True)
+        self.layers.index.names = ("ref", "aln_id")
+
+        self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
+
+        if not (self.coords is None or self.coords.ref_kmers is None):
+            kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
+            self.kmers = self.coords.ref_kmers.reindex(kidx)
+            self.kmers.index = self.layers.index
+
+        self.has_fwd = np.any(self.alignments['fwd'])
+        self.has_rev = not np.all(self.alignments['fwd'])
+
+    @property
+    def empty(self):
+        return len(self.alignments) == 0
 
     def _group_layers(self, group, layers):
         return pd.concat({group : layers}, names=["group", "layer"], axis=1)
@@ -166,30 +213,6 @@ class AlnTrack:
             raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
         return aln_id
 
-    def set_data(self, coords, alignments, layers):
-        self.coords = coords
-        self.layers = layers#pd.concat(layers, names=["group", "layer"], axis=1)
-        self.alignments = alignments
-
-        #TODO convert to reference coordinates here (or maybe upstream?)
-        #store bitvector of fwd alignments
-        mrefs = self.layers.index.get_level_values("mref")
-        refs = coords.mref_to_ref_index(self.layers.index.get_level_values("mref"), multi=False)
-        self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
-
-
-        self.layers.rename(index=coords.mref_to_ref, level=0, inplace=True)
-        self.layers.index.names = ("ref", "aln_id")
-
-        self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
-
-        if not (self.coords is None or self.coords.ref_kmers is None):
-            kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
-            self.kmers = self.coords.ref_kmers.reindex(kidx)
-            self.kmers.index = self.layers.index
-
-        self.has_fwd = np.any(self.alignments['fwd'])
-        self.has_rev = not np.all(self.alignments['fwd'])
 
     def calc_layers(self, layers):
         for group, layer in layers:
@@ -208,8 +231,7 @@ class AlnTrack:
 
         #print(self.mat.columns.get_level_values("ref").unique())
 
-        print("KMERS")
-        print(nt.base_to_char(nt.kmer_base(self.coords.ref_kmers[1], 2)).tostring().decode("ascii"))
+        #print(nt.base_to_char(nt.kmer_base(self.coords.ref_kmers[1], 2)).tostring().decode("ascii"))
 
         self.mat = self.mat.reindex(self.alignments.index, copy=False)
 

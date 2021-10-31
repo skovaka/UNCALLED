@@ -7,8 +7,8 @@ import sys
 #TODO need to make sure pybind11 already installed?
 #might be relevent: https://github.com/oslocyclotronlab/ompy/pull/160
 try:
-    from pybind11.setup_helpers import Pybind11Extension, ParallelCompile
-    ParallelCompile("NPY_NUM_BUILD_JOBS", default=8).install()
+    from pybind11.setup_helpers import Pybind11Extension, ParallelCompile, needs_recompile
+    ParallelCompile("NPY_NUM_BUILD_JOBS", default=8, needs_recompile=naive_recompile).install()
 except:
     from setuptools import Extension as Pybind11Extension
 
@@ -142,7 +142,9 @@ requires=[
     'pybind11>=2.6.0', 
     'read-until==3.0.0',
     'pandas>=1.1.5',
-    'matplotlib>=3.3.4',
+    'matplotlib',
+    'plotly',
+    'dash',
     'scipy>=1.5.4',
     'toml>=0.10.2',
     'ont_fast5_api',
@@ -161,9 +163,9 @@ setup(
       "Programming Language :: Python :: 3"
     ],
 
-    python_requires=">=3.6",
+    python_requires=">=3.8",
 
-    setup_requires=requires,
+    setup_requires=['pybind11>=2.6.0'],
     install_requires=requires,
 
     packages=find_packages(),

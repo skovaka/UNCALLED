@@ -1,4 +1,4 @@
 #from .mpl import browser
-from .plotly import trackplot, dotplot, sigplot, browser
-from .plotly.trackplot import Trackplot
-from .plotly.dotplot import Dotplot
+from . import trackplot, dotplot, sigplot, browser
+from .trackplot import Trackplot
+from .dotplot import Dotplot
