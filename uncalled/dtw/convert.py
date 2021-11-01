@@ -15,14 +15,20 @@ import scipy.stats
 from . import Tracks
 from .dtw import collapse_events
 from ..config import Config, ParamGroup
-from ..argparse import ArgParser, Opt
-from ..fast5 import Fast5Reader, FAST5_OPTS
+from ..argparse import ArgParser, Opt, FAST5_PARAM
+from ..fast5 import Fast5Reader, FAST5_OPTS, parse_read_ids
 from ..index import BWA_OPTS, str_to_coord, RefCoord
 from .. import nt, PoreModel
 
 import progressbar as progbar
 
-CONVERT_OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
+CONVERT_OPTS = (
+    Opt("index_prefix", "tracks"),
+    Opt(FAST5_PARAM, "fast5_reader", nargs="+", type=str),
+    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
+    Opt(("-n", "--max-reads"), "fast5_reader"),
+
     Opt("--rna", fn="set_r94_rna"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-f", "--overwrite"), "tracks", action="store_true"),
@@ -30,7 +36,11 @@ CONVERT_OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt(("-o", "--output"), "tracks", required=True),
 )
 
-NANOPOLISH_OPTS = CONVERT_OPTS + (Opt("eventalign_tsv", type=str, default=None),)
+NANOPOLISH_OPTS = CONVERT_OPTS + (
+    Opt(("-x", "--fast5-index"), "fast5_reader", required=True), 
+    Opt("eventalign_tsv", type=str, default=None)
+)
+
 def nanopolish(conf):
     """Convert from nanopolish eventalign TSV to uncalled DTW track"""
 
