@@ -142,13 +142,13 @@ requires=[
     'pybind11>=2.6.0', 
     'read-until==3.0.0',
     'pandas>=1.1.5',
-    'matplotlib',
-    'plotly',
-    'dash',
+    'plotly>=5.0.0',
+    'dash>=2.0.0',
     'scipy>=1.5.4',
     'toml>=0.10.2',
-    'ont_fast5_api',
-    'h5py'
+    'matplotlib',
+    'ont_fast5_api>=4.0.0',
+    'h5py>=2.10.0'
 ],
 
 setup(

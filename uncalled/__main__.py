@@ -20,7 +20,7 @@ SUBCMDS = [
 ]
 
 _help_lines = [
-    "Utility for Nanopore Read ALignment to Large Expanses of DNA", "",
+    "Utility for Nanopore Current ALignment to Large Expanses of DNA", "",
     "subcommand options:",
     "General:",
     "\tindex      " + index.main.__doc__.split(".")[0],"",
