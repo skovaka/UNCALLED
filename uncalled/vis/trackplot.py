@@ -27,11 +27,14 @@ TrackplotParams._def_params(
     ("outfile", None, str, "Output file"),
 )
 
+_CMP_COLOR = {"colorscale" : "RdYlGn", "cmin" : 0, "cmid" :5, "cmax" : 10, "reversescale":True}
+
 LAYER_COLORS = {
     ("dtw", "model_diff") : {"colorscale" : "RdBu", "cmid" : 0, "cmax" : 20, "cmin" : -20, "reversescale":True},
     ("dtw", "current") : {"colorscale" : "viridis"},
     ("dtw", "dwell") : {"colorscale" : "viridis", "cmin" : 0, "cmax" : 25},
-    ("cmp", "mean_ref_dist") : {"colorscale" : "RdYlGn", "cmin" : 0, "cmid" :5, "cmax" : 10, "reversescale":True},
+    ("cmp", "mean_ref_dist") : _CMP_COLOR,
+    ("bc_cmp", "mean_ref_dist") : _CMP_COLOR,
 }
 
 LAYER_PANELS = {"mat", "box"}
@@ -92,9 +95,6 @@ class Trackplot:
         #        layer_stats = self.tracks.refstats[names].columns.get_level_values("stat").unique()
         #    else:
         #        layer_stats = pd.Index([])
-        #print(refstat_tracks)
-        #print(layer_stats)
-        #print(cmp_stats)
         #n_stats = len(layer_stats)+len(cmp_stats)
         #row_heights = [1]*n_stats + [2]*len(self.tracks)
 
@@ -108,7 +108,6 @@ class Trackplot:
         else:
             panel_heights = self.prms.panel_heights
 
-        print(panel_heights)
 
         n_rows = len(panel_heights) #sum((
         #    len(self.tracks) if MULTIROW_PANEL[panel] else 1
@@ -126,7 +125,6 @@ class Trackplot:
             vertical_spacing=0.125/n_rows)
 
         row = 1
-        print(self.prms.panels)
         for panel,layer in self.prms.panels:
             fn = getattr(self, "_"+panel)
             fn(row, layer)
@@ -161,7 +159,6 @@ class Trackplot:
         layer_label = LAYERS[group][layer].label
 
         t0 = time.time()
-        print("MAT", self.tracks.aln_tracks)
         for i,track in enumerate(self.tracks.aln_tracks):
             self.fig.update_yaxes(
                 title_text=track.desc, 

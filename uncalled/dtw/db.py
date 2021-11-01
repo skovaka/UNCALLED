@@ -97,12 +97,12 @@ class TrackSQL:
         self.cur.execute("""
             CREATE TABLE IF NOT EXISTS cmp (
                 mref INTEGER,
-                aln_id INTEGER,
+                aln_a INTEGER,
                 aln_b INTEGER,
                 group_b TEXT DEFAULT "dtw",
                 mean_ref_dist REAL, 
                 jaccard REAL, 
-                FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE,
+                FOREIGN KEY (aln_a) REFERENCES alignment (id) ON DELETE CASCADE,
                 FOREIGN KEY (aln_b) REFERENCES alignment (id) ON DELETE CASCADE
             );""")
         #self.con.commit()
@@ -222,6 +222,50 @@ class TrackSQL:
             query += " ORDER BY " + ", ".join(order)
         return query
 
+    def query_compare(self, layers, track_id=None, coords=None, aln_id=None):
+        dtw = False
+        bcaln = False
+        fields = {"mref", "aln_a", "aln_b", "group_b"}
+        for group,layer in layers:
+            if group == "cmp": dtw = True
+            if group == "bc_cmp": bcaln = True
+            fields.add(layer)
+
+        fields = ", ".join(fields)
+        select = f"SELECT {fields} FROM cmp"
+
+        wheres = list()
+        params = list()
+
+        if track_id is not None:
+            select += " JOIN alignment ON id = cmp.aln_a"
+            self._add_where(wheres, params, "track_id", track_id)
+
+        if dtw and not bcaln:
+            self._add_where(wheres, params, "group_b", "dtw")
+        elif bcaln and not dtw:
+            self._add_where(wheres, params, "group_b", "bcaln")
+
+        self._add_where(wheres, params, "aln_a", aln_id)
+
+        if coords is not None:
+            if coords.stranded:
+                wheres.append("(mref >= ? AND mref <= ?)")
+                params += [str(coords.mrefs.min()), str(coords.mrefs.max())]
+            else:
+                wheres.append("((mref >= ? AND mref <= ?) OR (mref >= ? AND mref <= ?))")
+
+                params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
+                params += [str(coords.mrefs[False].min()), str(coords.mrefs[False].max())]
+
+        query = self._join_query(select, wheres)
+
+        return pd.read_sql_query(
+            query, self.con, 
+            index_col=["mref", "aln_a", "aln_b", "group_b"], 
+            params=params)
+
+
     def query_layer_groups(self, layers, track_id=None, coords=None, aln_id=None, order=["mref"], chunksize=None):
 
         group_layers = collections.defaultdict(list)
@@ -244,15 +288,6 @@ class TrackSQL:
         select = "SELECT " + ", ".join(fields) + " FROM " + tables[0]
         for table in tables[1:]:
             select += " LEFT JOIN %s ON %s.aln_id == idx_aln_id AND %s.mref == idx_mref" % ((table,)*3)
-        #for table in tables[1:]:
-        #    if table == "bc_cmp":
-        #        table = "cmp"
-        #        extra = " AND layer_group == \"bcaln\""
-        #    elif table == "cmp":
-        #        extra = " AND layer_group == \"dtw\""
-        #    else:
-        #        extra = ""
-        #    select += (" LEFT JOIN %s ON %s.aln_id == idx_aln_id AND %s.mref == idx_mref" + extra) % ((table,)*3)
 
         wheres = list()
         params = list()

@@ -65,19 +65,19 @@ LAYERS = {
         "length" : LayerMeta(int, "Basecalled Sample Length", None, None),
         "end" : LayerMeta(int, "Sample End",  
             lambda track: track.layers["bcaln","start"] + track.layers["bcaln","length"],
-            [("dtw", "start"), ("dtw", "length")]),
+            [("bcaln", "start"), ("bcaln", "length")]),
         "bp" : LayerMeta(int, "Basecaller Base Index", None, None),
         "err" : LayerMeta(str, "Basecalled Alignment Error", None, None),
     }, "cmp" : {
         "jaccard" : LayerMeta(int, "Jaccard Distance", None, 
-            [("dtw", "start"), ("dtw", "length")]),
+            [("dtw", "start"), ("dtw", "end"), ("dtw", "length")]),
         "mean_ref_dist" : LayerMeta(int, "Mean Ref. Distance", None,
-            [("dtw", "start"), ("dtw", "length")]),
+            [("dtw", "start"), ("dtw", "end"), ("dtw", "length")]),
     }, "bc_cmp" : {
         "jaccard" : LayerMeta(int, "Jaccard Distance", None, 
-            [("dtw", "start"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end")]),
-        "mean_ref_dist" : LayerMeta(int, "Mean Ref. Distance", None, 
-            [("dtw", "start"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end")]),
+            [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end"), ("bcaln", "length")]),
+        "mean_ref_dist" : LayerMeta(int, "Mean Ref. Distance", None,                   
+            [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end"), ("bcaln", "length")]),
     }
 }
 
@@ -97,15 +97,17 @@ def parse_layer(layer):
         group = "dtw"
         layer = spl[0]
     else:
-        raise ValueError("Invalid layer specifier \"%s\", must contain at most one \".\"" % layer)
+        raise ValueError("Invalid layer specifier \"{layer}\", must contain at most one \".\"")
 
     if not group in LAYERS:
-        raise ValueError("Invalid layer group \"%s\". Options: %s" % (group, LAYERS.keys()))
+        opts = ",".join(LAYERS.keys())
+        raise ValueError("Invalid layer group \"{group}\". Options: {opts}")
 
     group_layers = LAYERS[group]
 
     if not layer in group_layers:
-        raise ValueError("Invalid layer \"%s\". Options: %s" % (group, group_layers.keys()))
+        opts = "\", \"".join(group_layers.keys())
+        raise ValueError(f"Invalid layer \"{group}.{layer}\". Options: \"{opts}\"")
 
     return (group, layer)
 
@@ -160,11 +162,12 @@ class AlnTrack:
         #TODO convert to reference coordinates here (or maybe upstream?)
         #store bitvector of fwd alignments
         mrefs = self.layers.index.get_level_values("mref")
-        refs = coords.mref_to_ref_index(self.layers.index.get_level_values("mref"), multi=False)
+
         self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
 
-        self.layers.rename(index=coords.mref_to_ref, level=0, inplace=True)
-        self.layers.index.names = ("ref", "aln_id")
+        if coords is not None:
+            self.layers.rename(index=coords.mref_to_ref, level=0, inplace=True)
+            self.layers.index.names = ("ref", "aln_id")
 
         self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
 
@@ -215,8 +218,15 @@ class AlnTrack:
     def calc_layers(self, layers):
         for group, layer in layers:
             if not group in self.layers or not layer in self.layers[group].columns:
-                vals = LAYERS[group][layer].fn(self)
-                self.layers[group,layer] = vals
+                meta = LAYERS[group][layer]
+
+                #Make sure layer dependencies exist
+                if meta.deps is None or len(self.layers.columns.intersection(meta.deps)) == len(meta.deps):
+                    fn = meta.fn
+                    if fn is None:
+                        raise ValueError("Layer not found: {group}.{layer}")
+                    vals = fn(self)
+                    self.layers[group,layer] = vals
 
     def load_mat(self):
         df = self.layers.copy()
@@ -259,7 +269,7 @@ class AlnTrack:
         groups_b = other.alignments.groupby("read_id")
 
         df = pd.DataFrame(
-            columns=["aln_b", "mean_ref_dist", "jaccard"],
+            columns=["aln_b", "group_b", "mean_ref_dist", "jaccard"],
             index = self.layers.index
         )
 
@@ -268,17 +278,20 @@ class AlnTrack:
             dtw_a = self.get_aln_layers(id_a, "dtw", ["start","end"], False)
 
             for id_b, aln_b in groups_b.get_group(read_id).iterrows():
-                dtw_b = other.get_aln_layers(id_b, "dtw", ["start","end"], False) \
-                             .reset_index(level="aln_id") \
-                             .rename(columns={"aln_id" : "aln_b"})
+                #dtw_b = other.get_aln_layers(id_b, "dtw", ["start","end"], False) \
+                #             .reset_index(level="aln_id") \
+                #             .rename(columns={"aln_id" : "aln_b"})
 
-                self._compare_alns(dtw_a, dtw_b, df)
+                self._compare_alns(dtw_a, other, id_b, "dtw", df)
 
-        df = self._group_layers("cmp", df)
-        self.layers = pd.concat([self.layers, df], axis=1)
+        df["group_b"] = "dtw"
+        return df.set_index(["aln_b", "group_b"], append=True)
 
-        if write:
-            self.db.write_layers(df)
+        #df = self._group_layers("cmp", df)
+        #self.layers = pd.concat([self.layers, df], axis=1)
+        #if write:
+        #    self.db.write_layers(df)
+
 
     def bc_cmp(self, other=None, write=False):
         if other is not None:
@@ -302,11 +315,13 @@ class AlnTrack:
                     self._compare_alns(dtw, other, id_b, "bcaln", df)
 
         df["group_b"] = "bcaln"
-        df = self._group_layers("cmp", df)
-        self.layers = pd.concat([self.layers, df], axis=1)
+        return df.set_index(["aln_b", "group_b"], append=True)
 
-        if write:
-            self.db.write_layers(df)
+        #df = self._group_layers("cmp", df)
+        #self.layers = pd.concat([self.layers, df], axis=1)
+
+        #if write:
+        #    self.db.write_layers(df)
         
 
     def _compare_alns(self, aln_a, other, id_b, group, df): # aln_b, df):
@@ -314,9 +329,9 @@ class AlnTrack:
                      .reset_index(level="aln_id") \
                      .rename(columns={"aln_id" : "aln_b"})
         if group == "bcaln":
-            aln_b.index = aln_b.index-Bcaln.K+1
+            aln_b.index = aln_b.index+1
 
-        merge = aln_a.join(aln_b, on="mref", lsuffix="_a", rsuffix="_b")\
+        merge = aln_a.join(aln_b, on="ref", lsuffix="_a", rsuffix="_b") \
                      .dropna(how="all")
                      
         starts = merge[["start_a", "start_b"]]
@@ -362,7 +377,7 @@ class AlnTrack:
             if weight_a + weight_b > 0:
                 mean_ref_dist[idx] = (sum_a+sum_b) / (weight_a+weight_b)
 
-        df.loc[merge.index, "aln_b"] = merge["aln_b"]
+        df.loc[merge.index, "aln_b"] = merge["aln_b"].astype("Int32")
         df.loc[merge.index, "jaccard"] = jaccard
         df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
 
@@ -372,7 +387,11 @@ class AlnTrack:
 
     @property
     def layer_mrefs(self):
-        return self.coords.ref_to_mref(self.layer_refs)
+        mrefs = self.coords.ref_to_mref(self.layer_refs)
+        if self.coords.stranded:
+            return mrefs
+        else:
+            return mrefs[0].union(mrefs[1])
         #return self.layers.index.get_level_values("mref")
 
     @property

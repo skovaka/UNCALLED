@@ -73,6 +73,8 @@ REFSTAT_LABELS = {
     "q95" : "95% Quantile",
 }
 
+CMP_GROUPS = {"cmp", "bc_cmp"}
+
 class RefstatsSplit:
     def __init__(self, stats, track_count):
         self.layer = [s for s in stats if s in LAYER_REFSTATS]
@@ -132,11 +134,18 @@ class Tracks:
                 track.fast5s = self.fast5s
 
     @property
-    def empty(self):
+    def all_empty(self):
         for t in self.aln_tracks:
             if not t.empty:
                 return False
         return True
+
+    @property
+    def any_empty(self):
+        for t in self.aln_tracks:
+            if t.empty:
+                return True
+        return False
 
     def _set_ref_bounds(self, ref_bounds):
         if ref_bounds is not None:
@@ -153,9 +162,13 @@ class Tracks:
 
         self.db_layers = list()
         self.fn_layers = list()
+        self.cmp_layers = list()
         for group, layer in parse_layers(layers):
             if LAYERS[group][layer].fn is None:
-                self.db_layers.append((group, layer))
+                if group in CMP_GROUPS:
+                    self.cmp_layers.append((group, layer))
+                else:
+                    self.db_layers.append((group, layer))
             else:
                 self.fn_layers.append((group, layer))
 
@@ -370,15 +383,82 @@ class Tracks:
             track.set_data(self.coords, track_alns, track_layers)
             track.calc_layers(self.fn_layers)
 
-            if load_mat:
-                track.load_mat()
-
+        
+        self.load_compare(ids)
         self.calc_refstats()
+
+        if load_mat:
+            for track in self.aln_tracks:
+                track.load_mat()
 
         return self.aln_tracks
 
-    #def calc_dtwstats(self):
-    #    if self.need_cmp:
+    def load_compare(self, aln_ids=None):
+        if len(self.cmp_layers) == 0:
+            return
+
+        dbfile0,db = list(self.dbs.items())[0]
+
+        self.cmp = db.query_compare(self.cmp_layers, self.input_track_ids, self.coords, aln_ids)
+        #TODO add aln_ids
+
+        groups = self.cmp.index.get_level_values("group_b").unique()
+        if "bcaln" in groups:
+            bcalns = self.cmp.loc[(slice(None), slice(None), slice(None), "bcaln"),:]
+        else:
+            bcalns = None
+        if "dtw" in groups:
+            dtws = self.cmp.loc[(slice(None), slice(None), slice(None), "dtw"),:]
+        else:
+            dtws = None
+
+        def _add_group(group, df):
+            df = df.reset_index(["aln_b", "group_b"])
+            df = df[df.index.get_level_values("mref").isin(track.layer_mrefs)]
+            df.rename(index=track.coords.mref_to_ref, level=0, inplace=True)
+            df.index.names = ["ref", "aln_id"]
+            df = pd.concat({group : df.reindex(track.layers.index)}, axis=1)
+            track.layers = pd.concat([track.layers, df], axis=1)
+
+        for track in self.aln_tracks:
+            if bcalns is not None:
+                _add_group("bc_cmp", bcalns)
+            if dtws is not None:
+                _add_group("cmp", dtws)
+
+    def calc_compare(self, group_b, save):
+        if len(self.aln_tracks) == 0:
+            raise ValueError("Must input at least one track")
+
+        cols = self.aln_tracks[0].layers.columns.get_level_values("group").unique()
+        if (group_b == "dtw" and "cmp" in cols) or (group_b == "bcaln" and "bc_cmp" in cols):
+            sys.stderr.write(f"Read already has compare group. Skipping\n")
+            return None
+
+        if group_b == "dtw":
+            if len(self.aln_tracks) != 2:
+                raise ValueError("Must input exactly two tracks to compare dtw alignments")
+
+            df = self.aln_tracks[0].cmp(self.aln_tracks[1])
+
+        elif group_b == "bcaln":
+            if len(self.aln_tracks) > 2:
+                raise ValueError("Must input one or two tracks to compare dtw to bcaln")
+            
+            if len(self.aln_tracks) == 2:
+                df = self.aln_tracks[0].bc_cmp(self.aln_tracks[1])
+            else:
+                df = self.aln_tracks[0].bc_cmp()
+
+        df = df.dropna()
+
+        if save:
+            df.rename(index=self.aln_tracks[0].coords.ref_to_mref, level=0, inplace=True)
+            self.aln_tracks[0].db.write_layers(
+                pd.concat({"cmp" : df}, names=["group", "layer"], axis=1), 
+                index=["mref", "aln_a", "aln_b", "group_b"])
+        else:
+            print(df.to_csv(sep="\t"))
 
     def calc_refstats(self, verbose_refs=False, cov=False):
         if self.prms.refstats is None or len(self.prms.refstats) == 0 or len(self.prms.refstats_layers) == 0:
@@ -577,7 +657,12 @@ class Tracks:
                 track_coords = None
 
             track.set_data(track_coords, track_alns, track_layers)
-            track.calc_layers(self.fn_layers)
+
+            if not track.empty:
+                track.calc_layers(self.fn_layers)
+
+        if not self.all_empty:
+            self.load_compare(ids)
 
     
     def close(self):
