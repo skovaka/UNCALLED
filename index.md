@@ -4,7 +4,7 @@
 
 Uncalled enables targeted sequencing by directly aligning raw nanopore signal to a reference and selectively ejecting reads via [adaptive sampling](https://nanoporetech.com/resource-centre/adaptive-sampling-oxford-nanopore) (AKA ReadUntil).
 
-For more information see the main [GitHub branch](https://github.com/skovaka/UNCALLED), or [read the paper](https://www.nature.com/articles/s41587-020-0731-9)
+For more information see the [main branch](https://github.com/skovaka/UNCALLED), or [read the paper](https://www.nature.com/articles/s41587-020-0731-9)
 
 ## Uncalled4: visualization and analysis of nanopore RNA and DNA signal alignments
 
