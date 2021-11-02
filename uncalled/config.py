@@ -185,7 +185,7 @@ class Config(_Conf):
                 else:
                     for param, value in val.items():
                         if not hasattr(group, param):
-                            raise ValueError("Unrecognized parameter in TOML: %s.%s" % (group, param))
+                            sys.stderr.write(f"Unrecognized config parameter: \"{name}.{param}\". Skipping.\n")
                         if self.is_default(param, name):
                             setattr(group, param, value)
             else:

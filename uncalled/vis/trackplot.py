@@ -9,7 +9,7 @@ import sys
 from .. import config
 from ..dtw.aln_track import LAYERS, parse_layer, parse_layers
 from ..index import str_to_coord
-from ..dtw.tracks import Tracks, REFSTAT_LABELS
+from ..dtw.tracks import Tracks, REFSTAT_LABELS, COMPARE_REFSTATS
 from ..argparse import Opt, comma_split
 
 class TrackplotParams(config.ParamGroup):
@@ -83,21 +83,6 @@ class Trackplot:
 
         names = [t.name for t in self.tracks]
 
-        #if self.tracks.refstats is None:
-        #    refstat_tracks = pd.Index([])
-        #    layer_stats = pd.Index([])
-        #    cmp_stats = []
-        #else:
-        #    refstat_tracks = self.tracks.refstats.columns.get_level_values("track").unique()
-        #    cmp_stats = refstat_tracks.difference(names)
-
-        #    if len(refstat_tracks.intersection(names)) == len(names):
-        #        layer_stats = self.tracks.refstats[names].columns.get_level_values("stat").unique()
-        #    else:
-        #        layer_stats = pd.Index([])
-        #n_stats = len(layer_stats)+len(cmp_stats)
-        #row_heights = [1]*n_stats + [2]*len(self.tracks)
-
         if self.prms.panel_heights is None:
             panel_heights = list()
             for panel,_ in self.prms.panels:
@@ -108,11 +93,7 @@ class Trackplot:
         else:
             panel_heights = self.prms.panel_heights
 
-
-        n_rows = len(panel_heights) #sum((
-        #    len(self.tracks) if MULTIROW_PANEL[panel] else 1
-        #    for panel,_ in self.prms.panels
-        #))
+        n_rows = len(panel_heights)
 
         t0 = time.time()
         ref_title = "Reference (%s)" % self.tracks.coords.ref_name
@@ -161,7 +142,7 @@ class Trackplot:
         t0 = time.time()
         for i,track in enumerate(self.tracks.aln_tracks):
             self.fig.update_yaxes(
-                title_text=track.desc, 
+                title_text=f"{track.desc} ({layer_label})", 
                 showticklabels=False,
                 row=row, col=1)
 
@@ -228,24 +209,38 @@ class Trackplot:
     def _scatter(self, row, layer):
         self._refstat(row, layer, "scatter")#mode="markers", marker={"size" : 3, "color" : self.prms.track_colors[j]})
 
+    def _stat_kw(self, plot, color):
+        if plot == "line":
+            return {"line_color" : color}
+        elif plot == "scatter":
+            return {"mode" : "markers", 
+                  "marker" : {
+                    "size" : 3, "opacity" : 0.5, 
+                    "color" : color}}
+        raise ValueError( f"Unknown plot type: {plot}")
+
     def _refstat(self, row, layer, plot):
         spl = layer.split(".")
         group, layer = parse_layer(".".join(spl[:-1]))
         stat = spl[-1]
 
+        layer_label = LAYERS[group][layer].label
+        stat_label = REFSTAT_LABELS[stat]
+
+        if stat in COMPARE_REFSTATS:
+            self.fig.update_yaxes(title_text=f"{layer_label} {stat_label}", row=row, col=1)
+            stats = self.tracks.refstats[stat,group,layer,"stat"]
+            self.fig.add_trace(go.Scattergl(
+                name="Compare",
+                x=stats.index,
+                y=stats,
+                **self._stat_kw(plot, "red")
+            ), row=row, col=1)
+            return
+
         self.fig.update_yaxes(title_text=REFSTAT_LABELS[stat], row=row, col=1)
         for j,track in enumerate(self.tracks.aln_tracks):
             stats = self.tracks.refstats[track.name,group,layer,stat]
-
-            if plot == "line":
-                kw = {"line_color" : self.prms.track_colors[j]}
-            elif plot == "scatter":
-                kw = {"mode" : "markers", 
-                      "marker" : {
-                        "size" : 3, 
-                        "color" : self.prms.track_colors[j]}}
-            else:
-                raise ValueError( f"Unknown plot type: {plot}")
 
             self.fig.add_trace(go.Scattergl(
                 name=track.desc,
@@ -253,22 +248,10 @@ class Trackplot:
                 #showlegend=i==0,
                 x=stats.index,
                 y=stats,
-                opacity=0.5, **kw
+                **self._stat_kw(plot, self.prms.track_colors[j])
             ), row=row, col=1)
 
-
         #for stat in cmp_stats:
-        #    self.fig.update_yaxes(title_text=REFSTAT_LABELS[stat] + " Stat", row=row, col=1)
-        #    group,layer = self.prms.layer
-        #    stats = self.tracks.refstats[stat,group,layer,"stat"]
-        #    self.fig.add_trace(go.Scattergl(
-        #        name="Compare",
-        #        x=stats.index,
-        #        y=stats,
-        #        mode="lines",
-        #        line={"color":"red"},
-        #    ), row=row, col=1)
-        #    row += 1
 
     def show(self):
         fig_conf = {
