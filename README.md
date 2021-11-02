@@ -2,7 +2,7 @@
 
 A **U**tility for **N**anopore **C**urrent **Al**ignment to **L**arge **E**xpanses of **D**NA
 
-![UNCALLED logo](uncalled_logo_small.png "UNCALLED logo")
+![UNCALLED logo](logo.png "UNCALLED logo")
 
 A toolkit for nanopore signal alignment, analysis, and visualization
 
