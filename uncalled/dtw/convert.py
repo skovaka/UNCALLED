@@ -29,7 +29,7 @@ CONVERT_OPTS = (
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
     Opt(("-n", "--max-reads"), "fast5_reader"),
 
-    Opt("--rna", fn="set_r94_rna"),
+    Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-f", "--overwrite"), "tracks", action="store_true"),
     Opt(("-a", "--append"), "tracks", action="store_true"),
@@ -38,7 +38,7 @@ CONVERT_OPTS = (
 
 NANOPOLISH_OPTS = CONVERT_OPTS + (
     Opt(("-x", "--fast5-index"), "fast5_reader", required=True), 
-    Opt("eventalign_tsv", type=str, default=None)
+    Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include")
 )
 
 def nanopolish(conf):

@@ -24,7 +24,7 @@ OPTS = (
 )
 
 def main(conf):
-    """Nanopore DTW genome browser"""
+    """Interactive signal alignment genome browser"""
     conf.tracks.layers.append("cmp.mean_ref_dist")
     conf.tracks.refstats_layers.append("cmp.mean_ref_dist")
     tracks = Tracks(conf=conf)

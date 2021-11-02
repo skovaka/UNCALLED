@@ -146,9 +146,9 @@ requires=[
     'dash>=2.0.0',
     'scipy>=1.5.4',
     'toml>=0.10.2',
-    'matplotlib',
     'ont_fast5_api>=4.0.0',
-    'h5py>=2.10.0'
+    #'h5py>=2.10.0'
+    'matplotlib',
 ],
 
 setup(

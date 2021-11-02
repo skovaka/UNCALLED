@@ -34,16 +34,15 @@ AlignParams._def_params(
     ("band_width", 50, int, "DTW band width (only applies to BDTW)"),
     ("band_shift", 0.5, float, "DTW band shift coefficent (only applies to BDTW)"),
     ("mm2_paf", None, str, "Path to minimap2 alignments of basecalled reads in PAF format. Used to determine where each should be aligned. Should include cigar string."),
-    ("out_path", None, str, "Path to directory where alignments will be stored. If not specified will display interactive dotplot for each read."),
 )
 
 OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
-    Opt(("-o", "--out-path"), "dtw"),
+    Opt(("-o", "--output"), "tracks"),
     Opt(("-f", "--overwrite"), "tracks", action="store_true"),
     Opt("--full-overlap", "tracks", action="store_true"),
     Opt(("-a", "--append"), "tracks", action="store_true"),
-    Opt("--rna", fn="set_r94_rna"),
+    Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt("--method", "dtw", choices=METHODS.keys()),
     #Opt(("-b", "--band-width"), "dtw"),
@@ -57,7 +56,7 @@ def main(conf):
     conf.proc_read.detect_events = True
     conf.export_static()
 
-    tracks = Tracks(None, conf.dtw.out_path, conf=conf)
+    tracks = Tracks(conf=conf)
 
     fast5s = Fast5Processor(conf=conf)
 

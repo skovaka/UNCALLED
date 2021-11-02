@@ -1,4 +1,4 @@
-"""Query and edit DTW databases
+"""Edit and query alignment database metadata
 
 subcommand options:
 ls       List all tracks in a database

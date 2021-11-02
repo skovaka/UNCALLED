@@ -1,4 +1,4 @@
-"""Compute new DTW alignemnt layers
+"""Compute, compare, and query alignment layers
 
 subcommand options:
 compare  Compare different alignment methods on the same set of reads"""
@@ -29,6 +29,8 @@ COMPARE_OPTS = (
 )
 
 def compare(conf):
+    """Compute distance between alignments of the same reads"""
+
     group_b = "bcaln" if conf.bcaln else "dtw"
 
     if conf.bcaln:
@@ -45,55 +47,37 @@ def compare(conf):
                 print(read_id)
             tracks.calc_compare(group_b, conf.save)
 
-SUBCMDS = [
-    (compare, COMPARE_OPTS)
-]
+DUMP_OPTS = (
+    Opt("input", "tracks", nargs="+", type=str),
+    Opt("layers", nargs="+",  help="Layers to retrieve or compute"),
+    Opt(("-R", "--ref-bounds"), "tracks", type=ref_coords),
+    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
+)
 
-#OPTS = (
-#    Opt("input", "tracks", nargs="+", type=str),
-#    Opt("layers", nargs="+",  help="Layers to retrieve or compute"),
-#    Opt(("-R", "--ref-bounds"), "tracks", type=ref_coords),
-#    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
-#    Opt(("-o", "--output"), choices=["db", "tsv"], help="If \"db\" will output into the track database. If \"tsv\" will output a tab-delimited file to stdout."),
-#)
-#
-#dtwstats = _Dtwstats()
-#
-#def main(conf):
-#    """Output DTW alignment paths, statistics, and comparisons"""
-#
-#    tracks = Tracks(conf=conf)
-#    #TODO add layer dependencies (compare requires start/length)
-#    tracks.set_layers(["start", "length", "bcaln.start", "bcaln.length"])# + conf.layers)
-#
-#    layer_groups = {group for group,_ in parse_layers(conf.layers)}
-#
-#    need_cmp = "cmp" in layer_groups
-#    need_bc_cmp = "bc_cmp" in layer_groups
-#
-#    for read_id,tracks in tracks.iter_reads():
-#
-#        if need_cmp and not np.any([t.has_group("cmp") for t in tracks]):
-#            if len(tracks) != 2:
-#                raise ValueError("\"cmp\" can only be computed with two alignment tracks")
-#            if len(tracks[0].alignments) == 0 or len(tracks[1].alignments) == 0:
-#                continue
-#            tracks[0].cmp(tracks[1], write=False)
-#
-#            tracks = [tracks[0]]
-#
-#        if need_bc_cmp and not np.all([t.has_group("bc_cmp") for t in tracks]):
-#            if len(tracks) == 1:
-#                other = None
-#            elif len(tracks[1].alignments) > 0:
-#                other = tracks[1]
-#            else:
-#                continue
-#            print("ERE", tracks[0], other, len(tracks))
-#            tracks[0].bc_cmp(other, write=True)
-#            if len(tracks[0].alignments) == 0:
-#                continue
-#            tracks = [tracks[0]]
-#        
-#        for track in tracks:
-#            print(track.layers.to_csv(sep="\t"))
+def dump(conf):
+    """Output DTW alignment paths and statistics"""
+
+    tracks = Tracks(conf=conf)
+    #TODO add layer dependencies (compare requires start/length)
+    tracks.set_layers(["start", "length", "bcaln.start", "bcaln.length"])# + conf.layers)
+
+    layer_groups = {group for group,_ in parse_layers(conf.layers)}
+
+    need_cmp = "cmp" in layer_groups
+    need_bc_cmp = "bc_cmp" in layer_groups
+
+    header = True
+    for read_id,tracks in tracks.iter_reads():
+        for track in tracks:
+            if header:
+                columns = track.layers.index.names + [
+                    ".".join([c for c in col if len(c) > 0]) 
+                    for col in track.layers.columns]
+                print("\t".join(columns))
+                header = False
+            sys.stdout.write(track.layers.to_csv(sep="\t", header=False))
+
+SUBCMDS = [
+    (compare, COMPARE_OPTS),
+    (dump, DUMP_OPTS)
+]

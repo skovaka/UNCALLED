@@ -1,434 +1,430 @@
-# UNCALLED
+# Uncalled4
 
 A **U**tility for **N**anopore **C**urrent **Al**ignment to **L**arge **E**xpanses of **D**NA
 
 ![UNCALLED logo](uncalled_logo_small.png "UNCALLED logo")
 
-A read mapper which rapidly aligns raw nanopore signal to DNA references
+A toolkit for nanopore signal alignment, analysis, and visualization
 
-Enables software-based targeted sequenceing on Oxford Nanopore (ONT) MinION or GridION [via ReadUntil](https://nanoporetech.com/about-us/news/towards-real-time-targeting-enrichment-or-other-sampling-nanopore-sequencing-devices)
+Features an alignment algorithm guided by Guppy metadata, methods for comparing Tombo and Nanopolish alignments,  epigenetic modification detection statistics, and interactive alignment visualizations
 
-Also includes a simulator which can be used to predict how much enrichment could be achieved on a given reference using raw signal data from previous nanopore runs.
-
-[
-**Targeted nanopore sequencing by real-time mapping of raw electrical signal with UNCALLED** \
-Sam Kovaka, Yunfan Fan, Bohan Ni, Winston Timp, Michael C. Schatz \
-Nature Biotechnology (2020)
-](https://www.nature.com/articles/s41587-020-0731-9)
+For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0731), see the [main branch](https://github.com/skovaka/UNCALLED)
 
 ## Table of Contents
 
 - [Installation](#installation)
-- [`uncalled index`: Reference Indexing](#indexing)
-- [`uncalled map`: Fast5 Mapping](#fast5-mapping)
-- [`uncalled realtime`: Real-Time ReadUntil](#real-time-readuntil)
-  - [Planning Your Run](#planning-your-run)
-  - [Altering Chunk Size](#altering-chunk-size)
-- [`uncalled sim`: ReadUntil Simulator](#simulator)
-- [DTW: Raw Signal Analysis and Visualization](#dynamic-time-warping)
-  - [`uncalled dtw align`](#align)
-  - [`uncalled dtw convert`](#convert)
-  - [`uncalled dtw dotplot`](#dotplot)
-  - [`uncalled dtw browser`](#browser)
-  - [`uncalled dtw sample_compare`](#sample_compare)
-- [PAF Output Format](#output-format)
-  - [`uncalled pafstats`](#pafstats)
-- [Limitations](#limitations)
+- [`index`: Reference Indexing](#index)
+- [DTW Alignment and Storage](#dtw-alignment-and-storage)
+ - [`dtw`: Perform DTW alignment guided by basecalled alignments](#dtw)
+ - [`convert`: Import DTW alignments produced by Nanopolish or Tombo](#convert)
+ - [`db`: Edit and query alignment database metadata](#db)
+- [DTW Visualization](#dtw-visualization)
+ - [`dotplot`: Plot signal-to-reference alignment dotplots](#dotplot)
+ - [`trackplot`: Plot alignment tracks and per-reference statistics](#trackplot)
+ - [`browser`: Interactive signal alignment genome browser](#browser)
+- [DTW Analysis](#dtw-analysis)
+ - [`refstats`: Calculate per-reference-coordinate statistics](#refstats)
+ - [`dtwstats`: Compute, compare, and query alignment layers](#dtwstats)
 - [Release Notes](#release-notes)
 
 ## Installation
 
 ```
-> pip3 install git+https://github.com/skovaka/UNCALLED.git@drna --user
+> pip install git+https://github.com/skovaka/UNCALLED.git@uncalled4 --user
 ```
 
 OR
 
 ```
-> git clone --recursive https://github.com/skovaka/UNCALLED.git@drna
+> git clone --recursive -b uncalled4 https://github.com/skovaka/UNCALLED.git
 > cd UNCALLED
-> python3 setup.py install --user
+> pip install .
 ```
 
-Requires python >= 3.6, read-until == 3.0.0, pybind11 >= 2.5.0, and GCC >= 4.8.1 (all except GCC are automatically downloaded and installed)
+Requires python >= 3.8
 
 Other dependencies are included via submodules, so be sure to clone with `git --recursive`
 
-We recommend running on a Linux machine. UNCALLED has been successfully installed and run on Mac computers, but real-time ReadUntil has not been tested on a Mac. Installing UNCALLED has not been attempted on Windows.
+Uncalled4 is compatible with Linux and Mac OSX. It has been primarily developed and tested on Ubuntu Linux.
 
-## Indexing
+## `index`
 
-**Example:**
-
-
-```
-> uncalled index -o E.coli E.coli.fasta
-```
-**Positional arguments:**
-
-- `fasta-file` reference genome(s) or other target sequences in the FASTA format
-
-**Optional arguments:**
-
-- `-o/--bwa_prefix` output index prefix (default: same as input fasta)
-- `--no-bwt` Will only generate the pacseq if specified, which is much faster to build. Can only be used with [DTW subcommands](#dynamic-time-warping).
-
-
-Note that UNCALLED uses the [BWA](https://github.com/lh3/bwa) FM Index to encode the reference, and this command will use a previously built BWA index if all the required files exist with the specified prefix. Otherwise, a new BWA index will be automatically built. 
-
-**We recommend applying repeat masking your reference if it contains eukaryotic sequences.** See [masking](masking/) for more details.
-
-## Fast5 Mapping
-
-**Example:**
+Build an index from a FASTA reference
 
 ```
-> uncalled map -t 16 E.coli fast5_list.txt > uncalled_out.paf
-Loading fast5s
-Mapping
+uncalled index [-o INDEX_PREFIX] [--no-bwt] fasta_filename
 
-> head -n 4 uncalled_out.paf
-b84a48f0-9e86-47ef-9d20-38a0bded478e 3735 77 328 + Escherichia_coli_chromosome 4765434 2024611 2024838 66 228 255  ch:i:427 st:i:50085  mt:f:53.662560
-77fe7f8c-32d6-4789-9d62-41ff482cf890 5500 94 130 + Escherichia_coli_chromosome 4765434 2333754 2333792 38 39  255  ch:i:131 st:i:238518 mt:f:19.497091
-eee4b762-25dd-4d4a-8a59-be47065029be 2905     *      *      *      *      *      *      *      *      *       255  ch:i:44  st:i:302369 mt:f:542.985229
-e175c87b-a426-4a3f-8dc1-8e7ab5fdd30d 8052 84 154 + Escherichia_coli_chromosome 4765434 1064550 1064614 41 65  255  ch:i:182 st:i:452368 mt:f:38.611683
+positional arguments:
+  fasta_filename        FASTA file to index
+
+optional arguments:
+  -o INDEX_PREFIX, --index-prefix INDEX_PREFIX
+                        Index output prefix. Will use input fasta filename by
+                        default (default: None)
+  --no-bwt              Will only generate the pacseq if specified, which is
+                        much faster to build. Can only be used with DTW
+                        subcommands (NOT map, sim, or realtime) (default:
+                        False)
 ```
 
-**Positional arguments:**
+Note that UNCALLED uses the [BWA](https://github.com/lh3/bwa) FM Index to encode the reference, and this command will use a previously built BWA index if all the required files exist with the specified prefix. Otherwise, a new BWA index will be automatically built.
 
-- `bwa-prefix` the BWA reference index prefix generated by `uncalled index`
-- `fast5-files`  Reads to be mapped. Can be a directory which will be recursively searched for all files with the ".fast5" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.
+## DTW Alignment and Storage
 
-**Optional arguments:**
+The following subcommands generate and update dynamic time warping (DTW) alignment tracks. Alignment tracks are currently stored in a sqlite3 database. Multiple tracks can and should be stored in the same database in order to be analyzed together. Currently there is no way to merge databases. Tracks can be specified in `<file.db>:<track_name>` format.
 
-- `-l/--read-list` text file containing a list of read IDs. Only these reads will be mapped if specified        
-- `-n/--read-count` maximum number of reads to map
- - `-t/--threads` number of threads to use for mapping (default: 1)
-- `-e/--max-events-proc` number of events to attempt mapping before giving up on a read (default 30,000). Note that there are approximately two events per nucleotide on average.
+### `dtw`
 
-
-See [example/](example/) for a simple read and reference example.
-
-## Real-Time ReadUntil
-
-**THIS IS CURRENTLY BROKEN ON THIS BRANCH**
-
-Use the version on the master branch for realtime sequencing
-
-**Example:**
-
-```
-> uncalled realtime E.coli --port 8000 -t 16 --enrich -c 3 > uncalled_out.paf 
-Starting client
-Starting mappers
-Mapping
-
-> head -n 4 uncalled_out.paf
-81ba344d-60df-4688-b37f-9064e76a3eb8 1352 *     *     *     *      *      *      *      *      *   255 ch:i:68  st:i:29101 mt:f:375.93841 wt:f:1440.934 mx:f:0.152565
-404113c1-6ace-4690-885c-9c4a47da6476 450  *     *     *     *      *      *      *      *      *   255 ch:i:106 st:i:29268 mt:f:63.272270 wt:f:1591.070 en:f:0.010086
-d9acafe3-23dd-4a0f-83db-efe299ee59a4 1355 *     *     *     *      *      *      *      *      *   255 ch:i:118 st:i:29378 mt:f:239.50201 wt:f:1403.641 ej:f:0.120715
-8a6ec472-a289-4c50-9a75-589d7c21ef99 451  98 369 + Escherichia_coli 4765434 3421845 3422097 56 253 255 ch:i:490 st:i:29456 mt:f:79.419411 wt:f:8.551202 kp:f:0.097424
-```
-
-We recommend that you try mapping fast5s via `uncalled map` before real-time enrichment, as runtime issues could occur if UNCALLED is not installed properly.
-
-The command can generally be run at any time before or during a sequencing run, although an error may occur if UNCALLED is run before any sequencing run has been started in the current MinKNOW session. If this is happens you should start UNCALLED after the run begins, ideally during the first mux scan. If you want to change the chunk size you must run the command *before* starting the run (see below). 
-
-**Positional arguments:**
-- `bwa-prefix` the BWA reference index prefix generated by `uncalled index`
-
-**Required arguments:**
-- `--enrich` will *keep* reads that map to the reference if included OR
-- `--deplete` will *eject* reads that map to the reference if included
-Exactly one of `--deplete` or `--enrich` must be specified
-
-**Optional Arguments:**
-
-- `-c/--max-chunks` number of chunks to attempt mapping before giving up on a read (default: 10).
-- `--chunk-size` size of chunks in seconds (default: 1). Note: this is a new feature and may not work as intended (see below)
-- `-t/--threads` number of threads to use for mapping (default: 1)
-- `--port` MinION device port.
-- `--even` will only eject reads from even channels if included
-- `--odd` will only eject reads from odd channels if included
-- `--duration` expected duration of sequencing run in hours (default: 72)
-
-### Planning Your Run
-
-For ReadUntil sequencing, the first decision to make is whether to perform **enrichment** or **depletion** (`--enrich` or `--deplete`). 
-In enrichment mode, UNCALLED will eject a read if it *does not* map to the reference, meaning your target should be the reference. 
-In depletion mode, UNCALLED will eject a read if it *does* map to the reference, meaning your target should be everything except your reference.
-
-Note that enrichment necessitates a quick decision as to whether or not a read maps, since you want to eject a read as fast as possible. Usually ~95% of reads can be mapped within three seconds for highly non-repetitive references, so setting `-c/--max-chunks-proc` to `3` generally works well for enrichment. The default value of `10` works well for depletion. Note these values assume `--chunk-size` is set to the default 1 second.
-
-If you plan to target eukaryotic sequences we recommend masking repeats which can disrupt mapping. See [masking](masking/) for scripts and guidelines.
-
-ReadUntil works best with longer reads. Maximize your read lengths for best results. You may also need to perform a nuclease flush and reloading to achieve the highest yield of on-target bases.
-
-
-### Altering Chunk Size
-
-The ReadUntil API receives signal in "chunks", which by default are one second's worth of signal. This can be changed using the `--chunk-size` parameter. Note that `--max-chunks-proc` should also be changed to compensate for changes to chunk sizes. *If the chunk size is changed, you must start running UNCALLED before sequencing begins.* UNCALLED is unable to change the chunk size mid-seqencing-run. In general reducing the chunk size should improve enrichment, although [previous work](http://dx.doi.org/10.1101/2020.02.03.926956) has found that the API becomes unreliable with chunks sizes less than 0.4 seconds. We have not thoroughly tested this feature, and recommend using the default 1 second chunk size for most cases. In the future this default size may be reduced.
-
-## Simulator
-
-**THIS IS CURRENTLY BROKEN ON THIS BRANCH**
-
-Use the version on the master branch for simulation
-
-**Example:**
-
-```
-> uncalled sim E.coli.fasta /path/to/control/fast5s --ctl-seqsum /path/to/control/sequencing_summary.txt --unc-seqsum /path/to/uncalled/sequencing_summary.txt --unc-paf /path/to/uncalled/uncalled_out.paf -t 16 --enrich -c 3 --sim-speed 0.25 > uncalled_out.paf 2> uncalled_err.txt
-
-> sim_scripts/est_genome_yield.py -u uncalled_out.paf --enrich -x E.coli -m mm2.paf -s sequencing_summary.txt --sim-speed 0.25
-
-unc_on_bp       150.678033
-unc_total_bp    6094.559395
-cnt_on_bp       33.145022
-cnt_total_bp    8271.651331
-```
-
-The simulator simulates a real-time run using data from two real runs: one control run and one UNCALLED run. Reads are simulated from the control run, and the pattern of channel activity of modeled after the control run. The simulator outputs a PAF file similar to the real-time mode, which can be interperted using scripts found in [sim_scripts/](sim_scripts/).
-
-Example files which can be used as template UNCALLED sequencing summary and PAF files for the simulator can be found [here](http://labshare.cshl.edu/shares/schatzlab/www-data/UNCALLED/simulator_files/). The control reads/sequencing summary can be from any sequencing run of your sample of interest, and it does not have to match the sample used in the provided examples.
-
-The simulator can take up a large amount of memory (> 100Gb), and loading the fast5 reads can take quite a long time. To reduce the time/memory requirements you could truncate your control sequencing summary and only the loads present in the summary will be loaded, although this may reduce the accuracy of the simulation. Also, unfortunately the fast5 loading portion of the simulator cannot be exited via a keyboard interrupt and must be hard-killed. I will work on fixing this in future versions.
-
-Arguments:
-
-- `bwa-prefix` the prefix of the index to align to. Should be a BWA index that `uncalled index` was run on
-- `control-fast5-files` path to the directory where control run fast5 files are stored, or a text file containing the path to one control fast5 per line
-- `--ctl-seqsum` sequencing summary of the control run. Read IDs must match the control fast5 files
-- `--unc-seqsum` sequencing summary of the UNCALLED run
-- `--unc-paf` PAF file output by UNCALLED from the UNCALLED run
-- `--sim-speed` scaling factor of simulation duration in the range (0.0, 1.0], where smaller values are faster. Setting below 0.125 may decrease accuracy.
-- `-t/--threads` number of threads to use for mapping (default: 1)
-- `-c/--max-chunks-proc` number of chunks to attempt mapping before giving up on a read (default: 10). Note that for the simulator, altering this changes how many chunks is loaded from each each, changing the memory requirements.
-- `--enrich` will *keep* reads that map to the reference if included
-- `--deplete` will *eject* reads that map to the reference if included
-- `--even` will only eject reads from even channels if included
-- `--odd` will only eject reads from odd channels if included
-
-Exactly one of `--deplete` or `--enrich` must be specified
-
-## Dynamic Time Warping
-
-The `uncalled dtw` command consists of several subcommands for alignment, analysis, and visualizations of raw nanopore signal aligned via dynamic time warping. `uncalled dtw align` and `uncalled dtw convert` produce raw signal **alignment tracks**, which is a set of reads (typically from one sample) aligned to the same reference. The rest of the subcommands detailed below produce visualizations, analysis, and comparisons of alignment tracks.
-
-### align
-
-Aligns raw nanopore signal guided by basecaller output and minimap2 alignments.
-
-**Example:**
-
-```
-> uncalled dtw align -m mm2_alns.paf E.coli.fasta fast5s/ -o ecoli_dtw
-```
-
-The above command will generate a directory named `ecoli_dtw` which represents the DTW alignment track. This directory can be used as input for most other `dtw` subcommands listed below. 
+Perform DTW alignment guided by basecalled alignments
 
 Currently the **fast5 files must contain basecalling information** output by Guppy via the `--fast5_out` option.
 
-**Positional arguments:**
-- `bwa-prefix` The BWA reference index prefix generated by `uncalled index` (can use `--no-bwt` option to speed up indexing)
-- `fast5-files`  Reads to be mapped. Can be a directory which will be recursively searched for all files with the ".fast5" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names.
 
-**Required arguments:**
-- `-m/--mm2-map` Path to minimap2 alignments of basecalled reads in PAF format. **Must include a cigar string** (use -c option)
+```
+uncalled dtw [-r] [-l READ_FILTER] [-n MAX_READS]
+             -m MM2_PAF [-o OUTPUT][--full-overlap]
+              [--rna] [-R REF_BOUNDS] [-a] [-f]
+              index_prefix fast5_files [fast5_files ...]
 
-**Optional arguments:**
-- `-o/--out-path` Path to directory to store alignemnts. If not included will display an interactive dotplot for each read.
-- `-f/--force-overwrite` Will overwrite the `out-path` if one already exists.
-- `--rna` Must be included if aligning direct RNA reads
-- `-R/--ref-bounds` Reference bounds in "\<chr\>:\<start\>-\<end\>" format. Will only align between specified coordinates if included. Reads which do not overlap coordinates will be ignored.
-- `-l/--read-filter` Will only align reads listed if included. Can be comma-separated list of IDs or text file containing one read ID per line.
-- `-r/--recursive` Will recursively search for fast5s if included
+
+positional arguments:
+  index_prefix          BWA index prefix
+  fast5_files           List of paths to any combination of: 1. fast5 files 2.
+                        directories to search for fast5 files (optionally
+                        recursive) 3. text file(s) listing one fast5 file or
+                        directory to search per line
+
+optional arguments:
+  --rna                 Should be set for direct RNA data
+  -m MM2_PAF, --mm2-paf MM2_PAF
+                        Path to minimap2 alignments of basecalled reads in PAF
+                        format. Used to determine where each should be
+                        aligned. Should include cigar string. (default: None)
+  -r, --recursive       Will search directories recursively for any file                       
+                        ending in ".fast5" if true (default: False)
+  -l READ_FILTER, --read-filter READ_FILTER
+                        List of read IDs and/or text file(s) containing one
+                        read ID per line (default: [])
+  -n MAX_READS, --max-reads MAX_READS
+                        Maximum number of reads to load. (default: 0)
+  -o OUTPUT, --output OUTPUT
+                        Output track specifier. Should be in format
+                        <file.db>[:<track_name>], where file.db is the output
+                        sqlite database. If <track_name> is not specified,
+                        will be same as filename (without extension) (default:
+                        None)
+  -R REF_BOUNDS, --ref-bounds REF_BOUNDS
+                        Only load reads which overlap these coordinates
+                        (default: None)
+  --full-overlap        If true will only include reads which fully cover
+                        reference bounds (default: False)
+  -f, --overwrite       Overwrite existing tracks (default: False)
+  -a, --append          Append reads to existing tracks (default: False)
+```
+
+
+The `uncalled dtw` command consists of several subcommands for alignment, analysis, and visualizations of raw nanopore signal aligned via dynamic time warping. `uncalled dtw align` and `uncalled dtw convert` produce raw signal **alignment tracks**, which is a set of reads (typically from one sample) aligned to the same reference. The rest of the subcommands detailed below produce visualizations, analysis, and comparisons of alignment tracks.
 
 ### convert
 
-Converts Nanopolish eventalign output and Tombo alignments to UNCALLED DTW alignment tracks. 
+Import DTW alignments produced by Nanopolish and Tombo
 
-#### `convert nanopolish`
+#### `nanopolish`
 
-**Example:**
-
-```
-> uncalled dtw convert nanopolish -m mm2_alns.paf -x ecoli_reads.fq.index.readdb E.coli.fasta fast5s/ eventalign_output.tsv -o ecoli_nanopolish_dtw
-```
-
-Currently nanopolish eventalign **must** but run with the options `-n/--print-read-names`, `--signal-index`, abd `--scale-events`
-
-**Positional arguments:**
-- `bwa-prefix` The BWA reference index prefix generated by `uncalled index` (can use `--no-bwt` option to speed up indexing)
-- `fast5-files`  FAST5 files which nanopolish was run on
-- `eventalign_tsv` The TSV file output by nanopolish eventalign (see above for required options)
-
-**Required arguments:**
-- `-m/--mm2-map` Path to minimap2 alignments of basecalled reads in PAF format. **Must include a cigar string** (use -c option)
-- `-x/--fast5-index` Mapping from reads to FAST5 files. Can be the "\*.index.readdb" file output by nanopolish index.
-- `-o/--out-path` Path to directory to store alignemnts
-
-**Optional arguments**
-- `--rna` Must be included if converting direct RNA reads
-- `-l/--read-filter` Will only align reads listed if included. Can be comma-separated list of IDs or text file containing one read ID per line.
-- `-r/--recursive` Will recursively search for fast5s if included
-
-#### convert tombo
-
-**Example:**
+Currently nanopolish eventalign **must** but run with the options `-n/--print-read-names`, `--signal-index`, and `--scale-events`
 
 ```
-> uncalled dtw convert tombo -m mm2_alns.paf E.coli.fasta tombo_fast5s/ -o ecoli_tombo_dtw
+uncalled nanopolish [-r] [-l READ_FILTER] [-n MAX_READS] [--rna]
+                           [-R REF_BOUNDS] [-f] [-a] -o OUTPUT -x FAST5_INDEX
+                           index_prefix fast5_files [fast5_files ...]
+                           eventalign_tsv
+
+positional arguments:
+  index_prefix          BWA index prefix
+  fast5_files           List of paths to any combination of: 1. fast5 files 2.
+                        directories to search for fast5 files (optionally
+                        recursive) 3. text file(s) listing one fast5 file or
+                        directory to search per line
+  eventalign_tsv
+
+optional arguments:
+
+  -x FAST5_INDEX, --fast5-index FAST5_INDEX
+                        Filename mapping between read IDs and fast5 files Can
+                        be sequencing summary output by basecaller,
+                        "filename_mapping.txt" from ont_fast5_api, or
+                        nanopolish "*.index.readdb" file (default: )
+  -r, --recursive       Will search directories recursively for any file
+                        ending in ".fast5" if true (default: False)
+  -l READ_FILTER, --read-filter READ_FILTER
+                        List of read IDs and/or text file(s) containing one
+                        read ID per line (default: [])
+  -n MAX_READS, --max-reads MAX_READS
+                        Maximum number of reads to load. (default: 0)
+  --rna                 Should be set for direct RNA data
+  -R REF_BOUNDS, --ref-bounds REF_BOUNDS
+                        Only load reads which overlap these coordinates
+                        (default: None)
+  -f, --overwrite       Overwrite existing tracks (default: False)
+  -a, --append          Append reads to existing tracks (default: False)
+  -o OUTPUT, --output OUTPUT
+                        Output track specifier. Should be in format
+                        <file.db>[:<track_name>], where file.db is the output
+                        sqlite database. If <track_name> is not specified,
+                        will be same as filename (without extension) (default:
+                        None)
 ```
 
-**Positional arguments:**
-- `bwa-prefix` The BWA reference index prefix generated by `uncalled index` (can use `--no-bwt` option to speed up indexing)
-- `fast5-files` Path to directory containing FAST5 files containing Tombo alignments
-
-**Required arguments:**
-- `-m/--mm2-map` Path to minimap2 alignments of basecalled reads in PAF format. **Must include a cigar string** (use -c option)
-
-**Optional arguments**
-- `--rna` Must be included if converting direct RNA reads
-- `-l/--read-filter` Will only align reads listed if included. Can be comma-separated list of IDs or text file containing one read ID per line.
-- `-r/--recursive` Will recursively search for fast5s if included
-
-### dotplot
-
-Displays signal-to-reference dotplots from alignment tracks output by `uncalled dtw align` or `uncalled dtw convert`. The signal is annotated by which base is assigned to stretches of signal: green for A, blue for C, red for G, orange for T. Horizontal white lines behind the signal plot represent the expected current level. The difference between the mean observed current and the expected current is plotted on the right side of the plot.
-
-If alignments were generated basecalled FAST5 files, will also display a dotplot of the basecalled alignment projected into signal space in orange.
-
-**Example:**
+#### `tombo`
 
 ```
-> uncalled dtw dotplot ecoli_dtw
+uncalled tombo [-h] [-r] [-l READ_FILTER] [-n MAX_READS] [--rna]
+                      [-R REF_BOUNDS] [-f] [-a] -o OUTPUT
+                      index_prefix fast5_files [fast5_files ...]
+
+Convert from Tombo resquiggled fast5s to uncalled DTW track
+
+positional arguments:
+  index_prefix          BWA index prefix
+  fast5_files           List of paths to any combination of: 1. fast5 files 2.
+                        directories to search for fast5 files (optionally
+                        recursive) 3. text file(s) listing one fast5 file or
+                        directory to search per line
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -r, --recursive       Will search directories recursively for any file
+                        ending in ".fast5" if true (default: False)
+  -l READ_FILTER, --read-filter READ_FILTER
+                        List of read IDs and/or text file(s) containing one
+                        read ID per line (default: [])
+  -n MAX_READS, --max-reads MAX_READS
+                        Maximum number of reads to load. (default: 0)
+  --rna                 Should be set for direct RNA data
+  -R REF_BOUNDS, --ref-bounds REF_BOUNDS
+                        Only load reads which overlap these coordinates
+                        (default: None)
+  -f, --overwrite       Overwrite existing tracks (default: False)
+  -a, --append          Append reads to existing tracks (default: False)
+  -o OUTPUT, --output OUTPUT
+                        Output track specifier. Should be in format
+                        <file.db>[:<track_name>], where file.db is the output
+                        sqlite database. If <track_name> is not specified,
+                        will be same as filename (without extension) (default:
+                        None)
 ```
 
-If no output prefix is specified this will display an interactive plot.
+### `db`
 
-**Positional arguments:**
-- `track` Alignment track where alignments are stored
-
-**Optional arguments:**
-- `-R/--ref-bounds` Reference bounds in "\<chr\>:\<start\>-\<end\>" format. Will only display alignments between specified coordinates if included.
-- `-l/--read-filter` Will only display alignments of reads listed if included. Can be comma-separated list of IDs or text file containing one read ID per line.
-- `-C/--max-chunks N` Will only display the first N chunks if specified (useful for sanity checks on very long reads)
-- `-o/--out-prefix` If included will output images with specified prefix, otherwise will display interactive plot.
-- `-f/--out-format` Image output format ("svg" (defualt), "pdf", or "png")
-
-### browser
-
-Displays a raw signal genome browser of one or two alignment tracks, including interactive plotting options and summary statistics. You can choose to display at each position for each read the mean current, the dwell time, or the difference between expected and observed current. You can also click on different locations to view reads statistics at that position and open dotplots of the selected read.
-
-**Example:**
+Edit and query alignment database metadata
 
 ```
-> uncalled dtw browser Escherichia_coli:1000000-1001000 ecoli_dtw
+usage: uncalled db [-h]
+
+subcommand options:
+ls       List all tracks in a database
+delete   Delete a track from a database
+edit     Rename, change fast5 paths, or set description
 ```
 
-**Positional arguments:**
-- `ref-bounds` Reference bounds to display in "\<chr\>:\<start\>-\<end\>" format. We suggest you display no more than ~2000bp at a time.
-- `track_a` Alignment track to display
-- `track_b` (optional) a secondary alignment track to display in parallel
+## DTW Visualization
 
-**Optional arguments**
-- `-f/--full-overlap` Will only display reads which fully overlap the specified reference bounds
+All visualizations are generated using Plotly.
 
-### sample_compare
+### `dotplot`
 
-Outputs a TSV file conaining Kolmogorov–Smirnov test statistics comparing the current and dwell time of two alignment tracks
+Plot signal-to-reference alignment dotplots
 
-**Example:**
+If any alignments were generated using `uncalled dtw`, will also display a dotplot of the basecalled alignment projected into signal space in orange.
 
 ```
-> uncalled dtw sample_compare ecoli_ivt ecoil_native
-Current (pA)    Dwell Time (ms/bp)
-0.014147942351290663    0.029174953339242523
-0.030864053808638645    0.05042664744826436
-0.05507295971878467     0.023468723079030626
-...
+usage: uncalled dotplot [-h] [-o OUT_PREFIX] [-f {png,svg,pdf}]
+                        [-R REF_BOUNDS] [-l READ_FILTER] [-L LAYERS]
+                        input [input ...]
+
+positional arguments:
+  input                 Input tracks specifier. Should be in format
+                        <file.db>[:<track_name>], where file.db is an
+                        Uncalled4 aligment track database and <track_name>
+                        optionally specifies which tracks to read (reads all
+                        by default)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -o OUT_PREFIX, --out-prefix OUT_PREFIX
+                        If included will output images with specified prefix,
+                        otherwise will display interactive plot. (default:
+                        None)
+  -f {png,svg,pdf}, --out-format {png,svg,pdf}
+                        Image output format. Only has an effect with -o
+                        option. (default: svg)
+  -R REF_BOUNDS, --ref-bounds REF_BOUNDS
+                        Only load reads which overlap these coordinates
+                        (default: None)
+  -l READ_FILTER, --read-filter READ_FILTER
+                        Only load reads which overlap these coordinates
+                        (default: None)
+  -L LAYERS, --layers LAYERS
 ```
 
-**Positional arguments:**
-- `ref-bounds` Reference bounds where KS-stats should be computed in "\<chr\>:\<start\>-\<end\>" format. 
-- `track_a`, `track_b` Alignment tracks to compare
+### `trackplot`
 
-**Optional arguments**
-- `-f/--full-overlap` Will consider reads which fully overlap the specified reference bounds
-- `-o/--output-file` Output TSV file. Will output to stdout if not specified
+Plot alignment tracks and per-reference statistics
 
-## Output Format
+Trackplots are defined by a series of panels displaying different layers. A `mat` panel display a heatmap of layer values for each ref/read coordinate on each track. A `box` panel displays boxplots of layer summary statistics for each track. `line` and `scatter` panels display [`refstats`](#refstats) summary statistics, specified by `<layer>.<statistic>`.
 
-UNCALLED outputs to stdout in a format similar to [PAF](https://github.com/lh3/miniasm/blob/master/PAF.md). Unmapped reads are output with reference-location-dependent fields replaced with \*s. Lines that begin with "#" are comments that useful for debugging.
-
-Query coordinates, residue matches, and block lengths are estimated assuming 450bp sequenced per second. This estimate can be significantly off depending on the sequencing run. UNCALLED attempts to map a read as early as possible, so the "query sequence length" and "query end" fields correspond to the leftmost position where UNCALLED was able to confidently map the read. In many cases this may only be 450bp or 900bp into the read, even if the read is many times longer than this. This differs from aligners such as [minimap2](https://github.com/lh3/minimap2), which attempt to map the full length of the read.
-
-The "query sequence length" field currently does not correspond to the actual read length, rather an estimate of the number of bases that UNCALLED attempted to align. In most cases this will be equal to "query end". This may be changed to better reflect the full read length in future versions.
-
-Both modes include the following custom attributes in each PAF entry:
-
-- `mt`: **map time**. Time in milliseconds it took to map the read.
-- `ch`: **channel**. MinION channel that the read came from.
-- `st`: **start sample**. Global _sequencing_ start time of the read (in signal samples, 4000 samples/sec).
-
-`uncalled realtime` also includes the following attributes:
-
-- `ej`: **ejected**. Time that the eject signal was sent, in milliseconds since last chunk was received.
-- `kp`: **kept**. Time that UNCALLED decided to keep the read, in milliseconds since last chunk was received.
-- `en`: **ended**. Time that UNCALLED determined the read ended, in milliseconds since last chunk was received.
-- `mx`: **mux scan**. Time that the read _would have_ been ejected, had it not have occured within a mux scan.
-- `wt`: **wait time**. Time in milliseconds that the read was queued but was not actively being mapped, either due to thread delays or waiting for new chunks.
-
-### pafstats
-
-We have included a functionality called `uncalled pafstats` which computes speed statistics from a PAF file output by UNCALLED. Accuracy statistics can also be included if provided a ground truth PAF file, for example based on [minimap2](https://github.com/lh3/minimap2) alignments of basecalled reads. There is also an option to output the original UNCALLED PAF annotated with comparisons to the ground truth.
-
-**Example:**
 ```
-> uncalled pafstats -r minimap2_alns.paf -n 5000 uncalled_out.paf
-Summary: 5000 reads, 4373 mapped (89.46%)
+usage: uncalled trackplot [-h] [-f] [-H PANEL_HEIGHTS [PANEL_HEIGHTS ...]]
+                          [--mat LAYER] [--box LAYER] [--line LAYER.STAT]
+                          [--scatter LAYER.STAT] [-o OUTFILE]
+                          input [input ...] ref_bounds
 
-Comparing to reference PAF
-     P     N
-T  88.74  6.80
-F   0.60  3.74
-NA: 0.12
 
-Speed            Mean    Median
-BP per sec:   4878.24   4540.50
-BP mapped:     636.29    362.00
-MS to map:     140.99     89.96
+positional arguments:
+  input                 Input tracks specifier. Should be in format
+                        <file.db>[:<track_name>], where file.db is an
+                        Uncalled4 aligment track database and <track_name>
+                        optionally specifies which tracks to read (reads all
+                        by default)
+  ref_bounds            Only load reads which overlap these coordinates
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -f, --full-overlap    If true will only include reads which fully cover
+                        reference bounds (default: False)
+  -H PANEL_HEIGHTS [PANEL_HEIGHTS ...], --panel-heights PANEL_HEIGHTS [PANEL_HEIGHTS ...]
+                        Relative height of each panel (default: None)
+  --mat LAYER           Display a ref-by-read matrix of specified alignment
+                        layer (default: None)
+  --box LAYER           Display a boxplot of specified layer (default: None)
+  --line LAYER.STAT     Display a line plot of specifed layer summary
+                        statistic (default: None)
+  --scatter LAYER.STAT  Display a line plot of specifed layer summary
+                        statistic (default: None)
+  -o OUTFILE, --outfile OUTFILE
+                        Output file (default: None)
 ```
 
-Positional arguments
-- `infile` PAF file output by UNCALLED
+### `browser`
 
-Optional arguments
-- `-n/--max-reads` maximum number of reads to parse
-- `-r/--ref-paf` ground-truth alignments (from minimap2) to compute TP/TN/FP/FN rates
-- `-a/--annotate` if used with `-r`, will output PAF with "rf:" tag indicating TP, TN, FP, or FN
+Interactive signal alignment genome browser
 
-Accuracy statistics:
-- TP: true positive - percent infile reads that overlap reference read locations
-- FP: false positive - percent infile reads that do not overlap reference read locations
-- TN: true negative - percent of reads which were not aligned in reference or infile
-- FN: false negative - percent of reads which were aligned in the reference but not in the infile
-- NA: not aligned/not applicable - percent of reads aligned in infile but not in reference. Could be considered a false positive, but the truth is unknown.
+This feature is in very early stages. Currently it features trackplot visualization where you can click on different locations to display read/reference information.
 
-## Limitations
+```
+uncalled browser [-r REFSTATS] [-f] [-o OUTFILE]
+                 input [input ...] ref_bounds
 
-UNCALLED currently does not support large (> ~1Gbp) or highly repetitive references. 
-The speed and mapping rate both progressively drop as references become larger and more repetitive. 
-Bacterial genomes or small collections of divergent bacterial genomes typically work well. 
-Small segments of eukaryotic genomes can also be used, however the presence of any repetitve elements will harm the performance. 
-Collections of highly similar genomes wil not work well, as conserved sequences introduce repeats.
-See [masking](masking/) for repeat masking scripts and guidelines.
 
-UNCALLED currently only supports reads sequenced with r9.4.1/r9.4 chemistry.
+positional arguments:
+  input                 Input tracks specifier. Should be in format
+                        <file.db>[:<track_name>], where file.db is an
+                        Uncalled4 aligment track database and <track_name>
+                        optionally specifies which tracks to read (reads all
+                        by default)
+  ref_bounds            Only load reads which overlap these coordinates
 
-## Release Notes
+optional arguments:
+  -r REFSTATS, --refstats REFSTATS
+                        Per-reference summary statistics to compute for each
+                        layer (default: None)
+  -f, --full-overlap    If true will only include reads which fully cover
+                        reference bounds (default: False)
+  -o OUTFILE, --outfile OUTFILE
+                        Output file (default: None)
+```
 
+## DTW Analysis
+
+These functions compute statistics over reference and read coordinates. `refstats` computes summary and comparison statistics (e.g. Kolmogorov-Smirnov test) over reference coordinates, while `dtwstats` maintains the read-by-reference dimensions of the DTW alignments.
+
+(Coming soon: `readstats` to compute read-level statistics)
+
+### `refstats`
+
+Calculate per-reference-coordinate statistics
+
+```
+uncalled refstats [-R REF_BOUNDS] [-C REF_CHUNKSIZE] [-c] [-v]
+                  input [input ...] refstats_layers refstats
+
+positional arguments:
+  input                 Input tracks specifier. Should be in format
+                        <file.db>[:<track_name>], where file.db is an
+                        Uncalled4 aligment track database and <track_name>
+                        optionally specifies which tracks to read (reads all
+                        by default)
+  refstats_layers       Comma-separated list of layers over which to compute
+                        summary statistics
+  refstats              Comma-separated list of summary statistics to compute.
+                        Some statisitcs (ks) can only be used if exactly two
+                        tracks are provided {ks,mean,q95,median,skew,max,var,m
+                        in,q5,stdv,kurt,q25,q75}
+optional arguments:
+  -R REF_BOUNDS, --ref-bounds REF_BOUNDS
+                        Only load reads which overlap these coordinates
+                        (default: None)
+  -C REF_CHUNKSIZE, --ref-chunksize REF_CHUNKSIZE
+                        Number of reference coordinates to query for iteration
+                        (default: 10000)
+  -c, --cov             Output track coverage for each reference position (default: False)
+  -v, --verbose-refs    Output reference name and strand (default: False)
+```
+
+### `dtwstats`
+
+This subcommand features `compare`, which measures distance between alignments of the same set of reads (e.i. different alignment methods). It also features `dump`, which outputs DTW layers from a database.
+
+#### `compare`
+
+Compute distance between alignments of the same reads
+
+```
+uncalled dtwstats compare [-b] [-s] input [input ...]
+
+positional arguments:
+  input        Input tracks specifier. Should be in format
+               <file.db>[:<track_name>], where file.db is an Uncalled4
+               aligment track database and <track_name> optionally specifies
+               which tracks to read (reads all by default)
+
+optional arguments:
+  -b, --bcaln  Compare against basecalled alignment. If two tracks input will
+               look for "bcaln" group in second track, otherwise will look in
+               the first track. (default: False)
+  -s, --save   Will save in database if included, otherwise will output to TSV
+               (default: False)
+```
+
+#### `dump`
+
+Output DTW alignment paths and statistics
+
+```
+uncalled dump [-R REF_BOUNDS] [-l READ_FILTER] [-o {db,tsv}]
+              input [input ...] layers [layers ...]
+
+positional arguments:
+  input                 Input tracks specifier. Should be in format
+                        <file.db>[:<track_name>], where file.db is an
+                        Uncalled4 aligment track database and <track_name>
+                        optionally specifies which tracks to read (reads all
+                        by default)
+  layers                Layers to retrieve or compute
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -R REF_BOUNDS, --ref-bounds REF_BOUNDS
+                        Only load reads which overlap these coordinates
+                        (default: None)
+  -l READ_FILTER, --read-filter READ_FILTER
+                        Only load reads which overlap these coordinates
+                        (default: None)
+```
+
+
+## Release notes
+- v3.1: introduced Plotly visualizations and sqlite3 database
 - v3.0: added DTW alignment, analysis, and visualization commands
 - v2.2: added event profiler which masks out pore stalls, and added compile-time debug options
 - v2.1: updated ReadUntil client for latest MinKNOW version, made `uncalled index` automatically build the BWA index, added hdf5 submodule, further automated installation by auto-building hdf5, switched to using setuptools, moved submodules to submods/

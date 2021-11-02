@@ -312,6 +312,7 @@ OPTS = (
 )
 
 def main(conf):
+    """Plot alignment tracks and per-reference statistics"""
     #conf.tracks.layers.append(conf.trackplot.layer)
     #conf.tracks.refstats_layers = [conf.trackplot.layer]
     conf.trackplot.panels = conf.panels

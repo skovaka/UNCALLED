@@ -13,7 +13,7 @@ from .stats import _refstats, dtwstats, _readstats
 
 SUBCMDS = [
     index, 
-    realtime, map, sim, pafstats,
+    map, sim, pafstats, #realtime, 
     dtw, convert, db,
     browser, dotplot, sigplot, trackplot,
     _refstats, _readstats, dtwstats,
@@ -24,8 +24,8 @@ _help_lines = [
     "subcommand options:",
     "General:",
     "\tindex      " + index.main.__doc__.split(".")[0],"",
-    "Real-Time Enrichment (ReadUntil/Adaptive Sampling):",
-    "\trealtime   " + realtime.main.__doc__,
+    "Real-Time Enrichment (Rapid Signal Mapping):",
+#    "\trealtime   " + realtime.main.__doc__,
     "\tmap        " + map.main.__doc__,
     "\tsim        " + sim.main.__doc__,
     "\tpafstats   " + pafstats.main.__doc__, "",
@@ -35,12 +35,13 @@ _help_lines = [
     "\tdb         " + db.__doc__.split("\n")[0], "",
     "DTW Analysis:",
     "\trefstats   " + _refstats.main.__doc__,
-    "\treadstats  " + _readstats.main.__doc__,
+    #"\treadstats  " + _readstats.main.__doc__,
     "\tdtwstats   " + dtwstats.__doc__.split("\n")[0],"",
     "DTW Visualization:",
-    "\tbrowser    " + browser.main.__doc__,
-    "\tsigplot    " + sigplot.main.__doc__,
     "\tdotplot    " + dotplot.main.__doc__,
+    "\ttrackplot  " + trackplot.main.__doc__,
+    "\tbrowser    " + browser.main.__doc__,
+    #"\tsigplot    " + sigplot.main.__doc__,
 ]
 
 HELP = "\n".join([

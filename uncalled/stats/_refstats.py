@@ -67,12 +67,12 @@ OPTS = (
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-C", "--ref-chunksize"), "tracks"),
-    Opt(("-c", "--cov"), action="store_true"),
-    Opt(("-v", "--verbose-refs"), action="store_true"),
+    Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
+    Opt(("-v", "--verbose-refs"), action="store_true", help="Output reference name and strand"),
 )
 
 def main(conf):
-    """Summarize and compare DTW stats over reference coordinates"""
+    """Calculate per-reference-coordinate statistics"""
     from ..dtw import Tracks
 
     t0 = time.time()

@@ -1,3 +1,5 @@
+"""Plot signal-to-reference alignment dotplots"""
+
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -252,7 +254,7 @@ OPTS = (
 )
 
 def main(conf):
-    """plot a dotplot"""
+    """Plot signal-to-reference alignment dotplots"""
 
     dotplots = Dotplot(conf=conf)
     for read_id, fig in dotplots.iter_plots():
