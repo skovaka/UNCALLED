@@ -13,7 +13,6 @@ For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0
 ## Table of Contents
 
 - [Installation](#installation)
-- [Overview](#overview)
 - [`index`: Reference Indexing](#index)
 - [DTW Alignment and Storage](#dtw-alignment-and-storage)
   - [`dtw`: Perform DTW alignment guided by basecalled alignments](#dtw)
@@ -26,29 +25,9 @@ For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0
 - [DTW Analysis](#dtw-analysis)
   - [`refstats`: Calculate per-reference-coordinate statistics](#refstats)
   - [`dtwstats`: Compute, compare, and query alignment layers](#dtwstats)
+- [Alignment Database](#alignment-database)
+- [Future Work](#future-work)
 - [Release Notes](#release-notes)
-
-## Overview
-
-Uncalled4 stores signal alignments as a set of **layers** associated with read and reference coordinates. Each layer is derived from the read signal (e.g. `current`), the reference sequence (e.g. `kmer`), or other layers (e.g. `model_diff`). Layers are organized into **layer groups**: `dtw` for signal alignments, `bcaln` for projected basecalled alignments, and `cmp` for alignment comparisons. Several subcommands detailed above take layer names as input, which should generaly be in the form `<group>.<layer>`. For brevity, group can be excluded for `dtw` layers (e.g. you can simply input `current`, not `dtw.currnt`). Below is a table of currently available layers (more to come soon!):
-
-| Group | Layer   | Description |
-|-------|---------|-------------|
-| dtw   | current | Mean read signal current (pA) |
-| dtw   | dwell   | Signal dwell time (ms/nt) |
-| dtw   | model_diff | Difference between predicted (via a pore model) and observed current|
-| dtw   | kmer | Binarized reference k-mer |
-| dtw   | kmer | Binarized reference base |
-| cmp   | mean_ref_dist | Mean reference distance between two alignments (must first run [`dtwstats compare`](#compare)) |
-| cmp   | jaccard | Raw sample jaccard distances between two alignments (must first run [`dtwstats compare`](#compare)) |
-
-Read alignments are grouped into **tracks**, which are stored in an sqlite3 alignment database. When running [`uncalled dtw`](#dtw) or [`uncalled convert`](#convert), you must specify an output database file and an optional track name in the format `<filename.db>:<track_name>`. If only `<filename.db>` is specified, the track name will be the filename without the extension. Multiple tracks can be input as comma-separated track names: `<filename.db>:<track1>,<track2>,...`. You can change the name of a track with [`uncalled db edit`](#db), and also set a human readable description to appear in visualizations.
-
-All tracks must be written to the same database for multi-track visualization and analysis (e.g. comparing alignments, calculating KS statistics). There is currently no way to merge tracks. We plan to implement merging and cross-database analysis soon.
-
-Uncalled4 (v3.1.0) is a work in progress. Many additional features and optimizations are planned, which may require changes to the command line interface or database format. We also plan to provide a Python API in the future.
-
-Real-time targeted sequencing (`uncalled realtime`) is currently unavailable in Uncalled4. Related subcommands (`map`, `sim`, etc.) are available, but aren't documented here for brevity. We plan to integrate all functionalities eventually.
 
 ## Installation
 
@@ -446,6 +425,30 @@ optional arguments:
                         Only load reads which overlap these coordinates
                         (default: None)
 ```
+
+## Alignment Database
+
+Uncalled4 stores signal alignments as a set of **layers** associated with read and reference coordinates. Each layer is derived from the read signal (e.g. `current`), the reference sequence (e.g. `kmer`), or other layers (e.g. `model_diff`). Layers are organized into **layer groups**: `dtw` for signal alignments, `bcaln` for projected basecalled alignments, and `cmp` for alignment comparisons. Several subcommands detailed above take layer names as input, which should generaly be in the form `<group>.<layer>`. For brevity, group can be excluded for `dtw` layers (e.g. you can simply input `current`, not `dtw.currnt`). Below is a table of currently available layers (more to come soon!):
+
+| Group | Layer   | Description |
+|-------|---------|-------------|
+| dtw   | current | Mean read signal current (pA) |
+| dtw   | dwell   | Signal dwell time (ms/nt) |
+| dtw   | model_diff | Difference between predicted (via a pore model) and observed current|
+| dtw   | kmer | Binarized reference k-mer |
+| dtw   | kmer | Binarized reference base |
+| cmp   | mean_ref_dist | Mean reference distance between two alignments (must first run [`dtwstats compare`](#compare)) |
+| cmp   | jaccard | Raw sample jaccard distances between two alignments (must first run [`dtwstats compare`](#compare)) |
+
+Read alignments are grouped into **tracks**, which are stored in an sqlite3 alignment database. When running [`uncalled dtw`](#dtw) or [`uncalled convert`](#convert), you must specify an output database file and an optional track name in the format `<filename.db>:<track_name>`. If only `<filename.db>` is specified, the track name will be the filename without the extension. Multiple tracks can be input as comma-separated track names: `<filename.db>:<track1>,<track2>,...`. You can change the name of a track with [`uncalled db edit`](#db), and also set a human readable description to appear in visualizations.
+
+All tracks must be written to the same database for multi-track visualization and analysis (e.g. comparing alignments, calculating KS statistics). There is currently no way to merge tracks. We plan to implement merging and cross-database analysis soon.
+
+## Future Work
+
+Uncalled4 (v3.1.0) is a work in progress. Many additional features and optimizations are planned, which may require changes to the command line interface or database format. We also plan to provide a Python API in the future.
+
+Real-time targeted sequencing (`uncalled realtime`) is currently unavailable in Uncalled4. Related subcommands (`map`, `sim`, etc.) are available, but aren't documented here for brevity. We plan to integrate all functionalities eventually.
 
 ## Release Notes
 - v3.1: introduced Plotly visualizations and sqlite3 database
