@@ -13,6 +13,7 @@ For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0
 ## Table of Contents
 
 - [Installation](#installation)
+- [Overview](#overview)
 - [`index`: Reference Indexing](#index)
 - [DTW Alignment and Storage](#dtw-alignment-and-storage)
   - [`dtw`: Perform DTW alignment guided by basecalled alignments](#dtw)
@@ -26,6 +27,28 @@ For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0
   - [`refstats`: Calculate per-reference-coordinate statistics](#refstats)
   - [`dtwstats`: Compute, compare, and query alignment layers](#dtwstats)
 - [Release Notes](#release-notes)
+
+## Overview
+
+Uncalled4 stores signal alignments as a set of **layers** associated with read and reference coordinates. Each layer is derived from the read signal (e.g. `current`), the reference sequence (e.g. `kmer`), or other layers (e.g. `model_diff`). Layers are organized into **layer groups**: `dtw` for signal alignments, `bcaln` for projected basecalled alignments, and `cmp` for alignment comparisons. Several subcommands detailed above take layer names as input, which should generaly be in the form `<group>.<layer>`. For brevity, group can be excluded for `dtw` layers (e.g. you can simply input `current`, not `dtw.currnt`). Below is a table of currently available layers (more to come soon!):
+
+| Group | Layer   | Description |
+|-------|---------|-------------|
+| dtw   | current | Mean read signal current (pA) |
+| dtw   | dwell   | Signal dwell time (ms/nt) |
+| dtw   | model_diff | Difference between predicted (via a pore model) and observed current|
+| dtw   | kmer | Binarized reference k-mer |
+| dtw   | kmer | Binarized reference base |
+| cmp   | mean_ref_dist | Mean reference distance between two alignments (must first run [`dtwstats compare`](#compare)) |
+| cmp   | jaccard | Raw sample jaccard distances between two alignments (must first run [`dtwstats compare`](#compare)) |
+
+Read alignments are grouped into **tracks**, which are stored in an sqlite3 alignment database. When running [`uncalled dtw`](#dtw) or [`uncalled convert`](#convert), you must specify an output database file and an optional track name in the format `<filename.db>:<track_name>`. If only `<filename.db>` is specified, the track name will be the filename without the extension. Multiple tracks can be input as comma-separated track names: `<filename.db>:<track1>,<track2>,...`. You can change the name of a track with [`uncalled db edit`](#db), and also set a human readable description to appear in visualizations.
+
+All tracks must be written to the same database for multi-track visualization and analysis (e.g. comparing alignments, calculating KS statistics). There is currently no way to merge tracks. We plan to implement merging and cross-database analysis soon.
+
+Uncalled4 (v3.1.0) is a work in progress. Many additional features and optimizations are planned, which may require changes to the command line interface or database format. We also plan to provide a Python API in the future.
+
+Real-time targeted sequencing (`uncalled realtime`) is currently unavailable in Uncalled4. Related subcommands (`map`, `sim`, etc.) are available, but aren't documented here for brevity. We plan to integrate all functionalities eventually.
 
 ## Installation
 
@@ -49,7 +72,7 @@ Uncalled4 is compatible with Linux and Mac OSX. It has been primarily developed 
 
 ## `index`
 
-Build an index from a FASTA reference
+Build an index from a FASTA reference. Must be performed before any other analysis.
 
 ```
 uncalled index [-o INDEX_PREFIX] [--no-bwt] fasta_filename
@@ -67,11 +90,13 @@ optional arguments:
                         False)
 ```
 
+`--no-bwt` should be used if you don't plan to use this index for `uncalled realtime`, `map`, or `sim`
+
 Note that UNCALLED uses the [BWA](https://github.com/lh3/bwa) FM Index to encode the reference, and this command will use a previously built BWA index if all the required files exist with the specified prefix. Otherwise, a new BWA index will be automatically built.
 
 ## DTW Alignment and Storage
 
-The following subcommands generate and update dynamic time warping (DTW) alignment tracks. Alignment tracks are currently stored in a sqlite3 database. Multiple tracks can and should be stored in the same database in order to be analyzed together. Currently there is no way to merge databases. Tracks can be specified in `<file.db>:<track_name>` format.
+The following subcommands generate and update dynamic time warping (DTW) alignment tracks. Alignment tracks are stored in a sqlite3 database. Multiple tracks must be stored in the same database in order to be analyzed together. Tracks can be specified in `<file.db>:<track_name>` format.
 
 ### `dtw`
 
@@ -243,11 +268,10 @@ usage: uncalled dotplot [-h] [-o OUT_PREFIX] [-f {png,svg,pdf}]
                         input [input ...]
 
 positional arguments:
-  input                 Input tracks specifier. Should be in format
-                        <file.db>[:<track_name>], where file.db is an
-                        Uncalled4 aligment track database and <track_name>
-                        optionally specifies which tracks to read (reads all
-                        by default)
+input                 Input tracks specifier. Should be in the format
+                      <file.db>[:<track1>[,<track2>...]]. If no track
+                      names are specified, all tracks will be loaded from
+                      the database.
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -271,7 +295,7 @@ optional arguments:
 
 Plot alignment tracks and per-reference statistics
 
-Trackplots are defined by a series of panels displaying different layers. A `mat` panel display a heatmap of layer values for each ref/read coordinate on each track. A `box` panel displays boxplots of layer summary statistics for each track. `line` and `scatter` panels display [`refstats`](#refstats) summary statistics, specified by `<layer>.<statistic>`.
+Trackplots are defined by a series of panels displaying different layers. A `mat` panel display a heatmap of layer values for each ref/read coordinate on each track. A `box` panel displays boxplots of layer summary statistics for each track. `line` and `scatter` panels display [`refstats`](#refstats) summary statistics, specified by `<layer>.<statistic>` (e.g. `current.mean`, `model_diff.median`).
 
 ```
 usage: uncalled trackplot [-h] [-f] [-H PANEL_HEIGHTS [PANEL_HEIGHTS ...]]
@@ -281,11 +305,11 @@ usage: uncalled trackplot [-h] [-f] [-H PANEL_HEIGHTS [PANEL_HEIGHTS ...]]
 
 
 positional arguments:
-  input                 Input tracks specifier. Should be in format
-                        <file.db>[:<track_name>], where file.db is an
-                        Uncalled4 aligment track database and <track_name>
-                        optionally specifies which tracks to read (reads all
-                        by default)
+  input                 Input tracks specifier. Should be in the format
+                        <file.db>[:<track1>[,<track2>...]]. If no track
+                        names are specified, all tracks will be loaded from
+                        the database.
+
   ref_bounds            Only load reads which overlap these coordinates
 
 optional arguments:
@@ -317,11 +341,11 @@ uncalled browser [-r REFSTATS] [-f] [-o OUTFILE]
 
 
 positional arguments:
-  input                 Input tracks specifier. Should be in format
-                        <file.db>[:<track_name>], where file.db is an
-                        Uncalled4 aligment track database and <track_name>
-                        optionally specifies which tracks to read (reads all
-                        by default)
+  input                 Input tracks specifier. Should be in the format
+                        <file.db>[:<track1>[,<track2>...]]. If no track
+                        names are specified, all tracks will be loaded  from
+                        the database.
+
   ref_bounds            Only load reads which overlap these coordinates
 
 optional arguments:
@@ -349,11 +373,11 @@ uncalled refstats [-R REF_BOUNDS] [-C REF_CHUNKSIZE] [-c] [-v]
                   input [input ...] refstats_layers refstats
 
 positional arguments:
-  input                 Input tracks specifier. Should be in format
-                        <file.db>[:<track_name>], where file.db is an
-                        Uncalled4 aligment track database and <track_name>
-                        optionally specifies which tracks to read (reads all
-                        by default)
+  input                 Input tracks specifier. Should be in the format
+                        <file.db>[:<track1>[,<track2>...]]. If no track
+                        names are specified, all tracks will be loaded   from
+                        the database.
+
   refstats_layers       Comma-separated list of layers over which to compute
                         summary statistics
   refstats              Comma-separated list of summary statistics to compute.
@@ -383,10 +407,11 @@ Compute distance between alignments of the same reads
 uncalled dtwstats compare [-b] [-s] input [input ...]
 
 positional arguments:
-  input        Input tracks specifier. Should be in format
-               <file.db>[:<track_name>], where file.db is an Uncalled4
-               aligment track database and <track_name> optionally specifies
-               which tracks to read (reads all by default)
+input               Input tracks specifier. Should be in the format
+                    <file.db>[:<track1>[,<track2>...]]. If no track
+                    names are specified, all tracks will be loaded from
+                    the database.
+
 
 optional arguments:
   -b, --bcaln  Compare against basecalled alignment. If two tracks input will
@@ -405,11 +430,11 @@ uncalled dump [-R REF_BOUNDS] [-l READ_FILTER] [-o {db,tsv}]
               input [input ...] layers [layers ...]
 
 positional arguments:
-  input                 Input tracks specifier. Should be in format
-                        <file.db>[:<track_name>], where file.db is an
-                        Uncalled4 aligment track database and <track_name>
-                        optionally specifies which tracks to read (reads all
-                        by default)
+  input                 Input tracks specifier. Should be in the format
+                        <file.db>[:<track1>[,<track2>...]]. If no track
+                        names are specified, all tracks will be loaded from
+                        the database.
+
   layers                Layers to retrieve or compute
 
 optional arguments:
@@ -422,8 +447,7 @@ optional arguments:
                         (default: None)
 ```
 
-
-## Release notes
+## Release Notes
 - v3.1: introduced Plotly visualizations and sqlite3 database
 - v3.0: added DTW alignment, analysis, and visualization commands
 - v2.2: added event profiler which masks out pore stalls, and added compile-time debug options

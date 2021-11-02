@@ -20,8 +20,8 @@ from .. import config, nt
 class TracksParams(config.ParamGroup):
     _name = "tracks"
 TracksParams._def_params(
-    ("input", None, None, "Input tracks specifier. Should be in format <file.db>[:<track_name>], where file.db is an Uncalled4 aligment track database and <track_name> optionally specifies which tracks to read (reads all by default)"),
-    ("output", None, None,  "Output track specifier. Should be in format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
+    ("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
+    ("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("layers", ["length", "current", "dwell", "model_diff"], None, "Layers to load (e.g. current, dwell, model_diff)"),
     ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
