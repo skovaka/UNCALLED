@@ -53,7 +53,7 @@ Real-time targeted sequencing (`uncalled realtime`) is currently unavailable in 
 ## Installation
 
 ```
-> pip install git+https://github.com/skovaka/UNCALLED.git@uncalled4 --user
+> pip install git+https://github.com/skovaka/UNCALLED.git@uncalled4
 ```
 
 OR
