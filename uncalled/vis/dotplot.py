@@ -23,7 +23,7 @@ class DotplotParams(config.ParamGroup):
     _name = "dotplot"
 DotplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
-    ("dtw_layers", ["model_diff"], None, ""),
+    ("layers", ["model_diff"], None, ""),
     ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF"], list, ""),
 )
 
@@ -52,7 +52,9 @@ class Dotplot:
 
         self.conf = self.tracks.conf
 
-        self.tracks.set_layers(self._req_layers + conf.dotplot.dtw_layers)
+        self.prms.layers = list(parse_layers(self.prms.layers, False))
+
+        self.tracks.set_layers(self._req_layers + conf.dotplot.layers)
 
     def iter_plots(self):
         for read_id, tracks in self.tracks.iter_reads():
@@ -61,12 +63,12 @@ class Dotplot:
 
     def _plot(self, read_id, tracks):
 
-        if tracks[0].has_group("cmp"):
-            cmp_stats = list(tracks[0].layers["cmp"].columns)
-        else:
-            cmp_stats = []
+        #if tracks[0].has_group("cmp"):
+        #    cmp_stats = list(tracks[0].layers["cmp"].columns)
+        #else:
+        cmp_stats = []
 
-        column_widths=[6]+[1]*(len(self.prms.dtw_layers)+len(cmp_stats))
+        column_widths=[6]+[1]*(len(self.prms.layers)+len(cmp_stats))
 
         fig = make_subplots(
             rows=2, cols=len(column_widths), 
@@ -80,8 +82,8 @@ class Dotplot:
 
         Sigplot(tracks, track_colors=self.prms.track_colors, conf=self.conf).plot(fig)
 
-        hover_layers = ["middle","kmer","current","dwell"]#,"model_diff"]
-        hover_layers += (l for l in self.prms.dtw_layers if l not in {"current","dwell"})
+        hover_layers = [("dtw", "middle"),("dtw","kmer"),("dtw","current"),("dtw","dwell")] + self.prms.layers
+        #hover_layers += (l for l in self.prms.layers if l not in {"current","dwell"})
         hover_data = dict()
 
         for i,track in enumerate(tracks):
@@ -92,11 +94,9 @@ class Dotplot:
 
             first_aln = True
             for aln_id, aln in track.alignments.iterrows():
-                #layers = track.layers.xs(aln_id, level="aln_id")
                 layers = track.get_aln_layers(aln_id)
-                dtw = layers["dtw"]#track.get_aln_layers(aln_id, "dtw")
 
-                track_hover.append(dtw[hover_layers])
+                track_hover.append(layers[hover_layers])
                 
                 if has_bcaln:
                     fig.add_trace(go.Scatter(
@@ -109,7 +109,7 @@ class Dotplot:
                     ), row=2, col=1)
 
                 fig.add_trace(go.Scatter(
-                    x=dtw["start"], y=dtw.index,
+                    x=layers["dtw","start"], y=layers.index,
                     name=track.desc,
                     legendgroup=track.name,
                     line={"color":self.prms.track_colors[i], "width":2, "shape" : "hv"},
@@ -120,69 +120,52 @@ class Dotplot:
 
                 first_aln = False
 
-                for j,layer in enumerate(self.prms.dtw_layers):
-                    #fig.add_trace(go.Bar(
-                    #    x=dtw[layer], y=dtw.index,
-                    #    #base=0,
-                    #    name=track.desc,
-                    #    orientation="h",
-                    #    width=1.1,
-                    #    opacity=0.5,
-                    #    marker={
-                    #        "color":self.prms.track_colors[i],
-                    #        "line":{"color":self.prms.track_colors[i],"width":0.5}},
-                    #    legendgroup=track.name, 
-                    #    showlegend=False
-                    #), row=2, col=j+2)
+                for j,layer in enumerate(self.prms.layers):
+                    if layer[0] != "cmp":
+                        fig.add_trace(go.Scatter(
+                            x=layers[layer], y=layers.index-0.5,
+                            name=track.desc, 
+                            line={
+                                "color" : self.prms.track_colors[i], 
+                                "width":2, "shape" : "hv"},
+                            legendgroup=track.name, showlegend=False,
+                        ), row=2, col=j+2)
 
-                    fig.add_trace(go.Scatter(
-                        x=dtw[layer], y=dtw.index-0.5, #TODO try vhv
-                        name=track.desc, 
-                        line={
-                            "color" : self.prms.track_colors[i], 
-                            "width":2, "shape" : "hv"},
-                        legendgroup=track.name, showlegend=False,
-                    ), row=2, col=j+2)
+                    elif len(layers[layer].dropna()) > 0:
+                        color= "rgba(255,0,0,1)"
+                        #label = LAYERS["cmp"][stat].label
+                        fig.add_trace(go.Bar(
+                            x=track.layers[layer], 
+                            y=track.layer_refs, #TODO try vhv
+                            base=0,
+                            name="DTW Compare",
+                            orientation="h",
+                            width=1,
+                            marker={"color":color,"line":{"color":color,"width":0.5}},
+                            legendgroup="cmp",
+                            #showlegend=i==0
+                        ), row=2, col=j+2)
+            #fig.update_xaxes(row=2, col=cmp_col + i,
+            #    title_text=label)
 
             #hover_data[track.name] = pd.concat(track_hover)#.reset_index()
             hover_data[track.name] = track_hover[0]#.reset_index()
 
-        cmp_col = len(self.prms.dtw_layers)+2
-        for i,stat in enumerate(cmp_stats):
-            color= "rgba(255,0,0,1)"
-            label = LAYERS["cmp"][stat].label
-            fig.add_trace(go.Bar(
-                x=tracks[0].layers["cmp",stat], 
-                y=tracks[0].layer_refs, #TODO try vhv
-                base=0,
-                name="DTW Compare",
-                orientation="h",
-                width=1,
-                marker={"color":color,"line":{"color":color,"width":0.5}},
-                legendgroup="cmp",
-                showlegend=i==0
-            ), row=2, col=cmp_col + i)
-            fig.update_xaxes(row=2, col=cmp_col + i,
-                title_text=label)
-
         hover_data = pd.concat(hover_data, axis=1)
-        hover_coords = hover_data.xs("middle", axis=1, level=1).mean(axis=1)
+        hover_coords = hover_data.xs("middle", axis=1, level=2).mean(axis=1)
 
         hover_kmers = nt.kmer_to_str(
-            hover_data.xs("kmer", 1, 1)
+            hover_data.xs("kmer", 1, 2)
                       .fillna(method="pad", axis=1)
                       .iloc[:,-1])
 
 
-        customdata = hover_data.drop(["kmer","middle"], axis=1, level=1).to_numpy()
+        customdata = hover_data.drop(["kmer","middle"], axis=1, level=2).to_numpy()
 
         hover_rows = [
             "<b>" + track.coords.ref_name + ":%{y:,d} [%{text}]</b>"
         ]
-        labels = [LAYERS["dtw"][l].label for l in hover_layers[2:]]
-        #    "Current (pA): ", 
-        #    "Dwell (ms): ", 
-        #    "Model pA Diff: "]
+        labels = [LAYERS[g][l].label for g,l in hover_layers[2:]]
 
         for i,label in enumerate(labels):
             s = label
@@ -214,9 +197,9 @@ class Dotplot:
         fig.update_yaxes(row=2, col=1,
             title_text="Reference (%s)" % aln["ref_name"])
 
-        for i,layer in enumerate(self.prms.dtw_layers):
+        for i,(group,layer) in enumerate(self.prms.layers):
             fig.update_xaxes(row=2, col=i+2,
-                title_text=LAYERS["dtw"][layer].label)
+                title_text=LAYERS[group][layer].label)
 
         axis_kw = dict(
             showspikes=True,
@@ -246,11 +229,11 @@ class Dotplot:
 
 OPTS = (
     Opt("input", "tracks", nargs="+"),
-    Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
+    Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot.", required=True),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
-    Opt(("-L", "--layers"), "dotplot", "dtw_layers", type=comma_split),
+    Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
 )
 
 def main(conf):

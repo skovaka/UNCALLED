@@ -111,7 +111,7 @@ def parse_layer(layer):
 
     return (group, layer)
 
-def parse_layers(layers):
+def parse_layers(layers, add_deps=True):
     db_layers = list() 
     fn_layers = list() 
 
@@ -128,12 +128,13 @@ def parse_layers(layers):
         if not layer in parsed:
             parsed.add(layer)
 
-            deps = LAYERS[layer[0]][layer[1]].deps
-            if deps is not None:
-                for dep in deps:
-                    if not dep in parsed:
-                        parsed.add(dep)
-                        yield dep
+            if add_deps:
+                deps = LAYERS[layer[0]][layer[1]].deps
+                if deps is not None:
+                    for dep in deps:
+                        if not dep in parsed:
+                            parsed.add(dep)
+                            yield dep
 
             yield layer
 
@@ -169,7 +170,7 @@ class AlnTrack:
             self.layers.rename(index=coords.mref_to_ref, level=0, inplace=True)
             self.layers.index.names = ("ref", "aln_id")
 
-        self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
+        self.alignments = self.alignments.sort_values(["fwd", "ref_start"])
 
         if not (self.coords is None or self.coords.ref_kmers is None):
             kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
