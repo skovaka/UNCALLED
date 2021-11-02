@@ -30,7 +30,7 @@ For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0
 ## Installation
 
 ```
-> pip install git+https://github.com/skovaka/UNCALLED.git@uncalled4 --user
+> pip install git+https://github.com/skovaka/UNCALLED.git@uncalled4
 ```
 
 OR
