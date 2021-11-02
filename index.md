@@ -1,4 +1,4 @@
-## UNCALLED: a Utility for Nanopore Current ALgnment to Large Expanses of DNA
+## Uncalled: a Utility for Nanopore Current ALgnment to Large Expanses of DNA
 
 ### Real-time targeted sequencing
 
