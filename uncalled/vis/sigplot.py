@@ -125,7 +125,7 @@ class Sigplot:
             dtw_kws = [{}]
         else:
             colors = self.prms.track_colors
-            dtw_kws = [{"legendgroup" : t.desc, "showlegend" : False} for t in self.tracks]
+            dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks]
 
         fig.add_trace(go.Scattergl(
             x=samples, y=signal,

@@ -67,7 +67,7 @@ class Trackplot:
         
         prms = self.conf.tracks
         prms.layers = list(parse_layers(layers))
-        prms.refstats_layers = list(parse_layers(ref_layers))
+        prms.refstats_layers = list(parse_layers(ref_layers,add_deps=False))
         prms.refstats = list(ref_stats)
 
     def __init__(self, *args, **kwargs):
@@ -77,9 +77,12 @@ class Trackplot:
 
         if self.prms.tracks is None:
             self.tracks = Tracks(conf=self.conf)
-            self.tracks.load_refs(load_mat=True)
         else:
             self.tracks = self.prms.tracks
+            self.tracks.conf.load_config(self.conf)
+            self.conf = self.tracks.conf
+
+        self.tracks.load_refs(load_mat=True)
 
         names = [t.name for t in self.tracks]
 
@@ -142,7 +145,7 @@ class Trackplot:
         t0 = time.time()
         for i,track in enumerate(self.tracks.aln_tracks):
             self.fig.update_yaxes(
-                title_text=f"{track.desc} ({layer_label})", 
+                title_text=f"{track.desc}", 
                 showticklabels=False,
                 row=row, col=1)
 
@@ -152,9 +155,13 @@ class Trackplot:
                 continue
 
             mat = track.mat[(group,layer)]#.dropna(how="all")
+            
+            read_ids = np.tile(track.alignments.loc[mat.index, "read_id"].to_numpy(), (mat.shape[1], 1)).T
+
+
             hover = "<br>".join([
                 track.coords.ref_name + ":%{x}",
-                #"Read: %{y}",
+                "Read: %{text}",
                 layer_label + ": %{z}"])
 
             self.fig.add_trace(go.Heatmap(
@@ -164,6 +171,7 @@ class Trackplot:
                 z=mat,
                 zsmooth=False,
                 hovertemplate=hover,
+                text = read_ids,
                 coloraxis="coloraxis",
             ), row=row, col=1)
 
@@ -250,6 +258,8 @@ class Trackplot:
                 y=stats,
                 **self._stat_kw(plot, self.prms.track_colors[j])
             ), row=row, col=1)
+
+        #self.fig.update_layout(hovermode="x", row=row, col=1)
 
         #for stat in cmp_stats:
 

@@ -23,7 +23,7 @@ class DotplotParams(config.ParamGroup):
     _name = "dotplot"
 DotplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
-    ("layers", ["model_diff"], None, ""),
+    ("layers", [], None, ""),
     ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF"], list, ""),
 )
 
@@ -56,10 +56,22 @@ class Dotplot:
 
         self.tracks.set_layers(self._req_layers + conf.dotplot.layers)
 
+        self.fig_config = {
+                "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None},
+                "scrollZoom" : True, 
+                "displayModeBar" : True}
+
     def iter_plots(self):
         for read_id, tracks in self.tracks.iter_reads():
             print(read_id)
             yield read_id, self._plot(read_id, tracks)
+
+    def plot(self, read_id):
+        for read_id, tracks in self.tracks.iter_reads([read_id]):
+            return self._plot(read_id, tracks)
+
+    def show(self, read_id):
+        self.plot(read_id).show(config=self.fig_config)
 
     def _plot(self, read_id, tracks):
 
@@ -243,7 +255,4 @@ def main(conf):
     for read_id, fig in dotplots.iter_plots():
         fig.write_html(
             conf.out_prefix + read_id + ".html", 
-            config={
-                "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None},
-                "scrollZoom" : True, 
-                "displayModeBar" : True})
+            config=dotplots.fig_config)

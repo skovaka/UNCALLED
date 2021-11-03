@@ -97,7 +97,7 @@ class Tracks:
         #    self.prms.layers = [self.prms.layers]
 
         self.set_layers(self.prms.layers)
-        self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers))
+        self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers, add_deps=False))
 
         self.dbs = dict()
 
@@ -382,7 +382,6 @@ class Tracks:
 
             track.set_data(self.coords, track_alns, track_layers)
             track.calc_layers(self.fn_layers)
-
         
         self.load_compare(ids)
         self.calc_refstats()
