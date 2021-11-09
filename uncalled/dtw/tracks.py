@@ -212,7 +212,7 @@ class Tracks:
             filename = spl[0]
             track_names = spl[1].split(",")
         else:
-            raise ValueError("Incorrect database specifier format: " + db_str)
+            raise ValueError("Invalid database specifier format: " + db_str)
 
         return os.path.abspath(filename), track_names
 
@@ -263,7 +263,7 @@ class Tracks:
                         continue
                     elif self.prms.overwrite:
                         sys.stderr.write("Deleting existing track...\n")
-                        delete(name, db.con)
+                        delete(name, db)
                         db.init_track(track)
                         continue
                     else:

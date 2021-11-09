@@ -3,6 +3,7 @@
 subcommand options:
 ls       List all tracks in a database
 delete   Delete a track from a database
+merge    Merge databases into a single file
 edit     Rename, change fast5 paths, or set description"""
 
 import sqlite3
@@ -15,7 +16,6 @@ import sys
 from ..argparse import Opt, comma_split
 from ..fast5 import parse_fast5_paths
 
-
 class TrackSQL:
     def __init__(self, sqlite_db):
         self.filename = sqlite_db
@@ -23,13 +23,15 @@ class TrackSQL:
         self.con = sqlite3.connect(sqlite_db)
         self.cur = self.con.cursor()
         self.cur.execute("PRAGMA foreign_keys = ON")
+        self.con.commit()
         self.open = True
 
+        #if new_file:
         self.init_tables()
 
         self.prev_aln_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
         if self.prev_aln_id is None:
-            self.prev_aln_id = -1
+            self.prev_aln_id = 0
 
     def close(self):
         if self.open:
@@ -176,6 +178,7 @@ class TrackSQL:
         if val is None: return
 
         if not isinstance(val, str) and isinstance(val, (collections.abc.Sequence, np.ndarray)):
+            if len(val) == 0: return
             wheres.append("%s in (%s)" % (name, ",".join(["?"]*len(val))))
             params += map(str, val)
         else:
@@ -189,7 +192,6 @@ class TrackSQL:
         self._add_where(wheres,params,"name",name)
         query = self._join_query(select, wheres)
         return pd.read_sql_query(query, self.con, params=params)
-        #return self.cur.execute(query,params).fetchone()
 
     def query_alignments(self, track_id=None, read_id=None, aln_id=None, coords=None, full_overlap=False, order=None, chunksize=None):
         select = "SELECT * FROM alignment"
@@ -358,49 +360,43 @@ class TrackSQL:
 
         return pd.read_sql_query(query, self.con, index_col=index, params=params, chunksize=chunksize)
 
+    def _verify_track(self, track_name):
+        ids = self.cur.execute("SELECT id FROM track WHERE name == ?", (track_name,)).fetchall()
+        if len(ids) == 0:
+            raise ValueError(f"Track does not exist: \"{track_name}\"\n")
+        return ids[0][0]
+
+
 DB_OPT = Opt("db_file", help="Track database file")
 
 LS_OPTS = (DB_OPT,)
 _LS_QUERY = "SELECT name,desc,COUNT(alignment.id) FROM track " \
             "JOIN alignment ON track.id == track_id GROUP BY name"
-def ls(conf, con=None):
-    if con is None:
-        con = sqlite3.connect(conf.db_file)
-    cur = con.cursor()
+def ls(conf, db=None):
+    if db is None:
+        db = TrackSQL(conf.db_file)
     print("\t".join(["Name", "Description", "Alignments"]))
-    
-    for row in cur.execute(_LS_QUERY).fetchall():
-        print("\t".join(map(str, row)))
-    con.commit()
 
-def _verify_track(cur, track_name):
-    ids = cur.execute("SELECT id FROM track WHERE name == ?", (track_name,)).fetchall()
-    if len(ids) == 0:
-        sys.stderr.write("Track does not exist: \"%s\"\n" % conf.track_name)
-        sys.exit(1)
-    return ids[0][0]
+    for row in db.cur.execute(_LS_QUERY).fetchall():
+        print("\t".join(map(str, row)))
+
+    db.con.commit()
 
 DELETE_OPTS = (
     DB_OPT,
     Opt("track_name", help="Name of the track to delete"),
 )
-def delete(track_name=None, con=None, conf=None):
+def delete(track_name=None, db=None, conf=None):
+    if db is None:
+        db = TrackSQL(conf.db_file)
+
     if track_name is None:
         track_name = conf.track_name
-    if con is None:
-        con = sqlite3.connect(conf.db_file)
-        cur = con.cursor()
-        cur.execute("PRAGMA foreign_keys = ON")
-    else:
-        cur = con.cursor()
 
-    _verify_track(cur, track_name)
+    db._verify_track(track_name)
 
-    con.commit()
-    cur.execute("DELETE FROM track WHERE name == ?", (track_name,))
-    #con.commit()
-    #cur.execute("PRAGMA foreign_keys = OFF")
-    con.commit()
+    db.cur.execute("DELETE FROM track WHERE name == ?", (track_name,))
+    db.con.commit()
     print("Deleted track \"%s\"" % track_name)
 
 EDIT_OPTS = (
@@ -411,11 +407,10 @@ EDIT_OPTS = (
     Opt(("-F", "--fast5-files"), "fast5_reader", type=comma_split),
     Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
 )
-def edit(conf, con=None):
-    if con is None: con = sqlite3.connect(conf.db_file)
-    cur = con.cursor()
-    track_id = _verify_track(cur, conf.track_name)
-    print(track_id)
+def edit(conf, db=None):
+    if db is None:
+        db = TrackSQL(conf.db_file)
+    track_id = db._verify_track(conf.track_name)
 
     updates = []
     params = []
@@ -431,22 +426,21 @@ def edit(conf, con=None):
     params.append(conf.track_name)
         
     query = "UPDATE track SET " + ", ".join(updates) + " WHERE name == ?"
-    cur.execute(query, params)
+    db.cur.execute(query, params)
 
     if len(conf.fast5_files) > 0:
-        _set_fast5s(track_id, conf.fast5_reader, con, cur)
+        _set_fast5s(track_id, conf.fast5_reader, db)
         
+    db.con.commit()
+    db.con.close()
 
-    con.commit()
-    con.close()
-
-def _set_fast5s(track_id, prms, con, cur):
+def _set_fast5s(track_id, prms, db):
     fast5s = pd.read_sql_query(
         "SELECT fast5.id, filename FROM fast5 " \
         "JOIN read ON fast5.id = fast5_id " \
         "JOIN alignment ON read.id = read_id " \
         "WHERE track_id = ?",
-        con, index_col="id", params=(track_id,))
+        db.con, index_col="id", params=(track_id,))
 
     basenames = fast5s["filename"].map(os.path.basename)
 
@@ -462,13 +456,87 @@ def _set_fast5s(track_id, prms, con, cur):
         raise ValueError("Fast5 files found: " + ", ".join(missing))
     
     fast5s.to_sql(
-        "fast5", con=con,
+        "fast5", con=db.con,
         if_exists="append",
         index_label="id")
 
+MERGE_OPTS = (
+    Opt("dbs", nargs="+", type=str, help="Database files to merge. Will write to the first file if \"-o\" is not specified. "),
+    #Opt(("-n", "--track_names"), nargs="+", help="Names of tracks to merge. Will merge all tracks if not specified"),
+    Opt(("-o", "--out-db"), type=str, default=None, help="Output database file. Will output to the first input file if not specified"),
+)
+def merge(conf):
+    """Merge databases into a single file"""
+    if conf.out_db is None:
+        out_db = conf.dbs[0]
+        in_dbs = conf.dbs[1:]
+    else:
+        in_dbs = conf.dbs
+        out_db = conf.out_db
+
+    db = TrackSQL(out_db)
+    
+    def max_id(table, field="id"):
+        i = db.cur.execute(f"SELECT max({field}) FROM {table}").fetchone()[0]
+        if i is None:
+            return 0
+        return i
+
+    for fname in in_dbs:
+        track_shift = max_id("track")
+        aln_shift = max_id("alignment")+1
+        fast5_shift = max_id("fast5")
+
+        sys.stderr.write(f"Merging \"{fname}\"...\n")
+
+        db.cur.execute(f"ATTACH DATABASE '{fname}' AS input")
+        db.con.commit()
+        db.cur = db.con.cursor()
+
+        query = "INSERT INTO track "\
+               f"SELECT id+{track_shift},name,desc,config "\
+                "FROM input.track"
+        #db._add_where(wheres,params,"name",conf.track_names)
+        #query = db._join_query(query, wheres)
+        db.cur.execute(query)
+
+        query = "INSERT INTO fast5 "\
+               f"SELECT id+{fast5_shift},filename FROM input.fast5"
+        db.cur.execute(query)
+
+        query = "INSERT OR IGNORE INTO read "\
+               f"SELECT id,fast5_id+{fast5_shift} FROM input.read"
+        db.cur.execute(query)
+
+        query = "INSERT INTO alignment "\
+               f"SELECT id+{aln_shift},track_id+{track_shift},read_id,ref_name,ref_start,ref_end,fwd,samp_start,samp_end,tags "\
+                "FROM input.alignment"
+        db.cur.execute(query)
+
+        query = "INSERT INTO dtw "\
+               f"SELECT mref,aln_id+{aln_shift},start,length,current,stdv "\
+                "FROM input.dtw"
+        db.cur.execute(query)
+
+        query = "INSERT INTO bcaln "\
+               f"SELECT mref,aln_id+{aln_shift},start,length,bp,error "\
+                "FROM input.bcaln"
+        db.cur.execute(query)
+
+        query = "INSERT INTO cmp "\
+               f"SELECT mref,aln_a+{aln_shift},aln_b+{aln_shift},group_b,mean_ref_dist,jaccard "\
+                "FROM input.cmp"
+        db.cur.execute(query)
+
+        db.con.commit()
+        db.cur.execute("DETACH input")
+        db.con.commit()
+
+        
 SUBCMDS = [
     (ls, LS_OPTS), 
     (delete, DELETE_OPTS), 
+    (merge, MERGE_OPTS), 
     (edit, EDIT_OPTS), 
 ]
 
