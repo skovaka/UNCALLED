@@ -1,4 +1,4 @@
-"""Edit and query alignment database metadata
+"""Edit, merge, and ls alignment databases
 
 subcommand options:
 ls       List all tracks in a database

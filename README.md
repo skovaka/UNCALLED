@@ -17,7 +17,7 @@ For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0
 - [DTW Alignment and Storage](#dtw-alignment-and-storage)
   - [`dtw`: Perform DTW alignment guided by basecalled alignments](#dtw)
   - [`convert`: Import DTW alignments produced by Nanopolish or Tombo](#convert)
-  - [`db`: Edit and query alignment database metadata](#db)
+  - [`db`: Edit, merge, and ls alignment databases](#db)
 - [DTW Visualization](#dtw-visualization)
   - [`dotplot`: Plot signal-to-reference alignment dotplots](#dotplot)
   - [`trackplot`: Plot alignment tracks and per-reference statistics](#trackplot)
@@ -220,14 +220,15 @@ optional arguments:
 
 ### `db`
 
-Edit and query alignment database metadata
+Edit, merge, and ls alignment databases
 
 ```
-usage: uncalled db [-h]
+uncalled db [-h]
 
 subcommand options:
 ls       List all tracks in a database
 delete   Delete a track from a database
+merge    Merge databases into a single file
 edit     Rename, change fast5 paths, or set description
 ```
 
@@ -442,7 +443,7 @@ Uncalled4 stores signal alignments as a set of **layers** associated with read a
 
 Read alignments are grouped into **tracks**, which are stored in an sqlite3 database. When running [`uncalled dtw`](#dtw) or [`uncalled convert`](#convert), you must specify an output database file and an optional track name in the format `<filename.db>:<track_name>`. If only `<filename.db>` is specified, the track name will be the filename without the extension. Multiple tracks can be input as comma-separated track names: `<filename.db>:<track1>,<track2>,...`. You can change the name of a track with [`uncalled db edit`](#db), and also set a human readable description to appear in visualizations.
 
-All tracks must be written to the same database for multi-track visualization and analysis (e.g. comparing alignments, calculating KS statistics). There is currently no way to merge tracks. We plan to implement merging and cross-database analysis soon.
+All tracks must be written to the same database for multi-track visualization and analysis (e.g. comparing alignments, calculating KS statistics). You can merge multiple databases into a single file using [`uncalled db merge`](#db)
 
 ## Future Work
 
