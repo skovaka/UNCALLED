@@ -33,6 +33,8 @@ class Sigplot:
         self.conf, self.prms = config._init_group("sigplot", *args, **kwargs)
         self.tracks = self.prms.tracks #TODO do this better
 
+        self._legend = set()
+
         reads = pd.Index([])
         for t in self.tracks:
             reads = reads.union(t.alignments["read_id"]).unique()
@@ -72,9 +74,11 @@ class Sigplot:
                 hoverinfo="skip",
                 mode="none",
                 legendgroup="bases",
+                showlegend= color not in self._legend,
                 line={"width" : 0},
                 name=nt.base_to_char(base)
             ), row=row, col=col)
+            self._legend.add(color)
 
     def plot_read(self, fig, read_id, row=1, col=1):
 
@@ -124,6 +128,12 @@ class Sigplot:
             colors = ["white"]
             dtw_kws = [{}]
         else:
+
+            ys = np.linspace(current_min, current_max, len(self.tracks)+1)
+            dy = (ys[1]-ys[0])*0.01
+            for dtw,ymin,ymax in zip(track_dtws, ys[:-1], ys[1:]):
+                self._plot_bases(fig, dtw, ymin+dy, ymax-dy, row, col)
+
             colors = self.prms.track_colors
             dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks]
 

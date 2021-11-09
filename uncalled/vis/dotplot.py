@@ -23,6 +23,7 @@ class DotplotParams(config.ParamGroup):
     _name = "dotplot"
 DotplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
+    ("bcaln_track", None, str, "Only display basecalled alignments from this track"),
     ("layers", [], None, ""),
     ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF"], list, ""),
 )
@@ -92,7 +93,10 @@ class Dotplot:
             shared_xaxes=True,
             shared_yaxes=True)
 
-        Sigplot(tracks, track_colors=self.prms.track_colors, conf=self.conf).plot(fig)
+        tracks_filter,colors_filter = zip(*[(t,c) for t,c in zip(tracks,self.prms.track_colors) if t.name != self.prms.bcaln_track])
+        #colors_filter = [t for t in tracks if t.name != self.prms.bcaln_track]
+
+        Sigplot(tracks_filter, track_colors=colors_filter, conf=self.conf).plot(fig)
 
         hover_layers = [("dtw", "middle"),("dtw","kmer"),("dtw","current"),("dtw","dwell")] + self.prms.layers
         #hover_layers += (l for l in self.prms.layers if l not in {"current","dwell"})
@@ -103,12 +107,11 @@ class Dotplot:
             track_hover = list()
 
             has_bcaln = "bcaln" in track.layers.columns.get_level_values("group")
+            only_bcaln = self.prms.bcaln_track == track.name
 
             first_aln = True
             for aln_id, aln in track.alignments.iterrows():
                 layers = track.get_aln_layers(aln_id)
-
-                track_hover.append(layers[hover_layers])
                 
                 if has_bcaln:
                     fig.add_trace(go.Scatter(
@@ -119,6 +122,10 @@ class Dotplot:
                         hoverinfo="skip",
                         showlegend=first_aln
                     ), row=2, col=1)
+
+                if only_bcaln: continue
+
+                track_hover.append(layers[hover_layers])
 
                 fig.add_trace(go.Scatter(
                     x=layers["dtw","start"], y=layers.index,
@@ -161,7 +168,9 @@ class Dotplot:
             #    title_text=label)
 
             #hover_data[track.name] = pd.concat(track_hover)#.reset_index()
-            hover_data[track.name] = track_hover[0]#.reset_index()
+
+            if not only_bcaln:
+                hover_data[track.name] = track_hover[0]#.reset_index()
 
         hover_data = pd.concat(hover_data, axis=1)
         hover_coords = hover_data.xs("middle", axis=1, level=2).mean(axis=1)
@@ -182,7 +191,7 @@ class Dotplot:
         for i,label in enumerate(labels):
             s = label
             fields = list()
-            for j in range(len(tracks)):
+            for j in range(len(tracks_filter)):
                 k = len(labels) * j + i
                 fields.append(
                     '<span style="color:%s;float:right"><b>%%{customdata[%d]:.2f}</b></span>' % 
@@ -246,6 +255,7 @@ OPTS = (
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
+    Opt(("-b", "--bcaln-track"), "dotplot"),
 )
 
 def main(conf):
