@@ -101,7 +101,7 @@ class RefCoord {
     #ifdef PYBIND
 
     static void pybind_defs(pybind11::module_ m) {
-        py::class_<RefCoord> c(m, "RefCoord");
+        py::class_<RefCoord> c(m, "_RefCoord");
 
         c.def(py::init<std::string, i64, i64>());
         c.def(py::init<std::string, i64, i64, bool>());

@@ -17,15 +17,13 @@ from ..argparse import Opt, comma_split
 from ..fast5 import parse_read_ids
 from ..sigproc import ProcRead
 
-track_colors = ["#AA0DFE", "#1CA71C", "#6A76FC"]
-
 class DotplotParams(config.ParamGroup):
     _name = "dotplot"
 DotplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
     ("bcaln_track", None, str, "Only display basecalled alignments from this track"),
+    ("bcaln_error", False, bool, "Display basecalled alignment errors"),
     ("layers", [], None, ""),
-    ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF"], list, ""),
 )
 
 class Dotplot:
@@ -38,7 +36,7 @@ class Dotplot:
     _req_layers = [
         "start", "length", "middle", 
         "current", "dwell", "kmer", "base", 
-        "bcaln.start"#, "cmp.mean_ref_dist"
+        "bcaln.start", "bcaln.error" #, "cmp.mean_ref_dist"
     ]
 
     def __init__(self, *args, **kwargs):
@@ -83,6 +81,8 @@ class Dotplot:
 
         column_widths=[6]+[1]*(len(self.prms.layers)+len(cmp_stats))
 
+        legend = set()
+
         fig = make_subplots(
             rows=2, cols=len(column_widths), 
             row_heights=[1,3],
@@ -93,7 +93,7 @@ class Dotplot:
             shared_xaxes=True,
             shared_yaxes=True)
 
-        tracks_filter,colors_filter = zip(*[(t,c) for t,c in zip(tracks,self.prms.track_colors) if t.name != self.prms.bcaln_track])
+        tracks_filter,colors_filter = zip(*[(t,c) for t,c in zip(tracks,self.conf.vis.track_colors) if t.name != self.prms.bcaln_track])
         #colors_filter = [t for t in tracks if t.name != self.prms.bcaln_track]
 
         Sigplot(tracks_filter, track_colors=colors_filter, conf=self.conf).plot(fig)
@@ -102,9 +102,14 @@ class Dotplot:
         #hover_layers += (l for l in self.prms.layers if l not in {"current","dwell"})
         hover_data = dict()
 
+        coords = None
+
         for i,track in enumerate(tracks):
 
             track_hover = list()
+
+            if track.coords is not None:
+                coords = track.coords
 
             has_bcaln = "bcaln" in track.layers.columns.get_level_values("group")
             only_bcaln = self.prms.bcaln_track == track.name
@@ -114,38 +119,31 @@ class Dotplot:
                 layers = track.get_aln_layers(aln_id)
                 
                 if has_bcaln:
-                    fig.add_trace(go.Scatter(
-                        x=layers["bcaln","start"], y=layers.index+Bcaln.K-2,
-                        name="Basecalled Alignment",
-                        mode="markers", marker={"size":5,"color":"orange"},
-                        legendgroup="bcaln",
+                    self._plot_bcaln(fig, legend, layers)
+
+                if not only_bcaln: 
+                    fig.add_trace(go.Scattergl(
+                        x=layers["dtw","start"], y=layers.index,
+                        name=track.desc,
+                        legendgroup=track.name,
+                        line={"color":self.conf.vis.track_colors[i], "width":2, "shape" : "hv"},
                         hoverinfo="skip",
                         showlegend=first_aln
                     ), row=2, col=1)
-
                 if only_bcaln: continue
 
                 track_hover.append(layers[hover_layers])
-
-                fig.add_trace(go.Scatter(
-                    x=layers["dtw","start"], y=layers.index,
-                    name=track.desc,
-                    legendgroup=track.name,
-                    line={"color":self.prms.track_colors[i], "width":2, "shape" : "hv"},
-                    hoverinfo="skip",
-                    showlegend=first_aln
-                ), row=2, col=1)
                     
 
                 first_aln = False
 
                 for j,layer in enumerate(self.prms.layers):
                     if layer[0] != "cmp":
-                        fig.add_trace(go.Scatter(
+                        fig.add_trace(go.Scattergl(
                             x=layers[layer], y=layers.index-0.5,
                             name=track.desc, 
                             line={
-                                "color" : self.prms.track_colors[i], 
+                                "color" : self.conf.vis.track_colors[i], 
                                 "width":2, "shape" : "hv"},
                             legendgroup=track.name, showlegend=False,
                         ), row=2, col=j+2)
@@ -169,49 +167,53 @@ class Dotplot:
 
             #hover_data[track.name] = pd.concat(track_hover)#.reset_index()
 
-            if not only_bcaln:
+            if len(track_hover) > 0:
                 hover_data[track.name] = track_hover[0]#.reset_index()
 
-        hover_data = pd.concat(hover_data, axis=1)
-        hover_coords = hover_data.xs("middle", axis=1, level=2).mean(axis=1)
+        for i,track in enumerate(tracks):
+            if not ("bcaln","error") in track.layers.columns: continue
+            for aln_id, aln in track.alignments.iterrows():
+                self._plot_errors(fig, legend, track.get_aln_layers(aln_id))
 
-        hover_kmers = nt.kmer_to_str(
-            hover_data.xs("kmer", 1, 2)
-                      .fillna(method="pad", axis=1)
-                      .iloc[:,-1])
+        if len(hover_data) > 0:
+            hover_data = pd.concat(hover_data, axis=1)
+            hover_coords = hover_data.xs("middle", axis=1, level=2).mean(axis=1)
+
+            hover_kmers = nt.kmer_to_str(
+                hover_data.xs("kmer", 1, 2)
+                          .fillna(method="pad", axis=1)
+                          .iloc[:,-1])
+
+            customdata = hover_data.drop(["kmer","middle"], axis=1, level=2).to_numpy()
+
+            hover_rows = [
+                "<b>" + coords.ref_name + ":%{y:,d} [%{text}]</b>"
+            ]
+            labels = [LAYERS[g][l].label for g,l in hover_layers[2:]]
+
+            for i,label in enumerate(labels):
+                s = label
+                fields = list()
+                for j in range(len(tracks_filter)):
+                    k = len(labels) * j + i
+                    fields.append(
+                        '<span style="color:%s;float:right"><b>%%{customdata[%d]:.2f}</b></span>' % 
+                        (self.conf.vis.track_colors[j], k))
+                hover_rows.append(s + ": " + ", ".join(fields))
 
 
-        customdata = hover_data.drop(["kmer","middle"], axis=1, level=2).to_numpy()
+            fig.add_trace(go.Scattergl(
+                x=hover_coords, y=hover_data.index,
+                mode="markers", marker={"size":0,"color":"rgba(0,0,0,0)"},
+                name="",
+                customdata=customdata,
+                hovertemplate="<br>".join(hover_rows),
+                hoverlabel={"bgcolor":"rgba(255,255,255,1)"},
+                text=hover_kmers,
+                showlegend=False
+            ), row=2,col=1)
 
-        hover_rows = [
-            "<b>" + track.coords.ref_name + ":%{y:,d} [%{text}]</b>"
-        ]
-        labels = [LAYERS[g][l].label for g,l in hover_layers[2:]]
-
-        for i,label in enumerate(labels):
-            s = label
-            fields = list()
-            for j in range(len(tracks_filter)):
-                k = len(labels) * j + i
-                fields.append(
-                    '<span style="color:%s;float:right"><b>%%{customdata[%d]:.2f}</b></span>' % 
-                    (self.prms.track_colors[j], k))
-            hover_rows.append(s + ": " + ", ".join(fields))
-
-
-        fig.add_trace(go.Scatter(
-            x=hover_coords, y=hover_data.index,
-            mode="markers", marker={"size":0,"color":"rgba(0,0,0,0)"},
-            name="",
-            customdata=customdata,
-            hovertemplate="<br>".join(hover_rows),
-            hoverlabel={"bgcolor":"rgba(255,255,255,1)"},
-            text=hover_kmers,
-            showlegend=False
-        ), row=2,col=1)
-            #customdata=hoverdata.to_numpy(),
-
-        if track.coords.fwd == self.conf.is_rna:
+        if coords.fwd == self.conf.is_rna:
             fig.update_yaxes(autorange="reversed", row=2, col=1)
             fig.update_yaxes(autorange="reversed", row=2, col=2)
 
@@ -247,6 +249,96 @@ class Dotplot:
 
         return fig
 
+    def _plot_bcaln(self, fig, legend, layers):
+        fig.add_trace(go.Scattergl(
+            x=layers["bcaln","start"], y=layers.index+2,
+            name="Basecalled Alignment",
+            mode="markers", marker={"size":5,"color":"orange"},
+            legendgroup="bcaln",
+            hoverinfo="skip",
+            showlegend="bcaln_starts" not in legend
+        ), row=2, col=1)
+        legend.add("bcaln_starts")
+
+
+    def _plot_errors(self, fig, legend, layers):
+        if ("bcaln","error") not in layers.columns:
+            return 
+
+        errors = layers["bcaln","error"].dropna()
+        sub = errors[errors.str.startswith("*")].str.slice(2)
+
+        ins = errors[errors.str.startswith("+")]\
+                    .str.slice(1)\
+                    .map(list).explode()
+
+        del_ = errors[errors.str.startswith("-")]\
+               .str.slice(1)\
+               .map(list).explode()
+
+        #TODO global vis params
+        #colors = ["#80ff80", "#6b93ff", "#ffbd00", "#ff8080"]
+        linewidth = 3
+        size = 15
+        for b,base in enumerate(["a","c","g","t"]):
+            refs = sub.index[sub.str.match(base)]
+            if len(refs) > 0:
+                fig.add_trace(go.Scattergl(
+                    x=layers.loc[refs, ("bcaln","start")],
+                    y=refs+2,
+                    mode="markers",
+                    marker_line_color=self.conf.vis.base_colors[b],
+                    marker_line_width=linewidth,
+                    marker_size=size,
+                    marker_symbol="x-thin",
+                    #hoverinfo="skip",
+                    legendgroup="Bcaln Error",
+                    name="SUB",
+                    showlegend="bcaln_sub" not in legend,
+                    legendrank=3
+                ), row=2, col=1)
+                legend.add("bcaln_sub")
+
+            refs = ins.index[ins.str.match(base)]
+            if len(refs) > 0:
+                fig.add_trace(go.Scattergl(
+                    x=layers.loc[refs, ("bcaln","start")],
+                    y=refs+2,
+                    mode="markers",
+                    marker_line_color=self.conf.vis.base_colors[b],
+                    marker_line_width=linewidth,
+                    marker_size=size,
+                    marker_symbol="cross-thin",
+                    #hoverinfo="skip",
+                    legendgroup="Bcaln Error",
+                    name="INS",
+                    showlegend="bcaln_ins" not in legend,
+                    legendrank=4
+                ), row=2, col=1)
+                legend.add("bcaln_ins")
+
+            refs = del_.index[del_.str.match(base)]
+            if len(refs) > 0:
+                starts = layers[("bcaln","start")].dropna()
+                idxs = starts.index.get_indexer(refs,method="nearest")
+                samps = starts.iloc[idxs]
+
+                fig.add_trace(go.Scattergl(
+                    x=samps,
+                    y=refs+2,
+                    mode="markers",
+                    marker_line_color=self.conf.vis.base_colors[b],
+                    marker_line_width=linewidth,
+                    marker_size=size,
+                    marker_symbol="line-ew",
+                    #hoverinfo="skip",
+                    name="DEL",
+                    legendgroup="Bcaln Error",
+                    showlegend="bcaln_del" not in legend,
+                    legendrank=5
+                ), row=2, col=1)
+                legend.add("bcaln_del")
+
 
 OPTS = (
     Opt("input", "tracks", nargs="+"),
@@ -256,6 +348,9 @@ OPTS = (
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
     Opt(("-b", "--bcaln-track"), "dotplot"),
+    Opt(("--multi-background"), "sigplot", action="store_true"),
+    Opt(("--no-model"), "sigplot", action="store_true"),
+    Opt(("--bcaln-error", "-e"), "dotplot", action="store_true"),
 )
 
 def main(conf):

@@ -47,10 +47,7 @@ class Bcaln:
         self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna, kmer_trim=True)
 
         self.refgap_bps = list()
-        self.sub_bps = list()
-        self.ins_bps = list()
-        self.del_bps = list()
-        self.err_bps = None
+        self.errors = None
 
         self.is_fwd = paf.is_fwd
         self.flip_ref = paf.is_fwd == self.is_rna
@@ -83,11 +80,14 @@ class Bcaln:
             "bp"   : grp["bp"].first()
         }).set_index("mref")
 
-        if self.err_bps is not None:
-            self.errs = samp_bps.join(self.err_bps.set_index("bp"), on="bp").dropna()
-            self.errs.reset_index(inplace=True, drop=True)
-        else:
-            self.errs = None
+        df = pd.concat([df, self.errors], axis=1)
+
+        #if self.err_bps is not None:
+        #    self.errs = samp_bps.join(self.err_bps.set_index("bp"), on="bp").dropna()
+        #    self.errs.reset_index(inplace=True, drop=True)
+        #else:
+        #    self.errs = None
+
 
         if self.clip_coords is not None:
             mrefs = df.index.intersection(self.clip_coords.mrefs[self.is_fwd])
@@ -112,7 +112,7 @@ class Bcaln:
 
         #TODO rename to general cig/cs
         bp_mref_aln = list()
-        err_bps = list()
+        errors = list()
 
         if not self.is_rna:
             qr_i = paf.qr_st
@@ -136,43 +136,39 @@ class Bcaln:
                 for qr, mr in zip(range(qr_i, qr_i+l), range(mr_i, mr_i+l)):
                     if mr in mrefs:
                         bp_mref_aln.append((qr,mr))
-                #bp_mref_aln += zip(range(qr_i, qr_i+l), range(mr_i, mr_i+l))
                 qr_i += l
                 mr_i += l
-
-            elif c == '*':
-                self.sub_bps.append(qr_i)
-                bp_mref_aln.append((qr_i,mr_i))
-                err_bps.append( (qr_i,mr_i,"SUB",op[1][1].upper()) )
-                qr_i += 1
-                mr_i += 1
-
-            elif c == '-':
-                self.ins_bps.append(qr_i)
-                err_bps.append( (qr_i,mr_i,"DEL",op[1].upper()) )
-                l = len(op[1])
-                mr_i += l
-
-            elif c == '+':
-                self.del_bps.append(qr_i)
-                err_bps.append( (qr_i,mr_i,"INS",op[1].upper()) )
-
-                l = len(op[1])
-                qr_i += l
-
-            elif c == '~':
-                l = int(op[1][2:-2])
-                self.refgap_bps.append(qr_i)
-                mr_i += l
-
             else:
-                print("UNIMPLEMENTED ", op)
+                errors.append( (mr_i,"".join(op)) )
+
+                if c == '*':
+                    bp_mref_aln.append((qr_i,mr_i))
+                    qr_i += 1
+                    mr_i += 1
+
+                elif c == '-':
+                    l = len(op[1])
+                    mr_i += l
+
+                elif c == '+':
+                    l = len(op[1])
+                    qr_i += l
+
+                elif c == '~':
+                    l = int(op[1][2:-2])
+                    self.refgap_bps.append(qr_i)
+                    mr_i += l
+
+                else:
+                    print("UNIMPLEMENTED ", op)
 
         self.bp_mref_aln = pd.DataFrame(bp_mref_aln, columns=["bp","mref"], dtype='Int64')
         self.bp_mref_aln.set_index("bp", inplace=True)
 
         #TODO type shouldn't have to be 64 bit
-        self.err_bps = pd.DataFrame(err_bps, columns=["bp","mref","type","seq"])#, dtype='Int64')
+        self.errors = pd.DataFrame(errors, columns=["mref","error"]) \
+                       .set_index("mref").groupby(level=0) \
+                       .transform(lambda errs: ",".join(errs))
 
         return True        
 

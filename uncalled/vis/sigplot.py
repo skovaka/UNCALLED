@@ -21,9 +21,11 @@ SigplotParams._def_params(
     #("ref_bounds", None, str_to_coord, "DTW aligment tracks"),
     #("reads", None, None, "Reads to plot"),
     ("max_reads", 10, int, ""),
+    ("no_model", False, bool, "Will not plot the expected reference signal if True"),
+    ("multi_background", False, bool, "Will plot multiple stacked background colors for multiple tracks if True"),
     ("yaxis_fixed", True, bool, ""),
     ("track_colors", ["purple", "darkgreen", "royalblue", "crimson"], list, ""),
-    ("base_colors", ["#80ff80", "#6b93ff", "#ffbd00", "#ff8080"], list, "Colors for each base (A,C,G,T/U)"), 
+    #("base_colors", ["#80ff80", "#6b93ff", "#ffbd00", "#ff8080"], list, "Colors for each base (A,C,G,T/U)"), 
     ("fill_layer", "base", str, ""),
     ("fill_track", 0, None, "")
 )
@@ -59,7 +61,7 @@ class Sigplot:
             
     def _plot_bases(self, fig, dtw, ymin, ymax, row, col):
         bases = nt.kmer_base(dtw["kmers"], 2)
-        for base, color in enumerate(self.prms.base_colors):
+        for base, color in enumerate(self.conf.vis.base_colors):
             base_dtw = dtw[bases == base]
             starts = base_dtw['start']
             ends = starts + base_dtw['length'] - 1
@@ -76,7 +78,8 @@ class Sigplot:
                 legendgroup="bases",
                 showlegend= color not in self._legend,
                 line={"width" : 0},
-                name=nt.base_to_char(base)
+                name=nt.base_to_char(base),
+                legendrank=1
             ), row=row, col=col)
             self._legend.add(color)
 
@@ -108,7 +111,8 @@ class Sigplot:
                 current_min = min(current_min, dtw["model_current"].min())
                 current_max = max(current_max, dtw["model_current"].max())
 
-            track_dtws.append(pd.concat(dtws).sort_index())
+            if len(dtws) > 0:
+                track_dtws.append(pd.concat(dtws).sort_index())
 
         read = ProcRead(track.fast5s[read_id], conf=self.conf)
         signal = read.get_norm_signal(samp_min, samp_max)
@@ -129,10 +133,11 @@ class Sigplot:
             dtw_kws = [{}]
         else:
 
-            ys = np.linspace(current_min, current_max, len(self.tracks)+1)
-            dy = (ys[1]-ys[0])*0.01
-            for dtw,ymin,ymax in zip(track_dtws, ys[:-1], ys[1:]):
-                self._plot_bases(fig, dtw, ymin+dy, ymax-dy, row, col)
+            if self.prms.multi_background:
+                ys = np.linspace(current_min, current_max, len(self.tracks)+1)
+                dy = (ys[1]-ys[0])*0.01
+                for dtw,ymin,ymax in zip(track_dtws, ys[:-1], ys[1:]):
+                    self._plot_bases(fig, dtw, ymin+dy, ymax-dy, row, col)
 
             colors = self.prms.track_colors
             dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks]
@@ -142,18 +147,21 @@ class Sigplot:
             hoverinfo="skip",
             name="Raw Signal",
             mode="markers",
-            marker={"size":2, "color":"black"}
+            marker={"size":2, "color":"black"},
+            legendrank=0
         ), row=row, col=col)
 
-        for dtw,color,kw in zip(track_dtws, colors, dtw_kws):
-            dtw = dtw.sort_values("start")
-            fig.add_trace(go.Scattergl(
-                name = "Model Current",
-                mode = "lines",
-                x=dtw["start"], y=dtw["model_current"],
-                line={"color":color, "width":2, "shape" : "hv"},
-                **kw
-            ), row=row, col=col)
+
+        if not self.prms.no_model:
+            for dtw,color,kw in zip(track_dtws, colors, dtw_kws):
+                dtw = dtw.sort_values("start")
+                fig.add_trace(go.Scattergl(
+                    name = "Model Current",
+                    mode = "lines",
+                    x=dtw["start"], y=dtw["model_current"],
+                    line={"color":color, "width":2, "shape" : "hv"},
+                    **kw
+                ), row=row, col=col)
 
         fig.update_yaxes(title_text="Current (pA)", row=row, col=col)
         fig.update_yaxes(fixedrange=self.prms.yaxis_fixed, row=row, col=col)

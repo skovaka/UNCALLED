@@ -33,7 +33,7 @@ import collections.abc
 
 import pandas as pd
 
-from _uncalled import _RefIndex, RefCoord
+from _uncalled import _RefIndex, _RefCoord
 from .argparse import Opt
 from .config import ParamGroup
 from . import nt
@@ -43,12 +43,33 @@ def str_to_coord(coord_str):
     name = spl[0]                        
     st,en = map(int, spl[1].split("-"))
     
-                                       
     if len(spl) == 2:                  
         return RefCoord(name,st,en)
     else:                              
         fwd = spl[2] == "+"
         return RefCoord(name,st,en,fwd)
+
+class RefCoord(_RefCoord):
+    def __init__(self, *args):
+        if len(args) == 1:
+            args = args[0]
+            if isinstance(args, str):
+                args = self._str_to_tuple(args)
+            if not isinstance(args, tuple):
+                raise ValueError(f"Invalid RefCoord: {args}")
+        _RefCoord.__init__(self, *args)
+
+    def _str_to_tuple(self, coord_str):
+        spl = coord_str.split(":")         
+        name = spl[0]                        
+        st,en = map(int, spl[1].split("-"))
+        
+        if len(spl) == 2:                  
+            return (name,st,en)
+        elif len(spl) == 3 and spl[2] in {"+","-"}:
+            fwd = spl[2] == "+"
+            return (name,st,en,fwd)
+        return None
 
 class CoordSpace:
 
@@ -86,7 +107,12 @@ class CoordSpace:
         insc = a.intersection(b)
         return insc.min(),insc.max()
 
-    def mref_intersect(self, mrefs, stranded_out=True):
+    def ref_slice(self, ref_start, ref_end):
+        st = self.refs.get_loc(ref_start)
+        en = self.refs.get_loc(ref_end-1)+1
+        return self._slice(st,en)
+
+    def mref_intersect(self, mrefs):
         if self.stranded:
             fwd_in = self.fwd
             minmax = self._minmax_intersect(self.mrefs, mrefs)
@@ -107,6 +133,9 @@ class CoordSpace:
         st,en = sorted(bounds)
         en += 1
 
+        return self._slice(st,en,fwd_in)
+
+    def _slice(self, st, en, fwd=None):
         refs = self.refs[st:en]
 
         kmers = None
@@ -117,16 +146,15 @@ class CoordSpace:
             if self.kmers is not None:
                 kmers = self.kmers[st:en]
 
-        elif stranded_out:
-            fwd = fwd_in
+        elif fwd is None:
+            mrefs = tuple( (m[st:en] for m in self.mrefs) )
+            kmers = tuple( (k[st:en] for k in self.kmers) )
+        else:
             mrefs = self.mrefs[fwd][st:en]
             if self.kmers is not None:
                 kmers = self.kmers[fwd][st:en]
 
-        else:
-            fwd = None
-            mrefs = tuple( (m[st:en] for m in self.mrefs) )
-            kmers = tuple( (k[st:en] for k in self.kmers) )
+        #elif not stranded_out:
 
         return CoordSpace(self.ref_name, refs, mrefs, fwd, kmers)
 

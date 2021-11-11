@@ -88,6 +88,11 @@ def nanopolish(conf):
 
             fast5_name = f5reader.get_read_file(read_id)
 
+            #if io.coords is not None:
+            #    mrefs = df.index.intersection(io.coords.mrefs[self.is_fwd])
+            #    coords = io.coords.mref_intersect(mrefs=df.index)
+            #    df = df.reindex(index=mrefs, copy=False)
+
             io.init_alignment(read_id, fast5_name, coords, "dtw", df)
             print(read_id)
 

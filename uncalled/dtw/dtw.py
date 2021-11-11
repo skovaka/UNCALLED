@@ -117,7 +117,7 @@ class GuidedDTW:
         #self.ref_kmers = self.track.load_aln_kmers().sort_index()
         self.ref_kmers = self.track.coords.kmers.sort_index()
 
-        self.bcaln = bcaln.df[bcaln.df.index.isin(self.ref_kmers.index)].sort_index()
+        self.bcaln = bcaln.df[bcaln.df.index.isin(self.ref_kmers.index)].sort_index()[["start"]].dropna()
 
         self.read = read
 

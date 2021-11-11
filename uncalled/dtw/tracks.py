@@ -33,6 +33,7 @@ TracksParams._def_params(
     ("overwrite", False, bool, "Overwrite existing tracks"),
     ("append", False, bool, "Append reads to existing tracks"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
+    ("load_mat", False, bool, "If true will pivot layers into a matrix"), #TODO change to mat_layers, only do it for them
     ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
     ignore_toml={"input", "output", "ref_bounds", "layers", "full_overlap", "overwrite", "append","refstats", "refstats_layers", "read_filter"}
@@ -93,9 +94,6 @@ class Tracks:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("tracks", copy_conf=True, *args, **kwargs)
 
-        #if isinstance(self.prms.layers, str):
-        #    self.prms.layers = [self.prms.layers]
-
         self.set_layers(self.prms.layers)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers, add_deps=False))
 
@@ -113,12 +111,21 @@ class Tracks:
         self._load_dbs(self.prms.output, True)
         self._load_dbs(self.prms.input, False)
 
+        if self.prms.index_prefix is None:
+            raise RuntimeError("No reference index")
+
         self.input_track_ids = [t.id for t in self.aln_tracks]
         self.output_track_ids = [t.id for _,t in self.output_tracks.items()]
 
-        if self.prms.index_prefix is not None:
-            self.index = load_index(self.prms.index_prefix)
-            self._set_ref_bounds(self.prms.ref_bounds)
+        self.index = load_index(self.prms.index_prefix)
+
+        self._set_ref_bounds(self.prms.ref_bounds)
+
+        if self.coords is not None:
+            self.load_refs()
+
+        #if isinstance(self.prms.layers, str):
+        #    self.prms.layers = [self.prms.layers]
 
         if self.prms.load_fast5s:
             fast5_reads = list()
@@ -360,11 +367,15 @@ class Tracks:
 
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
+
         if self.coords is None:
             raise ValueError("Must set ref bounds")
 
         if full_overlap is None:
             full_overlap = self.prms.full_overlap
+
+        if load_mat is None:
+            load_mat = self.prms.load_mat
 
         dbfile0,db0 = list(self.dbs.items())[0]
         alignments = db0.query_alignments(self.input_track_ids, coords=self.coords, full_overlap=full_overlap)

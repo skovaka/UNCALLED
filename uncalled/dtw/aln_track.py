@@ -53,6 +53,9 @@ LAYERS = {
         "dwell" : LayerMeta(float, "Dwell Time (ms/nt)",
             lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate,
             [("dtw", "length")]),
+        "model" : LayerMeta(float, "Model Current",
+            lambda track: track.model[track.kmers],
+            [("dtw", "current")]),
         "model_diff" : LayerMeta(float, "Model pA Diff.",
             lambda track: track.layers["dtw","current"] - track.model[track.kmers],
             [("dtw", "current")]),
@@ -67,7 +70,7 @@ LAYERS = {
             lambda track: track.layers["bcaln","start"] + track.layers["bcaln","length"],
             [("bcaln", "start"), ("bcaln", "length")]),
         "bp" : LayerMeta(int, "Basecaller Base Index", None, None),
-        "err" : LayerMeta(str, "Basecalled Alignment Error", None, None),
+        "error" : LayerMeta(str, "Basecalled Alignment Error", None, None),
     }, "cmp" : {
         "jaccard" : LayerMeta(int, "Jaccard Distance", None, 
             [("dtw", "start"), ("dtw", "end"), ("dtw", "length")]),
@@ -139,46 +142,67 @@ def parse_layers(layers, add_deps=True):
             yield layer
 
 class AlnTrack:
-    def __init__(self, db, track_id, name, desc, conf):
+    def __init__(self, 
+            db, track_id, name, desc, conf, 
+            coords=None, alignments=None, layers=None):
+
         self.db = db
-        #self.index = index
         self.id = track_id
         self.name = name
         self.desc = desc
         self.conf = conf
 
-        self.read_ids = set()
-
         self.mat = None
-        self.coords = None
-        self.layers = None
 
         self.model = PoreModel(self.conf.pore_model) 
 
+        self.set_data(coords, alignments, layers)
+
     def set_data(self, coords, alignments, layers):
         self.coords = coords
-        self.layers = layers#pd.concat(layers, names=["group", "layer"], axis=1)
         self.alignments = alignments
+        self.layers = layers
 
-        #TODO convert to reference coordinates here (or maybe upstream?)
-        #store bitvector of fwd alignments
-        mrefs = self.layers.index.get_level_values("mref")
+        isnone = [coords is None, alignments is None, layers is None]
+        if np.all(isnone):
+            return
+        elif np.any(isnone):
+            raise ValueError("Must specify AlnTrack coords, alignments, and layers")
+
+        self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
 
         self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
 
-        if coords is not None:
+        if self.layers.index.names[0] == "mref":
             self.layers.rename(index=coords.mref_to_ref, level=0, inplace=True)
             self.layers.index.names = ("ref", "aln_id")
+        self.layers = layers.sort_index()
 
-        self.alignments = self.alignments.sort_values(["fwd", "ref_start"])
+        self.alignments = self.alignments
 
-        if not (self.coords is None or self.coords.ref_kmers is None):
+        if self.coords.ref_kmers is not None:
             kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
             self.kmers = self.coords.ref_kmers.reindex(kidx)
             self.kmers.index = self.layers.index
 
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
+
+    def slice(self, ref_start=0, ref_end=np.inf, aln_ids=None):
+        ref_start = max(self.layer_refs.min(), ref_start)
+        ref_end = min(self.layer_refs.max()+1, ref_end)
+
+        layers = self.layers.loc[ref_start:ref_end-1]
+        if aln_ids is None: aln_ids = layers.index.get_level_values("aln_id").unique()
+
+        alns = self.alignments.loc[aln_ids]
+        coords=self.coords.ref_slice(ref_start, ref_end)
+
+        return AlnTrack(
+            self.db, self.id, self.name, self.desc, self.conf, 
+            coords=coords, alignments=alns,#self.alignments.loc[aln_ids], 
+            layers=layers)#self.layers.loc[(slice(ref_start,ref_end), aln_ids)])
+        
 
     @property
     def empty(self):
