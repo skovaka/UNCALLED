@@ -350,17 +350,13 @@ class Tracks:
     def input_count(self):
         return len(self.aln_tracks)
 
-
-    LAYER_FNS = {
-        "dwell" : (lambda self,track: 
-            1000 * track.layers["dtw","length"] / self.conf.read_buffer.sample_rate),
-        "model_diff" : (lambda self,track: 
-            track.layers["dtw","current"] - track.model[track.kmers])
-    }
-    
     def _verify_read(self):
         if len(self.input_track_ids) == 0:
             raise RuntimeError("No input tracks have been loaded")
+
+    #TODO read_ids, track_alns, max_cov(?)
+    def slice(self, ref_start, ref_end):
+        pass
 
     def load_refs(self, ref_bounds=None, full_overlap=None, load_mat=False):
         self._verify_read()

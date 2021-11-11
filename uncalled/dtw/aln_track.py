@@ -193,15 +193,20 @@ class AlnTrack:
         ref_end = min(self.layer_refs.max()+1, ref_end)
 
         layers = self.layers.loc[ref_start:ref_end-1]
-        if aln_ids is None: aln_ids = layers.index.get_level_values("aln_id").unique()
 
-        alns = self.alignments.loc[aln_ids]
-        coords=self.coords.ref_slice(ref_start, ref_end)
+        if aln_ids is not None: 
+            layer_alns = layers.index.get_level_values("aln_id")
+            aln_ids = layer_alns.unique().intersection(aln_ids)
+            layers = layers.loc[layer_alns.isin(aln_ids)] 
+        else:
+            aln_ids = slice(None)
+
+        alignments = self.alignments.loc[aln_ids]
+        coords = self.coords.ref_slice(ref_start, ref_end)
 
         return AlnTrack(
             self.db, self.id, self.name, self.desc, self.conf, 
-            coords=coords, alignments=alns,#self.alignments.loc[aln_ids], 
-            layers=layers)#self.layers.loc[(slice(ref_start,ref_end), aln_ids)])
+            coords, alignments, layers=layers)
         
 
     @property
