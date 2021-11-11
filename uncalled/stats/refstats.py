@@ -37,14 +37,14 @@ def main(conf):
     tracks = Tracks(conf=conf)
     conf = tracks.conf
 
-    stats = RefstatsSplit(conf.tracks.refstats, len(tracks.aln_tracks))
+    stats = RefstatsSplit(conf.tracks.refstats, len(tracks.alns))
 
     if conf.verbose_refs:
         columns = ["ref_name", "ref", "strand"]
     else:
         columns = ["ref"]
 
-    for track in tracks.aln_tracks:
+    for track in tracks.alns:
         name = track.name
         if conf.cov:
             columns.append(".".join([track.name, "cov"]))

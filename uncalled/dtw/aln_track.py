@@ -188,11 +188,13 @@ class AlnTrack:
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
 
-    def slice(self, ref_start=0, ref_end=np.inf, aln_ids=None):
-        ref_start = max(self.layer_refs.min(), ref_start)
-        ref_end = min(self.layer_refs.max()+1, ref_end)
+    #def slice(self, ref_start=0, ref_end=np.inf, aln_ids=None):
+    def slice(self, coords=slice(None), aln_ids=None):
+        #ref_start = max(self.layer_refs.min(), ref_start)
+        #ref_end = min(self.layer_refs.max()+1, ref_end)
+        #coords = self.coords.ref_slice(ref_start, ref_end)
 
-        layers = self.layers.loc[ref_start:ref_end-1]
+        layers = self.layers.loc[coords.refs]
 
         if aln_ids is not None: 
             layer_alns = layers.index.get_level_values("aln_id")
@@ -202,7 +204,6 @@ class AlnTrack:
             aln_ids = slice(None)
 
         alignments = self.alignments.loc[aln_ids]
-        coords = self.coords.ref_slice(ref_start, ref_end)
 
         return AlnTrack(
             self.db, self.id, self.name, self.desc, self.conf, 

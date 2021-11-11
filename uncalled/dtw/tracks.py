@@ -74,6 +74,8 @@ REFSTAT_LABELS = {
     "q95" : "95% Quantile",
 }
 
+BUILTIN_TRACKS = {"_refstats", "_dtwstats", "_readstats"}
+
 CMP_GROUPS = {"cmp", "bc_cmp"}
 
 class RefstatsSplit:
@@ -92,6 +94,12 @@ class RefstatsSplit:
 
 class Tracks:
     def __init__(self, *args, **kwargs):
+        if isinstance(args[0], Tracks):
+            self._init_slice(*args, **kwargs)
+        else:
+            self._init_new(*args, **kwargs)
+
+    def _init_new(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("tracks", copy_conf=True, *args, **kwargs)
 
         self.set_layers(self.prms.layers)
@@ -99,11 +107,11 @@ class Tracks:
 
         self.dbs = dict()
 
-        self.track_dbs = dict()
+        self.track_dbs = dict() #TODO do we need this?
 
-        self.aln_tracks = list()
+        self.alns = list()
         self.output_tracks = dict()
-        self.all = self.aln_tracks
+        self._tracks = dict()
 
         self.prev_fast5 = dict()
         self.prev_read = dict()
@@ -114,8 +122,7 @@ class Tracks:
         if self.prms.index_prefix is None:
             raise RuntimeError("No reference index")
 
-        self.input_track_ids = [t.id for t in self.aln_tracks]
-        self.output_track_ids = [t.id for _,t in self.output_tracks.items()]
+        self._aln_track_ids = [t.id for t in self.alns]
 
         self.index = load_index(self.prms.index_prefix)
 
@@ -124,32 +131,55 @@ class Tracks:
         if self.coords is not None:
             self.load_refs()
 
-        #if isinstance(self.prms.layers, str):
-        #    self.prms.layers = [self.prms.layers]
-
         if self.prms.load_fast5s:
             fast5_reads = list()
             for _,db in self.dbs.items():
-                fast5_reads.append(db.get_fast5_index(self.input_track_ids))
+                fast5_reads.append(db.get_fast5_index(self._aln_track_ids))
             fast5_reads = pd.concat(fast5_reads)
             self.fast5s = self.fast5s = Fast5Reader(index=fast5_reads, conf=self.conf)
 
             reads = fast5_reads["read_id"]
             self.reads = pd.Index(reads[~reads.duplicated()])
 
-            for track in self.aln_tracks:
+            for track in self.alns:
                 track.fast5s = self.fast5s
+
+    def _init_slice(self, parent, coords, tracks):
+        self.conf = parent.conf 
+        self.prms = parent.prms
+
+        self.set_layers(self.prms.layers)
+        self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers, add_deps=False))
+
+        self.dbs = parent.dbs
+        self.track_dbs = parent.track_dbs
+        self.output_tracks = parent.output_tracks
+        self.prev_fast5 = parent.prev_fast5
+        self.prev_read = parent.prev_read
+        self.index = parent.index
+        self.fast5s = parent.fast5s
+        self._aln_track_ids = parent._aln_track_ids
+
+        self.coords = coords
+        self._tracks = tracks
+
+        self.alns = list()
+        for name,track in tracks.items():
+            if name in BUILTIN_TRACKS:
+                setattr(self, name[1:])
+            elif isinstance(track, AlnTrack):
+                self.alns.append(track)
 
     @property
     def all_empty(self):
-        for t in self.aln_tracks:
+        for t in self.alns:
             if not t.empty:
                 return False
         return True
 
     @property
     def any_empty(self):
-        for t in self.aln_tracks:
+        for t in self.alns:
             if t.empty:
                 return True
         return False
@@ -180,10 +210,10 @@ class Tracks:
                 self.fn_layers.append((group, layer))
 
     def __len__(self):
-        return len(self.all)
+        return len(self.alns)
 
     def __getitem__(self, i):
-        return self.all[i]
+        return self.alns[i]
 
     def _load_dbs(self, dbs, out):
         if dbs is None:
@@ -244,7 +274,8 @@ class Tracks:
 
             conf = config.Config(toml=row.config)
             t = AlnTrack(db, row["id"], name, row["desc"], conf)
-            self.aln_tracks.append(t)
+            self.alns.append(t)
+            self._tracks[t.name] = t
 
             self.conf.load_config(conf)
 
@@ -348,15 +379,28 @@ class Tracks:
 
     @property
     def input_count(self):
-        return len(self.aln_tracks)
+        return len(self.alns)
 
     def _verify_read(self):
-        if len(self.input_track_ids) == 0:
+        if len(self._aln_track_ids) == 0:
             raise RuntimeError("No input tracks have been loaded")
 
     #TODO read_ids, track_alns, max_cov(?)
     def slice(self, ref_start, ref_end):
-        pass
+        if self.coords is None:
+            raise IndexError("Cannot slice empty Tracks")
+
+        coords = self.coords.ref_slice(ref_start, ref_end)
+
+        tracks = dict()
+        for name,track in self._tracks.items():
+            if isinstance(track, pd.DataFrame):
+                tracks[name] = track.loc[coords.refs]
+            elif isinstance(track, AlnTrack):
+                tracks[name] = track.slice(coords)
+
+        return Tracks(self, coords, tracks)
+            
 
     def load_refs(self, ref_bounds=None, full_overlap=None, load_mat=False):
         self._verify_read()
@@ -374,15 +418,15 @@ class Tracks:
             load_mat = self.prms.load_mat
 
         dbfile0,db0 = list(self.dbs.items())[0]
-        alignments = db0.query_alignments(self.input_track_ids, coords=self.coords, full_overlap=full_overlap)
+        alignments = db0.query_alignments(self._aln_track_ids, coords=self.coords, full_overlap=full_overlap)
 
         ids = alignments.index.to_numpy()
 
-        layers = db0.query_layer_groups(self.db_layers, self.input_track_ids, self.coords, ids)
+        layers = db0.query_layer_groups(self.db_layers, self._aln_track_ids, self.coords, ids)
 
         all_empty = True
         
-        for track in self.aln_tracks:
+        for track in self.alns:
             track_alns = alignments[alignments["track_id"] == track.id].copy()
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)
             track_layers = layers.iloc[i].copy()
@@ -394,10 +438,10 @@ class Tracks:
         self.calc_refstats()
 
         if load_mat:
-            for track in self.aln_tracks:
+            for track in self.alns:
                 track.load_mat()
 
-        return self.aln_tracks
+        return self.alns
 
     def load_compare(self, aln_ids=None):
         if len(self.cmp_layers) == 0:
@@ -405,7 +449,7 @@ class Tracks:
 
         dbfile0,db = list(self.dbs.items())[0]
 
-        self.cmp = db.query_compare(self.cmp_layers, self.input_track_ids, self.coords, aln_ids)
+        self.cmp = db.query_compare(self.cmp_layers, self._aln_track_ids, self.coords, aln_ids)
         #TODO add aln_ids
 
         groups = self.cmp.index.get_level_values("group_b").unique()
@@ -426,41 +470,41 @@ class Tracks:
             df = pd.concat({group : df.reindex(track.layers.index)}, axis=1)
             track.layers = pd.concat([track.layers, df], axis=1)
 
-        for track in self.aln_tracks:
+        for track in self.alns:
             if bcalns is not None:
                 _add_group("bc_cmp", bcalns)
             if dtws is not None:
                 _add_group("cmp", dtws)
 
     def calc_compare(self, group_b, save):
-        if len(self.aln_tracks) == 0:
+        if len(self.alns) == 0:
             raise ValueError("Must input at least one track")
 
-        cols = self.aln_tracks[0].layers.columns.get_level_values("group").unique()
+        cols = self.alns[0].layers.columns.get_level_values("group").unique()
         if (group_b == "dtw" and "cmp" in cols) or (group_b == "bcaln" and "bc_cmp" in cols):
             sys.stderr.write(f"Read already has compare group. Skipping\n")
             return None
 
         if group_b == "dtw":
-            if len(self.aln_tracks) != 2:
+            if len(self.alns) != 2:
                 raise ValueError("Must input exactly two tracks to compare dtw alignments")
 
-            df = self.aln_tracks[0].cmp(self.aln_tracks[1])
+            df = self.alns[0].cmp(self.alns[1])
 
         elif group_b == "bcaln":
-            if len(self.aln_tracks) > 2:
+            if len(self.alns) > 2:
                 raise ValueError("Must input one or two tracks to compare dtw to bcaln")
             
-            if len(self.aln_tracks) == 2:
-                df = self.aln_tracks[0].bc_cmp(self.aln_tracks[1])
+            if len(self.alns) == 2:
+                df = self.alns[0].bc_cmp(self.alns[1])
             else:
-                df = self.aln_tracks[0].bc_cmp()
+                df = self.alns[0].bc_cmp()
 
         df = df.dropna()
 
         if save:
-            df.rename(index=self.aln_tracks[0].coords.ref_to_mref, level=0, inplace=True)
-            self.aln_tracks[0].db.write_layers(
+            df.rename(index=self.alns[0].coords.ref_to_mref, level=0, inplace=True)
+            self.alns[0].db.write_layers(
                 pd.concat({"cmp" : df}, names=["group", "layer"], axis=1), 
                 index=["mref", "aln_a", "aln_b", "group_b"])
         else:
@@ -471,14 +515,14 @@ class Tracks:
             self.refstats = None
             return None
 
-        stats = RefstatsSplit(self.prms.refstats, len(self.aln_tracks))
+        stats = RefstatsSplit(self.prms.refstats, len(self.alns))
 
         refstats = dict()
         grouped = [
             t.layers[self.prms.refstats_layers].groupby(level="ref")
-            for t in self.aln_tracks]
+            for t in self.alns]
 
-        for track,groups in zip(self.aln_tracks, grouped):
+        for track,groups in zip(self.alns, grouped):
             refstats[track.name] = groups.agg(stats.layer_agg)
             rename = ({
                 old[-1] : new
@@ -490,8 +534,8 @@ class Tracks:
 
         if len(stats.compare) > 0:
             groups_a, groups_b = grouped
-            refs_a = self.aln_tracks[0].layers.index.unique("ref")
-            refs_b = self.aln_tracks[1].layers.index.unique("ref")
+            refs_a = self.alns[0].layers.index.unique("ref")
+            refs_b = self.alns[1].layers.index.unique("ref")
             refs = refs_a.intersection(refs_b)
             cmps = {l : defaultdict(list) for l in self.prms.refstats_layers}
             for ref in refs:
@@ -510,9 +554,11 @@ class Tracks:
         refstats = pd.concat(refstats, axis=1, names=["track", "group", "layer", "stat"])
 
         #TODO make verbose ref indexing
-        #refstats.index = self.aln_tracks[0].coords.mref_to_ref_index(refstats.index, multi=verbose_refs)
+        #refstats.index = self.alns[0].coords.mref_to_ref_index(refstats.index, multi=verbose_refs)
 
         self.refstats = refstats.dropna()
+
+        self.tracks["_refstats"] = self.refstats
 
         return refstats
 
@@ -523,7 +569,7 @@ class Tracks:
         dbfile0,db0 = list(self.dbs.items())[0]
         layer_iter = db0.query_layers(
             self.db_layers, 
-            self.input_track_ids, 
+            self._aln_track_ids, 
             coords=self.coords, 
             order=["mref"],
             chunksize=self.prms.ref_chunksize)
@@ -558,15 +604,15 @@ class Tracks:
             layers = pd.concat({"dtw":chunk}, names=["group", "layer"], axis=1)
 
             aln_ids = chunk.index.unique("aln_id").to_numpy()
-            alns = db0.query_alignments(self.input_track_ids, aln_id=aln_ids)
+            alns = db0.query_alignments(self._aln_track_ids, aln_id=aln_ids)
 
-            for track in self.aln_tracks:
+            for track in self.alns:
                 track_alns = alns[alns["track_id"]==track.id].copy()
                 track_layers = layers[layers.index.isin(track_alns.index, 1)].copy()
                 track.set_data(coords, track_alns, track_layers)
                 track.calc_layers(self.fn_layers)
 
-            yield (coords, self.aln_tracks)
+            yield (coords, self.alns)
 
     def load_read(self, read_id, ref_bounds=None):
         if ref_bounds is not None:
@@ -577,13 +623,13 @@ class Tracks:
         dbfile0,db0 = list(self.dbs.items())[0]
 
         alns = db0.query_alignments(
-            self.input_track_ids,
+            self._aln_track_ids,
             read_id=read_id,
             coords=self.coords)
 
         self._fill_tracks(db0, alns)
 
-        return self.aln_tracks
+        return self.alns
 
     def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
         if ref_bounds is not None:
@@ -596,7 +642,7 @@ class Tracks:
         dbfile0,db0 = list(self.dbs.items())[0]
 
         aln_iter = db0.query_alignments(
-            self.input_track_ids,
+            self._aln_track_ids,
             read_id=read_filter,
             coords=self.coords, 
             full_overlap=full_overlap, 
@@ -616,7 +662,7 @@ class Tracks:
                     
                 for group in overlap_groups:
                     self._fill_tracks(db0, alns.loc[group])
-                    yield (read_id, self.aln_tracks)
+                    yield (read_id, self.alns)
 
         n = 0
         leftovers = pd.DataFrame()
@@ -643,9 +689,9 @@ class Tracks:
     def _fill_tracks(self, db, alns):
         ids = list(alns.index)
 
-        layers = db.query_layer_groups(self.db_layers, self.input_track_ids, self.coords, ids)
+        layers = db.query_layer_groups(self.db_layers, self._aln_track_ids, self.coords, ids)
 
-        for track in self.aln_tracks:
+        for track in self.alns:
             track_alns = alns[alns["track_id"] == track.id]
 
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)

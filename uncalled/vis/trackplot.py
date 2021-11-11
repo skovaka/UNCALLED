@@ -143,7 +143,7 @@ class Trackplot:
         layer_label = LAYERS[group][layer].label
 
         t0 = time.time()
-        for i,track in enumerate(self.tracks.aln_tracks):
+        for i,track in enumerate(self.tracks.alns):
             self.fig.update_yaxes(
                 title_text=f"{track.desc}", 
                 showticklabels=False,
@@ -195,7 +195,7 @@ class Trackplot:
         layer_label = LAYERS[group][layer].label
 
         self.fig.update_yaxes(title_text=layer_label, row=row, col=1)
-        for j,track in enumerate(self.tracks.aln_tracks):
+        for j,track in enumerate(self.tracks.alns):
             stats = self.tracks.refstats[track.name,group,layer]
             for idx in stats.index[:-1]:
                 self.fig.add_vline(x=idx-0.5, line_color="black", row=row, col=1)
@@ -247,7 +247,7 @@ class Trackplot:
             return
 
         self.fig.update_yaxes(title_text=REFSTAT_LABELS[stat], row=row, col=1)
-        for j,track in enumerate(self.tracks.aln_tracks):
+        for j,track in enumerate(self.tracks.alns):
             stats = self.tracks.refstats[track.name,group,layer,stat]
 
             self.fig.add_trace(go.Scattergl(
