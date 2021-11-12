@@ -401,12 +401,14 @@ class Tracks:
 
         return Tracks(self, coords, tracks)
             
-
-    def load(self, ref_bounds=None, full_overlap=None, load_mat=False):
+    def load(self, ref_bounds=None, full_overlap=None, read_filter=None, load_mat=False):
         self._verify_read()
 
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
+
+        if read_filter is None:
+            read_filter = self.prms.read_filter
 
         if self.coords is None:
             raise ValueError("Must set ref bounds")
@@ -418,18 +420,17 @@ class Tracks:
             load_mat = self.prms.load_mat
 
         dbfile0,db0 = list(self.dbs.items())[0]
-        alignments = db0.query_alignments(self._aln_track_ids, coords=self.coords, full_overlap=full_overlap)
 
-        ids = alignments.index.to_numpy()
+        layers = db0.query_layers(self.db_layers, self._aln_track_ids, self.coords, full_overlap=full_overlap, read_id=read_filter)
 
-        layers = db0.query_layer_groups(self.db_layers, self._aln_track_ids, self.coords, ids)
+        ids = layers.index.get_level_values("aln_id").unique().to_numpy()
 
-        all_empty = True
-        
+        alignments = db0.query_alignments(aln_id=ids)#self._aln_track_ids, coords=self.coords, full_overlap=full_overlap)
+
         for track in self.alns:
-            track_alns = alignments[alignments["track_id"] == track.id].copy()
+            track_alns = alignments[alignments["track_id"] == track.id]
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)
-            track_layers = layers.iloc[i].copy()
+            track_layers = layers.iloc[i]
 
             track.set_data(self.coords, track_alns, track_layers)
             track.calc_layers(self.fn_layers)
@@ -672,7 +673,7 @@ class Tracks:
     def _fill_tracks(self, db, alns):
         ids = list(alns.index)
 
-        layers = db.query_layer_groups(self.db_layers, self._aln_track_ids, self.coords, ids)
+        layers = db.query_layers(self.db_layers, self._aln_track_ids, self.coords, ids)
 
         for track in self.alns:
             track_alns = alns[alns["track_id"] == track.id]

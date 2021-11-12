@@ -268,7 +268,7 @@ class TrackSQL:
             params=params)
 
 
-    def query_layer_groups(self, layers, track_id=None, coords=None, aln_id=None, order=["mref"], chunksize=None):
+    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, order=["mref"], chunksize=None, full_overlap=False):
 
         group_layers = collections.defaultdict(list)
         renames = dict()
@@ -294,9 +294,12 @@ class TrackSQL:
         wheres = list()
         params = list()
 
-        if track_id is not None:
+        if track_id is not None or read_id is not None:
             select += " JOIN alignment ON id = idx_aln_id"
-            self._add_where(wheres, params, "track_id", track_id)
+            if track_id is not None:
+                self._add_where(wheres, params, "track_id", track_id)
+            if read_id is not None:
+                self._add_where(wheres, params, "read_id", read_id)
 
         if "cmp" in group_layers:
             self._add_where(wheres, params, "group_b", "bcaln")
@@ -310,6 +313,10 @@ class TrackSQL:
 
                 params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
                 params += [str(coords.mrefs[False].min()), str(coords.mrefs[False].max())]
+            if full_overlap:
+                wheres.append("ref_name = ? AND ref_start < ? AND ref_end > ?")
+                params.append(coords.ref_name)
+                params += [coords.refs.min(), coords.refs.max()]
 
         self._add_where(wheres, params, "idx_aln_id", aln_id)
 
@@ -333,39 +340,6 @@ class TrackSQL:
             return make_groups(ret)
 
         return (make_groups(df) for df in ret)
-
-    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, order=["mref"], index=["mref","aln_id"], chunksize=None):
-        select = "SELECT mref, aln_id, start, length, current FROM dtw"
-
-        wheres = list()
-        params = list()
-
-        if track_id is not None:
-            select += " JOIN alignment ON id = aln_id"
-            self._add_where(wheres, params, "track_id", track_id)
-
-        if coords is not None:
-            if coords.stranded:
-                wheres.append("(mref >= ? AND mref <= ?)")
-                params += [str(coords.mrefs.min()), str(coords.mrefs.max())]
-            else:
-                wheres.append("((mref >= ? AND mref <= ?) OR (mref >= ? AND mref <= ?))")
-
-                params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
-                params += [str(coords.mrefs[False].min()), str(coords.mrefs[False].max())]
-
-        self._add_where(wheres, params, "aln_id", aln_id)
-
-        query = self._join_query(select, wheres, order)
-
-        return pd.read_sql_query(query, self.con, index_col=index, params=params, chunksize=chunksize)
-
-    def _verify_track(self, track_name):
-        ids = self.cur.execute("SELECT id FROM track WHERE name == ?", (track_name,)).fetchall()
-        if len(ids) == 0:
-            raise ValueError(f"Track does not exist: \"{track_name}\"\n")
-        return ids[0][0]
-
 
 DB_OPT = Opt("db_file", help="Track database file")
 

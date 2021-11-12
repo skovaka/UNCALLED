@@ -7,6 +7,7 @@ import time
 import sys
 
 from .. import config
+from ..fast5 import parse_read_ids
 from ..dtw.aln_track import LAYERS, parse_layer, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks, REFSTAT_LABELS, COMPARE_REFSTATS
@@ -289,6 +290,7 @@ OPTS = (
     Opt("input", "tracks", nargs="+"),
     Opt("ref_bounds", "tracks", type=str_to_coord),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
+    Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
     Opt(("-H", "--panel-heights"), "trackplot", nargs="+", type=int),
 
     Opt("--mat", dest="panels",
