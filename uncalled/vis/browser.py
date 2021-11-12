@@ -26,11 +26,9 @@ OPTS = (
 def main(conf):
     """Interactive signal alignment genome browser"""
     conf.tracks.layers.append("cmp.mean_ref_dist")
+    conf.tracks.load_mat = True
     conf.tracks.refstats_layers.append("cmp.mean_ref_dist")
     tracks = Tracks(conf=conf)
-    print("Loading tracks...")
-    tracks.load_refs(load_mat=True)
-    print("Done")
     browser(tracks, conf)
 
 def browser(tracks, conf):

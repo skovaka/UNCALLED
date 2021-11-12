@@ -181,8 +181,6 @@ def main(conf):
     """plot a dotplot"""
     io = Tracks(conf=conf)
 
-    tracks = io.load_refs()
-
     fig = Sigplot(tracks, conf=conf).plot()
 
     fig.write_html(conf.outfile, config={"scrollZoom" : True, "displayModeBar" : True})

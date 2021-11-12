@@ -76,7 +76,9 @@ class Trackplot:
         self._parse_panels()
 
         if self.prms.tracks is None:
+            t0 = time.time()
             self.tracks = Tracks(conf=self.conf)
+            print("TIME", time.time()-t0)
         else:
             self.tracks = self.prms.tracks
             self.tracks.conf.load_config(self.conf)

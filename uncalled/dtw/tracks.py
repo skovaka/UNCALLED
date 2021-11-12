@@ -94,7 +94,7 @@ class RefstatsSplit:
 
 class Tracks:
     def __init__(self, *args, **kwargs):
-        if isinstance(args[0], Tracks):
+        if len(args) > 0 and isinstance(args[0], Tracks):
             self._init_slice(*args, **kwargs)
         else:
             self._init_new(*args, **kwargs)
@@ -129,7 +129,7 @@ class Tracks:
         self._set_ref_bounds(self.prms.ref_bounds)
 
         if self.coords is not None:
-            self.load_refs()
+            self.load()
 
         if self.prms.load_fast5s:
             fast5_reads = list()
@@ -402,7 +402,7 @@ class Tracks:
         return Tracks(self, coords, tracks)
             
 
-    def load_refs(self, ref_bounds=None, full_overlap=None, load_mat=False):
+    def load(self, ref_bounds=None, full_overlap=None, load_mat=False):
         self._verify_read()
 
         if ref_bounds is not None:
@@ -613,23 +613,6 @@ class Tracks:
                 track.calc_layers(self.fn_layers)
 
             yield (coords, self.alns)
-
-    def load_read(self, read_id, ref_bounds=None):
-        if ref_bounds is not None:
-            self._set_ref_bounds(ref_bounds)
-        else:
-            self.coords = None
-        
-        dbfile0,db0 = list(self.dbs.items())[0]
-
-        alns = db0.query_alignments(
-            self._aln_track_ids,
-            read_id=read_id,
-            coords=self.coords)
-
-        self._fill_tracks(db0, alns)
-
-        return self.alns
 
     def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
         if ref_bounds is not None:
