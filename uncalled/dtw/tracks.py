@@ -23,7 +23,7 @@ TracksParams._def_params(
     ("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
     ("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
-    ("layers", ["length", "current", "dwell", "model_diff"], None, "Layers to load (e.g. current, dwell, model_diff)"),
+    ("layers", ["dtw","bcaln","cmp","bc_cmp"], None, "Layers to load (e.g. current, dwell, model_diff)"),
     ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
     ("refstats_layers", ["current", "dwell", "model_diff"], None, "Layers to compute refstats"),
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),

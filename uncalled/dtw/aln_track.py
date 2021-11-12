@@ -10,7 +10,9 @@ from typing import NamedTuple
 from matplotlib.colors import Normalize
 import pandas as pd
 import copy
-import sqlite3
+
+from dataclasses import dataclass
+from typing import Callable
 
 import scipy.stats
 from sklearn.decomposition import PCA
@@ -29,21 +31,30 @@ DWELL_LAYER      = "dwell"
 MODEL_DIFF_LAYER = "model_diff"
 DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
 
-LayerMeta = namedtuple("LayerMeta", ["type", "label", "fn", "deps"])
+
+LayerMeta = namedtuple("LayerMeta", ["type", "label", "fn", "deps"], defaults=[None,None])
+
+#@dataclass 
+#class LayerMeta:
+#    _type : type
+#    label : str
+#    fn    : Callable = None
+#    deps  : list = None
+
 
 #TODO probably move this to AlnTrack
 LAYERS = {
     "ref" : {
         "coord" : LayerMeta(int, "Reference Coordinate", 
-            lambda track: track.coords.mref_to_ref(track.layer_mrefs), None),
+            lambda track: track.coords.mref_to_ref(track.layer_mrefs)),
         "name" : LayerMeta(str, "Reference Name",
-            lambda track: [track.coords.ref_name]*len(track.layers), None),
+            lambda track: [track.coords.ref_name]*len(track.layers)),
         "fwd" : LayerMeta(bool, "Is on fwd strand",
-            lambda track: [track.coords.fwd]*len(track.layers), None),
+            lambda track: [track.coords.fwd]*len(track.layers)),
     }, "dtw" : {
-        "start" : LayerMeta(int, "Sample Start", None, None),
-        "length" : LayerMeta(int, "Sample Length", None, None),
-        "current" : LayerMeta(float, "Current (pA)", None, None),
+        "start" : LayerMeta(int, "Sample Start"),
+        "length" : LayerMeta(int, "Sample Length"),
+        "current" : LayerMeta(float, "Current (pA)"),
         "end" : LayerMeta(int, "Sample End",  
             lambda track: track.layers["dtw","start"] + track.layers["dtw","length"],
             [("dtw", "start"), ("dtw", "length")]),
@@ -60,17 +71,17 @@ LAYERS = {
             lambda track: track.layers["dtw","current"] - track.model[track.kmers],
             [("dtw", "current")]),
         "kmer" : LayerMeta(str, "Reference k-mer",
-            lambda track: track.kmers, None),
+            lambda track: track.kmers),
         "base" : LayerMeta(str, "Reference base",
-            lambda track: nt.kmer_base(track.kmers, 2), None),
+            lambda track: nt.kmer_base(track.kmers, 2)),
     }, "bcaln" : {
-        "start" : LayerMeta(int, "Basecalled Sample Start", None, None),
-        "length" : LayerMeta(int, "Basecalled Sample Length", None, None),
+        "start" : LayerMeta(int, "Basecalled Sample Start"),
+        "length" : LayerMeta(int, "Basecalled Sample Length"),
         "end" : LayerMeta(int, "Sample End",  
             lambda track: track.layers["bcaln","start"] + track.layers["bcaln","length"],
             [("bcaln", "start"), ("bcaln", "length")]),
-        "bp" : LayerMeta(int, "Basecaller Base Index", None, None),
-        "error" : LayerMeta(str, "Basecalled Alignment Error", None, None),
+        "bp" : LayerMeta(int, "Basecaller Base Index"),
+        "error" : LayerMeta(str, "Basecalled Alignment Error"),
     }, "cmp" : {
         "jaccard" : LayerMeta(int, "Jaccard Distance", None, 
             [("dtw", "start"), ("dtw", "end"), ("dtw", "length")]),
@@ -97,6 +108,11 @@ def parse_layer(layer):
         group,layer = spl
     #TODO allow for full group specification
     elif len(spl) == 1:
+        if layer in LAYERS:
+            group = layer
+            for layer in LAYERS[group].keys():
+                yield (group, layer)
+            return
         group = "dtw"
         layer = spl[0]
     else:
@@ -112,7 +128,7 @@ def parse_layer(layer):
         opts = "\", \"".join(group_layers.keys())
         raise ValueError(f"Invalid layer \"{group}.{layer}\". Options: \"{opts}\"")
 
-    return (group, layer)
+    yield (group, layer)
 
 def parse_layers(layers, add_deps=True):
     db_layers = list() 
@@ -125,21 +141,20 @@ def parse_layers(layers, add_deps=True):
 
     parsed = set()
 
-    for layer in layers:
-        layer = parse_layer(layer)
+    for layerstr in layers:
+        for layer in parse_layer(layerstr):
+            if not layer in parsed:
+                parsed.add(layer)
 
-        if not layer in parsed:
-            parsed.add(layer)
+                if add_deps:
+                    deps = LAYERS[layer[0]][layer[1]].deps
+                    if deps is not None:
+                        for dep in deps:
+                            if not dep in parsed:
+                                parsed.add(dep)
+                                yield dep
 
-            if add_deps:
-                deps = LAYERS[layer[0]][layer[1]].deps
-                if deps is not None:
-                    for dep in deps:
-                        if not dep in parsed:
-                            parsed.add(dep)
-                            yield dep
-
-            yield layer
+                yield layer
 
 class AlnTrack:
     def __init__(self, 

@@ -82,7 +82,7 @@ class Trackplot:
             self.tracks.conf.load_config(self.conf)
             self.conf = self.tracks.conf
 
-        self.tracks.load_refs(load_mat=True)
+        #self.tracks.load_refs(load_mat=True)
 
         names = [t.name for t in self.tracks]
 
@@ -138,7 +138,7 @@ class Trackplot:
         )
         
     def _mat(self, row, layer):
-        group,layer = parse_layer(layer)
+        (group,layer), = parse_layer(layer)
 
         layer_label = LAYERS[group][layer].label
 
@@ -153,6 +153,9 @@ class Trackplot:
                 sys.stderr.write("Warning: no alignments loaded from track \"%s\"\n" % track.desc)
                 row += 1
                 continue
+
+            if track.mat is None:
+                track.load_mat()
 
             mat = track.mat[(group,layer)]#.dropna(how="all")
             
