@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
+import time
 
 from .sigplot import Sigplot
 
@@ -61,9 +62,12 @@ class Dotplot:
                 "displayModeBar" : True}
 
     def iter_plots(self):
+        t0 = time.time()
         for read_id, tracks in self.tracks.iter_reads():
-            print(read_id)
+            print(read_id, time.time()-t0)
             yield read_id, self._plot(read_id, tracks)
+            t0 = time.time()
+
 
     def plot(self, read_id):
         for read_id, tracks in self.tracks.iter_reads([read_id]):
@@ -170,10 +174,14 @@ class Dotplot:
             if len(track_hover) > 0:
                 hover_data[track.name] = track_hover[0]#.reset_index()
 
-        for i,track in enumerate(tracks):
-            if not ("bcaln","error") in track.layers.columns: continue
-            for aln_id, aln in track.alignments.iterrows():
-                self._plot_errors(fig, legend, track.get_aln_layers(aln_id))
+        if self.prms.bcaln_error:
+            print("BLAH")
+            for i,track in enumerate(tracks):
+                if not ("bcaln","error") in track.layers.columns: 
+                    print("BO")
+                    continue
+                for aln_id, aln in track.alignments.iterrows():
+                    self._plot_errors(fig, legend, track.get_aln_layers(aln_id))
 
         if len(hover_data) > 0:
             hover_data = pd.concat(hover_data, axis=1)

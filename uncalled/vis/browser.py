@@ -6,7 +6,7 @@ import dash
 from dash import html, dcc, dash_table
 from dash.dependencies import Input, Output, State
 
-from .trackplot import Trackplot
+from .trackplot import Trackplot, PLOT_LAYERS
 from .. import config
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
@@ -25,7 +25,6 @@ OPTS = (
 
 def main(conf):
     """Interactive signal alignment genome browser"""
-    conf.tracks.layers.append("cmp.mean_ref_dist")
     conf.tracks.load_mat = True
     conf.tracks.refstats_layers.append("cmp.mean_ref_dist")
     tracks = Tracks(conf=conf)
@@ -36,6 +35,10 @@ def browser(tracks, conf):
 
     app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
     app.title = "Uncalled4 Browser"
+
+    layer_opts = [
+        {"label" : LAYERS[group][layer].label, "value" : f"{group}.{layer}"}
+        for group,layer in tracks.aln_layers(PLOT_LAYERS)]
 
     app.layout = html.Div(children=[
         html.Div(
@@ -53,13 +56,14 @@ def browser(tracks, conf):
                 html.Div([
                     html.B("Active layer: "), 
                     dcc.Dropdown(
-                        options=[
-                            {"label": "Current (pA)", "value": "current"},
-                            {"label": "Dwell Time (ms)", "value": "dwell"},
-                            {"label": "Model pA Difference", "value": "model_diff"},
-                            {"label": "Mean Ref. Dist", "value": "cmp.mean_ref_dist"},
-                        ],
-                        value=conf.trackplot.layer, 
+                        #options=[
+                        #    {"label": "Current (pA)", "value": "current"},
+                        #    {"label": "Dwell Time (ms)", "value": "dwell"},
+                        #    {"label": "Model pA Difference", "value": "model_diff"},
+                        #    {"label": "Mean Ref. Dist", "value": "cmp.mean_ref_dist"},
+                        #],
+                        options=layer_opts,
+                        value=layer_opts[0]["value"], 
                         clearable=False, multi=False,
                         id="trackplot-layer"),
                 ]),
@@ -101,12 +105,13 @@ def browser(tracks, conf):
             ref = coord["x"]
 
             if coord["curveNumber"] < len(tracks):
-                track = tracks.all[coord["curveNumber"]]
+                track = tracks.alns[coord["curveNumber"]]
                 aln = track.alignments.iloc[coord["y"]]
                 read = aln["read_id"]
-                mref = tracks.coords.ref_to_mref(ref, aln.fwd)
 
-                layers = track.layers.loc[(mref, aln.name)]["dtw"]
+                print(ref,read,aln)
+
+                layers = track.layers.loc[(ref, aln.name)]["dtw"]
 
                 table.append(html.Tr(html.Td(html.B("%s:%d" % (tracks.coords.ref_name, ref)), colSpan=2)))
                 table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
@@ -119,11 +124,11 @@ def browser(tracks, conf):
 
         print(layer)
 
-        layer = parse_layer(layer)
+        layer, = parse_layer(layer)
 
         print(layer)
         fig = Trackplot(
-            tracks, layer, 
+            tracks, [("mat", layer)], 
             select_ref=ref, select_read=read, 
             conf=conf).fig
         fig.update_layout(uirevision=True)

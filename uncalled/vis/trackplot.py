@@ -49,12 +49,19 @@ DEFAULT_HEIGHTS = {
     "mat" : 3, "box" : 2, "line" : 1, "scatter" : 1
 }
 
+PLOT_LAYERS = {
+    ("dtw", "current"), ("dtw", "dwell"), ("dtw", "model_diff"),
+    ("bcaln", "error"), ("cmp", "mean_ref_dist"), ("bc_cmp", "mean_ref_dist"),
+    ("cmp", "jaccard"), ("bc_cmp", "jaccard"),
+}
+
 class Trackplot:
 
     def _parse_panels(self):
         layers = list()
         ref_layers = list()
         ref_stats = set()
+        print(self.prms.panels)
         for panel, layer in self.prms.panels:
             if panel in LAYER_PANELS:
                 layers.append(layer)

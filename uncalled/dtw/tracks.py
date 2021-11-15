@@ -310,6 +310,18 @@ class Tracks:
 
                 raise err
 
+    def aln_layers(self, layer_filter=None):
+        ret = pd.Index([])
+        for track in self.alns:
+            layers = track.layers.columns
+            if layer_filter is not None:
+                layers = layers.intersection(layer_filter)
+            print(ret)
+            print(layers)
+            ret = ret.union(layers)
+        return ret
+            
+
     def get_fast5_reader(self):
         #TODO needs work for multiple DBs
         if self.fast5s is None:
@@ -615,7 +627,7 @@ class Tracks:
 
             yield (coords, self.alns)
 
-    def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
+    def iter_reads_new(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
         if read_filter is None:
@@ -623,6 +635,34 @@ class Tracks:
         if max_reads is None:
             max_reads = self.prms.max_reads
         
+        dbfile0,db0 = list(self.dbs.items())[0]
+
+        layer_iter = db0.query_layers(
+            self._aln_track_ids,
+            read_id=read_filter,
+            coords=self.coords, 
+            full_overlap=full_overlap, 
+            order=["read_id"],
+            chunksize=self.prms.ref_chunksize)
+
+        layer_leftovers = pd.DataFrame()
+        alignment_leftovers = pd.DataFrame()
+
+        for layers in layer_iter:
+            layers = pd.concat([layer_leftovers, layers])
+
+            ids = layers.index.get_level_values("aln_id").unique().to_numpy()
+            alignments = db0.query_alignments(aln_id=ids)
+
+
+    def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
+        if ref_bounds is not None:
+            self._set_ref_bounds(ref_bounds)
+        if read_filter is None:
+            read_filter = self.prms.read_filter
+        if max_reads is None:
+            max_reads = self.prms.max_reads
+
         dbfile0,db0 = list(self.dbs.items())[0]
 
         aln_iter = db0.query_alignments(

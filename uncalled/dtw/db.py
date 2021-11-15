@@ -320,7 +320,7 @@ class TrackSQL:
 
         self._add_where(wheres, params, "idx_aln_id", aln_id)
 
-        query = self._join_query(select, wheres, ["idx_"+o for o in order])
+        query = self._join_query(select, wheres, ["idx_"+o if o in {"aln_id","mref"} else o for o in order])
 
         ret = pd.read_sql_query(
             query, self.con, 
