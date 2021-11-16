@@ -159,13 +159,15 @@ def parse_layers(layers, add_deps=True):
 class AlnTrack:
     def __init__(self, 
             db, track_id, name, desc, conf, 
-            coords=None, alignments=None, layers=None):
+            coords=None, alignments=None, layers=None, 
+            fast5s=None): #shouldn't need
 
         self.db = db
         self.id = track_id
         self.name = name
         self.desc = desc
         self.conf = conf
+        self.fast5s = fast5s
 
         self.mat = None
 
@@ -203,13 +205,26 @@ class AlnTrack:
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
 
+    @property
+    def all_fwd(self):
+        return np.all(self.alignments["fwd"])
+
+    @property
+    def all_rev(self):
+        return not np.any(self.alignments["fwd"])
+
     #def slice(self, ref_start=0, ref_end=np.inf, aln_ids=None):
-    def slice(self, coords=slice(None), aln_ids=None):
+    def slice(self, coords=slice(None), aln_ids=None, reads=None):
         #ref_start = max(self.layer_refs.min(), ref_start)
         #ref_end = min(self.layer_refs.max()+1, ref_end)
         #coords = self.coords.ref_slice(ref_start, ref_end)
 
         layers = self.layers.loc[coords.refs]
+
+        if reads is not None:
+            if aln_ids is not None:
+                raise ValueError("Only one of 'aln_ids' and 'reads' can be specified")
+            aln_ids = self.alignments.index[self.alignments["read_id"].isin(reads)]
 
         if aln_ids is not None: 
             layer_alns = layers.index.get_level_values("aln_id")
@@ -222,7 +237,8 @@ class AlnTrack:
 
         return AlnTrack(
             self.db, self.id, self.name, self.desc, self.conf, 
-            coords, alignments, layers=layers)
+            coords, alignments, layers=layers, 
+            fast5s=self.fast5s) #TODO should just store in tracks
         
 
     @property

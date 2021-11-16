@@ -5,8 +5,10 @@ import numpy as np
 import dash
 from dash import html, dcc, dash_table
 from dash.dependencies import Input, Output, State
+import sys
 
 from .trackplot import Trackplot, PLOT_LAYERS
+from .dotplot import Dotplot
 from .. import config
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
@@ -27,7 +29,9 @@ def main(conf):
     """Interactive signal alignment genome browser"""
     conf.tracks.load_mat = True
     conf.tracks.refstats_layers.append("cmp.mean_ref_dist")
+    sys.stderr.write("Loading tracks...\n")
     tracks = Tracks(conf=conf)
+    sys.stderr.write("Starting server...\n")
     browser(tracks, conf)
 
 def browser(tracks, conf):
@@ -50,7 +54,7 @@ def browser(tracks, conf):
                 dcc.Graph(#[dcc.Loading(type="circle"),
                     id="trackplot",
                     config = {"scrollZoom" : True, "displayModeBar" : True}
-            )], className="w3-container w3-twothird w3-card"),
+            )], className="w3-container w3-card w3-half"),
 
             html.Div([
                 html.Div([
@@ -72,17 +76,17 @@ def browser(tracks, conf):
                     html.Table([], id="info-table"),
                     html.Button("View Dotplot", id="dotplot-btn", style={"margin" : "5px"})
                     ], style={"display" : "none"},
-                    id="selection-card", className="w3-container w3-card"),
+                    id="selection-card", className="w3-card w3-container"),
 
-            ], className="w3-container w3-third"),
+                html.Div([
+                    dcc.Graph(
+                        id="dotplot",
+                        config = {"scrollZoom" : True, "displayModeBar" : True}
+                )], id="dotplot-div", 
+                    style={"display" : "none"},
+                    className="w3-card"),
+            ], className="w3-container w3-half"),
 
-            html.Div([
-                dcc.Graph(
-                    id="dotplot",
-                    config = {"scrollZoom" : True, "displayModeBar" : True}
-            )], id="dotplot-div", 
-                style={"display" : "none"},
-                className="w3-container w3-twothird w3-card"),
         ]),
         html.Div(style={"display" : "none"}, id="selected-read"),
         html.Div(style={"display" : "none"}, id="selected-ref"),
@@ -109,8 +113,6 @@ def browser(tracks, conf):
                 aln = track.alignments.iloc[coord["y"]]
                 read = aln["read_id"]
 
-                print(ref,read,aln)
-
                 layers = track.layers.loc[(ref, aln.name)]["dtw"]
 
                 table.append(html.Tr(html.Td(html.B("%s:%d" % (tracks.coords.ref_name, ref)), colSpan=2)))
@@ -122,29 +124,30 @@ def browser(tracks, conf):
 
                 card_style = {"display" : "block"}
 
-        print(layer)
-
         layer, = parse_layer(layer)
 
-        print(layer)
         fig = Trackplot(
             tracks, [("mat", layer)], 
             select_ref=ref, select_read=read, 
             conf=conf).fig
         fig.update_layout(uirevision=True)
 
-        print("DONE")
-
         return fig, table, card_style, ref, read
 
     @app.callback(
-        #Output("dotplot", "figure"),
+        Output("dotplot", "figure"),
         Output("dotplot-div", "style"),
         State("selected-read", "children"),
         Input("dotplot-btn", "n_clicks"))
     def update_trackplot(read, n_clicks):
         if n_clicks is None:
-            return {"display" : "hidden"}
-        return {"display" : "block"}
+            print("Nothing")
+            return {}, {"display" : "hidden"}
+
+        print("Dotting")
+        fig = Dotplot(tracks, conf=tracks.conf).plot(read)
+        print("Plotting")
+
+        return fig, {"display" : "block"}
 
     app.run_server(debug=True)

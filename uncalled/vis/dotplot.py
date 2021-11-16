@@ -68,10 +68,11 @@ class Dotplot:
             yield read_id, self._plot(read_id, tracks)
             t0 = time.time()
 
-
     def plot(self, read_id):
-        for read_id, tracks in self.tracks.iter_reads([read_id]):
-            return self._plot(read_id, tracks)
+        chunk = self.tracks.slice(reads=[read_id])
+        return self._plot(read_id, chunk.alns)
+        #for read_id, tracks in self.tracks.iter_reads_([read_id]):
+        #    return self._plot(read_id, tracks)
 
     def show(self, read_id):
         self.plot(read_id).show(config=self.fig_config)
@@ -175,10 +176,8 @@ class Dotplot:
                 hover_data[track.name] = track_hover[0]#.reset_index()
 
         if self.prms.bcaln_error:
-            print("BLAH")
             for i,track in enumerate(tracks):
                 if not ("bcaln","error") in track.layers.columns: 
-                    print("BO")
                     continue
                 for aln_id, aln in track.alignments.iterrows():
                     self._plot_errors(fig, legend, track.get_aln_layers(aln_id))
@@ -221,7 +220,7 @@ class Dotplot:
                 showlegend=False
             ), row=2,col=1)
 
-        if coords.fwd == self.conf.is_rna:
+        if track.all_fwd == self.conf.is_rna:
             fig.update_yaxes(autorange="reversed", row=2, col=1)
             fig.update_yaxes(autorange="reversed", row=2, col=2)
 
@@ -250,6 +249,7 @@ class Dotplot:
 
         fig.update_layout(
             #hovermode="x unified",
+            margin={"t":50, "b":50},
             barmode="overlay",
             hoverdistance=20,
             dragmode="pan", 
@@ -259,7 +259,7 @@ class Dotplot:
 
     def _plot_bcaln(self, fig, legend, layers):
         fig.add_trace(go.Scattergl(
-            x=layers["bcaln","start"], y=layers.index+2,
+            x=layers["bcaln","start"], y=layers.index+1,
             name="Basecalled Alignment",
             mode="markers", marker={"size":5,"color":"orange"},
             legendgroup="bcaln",

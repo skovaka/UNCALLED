@@ -398,18 +398,25 @@ class Tracks:
             raise RuntimeError("No input tracks have been loaded")
 
     #TODO read_ids, track_alns, max_cov(?)
-    def slice(self, ref_start, ref_end):
+    def slice(self, ref_start=None, ref_end=None, reads=None):
         if self.coords is None:
             raise IndexError("Cannot slice empty Tracks")
 
-        coords = self.coords.ref_slice(ref_start, ref_end)
+        hasbounds = (ref_start is not None, ref_end is not None)
+        if np.all(hasbounds):
+            coords = self.coords.ref_slice(ref_start, ref_end)
+        elif np.any(hasbounds):
+            raise IndexError(f"Invalid bounds {ref_start}-{ref_end}")
+        else:
+            coords = self.coords
 
         tracks = dict()
         for name,track in self._tracks.items():
             if isinstance(track, pd.DataFrame):
                 tracks[name] = track.loc[coords.refs]
+
             elif isinstance(track, AlnTrack):
-                tracks[name] = track.slice(coords)
+                tracks[name] = track.slice(coords, reads=reads)
 
         return Tracks(self, coords, tracks)
             
@@ -627,7 +634,7 @@ class Tracks:
 
             yield (coords, self.alns)
 
-    def iter_reads_new(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
+    def iter_reads_db(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
         if read_filter is None:
@@ -653,6 +660,9 @@ class Tracks:
 
             ids = layers.index.get_level_values("aln_id").unique().to_numpy()
             alignments = db0.query_alignments(aln_id=ids)
+
+    def iter_reads_slice(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
+        pass
 
 
     def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):

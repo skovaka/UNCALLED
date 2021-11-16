@@ -23,7 +23,7 @@ TrackplotParams._def_params(
     ("select_read", None, str, "Read Selection"),
     ("width", None, int, "Figure width"),
     ("panel_heights", None, None, "Relative height of each panel"),
-    ("min_height", 700, int, "Minimum figure height"),
+    ("min_height", 200, int, "Minimum figure height"),
     ("track_height", 100, int, "Minimum per-track figure height"),
     ("outfile", None, str, "Output file"),
 )
