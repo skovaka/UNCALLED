@@ -24,6 +24,7 @@ DotplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
     ("bcaln_track", None, str, "Only display basecalled alignments from this track"),
     ("bcaln_error", False, bool, "Display basecalled alignment errors"),
+    ("select_ref", None, int, "Display a horizontal line at specified reference coordinate"),
     ("layers", [], None, ""),
 )
 
@@ -127,11 +128,12 @@ class Dotplot:
                     self._plot_bcaln(fig, legend, layers)
 
                 if not only_bcaln: 
+                    print(layers)
                     fig.add_trace(go.Scattergl(
                         x=layers["dtw","start"], y=layers.index,
                         name=track.desc,
                         legendgroup=track.name,
-                        line={"color":self.conf.vis.track_colors[i], "width":2, "shape" : "hv"},
+                        line={"color":self.conf.vis.track_colors[i], "width":2, "shape" : "vh"},
                         hoverinfo="skip",
                         showlegend=first_aln
                     ), row=2, col=1)
@@ -145,7 +147,7 @@ class Dotplot:
                 for j,layer in enumerate(self.prms.layers):
                     if layer[0] != "cmp":
                         fig.add_trace(go.Scattergl(
-                            x=layers[layer], y=layers.index-0.5,
+                            x=layers[layer], y=layers.index+0.5,
                             name=track.desc, 
                             line={
                                 "color" : self.conf.vis.track_colors[i], 
@@ -223,6 +225,9 @@ class Dotplot:
         if track.all_fwd == self.conf.is_rna:
             fig.update_yaxes(autorange="reversed", row=2, col=1)
             fig.update_yaxes(autorange="reversed", row=2, col=2)
+
+        if self.prms.select_ref is not None:
+            fig.add_hline(y=self.prms.select_ref, line_color="red", row=2, col=1, opacity=0.5)
 
         fig.update_yaxes(row=2, col=1,
             title_text="Reference (%s)" % aln["ref_name"])

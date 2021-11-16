@@ -21,6 +21,7 @@ TrackplotParams._def_params(
     ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF", "red"], list, ""),
     ("select_ref", None, str, "Reference Selection"),
     ("select_read", None, str, "Read Selection"),
+    ("hover_read", False, bool, "If True will display read_id in mat hover"),
     ("width", None, int, "Figure width"),
     ("panel_heights", None, None, "Relative height of each panel"),
     ("min_height", 200, int, "Minimum figure height"),
@@ -144,8 +145,10 @@ class Trackplot:
             dragmode="pan", 
             autosize=True, height=height,
             margin={"t":50},
-            legend={"x":1,"y":1,"xanchor":"left"}
+            legend={"x":1,"y":1,"xanchor":"left"},
+            #hovermode="x unified",
         )
+        self.fig.update_traces(xaxis="x3")
         
     def _mat(self, row, layer):
         (group,layer), = parse_layer(layer)
@@ -172,10 +175,11 @@ class Trackplot:
             read_ids = np.tile(track.alignments.loc[mat.index, "read_id"].to_numpy(), (mat.shape[1], 1)).T
 
 
-            hover = "<br>".join([
-                track.coords.ref_name + ":%{x}",
-                "Read: %{text}",
-                layer_label + ": %{z}"])
+            hover_lines = [track.coords.ref_name + ":%{x}"]
+            if self.prms.hover_read:
+                hover_lines.append("%{text}")
+            hover_lines.append(layer_label + ": %{z}<extra></extra>")
+            hover = "<br>".join(hover_lines)
 
             self.fig.add_trace(go.Heatmap(
                 name=track.desc,
@@ -183,8 +187,9 @@ class Trackplot:
                 #y=track.alignments["read_id"],
                 z=mat,
                 zsmooth=False,
+                hoverinfo="text",
                 hovertemplate=hover,
-                text = read_ids,
+                #text = read_ids,
                 coloraxis="coloraxis",
             ), row=row, col=1)
 
@@ -272,7 +277,6 @@ class Trackplot:
                 **self._stat_kw(plot, self.prms.track_colors[j])
             ), row=row, col=1)
 
-        #self.fig.update_layout(hovermode="x", row=row, col=1)
 
         #for stat in cmp_stats:
 

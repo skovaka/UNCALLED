@@ -316,8 +316,6 @@ class Tracks:
             layers = track.layers.columns
             if layer_filter is not None:
                 layers = layers.intersection(layer_filter)
-            print(ret)
-            print(layers)
             ret = ret.union(layers)
         return ret
             
@@ -472,6 +470,9 @@ class Tracks:
         self.cmp = db.query_compare(self.cmp_layers, self._aln_track_ids, self.coords, aln_ids)
         #TODO add aln_ids
 
+        print("HERE")
+        print(self.cmp)
+
         groups = self.cmp.index.get_level_values("group_b").unique()
         if "bcaln" in groups:
             bcalns = self.cmp.loc[(slice(None), slice(None), slice(None), "bcaln"),:]
@@ -619,9 +620,9 @@ class Tracks:
 
             i = chunk_mrefs.difference(coords.mrefs)
             leftovers = chunk.loc[i]
-            chunk = chunk.drop(index=i)
+            layers = chunk.drop(index=i)
 
-            layers = pd.concat({"dtw":chunk}, names=["group", "layer"], axis=1)
+            #layers = pd.concat({"dtw":chunk}, names=["group", "layer"], axis=1)
 
             aln_ids = chunk.index.unique("aln_id").to_numpy()
             alns = db0.query_alignments(self._aln_track_ids, aln_id=aln_ids)

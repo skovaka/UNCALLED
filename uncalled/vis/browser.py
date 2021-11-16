@@ -29,6 +29,7 @@ def main(conf):
     """Interactive signal alignment genome browser"""
     conf.tracks.load_mat = True
     conf.tracks.refstats_layers.append("cmp.mean_ref_dist")
+    conf.dotplot.layers=["model_diff"]
     sys.stderr.write("Loading tracks...\n")
     tracks = Tracks(conf=conf)
     sys.stderr.write("Starting server...\n")
@@ -51,12 +52,6 @@ def browser(tracks, conf):
 
         html.Div([
             html.Div([
-                dcc.Graph(#[dcc.Loading(type="circle"),
-                    id="trackplot",
-                    config = {"scrollZoom" : True, "displayModeBar" : True}
-            )], className="w3-container w3-card w3-half"),
-
-            html.Div([
                 html.Div([
                     html.B("Active layer: "), 
                     dcc.Dropdown(
@@ -71,13 +66,19 @@ def browser(tracks, conf):
                         clearable=False, multi=False,
                         id="trackplot-layer"),
                 ]),
+                dcc.Graph(#[dcc.Loading(type="circle"),
+                    id="trackplot",
+                    config = {"scrollZoom" : True, "displayModeBar" : True}
+            )], className="w3-container w3-card w3-half"),
+
+            html.Div([
 
                 html.Div([
                     html.Table([], id="info-table"),
-                    html.Button("View Dotplot", id="dotplot-btn", style={"margin" : "5px"})
                     ], style={"display" : "none"},
                     id="selection-card", className="w3-card w3-container"),
 
+                html.P([
                 html.Div([
                     dcc.Graph(
                         id="dotplot",
@@ -85,6 +86,7 @@ def browser(tracks, conf):
                 )], id="dotplot-div", 
                     style={"display" : "none"},
                     className="w3-card"),
+                ]),
             ], className="w3-container w3-half"),
 
         ]),
@@ -137,16 +139,27 @@ def browser(tracks, conf):
     @app.callback(
         Output("dotplot", "figure"),
         Output("dotplot-div", "style"),
-        State("selected-read", "children"),
-        Input("dotplot-btn", "n_clicks"))
-    def update_trackplot(read, n_clicks):
-        if n_clicks is None:
-            print("Nothing")
-            return {}, {"display" : "hidden"}
+        #State("selected-read", "children"),
+        #Input("dotplot-btn", "n_clicks"))
+        Input("trackplot", "clickData"))
+    def update_trackplot(click):
+        #if n_clicks is None:
+        #    print("Nothing")
+        #    return {}, {"display" : "hidden"}
 
-        print("Dotting")
-        fig = Dotplot(tracks, conf=tracks.conf).plot(read)
-        print("Plotting")
+        if click is None: 
+            return {}, {"display" : "hidden"}
+        coord = click["points"][0]
+        if coord["curveNumber"] >= len(tracks): 
+            return {}, {"display" : "hidden"}
+        ref = coord["x"]
+
+        track = tracks.alns[coord["curveNumber"]]
+        aln = track.alignments.iloc[coord["y"]]
+        read = aln["read_id"]
+
+        fig = Dotplot(tracks, select_ref=ref, conf=tracks.conf).plot(read)
+        #fig.update_layout(uirevision=True)
 
         return fig, {"display" : "block"}
 
