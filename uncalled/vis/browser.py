@@ -48,7 +48,10 @@ def _panel(title, name, content, hide=False):
     id=f"{name}-panel", className="w3-panel", style=style)
 
 def browser(tracks, conf):
-    external_stylesheets = ["https://www.w3schools.com/w3css/4/w3.css"]
+    external_stylesheets = [
+        "https://www.w3schools.com/w3css/4/w3.css",
+        "https://fonts.googleapis.com/icon?family=Material+Icons"
+    ]
 
     app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
     app.title = "Uncalled4 Browser"

@@ -635,19 +635,20 @@ class Tracks:
 
             yield (coords, self.alns)
 
-    def iter_reads_db(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
+    def iter_reads_db(self, reads=None, ref_bounds=None, full_overlap=False, max_reads=None):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
-        if read_filter is None:
-            read_filter = self.prms.read_filter
+        if reads is None:
+            reads = self.prms.read_filter
         if max_reads is None:
             max_reads = self.prms.max_reads
         
         dbfile0,db0 = list(self.dbs.items())[0]
 
         layer_iter = db0.query_layers(
+            self.db_layers, 
             self._aln_track_ids,
-            read_id=read_filter,
+            read_id=reads,
             coords=self.coords, 
             full_overlap=full_overlap, 
             order=["read_id"],
@@ -661,6 +662,7 @@ class Tracks:
 
             ids = layers.index.get_level_values("aln_id").unique().to_numpy()
             alignments = db0.query_alignments(aln_id=ids)
+            yield alignments
 
     def iter_reads_slice(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
         pass

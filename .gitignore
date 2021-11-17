@@ -2,6 +2,7 @@
 .*.swp
 .*.swo
 .eggs
+_uncalled*
 build
 dist
 bin
