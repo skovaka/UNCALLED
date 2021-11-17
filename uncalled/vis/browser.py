@@ -35,6 +35,18 @@ def main(conf):
     sys.stderr.write("Starting server...\n")
     browser(tracks, conf)
 
+def _panel(title, name, content, hide=False, panel_class=""):
+    style={"display" : "none" if hide else "block"}
+    return html.Div(
+            html.Div([
+                html.Header(
+                    html.H6(html.B(title)), 
+                    id=f"{name}-header", 
+                    className="w3-container w3-deep-purple"),
+                html.Div(content, id=f"{name}-body", className="w3-container")
+        ], id=f"{name}-card", className="w3-card"),
+    id=f"{name}-panel", className="w3-panel "+panel_class, style=style)
+
 def browser(tracks, conf):
     external_stylesheets = ["https://www.w3schools.com/w3css/4/w3.css"]
 
@@ -47,47 +59,36 @@ def browser(tracks, conf):
 
     app.layout = html.Div(children=[
         html.Div(
-            html.H2(html.B("Uncalled4 Genome Browser")), 
+            html.H4(html.B("Uncalled4 Genome Browser")), 
             className="w3-container w3-deep-purple"),
 
         html.Div([
-            html.Div([
-                html.Div([
-                    html.B("Active layer: "), 
+            #html.Div(
+                _panel("Trackplot", "trackplot", [
+                    #html.B("Active layer: "), 
                     dcc.Dropdown(
-                        #options=[
-                        #    {"label": "Current (pA)", "value": "current"},
-                        #    {"label": "Dwell Time (ms)", "value": "dwell"},
-                        #    {"label": "Model pA Difference", "value": "model_diff"},
-                        #    {"label": "Mean Ref. Dist", "value": "cmp.mean_ref_dist"},
-                        #],
                         options=layer_opts,
                         value=layer_opts[0]["value"], 
                         clearable=False, multi=False,
                         id="trackplot-layer"),
-                ]),
-                dcc.Graph(#[dcc.Loading(type="circle"),
-                    id="trackplot",
-                    config = {"scrollZoom" : True, "displayModeBar" : True}
-            )], className="w3-container w3-card w3-half"),
+                    dcc.Graph(#[dcc.Loading(type="circle"),
+                        id="trackplot",
+                        config = {"scrollZoom" : True, "displayModeBar" : True})
+                ], panel_class="w3-half"),
+            #, className="w3-container w3-half"),
 
             html.Div([
 
-                html.Div([
-                    html.Table([], id="info-table"),
-                    ], style={"display" : "none"},
-                    id="selection-card", className="w3-card w3-container"),
+                _panel("Selection", "selection",
+                        html.Table([], id="info-table")),
 
-                html.P([
-                html.Div([
+                _panel("Dotplot", "dotplot",
                     dcc.Graph(
                         id="dotplot",
                         config = {"scrollZoom" : True, "displayModeBar" : True}
-                )], id="dotplot-div", 
-                    style={"display" : "none"},
-                    className="w3-card"),
-                ]),
-            ], className="w3-container w3-half"),
+                    ), hide=True,
+                ),
+            ], className="w3-half"),
 
         ]),
         html.Div(style={"display" : "none"}, id="selected-read"),
@@ -97,7 +98,7 @@ def browser(tracks, conf):
     @app.callback(
         Output("trackplot", "figure"),
         Output("info-table", "children"),
-        Output("selection-card", "style"),
+        Output("selection-panel", "style"),
         Output("selected-ref", "children"),
         Output("selected-read", "children"),
         Input("trackplot-layer", "value"),
@@ -138,7 +139,7 @@ def browser(tracks, conf):
 
     @app.callback(
         Output("dotplot", "figure"),
-        Output("dotplot-div", "style"),
+        Output("dotplot-panel", "style"),
         #State("selected-read", "children"),
         #Input("dotplot-btn", "n_clicks"))
         Input("trackplot", "clickData"))
