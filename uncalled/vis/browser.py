@@ -35,7 +35,7 @@ def main(conf):
     sys.stderr.write("Starting server...\n")
     browser(tracks, conf)
 
-def _panel(title, name, content, hide=False, panel_class=""):
+def _panel(title, name, content, hide=False):
     style={"display" : "none" if hide else "block"}
     return html.Div(
             html.Div([
@@ -45,7 +45,7 @@ def _panel(title, name, content, hide=False, panel_class=""):
                     className="w3-container w3-deep-purple"),
                 html.Div(content, id=f"{name}-body", className="w3-container")
         ], id=f"{name}-card", className="w3-card"),
-    id=f"{name}-panel", className="w3-panel "+panel_class, style=style)
+    id=f"{name}-panel", className="w3-panel", style=style)
 
 def browser(tracks, conf):
     external_stylesheets = ["https://www.w3schools.com/w3css/4/w3.css"]
@@ -59,11 +59,11 @@ def browser(tracks, conf):
 
     app.layout = html.Div(children=[
         html.Div(
-            html.H4(html.B("Uncalled4 Genome Browser")), 
+            html.H3(html.B("Uncalled4 Genome Browser")), 
             className="w3-container w3-deep-purple"),
 
         html.Div([
-            #html.Div(
+            html.Div(
                 _panel("Trackplot", "trackplot", [
                     #html.B("Active layer: "), 
                     dcc.Dropdown(
@@ -74,11 +74,10 @@ def browser(tracks, conf):
                     dcc.Graph(#[dcc.Loading(type="circle"),
                         id="trackplot",
                         config = {"scrollZoom" : True, "displayModeBar" : True})
-                ], panel_class="w3-half"),
-            #, className="w3-container w3-half"),
+                    ])
+            , className="w3-half"),
 
             html.Div([
-
                 _panel("Selection", "selection",
                         html.Table([], id="info-table")),
 
