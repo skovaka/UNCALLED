@@ -396,7 +396,7 @@ class Tracks:
             raise RuntimeError("No input tracks have been loaded")
 
     #TODO read_ids, track_alns, max_cov(?)
-    def slice(self, ref_start=None, ref_end=None, reads=None):
+    def slice(self, ref_start=None, ref_end=None, reads=None, order=["fwd","ref_start"]):
         if self.coords is None:
             raise IndexError("Cannot slice empty Tracks")
 
@@ -414,9 +414,15 @@ class Tracks:
                 tracks[name] = track.loc[coords.refs]
 
             elif isinstance(track, AlnTrack):
-                tracks[name] = track.slice(coords, reads=reads)
+                tracks[name] = track.slice(coords, reads=reads, order=order)
 
         return Tracks(self, coords, tracks)
+
+    def slice_shared_reads(self):
+        read_ids = pd.Index(self.alns[0].read_ids)
+        for track in self.alns[1:]:
+            read_ids = read_ids.intersection(track.read_ids)
+        return self.slice(reads=read_ids, order="read_id")
             
     def load(self, ref_bounds=None, full_overlap=None, read_filter=None, load_mat=False):
         self._verify_read()
@@ -470,8 +476,6 @@ class Tracks:
         self.cmp = db.query_compare(self.cmp_layers, self._aln_track_ids, self.coords, aln_ids)
         #TODO add aln_ids
 
-        print("HERE")
-        print(self.cmp)
 
         groups = self.cmp.index.get_level_values("group_b").unique()
         if "bcaln" in groups:
@@ -579,7 +583,7 @@ class Tracks:
 
         self.refstats = refstats.dropna()
 
-        self.tracks["_refstats"] = self.refstats
+        self._tracks["_refstats"] = self.refstats
 
         return refstats
 

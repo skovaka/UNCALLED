@@ -22,10 +22,11 @@ TrackplotParams._def_params(
     ("select_ref", None, str, "Reference Selection"),
     ("select_read", None, str, "Read Selection"),
     ("hover_read", False, bool, "If True will display read_id in mat hover"),
+    ("show_legend", True, bool, "If True will display legend"),
+    ("share_reads", False, bool, "If True will only display reads shared by all alignment tracks with shared y-axis"),
     ("width", None, int, "Figure width"),
     ("panel_heights", None, None, "Relative height of each panel"),
     ("min_height", 200, int, "Minimum figure height"),
-    ("track_height", 100, int, "Minimum per-track figure height"),
     ("outfile", None, str, "Output file"),
 )
 
@@ -47,7 +48,7 @@ MULTIROW_PANEL = {
 }
 
 DEFAULT_HEIGHTS = {
-    "mat" : 3, "box" : 2, "line" : 1, "scatter" : 1
+    "mat" : 2, "box" : 1, "line" : 1, "scatter" : 1
 }
 
 PLOT_LAYERS = {
@@ -62,7 +63,6 @@ class Trackplot:
         layers = list()
         ref_layers = list()
         ref_stats = set()
-        print(self.prms.panels)
         for panel, layer in self.prms.panels:
             if panel in LAYER_PANELS:
                 layers.append(layer)
@@ -87,11 +87,11 @@ class Trackplot:
         if self.prms.tracks is None:
             t0 = time.time()
             self.tracks = Tracks(conf=self.conf)
-            print("TIME", time.time()-t0)
         else:
             self.tracks = self.prms.tracks
             self.tracks.conf.load_config(self.conf)
             self.conf = self.tracks.conf
+
 
         #self.tracks.load_refs(load_mat=True)
 
@@ -107,17 +107,22 @@ class Trackplot:
         else:
             panel_heights = self.prms.panel_heights
 
+
         n_rows = len(panel_heights)
 
         t0 = time.time()
         ref_title = "Reference (%s)" % self.tracks.coords.ref_name
         self.fig = make_subplots(
             rows=n_rows, cols=1, 
-            row_heights=self.prms.panel_heights,
+            row_heights=panel_heights,
             shared_xaxes=True, 
+            shared_yaxes=self.prms.share_reads, 
             x_title=ref_title,
             #y_title="Reads",
             vertical_spacing=0.125/n_rows)
+
+        if self.prms.share_reads:
+            self.fig.update_yaxes(matches="y")
 
         row = 1
         for panel,layer in self.prms.panels:
@@ -146,9 +151,11 @@ class Trackplot:
             autosize=True, height=height,
             margin={"t":50},
             legend={"x":1,"y":1,"xanchor":"left"},
+            showlegend=self.prms.show_legend,
+            coloraxis_showscale=self.prms.show_legend,
             #hovermode="x unified",
         )
-        self.fig.update_traces(xaxis="x3")
+        #self.fig.update_traces(xaxis="x3")
         
     def _mat(self, row, layer):
         (group,layer), = parse_layer(layer)
@@ -208,7 +215,7 @@ class Trackplot:
         self.fig.update_layout(coloraxis=cax)
         
     def _box(self, row, layer):
-        group,layer = parse_layer(layer)
+        (group,layer), = parse_layer(layer)
 
         layer_label = LAYERS[group][layer].label
 
@@ -216,7 +223,7 @@ class Trackplot:
         for j,track in enumerate(self.tracks.alns):
             stats = self.tracks.refstats[track.name,group,layer]
             for idx in stats.index[:-1]:
-                self.fig.add_vline(x=idx-0.5, line_color="black", row=row, col=1)
+                self.fig.add_vline(x=idx+0.5, line_color="black", row=row, col=1)
             self.fig.add_trace(go.Box(
                 x=stats.index - 0.25 + j*0.5,
                 median=stats["median"],
@@ -247,7 +254,7 @@ class Trackplot:
 
     def _refstat(self, row, layer, plot):
         spl = layer.split(".")
-        group, layer = parse_layer(".".join(spl[:-1]))
+        (group, layer), = parse_layer(".".join(spl[:-1]))
         stat = spl[-1]
 
         layer_label = LAYERS[group][layer].label
@@ -282,7 +289,7 @@ class Trackplot:
 
     def show(self):
         fig_conf = {
-            "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None, "scale" : 2},
+            "toImageButtonOptions" : {"format" : "png", "width" : None, "height" : None, "scale" : 2},
             "scrollZoom" : True, 
             "displayModeBar" : True}
 

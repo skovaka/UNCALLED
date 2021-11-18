@@ -160,7 +160,7 @@ class AlnTrack:
     def __init__(self, 
             db, track_id, name, desc, conf, 
             coords=None, alignments=None, layers=None, 
-            fast5s=None): #shouldn't need
+            fast5s=None, order=["fwd", "ref_start"]): #shouldn't need
 
         self.db = db
         self.id = track_id
@@ -173,9 +173,9 @@ class AlnTrack:
 
         self.model = PoreModel(self.conf.pore_model) 
 
-        self.set_data(coords, alignments, layers)
+        self.set_data(coords, alignments, layers, order)
 
-    def set_data(self, coords, alignments, layers):
+    def set_data(self, coords, alignments, layers, order=["fwd", "ref_start"]):
         self.coords = coords
         self.alignments = alignments
         self.layers = layers
@@ -186,7 +186,7 @@ class AlnTrack:
         elif np.any(isnone):
             raise ValueError("Must specify AlnTrack coords, alignments, and layers")
 
-        self.alignments.sort_values(["fwd", "ref_start"], inplace=True)
+        self.alignments.sort_values(order, inplace=True)
 
         self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
 
@@ -214,7 +214,7 @@ class AlnTrack:
         return not np.any(self.alignments["fwd"])
 
     #def slice(self, ref_start=0, ref_end=np.inf, aln_ids=None):
-    def slice(self, coords=slice(None), aln_ids=None, reads=None):
+    def slice(self, coords=slice(None), aln_ids=None, reads=None, order=["fwd","ref_start"]):
         #ref_start = max(self.layer_refs.min(), ref_start)
         #ref_end = min(self.layer_refs.max()+1, ref_end)
         #coords = self.coords.ref_slice(ref_start, ref_end)
@@ -238,7 +238,7 @@ class AlnTrack:
         return AlnTrack(
             self.db, self.id, self.name, self.desc, self.conf, 
             coords, alignments, layers=layers, 
-            fast5s=self.fast5s) #TODO should just store in tracks
+            fast5s=self.fast5s, order=order) #TODO should just store in tracks
         
 
     @property
@@ -442,6 +442,10 @@ class AlnTrack:
         df.loc[merge.index, "aln_b"] = merge["aln_b"].astype("Int32")
         df.loc[merge.index, "jaccard"] = jaccard
         df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
+
+    @property
+    def read_ids(self):
+        return self.alignments["read_id"].unique()
 
     @property
     def layer_aln_ids(self):

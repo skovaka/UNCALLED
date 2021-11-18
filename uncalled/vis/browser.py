@@ -14,6 +14,7 @@ from ..index import str_to_coord
 from ..dtw.tracks import Tracks
 from ..dtw.aln_track import LAYERS, parse_layer
 from ..argparse import Opt, comma_split
+from ..config import Config
 
 
 OPTS = (
@@ -48,6 +49,14 @@ def _icon_btn(icon, name=None, panel="", hide=False):
 
 def _panel(title, name, content, settings=None, hide=False):
     style={"display" : "none" if hide else "block"}
+    btns = list()
+
+    if settings is not None:
+        btns.append(_icon_btn("settings", "toggle_settings", name))
+    btns += [
+        _icon_btn("remove", "minimize", name),
+        _icon_btn("add", "maximize", name, hide=True),
+    ]
 
     ret = [html.Header(
         id=f"{name}-header", 
@@ -58,13 +67,7 @@ def _panel(title, name, content, settings=None, hide=False):
                 html.H5(html.B(title)),
                 className="w3-padding w3-display-left"),
             
-            html.Div(children=[
-                _icon_btn("settings", "toggle_settings", name),
-                #_icon_btn("arrow_drop_down"),
-                #_icon_btn("arrow_drop_up"),
-                _icon_btn("remove", "minimize", name),
-                _icon_btn("add", "maximize", name, hide=True),
-            ], className="w3-display-right w3-padding"),
+            html.Div(children=btns, className="w3-display-right w3-padding"),
     ])]
 
     if settings is not None:
@@ -112,8 +115,17 @@ def browser(tracks, conf):
                         dcc.Graph(#[dcc.Loading(type="circle"),
                             id="trackplot",
                             config = {"scrollZoom" : True, "displayModeBar" : True})
+
                     ], settings=[
-                        html.P("blah blah blah")
+                        dcc.Checklist(
+                            id="trackplot-checklist",
+                            className="w3-container w3-padding",
+                            labelStyle={"display" : "block"},
+                            inputClassName="w3-padding",
+                            options=[
+                                {"label" : "Show legend", "value" : "show_legend"},
+                                {"label" : "Shared reads only", "value" : "share_reads"},
+                            ], value=["show_legend", "share_reads"])
                 ])
             , className="w3-half"),
 
@@ -122,11 +134,21 @@ def browser(tracks, conf):
                         html.Table([], id="info-table")),
 
                 _panel("Dotplot", "dotplot",
-                    dcc.Graph(
+                    content=dcc.Graph(
                         id="dotplot",
                         config = {"scrollZoom" : True, "displayModeBar" : True}
-                    ), hide=True,
-                ),
+                    ), settings=[
+                        dcc.Checklist(
+                            id="dotplot-checklist",
+                            className="w3-container w3-padding",
+                            labelStyle={"display" : "block"},
+                            inputClassName="w3-padding",
+                            options=[
+                                {"label" : "Show legend", "value" : "show_legend"},
+                                {"label" : "Show model current", "value" : "show_model"},
+                                {"label" : "Always color bases", "value" : "multi_background"},
+                            ], value=["show_legend", "show_model"])
+                    ], hide=True),
             ], className="w3-half"),
 
         ]),
@@ -140,24 +162,34 @@ def browser(tracks, conf):
         Output("selection-panel", "style"),
         Output("selected-ref", "children"),
         Output("selected-read", "children"),
+        Input("trackplot-checklist", "value"),
         Input("trackplot-layer", "value"),
         Input("trackplot", "clickData"))
-    def update_trackplot(layer, click):
+    def update_trackplot(checklist, layer, click):
         table = list()
         ref = aln = read = None
         card_style = {"display" : "none"}
+        print("CLICK", click)
+
+        checklist = set(checklist)
+
+        if "share_reads" in checklist:
+            chunk = tracks.slice_shared_reads()
+        else:
+            chunk = tracks
+
         if click is not None:
             coord = click["points"][0]
             ref = coord["x"]
 
-            if coord["curveNumber"] < len(tracks):
-                track = tracks.alns[coord["curveNumber"]]
+            if coord["curveNumber"] < len(chunk):
+                track = chunk.alns[coord["curveNumber"]]
                 aln = track.alignments.iloc[coord["y"]]
                 read = aln["read_id"]
 
                 layers = track.layers.loc[(ref, aln.name)]["dtw"]
 
-                table.append(html.Tr(html.Td(html.B("%s:%d" % (tracks.coords.ref_name, ref)), colSpan=2)))
+                table.append(html.Tr(html.Td(html.B("%s:%d" % (chunk.coords.ref_name, ref)), colSpan=2)))
                 table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
                 for l in ["current", "dwell", "model_diff"]:
                     table.append(html.Tr([
@@ -169,8 +201,10 @@ def browser(tracks, conf):
         layer, = parse_layer(layer)
 
         fig = Trackplot(
-            tracks, [("mat", layer)], 
+            chunk, [("mat", layer)], 
             select_ref=ref, select_read=read, 
+            show_legend="show_legend" in checklist,
+            share_reads="share_reads" in checklist,
             conf=conf).fig
         fig.update_layout(uirevision=True)
 
@@ -181,24 +215,38 @@ def browser(tracks, conf):
         Output("dotplot-panel", "style"),
         #State("selected-read", "children"),
         #Input("dotplot-btn", "n_clicks"))
-        Input("trackplot", "clickData"))
-    def update_trackplot(click):
-        #if n_clicks is None:
-        #    print("Nothing")
+        Input("dotplot-checklist", "value"),
+        Input("trackplot-layer", "value"),
+        Input("selected-ref", "children"),
+        Input("selected-read", "children"))
+    def update_trackplot(flags, layer, ref, read):
+        #if click is None: 
         #    return {}, {"display" : "hidden"}
+        #coord = click["points"][0]
+        #if coord["curveNumber"] >= len(tracks): 
+        #    return {}, {"display" : "hidden"}
+        #ref = coord["x"]
 
-        if click is None: 
+        #track = tracks.alns[coord["curveNumber"]]
+        #aln = track.alignments.iloc[coord["y"]]
+        #read = aln["read_id"]
+        if read is None:
             return {}, {"display" : "hidden"}
-        coord = click["points"][0]
-        if coord["curveNumber"] >= len(tracks): 
-            return {}, {"display" : "hidden"}
-        ref = coord["x"]
 
-        track = tracks.alns[coord["curveNumber"]]
-        aln = track.alignments.iloc[coord["y"]]
-        read = aln["read_id"]
+        flags = set(flags)
 
-        fig = Dotplot(tracks, select_ref=ref, conf=tracks.conf).plot(read)
+        conf = Config(conf=tracks.conf)
+        conf.sigplot.multi_background="multi_background" in flags
+        conf.sigplot.no_model="show_model" not in flags
+        print(conf.sigplot.no_model, "MODE")
+        print(list(parse_layer(layer)))
+
+        fig = Dotplot(
+            tracks, 
+            select_ref=ref, 
+            show_legend="show_legend" in flags,
+            layers=list(parse_layer(layer)),
+            conf=conf).plot(read)
         #fig.update_layout(uirevision=True)
 
         return fig, {"display" : "block"}

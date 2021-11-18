@@ -24,6 +24,7 @@ DotplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
     ("bcaln_track", None, str, "Only display basecalled alignments from this track"),
     ("bcaln_error", False, bool, "Display basecalled alignment errors"),
+    ("show_legend", True, bool, "Display legend"),
     ("select_ref", None, int, "Display a horizontal line at specified reference coordinate"),
     ("layers", [], None, ""),
 )
@@ -42,20 +43,21 @@ class Dotplot:
     ]
 
     def __init__(self, *args, **kwargs):
-        conf, self.prms = config._init_group("dotplot", *args, **kwargs)
+        self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
 
         if isinstance(self.prms.tracks, str) or self.prms.tracks is None:
-            self.tracks = Tracks(conf=conf)
+            self.tracks = Tracks(conf=self.conf)
         elif isinstance(self.prms.tracks, Tracks):
             self.tracks = self.prms.tracks
         else:
             raise ValueError("Dotplot tracks parameter must be string or Tracks instance")
 
-        self.conf = self.tracks.conf
+        self.layers = list(parse_layers(self.prms.layers, False))
 
-        self.prms.layers = list(parse_layers(self.prms.layers, False))
+        self.tracks.set_layers(self._req_layers + self.layers)
 
-        self.tracks.set_layers(self._req_layers + conf.dotplot.layers)
+        self.conf.load_config(self.tracks.conf)
+
 
         self.fig_config = {
                 "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None},
@@ -85,7 +87,7 @@ class Dotplot:
         #else:
         cmp_stats = []
 
-        column_widths=[6]+[1]*(len(self.prms.layers)+len(cmp_stats))
+        column_widths=[6]+[1]*(len(self.layers)+len(cmp_stats))
 
         legend = set()
 
@@ -104,7 +106,8 @@ class Dotplot:
 
         Sigplot(tracks_filter, track_colors=colors_filter, conf=self.conf).plot(fig)
 
-        hover_layers = [("dtw", "middle"),("dtw","kmer"),("dtw","current"),("dtw","dwell")] + self.prms.layers
+        hover_layers = [("dtw", "middle"),("dtw","kmer"),("dtw","current"),("dtw","dwell")] + self.layers
+        print("HOVER", self.layers)
         #hover_layers += (l for l in self.prms.layers if l not in {"current","dwell"})
         hover_data = dict()
 
@@ -128,7 +131,6 @@ class Dotplot:
                     self._plot_bcaln(fig, legend, layers)
 
                 if not only_bcaln: 
-                    print(layers)
                     fig.add_trace(go.Scattergl(
                         x=layers["dtw","start"], y=layers.index,
                         name=track.desc,
@@ -144,7 +146,7 @@ class Dotplot:
 
                 first_aln = False
 
-                for j,layer in enumerate(self.prms.layers):
+                for j,layer in enumerate(self.layers):
                     if layer[0] != "cmp":
                         fig.add_trace(go.Scattergl(
                             x=layers[layer], y=layers.index+0.5,
@@ -232,7 +234,7 @@ class Dotplot:
         fig.update_yaxes(row=2, col=1,
             title_text="Reference (%s)" % aln["ref_name"])
 
-        for i,(group,layer) in enumerate(self.prms.layers):
+        for i,(group,layer) in enumerate(self.layers):
             fig.update_xaxes(row=2, col=i+2,
                 title_text=LAYERS[group][layer].label)
 
@@ -258,6 +260,7 @@ class Dotplot:
             barmode="overlay",
             hoverdistance=20,
             dragmode="pan", 
+            showlegend=self.prms.show_legend,
             legend={"bgcolor" : "#e6edf6"})#, scroll_zoom=True)
 
         return fig
