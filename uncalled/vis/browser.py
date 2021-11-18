@@ -35,22 +35,56 @@ def main(conf):
     sys.stderr.write("Starting server...\n")
     browser(tracks, conf)
 
-def _panel(title, name, content, hide=False):
+def _icon_btn(icon, name=None, panel="", hide=False):
+    style={"display" : "none" if hide else "inline-block"}
+    if name is not None:
+        href = f"javascript:{name}('{panel}')"
+        id=f"{panel}-{name}"
+    else:
+        href = "javascript:void()"
+        id=""
+
+    return html.A(icon, id=id, className="material-icons w3-padding-24", href=href, style=style)
+
+def _panel(title, name, content, settings=None, hide=False):
     style={"display" : "none" if hide else "block"}
+
+    ret = [html.Header(
+        id=f"{name}-header", 
+        className="w3-display-container w3-deep-purple", 
+        style={"height":"40px"},
+        children = [
+            html.Div(
+                html.H5(html.B(title)),
+                className="w3-padding w3-display-left"),
+            
+            html.Div(children=[
+                _icon_btn("settings", "toggle_settings", name),
+                #_icon_btn("arrow_drop_down"),
+                #_icon_btn("arrow_drop_up"),
+                _icon_btn("remove", "minimize", name),
+                _icon_btn("add", "maximize", name, hide=True),
+            ], className="w3-display-right w3-padding"),
+    ])]
+
+    if settings is not None:
+        ret.append(html.Div(
+            settings, 
+            id=f"{name}-settings", 
+            style={"display" : "none"},
+            className="w3-container w3-pale-blue"))
+        
+    ret.append(
+        html.Div(content, id=f"{name}-body", className="w3-container"))
+
     return html.Div(
-            html.Div([
-                html.Header(
-                    html.H6(html.B(title)), 
-                    id=f"{name}-header", 
-                    className="w3-container w3-deep-purple"),
-                html.Div(content, id=f"{name}-body", className="w3-container")
-        ], id=f"{name}-card", className="w3-card"),
-    id=f"{name}-panel", className="w3-panel", style=style)
+        html.Div(ret, id=f"{name}-card", className="w3-card"),
+        id=f"{name}-panel", className="w3-panel", style=style)
 
 def browser(tracks, conf):
     external_stylesheets = [
+        "https://fonts.googleapis.com/icon?family=Material+Icons",
         "https://www.w3schools.com/w3css/4/w3.css",
-        "https://fonts.googleapis.com/icon?family=Material+Icons"
     ]
 
     app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -67,17 +101,20 @@ def browser(tracks, conf):
 
         html.Div([
             html.Div(
-                _panel("Trackplot", "trackplot", [
-                    #html.B("Active layer: "), 
-                    dcc.Dropdown(
-                        options=layer_opts,
-                        value=layer_opts[0]["value"], 
-                        clearable=False, multi=False,
-                        id="trackplot-layer"),
-                    dcc.Graph(#[dcc.Loading(type="circle"),
-                        id="trackplot",
-                        config = {"scrollZoom" : True, "displayModeBar" : True})
-                    ])
+                _panel("Trackplot", "trackplot", 
+                    content=[
+                        dcc.Dropdown(
+                            options=layer_opts,
+                            value=layer_opts[0]["value"], 
+                            clearable=False, multi=False,
+                            className="w3-padding",
+                            id="trackplot-layer"),
+                        dcc.Graph(#[dcc.Loading(type="circle"),
+                            id="trackplot",
+                            config = {"scrollZoom" : True, "displayModeBar" : True})
+                    ], settings=[
+                        html.P("blah blah blah")
+                ])
             , className="w3-half"),
 
             html.Div([
