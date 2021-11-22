@@ -157,22 +157,26 @@ def parse_layers(layers, add_deps=True):
                 yield layer
 
 class AlnTrack:
-    def __init__(self, 
-            db, track_id, name, desc, conf, 
-            coords=None, alignments=None, layers=None, 
-            fast5s=None, order=["fwd", "ref_start"]): #shouldn't need
+    def __init__(self, *args, **kwargs):
+        if isinstance(args[0], AlnTrack):
+            self._init_slice(*args, **kwargs)
+        else:
+            self._init_new(*args, **kwargs)
 
+    def _init_new(self, db, track_id, name, desc, conf, fast5s=None):
         self.db = db
         self.id = track_id
         self.name = name
         self.desc = desc
         self.conf = conf
-        self.fast5s = fast5s
+
+        self.fast5s = fast5s #TODO GET RID OF THIS
+        self.model = PoreModel(self.conf.pore_model) 
 
         self.mat = None
 
-        self.model = PoreModel(self.conf.pore_model) 
-
+    def _init_slice(self, p, coords, alignments, layers, order=["fwd", "ref_start"]):
+        self._init_new(p.db, p.id, p.name, p.desc, p.conf, p.fast5s)
         self.set_data(coords, alignments, layers, order)
 
     def set_data(self, coords, alignments, layers, order=["fwd", "ref_start"]):
@@ -235,10 +239,8 @@ class AlnTrack:
 
         alignments = self.alignments.loc[aln_ids]
 
-        return AlnTrack(
-            self.db, self.id, self.name, self.desc, self.conf, 
-            coords, alignments, layers=layers, 
-            fast5s=self.fast5s, order=order) #TODO should just store in tracks
+        return AlnTrack(self, coords, alignments, layers, 
+                        order=order) #TODO should handle order in tracks
         
 
     @property
