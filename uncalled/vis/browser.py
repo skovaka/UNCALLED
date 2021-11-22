@@ -154,6 +154,7 @@ def browser(tracks, conf):
         ]),
         html.Div(style={"display" : "none"}, id="selected-read"),
         html.Div(style={"display" : "none"}, id="selected-ref"),
+        html.Div(style={"display" : "none"}, id="read-changed"),
     ])
 
     @app.callback(
@@ -162,14 +163,15 @@ def browser(tracks, conf):
         Output("selection-panel", "style"),
         Output("selected-ref", "children"),
         Output("selected-read", "children"),
+        Output("read-changed", "children"),
         Input("trackplot-checklist", "value"),
         Input("trackplot-layer", "value"),
-        Input("trackplot", "clickData"))
-    def update_trackplot(checklist, layer, click):
+        Input("trackplot", "clickData"),
+        State("selected-read", "children"))
+    def update_trackplot(checklist, layer, click, prev_read):
         table = list()
         ref = aln = read = None
         card_style = {"display" : "none"}
-        print("CLICK", click)
 
         checklist = set(checklist)
 
@@ -208,7 +210,7 @@ def browser(tracks, conf):
             conf=conf).fig
         fig.update_layout(uirevision=True)
 
-        return fig, table, card_style, ref, read
+        return fig, table, card_style, ref, read, (read != prev_read)
 
     @app.callback(
         Output("dotplot", "figure"),
@@ -218,28 +220,18 @@ def browser(tracks, conf):
         Input("dotplot-checklist", "value"),
         Input("trackplot-layer", "value"),
         Input("selected-ref", "children"),
-        Input("selected-read", "children"))
-    def update_trackplot(flags, layer, ref, read):
-        #if click is None: 
-        #    return {}, {"display" : "hidden"}
-        #coord = click["points"][0]
-        #if coord["curveNumber"] >= len(tracks): 
-        #    return {}, {"display" : "hidden"}
-        #ref = coord["x"]
-
-        #track = tracks.alns[coord["curveNumber"]]
-        #aln = track.alignments.iloc[coord["y"]]
-        #read = aln["read_id"]
+        Input("selected-read", "children"),
+        Input("read-changed", "children"))
+    def update_trackplot(flags, layer, ref, read, read_changed):
         if read is None:
             return {}, {"display" : "hidden"}
 
         flags = set(flags)
+        #print("CHANGE", read_changed)
 
         conf = Config(conf=tracks.conf)
         conf.sigplot.multi_background="multi_background" in flags
         conf.sigplot.no_model="show_model" not in flags
-        print(conf.sigplot.no_model, "MODE")
-        print(list(parse_layer(layer)))
 
         fig = Dotplot(
             tracks, 
@@ -247,7 +239,7 @@ def browser(tracks, conf):
             show_legend="show_legend" in flags,
             layers=list(parse_layer(layer)),
             conf=conf).plot(read)
-        #fig.update_layout(uirevision=True)
+        #fig.update_layout(uirevision=read_changed)
 
         return fig, {"display" : "block"}
 

@@ -185,15 +185,15 @@ class AlnTrack:
             return
         elif np.any(isnone):
             raise ValueError("Must specify AlnTrack coords, alignments, and layers")
-
-        self.alignments.sort_values(order, inplace=True)
+        self.alignments = self.alignments.sort_values(order)
 
         self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
 
         if self.layers.index.names[0] == "mref":
-            self.layers.rename(index=coords.mref_to_ref, level=0, inplace=True)
+            self.layers = self.layers.rename(index=coords.mref_to_ref, level=0)
             self.layers.index.names = ("ref", "aln_id")
-        self.layers = layers.sort_index()
+
+        self.layers = self.layers.sort_index()
 
         self.alignments = self.alignments
 
@@ -297,7 +297,7 @@ class AlnTrack:
 
         self.mat = df.pivot(index="aln_id", columns=["ref"]) \
                      .rename_axis(("group","layer","ref"), axis=1) \
-                     .sort_index(axis=1, level="ref")
+                     .sort_index(axis=1)
 
         self.mat = self.mat.reindex(self.alignments.index, copy=False)
 

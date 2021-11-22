@@ -107,7 +107,6 @@ class Dotplot:
         Sigplot(tracks_filter, track_colors=colors_filter, conf=self.conf).plot(fig)
 
         hover_layers = [("dtw", "middle"),("dtw","kmer"),("dtw","current"),("dtw","dwell")] + self.layers
-        print("HOVER", self.layers)
         #hover_layers += (l for l in self.prms.layers if l not in {"current","dwell"})
         hover_data = dict()
 
@@ -230,6 +229,13 @@ class Dotplot:
 
         if self.prms.select_ref is not None:
             fig.add_hline(y=self.prms.select_ref, line_color="red", row=2, col=1, opacity=0.5)
+            #print("SELECT")
+            #print(self.prms.select_ref)
+            i = hover_data.index.get_loc(self.prms.select_ref)
+            #print(i)
+            #print(hover_coords)
+            #fig.add_vline(x=hover_coords[self.prms.select_ref], line_color="red", row=2, col=1, opacity=0.5)
+
 
         fig.update_yaxes(row=2, col=1,
             title_text="Reference (%s)" % aln["ref_name"])

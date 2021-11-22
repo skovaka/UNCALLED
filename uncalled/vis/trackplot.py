@@ -53,8 +53,8 @@ DEFAULT_HEIGHTS = {
 
 PLOT_LAYERS = {
     ("dtw", "current"), ("dtw", "dwell"), ("dtw", "model_diff"),
-    ("bcaln", "error"), ("cmp", "mean_ref_dist"), ("bc_cmp", "mean_ref_dist"),
-    ("cmp", "jaccard"), ("bc_cmp", "jaccard"),
+    ("cmp", "mean_ref_dist"), ("bc_cmp", "mean_ref_dist"),
+    ("cmp", "jaccard"), ("bc_cmp", "jaccard"), #("bcaln", "error"), 
 }
 
 class Trackplot:
@@ -91,6 +91,9 @@ class Trackplot:
             self.tracks = self.prms.tracks
             self.tracks.conf.load_config(self.conf)
             self.conf = self.tracks.conf
+
+        if self.tracks.refstats is None:
+            self.tracks.calc_refstats()
 
 
         #self.tracks.load_refs(load_mat=True)
@@ -179,12 +182,14 @@ class Trackplot:
 
             mat = track.mat[(group,layer)]#.dropna(how="all")
             
-            read_ids = np.tile(track.alignments.loc[mat.index, "read_id"].to_numpy(), (mat.shape[1], 1)).T
 
 
             hover_lines = [track.coords.ref_name + ":%{x}"]
             if self.prms.hover_read:
                 hover_lines.append("%{text}")
+                read_ids = np.tile(track.alignments.loc[mat.index, "read_id"].to_numpy(), (mat.shape[1], 1)).T
+            else:
+                read_ids = None
             hover_lines.append(layer_label + ": %{z}<extra></extra>")
             hover = "<br>".join(hover_lines)
 
@@ -196,7 +201,7 @@ class Trackplot:
                 zsmooth=False,
                 hoverinfo="text",
                 hovertemplate=hover,
-                #text = read_ids,
+                text = read_ids,
                 coloraxis="coloraxis",
             ), row=row, col=1)
 

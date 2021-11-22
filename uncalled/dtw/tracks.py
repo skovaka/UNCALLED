@@ -159,6 +159,7 @@ class Tracks:
         self.index = parent.index
         self.fast5s = parent.fast5s
         self._aln_track_ids = parent._aln_track_ids
+        self.refstats = None
 
         self.coords = coords
         self._tracks = tracks
@@ -166,7 +167,7 @@ class Tracks:
         self.alns = list()
         for name,track in tracks.items():
             if name in BUILTIN_TRACKS:
-                setattr(self, name[1:])
+                setattr(self, name[1:], track)
             elif isinstance(track, AlnTrack):
                 self.alns.append(track)
 

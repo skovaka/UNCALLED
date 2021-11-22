@@ -2,6 +2,9 @@ function minimize(name) {
     document.getElementById(name+"-body").style.display = "none";
     document.getElementById(name+"-minimize").style.display = "none";
     document.getElementById(name+"-maximize").style.display = "inline";
+    
+    var elm = document.getElementById(name+"-settings");
+    if (elm) elm.style.display = "none";
 }
 
 function maximize(name) {
@@ -11,7 +14,7 @@ function maximize(name) {
 }
 
 function toggle_settings(name) {
-    elm = document.getElementById(name+"-settings");
+    var elm = document.getElementById(name+"-settings");
     if (elm.style.display == "none") {
         elm.style.display = "block";
     } else {
