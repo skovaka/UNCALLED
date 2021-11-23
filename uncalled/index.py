@@ -103,6 +103,18 @@ class CoordSpace:
     def stranded(self):
         return self.fwd is not None
 
+    def contains(self, other):
+        if isinstance(other, CoordSpace):
+            return (self.ref_name == other.ref_name and
+                    self.refs.min() <= other.refs.min() and 
+                    self.refs.max() >= other.refs.max())
+        elif isinstance(other, RefCoord):
+            return (self.ref_name == other.name and
+                    self.refs.min() <= other.start and 
+                    self.refs.max() > other.end)
+        else:
+            raise ValueError(f"Expected CoordSpace or RefCoord, received {type(other)}")
+
     def _minmax_intersect(self, a, b):
         insc = a.intersection(b)
         return insc.min(),insc.max()

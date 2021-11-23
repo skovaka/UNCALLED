@@ -650,8 +650,38 @@ class Tracks:
 
             yield (coords, self.alns)
 
+    def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
+        
+        if ref_bounds is not None and not isinstance(ref_bounds, RefCoord):
+            ref_bounds = RefCoord(ref_bounds)
 
-    def iter_reads_db(self, reads=None, ref_bounds=None, full_overlap=False, max_reads=None):
+        if (self.coords is None or
+            (read_filter is not None and 
+             len(self.get_all_reads().intersection(read_filter)) < len(read_filter)) or
+            (ref_bounds is not None and not self.coords.contains(ref_bounds))):
+                
+            gen = self.iter_reads_db(read_filter, ref_bounds, full_overlap, max_reads)
+        else:
+            gen = self.iter_reads_slice(read_filter, ref_bounds)
+
+        for read_id,chunk in gen:
+            yield read_id,chunk
+            
+    def iter_reads_slice(self, reads=None, ref_bounds=None):
+        all_reads = self.get_all_reads()
+        if reads is not None:
+            all_reads = all_reads.intersection(reads)
+
+        if ref_bounds is None:
+            ref_start = ref_end = None
+        else:
+            ref_start = ref_bounds.start
+            ref_end = ref_bounds.end
+        
+        for read_id in all_reads:
+            yield read_id, self.slice(ref_start, ref_end, [read_id])
+
+    def iter_reads_db(self, reads, ref_bounds, full_overlap, max_reads):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
         if reads is None:
@@ -694,33 +724,37 @@ class Tracks:
             layer_alns = layers.index.get_level_values("aln_id")
             
             for ref_name,ref_alns in alignments.groupby("ref_name"):
-
-            #def _init_child(self, coords
-                coords = self._alns_to_coords(ref_alns)
-                tracks = dict()
-                aln_groups = ref_alns.groupby("track_id")
-                for parent in self.alns:
-                    track_alns = aln_groups.get_group(parent.id)
-                    track_layers = layers.loc[layer_alns.isin(track_alns.index)]
-                    track = AlnTrack(parent, coords, track_alns, track_layers)
-
-                    if not track.empty:
-                        track.calc_layers(self.fn_layers)
-
-                    tracks[parent.name] = track
-
-                cache = Tracks(self, coords, tracks)
-
-                if not cache.all_empty:
-                    cache.load_compare(ids)
-
+                cache = self._tables_to_tracks(ref_alns, layers)
                 for ret in cache.iter_reads_slice():
                     yield ret
 
-                
-    def iter_reads_slice(self):
-        for read_id in self.get_all_reads():
-            yield read_id, self.slice(reads=[read_id])
+        if len(aln_leftovers) > 0:
+            for ref_name,ref_alns in aln_leftovers.groupby("ref_name"):
+                cache = self._tables_to_tracks(ref_alns, layer_leftovers)
+                for ret in cache.iter_reads_slice():
+                    yield ret
+
+    def _tables_to_tracks(self, alignments, layers):
+        coords = self._alns_to_coords(alignments)
+        tracks = dict()
+        aln_groups = alignments.groupby("track_id")
+        layer_alns = layers.index.get_level_values("aln_id")
+        for parent in self.alns:
+            track_alns = aln_groups.get_group(parent.id)
+            track_layers = layers.loc[layer_alns.isin(track_alns.index)]
+            track = AlnTrack(parent, coords, track_alns, track_layers)
+
+            if not track.empty:
+                track.calc_layers(self.fn_layers)
+
+            tracks[parent.name] = track
+
+        tracks = Tracks(self, coords, tracks)
+
+        if not tracks.all_empty:
+            tracks.load_compare(alignments.index.to_numpy())
+
+        return tracks
 
     def _alns_to_coords(self, alns):
         ref_coord = RefCoord(
@@ -731,7 +765,7 @@ class Tracks:
             ref_coord, self.conf.is_rna, load_kmers=True, kmer_trim=True)
 
 
-    def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
+    def iter_reads_old(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
         if read_filter is None:
