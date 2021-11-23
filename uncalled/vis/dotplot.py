@@ -66,7 +66,7 @@ class Dotplot:
 
     def iter_plots(self):
         t0 = time.time()
-        for read_id, tracks in self.tracks.iter_reads():
+        for read_id, tracks in self.tracks.iter_reads_db():
             print(read_id, time.time()-t0)
             yield read_id, self._plot(read_id, tracks)
             t0 = time.time()

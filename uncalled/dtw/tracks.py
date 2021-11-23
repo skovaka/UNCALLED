@@ -165,11 +165,12 @@ class Tracks:
         self._tracks = tracks
 
         self.alns = list()
-        for name,track in tracks.items():
-            if name in BUILTIN_TRACKS:
-                setattr(self, name[1:], track)
-            elif isinstance(track, AlnTrack):
-                self.alns.append(track)
+        if self._tracks is not None:
+            for name,track in tracks.items():
+                if name in BUILTIN_TRACKS:
+                    setattr(self, name[1:], track)
+                elif isinstance(track, AlnTrack):
+                    self.alns.append(track)
 
     @property
     def all_empty(self):
@@ -419,11 +420,20 @@ class Tracks:
 
         return Tracks(self, coords, tracks)
 
-    def slice_shared_reads(self):
+    def get_shared_reads(self):
         read_ids = pd.Index(self.alns[0].read_ids)
         for track in self.alns[1:]:
             read_ids = read_ids.intersection(track.read_ids)
-        return self.slice(reads=read_ids, order="read_id")
+        return read_ids
+
+    def get_all_reads(self):
+        read_ids = pd.Index(self.alns[0].read_ids)
+        for track in self.alns[1:]:
+            read_ids = read_ids.union(track.read_ids)
+        return read_ids
+
+    def slice_shared_reads(self):
+        return self.slice(reads=self.get_shared_reads(), order="read_id")
             
     def load(self, ref_bounds=None, full_overlap=None, read_filter=None, load_mat=False):
         self._verify_read()
@@ -640,6 +650,7 @@ class Tracks:
 
             yield (coords, self.alns)
 
+
     def iter_reads_db(self, reads=None, ref_bounds=None, full_overlap=False, max_reads=None):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
@@ -659,18 +670,65 @@ class Tracks:
             order=["read_id"],
             chunksize=self.prms.ref_chunksize)
 
+        aln_leftovers = pd.DataFrame()
         layer_leftovers = pd.DataFrame()
-        alignment_leftovers = pd.DataFrame()
 
         for layers in layer_iter:
+            ids = layers.index \
+                        .get_level_values("aln_id") \
+                        .unique() \
+                        .difference(aln_leftovers.index) \
+                        .to_numpy()
+            alignments = db0.query_alignments(aln_id=ids)
+
+            alignments = pd.concat([aln_leftovers, alignments])
             layers = pd.concat([layer_leftovers, layers])
 
-            ids = layers.index.get_level_values("aln_id").unique().to_numpy()
-            alignments = db0.query_alignments(aln_id=ids)
-            yield alignments
+            aln_end = alignments["read_id"] == alignments["read_id"].iloc[-1]
+            aln_leftovers = alignments.loc[aln_end]
+            alignments = alignments.loc[~aln_end]
 
-    def iter_reads_slice(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
-        pass
+            layer_end = layers.index.get_level_values("aln_id").isin(aln_leftovers.index)
+            layer_leftovers = layers.loc[layer_end]
+            layers = layers.loc[~layer_end]
+            layer_alns = layers.index.get_level_values("aln_id")
+            
+            for ref_name,ref_alns in alignments.groupby("ref_name"):
+
+            #def _init_child(self, coords
+                coords = self._alns_to_coords(ref_alns)
+                tracks = dict()
+                aln_groups = ref_alns.groupby("track_id")
+                for parent in self.alns:
+                    track_alns = aln_groups.get_group(parent.id)
+                    track_layers = layers.loc[layer_alns.isin(track_alns.index)]
+                    track = AlnTrack(parent, coords, track_alns, track_layers)
+
+                    if not track.empty:
+                        track.calc_layers(self.fn_layers)
+
+                    tracks[parent.name] = track
+
+                cache = Tracks(self, coords, tracks)
+
+                if not cache.all_empty:
+                    cache.load_compare(ids)
+
+                for ret in cache.iter_reads_slice():
+                    yield ret
+
+                
+    def iter_reads_slice(self):
+        for read_id in self.get_all_reads():
+            yield read_id, self.slice(reads=[read_id])
+
+    def _alns_to_coords(self, alns):
+        ref_coord = RefCoord(
+            alns["ref_name"].iloc[0],
+            alns["ref_start"].min(),
+            alns["ref_end"].max())
+        return self.index.get_coord_space(
+            ref_coord, self.conf.is_rna, load_kmers=True, kmer_trim=True)
 
 
     def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):

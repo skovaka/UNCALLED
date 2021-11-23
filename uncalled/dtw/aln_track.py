@@ -163,6 +163,10 @@ class AlnTrack:
         else:
             self._init_new(*args, **kwargs)
 
+        self.mat = None
+        self._layers_leftover = pd.DataFrame()
+        self._alignments_leftover = pd.DataFrame()
+
     def _init_new(self, db, track_id, name, desc, conf, fast5s=None):
         self.db = db
         self.id = track_id
@@ -173,13 +177,12 @@ class AlnTrack:
         self.fast5s = fast5s #TODO GET RID OF THIS
         self.model = PoreModel(self.conf.pore_model) 
 
-        self.mat = None
-
     def _init_slice(self, p, coords, alignments, layers, order=["fwd", "ref_start"]):
         self._init_new(p.db, p.id, p.name, p.desc, p.conf, p.fast5s)
         self.set_data(coords, alignments, layers, order)
 
     def set_data(self, coords, alignments, layers, order=["fwd", "ref_start"]):
+
         self.coords = coords
         self.alignments = alignments
         self.layers = layers
@@ -191,15 +194,13 @@ class AlnTrack:
             raise ValueError("Must specify AlnTrack coords, alignments, and layers")
         self.alignments = self.alignments.sort_values(order)
 
-        self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
-
         if self.layers.index.names[0] == "mref":
             self.layers = self.layers.rename(index=coords.mref_to_ref, level=0)
             self.layers.index.names = ("ref", "aln_id")
 
         self.layers = self.layers.sort_index()
 
-        self.alignments = self.alignments
+        self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
 
         if self.coords.ref_kmers is not None:
             kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
@@ -222,8 +223,9 @@ class AlnTrack:
         #ref_start = max(self.layer_refs.min(), ref_start)
         #ref_end = min(self.layer_refs.max()+1, ref_end)
         #coords = self.coords.ref_slice(ref_start, ref_end)
+        layer_refs = self.layers.index.get_level_values("ref")
 
-        layers = self.layers.loc[coords.refs]
+        layers = self.layers.loc[layer_refs.isin(coords.refs)]
 
         if reads is not None:
             if aln_ids is not None:
