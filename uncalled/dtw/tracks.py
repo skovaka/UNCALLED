@@ -126,7 +126,7 @@ class Tracks:
 
         self.index = load_index(self.prms.index_prefix)
 
-        self._set_ref_bounds(self.prms.ref_bounds)
+        self.coords = self._ref_bounds_to_coords(self.prms.ref_bounds)
 
         if self.coords is not None:
             self.load()
@@ -186,15 +186,14 @@ class Tracks:
                 return True
         return False
 
-    def _set_ref_bounds(self, ref_bounds):
+    def _ref_bounds_to_coords(self, ref_bounds):
         if ref_bounds is not None:
             if isinstance(ref_bounds, str):
                 ref_bounds = str_to_coord(ref_bounds)
             elif isinstance(ref_bounds, tuple):
                 ref_bounds = RefCoord(*ref_bounds)
-            self.coords = self.index.get_coord_space(ref_bounds, self.conf.is_rna)
-        else:
-            self.coords = None
+            return self.index.get_coord_space(ref_bounds, self.conf.is_rna)
+        return None
 
     def set_layers(self, layers):
         self.prms.layers = layers
@@ -439,7 +438,7 @@ class Tracks:
         self._verify_read()
 
         if ref_bounds is not None:
-            self._set_ref_bounds(ref_bounds)
+            self.coords = self._ref_bounds_to_coords(ref_bounds)
 
         if read_filter is None:
             read_filter = self.prms.read_filter
@@ -600,65 +599,61 @@ class Tracks:
 
     def iter_refs(self, ref_bounds=None):
         if ref_bounds is not None:
-            self._set_ref_bounds(ref_bounds)
+            coords = self._ref_bounds_to_coords(ref_bounds)
+        else:
+            coords = self.coords
 
         dbfile0,db0 = list(self.dbs.items())[0]
         layer_iter = db0.query_layers(
             self.db_layers, 
             self._aln_track_ids, 
-            coords=self.coords, 
+            coords=coords, 
             order=["mref"],
             chunksize=self.prms.ref_chunksize)
 
-        leftovers = pd.DataFrame()
-        seq_coords = None
+        def get_full_coords(mref):
+            chunk_refs = self.index.mrefs_to_ref_coord(mref, mref, not self.conf.is_rna)
+            seq_refs = RefCoord(chunk_refs.name, 0, chunk_refs.ref_len, chunk_refs.fwd)
+            return self.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=False)
 
-        #chunk = next(layer_iter)
-        #while len(chunk) > 0:
-        #    chunk_empty = len(leftovers.index.get_level_values("mref").unique()) <= 1
-            
+        def next_coords(seq_coords, mrefs):
+            if len(mrefs) > 1:
+                mrefs = mrefs[:-1]
 
-        for chunk in layer_iter:
-            chunk_empty = False
-            while not chunk_empty:
-                chunk = pd.concat([leftovers, chunk])
+            coords = seq_coords.mref_intersect(mrefs)
+            if coords is None:
+                seq_coords = get_full_coords(mrefs[0])
+                coords = seq_coords.mref_intersect(mrefs)
 
-                chunk_mrefs = chunk.index.get_level_values("mref").unique()
+            return seq_coords, coords
 
-                if len(chunk_mrefs) == 1:
-                    leftovers = chunk
-                    continue
+        chunk = next(layer_iter)
+        seq_coords = get_full_coords(chunk.index.get_level_values("mref")[0])
+                
+        while len(chunk) > 0:
 
-                if seq_coords is not None:
-                    coords = seq_coords.mref_intersect(chunk_mrefs[:-1])
-                    
-                if seq_coords is None or coords is None:
-                    chunk_refs = self.index.mrefs_to_ref_coord(chunk_mrefs[0], chunk_mrefs[0], not self.conf.is_rna)
-                    seq_refs = RefCoord(chunk_refs.name, 0, chunk_refs.ref_len, chunk_refs.fwd)
-                    seq_coords = self.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=False)
-                    coords = seq_coords.mref_intersect(chunk_mrefs[:-1])
+            if len(chunk.index.get_level_values("mref").unique()) <= 1:
+                chunk = pd.concat([chunk, next(layer_iter, pd.DataFrame())])
 
-                coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
+            chunk_mrefs = chunk.index.get_level_values("mref").unique()
 
-                i = chunk_mrefs.difference(coords.mrefs)
-                leftovers = chunk.loc[i]
-                layers = chunk.drop(index=i)
+            seq_coords, coords = next_coords(seq_coords, chunk_mrefs)
 
-                #layers = pd.concat({"dtw":chunk}, names=["group", "layer"], axis=1)
+            coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
 
-                aln_ids = chunk.index.unique("aln_id").to_numpy()
-                alns = db0.query_alignments(self._aln_track_ids, aln_id=aln_ids)
+            i = chunk_mrefs.difference(coords.mrefs)
+            leftovers = chunk.loc[i]
+            layers = chunk.drop(index=i)
 
-                for track in self.alns:
-                    track_alns = alns[alns["track_id"]==track.id].copy()
-                    track_layers = layers[layers.index.isin(track_alns.index, 1)].copy()
-                    track.set_data(coords, track_alns, track_layers)
-                    track.calc_layers(self.fn_layers)
+            aln_ids = chunk.index.unique("aln_id").to_numpy()
+            alns = db0.query_alignments(self._aln_track_ids, aln_id=aln_ids)
 
-                chunk_empty = len(leftovers.index.get_level_values("mref").unique()) <= 1
-                chunk = pd.DataFrame()
+            ret = self._tables_to_tracks(alns, layers)
 
-                yield (coords, self.alns)
+            chunk = leftovers
+
+            yield ret
+
 
     def _mref_to_coords(self, mref):
         pass
