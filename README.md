@@ -1,1 +1,1 @@
-https://skovaka.github.io/UNCALLED/
+https://skovaka.github.io/UNCALLED
