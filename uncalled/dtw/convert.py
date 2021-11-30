@@ -141,79 +141,96 @@ def tombo(conf):
 
         fast5_basename = os.path.basename(fast5_name)
 
-        with get_fast5_file(fast5_name, mode="r") as fast5:
-            read_count += 1
+        try:
+            fast5 = get_fast5_file(fast5_name, mode="r")
+        except:
+            sys.stderr.write(f"Unable to open \"{fast5_name}\". Skipping.")
+            continue
 
-            read, = fast5.get_reads()
+        read_count += 1
 
-            if not (read_filter is None or read.read_id in read_filter): 
-                continue
+        read, = fast5.get_reads()
 
-            if not 'BaseCalled_template' in read.handle['Analyses']['RawGenomeCorrected_000']:
-                #TODO debug logs
-                continue
+        if not (read_filter is None or read.read_id in read_filter): 
+            continue
 
-            handle = read.handle['Analyses']['RawGenomeCorrected_000']['BaseCalled_template']
-            attrs = handle.attrs
-            if attrs["status"] != "success":
-                #TODO debug logs
-                continue
+        if not 'BaseCalled_template' in read.handle['Analyses']['RawGenomeCorrected_000']:
+            #TODO debug logs
+            continue
 
-            is_rna = handle.attrs["rna"]
-            if is_rna != conf.is_rna:
-                raise RuntimeError("Reads appear to be RNA but --rna not specified")
+        handle = read.handle['Analyses']['RawGenomeCorrected_000']['BaseCalled_template']
+        attrs = handle.attrs
+        if attrs["status"] != "success":
+            #TODO debug logs
+            continue
 
-            aln_attrs = dict(handle["Alignment"].attrs)
+        is_rna = handle.attrs["rna"]
+        if is_rna != conf.is_rna:
+            raise RuntimeError("Reads appear to be RNA but --rna not specified")
 
-            #TODO feels hacky
+        aln_attrs = dict(handle["Alignment"].attrs)
+
+        fwd = aln_attrs["mapped_strand"] == "+"
+        if fwd:
             start = aln_attrs["mapped_start"]-1
             end = aln_attrs["mapped_end"]+3
-            if start < 0:
-                clip = -start
-                start = 0
-            else:
-                clip = 0
+        else:
+            start = aln_attrs["mapped_start"]-3
+            end = aln_attrs["mapped_end"]+1
 
-            ref_bounds = RefCoord(
-                aln_attrs["mapped_chrom"],
-                start, end,
-                aln_attrs["mapped_strand"] == "+")
-            sig_fwd = (ref_bounds.fwd != is_rna)
+        if start < 0:
+            clip = -start
+            start = 0
+        else:
+            clip = 0
 
-            #io.
-            #track.init_alignment(read.read_id, ref_bounds)
-            coords = io.index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True, kmer_trim=True)
-            track = io.init_alignment(read.read_id, fast5_name, coords)
+        ref_bounds = RefCoord(
+            aln_attrs["mapped_chrom"],
+            start, end,
+            aln_attrs["mapped_strand"] == "+")
 
-            tombo_events = pd.DataFrame(np.array(handle["Events"])).iloc[clip:]
-            tombo_start = handle["Events"].attrs["read_start_rel_to_raw"]
+        sig_fwd = ref_bounds.fwd != is_rna
+
+        coords = io.index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True, kmer_trim=True)
+        track = io.init_alignment(read.read_id, fast5_name, coords)
+
+        tombo_events = pd.DataFrame(np.array(handle["Events"])).iloc[clip:]
+        
+        if not ref_bounds.fwd:
+            tombo_events = tombo_events[::-1]
             
-            raw_len = len(read.get_raw_data())
-            starts = tombo_events["start"]
 
-            kmers = coords.kmers#.sort_index()
+        tombo_start = handle["Events"].attrs["read_start_rel_to_raw"]
 
-            lengths = tombo_events["length"]
-            currents = tombo_events["norm_mean"]
+        
+        raw_len = len(read.get_raw_data())
+        starts = tombo_events["start"]
 
-            if not sig_fwd:
-                starts = raw_len - tombo_start - starts - tombo_events["length"] - 2
+        kmers = coords.kmers#.sort_index()
 
-            lr = scipy.stats.linregress(currents, model[kmers])
-            currents = lr.slope * currents + lr.intercept
+        lengths = tombo_events["length"]
+        currents = tombo_events["norm_mean"]
 
-            df = pd.DataFrame({
-                    "mref" : kmers.index,
-                    "start"  : starts,
-                    "length" : lengths,
-                    "current"   : currents
-                 }).set_index("mref")
+        if is_rna:
+            starts = raw_len - tombo_start - starts - tombo_events["length"] - 2
 
-            track.add_layer_group("dtw", df)
+        #if is_rna == ref_bounds.fwd:
 
-            #track.save_read(fast5_basename)
+        lr = scipy.stats.linregress(currents, model[kmers])
+        currents = lr.slope * currents + lr.intercept
 
-            pbar.update(read_count)
+        df = pd.DataFrame({
+                "mref" : kmers.index,
+                "start"  : starts,
+                "length" : lengths,
+                "current"   : currents
+             }).set_index("mref")
+
+        track.add_layer_group("dtw", df)
+
+        #track.save_read(fast5_basename)
+
+        pbar.update(read_count)
 
     io.close()
 

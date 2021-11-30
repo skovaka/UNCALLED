@@ -37,12 +37,12 @@ class Sigplot:
 
         self._legend = set()
 
-        reads = pd.Index([])
-        for t in self.tracks:
-            reads = reads.union(t.alignments["read_id"]).unique()
-        if len(reads) > self.prms.max_reads:
-            reads = np.random.choice(reads, self.prms.max_reads, False)
-        self.reads = np.sort(reads)
+        #reads = pd.Index([])
+        #for t in self.tracks:
+        #    reads = reads.union(t.alignments["read_id"]).unique()
+        #if len(reads) > self.prms.max_reads:
+        #    reads = np.random.choice(reads, self.prms.max_reads, False)
+        self.reads = np.sort(self.tracks.get_all_reads())
         
     def plot(self, fig=None, row=1, col=1):
         if fig is None:
@@ -89,7 +89,7 @@ class Sigplot:
         
         current_min = samp_min = np.inf
         current_max = samp_max = 0
-        for i,track in enumerate(self.tracks):
+        for i,track in enumerate(self.tracks.alns):
             track_color = self.prms.track_colors[i]
 
             alns = track.alignments.query("@read_id == read_id")
@@ -140,7 +140,7 @@ class Sigplot:
                     self._plot_bases(fig, dtw, ymin+dy, ymax-dy, row, col)
 
             colors = self.prms.track_colors
-            dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks]
+            dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks.alns]
 
         fig.add_trace(go.Scattergl(
             x=samples, y=signal,

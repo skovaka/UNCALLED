@@ -186,6 +186,8 @@ class AlnTrack:
         self.coords = coords
         self.alignments = alignments
         self.layers = layers
+        print("ASDF")
+        print(coords, alignments, layers)
 
         isnone = [coords is None, alignments is None, layers is None]
         if np.all(isnone) or len(alignments) == 0:

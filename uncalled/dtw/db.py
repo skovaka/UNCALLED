@@ -12,6 +12,7 @@ import collections
 import numpy as np
 import pandas as pd
 import sys
+import time
 
 from ..argparse import Opt, comma_split
 from ..fast5 import parse_fast5_paths
@@ -270,6 +271,8 @@ class TrackSQL:
 
     def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, order=["mref"], chunksize=None, full_overlap=False):
 
+        t0 = time.time()
+
         group_layers = collections.defaultdict(list)
         renames = dict()
         fields = list()
@@ -322,10 +325,14 @@ class TrackSQL:
 
         query = self._join_query(select, wheres, ["idx_"+o if o in {"aln_id","mref"} else o for o in order])
 
+        t0 = time.time()
+
         ret = pd.read_sql_query(
             query, self.con, 
             index_col=["idx_mref", "idx_aln_id"], 
             params=params, chunksize=chunksize)
+
+        t0 = time.time()
 
         def make_groups(df):
             grouped = dict()
@@ -339,7 +346,15 @@ class TrackSQL:
         if chunksize is None:
             return make_groups(ret)
 
+        t0 = time.time()
+
         return (make_groups(df) for df in ret)
+    
+    def _verify_track(self, track_name):
+        ids = self.cur.execute("SELECT id FROM track WHERE name == ?", (track_name,)).fetchall()
+        if len(ids) == 0:
+            raise ValueError(f"Track does not exist: \"{track_name}\"\n")
+        return ids[0][0]
 
 DB_OPT = Opt("db_file", help="Track database file")
 
