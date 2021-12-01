@@ -34,7 +34,7 @@ def main(conf):
 
     t0 = time.time()
 
-    tracks = Tracks(conf=conf)
+    tracks = Tracks(layers=conf.tracks.refstats_layers, conf=conf)
     conf = tracks.conf
 
     stats = RefstatsSplit(conf.tracks.refstats, len(tracks.alns))

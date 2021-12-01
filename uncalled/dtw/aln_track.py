@@ -164,9 +164,9 @@ class AlnTrack:
             self._init_new(*args, **kwargs)
 
         self.mat = None
-        self.coords = None
-        self.alignments = pd.DataFrame()
-        self.layers = pd.DataFrame()
+        #self.coords = None
+        #self.alignments = pd.DataFrame()
+        #self.layers = pd.DataFrame()
 
     def _init_new(self, db, track_id, name, desc, conf, fast5s=None):
         self.db = db
@@ -175,7 +175,7 @@ class AlnTrack:
         self.desc = desc
         self.conf = conf
 
-        self.fast5s = fast5s #TODO GET RID OF THIS
+        self.fast5s = fast5s #TODO get rid of this
         self.model = PoreModel(self.conf.pore_model) 
 
     def _init_slice(self, p, coords=None, alignments=None, layers=None, order=["fwd", "ref_start"]):

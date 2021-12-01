@@ -125,7 +125,7 @@ def browser(tracks, conf):
                             options=[
                                 {"label" : "Show legend", "value" : "show_legend"},
                                 {"label" : "Shared reads only", "value" : "share_reads"},
-                            ], value=["show_legend", "share_reads"])
+                            ], value=["show_legend"])
                 ])
             , className="w3-half"),
 

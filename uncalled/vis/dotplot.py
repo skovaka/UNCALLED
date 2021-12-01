@@ -36,14 +36,16 @@ class Dotplot:
     #iter_plots() -> figs
     #plot_read(read_id) -> fig
 
-    _req_layers = [
+    REQ_LAYERS = [
         "start", "length", "middle", 
         "current", "dwell", "kmer", "base", 
-        "bcaln.start", "bcaln.error" #, "cmp.mean_ref_dist"
+        "bcaln.start", "bcaln.error"
     ]
 
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
+
+        self.conf.tracks.layers = self.REQ_LAYERS + self.prms.layers
 
         if isinstance(self.prms.tracks, str) or self.prms.tracks is None:
             self.tracks = Tracks(conf=self.conf)
@@ -54,10 +56,9 @@ class Dotplot:
 
         self.layers = list(parse_layers(self.prms.layers, False))
 
-        self.tracks.set_layers(self._req_layers + self.layers)
+        self.tracks.set_layers(self.REQ_LAYERS + self.layers)
 
         self.conf.load_config(self.tracks.conf)
-
 
         self.fig_config = {
                 "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None},
@@ -74,7 +75,7 @@ class Dotplot:
 
     def plot(self, read_id):
         chunk = self.tracks.slice(reads=[read_id])
-        return self._plot(read_id, chunk.alns)
+        return self._plot(read_id, chunk)
         #for read_id, tracks in self.tracks.iter_reads_([read_id]):
         #    return self._plot(read_id, tracks)
 
@@ -274,7 +275,7 @@ class Dotplot:
 
     def _plot_bcaln(self, fig, legend, layers):
         fig.add_trace(go.Scattergl(
-            x=layers["bcaln","start"], y=layers.index-1,
+            x=layers["bcaln","start"], y=layers.index+1,
             name="Basecalled Alignment",
             mode="markers", marker={"size":5,"color":"orange"},
             legendgroup="bcaln",

@@ -538,7 +538,7 @@ class Tracks:
         df = df.dropna()
 
         if save:
-            df.rename(index=self.alns[0].coords.ref_to_mref, level=0, inplace=True)
+            df.rename(index=lambda r: self.alns[0].coords.ref_to_mref(r, True), level=0, inplace=True)
             self.alns[0].db.write_layers(
                 pd.concat({"cmp" : df}, names=["group", "layer"], axis=1), 
                 index=["mref", "aln_a", "aln_b", "group_b"])
@@ -562,6 +562,7 @@ class Tracks:
                 refstats[track.name] = None
                 continue
 
+
             refstats[track.name] = groups.agg(stats.layer_agg)
             rename = ({
                 old[-1] : new
@@ -573,23 +574,27 @@ class Tracks:
 
 
         if len(stats.compare) > 0:
-            groups_a, groups_b = grouped
-            refs_a = self.alns[0].layers.index.unique("ref")
-            refs_b = self.alns[1].layers.index.unique("ref")
-            refs = refs_a.intersection(refs_b)
-            cmps = {l : defaultdict(list) for l in self.prms.refstats_layers}
-            for ref in refs:
-                track_a = groups_a.get_group(ref)
-                track_b = groups_b.get_group(ref)
-                for layer in self.prms.refstats_layers:
-                    a = track_a[layer]
-                    b = track_b[layer]
-                    for stat in stats.compare:
-                        ks = scipy.stats.stats.ks_2samp(a,b,mode="asymp")
-                        cmps[layer]["stat"].append(ks.statistic)
-                        cmps[layer]["pval"].append(ks.pvalue)
+            if self.any_empty:
+                refstats["ks"] = None
+            
+            else:
+                groups_a, groups_b = grouped
+                refs_a = self.alns[0].layers.index.unique("ref")
+                refs_b = self.alns[1].layers.index.unique("ref")
+                refs = refs_a.intersection(refs_b)
+                cmps = {l : defaultdict(list) for l in self.prms.refstats_layers}
+                for ref in refs:
+                    track_a = groups_a.get_group(ref)
+                    track_b = groups_b.get_group(ref)
+                    for layer in self.prms.refstats_layers:
+                        a = track_a[layer]
+                        b = track_b[layer]
+                        for stat in stats.compare:
+                            ks = scipy.stats.stats.ks_2samp(a,b,mode="asymp")
+                            cmps[layer]["stat"].append(ks.statistic)
+                            cmps[layer]["pval"].append(ks.pvalue)
 
-            refstats["ks"] = pd.concat({k : pd.DataFrame(index=refs, data=c) for k,c in cmps.items()}, axis=1) 
+                refstats["ks"] = pd.concat({k : pd.DataFrame(index=refs, data=c) for k,c in cmps.items()}, axis=1) 
         
         if np.any([df is None for df in refstats.values()]):
             columns = None
@@ -772,8 +777,8 @@ class Tracks:
                 track_alns = alignments.loc[aln_groups[parent.id]]
                 track_layers = layers.loc[layer_alns.isin(track_alns.index)]
             else:
-                track_alns = pd.DataFrame(columns=alignments.columns)
-                track_layers = pd.DataFrame(columns=layers.columns)
+                track_alns = alignments.loc[:0] #pd.DataFrame(index=alignments.index.names, columns=alignments.columns)
+                track_layers = layers.loc[:0] #pd.DataFrame(index=layers.index.names, columns=layers.columns)
 
             track = AlnTrack(parent, coords, track_alns, track_layers)
 
