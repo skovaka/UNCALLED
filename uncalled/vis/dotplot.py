@@ -68,8 +68,6 @@ class Dotplot:
     def iter_plots(self):
         t0 = time.time()
         for read_id, tracks in self.tracks.iter_reads():
-            print(read_id, time.time()-t0)
-            print(tracks)
             yield read_id, self._plot(read_id, tracks)
             t0 = time.time()
 
@@ -231,13 +229,7 @@ class Dotplot:
 
         if self.prms.select_ref is not None:
             fig.add_hline(y=self.prms.select_ref, line_color="red", row=2, col=1, opacity=0.5)
-            #print("SELECT")
-            #print(self.prms.select_ref)
             i = hover_data.index.get_loc(self.prms.select_ref)
-            #print(i)
-            #print(hover_coords)
-            #fig.add_vline(x=hover_coords[self.prms.select_ref], line_color="red", row=2, col=1, opacity=0.5)
-
 
         fig.update_yaxes(row=2, col=1,
             title_text="Reference (%s)" % aln["ref_name"])
@@ -382,6 +374,7 @@ def main(conf):
 
     dotplots = Dotplot(conf=conf)
     for read_id, fig in dotplots.iter_plots():
+        print(read_id)
         fig.write_html(
             conf.out_prefix + read_id + ".html", 
             config=dotplots.fig_config)
