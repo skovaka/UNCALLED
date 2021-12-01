@@ -179,6 +179,7 @@ def tombo(conf):
                 start, end,
                 aln_attrs["mapped_strand"] == "+")
             sig_fwd = (ref_bounds.fwd != is_rna)
+            print(ref_bounds.fwd, sig_fwd)
 
             #io.
             #track.init_alignment(read.read_id, ref_bounds)
