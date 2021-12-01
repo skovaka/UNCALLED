@@ -58,10 +58,10 @@ def main(conf):
 
     print("\t".join(columns))
 
-    for coords,_ in tracks.iter_refs():
-        stats = tracks.calc_refstats(conf.verbose_refs, conf.cov)
+    for chunk in tracks.iter_refs():
+        stats = chunk.calc_refstats(conf.verbose_refs, conf.cov)
         if conf.verbose_refs:
             stats.index = pd.MultiIndex.from_product([
-                [coords.ref_name], stats.index, ["+" if coords.fwd else "-"]
+                [chunk.coords.ref_name], stats.index, ["+" if chunk.coords.fwd else "-"]
             ])
         sys.stdout.write(stats.to_csv(sep="\t",header=False,na_rep=0))

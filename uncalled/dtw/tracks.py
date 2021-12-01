@@ -554,10 +554,14 @@ class Tracks:
 
         refstats = dict()
         grouped = [
-            t.layers[self.prms.refstats_layers].groupby(level="ref")
+            t.layers[self.prms.refstats_layers].groupby(level=0)
             for t in self.alns]
 
         for track,groups in zip(self.alns, grouped):
+            if track.empty:
+                refstats[track.name] = None
+                continue
+
             refstats[track.name] = groups.agg(stats.layer_agg)
             rename = ({
                 old[-1] : new
@@ -566,6 +570,7 @@ class Tracks:
             refstats[track.name].rename(columns=rename, inplace=True)
             if cov:
                 refstats[track.name].insert(0, "cov", groups.size())
+
 
         if len(stats.compare) > 0:
             groups_a, groups_b = grouped
@@ -586,6 +591,15 @@ class Tracks:
 
             refstats["ks"] = pd.concat({k : pd.DataFrame(index=refs, data=c) for k,c in cmps.items()}, axis=1) 
         
+        if np.any([df is None for df in refstats.values()]):
+            columns = None
+            for df in refstats.values():
+                if df is not None:
+                    columns = df.columns
+                    break
+            for name,df in refstats.items():
+                if df is None:
+                    refstats[name] = pd.DataFrame(columns=columns)
         refstats = pd.concat(refstats, axis=1, names=["track", "group", "layer", "stat"])
 
         #TODO make verbose ref indexing
@@ -763,8 +777,8 @@ class Tracks:
 
             track = AlnTrack(parent, coords, track_alns, track_layers)
 
-            if not track.empty:
-                track.calc_layers(self.fn_layers)
+            #if not track.empty:
+            track.calc_layers(self.fn_layers)
 
             tracks[parent.name] = track
 

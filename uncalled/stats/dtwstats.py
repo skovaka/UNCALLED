@@ -39,13 +39,13 @@ def compare(conf):
         conf.tracks.layers += [("cmp", "mean_ref_dist")] #LAYERS["cmp"]["mean_ref_dist"].deps
     
     tracks = Tracks(conf=conf)
-    for read_id,_ in tracks.iter_reads():
-        if tracks.any_empty:
+    for read_id,chunk in tracks.iter_reads():
+        if chunk.any_empty:
             sys.stderr.write(f"Skipping {read_id}\n")
         else:
             if conf.save:
                 print(read_id)
-            tracks.calc_compare(group_b, conf.save)
+            chunk.calc_compare(group_b, conf.save)
 
 DUMP_OPTS = (
     Opt("input", "tracks", nargs="+", type=str),

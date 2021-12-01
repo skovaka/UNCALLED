@@ -164,8 +164,9 @@ class AlnTrack:
             self._init_new(*args, **kwargs)
 
         self.mat = None
-        self._layers_leftover = pd.DataFrame()
-        self._alignments_leftover = pd.DataFrame()
+        self.coords = None
+        self.alignments = pd.DataFrame()
+        self.layers = pd.DataFrame()
 
     def _init_new(self, db, track_id, name, desc, conf, fast5s=None):
         self.db = db
@@ -249,7 +250,7 @@ class AlnTrack:
 
     @property
     def empty(self):
-        return len(self.alignments) == 0
+        return self.coords is None or len(self.alignments) == 0
 
     def _group_layers(self, group, layers):
         return pd.concat({group : layers}, names=["group", "layer"], axis=1)
@@ -289,12 +290,14 @@ class AlnTrack:
                 meta = LAYERS[group][layer]
 
                 #Make sure layer dependencies exist
-                if meta.deps is None or len(self.layers.columns.intersection(meta.deps)) == len(meta.deps):
+                if not self.empty and (meta.deps is None or len(self.layers.columns.intersection(meta.deps)) == len(meta.deps)):
                     fn = meta.fn
                     if fn is None:
                         raise ValueError("Layer not found: {group}.{layer}")
                     vals = fn(self)
                     self.layers[group,layer] = vals
+                else:
+                    self.layers[group,layer] = pd.NA
 
     def load_mat(self):
         df = self.layers.copy()
