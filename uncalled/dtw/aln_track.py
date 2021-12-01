@@ -177,7 +177,7 @@ class AlnTrack:
         self.fast5s = fast5s #TODO GET RID OF THIS
         self.model = PoreModel(self.conf.pore_model) 
 
-    def _init_slice(self, p, coords, alignments, layers, order=["fwd", "ref_start"]):
+    def _init_slice(self, p, coords=None, alignments=None, layers=None, order=["fwd", "ref_start"]):
         self._init_new(p.db, p.id, p.name, p.desc, p.conf, p.fast5s)
         self.set_data(coords, alignments, layers, order)
 
@@ -188,7 +188,7 @@ class AlnTrack:
         self.layers = layers
 
         isnone = [coords is None, alignments is None, layers is None]
-        if np.all(isnone):
+        if np.all(isnone) or len(alignments) == 0:
             return
         elif np.any(isnone):
             raise ValueError("Must specify AlnTrack coords, alignments, and layers")
@@ -223,6 +223,8 @@ class AlnTrack:
         #ref_start = max(self.layer_refs.min(), ref_start)
         #ref_end = min(self.layer_refs.max()+1, ref_end)
         #coords = self.coords.ref_slice(ref_start, ref_end)
+        if self.empty:
+            return AlnTrack(self, coords, self.alignments, self.layers)
         layer_refs = self.layers.index.get_level_values("ref")
 
         layers = self.layers.loc[layer_refs.isin(coords.refs)]

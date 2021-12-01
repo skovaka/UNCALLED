@@ -68,6 +68,7 @@ class Dotplot:
         t0 = time.time()
         for read_id, tracks in self.tracks.iter_reads():
             print(read_id, time.time()-t0)
+            print(tracks)
             yield read_id, self._plot(read_id, tracks)
             t0 = time.time()
 
@@ -104,7 +105,7 @@ class Dotplot:
         tracks_filter,colors_filter = zip(*[(t,c) for t,c in zip(tracks,self.conf.vis.track_colors) if t.name != self.prms.bcaln_track])
         #colors_filter = [t for t in tracks if t.name != self.prms.bcaln_track]
 
-        Sigplot(tracks_filter, track_colors=colors_filter, conf=self.conf).plot(fig)
+        Sigplot(tracks, conf=self.conf).plot(fig)
 
         hover_layers = [("dtw", "middle"),("dtw","kmer"),("dtw","current"),("dtw","dwell")] + self.layers
         #hover_layers += (l for l in self.prms.layers if l not in {"current","dwell"})
@@ -223,7 +224,7 @@ class Dotplot:
                 showlegend=False
             ), row=2,col=1)
 
-        if track.all_fwd == self.conf.is_rna:
+        if not track.empty and track.all_fwd == self.conf.is_rna:
             fig.update_yaxes(autorange="reversed", row=2, col=1)
             fig.update_yaxes(autorange="reversed", row=2, col=2)
 
@@ -273,7 +274,7 @@ class Dotplot:
 
     def _plot_bcaln(self, fig, legend, layers):
         fig.add_trace(go.Scattergl(
-            x=layers["bcaln","start"], y=layers.index+1,
+            x=layers["bcaln","start"], y=layers.index-1,
             name="Basecalled Alignment",
             mode="markers", marker={"size":5,"color":"orange"},
             legendgroup="bcaln",

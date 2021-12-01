@@ -136,7 +136,7 @@ class Tracks:
             for _,db in self.dbs.items():
                 fast5_reads.append(db.get_fast5_index(self._aln_track_ids))
             fast5_reads = pd.concat(fast5_reads)
-            self.fast5s = self.fast5s = Fast5Reader(index=fast5_reads, conf=self.conf)
+            self.fast5s = Fast5Reader(index=fast5_reads, conf=self.conf)
 
             reads = fast5_reads["read_id"]
             self.reads = pd.Index(reads[~reads.duplicated()])
@@ -428,7 +428,8 @@ class Tracks:
     def get_all_reads(self):
         read_ids = pd.Index(self.alns[0].read_ids)
         for track in self.alns[1:]:
-            read_ids = read_ids.union(track.read_ids)
+            if not track.empty:
+                read_ids = read_ids.union(track.read_ids)
         return read_ids
 
     def slice_shared_reads(self):
@@ -485,7 +486,6 @@ class Tracks:
 
         self.cmp = db.query_compare(self.cmp_layers, self._aln_track_ids, self.coords, aln_ids)
         #TODO add aln_ids
-
 
         groups = self.cmp.index.get_level_values("group_b").unique()
         if "bcaln" in groups:
@@ -603,6 +603,7 @@ class Tracks:
         else:
             coords = self.coords
 
+        t0 = time.time()
         dbfile0,db0 = list(self.dbs.items())[0]
         layer_iter = db0.query_layers(
             self.db_layers, 
@@ -610,6 +611,8 @@ class Tracks:
             coords=coords, 
             order=["mref"],
             chunksize=self.prms.ref_chunksize)
+
+        t0 = time.time()
 
         def get_full_coords(mref):
             chunk_refs = self.index.mrefs_to_ref_coord(mref, mref, not self.conf.is_rna)
@@ -629,6 +632,8 @@ class Tracks:
 
         chunk = next(layer_iter)
         seq_coords = get_full_coords(chunk.index.get_level_values("mref")[0])
+
+        t0 = time.time()
                 
         while len(chunk) > 0:
 
@@ -645,10 +650,10 @@ class Tracks:
             leftovers = chunk.loc[i]
             layers = chunk.drop(index=i)
 
-            aln_ids = chunk.index.unique("aln_id").to_numpy()
+            aln_ids = layers.index.unique("aln_id").to_numpy()
             alns = db0.query_alignments(self._aln_track_ids, aln_id=aln_ids)
 
-            ret = self._tables_to_tracks(alns, layers)
+            ret = self._tables_to_tracks(coords, alns, layers)
 
             chunk = leftovers
 
@@ -732,24 +737,30 @@ class Tracks:
             layer_alns = layers.index.get_level_values("aln_id")
             
             for ref_name,ref_alns in alignments.groupby("ref_name"):
-                cache = self._tables_to_tracks(ref_alns, layers)
+                coords = self._alns_to_coords(ref_alns)
+                cache = self._tables_to_tracks(coords, ref_alns, layers)
                 for ret in cache.iter_reads_slice():
                     yield ret
 
         if len(aln_leftovers) > 0:
             for ref_name,ref_alns in aln_leftovers.groupby("ref_name"):
-                cache = self._tables_to_tracks(ref_alns, layer_leftovers)
+                coords = self._alns_to_coords(ref_alns)
+                cache = self._tables_to_tracks(coords, ref_alns, layer_leftovers)
                 for ret in cache.iter_reads_slice():
                     yield ret
 
-    def _tables_to_tracks(self, alignments, layers):
-        coords = self._alns_to_coords(alignments)
+    def _tables_to_tracks(self, coords, alignments, layers):
         tracks = dict()
-        aln_groups = alignments.groupby("track_id")
+        aln_groups = alignments.groupby("track_id").groups
         layer_alns = layers.index.get_level_values("aln_id")
         for parent in self.alns:
-            track_alns = aln_groups.get_group(parent.id)
-            track_layers = layers.loc[layer_alns.isin(track_alns.index)]
+            if parent.id in aln_groups:
+                track_alns = alignments.loc[aln_groups[parent.id]]
+                track_layers = layers.loc[layer_alns.isin(track_alns.index)]
+            else:
+                track_alns = pd.DataFrame(columns=alignments.columns)
+                track_layers = pd.DataFrame(columns=layers.columns)
+
             track = AlnTrack(parent, coords, track_alns, track_layers)
 
             if not track.empty:

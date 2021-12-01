@@ -191,9 +191,12 @@ class Fast5Reader:
         return self
 
     def __next__(self):
-        if self._iter.empty():
-            raise StopIteration
-        return self._iter.next_read()
+        while not self._iter.empty():
+            try:
+                return self._iter.next_read()
+            except:
+                sys.stderr.write("Failed to load fast5 file\n")
+        raise StopIteration
 
 if __name__ == "__main__":
     import argparse
