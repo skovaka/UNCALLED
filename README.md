@@ -437,7 +437,7 @@ Uncalled4 stores signal alignments as a set of **layers** associated with read a
 | dtw   | dwell   | Signal dwell time (ms/nt) |
 | dtw   | model_diff | Difference between predicted (via a pore model) and observed current|
 | dtw   | kmer | Binarized reference k-mer |
-| dtw   | kmer | Binarized reference base |
+| dtw   | base | Binarized reference base |
 | cmp   | mean_ref_dist | Mean reference distance between two alignments (must first run [`dtwstats compare`](#compare)) |
 | cmp   | jaccard | Raw sample jaccard distances between two alignments (must first run [`dtwstats compare`](#compare)) |
 
