@@ -6,7 +6,6 @@ tombo       Convert alignments produced by tomobo resquiggle"""
 
 import sys, os
 import numpy as np
-import matplotlib.pyplot as plt
 import argparse
 import pandas as pd
 from ont_fast5_api.fast5_interface import get_fast5_file

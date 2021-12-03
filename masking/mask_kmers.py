@@ -2,7 +2,6 @@
 
 import sys, os
 import numpy as np
-import matplotlib.pyplot as plt
 import argparse
 
 def mask_seq(seq, kmer):

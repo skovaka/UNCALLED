@@ -4,11 +4,9 @@ import os
 import subprocess
 import sys
 
-#TODO need to make sure pybind11 already installed?
-#might be relevent: https://github.com/oslocyclotronlab/ompy/pull/160
 try:
-    from pybind11.setup_helpers import Pybind11Extension, ParallelCompile, needs_recompile
-    ParallelCompile("NPY_NUM_BUILD_JOBS", default=8, needs_recompile=naive_recompile).install()
+    from pybind11.setup_helpers import Pybind11Extension, ParallelCompile, naive_recompile
+    ParallelCompile("NPY_NUM_BUILD_JOBS", needs_recompile=naive_recompile).install()
 except:
     from setuptools import Extension as Pybind11Extension
 
@@ -147,8 +145,6 @@ requires=[
     'scipy>=1.5.4',
     'toml>=0.10.2',
     'ont_fast5_api>=4.0.0',
-    #'h5py>=2.10.0'
-    'matplotlib',
 ],
 
 setup(

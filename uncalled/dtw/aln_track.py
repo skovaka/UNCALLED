@@ -7,7 +7,6 @@ from collections import defaultdict, namedtuple
 import re
 import time
 from typing import NamedTuple
-from matplotlib.colors import Normalize
 import pandas as pd
 import copy
 
@@ -16,8 +15,6 @@ from typing import Callable
 
 import scipy.stats
 from sklearn.decomposition import PCA
-
-import matplotlib.pyplot as plt
 
 from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords

@@ -6,12 +6,9 @@ import argparse
 from collections import defaultdict, namedtuple
 import re
 import time
-from matplotlib.colors import Normalize
 import pandas as pd
 import scipy.stats
 import copy
-
-import matplotlib.pyplot as plt
 
 from ..pafstats import parse_paf, PafEntry
 from ..config import Config
