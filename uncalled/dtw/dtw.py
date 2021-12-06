@@ -156,17 +156,13 @@ class GuidedDTW:
         #block_ends   = np.append(self.bcaln.ref_gaps, block_max)
         #for st, en in zip(block_starts, block_ends):
 
-
         for st, en in [(block_min, block_max)]:
             mref_st = st
             mref_en = en+1
             block_kmers = self.ref_kmers.loc[mref_st:mref_en]
-            #mref_st = st = block_kmers.index[0]
-            #en = block_kmers.index[-1]
 
             samp_st = self.bcaln.loc[st,"start"]
             samp_en = self.bcaln.loc[en,"start"]
-
 
             read_block = self.read.sample_range(samp_st, samp_en)
 

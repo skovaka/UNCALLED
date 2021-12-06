@@ -51,8 +51,6 @@ class Bcaln:
 
         if not read.f5.bc_loaded or (not self.parse_cs(paf) and not self.parse_cigar(paf)):
             return
-        #if self.empty: 
-        #    return
 
         #TODO make c++ build this 
         moves = np.array(read.f5.moves, bool)
@@ -66,7 +64,6 @@ class Bcaln:
         })
 
         df = samp_bps.join(self.bp_mref_aln, on="bp").dropna()
-        #df["mref"] = df["mref"].astype("Int64")
 
         grp = df.groupby("mref")
 
