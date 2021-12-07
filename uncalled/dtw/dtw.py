@@ -26,14 +26,15 @@ METHODS = {
     "DTW" : DTWd,
 }
 
-class AlignParams(ParamGroup):
+class DtwParams(ParamGroup):
     _name = "dtw"
 
-AlignParams._def_params(
+DtwParams._def_params(
     ("method", "GuidedBDTW", str, "DTW method"),
     ("band_width", 50, int, "DTW band width (only applies to BDTW)"),
     ("band_shift", 0.5, float, "DTW band shift coefficent (only applies to BDTW)"),
     ("mm2_paf", None, str, "Path to minimap2 alignments of basecalled reads in PAF format. Used to determine where each should be aligned. Should include cigar string."),
+    ("mask_skips", False, bool, "Represent skips as missing data"),
 )
 
 OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
@@ -42,6 +43,7 @@ OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt(("-f", "--overwrite"), "tracks", action="store_true"),
     Opt("--full-overlap", "tracks", action="store_true"),
     Opt(("-a", "--append"), "tracks", action="store_true"),
+    Opt(("-S", "--mask-skips"), "dtw", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt("--method", "dtw", choices=METHODS.keys()),
@@ -190,7 +192,7 @@ class GuidedDTW:
                   .rename(columns={'norm_sig' : 'current'})
 
         #def self, aln_id, group, layers):
-        self.df = collapse_events(df, True)
+        self.df = collapse_events(df, True, mask_skips=self.prms.mask_skips)
         self.track.add_layer_group("dtw", self.df)
 
         #if len(band_blocks) == 0:
@@ -254,7 +256,7 @@ class GuidedDTW:
             'ref_en': ref_st + band_ref_en
         })
 
-def collapse_events(dtw, kmer_str=False, start_col="start", length_col="length", mean_col="current", kmer_col="kmer"):
+def collapse_events(dtw, kmer_str=False, start_col="start", length_col="length", mean_col="current", kmer_col="kmer", mask_skips=False):
 
     dtw["cuml_mean"] = dtw[length_col] * dtw[mean_col]
 
@@ -281,6 +283,9 @@ def collapse_events(dtw, kmer_str=False, start_col="start", length_col="length",
 
     if kmers is not None:
         dtw["kmer"] = kmers.astype("uint16")
+
+    if mask_skips:
+        dtw = dtw[~dtw.duplicated("start")]
 
     return dtw.set_index("mref").sort_index()
 
