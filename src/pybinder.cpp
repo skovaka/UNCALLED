@@ -111,28 +111,17 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<DTWd, DTWp> dtw_d(m, "DTWd");
     DTWd::pybind_defs(dtw_d);
 
-    //py::class_<DTWr94p> dtw_r94p(m, "DTWr94p");
-    //DTWr94p::pybind_defs(dtw_r94p);
-
-    //py::class_<DTWr94d> dtw_r94d(m, "DTWr94d");
-    //DTWr94d::pybind_defs(dtw_r94d);
-
-    //py::class_<DTWr94pRNA> dtw_r94pRNA(m, "DTWr94pRNA");
-    //DTWr94pRNA::pybind_defs(dtw_r94pRNA);
-
-    //py::class_<DTWr94dRNA> dtw_r94dRNA(m, "DTWr94dRNA");
-    //DTWr94dRNA::pybind_defs(dtw_r94dRNA);
-
-    py::class_<DTWParams>dtwp(m, "DTWParams");
-    dtwp.def_readwrite("dw", &DTWParams::dw);
-    dtwp.def_readwrite("hw", &DTWParams::hw);
-    dtwp.def_readwrite("vw", &DTWParams::vw);
-    m.attr("DTW_EVENT_GLOB") = py::cast(DTW_EVENT_GLOB);
-    m.attr("DTW_RAW_GLOB") = py::cast(DTW_RAW_GLOB);
-    m.attr("DTW_GLOB") = py::cast(DTW_GLOB);
-    m.attr("DTW_EVENT_QSUB") = py::cast(DTW_EVENT_QSUB);
-    m.attr("DTW_EVENT_RSUB") = py::cast(DTW_EVENT_RSUB);
-    m.attr("DTW_RAW_QSUB") = py::cast(DTW_EVENT_QSUB);
-    m.attr("DTW_RAW_RSUB") = py::cast(DTW_EVENT_RSUB);
+    pybind_dtw(m);
+    //py::class_<DTWParams> dtwp(m, "DTWParams");
+    //dtwp.def_readwrite("dw", &DTWParams::dw);
+    //dtwp.def_readwrite("hw", &DTWParams::hw);
+    //dtwp.def_readwrite("vw", &DTWParams::vw);
+    //m.attr("DTW_EVENT_GLOB") = py::cast(DTW_EVENT_GLOB);
+    //m.attr("DTW_RAW_GLOB") = py::cast(DTW_RAW_GLOB);
+    //m.attr("DTW_GLOB") = py::cast(DTW_GLOB);
+    //m.attr("DTW_EVENT_QSUB") = py::cast(DTW_EVENT_QSUB);
+    //m.attr("DTW_EVENT_RSUB") = py::cast(DTW_EVENT_RSUB);
+    //m.attr("DTW_RAW_QSUB") = py::cast(DTW_EVENT_QSUB);
+    //m.attr("DTW_RAW_RSUB") = py::cast(DTW_EVENT_RSUB);
 }
 

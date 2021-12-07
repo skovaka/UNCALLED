@@ -169,7 +169,7 @@ class BandedDTW {
                     } else hs = MAX_COST;
 
                     if (ak+1 >= astart && ak+1 <= aend) {
-                        vs = mat_[ak+1] + cost;
+                        vs = mat_[ak+1] + cost * 4;
                     } else vs = MAX_COST;
 
                     if (dk >= dstart && dk <= dend) {

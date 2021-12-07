@@ -27,6 +27,7 @@
 #include <iostream>
 #include <vector>
 #include <cfloat>
+#include "dtw.hpp"
 #include "mapper.hpp"
 #include "fast5_reader.hpp"
 #include "toplevel_prms.hpp"
@@ -70,11 +71,12 @@ class Config {
     EventProfiler::Params event_profiler = EventProfiler::PRMS_DEF;
     SeedTracker::Params   seed_tracker   = SeedTracker::PRMS_DEF;
     Fast5Reader::Params   fast5_reader   = Fast5Reader::PRMS_DEF;
-    PoreModel<KLEN>::Params     pore_model     = PoreModel<KLEN>::PRMS_DEF;
+    PoreModel<KLEN>::Params pore_model   = PoreModel<KLEN>::PRMS_DEF;
 
     RealtimeParams        realtime       = REALTIME_PRMS_DEF;
     SimulatorParams       simulator     = SIM_PRMS_DEF;
     MapOrdParams          map_pool_ord   = MAP_ORD_PRMS_DEF;
+    DtwParams             dtw            = DTW_PRMS_DEF;
 
     Config() : mode(Mode::UNDEF), threads(1) {}
 
@@ -364,6 +366,7 @@ class Config {
         CONF_GROUP(realtime, "") 
         CONF_GROUP(simulator, "")
         CONF_GROUP(map_pool_ord, "")
+        CONF_GROUP(dtw, "")
 
         c.def_readonly_static("_PARAM_GROUPS", &Config::_PARAM_GROUPS);
         c.def_readonly_static("_GLOBAL_PARAMS", &Config::_GLOBAL_PARAMS);

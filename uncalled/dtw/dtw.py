@@ -12,7 +12,7 @@ from ..argparse import ArgParser, Opt
 from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..sigproc import ProcRead
-from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_GLOB, nt
+from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_PRMS_EVT_GLOB, nt, DtwParams
 
 from _uncalled._nt import KmerArray
 
@@ -21,21 +21,21 @@ from . import Bcaln, Tracks
 
 #TODO make this better
 METHODS = {
-    "GuidedBDTW" : BandedDTW,
-    "StaticBDTW" : StaticBDTW,
-    "DTW" : DTWd,
+    "guided" : BandedDTW,
+    "static" : StaticBDTW,
+    "global" : DTWd,
 }
 
-class DtwParams(ParamGroup):
-    _name = "dtw"
-
-DtwParams._def_params(
-    ("method", "GuidedBDTW", str, "DTW method"),
-    ("band_width", 50, int, "DTW band width (only applies to BDTW)"),
-    ("band_shift", 0.5, float, "DTW band shift coefficent (only applies to BDTW)"),
-    ("mm2_paf", None, str, "Path to minimap2 alignments of basecalled reads in PAF format. Used to determine where each should be aligned. Should include cigar string."),
-    ("mask_skips", False, bool, "Represent skips as missing data"),
-)
+#class DtwParams(ParamGroup):
+#    _name = "dtw"
+#
+#DtwParams._def_params(
+#    ("method", "guided", str, "DTW method"),
+#    ("band_width", 50, int, "DTW band width (only applies to BDTW)"),
+#    ("band_shift", 0.5, float, "DTW band shift coefficent (only applies to BDTW)"),
+#    ("mm2_paf", None, str, "Path to minimap2 alignments of basecalled reads in PAF format. Used to determine where each should be aligned. Should include cigar string."),
+##    ("mask_skips", False, bool, "Represent skips as missing data"),
+#)
 
 OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
@@ -43,7 +43,7 @@ OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt(("-f", "--overwrite"), "tracks", action="store_true"),
     Opt("--full-overlap", "tracks", action="store_true"),
     Opt(("-a", "--append"), "tracks", action="store_true"),
-    Opt(("-S", "--mask-skips"), "dtw", action="store_true"),
+    #Opt(("-S", "--mask-skips"), "dtw", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt("--method", "dtw", choices=METHODS.keys()),
@@ -123,7 +123,7 @@ class GuidedDTW:
 
         self.read = read
 
-        self.method = self.prms.method
+        self.method = self.prms.band_mode
         if not self.method in METHODS:
             sys.stderr.write("Error: unrecongized DTW method \"%s\".\n" % method)
             sys.stderr.write("Must be one of \"%s\".\n" % "\", \"".join(METHODS.keys()))
@@ -192,7 +192,7 @@ class GuidedDTW:
                   .rename(columns={'norm_sig' : 'current'})
 
         #def self, aln_id, group, layers):
-        self.df = collapse_events(df, True, mask_skips=self.prms.mask_skips)
+        self.df = collapse_events(df, True)#, mask_skips=self.prms.mask_skips)
         self.track.add_layer_group("dtw", self.df)
 
         #if len(band_blocks) == 0:
@@ -211,7 +211,7 @@ class GuidedDTW:
         ref_len = len(ref_kmers)
 
         #should maybe move to C++
-        if self.method == "GuidedBDTW":
+        if self.method == "guided":
             band_count = qry_len + ref_len
             band_lls = list()
 
@@ -230,7 +230,7 @@ class GuidedDTW:
 
             return common + (self.prms.band_width, band_lls)
 
-        elif self.method == "StaticBDTW":
+        elif self.method == "static":
             return common + (self.prms.band_width, self.prms.band_shift)
 
         else:

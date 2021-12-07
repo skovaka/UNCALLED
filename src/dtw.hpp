@@ -14,26 +14,45 @@ const KmerLen DTW_KLEN = KmerLen::k5;
 enum class DTWSubSeq {NONE, ROW, COL};
 typedef struct {
     DTWSubSeq subseq;
-    float dw, hw, vw;
-} DTWParams;
+    float move_cost, stay_cost, skip_cost,
+          band_shift;
+    i32 band_width;
+    std::string band_mode, mm2_paf;
+} DtwParams;
 
-const DTWParams 
-    DTW_EVENT_GLOB = {
-        DTWSubSeq::NONE, 2, 1, 100
-    }, DTW_EVENT_QSUB = {
-        DTWSubSeq::COL, 2, 1, 100
-    }, DTW_EVENT_RSUB = {
-        DTWSubSeq::ROW, 2, 1, 100
-    }, DTW_RAW_QSUB = {
-        DTWSubSeq::COL, 10, 1, 1000
-    }, DTW_RAW_RSUB = {
-        DTWSubSeq::ROW, 10, 1, 1000
-    }, DTW_RAW_GLOB = {
-        DTWSubSeq::NONE, 10, 1, 1000
-    }, DTW_GLOB = {
-        DTWSubSeq::NONE, 1, 1, 1
+const DtwParams 
+    DTW_PRMS_DEF = {
+        DTWSubSeq::NONE, 1, 1, 1, 0.5, 100, "guided", ""
+    }, DTW_PRMS_EVT_GLOB = {
+        DTWSubSeq::NONE, 2, 1, 100, 0, 0, "", "",
     };
 
+//   ("method", "guided", str, "DTW method"),
+//   ("band_width", 50, int, "DTW band width (only applies to BDTW)"),
+//   ("band_shift", 0.5, float, "DTW band shift coefficent (only applies to BDTW)"),
+//   ("mm2_paf", None, str, "Path to minimap2 alignments of basecalled reads in PAF format. Used to determine where each should be aligned. Should include cigar string."),
+//    ("mask_skips", False, bool, "Represent skips as missing data"),
+
+#ifdef PYBIND
+#define PY_DTW_PARAM(P, D) p.def_readwrite(#P, &DtwParams::P, D);
+void pybind_dtw(py::module_ &m) {
+    py::class_<DtwParams> p(m, "DtwParams");
+    PY_DTW_PARAM(band_mode, "DTW band mode (\"guided\", \"static\", or \"\"/\"none\")");
+    PY_DTW_PARAM(mm2_paf, "Path to minimap2 alignments of basecalled reads in PAF format. Used to determine where each should be aligned. Should include cigar string.");
+    PY_DTW_PARAM(move_cost, "DTW event move (diagonal) penalty");
+    PY_DTW_PARAM(stay_cost, "DTW event stay (horizontal) penalty");
+    PY_DTW_PARAM(skip_cost, "DTW event skip (vertical) penalty");
+    PY_DTW_PARAM(band_width, "DTW band width");
+    PY_DTW_PARAM(band_shift, "DTW band shift");
+    //dtwp.def_readwrite("move_cost", &DtwParams::move_cost);
+    //dtwp.def_readwrite("stay_cost", &DtwParams::stay_cost);
+    //dtwp.def_readwrite("skip_cost", &DtwParams::skip_cost);
+    //dtwp.def_readwrite("band_width", &DtwParams::band_width);
+
+    m.attr("DTW_PRMS_DEF") = py::cast(DTW_PRMS_DEF);
+    m.attr("DTW_PRMS_EVT_GLOB") = py::cast(DTW_PRMS_EVT_GLOB);
+}
+#endif
 
 class DTWp {
     public:
@@ -45,7 +64,7 @@ class DTWp {
     DTWp(const std::vector<float> &qry_vals,   
         const std::vector<u16> &ref_vals,
         const PoreModel<DTW_KLEN> &model,
-        const DTWParams &p) : 
+        const DtwParams &p) : 
         PRMS(p),
         model_(model),
         ref_vals_(ref_vals),
@@ -65,9 +84,9 @@ class DTWp {
             for (u64 q = 0; q < qry_vals_.size(); q++) {
 
                 cost = costfn(qry_vals_[q], ref_vals_[r]);
-                ds = dscore(r,q) + (PRMS.dw * cost);
-                hs = hscore(r,q) + (PRMS.hw * cost);
-                vs = vscore(r,q) + (PRMS.vw * cost);
+                ds = dscore(r,q) + (PRMS.move_cost * cost);
+                hs = hscore(r,q) + (PRMS.stay_cost * cost);
+                vs = vscore(r,q) + (PRMS.skip_cost * cost);
 
                 if (ds <= hs && ds <= vs) {
                     mat_[k] = ds;
@@ -148,7 +167,7 @@ class DTWp {
     enum Move {D, H, V}; //Horizontal, vertical, diagonal
     static constexpr float MAX_COST = FLT_MAX / 2.0;
 
-    const DTWParams PRMS;
+    const DtwParams PRMS;
     const PoreModel<DTW_KLEN> model_;
 
     const std::vector<u16> ref_vals_;
@@ -192,7 +211,7 @@ class DTWp {
         c.def(pybind11::init<const std::vector<float>&, 
                              const std::vector<u16>&,
                              const PoreModel<DTW_KLEN>,
-                             const DTWParams&>());
+                             const DtwParams&>());
         PY_DTW_P_METH(get_path)
         PY_DTW_P_METH(score)
         PY_DTW_P_METH(mean_score)
@@ -217,7 +236,7 @@ class DTWd : public DTWp {
     DTWd(const std::vector<float> &qry_vals,   
         const std::vector<u16> &ref_vals,
         const PoreModel<DTW_KLEN> &model,
-        const DTWParams &prms) 
+        const DtwParams &prms) 
         : DTWp(qry_vals, ref_vals, model, prms) {}
 
     private:
@@ -232,7 +251,7 @@ class DTWd : public DTWp {
         c.def(pybind11::init<const std::vector<float>&, 
                              const std::vector<u16>&,
                              const PoreModel<DTW_KLEN>,
-                             const DTWParams&>());
+                             const DtwParams&>());
         PY_DTW_D_METH(get_path)
         PY_DTW_D_METH(score)
         PY_DTW_D_METH(mean_score)
