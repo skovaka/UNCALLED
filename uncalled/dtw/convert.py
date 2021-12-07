@@ -210,7 +210,7 @@ def tombo(conf):
         currents = tombo_events["norm_mean"]
 
         if is_rna:
-            starts = raw_len - tombo_start - starts - tombo_events["length"] - 2
+            starts = raw_len - tombo_start - starts - tombo_events["length"]
 
         #if is_rna == ref_bounds.fwd:
 

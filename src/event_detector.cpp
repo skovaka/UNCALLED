@@ -45,6 +45,9 @@ EventDetector::~EventDetector() {
 }
 
 void EventDetector::reset() {
+    //for (size_t i = 0; i < BUF_LEN; i++) {
+    //    sum[i] = sumsq[i] = 0;
+    //}
     sum[0] = sumsq[0] = 0.0;
     t = 1;
     evt_st = 0;
@@ -103,6 +106,8 @@ bool EventDetector::add_sample(float s) {
     double tstat1 = compute_tstat(PRMS.window_length1),
            tstat2 = compute_tstat(PRMS.window_length2);
 
+    //std::cout << tstat1 << "\t" << tstat2 << "\n";
+
     bool p1 = peak_detect(tstat1, short_detector),
          p2 = peak_detect(tstat2, long_detector);
 
@@ -116,7 +121,7 @@ bool EventDetector::add_sample(float s) {
     #endif
 
     if (p1 || p2) {
-        create_event(buf_mid-PRMS.window_length1+1); //+3?
+        create_event(buf_mid-(PRMS.window_length1/2+1)); //+3?
 
         if (event_.mean >= PRMS.min_mean && event_.mean <= PRMS.max_mean) {
             return true;
@@ -197,7 +202,8 @@ float EventDetector::compute_tstat(u32 w_length) {
     // Quick return:
     //   t-test not defined for number of points less than 2
     //   need at least as many points as twice the window length
-    if (t <= 2*w_length || w_length < 2) {
+    if (t < BUF_LEN || w_length < 2) {
+    //if (t < w_length*2 || w_length < 2) {
         return 0;
     }
 
@@ -213,8 +219,16 @@ float EventDetector::compute_tstat(u32 w_length) {
 
     //std::cout << i << " " << st << " " << en << "\n";
 
-    double sum1 = sum[i] - sum[st];
-    double sumsq1 = sumsq[i] - sumsq[st];
+    //double sum1 = sum[i] - sum[st];
+    //double sumsq1 = sumsq[i] - sumsq[st];
+
+    double sum1 = sum[i];             
+    double sumsq1 = sumsq[i];         
+    if (buf_mid > w_length) {
+        sum1 -= sum[st];    
+        sumsq1 -= sumsq[st];
+    }
+
     float sum2 = (float)(sum[en] - sum[i]);
     float sumsq2 = (float)(sumsq[en] - sumsq[i]);
     float mean1 = sum1 / w_lengthf;
