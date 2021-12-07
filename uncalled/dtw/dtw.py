@@ -285,7 +285,7 @@ def collapse_events(dtw, kmer_str=False, start_col="start", length_col="length",
         dtw["kmer"] = kmers.astype("uint16")
 
     if mask_skips:
-        dtw = dtw[~dtw.duplicated("start")]
+        dtw = dtw[~dtw.duplicated("start", False)]
 
     return dtw.set_index("mref").sort_index()
 
