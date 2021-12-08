@@ -47,6 +47,9 @@ OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt("--method", "dtw", choices=METHODS.keys()),
+    Opt("--skip-cost", "dtw"),
+    Opt("--stay-cost", "dtw"),
+    Opt("--move-cost", "dtw"),
     #Opt(("-b", "--band-width"), "dtw"),
     #Opt(("-s", "--band-shift"), "dtw"),
     Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
@@ -204,6 +207,7 @@ class GuidedDTW:
 
     def _get_dtw_args(self, read_block, mref_start, ref_kmers):
         common = (
+            self.prms,
             read_block['norm_sig'].to_numpy(), 
             nt.kmer_array(ref_kmers), 
             self.model)
@@ -228,10 +232,10 @@ class GuidedDTW:
                 else:
                     q += 1
 
-            return common + (self.prms.band_width, band_lls)
+            return common + (band_lls, )
 
         elif self.method == "static":
-            return common + (self.prms.band_width, self.prms.band_shift)
+            return common
 
         else:
             return common + (DTW_GLOB,)

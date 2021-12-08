@@ -791,6 +791,7 @@ class Tracks:
 
         if not tracks.all_empty:
             tracks.load_compare(alignments.index.to_numpy())
+        tracks.calc_refstats()
 
         return tracks
 
