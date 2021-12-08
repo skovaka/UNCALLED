@@ -7,7 +7,6 @@
 #include "fast5_reader.hpp"
 #include "ref_index.hpp"
 #include "dtw.hpp"
-#include "dtw_banded.hpp"
 
 //const std::string CONF_DIR(std::getenv("UNCALLED_CONF")),
 //                  DEF_MODEL = CONF_DIR + "/r94_5mers.txt",

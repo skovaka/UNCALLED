@@ -9,7 +9,6 @@
 #include "map_pool_ord.hpp"
 #include "simulator.hpp"
 #include "dtw.hpp"
-#include "dtw_banded.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
