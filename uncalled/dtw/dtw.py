@@ -50,8 +50,8 @@ OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt("--skip-cost", "dtw"),
     Opt("--stay-cost", "dtw"),
     Opt("--move-cost", "dtw"),
-    #Opt(("-b", "--band-width"), "dtw"),
-    #Opt(("-s", "--band-shift"), "dtw"),
+    Opt(("-b", "--band-width"), "dtw"),
+    Opt(("-s", "--band-shift"), "dtw"),
     Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
 )
 
@@ -86,7 +86,9 @@ def main(conf):
     for read in fast5s:
         aligned = False
         for paf in mm2s[read.id]:
+            t0 = time.time()
             dtw = GuidedDTW(tracks, read, paf, conf)
+            #print(time.time()-t0)
 
             if dtw.df is None:
                 sys.stderr.write("dtw failed\n")
@@ -225,6 +227,7 @@ class GuidedDTW:
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
             for i in range(band_count):
                 band_lls.append( (int(q+shift), int(r-shift)) )
+                #print(band_lls[-1])
 
                 tgt = starts[q] if q < len(starts) else starts[-1]
                 if r <= tgt - mref_start:

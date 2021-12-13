@@ -77,6 +77,9 @@ LAYERS = {
         "end" : LayerMeta(int, "Sample End",  
             lambda track: track.layers["bcaln","start"] + track.layers["bcaln","length"],
             [("bcaln", "start"), ("bcaln", "length")]),
+        "middle" : LayerMeta(float, "Sample Middle",  
+            lambda track: track.layers["bcaln","start"] + (track.layers["bcaln","length"] / 2),
+            [("bcaln", "start"), ("bcaln", "length")]),
         "bp" : LayerMeta(int, "Basecaller Base Index"),
         "error" : LayerMeta(str, "Basecalled Alignment Error"),
     }, "cmp" : {
@@ -396,8 +399,8 @@ class AlnTrack:
         aln_b = other.get_aln_layers(id_b, group, ["start","end"], False) \
                      .reset_index(level="aln_id") \
                      .rename(columns={"aln_id" : "aln_b"})
-        if group == "bcaln":
-            aln_b.index = aln_b.index+1
+        #if group == "bcaln":
+        #    aln_b.index = aln_b.index+1
 
         merge = aln_a.join(aln_b, on="ref", lsuffix="_a", rsuffix="_b") \
                      .dropna(how="all")

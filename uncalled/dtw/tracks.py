@@ -691,7 +691,6 @@ class Tracks:
             (read_filter is not None and 
              len(self.get_all_reads().intersection(read_filter)) < len(read_filter)) or
             (ref_bounds is not None and not self.coords.contains(ref_bounds))):
-                
             gen = self.iter_reads_db(read_filter, ref_bounds, full_overlap, max_reads)
         else:
             gen = self.iter_reads_slice(read_filter, ref_bounds)
@@ -741,7 +740,10 @@ class Tracks:
                         .unique() \
                         .difference(aln_leftovers.index) \
                         .to_numpy()
-            alignments = db0.query_alignments(aln_id=ids)
+            if len(ids) > 0:
+                alignments = db0.query_alignments(aln_id=ids)
+            else:
+                alignments = pd.DataFrame()
 
             alignments = pd.concat([aln_leftovers, alignments])
             layers = pd.concat([layer_leftovers, layers])

@@ -39,7 +39,7 @@ class Dotplot:
     REQ_LAYERS = [
         "start", "length", "middle", 
         "current", "dwell", "kmer", "base", 
-        "bcaln.start", "bcaln.error"
+        "bcaln.middle", "bcaln.error"
     ]
 
     def __init__(self, *args, **kwargs):
@@ -231,8 +231,9 @@ class Dotplot:
             fig.add_hline(y=self.prms.select_ref, line_color="red", row=2, col=1, opacity=0.5)
             i = hover_data.index.get_loc(self.prms.select_ref)
 
+        strand = "+" if aln["fwd"] else "-"
         fig.update_yaxes(row=2, col=1,
-            title_text="Reference (%s)" % aln["ref_name"])
+            title_text=aln["ref_name"] + f" ({strand})")
 
         for i,(group,layer) in enumerate(self.layers):
             fig.update_xaxes(row=2, col=i+2,
@@ -267,9 +268,11 @@ class Dotplot:
 
     def _plot_bcaln(self, fig, legend, layers):
         fig.add_trace(go.Scattergl(
-            x=layers["bcaln","start"], y=layers.index+2,
+            x=layers["bcaln","start"], y=layers.index,#+2, #-1
+            #x=layers["bcaln","start"], y=layers.index,#+2, #-1
             name="Basecalled Alignment",
             mode="markers", marker={"size":5,"color":"orange"},
+            #line={"color":"orange", "width":2, "shape" : "vh"},
             legendgroup="bcaln",
             hoverinfo="skip",
             showlegend="bcaln_starts" not in legend

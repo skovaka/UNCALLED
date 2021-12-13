@@ -40,6 +40,7 @@ class Bcaln:
 
         self.clip_coords = clip_coords
 
+        #ref_coord = RefCoord(paf.rf_name, paf.rf_st-1, paf.rf_en+2, paf.is_fwd)
         ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
         self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna, kmer_trim=True)
 
@@ -74,14 +75,8 @@ class Bcaln:
             "bp"   : grp["bp"].first()
         }).set_index("mref")
 
+
         df = pd.concat([df, self.errors], axis=1)
-
-        #if self.err_bps is not None:
-        #    self.errs = samp_bps.join(self.err_bps.set_index("bp"), on="bp").dropna()
-        #    self.errs.reset_index(inplace=True, drop=True)
-        #else:
-        #    self.errs = None
-
 
         if self.clip_coords is not None:
             mrefs = df.index.intersection(self.clip_coords.mrefs[self.is_fwd])
@@ -110,12 +105,10 @@ class Bcaln:
 
         if not self.is_rna:
             qr_i = paf.qr_st
-            #rf_i = paf.rf_st
         else:
             qr_i = paf.qr_len - paf.qr_en 
-            #rf_i = -paf.rf_en+1
 
-        mrefs = self.paf_coords.mrefs
+        mrefs = self.paf_coords.mrefs - 2
         mr_i = mrefs.min()
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
@@ -179,13 +172,13 @@ class Bcaln:
         else:
             qr_i = paf.qr_len - paf.qr_en 
 
-        mrefs = self.paf_coords.mrefs
-        mr_i = mrefs.min()
-
         cig_ops = self.CIG_RE.findall(cig)
 
         if paf.is_fwd == self.is_rna:
             cig_ops = list(reversed(cig_ops))
+
+        mrefs = self.paf_coords.mrefs - 2
+        mr_i = mrefs.min()
 
         for l,c in cig_ops:
             l = int(l)
