@@ -377,6 +377,12 @@ class BandedDTW {
                 dend   = dstart + PRMS.band_width,
                 dk     = dstart + (r - ll_[dband].ref - 1);
 
+            //std::cout << mat_.size() << " "
+            //          << q << " " 
+            //          << r << " " 
+            //          << ak << " " 
+            //          << dk << "\n";
+
             for (size_t k = band_start; k < band_end; k++) {
 
                 //TODO can I compute starting locaiton from ll_?

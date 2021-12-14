@@ -8,6 +8,7 @@
 #include "realtime_pool.hpp"
 #include "map_pool_ord.hpp"
 #include "simulator.hpp"
+#include "signal_processor.hpp"
 #include "dtw.hpp"
 
 namespace py = pybind11;
@@ -72,9 +73,7 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Fast5Dict, Fast5Reader> fast5_dict(m, "_Fast5Dict");
     Fast5Dict::pybind_defs(fast5_dict);
 
-    py::class_<Event> event(m, "Event");
-    py::class_<EventDetector> event_detector(m, "EventDetector");
-    EventDetector::pybind_defs(event_detector, event);
+    EventDetector::pybind_defs(m);
 
     py::class_<EventProfiler>  event_profiler(m, "EventProfiler");
     EventProfiler::pybind_defs(event_profiler);
@@ -109,6 +108,8 @@ PYBIND11_MODULE(_uncalled, m) {
 
     py::class_<DTWd, DTWp> dtw_d(m, "DTWd");
     DTWd::pybind_defs(dtw_d);
+
+    SignalProcessor::pybind_defs(m);
 
     pybind_dtw(m);
     //py::class_<DTWParams> dtwp(m, "DTWParams");

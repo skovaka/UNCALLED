@@ -13,6 +13,7 @@ from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader, FAST5_OPTS
 from ..sigproc import ProcRead
 from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_PRMS_EVT_GLOB, nt, DtwParams
+from _uncalled import SignalProcessor
 
 from _uncalled._nt import KmerArray
 
@@ -77,6 +78,9 @@ def main(conf):
     for paf in pafs:
         mm2s[paf.qr_name].append(paf)
 
+    model = PoreModel(conf.pore_model)
+    #sigproc = SignalProcessor(model, conf.event_detector)
+
     pbar = progbar.ProgressBar(
             widgets=[progbar.Percentage(), progbar.Bar(), progbar.ETA()], 
             maxval=len(mm2s)).start()
@@ -87,6 +91,8 @@ def main(conf):
         aligned = False
         for paf in mm2s[read.id]:
             t0 = time.time()
+            #pread = sigproc.process(read.f5)
+            #print(pread.norm_events)
             dtw = GuidedDTW(tracks, read, paf, conf)
             #print(time.time()-t0)
 
@@ -117,6 +123,8 @@ class GuidedDTW:
         if bcaln.empty:
             self.df = None
             return
+
+        #print(read.df)
 
         #TODO init_alignment(read_id, fast5, group, layers)
         self.track = tracks.init_alignment(read.id, read.f5.filename, bcaln.coords, "bcaln", bcaln.df)

@@ -13,6 +13,10 @@
 
 #ifdef PYBIND
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
+#include <pybind11/numpy.h>
+namespace py = pybind11;
 #endif
 
 
@@ -22,6 +26,10 @@ typedef struct {
     u32 start;
     u32 length;
 } Event;
+//
+//#ifdef PYBIND
+//PYBIND11_MAKE_OPAQUE(std::vector<Event>);
+//#endif
 
 class EventDetector {
 
@@ -87,15 +95,17 @@ class EventDetector {
     #define PY_EVT_VAL(P, D) evt.def_readwrite(#P, &Event::P, D);
     #define PY_DBG_VAL(P, D) dbg.def_readonly(#P, &Debug::P, D);
 
-    static void pybind_defs(
-            pybind11::class_<EventDetector> &evdt,
-            pybind11::class_<Event> &evt) {
+    static void pybind_defs(py::module_ &m) {
+        py::class_<Event> evt(m, "Event");
+        py::class_<EventDetector> evdt(m, "EventDetector");
+
+        PYBIND11_NUMPY_DTYPE(Event, start, length, mean, stdv);
 
         evdt.def(pybind11::init<Params>());
         evdt.def(pybind11::init());
         PY_EVTD_METH(reset, "");
         PY_EVTD_METH(add_sample, "");
-        PY_EVTD_METH(get_event, "");
+        //:PY_EVTD_METH(get_event, "");
         PY_EVTD_METH(get_events, "");
         PY_EVTD_METH(kmer_current, "");
         PY_EVTD_METH(get_means, "");
