@@ -20,7 +20,6 @@ from .fast5 import Fast5Reader
 from .index import RefIndex
 
 from .pore_model import PoreModel
-from .sigproc import ProcRead
 
 from . import dtw
 from . import vis

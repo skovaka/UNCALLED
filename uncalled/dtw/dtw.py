@@ -11,9 +11,9 @@ from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt 
 from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader, FAST5_OPTS
-from ..sigproc import ProcRead
 from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_PRMS_EVT_GLOB, nt, DtwParams
-from _uncalled import SignalProcessor
+
+from ..signal_processor import SignalProcessor
 
 from _uncalled._nt import KmerArray
 
@@ -64,7 +64,7 @@ def main(conf):
 
     tracks = Tracks(conf=conf)
 
-    fast5s = Fast5Processor(conf=conf)
+    fast5s = Fast5Reader(conf=conf)
 
     read_filter = fast5s.get_read_filter()
 
@@ -79,7 +79,7 @@ def main(conf):
         mm2s[paf.qr_name].append(paf)
 
     model = PoreModel(conf.pore_model)
-    #sigproc = SignalProcessor(model, conf.event_detector)
+    sigproc = SignalProcessor(model, conf.event_detector)
 
     pbar = progbar.ProgressBar(
             widgets=[progbar.Percentage(), progbar.Bar(), progbar.ETA()], 
@@ -91,9 +91,8 @@ def main(conf):
         aligned = False
         for paf in mm2s[read.id]:
             t0 = time.time()
-            #pread = sigproc.process(read.f5)
             #print(pread.norm_events)
-            dtw = GuidedDTW(tracks, read, paf, conf)
+            dtw = GuidedDTW(tracks, sigproc, read, paf, conf)
             #print(time.time()-t0)
 
             if dtw.df is None:
@@ -113,13 +112,13 @@ class GuidedDTW:
 
     #TODO do more in constructor using prms, not in main
     #def __init__(self, track, read, paf, conf=None, **kwargs):
-    def __init__(self, tracks, read, paf, conf=None, **kwargs):
+    def __init__(self, tracks, sigproc, read, paf, conf=None, **kwargs):
         self.conf = read.conf if conf is None else conf
         self.prms = self.conf.dtw
 
         #self.track = track
 
-        bcaln = Bcaln(tracks.index, read, paf, tracks.coords)
+        bcaln = Bcaln(conf, tracks.index, read, paf, tracks.coords)
         if bcaln.empty:
             self.df = None
             return
@@ -127,14 +126,14 @@ class GuidedDTW:
         #print(read.df)
 
         #TODO init_alignment(read_id, fast5, group, layers)
-        self.track = tracks.init_alignment(read.id, read.f5.filename, bcaln.coords, "bcaln", bcaln.df)
+        self.track = tracks.init_alignment(read.id, read.filename, bcaln.coords, "bcaln", bcaln.df)
 
         #self.ref_kmers = self.track.load_aln_kmers().sort_index()
         self.ref_kmers = self.track.coords.kmers.sort_index()
 
         self.bcaln = bcaln.df[bcaln.df.index.isin(self.ref_kmers.index)].sort_index()[["start"]].dropna()
 
-        self.read = read
+        self.read = sigproc.process(read)
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
@@ -150,6 +149,7 @@ class GuidedDTW:
         self.samp_max = self.bcaln["start"].max()
 
         self._calc_dtw()
+        self.track.add_layer_group("dtw", self.df)
 
         self.empty = False
 
@@ -181,7 +181,7 @@ class GuidedDTW:
 
             read_block = self.read.sample_range(samp_st, samp_en)
 
-            block_signal = read_block['norm_sig'].to_numpy()
+            block_signal = read_block['mean'].to_numpy()
             
             args = self._get_dtw_args(read_block, mref_st, block_kmers)
 
@@ -200,13 +200,12 @@ class GuidedDTW:
         df = pd.DataFrame({'mref': np.concatenate(path_refs)}, 
                                index = np.concatenate(path_qrys),
                                dtype='Int32') \
-                  .join(self.read.df) \
-                  .drop(columns=['mean', 'stdv', 'mask'], errors='ignore') \
-                  .rename(columns={'norm_sig' : 'current'})
+                  .join(self.read.to_df()) \
+                  .drop(columns=['stdv', 'mask'], errors='ignore') \
+                  .rename(columns={'mean' : 'current'})
 
         #def self, aln_id, group, layers):
         self.df = collapse_events(df, True)#, mask_skips=self.prms.mask_skips)
-        self.track.add_layer_group("dtw", self.df)
 
         #if len(band_blocks) == 0:
         #    self.track.read_aln.bands = None
@@ -218,7 +217,7 @@ class GuidedDTW:
     def _get_dtw_args(self, read_block, mref_start, ref_kmers):
         common = (
             self.prms,
-            read_block['norm_sig'].to_numpy(), 
+            read_block['mean'].to_numpy(), 
             nt.kmer_array(ref_kmers), 
             self.model)
         qry_len = len(read_block)

@@ -61,32 +61,23 @@ class SignalProcessor {
 
     #ifdef PYBIND
 
-    //#define PY_EVENT_PROFILER_METH(P) evpr.def(#P, &EventProfiler::P);
-    //#define PY_EVENT_PROFILER_PROP(P) evpr.def_property(#P, &EventProfiler::get_##P, &EventProfiler::set_##P);
-    //#define PY_EVENT_PROFILER_RPROP(P) evpr.def_property_readonly(#P, &EventProfiler::get_##P);
-    //#define PY_EVENT_PROFILER_PRM(P, D) prm.def_readwrite(#P, &EventProfiler::Params::P, D);
-    //#define PY_ANNO_EVENT_VAL(P) ann.def_readonly(#P, &AnnoEvent::P);
-
-    //#define PY_EVT_PROF_VAL(P) ep.def_readonly(#P, &EvtProf::P);
-
     #define PY_PROC_ARR(T, A, D) p.def_property_readonly(#A, \
         [](ProcessedRead &r) -> py::array_t<T> { \
             return py::array_t<T>(r.A.size(), r.A.data()); \
         }, D);
 
-
     static void pybind_defs(py::module_ &m) {
-        py::class_<SignalProcessor> s(m, "SignalProcessor");
+        py::class_<SignalProcessor> s(m, "_SignalProcessor");
         s.def(pybind11::init<const PoreModel<SIG_KLEN> &, EventDetector::Params>());
         s.def("process", &SignalProcessor::process);
 
         PYBIND11_NUMPY_DTYPE(NormVals, start, end, scale, shift);
 
-        py::class_<ProcessedRead> p(m, "ProcessedRead");
+        py::class_<ProcessedRead> p(m, "_ProcessedRead");
+        p.def(pybind11::init<const ProcessedRead &>());
         PY_PROC_ARR(Event, raw_events, "Un-normalized events");
         PY_PROC_ARR(float, norm_events, "Normalized event means");
         PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");
-
     }
     #endif
 

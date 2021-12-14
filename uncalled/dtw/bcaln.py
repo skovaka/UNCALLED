@@ -34,9 +34,9 @@ class Bcaln:
     ERR_WIDTHS = [0,0,5]
 
 
-    def __init__(self, ref_index, read, paf, clip_coords=None):
+    def __init__(self, conf, ref_index, read, paf, clip_coords=None):
 
-        self.is_rna = read.conf.is_rna
+        self.is_rna = conf.is_rna
 
         self.clip_coords = clip_coords
 
@@ -50,18 +50,18 @@ class Bcaln:
         self.is_fwd = paf.is_fwd
         self.flip_ref = paf.is_fwd == self.is_rna
 
-        if not read.f5.bc_loaded or (not self.parse_cs(paf) and not self.parse_cigar(paf)):
+        if not read.bc_loaded or (not self.parse_cs(paf) and not self.parse_cigar(paf)):
             return
 
         #TODO make c++ build this 
-        moves = np.array(read.f5.moves, bool)
-        bce_qrs = np.cumsum(read.f5.moves)
-        bce_samps = read.f5.template_start + np.arange(len(bce_qrs)) * read.f5.bce_stride
+        moves = np.array(read.moves, bool)
+        bce_qrs = np.cumsum(read.moves)
+        bce_samps = read.template_start + np.arange(len(bce_qrs)) * read.bce_stride
 
         samp_bps = pd.DataFrame({
             "start" : bce_samps,
-            "length" : read.f5.bce_stride,
-            "bp"     : np.cumsum(read.f5.moves),
+            "length" : read.bce_stride,
+            "bp"     : np.cumsum(read.moves),
         })
 
         df = samp_bps.join(self.bp_mref_aln, on="bp").dropna()
