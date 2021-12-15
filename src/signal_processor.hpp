@@ -22,10 +22,9 @@ struct NormVals {
 };
 
 struct ProcessedRead {
-    std::vector<Event> raw_events;
-    std::vector<float> norm_events;
-    std::vector<bool> mask;
+    std::vector<Event> events;
     std::vector<NormVals> norm;
+    //std::vector<bool> mask;
 };
 
 class SignalProcessor {
@@ -45,17 +44,35 @@ class SignalProcessor {
 
     ProcessedRead process(const ReadBuffer &read) {
         ProcessedRead ret = {};
-        ret.raw_events = evdt_.get_events(read.get_signal());
-        ret.norm_events.reserve(ret.raw_events.size());
-        for (auto &e : ret.raw_events) {
-            ret.norm_events.push_back(e.mean);
-        }
-        norm_.set_signal(ret.norm_events);
-        ret.norm.push_back({0, static_cast<i32>(ret.norm_events.size()), norm_.get_scale(), norm_.get_shift()});
-        for (size_t i = 0; i < ret.norm_events.size(); i++) { 
-            ret.norm_events[i] = norm_.pop();
+
+        ret.events = evdt_.get_events(read.get_signal());
+
+        auto norm = norm_mom_params(ret.events);
+        for (auto &e : ret.events) {
+            e.mean = e.mean * norm.scale + norm.shift;
         }
 
+        return ret;
+    }
+
+    NormVals norm_mom_params(const std::vector<Event> &events) {
+        float mean = 0, stdv = 0;
+        for (auto &e : events) {
+            mean += e.mean;
+        }
+        mean /= events.size();
+        
+        for (auto &e : events) {
+            float delta = e.mean - mean;
+            stdv += delta*delta;
+        }
+        stdv = sqrt(stdv / events.size());
+
+        NormVals ret;
+        ret.start = 0;
+        ret.end = events.size();
+        ret.scale = norm_.PRMS.tgt_stdv / stdv;
+        ret.shift = norm_.PRMS.tgt_mean - ret.scale * mean;
         return ret;
     }
 
@@ -75,8 +92,7 @@ class SignalProcessor {
 
         py::class_<ProcessedRead> p(m, "_ProcessedRead");
         p.def(pybind11::init<const ProcessedRead &>());
-        PY_PROC_ARR(Event, raw_events, "Un-normalized events");
-        PY_PROC_ARR(float, norm_events, "Normalized event means");
+        PY_PROC_ARR(Event, events, "Un-normalized events");
         PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");
     }
     #endif

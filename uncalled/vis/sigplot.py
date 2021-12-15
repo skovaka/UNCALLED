@@ -12,6 +12,7 @@ from ..index import str_to_coord
 from ..dtw.tracks import Tracks
 from ..argparse import Opt, comma_split
 from ..fast5 import parse_read_ids
+from ..sigproc import ProcRead
 
 class SigplotParams(config.ParamGroup):
     _name = "sigplot"

@@ -11,13 +11,11 @@ from _uncalled import _SignalProcessor, _ProcessedRead
 
 class ProcessedRead(_ProcessedRead):
     def sample_range(self, start, end):
-        mask = (self.raw_events["start"] >= start) & (self.raw_events["start"] <= end)
+        mask = (self.events["start"] >= start) & (self.events["start"] <= end)
         return self.to_df()[mask]
 
     def to_df(self):
-        df = pd.DataFrame(self.raw_events[["start", "length", "stdv"]])
-        df["mean"] = self.norm_events
-        return df
+        return pd.DataFrame(self.events)
 
 class SignalProcessor(_SignalProcessor):
     def process(self, read):
