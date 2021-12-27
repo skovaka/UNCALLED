@@ -33,6 +33,9 @@ TracksParams._def_params(
     ("overwrite", False, bool, "Overwrite existing tracks"),
     ("append", False, bool, "Append reads to existing tracks"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
+    ("min_coverage", 1, int, "Reference positions with less than this coverage will be excluded from each track (or all tracks if shared_refs_only is true)"),
+    ("shared_reads_only", False, bool, "If true will only contain reads shared between all tracks"),
+    ("shared_refs_only", False, bool, "If true will only contain reference positions where all tracks have sufficient coverage (see min_coverage)"),
     ("load_mat", False, bool, "If true will pivot layers into a matrix"), #TODO change to mat_layers, only do it for them
     ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
@@ -546,7 +549,7 @@ class Tracks:
             print(df.to_csv(sep="\t"))
 
     def calc_refstats(self, verbose_refs=False, cov=False):
-        if self.prms.refstats is None or len(self.prms.refstats) == 0 or len(self.prms.refstats_layers) == 0:
+        if self.prms.refstats is None or len(self.prms.refstats) == 0 or len(self.prms.refstats_layers) == 0 or self.all_empty:
             self.refstats = None
             return None
 
@@ -676,8 +679,8 @@ class Tracks:
 
             chunk = leftovers
 
-            yield ret
-
+            if not ret.all_empty:
+                yield ret
 
     def _mref_to_coords(self, mref):
         pass
@@ -772,8 +775,34 @@ class Tracks:
 
     def _tables_to_tracks(self, coords, alignments, layers):
         tracks = dict()
-        aln_groups = alignments.groupby("track_id").groups
+
         layer_alns = layers.index.get_level_values("aln_id")
+
+        if self.prms.shared_refs_only or self.prms.min_coverage > 1:
+            track_covs = alignments.loc[layer_alns, ["track_id"]] \
+                                   .set_index(layers.index) \
+                                   .reset_index("aln_id", drop=True) \
+                                   .set_index("track_id", append=True) \
+                                   .index.value_counts()
+
+            mask = track_covs >= self.prms.min_coverage
+            if not np.any(mask):
+                mrefs = pd.Index([])
+            elif self.prms.shared_refs_only:
+                track_counts = pd.MultiIndex.from_tuples(track_covs[mask].index) \
+                                   .get_level_values(0) \
+                                   .value_counts()
+
+                mrefs = track_counts.index[track_counts == len(self.alns)]
+            else:
+                mrefs = track_covs[mask].index.get_level_values(0).unique()
+
+            
+            layers = layers.loc[(mrefs,slice(None))]
+            layer_alns = layers.index.get_level_values("aln_id")
+            alignments = alignments.loc[layer_alns.unique()]
+
+        aln_groups = alignments.groupby("track_id").groups
         for parent in self.alns:
             if parent.id in aln_groups:
                 track_alns = alignments.loc[aln_groups[parent.id]]
