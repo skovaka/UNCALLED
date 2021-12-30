@@ -131,6 +131,9 @@ def parse_layer(layer):
     yield (group, layer)
 
 def parse_layers(layers, add_deps=True):
+    if layers is None:
+        return None
+
     db_layers = list() 
     fn_layers = list() 
 

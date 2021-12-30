@@ -40,13 +40,20 @@ from . import nt
 
 def str_to_coord(coord_str):
     spl = coord_str.split(":")         
-    name = spl[0]                        
-    st,en = map(int, spl[1].split("-"))
+    #name = spl[0]
+    i = 1
+    while True:
+        try:
+            st,en = map(int, spl[i].split("-"))
+            break
+        except ValueError:
+            i += 1
+    name = ":".join(spl[:i])
     
-    if len(spl) == 2:                  
+    if i < len(spl):
         return RefCoord(name,st,en)
     else:                              
-        fwd = spl[2] == "+"
+        fwd = spl[i] == "+"
         return RefCoord(name,st,en,fwd)
 
 class RefCoord(_RefCoord):

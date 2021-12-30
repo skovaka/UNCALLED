@@ -25,7 +25,7 @@ TracksParams._def_params(
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("layers", ["dtw","bcaln","cmp","bc_cmp"], None, "Layers to load (e.g. current, dwell, model_diff)"),
     ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
-    ("refstats_layers", ["current", "dwell", "model_diff"], None, "Layers to compute refstats"),
+    ("refstats_layers", None, None, "Layers to compute refstats"),
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),
     ("max_reads", None, int, "Only load reads which overlap these coordinates"),
     ("index_prefix", None, str, "BWA index prefix"),
@@ -139,7 +139,10 @@ class Tracks:
             for _,db in self.dbs.items():
                 fast5_reads.append(db.get_fast5_index(self._aln_track_ids))
             fast5_reads = pd.concat(fast5_reads)
-            self.fast5s = Fast5Reader(index=fast5_reads, conf=self.conf)
+            files = fast5_reads["filename"].unique()
+            self.fast5s = Fast5Reader(
+                index=fast5_reads, 
+                conf=self.conf)
 
             reads = fast5_reads["read_id"]
             self.reads = pd.Index(reads[~reads.duplicated()])
@@ -324,8 +327,8 @@ class Tracks:
         return ret
             
 
+    
     def get_fast5_reader(self):
-        #TODO needs work for multiple DBs
         if self.fast5s is None:
             for db in self.dbs.values():
                 fast5_index = db.get_fast5_index()
@@ -464,6 +467,7 @@ class Tracks:
 
         alignments = db0.query_alignments(aln_id=ids)#self._aln_track_ids, coords=self.coords, full_overlap=full_overlap)
 
+
         for track in self.alns:
             track_alns = alignments[alignments["track_id"] == track.id]
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)
@@ -572,9 +576,9 @@ class Tracks:
                 for old,new in zip(refstats[track.name].columns, stats.layer)
             })
             refstats[track.name].rename(columns=rename, inplace=True)
+
             if cov:
                 refstats[track.name].insert(0, "cov", groups.size())
-
 
         if len(stats.compare) > 0:
             if self.any_empty:

@@ -29,10 +29,12 @@ OPTS = (
 def main(conf):
     """Interactive signal alignment genome browser"""
     conf.tracks.load_mat = True
-    conf.tracks.refstats_layers.append("cmp.mean_ref_dist")
-    conf.dotplot.layers=["model_diff"]
+    #conf.tracks.refstats_layers = ["cmp.mean_ref_dist"]
+    conf.tracks.layers=["dtw","bcaln","cmp","bc_cmp"]
     sys.stderr.write("Loading tracks...\n")
     tracks = Tracks(conf=conf)
+    print([a.alignments for a in tracks.alns])
+    print([a.layers for a in tracks.alns])
     sys.stderr.write("Starting server...\n")
     browser(tracks, conf)
 

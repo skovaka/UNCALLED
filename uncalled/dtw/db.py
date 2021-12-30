@@ -327,6 +327,8 @@ class TrackSQL:
 
         t0 = time.time()
 
+        print(query, params)
+
         ret = pd.read_sql_query(
             query, self.con, 
             index_col=["idx_mref", "idx_aln_id"], 
@@ -520,6 +522,8 @@ def merge(conf):
         db.con.commit()
         db.cur.execute("DETACH input")
         db.con.commit()
+    db.close()
+
 
         
 SUBCMDS = [

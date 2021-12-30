@@ -4,7 +4,7 @@ import glob
 import numpy as np
 import pandas as pd
 import os
-from _uncalled import _Fast5Dict, _Fast5Iter
+from _uncalled import _Fast5Dict, _Fast5Iter, _Fast5Reader
 import uncalled as unc
 import re
 
@@ -82,20 +82,31 @@ class Fast5Reader:
 
     def __init__(self, fast5s=None, index=None, reads=None, recursive=None, conf=None):
         self.conf = unc.Config(conf)# if conf is None else conf
-        self.prms = self.conf.fast5_reader
+
+        conf_prms = self.conf.fast5_reader
+        self.prms = _Fast5Iter.Params()
+
+        #TODO all very hacky. should be refactored into C++
+
+        if reads is None: 
+            reads = conf_prms.read_filter
+        self.prms.read_filter = parse_read_ids(reads)
+
+        if recursive is None: 
+            recursive = conf_prms.recursive
+        self.prms.recursive = recursive
 
         if fast5s is None: 
-            fast5s = self.prms.fast5_files
-        if recursive is not None: 
-            self.prms.recursive = recursive
-
+            fast5s = conf_prms.fast5_files
         self.prms.fast5_files = parse_fast5_paths(fast5s, recursive)
 
-        if reads is not None: 
-            self.prms.read_filter = parse_read_ids(reads)
-
         if index is None:
-            index = self.prms.fast5_index
+            index = conf_prms.fast5_index
+        #self.prms.fast5_index = index
+
+        self.prms.max_reads = conf_prms.max_reads
+        self.prms.max_buffer = conf_prms.max_buffer
+        self.prms.load_bc = conf_prms.load_bc
 
         if isinstance(index, str): 
             if len(index) > 0:

@@ -315,6 +315,7 @@ OPTS = (
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
     Opt(("-H", "--panel-heights"), "trackplot", nargs="+", type=int),
+    Opt(("--shared-refs-only"), "tracks", action="store_true"),
 
     Opt("--mat", dest="panels",
         metavar="LAYER", action="append", type=panel_opt("mat"),

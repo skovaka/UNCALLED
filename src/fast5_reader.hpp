@@ -122,6 +122,8 @@ class Fast5Reader {
         PY_FAST5_READER_METH(add_fast5, "Adds fast5 filename");
 
         pybind11::class_<Params> p(c, "Params");
+        p.def(pybind11::init<>());
+        p.def(pybind11::init<Params>());
         //p.def_readwrite(PARAM_META[0], &Fast5Reader::Params::P);
 
         //DPRM(p, "fast5_files", &Fast5Reader::Params::fast5_files);

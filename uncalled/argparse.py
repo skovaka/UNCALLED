@@ -172,9 +172,9 @@ class ArgParser:
                 #if value is not None or not hasattr(self.config, name):
                 #    setattr(self.config, name, value)
 
-        fast5s = getattr(args, FAST5_PARAM, None)
-        if fast5s is not None:
-            self.config.fast5_reader.fast5_files = unc.fast5.parse_fast5_paths(fast5s, self.config.fast5_reader.recursive)
+        #fast5s = getattr(args, FAST5_PARAM, None)
+        #if fast5s is not None:
+        #    self.config.fast5_reader.fast5_files = unc.fast5.parse_fast5_paths(fast5s, self.config.fast5_reader.recursive)
 
         return cmd, self.config
     
