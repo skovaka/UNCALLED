@@ -57,7 +57,7 @@ def nanopolish(conf):
                  "start_idx","event_level_mean",
                  "event_length","strand"])
 
-    io = Tracks(conf=conf)
+    tracks = Tracks(conf=conf)
 
     def add_alns(events):
         groups = events.groupby(["contig", "read_name"])
@@ -79,7 +79,7 @@ def nanopolish(conf):
                 clip = 0
 
             ref_coord = RefCoord(contig, start, end, fwd)
-            coords = io.index.get_coord_space(ref_coord, conf.is_rna, kmer_trim=True)
+            coords = tracks.index.get_coord_space(ref_coord, conf.is_rna, kmer_trim=True)
 
             df["mref"] = coords.ref_to_mref(df["position"].to_numpy()+2)
 
@@ -87,12 +87,7 @@ def nanopolish(conf):
 
             fast5_name = f5reader.get_read_file(read_id)
 
-            #if io.coords is not None:
-            #    mrefs = df.index.intersection(io.coords.mrefs[self.is_fwd])
-            #    coords = io.coords.mref_intersect(mrefs=df.index)
-            #    df = df.reindex(index=mrefs, copy=False)
-
-            io.init_alignment(read_id, fast5_name, coords, "dtw", df)
+            tracks.write_alignment(read_id, fast5_name, coords, {"dtw" : df})
             print(read_id)
 
     leftover = pd.DataFrame()
@@ -112,7 +107,7 @@ def nanopolish(conf):
     if len(leftover) > 0:
         add_alns(leftover)
 
-    io.close()
+    tracks.close()
 
 TOMBO_OPTS = CONVERT_OPTS 
 def tombo(conf):
@@ -122,7 +117,7 @@ def tombo(conf):
     conf.pore_model.name = "r94_rna_tombo"
     read_filter = f5reader.get_read_filter()
 
-    io = Tracks(conf=conf)
+    tracks = Tracks(conf=conf)
     
     fast5_files = f5reader.prms.fast5_files
 
@@ -190,8 +185,8 @@ def tombo(conf):
 
         sig_fwd = ref_bounds.fwd != is_rna
 
-        coords = io.index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True, kmer_trim=True)
-        track = io.init_alignment(read.read_id, fast5_name, coords)
+        coords = tracks.index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True, kmer_trim=True)
+        track = tracks.write_alignment(read.read_id, fast5_name, coords)
 
         tombo_events = pd.DataFrame(np.array(handle["Events"])).iloc[clip:]
         
@@ -224,13 +219,13 @@ def tombo(conf):
                 "current"   : currents
              }).set_index("mref")
 
-        track.add_layer_group("dtw", df)
+        track.add_layer_group({"dtw" : df})
 
         #track.save_read(fast5_basename)
 
         pbar.update(read_count)
 
-    io.close()
+    tracks.close()
 
     pbar.finish()
 

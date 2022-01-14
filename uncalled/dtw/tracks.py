@@ -22,6 +22,7 @@ class TracksParams(config.ParamGroup):
 TracksParams._def_params(
     ("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
     ("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
+    ("output_format", "db", str,  "Output format (db, nanopolish)"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("layers", ["dtw","bcaln","cmp","bc_cmp"], None, "Layers to load (e.g. current, dwell, model_diff)"),
     ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
@@ -39,7 +40,7 @@ TracksParams._def_params(
     ("load_mat", False, bool, "If true will pivot layers into a matrix"), #TODO change to mat_layers, only do it for them
     ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
-    ignore_toml={"input", "output", "ref_bounds", "layers", "full_overlap", "overwrite", "append","refstats", "refstats_layers", "read_filter"}
+    ignore_toml={"input", "output", "output_format", "ref_bounds", "layers", "full_overlap", "overwrite", "append","refstats", "refstats_layers", "read_filter"}
 )
 
 _REFSTAT_AGGS = {
@@ -335,7 +336,7 @@ class Tracks:
             self.fast5s = Fast5Reader(index=fast5_index, conf=self.conf)
         return self.fast5s
 
-    def init_alignment(self, read_id, fast5, coords, group=None, layers=None, track_name=None):
+    def write_alignment(self, read_id, fast5, coords, layers={}, track_name=None):
         if track_name is None:
             if len(self.output_tracks) == 1:
                 track_name, = self.output_tracks
@@ -343,7 +344,7 @@ class Tracks:
                 raise ValueError("Must specify track name when using multiple output tracks")
 
         track = self.output_tracks[track_name]
-        db = track.db
+        db = self.track_dbs[track_name]
 
         #self.prev_aln[track_name] += 1
         aln_id = db.next_aln_id()
@@ -358,16 +359,19 @@ class Tracks:
             db.init_read(read_id, fast5_id)
             self.prev_read[track_name] = read_id
 
-        if layers is not None:
-            if "start" in layers.columns:
-                col = "start"
-            #elif "sample" in layers.columns:
-            #    col = "sample"
-            else:
+
+        if len(layers) > 0:
+            starts = None
+            for group,vals in layers.items():
+                if "start" in vals.columns:
+                 starts = vals["start"]
+                 break
+
+            if starts is None:
                 raise ValueError("Must initialize alignment from DataFrame with start column")
 
-            samp_start = layers[col].min()
-            samp_end = layers[col].max()
+            samp_start = starts.min()
+            samp_end = starts.max()
         else:
             samp_start = samp_end = None
 
@@ -387,8 +391,8 @@ class Tracks:
 
         track.layers = None
 
-        if layers is not None:
-            track.add_layer_group(group, layers)
+        if len(layers) > 0:
+            track.add_layer_group(layers)
 
         track.coords = coords
 
