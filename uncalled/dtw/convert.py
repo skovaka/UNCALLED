@@ -186,7 +186,7 @@ def tombo(conf):
         sig_fwd = ref_bounds.fwd != is_rna
 
         coords = tracks.index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True, kmer_trim=True)
-        track = tracks.write_alignment(read.read_id, fast5_name, coords)
+        aln_id,_ = tracks.write_alignment(read.read_id, fast5_name, coords)
 
         tombo_events = pd.DataFrame(np.array(handle["Events"])).iloc[clip:]
         
@@ -219,7 +219,7 @@ def tombo(conf):
                 "current"   : currents
              }).set_index("mref")
 
-        track.add_layer_group({"dtw" : df})
+        tracks.write_layers({"dtw" : df}, aln_id=aln_id)
 
         #track.save_read(fast5_basename)
 

@@ -14,10 +14,94 @@ import pandas as pd
 import sys
 import time
 
+from ..nt import kmer_to_str, kmer_rev, kmer_comp
 from ..argparse import Opt, comma_split
 from ..fast5 import parse_fast5_paths
 
-class TrackSQL:
+class TrackIO:
+    def __init__(self):
+        if not hasattr(self, "prev_aln_id"):
+            self.prev_aln_id = 0
+
+    def next_aln_id(self):
+        self.prev_aln_id += 1
+        return self.prev_aln_id
+
+
+class Eventalign(TrackIO):
+    def __init__(self, filename=None, mode="r"):
+        self.mode = "r"
+        if filename is None:
+            self.out = sys.stdout
+        else:
+            self.out = open(filename, mode)
+
+        self._header = True
+
+        TrackIO.__init__(self)
+
+    def write_events(self, track, events):
+        contig = track.coords.ref_name
+
+        events = events.set_index("mref")
+        kmers = track.coords.kmers[events.index]
+        model_kmers = kmer_to_str(kmer_rev(kmers))
+
+        if track.coords.fwd:
+            ref_kmers = model_kmers
+        else:
+            ref_kmers = kmer_to_str(kmer_comp(kmers))
+
+        #read_id = track.alignments.iloc[0]["read_id"]
+        #sys.stderr.write(f"{self.prev_aln_id}\t{read_id}\n")
+
+        model = track.model
+
+        #https://github.com/jts/nanopolish/issues/655
+        std_level = (events["current"] - model.model_mean) / model.model_stdv
+
+        eventalign = pd.DataFrame(
+            data = {
+                "contig" : track.coords.ref_name,
+                "position" : track.coords.mref_to_ref(events.index)-2,
+                "reference_kmer" : ref_kmers,
+                "read_index" : self.prev_aln_id,
+                #"read_name" : read_id,
+                "strand" : "t",
+                "event_index" : pd.RangeIndex(0,len(events))[::-1]+1,
+                "event_level_mean" : events["current"],
+                "event_stdv" : events["current_stdv"],
+                "event_length" : events["length"] / track.conf.read_buffer.sample_rate,
+                "model_kmer" : model_kmers,
+                "model_mean" : model.means[kmers],
+                "model_stdv" : model.stdvs[kmers],
+                "standardized_level" : std_level,
+                "start_idx" : events["start"],
+                "end_idx" : events["start"] + events["length"],
+            }, index = events.index).sort_values("position")
+
+        eventalign.to_csv(
+            self.out, sep="\t", 
+            header=self._header,
+            float_format="%.5f",
+            index=False)
+
+        self._header = False
+
+    def init_alignment(self, alns):
+        pass
+
+    def init_fast5(self, fast5):
+        pass
+
+    def init_read(self, read_id, fast5_id):
+        pass
+
+    def close(self):
+        self.out.close()
+
+
+class TrackSQL(TrackIO):
     def __init__(self, sqlite_db):
         self.filename = sqlite_db
         new_file = not os.path.exists(sqlite_db)
@@ -33,6 +117,8 @@ class TrackSQL:
         self.prev_aln_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
         if self.prev_aln_id is None:
             self.prev_aln_id = 0
+
+        TrackIO.__init__(self)
 
     def close(self):
         if self.open:
@@ -145,10 +231,6 @@ class TrackSQL:
 
     def init_read(self, read_id, fast5_id):
         self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
-
-    def next_aln_id(self):
-        self.prev_aln_id += 1
-        return self.prev_aln_id
 
     def write_layers(self, df, index=["mref","aln_id"]):
         for group in df.columns.levels[0]:
@@ -326,8 +408,6 @@ class TrackSQL:
         query = self._join_query(select, wheres, ["idx_"+o if o in {"aln_id","mref"} else o for o in order])
 
         t0 = time.time()
-
-        print(query, params)
 
         ret = pd.read_sql_query(
             query, self.con, 
