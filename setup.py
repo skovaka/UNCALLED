@@ -139,7 +139,7 @@ uncalled = Pybind11Extension(
 
 requires=[
     'pybind11>=2.6.0', 
-    'read-until==3.0.0',
+    #'read-until==3.0.0',
     'pandas>=1.1.5',
     'plotly>=5.0.0',
     'dash>=2.0.0',

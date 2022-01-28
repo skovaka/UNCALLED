@@ -12,8 +12,6 @@ from .__about__ import (
 
 from _uncalled import *
 
-from .rt import ReadUntilClient
-
 from .config import Config
 from .argparse import ArgParser
 from .fast5 import Fast5Reader
