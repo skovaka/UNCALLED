@@ -159,6 +159,9 @@ def parse_layers(layers, add_deps=True):
 
                 yield layer
 
+def add_group_level(self, group, layers):
+    return pd.concat({group : layers}, names=["group", "layer"], axis=1)
+
 class AlnTrack:
     def __init__(self, *args, **kwargs):
         if isinstance(args[0], AlnTrack):
@@ -257,34 +260,34 @@ class AlnTrack:
 
     def _group_layers(self, group, layers):
         return pd.concat({group : layers}, names=["group", "layer"], axis=1)
+
+    def _aln_id_or_default(self, aln_id):
+        if aln_id is None:
+            if len(self.alignments) == 1:
+                return self.alignments.index[0]
+            raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
+        return aln_id
         
-    def add_layer_group(self, group, df, aln_id=None):
-        aln_id = self._default_id(aln_id)
-        df = self._group_layers(group, df)#pd.concat({group : layers}, names=["group", "layer"], axis=1)
+    def add_layer_group(self, layers, aln_id=None):
+        aln_id = self._aln_id_or_default(aln_id)
+        df = pd.concat(layers, names=["group", "layer"], axis=1)
 
         df.index = pd.MultiIndex.from_product(
                         [df.index, [aln_id]], 
                         names=["mref", "aln_id"])
-
-        self.db.write_layers(df)
 
         if self.layers is None:
             self.layers = df
         else:
             self.layers = pd.concat([self.layers, df], axis=1)
 
+        return df
+
     def aln_ref_coord(self, aln_id):
         return RefCoord(*self.alignments[["ref_name","ref_start","ref_end","fwd"]].loc[aln_id])
 
     def has_group(self, group):
         return group in self.layers.columns.get_level_values(0)
-
-    def _default_id(self, aln_id):
-        if aln_id is None:
-            if len(self.alignments) == 1:
-                return self.alignments.index[0]
-            raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
-        return aln_id
 
 
     def calc_layers(self, layers):
@@ -361,12 +364,6 @@ class AlnTrack:
         df["group_b"] = "dtw"
         return df.set_index(["aln_b", "group_b"], append=True)
 
-        #df = self._group_layers("cmp", df)
-        #self.layers = pd.concat([self.layers, df], axis=1)
-        #if write:
-        #    self.db.write_layers(df)
-
-
     def bc_cmp(self, other=None, write=False):
         if other is not None:
             groups_b = other.alignments.groupby("read_id")
@@ -391,12 +388,6 @@ class AlnTrack:
         df["group_b"] = "bcaln"
         return df.set_index(["aln_b", "group_b"], append=True)
 
-        #df = self._group_layers("cmp", df)
-        #self.layers = pd.concat([self.layers, df], axis=1)
-
-        #if write:
-        #    self.db.write_layers(df)
-        
 
     def _compare_alns(self, aln_a, other, id_b, group, df): # aln_b, df):
         aln_b = other.get_aln_layers(id_b, group, ["start","end"], False) \

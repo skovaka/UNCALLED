@@ -15,13 +15,14 @@ from ..dtw.tracks import Tracks
 from ..dtw.aln_track import LAYERS, parse_layer
 from ..argparse import Opt, comma_split
 from ..config import Config
-
+from ..fast5 import parse_read_ids
 
 OPTS = (
     Opt("input", "tracks", nargs="+"),
     Opt("ref_bounds", "tracks", type=str_to_coord),
     #Opt("layer", "trackplot", default="current", nargs="?"),
     Opt(("-r", "--refstats"), "tracks", default=None, type=comma_split),
+    Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-o", "--outfile"), "trackplot"),
 )

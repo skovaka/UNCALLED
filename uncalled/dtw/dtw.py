@@ -41,6 +41,7 @@ METHODS = {
 OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt(("-o", "--output"), "tracks"),
+    Opt(("-O", "--output-format"), "tracks"),
     Opt(("-f", "--overwrite"), "tracks", action="store_true"),
     Opt("--full-overlap", "tracks", action="store_true"),
     Opt(("-a", "--append"), "tracks", action="store_true"),
@@ -64,6 +65,8 @@ def main(conf):
 
     tracks = Tracks(conf=conf)
 
+    clip_coords = tracks.coords
+
     fast5s = Fast5Reader(conf=conf)
 
     read_filter = fast5s.get_read_filter()
@@ -81,9 +84,9 @@ def main(conf):
     model = PoreModel(conf.pore_model)
     sigproc = SignalProcessor(model, conf.event_detector)
 
-    pbar = progbar.ProgressBar(
-            widgets=[progbar.Percentage(), progbar.Bar(), progbar.ETA()], 
-            maxval=len(mm2s)).start()
+    #pbar = progbar.ProgressBar(
+    #        widgets=[progbar.Percentage(), progbar.Bar(), progbar.ETA()], 
+    #        maxval=len(mm2s)).start()
 
     n_reads = 0
 
@@ -101,12 +104,12 @@ def main(conf):
             aligned = True
 
         if aligned:
-            pbar.update(n_reads)
+            #pbar.update(n_reads)
             n_reads += 1
 
     tracks.close()
 
-    pbar.finish()
+    #pbar.finish()
 
 class GuidedDTW:
 
@@ -116,8 +119,6 @@ class GuidedDTW:
         self.conf = read.conf if conf is None else conf
         self.prms = self.conf.dtw
 
-        #self.track = track
-
         bcaln = Bcaln(conf, tracks.index, read, paf, tracks.coords)
         if bcaln.empty:
             self.df = None
@@ -125,11 +126,10 @@ class GuidedDTW:
 
         #print(read.df)
 
-        #TODO init_alignment(read_id, fast5, group, layers)
-        self.track = tracks.init_alignment(read.id, read.filename, bcaln.coords, "bcaln", bcaln.df)
+        aln_id, coords = tracks.write_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df})
+        #TODO return coords?
 
-        #self.ref_kmers = self.track.load_aln_kmers().sort_index()
-        self.ref_kmers = self.track.coords.kmers.sort_index()
+        self.ref_kmers = coords.kmers.sort_index()
 
         self.bcaln = bcaln.df[bcaln.df.index.isin(self.ref_kmers.index)].sort_index()[["start"]].dropna()
 
@@ -149,7 +149,8 @@ class GuidedDTW:
         self.samp_max = self.bcaln["start"].max()
 
         self._calc_dtw()
-        self.track.add_layer_group("dtw", self.df)
+
+        tracks.write_events(self.df, aln_id=aln_id)
 
         self.empty = False
 
@@ -197,22 +198,15 @@ class GuidedDTW:
                     self._ll_to_df(dtw.ll, read_block, mref_st, len(block_kmers))
                 )
 
-        df = pd.DataFrame({'mref': np.concatenate(path_refs)}, 
+        self.df = pd.DataFrame({'mref': np.concatenate(path_refs)}, 
                                index = np.concatenate(path_qrys),
                                dtype='Int32') \
                   .join(self.read.to_df()) \
-                  .drop(columns=['stdv', 'mask'], errors='ignore') \
-                  .rename(columns={'mean' : 'current'})
+                  .drop(columns=['mask'], errors='ignore') \
+                  .rename(columns={'mean' : 'current', 'stdv' : 'current_stdv'})
 
         #def self, aln_id, group, layers):
-        self.df = collapse_events(df, True)#, mask_skips=self.prms.mask_skips)
-
-        #if len(band_blocks) == 0:
-        #    self.track.read_aln.bands = None
-        #elif len(band_blocks) > 1:
-        #    self.track.read_aln.bands = pd.concat(band_blocks)
-        #else:
-        #    self.track.read_aln.bands = pd.DataFrame(band_blocks[0])
+        #self.df = collapse_events(df, True)#, mask_skips=self.prms.mask_skips)
 
     def _get_dtw_args(self, read_block, mref_start, ref_kmers):
         common = (

@@ -207,7 +207,7 @@ class CoordSpace:
             
     def all_mrefs_fwd(self, mrefs):
 
-        if isinstance(mrefs, (collections.abc.Sequence, np.ndarray, pd.Index)):
+        if isinstance(mrefs, (collections.abc.Sequence, np.ndarray, pd.Index, pd.Series)):
             isin = lambda a,b: a.isin(b).all()
         else:
             isin = lambda a,b: a in b
@@ -232,7 +232,7 @@ class CoordSpace:
         else:
             mrefs = self.mrefs[fwd]
 
-        if isinstance(mref, (collections.abc.Sequence, np.ndarray, pd.Index)):
+        if isinstance(mref, (collections.abc.Sequence, np.ndarray, pd.Index, pd.Series)):
             i = mrefs.get_indexer(mref)
         else:
             i = mrefs.get_loc(mref)
