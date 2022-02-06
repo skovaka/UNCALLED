@@ -188,6 +188,10 @@ class PoreModel {
         return std::abs(samp - kmer_means_[kmer]);
     }
 
+    float z_score(float samp, u16 kmer) const {
+        return std::abs(samp - kmer_means_[kmer]) / kmer_stdvs_[kmer];
+    }
+
     float model_mean() const {
         return model_mean_;
     }

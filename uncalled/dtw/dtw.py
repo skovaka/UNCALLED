@@ -54,6 +54,7 @@ OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt("--move-cost", "dtw"),
     Opt(("-b", "--band-width"), "dtw"),
     Opt(("-s", "--band-shift"), "dtw"),
+    Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
     Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
 )
 

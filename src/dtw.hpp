@@ -12,13 +12,14 @@
 const KmerLen DTW_KLEN = KmerLen::k5;
 
 enum class DTWSubSeq {NONE, ROW, COL};
+enum class DTWCostFn {ABS_DIFF, NORM_PDF, Z_SCORE};
 
 typedef struct {
     DTWSubSeq subseq;
     float move_cost, stay_cost, skip_cost,
           band_shift;
     i32 band_width;
-    std::string band_mode, mm2_paf;
+    std::string band_mode, cost_fn, mm2_paf;
 } DtwParams;
 
 extern const DtwParams DTW_PRMS_DEF, DTW_PRMS_EVT_GLOB;
@@ -245,6 +246,7 @@ class BandedDTW {
     static constexpr float MAX_COST = FLT_MAX / 2.0;
 
     const DtwParams PRMS;
+    const DTWCostFn cost_fn_;
 
     const std::vector<float> qry_vals_;
     const std::vector<u16> ref_vals_;
@@ -260,15 +262,26 @@ class BandedDTW {
     std::vector<Coord> path_;
     float score_sum_;
 
+    static DTWCostFn get_cost_fn(const std::string &cost_str) {
+        if (cost_str == "abs_diff") return DTWCostFn::ABS_DIFF;
+        if (cost_str == "norm_pdf") return DTWCostFn::NORM_PDF;
+        if (cost_str == "z_score") return DTWCostFn::Z_SCORE;
+        std::cerr << "Error: unknown DTW cost function: \""
+                  << cost_str << "\". Defaulting to \"abs_diff\"\n";
+        return DTWCostFn::ABS_DIFF;
+    }
+
     public:
     BandedDTW(const DtwParams &prms,
               const std::vector<float> &qry_vals,   
               const std::vector<u16> &ref_vals,
               const PoreModel<DTW_KLEN> &model) :
             PRMS(prms),
+            cost_fn_(get_cost_fn(PRMS.cost_fn)),
             qry_vals_(qry_vals),
             ref_vals_(ref_vals),
-            model_(model) {}
+            model_(model) {
+    }
 
     BandedDTW(const DtwParams &prms,
               const std::vector<float> &qry_vals,   
@@ -559,9 +572,17 @@ class BandedDTW {
 
     protected:
 
-    float costfn(float pA, u16 kmer) {
-        return abs(pA-model_.kmer_current(kmer));
-        //return -model_.norm_pdf(pA,kmer);
+    float costfn(float current, u16 kmer) {
+        switch(cost_fn_) {
+            case DTWCostFn::NORM_PDF:
+            return -model_.norm_pdf(current, kmer);
+
+            case DTWCostFn::Z_SCORE:
+            return model_.z_score(current, kmer);
+
+            default:
+            return model_.abs_diff(current, kmer);
+        }
     }
 
     public:
