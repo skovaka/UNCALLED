@@ -83,7 +83,13 @@ def nanopolish(conf):
 
             df["mref"] = coords.ref_to_mref(df["position"].to_numpy()+2)
 
-            df = collapse_events(df, start_col="start_idx", length_col="event_length", mean_col="event_level_mean")[clip:]
+            df.rename(columns={
+                "start_idx" : "start",
+                "event_length" : "length",
+                "event_level_mean" : "current"
+            }, inplace=True)
+            print(df)
+            #df = collapse_events(df, start_col="start_idx", length_col="event_length", mean_col="event_level_mean")[clip:]
 
             fast5_name = f5reader.get_read_file(read_id)
 

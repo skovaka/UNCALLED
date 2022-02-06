@@ -98,8 +98,10 @@ def main(conf):
             dtw = GuidedDTW(tracks, sigproc, read, paf, conf)
             #print(time.time()-t0)
 
+            sys.stderr.write(f"{read.id}\n")
+
             if dtw.df is None:
-                sys.stderr.write("dtw failed\n")
+                sys.stderr.write("# dtw failed\n")
                 continue
             aligned = True
 

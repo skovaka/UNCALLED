@@ -211,6 +211,7 @@ bool Fast5Iter::open_fast5(u32 i) {
     //TODO put in function
     case Format::MULTI:
         for (const std::string &read_path : fast5_file_.list_group("/")) {
+            
             read_id = read_path.substr(MULTI_READ_PREFIX.size());
             if (read_filter_.empty() || read_filter_.count(read_id) > 0) {
                 read_paths_.push_back("/"+read_path);
@@ -231,13 +232,11 @@ u32 Fast5Iter::fill_buffer() {
     //TODO: max total default to max int
     while (buffered_reads_.size() < PRMS.max_buffer) {
 
-
         if (all_buffered())  {
             read_paths_.clear();
             fast5_files_.clear();
             break;
         }
-
 
         //Open fast5s until one is found which contains reads to load
         while (read_paths_.empty()) {
@@ -249,9 +248,16 @@ u32 Fast5Iter::fill_buffer() {
         if (read_paths_.empty()) break;
 
         auto subpaths = get_subpaths(read_paths_.front());
-        buffered_reads_.emplace_back(fast5_file_, subpaths);
-        read_paths_.pop_front();
 
+        try {
+            buffered_reads_.emplace_back(fast5_file_, subpaths);
+        } catch (const std::exception e) {
+            std::cerr << "Failed parse read in file \""
+                      << read_paths_.front() << "\" at \""
+                      << subpaths.raw << "\"\n";
+        }
+
+        read_paths_.pop_front();
 
         count++;
         total_buffered_++;

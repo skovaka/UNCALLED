@@ -145,7 +145,7 @@ requires=[
     'dash>=2.0.0',
     'scipy>=1.5.4',
     'toml>=0.10.2',
-    'ont_fast5_api>=4.0.0',
+    'ont_fast5_api',
 ],
 
 setup(
