@@ -26,6 +26,8 @@ COMPARE_OPTS = (
     Opt(("-R", "--ref-bounds"), "tracks"),
     Opt(("-b", "--bcaln"), action="store_true", help="Compare against basecalled alignment. If two tracks input will look for \"bcaln\" group in second track, otherwise will look in the first track."),
     Opt(("-s", "--save"), action="store_true", help="Will save in database if included, otherwise will output to TSV"),
+    Opt(("-j", "--jaccard"), action="store_true", help="Will compute per-reference raw sample jaccard distances. Output by default if no other statistics are specified."),
+    Opt(("-d", "--mean-ref-dist"), action="store_true", help="Will compute mean reference coordinate distances between raw samples of alignments of the same read. Output by default if no other statistics are specified."),
     #Opt(("-o", "--output"), choices=["db", "tsv"], help="If \"db\" will output into the track database. If \"tsv\" will output a tab-delimited file to stdout."),
 )
 
@@ -38,6 +40,10 @@ def compare(conf):
         conf.tracks.layers += [("bc_cmp", "mean_ref_dist")] #LAYERS["bc_cmp"]["mean_ref_dist"].deps
     else:
         conf.tracks.layers += [("cmp", "mean_ref_dist")] #LAYERS["cmp"]["mean_ref_dist"].deps
+
+    all_layers = not (conf.jaccard or conf.mean_ref_dist)
+    calc_jaccard = all_layers or conf.jaccard
+    calc_mean_ref_dist = all_layers or conf.mean_ref_dist
     
     tracks = Tracks(conf=conf)
     for read_id,chunk in tracks.iter_reads():
@@ -46,7 +52,7 @@ def compare(conf):
         else:
             if conf.save:
                 print(read_id)
-            chunk.calc_compare(group_b, conf.save)
+            chunk.calc_compare(group_b, calc_jaccard, calc_mean_ref_dist, conf.save)
 
 DUMP_OPTS = (
     Opt("input", "tracks", nargs="+", type=str),

@@ -88,7 +88,6 @@ def nanopolish(conf):
                 "event_length" : "length",
                 "event_level_mean" : "current"
             }, inplace=True)
-            print(df)
             #df = collapse_events(df, start_col="start_idx", length_col="event_length", mean_col="event_level_mean")[clip:]
 
             fast5_name = f5reader.get_read_file(read_id)

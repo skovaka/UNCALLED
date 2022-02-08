@@ -342,7 +342,7 @@ class AlnTrack:
             return df[group]
         return df[group][layers]
 
-    def cmp(self, other, write=False):
+    def cmp(self, other, calc_jaccard, calc_mean_ref_dist):
         groups_b = other.alignments.groupby("read_id")
 
         df = pd.DataFrame(
@@ -355,11 +355,7 @@ class AlnTrack:
             dtw_a = self.get_aln_layers(id_a, "dtw", ["start","end"], False)
 
             for id_b, aln_b in groups_b.get_group(read_id).iterrows():
-                #dtw_b = other.get_aln_layers(id_b, "dtw", ["start","end"], False) \
-                #             .reset_index(level="aln_id") \
-                #             .rename(columns={"aln_id" : "aln_b"})
-
-                self._compare_alns(dtw_a, other, id_b, "dtw", df)
+                self._compare_alns(dtw_a, other, id_b, "dtw", df, calc_jaccard, calc_mean_ref_dist)
 
         df["group_b"] = "dtw"
         return df.set_index(["aln_b", "group_b"], append=True)
@@ -389,7 +385,7 @@ class AlnTrack:
         return df.set_index(["aln_b", "group_b"], append=True)
 
 
-    def _compare_alns(self, aln_a, other, id_b, group, df): # aln_b, df):
+    def _compare_alns(self, aln_a, other, id_b, group, df, calc_jaccard=False, calc_mean_ref_dist=False):
         aln_b = other.get_aln_layers(id_b, group, ["start","end"], False) \
                      .reset_index(level="aln_id") \
                      .rename(columns={"aln_id" : "aln_b"})
@@ -401,50 +397,59 @@ class AlnTrack:
                      
         starts = merge[["start_a", "start_b"]]
         ends = merge[["end_a", "end_b"]]
-        jaccard = 1 - (
-            (ends.min(axis=1) - starts.max(axis=1)).clip(0) /
-            (ends.max(axis=1) - starts.min(axis=1)))
-
-        intvs_a = pd.IntervalIndex.from_arrays(merge["start_a"], merge["end_a"])
-        intvs_b = pd.IntervalIndex.from_arrays(merge["start_b"], merge["end_b"])
-
-        mean_ref_dist = pd.Series(index=merge.index)
-        refs = merge.index.get_level_values(0)
-
-        def weighted_dist(idxs, idx_b, swap):
-            if swap:
-                a = "b"
-                b = "a"
-            else:
-                a = "a"
-                b = "b"
-            coord_a = merge.loc[idxs]
-            coord_b = merge.loc[idx_b]
-            samp_overlaps = coord_a["end_"+a].clip(upper=coord_b["end_"+b]) - coord_a["start_"+a].clip(lower=coord_b["start_"+b])
-            ref_dists = np.abs(idxs.get_level_values(0).to_numpy()-idx_b[0])
-            return np.sum(samp_overlaps), np.sum(ref_dists * samp_overlaps)
-
-        for i,idx in enumerate(merge.index):
-            ref,_ = idx
-
-            if not pd.isnull(intvs_b[i]):
-                ovr_a = merge.index[intvs_a.overlaps(intvs_b[i])]
-                weight_a, sum_a = weighted_dist(ovr_a,idx, False)
-            else:
-                weight_a = sum_a = 0
-
-            if not pd.isnull(intvs_a[i]):
-                ovr_b = merge.index[intvs_b.overlaps(intvs_a[i])]
-                weight_b, sum_b = weighted_dist(ovr_b,idx, True)
-            else:
-                weight_b = sum_b = 0
-
-            if weight_a + weight_b > 0:
-                mean_ref_dist[idx] = (sum_a+sum_b) / (weight_a+weight_b)
 
         df.loc[merge.index, "aln_b"] = merge["aln_b"].astype("Int32")
-        df.loc[merge.index, "jaccard"] = jaccard
-        df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
+
+        if calc_jaccard:
+            df.loc[merge.index, "jaccard"] = 1 - (
+                (ends.min(axis=1) - starts.max(axis=1)).clip(0) /
+                (ends.max(axis=1) - starts.min(axis=1)))
+        #else:
+        #    jaccard = pd.NA
+
+        if calc_mean_ref_dist:
+            intvs_a = pd.IntervalIndex.from_arrays(merge["start_a"], merge["end_a"])
+            intvs_b = pd.IntervalIndex.from_arrays(merge["start_b"], merge["end_b"])
+
+            mean_ref_dist = pd.Series(index=merge.index)
+            refs = merge.index.get_level_values(0)
+
+            def weighted_dist(idxs, idx_b, swap):
+                if swap:
+                    a = "b"
+                    b = "a"
+                else:
+                    a = "a"
+                    b = "b"
+                coord_a = merge.loc[idxs]
+                coord_b = merge.loc[idx_b]
+                samp_overlaps = coord_a["end_"+a].clip(upper=coord_b["end_"+b]) - coord_a["start_"+a].clip(lower=coord_b["start_"+b])
+                ref_dists = np.abs(idxs.get_level_values(0).to_numpy()-idx_b[0])
+                return np.sum(samp_overlaps), np.sum(ref_dists * samp_overlaps)
+
+            for i,idx in enumerate(merge.index):
+                ref,_ = idx
+
+                if not pd.isnull(intvs_b[i]):
+                    ovr_a = merge.index[intvs_a.overlaps(intvs_b[i])]
+                    weight_a, sum_a = weighted_dist(ovr_a,idx, False)
+                else:
+                    weight_a = sum_a = 0
+
+                if not pd.isnull(intvs_a[i]):
+                    ovr_b = merge.index[intvs_b.overlaps(intvs_a[i])]
+                    weight_b, sum_b = weighted_dist(ovr_b,idx, True)
+                else:
+                    weight_b = sum_b = 0
+
+                if weight_a + weight_b > 0:
+                    mean_ref_dist[idx] = (sum_a+sum_b) / (weight_a+weight_b)
+
+            df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
+        #else:
+        #    mean_ref_dist = pd.NA
+
+        
 
     @property
     def read_ids(self):

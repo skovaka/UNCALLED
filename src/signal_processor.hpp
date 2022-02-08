@@ -25,6 +25,11 @@ struct ProcessedRead {
     std::vector<Event> events;
     std::vector<NormVals> norm;
     //std::vector<bool> mask;
+    void rescale(float scale, float shift) {
+        for (auto &e : events) {
+            e.mean = e.mean * scale + shift;
+        }
+    }
 };
 
 class SignalProcessor {
@@ -48,9 +53,10 @@ class SignalProcessor {
         ret.events = evdt_.get_events(read.get_signal());
 
         auto norm = norm_mom_params(ret.events);
-        for (auto &e : ret.events) {
-            e.mean = e.mean * norm.scale + norm.shift;
-        }
+        ret.rescale(norm.scale, norm.shift);
+        //for (auto &e : ret.events) {
+        //    e.mean = e.mean * norm.scale + norm.shift;
+        //}
 
         return ret;
     }
@@ -92,6 +98,7 @@ class SignalProcessor {
 
         py::class_<ProcessedRead> p(m, "_ProcessedRead");
         p.def(pybind11::init<const ProcessedRead &>());
+        p.def("rescale", &ProcessedRead::rescale);
         PY_PROC_ARR(Event, events, "Un-normalized events");
         PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");
     }

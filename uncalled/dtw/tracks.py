@@ -573,7 +573,7 @@ class Tracks:
             if dtws is not None:
                 _add_group("cmp", dtws)
 
-    def calc_compare(self, group_b, save):
+    def calc_compare(self, group_b, calc_jaccard, calc_mean_ref_dist, save):
         if len(self.alns) == 0:
             raise ValueError("Must input at least one track")
 
@@ -586,7 +586,7 @@ class Tracks:
             if len(self.alns) != 2:
                 raise ValueError("Must input exactly two tracks to compare dtw alignments")
 
-            df = self.alns[0].cmp(self.alns[1])
+            df = self.alns[0].cmp(self.alns[1], calc_jaccard, calc_mean_ref_dist)
 
         elif group_b == "bcaln":
             if len(self.alns) > 2:
@@ -597,7 +597,7 @@ class Tracks:
             else:
                 df = self.alns[0].bc_cmp()
 
-        df = df.dropna()
+        df = df.dropna(how="all")
 
         if save:
             df.rename(index=lambda r: self.alns[0].coords.ref_to_mref(r, True), level=0, inplace=True)
@@ -867,8 +867,8 @@ class Tracks:
                 track_alns = alignments.loc[aln_groups[parent.id]]
                 track_layers = layers.loc[layer_alns.isin(track_alns.index)]
             else:
-                track_alns = alignments.loc[:0] #pd.DataFrame(index=alignments.index.names, columns=alignments.columns)
-                track_layers = layers.loc[:0] #pd.DataFrame(index=layers.index.names, columns=layers.columns)
+                track_alns = alignments.iloc[:0] 
+                track_layers = layers.iloc[:0]   
 
             track = AlnTrack(parent, coords, track_alns, track_layers)
 

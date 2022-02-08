@@ -2,9 +2,9 @@
 
 const DtwParams
     DTW_PRMS_DEF = {
-        DTWSubSeq::NONE, 1, 1, 1, 0.5, 100, "guided", "abs_diff", ""
+        DTWSubSeq::NONE, 1, 1, 1, 0.5, 100, 0, "guided", "abs_diff", ""
     }, DTW_PRMS_EVT_GLOB = {
-        DTWSubSeq::NONE, 2, 1, 100, 0, 0, "", "abs_diff", "",
+        DTWSubSeq::NONE, 2, 1, 100, 0, 0, 0, "", "abs_diff", "",
     };
 
 #ifdef PYBIND
@@ -18,6 +18,7 @@ void pybind_dtw(py::module_ &m) {
     PY_DTW_PARAM(stay_cost, "DTW event stay (horizontal) penalty");
     PY_DTW_PARAM(skip_cost, "DTW event skip (vertical) penalty");
     PY_DTW_PARAM(band_width, "DTW band width");
+    PY_DTW_PARAM(iterations, "Number of DTW iterations to perform");
     PY_DTW_PARAM(band_shift, "DTW band shift");
 
     m.attr("DTW_PRMS_DEF") = py::cast(DTW_PRMS_DEF);

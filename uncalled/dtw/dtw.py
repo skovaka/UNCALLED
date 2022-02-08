@@ -6,6 +6,7 @@ import pandas as pd
 from collections import defaultdict
 import progressbar as progbar
 
+from sklearn.linear_model import TheilSenRegressor
 from ..pafstats import parse_paf
 from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt 
@@ -49,12 +50,13 @@ OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt("--method", "dtw", choices=METHODS.keys()),
+    Opt(("-i", "--iterations"), "dtw"),
+    Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
     Opt("--skip-cost", "dtw"),
     Opt("--stay-cost", "dtw"),
     Opt("--move-cost", "dtw"),
     Opt(("-b", "--band-width"), "dtw"),
     Opt(("-s", "--band-shift"), "dtw"),
-    Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
     Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
 )
 
@@ -129,20 +131,20 @@ class GuidedDTW:
 
         #print(read.df)
 
-        aln_id, coords = tracks.write_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df})
+        aln_id, self.coords = tracks.write_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df})
         #TODO return coords?
 
-        self.ref_kmers = coords.kmers.sort_index()
+        self.ref_kmers = self.coords.kmers.sort_index()
 
         self.bcaln = bcaln.df[bcaln.df.index.isin(self.ref_kmers.index)].sort_index()[["start"]].dropna()
 
-        self.read = sigproc.process(read)
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
             sys.stderr.write("Error: unrecongized DTW method \"%s\".\n" % method)
             sys.stderr.write("Must be one of \"%s\".\n" % "\", \"".join(METHODS.keys()))
             sys.exit()
+
 
         self.dtw_fn = METHODS[self.method]
 
@@ -151,14 +153,29 @@ class GuidedDTW:
         self.samp_min = self.bcaln["start"].min()
         self.samp_max = self.bcaln["start"].max()
 
-        self._calc_dtw()
+        signal = sigproc.process(read)
+
+        df = self._calc_dtw(signal)
+
+        for i in range(self.prms.iterations-1):
+            reg = self.renormalize(signal, df)
+            signal.rescale(reg.coef_, reg.intercept_)
+            df = self._calc_dtw(signal)
+
+        self.df = df
 
         tracks.write_events(self.df, aln_id=aln_id)
 
         self.empty = False
 
+    def renormalize(self, signal, aln):
+        kmers = self.ref_kmers[aln["mref"]]
+        model_current = self.model[kmers]
+        reg = TheilSenRegressor(random_state=0)
+        return reg.fit(aln[["current"]], model_current)
+
     #TODO refactor inner loop to call function per-block
-    def _calc_dtw(self):
+    def _calc_dtw(self, signal):
         self.mats = list()
 
         path_qrys = list()
@@ -183,7 +200,7 @@ class GuidedDTW:
             samp_st = self.bcaln.loc[st,"start"]
             samp_en = self.bcaln.loc[en,"start"]
 
-            read_block = self.read.sample_range(samp_st, samp_en)
+            read_block = signal.sample_range(samp_st, samp_en)
 
             block_signal = read_block['mean'].to_numpy()
             
@@ -201,15 +218,12 @@ class GuidedDTW:
                     self._ll_to_df(dtw.ll, read_block, mref_st, len(block_kmers))
                 )
 
-        self.df = pd.DataFrame({'mref': np.concatenate(path_refs)}, 
+        return pd.DataFrame({'mref': np.concatenate(path_refs)}, 
                                index = np.concatenate(path_qrys),
                                dtype='Int32') \
-                  .join(self.read.to_df()) \
+                  .join(signal.to_df()) \
                   .drop(columns=['mask'], errors='ignore') \
                   .rename(columns={'mean' : 'current', 'stdv' : 'current_stdv'})
-
-        #def self, aln_id, group, layers):
-        #self.df = collapse_events(df, True)#, mask_skips=self.prms.mask_skips)
 
     def _get_dtw_args(self, read_block, mref_start, ref_kmers):
         common = (
