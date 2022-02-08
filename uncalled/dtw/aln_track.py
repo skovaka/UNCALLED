@@ -385,7 +385,7 @@ class AlnTrack:
         return df.set_index(["aln_b", "group_b"], append=True)
 
 
-    def _compare_alns(self, aln_a, other, id_b, group, df, calc_jaccard=False, calc_mean_ref_dist=False):
+    def _compare_alns(self, aln_a, other, id_b, group, df, calc_jaccard=True, calc_mean_ref_dist=True):
         aln_b = other.get_aln_layers(id_b, group, ["start","end"], False) \
                      .reset_index(level="aln_id") \
                      .rename(columns={"aln_id" : "aln_b"})
