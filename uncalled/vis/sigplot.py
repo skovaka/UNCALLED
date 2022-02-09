@@ -21,6 +21,7 @@ SigplotParams._def_params(
     #("ref_bounds", None, str_to_coord, "DTW aligment tracks"),
     #("reads", None, None, "Reads to plot"),
     ("max_reads", 10, int, ""),
+    ("show_events", False, bool, "Display event means plotted over signal instead of model current (currently events are computed from scratch)"),
     ("no_model", False, bool, "Will not plot the expected reference signal if True"),
     ("multi_background", False, bool, "Will plot multiple stacked background colors for multiple tracks if True"),
     ("yaxis_fixed", True, bool, ""),
@@ -117,6 +118,8 @@ class Sigplot:
         read = ProcRead(track.fast5s[read_id], conf=self.conf)
         signal = read.get_norm_signal(samp_min, samp_max)
 
+        #events are in read.norm_sig
+
         #TODO set global signal min/max
         mask = ((signal >= 40) &
                 (signal <= self.conf.event_detector.max_mean))
@@ -147,10 +150,16 @@ class Sigplot:
             hoverinfo="skip",
             name="Raw Signal",
             mode="markers",
-            marker={"size":2, "color":"black"},
+            marker={"size":3, "color":"black", "opacity" : 0.75},
             legendrank=0
         ), row=row, col=col)
 
+        fig.add_trace(go.Scattergl(
+            name = "Event Means",
+            mode = "lines",
+            x=read.df["start"], y=read.df["norm_sig"],
+            line={"color":"black", "width":2, "shape" : "hv"},
+        ), row=row, col=col)
 
         if not self.prms.no_model:
             for dtw,color,kw in zip(track_dtws, colors, dtw_kws):
@@ -159,7 +168,7 @@ class Sigplot:
                     name = "Model Current",
                     mode = "lines",
                     x=dtw["start"], y=dtw["model_current"],
-                    line={"color":color, "width":2, "shape" : "hv"},
+                    line={"color":color, "width":2.5, "shape" : "hv"},
                     **kw
                 ), row=row, col=col)
 

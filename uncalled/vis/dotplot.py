@@ -16,7 +16,6 @@ from ..dtw.tracks import Tracks
 from ..dtw.bcaln import Bcaln
 from ..argparse import Opt, comma_split
 from ..fast5 import parse_read_ids
-from ..sigproc import ProcRead
 
 class DotplotParams(config.ParamGroup):
     _name = "dotplot"
@@ -368,6 +367,7 @@ OPTS = (
     Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
     Opt(("-b", "--bcaln-track"), "dotplot"),
     Opt(("--multi-background"), "sigplot", action="store_true"),
+    Opt(("--show-events"), "sigplot", action="store_true"),
     Opt(("--no-model"), "sigplot", action="store_true"),
     Opt(("--bcaln-error", "-e"), "dotplot", action="store_true"),
 )

@@ -114,12 +114,12 @@ class PoreModel(_PoreModel):
     def to_tsv(self, out=None):
         return self.to_df().to_csv(out, sep="\t", index=False)
 
-    def normalize(self, current, tgt_mean=None, tgt_stdv=None):
+    def norm_mom_params(self, current, tgt_mean=None, tgt_stdv=None):
         tgt_mean = self.model_mean if tgt_mean is None else tgt_mean
         tgt_stdv = self.model_stdv if tgt_stdv is None else tgt_stdv
         scale = tgt_stdv / np.std(current)
         shift = tgt_mean - scale * np.mean(current)
-        return scale * current + shift
+        return scale, shift
 
     def get_normalized(self, *args):
         if len(args) == 2:
@@ -129,9 +129,11 @@ class PoreModel(_PoreModel):
             tgt_mean = model.model_mean
             tgt_stdv = model.model_stdv
 
-        means = self.normalize(self.means, tgt_mean, tgt_stdv)
-        vals = np.ravel(np.dstack([means,self.stdvs]))
-        return(PoreModel(_PoreModel(vals), name=self.name))
+        scale,shift = self.norm_mom_params(self.means, tgt_mean, tgt_stdv)
+        new_means = self.means * scale + shift
+        vals = np.ravel(np.dstack([new_means,self.stdvs]))
+
+        return(PoreModel(_PoreModel(vals), name=self.name), scale, shift)
     
     
     def __repr__(self):
