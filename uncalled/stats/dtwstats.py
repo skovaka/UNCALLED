@@ -66,7 +66,7 @@ def dump(conf):
 
     tracks = Tracks(conf=conf)
     #TODO add layer dependencies (compare requires start/length)
-    tracks.set_layers(["start", "length", "bcaln.start", "bcaln.length"])# + conf.layers)
+    tracks.set_layers(["start", "length", "bcaln.start", "bcaln.length"] + conf.layers)
 
     layer_groups = {group for group,_ in parse_layers(conf.layers)}
 

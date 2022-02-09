@@ -214,8 +214,10 @@ def tombo(conf):
 
         #if is_rna == ref_bounds.fwd:
 
-        lr = scipy.stats.linregress(currents, model[kmers])
-        currents = lr.slope * currents + lr.intercept
+        #lr = scipy.stats.linregress(currents, model[kmers])
+        #currents = lr.slope * currents + lr.intercept
+        #TODO store scaling factors in pore model
+        currents = currents * 10.868760552593136 + 91.25486108714513
 
         df = pd.DataFrame({
                 "mref" : kmers.index,
