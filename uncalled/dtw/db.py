@@ -124,7 +124,7 @@ class TrackSQL(TrackIO):
         if self.open:
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (mref, aln_id);")
-            #self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (mref, aln_id, aln_b, group_b);")
+            #self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (mref, aln_a, aln_b, group_b);")
             self.con.close()
             self.open = False
 

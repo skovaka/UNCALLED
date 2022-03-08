@@ -559,19 +559,24 @@ class Tracks:
         else:
             dtws = None
 
-        def _add_group(group, df):
-            df = df.reset_index(["aln_b", "group_b"])
-            df = df[df.index.get_level_values("mref").isin(track.layer_mrefs)]
-            df.rename(index=track.coords.mref_to_ref, level=0, inplace=True)
-            df.index.names = ["ref", "aln_id"]
-            df = pd.concat({group : df.reindex(track.layers.index)}, axis=1)
-            track.layers = pd.concat([track.layers, df], axis=1)
-
         for track in self.alns:
-            if bcalns is not None:
-                _add_group("bc_cmp", bcalns)
-            if dtws is not None:
-                _add_group("cmp", dtws)
+            def _add_group(group, df):
+                df = df.reset_index(["aln_b", "group_b"])
+                df = df[df.index.get_level_values("mref").isin(track.layer_mrefs)]
+                df.rename(index=track.coords.mref_to_ref, level=0, inplace=True)
+                df.index.names = ["ref", "aln_id"]
+                #print("A", list(track.layers.columns))
+                df = pd.concat({group : df.reindex(track.layers.index)}, axis=1)
+                track.layers = pd.concat([track.layers, df], axis=1).dropna(axis=1,how="all")
+
+            try:
+                if bcalns is not None:
+                    _add_group("bc_cmp", bcalns)
+                if dtws is not None:
+                    _add_group("cmp", dtws)
+            except:
+                sys.stderr.write("Failed to write compare group\n")
+                sys.stderr.write(str(track.alignments))
 
     def calc_compare(self, group_b, calc_jaccard, calc_mean_ref_dist, save):
         if len(self.alns) == 0:

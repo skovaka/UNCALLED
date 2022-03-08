@@ -139,7 +139,7 @@ class Dotplot:
                     ), row=2, col=1)
                 if only_bcaln: continue
 
-                track_hover.append(layers[hover_layers])
+                #track_hover.append(layers[hover_layers])
                     
 
                 first_aln = False
@@ -155,11 +155,11 @@ class Dotplot:
                             legendgroup=track.name, showlegend=False,
                         ), row=2, col=j+2)
 
-                    elif len(layers[layer].dropna()) > 0:
+                    elif layer in layers and len(layers[layer].dropna()) > 0:
                         color= "rgba(255,0,0,1)"
                         #label = LAYERS["cmp"][stat].label
                         fig.add_trace(go.Bar(
-                            x=track.layers[layer], 
+                            x=track.layers[layer].fillna(1.0), 
                             y=track.layer_refs, #TODO try vhv
                             base=0,
                             name="DTW Compare",

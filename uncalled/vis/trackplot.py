@@ -48,7 +48,7 @@ MULTIROW_PANEL = {
 }
 
 DEFAULT_HEIGHTS = {
-    "mat" : 2, "box" : 1, "line" : 1, "scatter" : 1
+    "mat" : 3, "box" : 1, "line" : 1, "scatter" : 1
 }
 
 PLOT_LAYERS = {
@@ -294,7 +294,7 @@ class Trackplot:
 
     def show(self):
         fig_conf = {
-            "toImageButtonOptions" : {"format" : "png", "width" : None, "height" : None, "scale" : 2},
+            "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None, "scale" : 2},
             "scrollZoom" : True, 
             "displayModeBar" : True}
 
@@ -316,6 +316,8 @@ OPTS = (
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
     Opt(("-H", "--panel-heights"), "trackplot", nargs="+", type=int),
     Opt(("--shared-refs-only"), "tracks", action="store_true"),
+    Opt(("--shared-reads-only"), "tracks", action="store_true"),
+    Opt(("--share-reads"), "trackplot", action="store_true"),
 
     Opt("--mat", dest="panels",
         metavar="LAYER", action="append", type=panel_opt("mat"),
