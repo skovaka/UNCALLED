@@ -48,7 +48,7 @@ MULTIROW_PANEL = {
 }
 
 DEFAULT_HEIGHTS = {
-    "mat" : 3, "box" : 1, "line" : 1, "scatter" : 1
+    "mat" : 2, "box" : 1, "line" : 1, "scatter" : 1
 }
 
 PLOT_LAYERS = {

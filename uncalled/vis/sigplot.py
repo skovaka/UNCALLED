@@ -71,7 +71,7 @@ class Sigplot:
             ys = [ymax,ymax,ymin,ymin,None]*len(base_dtw)
             xs = np.dstack([starts, ends, ends, starts, nones]).reshape(len(ys))
 
-            fig.add_trace(go.Scatter(
+            fig.add_trace(go.Scattergl(
                 x=xs,y=ys, fill="toself",
                 fillcolor=color,
                 hoverinfo="skip",
@@ -146,7 +146,7 @@ class Sigplot:
             colors = self.conf.vis.track_colors
             dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks.alns]
 
-        fig.add_trace(go.Scatter(
+        fig.add_trace(go.Scattergl(
             x=samples, y=signal,
             hoverinfo="skip",
             name="Raw Signal",
@@ -156,7 +156,7 @@ class Sigplot:
         ), row=row, col=col)
 
         if self.prms.show_events:
-            fig.add_trace(go.Scatter(
+            fig.add_trace(go.Scattergl(
                 name = "Event Means",
                 mode = "lines",
                 x=read.df["start"], y=read.df["norm_sig"],
@@ -166,7 +166,7 @@ class Sigplot:
         if not self.prms.no_model:
             for dtw,color,kw in zip(track_dtws, colors, dtw_kws):
                 dtw = dtw.sort_values("start")
-                fig.add_trace(go.Scatter(
+                fig.add_trace(go.Scattergl(
                     name = "Model Current",
                     mode = "lines",
                     x=dtw["start"], y=dtw["model_current"],

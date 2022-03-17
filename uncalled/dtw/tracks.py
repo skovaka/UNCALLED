@@ -478,6 +478,10 @@ class Tracks:
             elif isinstance(track, AlnTrack):
                 tracks[name] = track.slice(coords, reads=reads, order=order)
 
+            #print(reads)
+            #print(tracks[name].alignments)
+            #print(tracks[name].layers)
+
         return Tracks(self, coords, tracks)
 
     def get_shared_reads(self):
@@ -495,6 +499,19 @@ class Tracks:
 
     def slice_shared_reads(self):
         return self.slice(reads=self.get_shared_reads(), order="read_id")
+
+    def slice_full_overlap(self):
+        read_ids = None
+        rmin = self.coords.refs.min()
+        rmax = self.coords.refs.max()
+        for track in self.alns:
+            alns = track.alignments[(track.alignments["ref_start"] <= rmin) & (track.alignments["ref_end"] >= rmax)]
+            if read_ids is None:
+                read_ids = pd.Index(alns["read_id"])
+            else:
+                read_ids = read_ids.intersection(alns["read_id"])
+
+        return self.slice(reads=read_ids)
             
     def load(self, ref_bounds=None, full_overlap=None, read_filter=None, load_mat=False):
         self._verify_read()
@@ -565,7 +582,6 @@ class Tracks:
                 df = df[df.index.get_level_values("mref").isin(track.layer_mrefs)]
                 df.rename(index=track.coords.mref_to_ref, level=0, inplace=True)
                 df.index.names = ["ref", "aln_id"]
-                #print("A", list(track.layers.columns))
                 df = pd.concat({group : df.reindex(track.layers.index)}, axis=1)
                 track.layers = pd.concat([track.layers, df], axis=1).dropna(axis=1,how="all")
 
@@ -795,7 +811,7 @@ class Tracks:
             read_id=reads,
             coords=self.coords, 
             full_overlap=full_overlap, 
-            order=["read_id"],
+            order=["read_id", "mref"],
             chunksize=self.prms.ref_chunksize)
 
         aln_leftovers = pd.DataFrame()
@@ -823,7 +839,7 @@ class Tracks:
             layer_leftovers = layers.loc[layer_end]
             layers = layers.loc[~layer_end]
             layer_alns = layers.index.get_level_values("aln_id")
-            
+
             for ref_name,ref_alns in alignments.groupby("ref_name"):
                 coords = self._alns_to_coords(ref_alns)
                 cache = self._tables_to_tracks(coords, ref_alns, layers)

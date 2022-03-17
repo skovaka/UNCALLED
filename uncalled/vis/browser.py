@@ -34,8 +34,6 @@ def main(conf):
     conf.tracks.layers=["dtw","bcaln","cmp","bc_cmp"]
     sys.stderr.write("Loading tracks...\n")
     tracks = Tracks(conf=conf)
-    print([a.alignments for a in tracks.alns])
-    print([a.layers for a in tracks.alns])
     sys.stderr.write("Starting server...\n")
     browser(tracks, conf)
 
@@ -127,6 +125,7 @@ def browser(tracks, conf):
                             inputClassName="w3-padding",
                             options=[
                                 {"label" : "Show legend", "value" : "show_legend"},
+                                {"label" : "Full overlap", "value" : "full_overlap"},
                                 {"label" : "Shared reads only", "value" : "share_reads"},
                             ], value=["show_legend"])
                 ])
@@ -178,10 +177,16 @@ def browser(tracks, conf):
 
         checklist = set(checklist)
 
+        chunk = tracks
+        uirev = True
+
+        if "full_overlap" in checklist:
+            chunk = chunk.slice_full_overlap()
+            #uirev = False
+
         if "share_reads" in checklist:
-            chunk = tracks.slice_shared_reads()
-        else:
-            chunk = tracks
+            chunk = chunk.slice_shared_reads()
+            #uirev = False
 
         if click is not None:
             coord = click["points"][0]
@@ -208,10 +213,10 @@ def browser(tracks, conf):
         fig = Trackplot(
             chunk, [("mat", layer)], 
             select_ref=ref, select_read=read, 
-            show_legend="show_legend" in checklist,
             share_reads="share_reads" in checklist,
+            show_legend="show_legend" in checklist,
             conf=conf).fig
-        fig.update_layout(uirevision=True)
+        fig.update_layout(uirevision=uirev)
 
         return fig, table, card_style, ref, read, (read != prev_read)
 

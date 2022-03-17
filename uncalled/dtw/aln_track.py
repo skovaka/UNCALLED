@@ -394,6 +394,8 @@ class AlnTrack:
 
         merge = aln_a.join(aln_b, on="ref", lsuffix="_a", rsuffix="_b") \
                      .dropna(how="all")
+
+        #print(merge)
                      
         starts = merge[["start_a", "start_b"]]
         ends = merge[["end_a", "end_b"]]
@@ -446,8 +448,8 @@ class AlnTrack:
                     mean_ref_dist[idx] = (sum_a+sum_b) / (weight_a+weight_b)
 
             df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
-        #else:
-        #    mean_ref_dist = pd.NA
+
+            #print(df)
 
         
 

@@ -139,7 +139,7 @@ class Dotplot:
                     ), row=2, col=1)
                 if only_bcaln: continue
 
-                #track_hover.append(layers[hover_layers])
+                track_hover.append(layers[hover_layers])
                     
 
                 first_aln = False
@@ -172,7 +172,7 @@ class Dotplot:
             #fig.update_xaxes(row=2, col=cmp_col + i,
             #    title_text=label)
 
-            #hover_data[track.name] = pd.concat(track_hover)#.reset_index()
+            hover_data[track.name] = pd.concat(track_hover)#.reset_index()
 
             if len(track_hover) > 0:
                 hover_data[track.name] = track_hover[0]#.reset_index()
