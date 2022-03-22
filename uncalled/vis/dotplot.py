@@ -359,7 +359,7 @@ class Dotplot:
 
 
 OPTS = (
-    Opt("input", "tracks", nargs="+"),
+    Opt("input", "tracks.io", nargs="+"),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot.", required=True),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),

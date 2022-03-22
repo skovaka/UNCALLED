@@ -16,31 +16,43 @@ from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
 from .. import config, nt
 
-            
-class TracksParams(config.ParamGroup):
-    _name = "tracks"
-TracksParams._def_params(
+class IOParams(config.ParamGroup):
+    _name = "io"
+IOParams._def_params(
     ("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
     ("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
     ("output_format", "db", str,  "Output format (db, nanopolish)"),
-    ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
-    ("layers", ["dtw","bcaln","cmp","bc_cmp"], None, "Layers to load (e.g. current, dwell, model_diff)"),
-    ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
-    ("refstats_layers", None, None, "Layers to compute refstats"),
-    ("read_filter", None, None, "Only load reads which overlap these coordinates"),
-    ("max_reads", None, int, "Only load reads which overlap these coordinates"),
-    ("index_prefix", None, str, "BWA index prefix"),
-    ("load_fast5s", bool, True, "Load fast5 files"),
     ("overwrite", False, bool, "Overwrite existing tracks"),
     ("append", False, bool, "Append reads to existing tracks"),
+    ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
+    ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
+    ignore_toml={"input", "output", "output_format", "overwrite", "append"},
+    config_add=False
+)
+
+class TracksParams(config.ParamGroup):
+    _name = "tracks"
+TracksParams._def_params(
+    ("io", {}, IOParams, "Track input/output parameters"),
+    ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
+    ("read_filter", None, None, "Only load reads which overlap these coordinates"),
+    ("max_reads", None, int, "Only load reads which overlap these coordinates"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("min_coverage", 1, int, "Reference positions with less than this coverage will be excluded from each track (or all tracks if shared_refs_only is true)"),
     ("shared_reads_only", False, bool, "If true will only contain reads shared between all tracks"),
     ("shared_refs_only", False, bool, "If true will only contain reference positions where all tracks have sufficient coverage (see min_coverage)"),
+
+    ("layers", ["dtw","bcaln","cmp","bc_cmp"], None, "Layers to load (e.g. current, dwell, model_diff)"),
+
     ("load_mat", False, bool, "If true will pivot layers into a matrix"), #TODO change to mat_layers, only do it for them
-    ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
-    ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
-    ignore_toml={"input", "output", "output_format", "ref_bounds", "layers", "full_overlap", "overwrite", "append","refstats", "refstats_layers", "read_filter"}
+
+    ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
+    ("refstats_layers", None, None, "Layers to compute refstats"),
+
+    ("index_prefix", None, str, "BWA index prefix"),
+    ("load_fast5s", True, bool, "Load fast5 files"),
+
+    ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter"}
 )
 
 _REFSTAT_AGGS = {
@@ -120,11 +132,11 @@ class Tracks:
         self.prev_fast5 = dict()
         self.prev_read = dict()
 
-        if self.prms.output_format == "db":
-            self._load_dbs(self.prms.output, True)
-            self._load_dbs(self.prms.input, False)
+        if self.prms.io.output_format == "db":
+            self._load_dbs(self.prms.io.output, True)
+            self._load_dbs(self.prms.io.input, False)
         else:
-            self.io = Eventalign(self.prms.output, "wb")
+            self.io = Eventalign(self.prms.io.output, "wb")
 
             name = ""
             track = AlnTrack(None, None, name, name, self.conf)
@@ -312,9 +324,9 @@ class Tracks:
                 db.init_track(track)
             except Exception as err:
                 if len(db.query_track(name)) > 0:
-                    if self.prms.append:
+                    if self.prms.io.append:
                         continue
-                    elif self.prms.overwrite:
+                    elif self.prms.io.overwrite:
                         sys.stderr.write("Deleting existing track...\n")
                         delete(name, db)
                         db.init_track(track)
@@ -370,10 +382,10 @@ class Tracks:
         return dtw.set_index("mref").sort_index()
 
     def write_events(self, events, track_name=None, aln_id=None):
-        if self.prms.output_format == "db":
+        if self.prms.io.output_format == "db":
             dtw = self.collapse_events(events)
             self.write_layers({"dtw" : dtw}, track_name, aln_id)
-        elif self.prms.output_format == "eventalign":
+        elif self.prms.io.output_format == "eventalign":
             track = self._track_or_default(track_name)
             self.io.write_events(track, events)
         
@@ -381,7 +393,7 @@ class Tracks:
         track = self._track_or_default(track_name)
         df = track.add_layer_group(layers, aln_id)
 
-        if self.prms.output_format == "db":
+        if self.prms.io.output_format == "db":
             db = self.track_dbs[track.name]
             db.write_layers(df)
 
@@ -712,7 +724,7 @@ class Tracks:
             self._aln_track_ids, 
             coords=coords, 
             order=["mref"],
-            chunksize=self.prms.ref_chunksize)
+            chunksize=self.prms.io.ref_chunksize)
 
         t0 = time.time()
 
@@ -812,7 +824,7 @@ class Tracks:
             coords=self.coords, 
             full_overlap=full_overlap, 
             order=["read_id", "mref"],
-            chunksize=self.prms.ref_chunksize)
+            chunksize=self.prms.io.ref_chunksize)
 
         aln_leftovers = pd.DataFrame()
         layer_leftovers = pd.DataFrame()
@@ -930,7 +942,7 @@ class Tracks:
             coords=self.coords, 
             full_overlap=full_overlap, 
             order=["read_id"],
-            chunksize=self.prms.aln_chunksize)
+            chunksize=self.prms.io.aln_chunksize)
 
         def _iter_reads(chunk):
             for read_id, alns in chunk.groupby("read_id"):
@@ -1003,5 +1015,5 @@ class Tracks:
     def close(self):
         for filename, db in self.dbs.items():
             db.close()
-        if self.prms.output_format != "db":
+        if self.prms.io.output_format != "db":
             self.io.close()

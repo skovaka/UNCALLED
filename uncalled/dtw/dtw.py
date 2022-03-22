@@ -41,11 +41,11 @@ METHODS = {
 
 OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
-    Opt(("-o", "--output"), "tracks"),
-    Opt(("-O", "--output-format"), "tracks"),
-    Opt(("-f", "--overwrite"), "tracks", action="store_true"),
+    Opt(("-o", "--output"), "tracks.io"),
+    Opt(("-O", "--output-format"), "tracks.io"),
+    Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
+    Opt(("-a", "--append"), "tracks.io", action="store_true"),
     Opt("--full-overlap", "tracks", action="store_true"),
-    Opt(("-a", "--append"), "tracks", action="store_true"),
     #Opt(("-S", "--mask-skips"), "dtw", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),

@@ -18,14 +18,14 @@ from ..fast5 import Fast5Reader
 
 
 OPTS = (
-    Opt("input", "tracks", nargs="+", type=str),
+    Opt("input", "tracks.io", nargs="+", type=str),
     Opt("layers", "tracks", type=comma_split,
         help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
     Opt("refstats", type=comma_split,
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-C", "--min-coverage"), "tracks"),
-    Opt(("--ref-chunksize"), "tracks"),
+    Opt(("--ref-chunksize"), "tracks.io"),
     Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
     Opt(("-v", "--verbose-refs"), action="store_true", help="Output reference name and strand"),
 )

@@ -42,26 +42,34 @@ Param = namedtuple("Param", ["name", "default", "type", "doc"])
 class ParamGroup:
     _name = None
 
-    def __init__(self):
+    def __init__(self, init=None):
         self._values = dict()
+        #TODO init could store dict, other param group?
+        #if type
 
-    def set(self, name, val):
+    def _set(self, name, val):
         """Sets parameter with automatic type conversion"""
         if name not in self._types:
             raise KeyError(name)
 
-        type_ = self._types[name]
-        if not (type_ is None or isinstance(val, type_)):
-            val = type_(val)
+        self._values[name] = self._convert(name, val)
 
-        self._values[name] = val
+    def _convert(self, name, val):
+        type_ = self._types[name]
+        if not type_ is None:
+            if issubclass(type_, ParamGroup) and val is None:
+                val = type_()
+
+            elif val is not None and not isinstance(val, type_):
+                val = type_(val)
+        return val
     
     @property
     def count(self):
         return len(self._types)
 
     @classmethod
-    def _def_params(_class, *params, ignore_toml={}):
+    def _def_params(_class, *params, ignore_toml={}, config_add=True):
         _class._order = list()
         _class._types = dict()
 
@@ -70,7 +78,8 @@ class ParamGroup:
 
         _class._ignore_toml = ignore_toml
 
-        Config._EXTRA_GROUPS[_class._name] = _class 
+        if config_add:
+            Config._EXTRA_GROUPS[_class._name] = _class 
 
     @classmethod
     #def _prm(_class, name, default, type, docstr):
@@ -78,18 +87,24 @@ class ParamGroup:
         if type(p) != Param:
             p = Param._make(p)
 
-        def getter(self):
-            return self._values.get(p.name, p.default)
-
-        def setter(self, value):
-            type_ = self._types[p.name]
-            if not (type_ is None or isinstance(value, type_)):
-                value = type_(value)
-            self._values[p.name] = value
-
-        setattr(_class, p.name, property(getter, setter, doc=p.doc))
         _class._types[p.name] = p.type
         _class._order.append(p.name)
+
+        def getter(self):
+            if not p.name in self._values:
+                self._values[p.name] = self._convert(p.name, p.default)
+            return self._values[p.name]
+
+        def setter(self, value):
+            self._set(p.name, value)
+            #type_ = self._types[p.name]
+
+            #if not (type_ is None or isinstance(value, type_)):
+            #    value = type_(value)
+
+            #self._values[p.name] = value
+
+        setattr(_class, p.name, property(getter, setter, doc=p.doc))
 
 class Config(_Conf):
     _EXTRA_GROUPS = dict()
@@ -130,6 +145,7 @@ class Config(_Conf):
         for group_name in groups:
             ogroup = getattr(other, group_name)
             sgroup = getattr(self, group_name)
+
             for param in dir(ogroup):
                 if not (param.startswith("_") or (ignore_defaults and other.is_default(param, group_name))):
                     setattr(sgroup, param, getattr(ogroup, param))
@@ -198,32 +214,38 @@ class Config(_Conf):
         if group_name is None or len(group_name) == 0:
             return self
 
-        if not hasattr(self, group_name):
-            raise ValueError("Unknown Config group: " + group_name)
+        group = self
+        for name in group_name.split("."):
+            if not hasattr(group, name):
+                raise ValueError("Unknown Config group: " + group_name)
 
-        return getattr(self, group_name)
+            group = getattr(group, name)
+
+        return group
     
     @property
     def is_rna(self):
         return not self.read_buffer.seq_fwd
 
     def is_default(self, param, group=None):
-        if group is None:
-            sg = self
-            dg = _DEFAULTS
+        sg = self.get_group(group)
+        dg = _DEFAULTS.get_group(group)
 
-            if not hasattr(dg, param) and hasattr(sg, param):
-                return False
+        #if group is None:
+        #    sg = self
+        #    dg = _DEFAULTS
 
-        else:
-            sg = getattr(self, group, None)
-            dg = getattr(_DEFAULTS, group, None)
+        #    if not hasattr(dg, param) and hasattr(sg, param):
+        #        return False
 
-        if sg is None and dg is None:
-            return True
-        elif sg is None or dg is None:
-            return False
+        #else:
+        #    sg = getattr(self, group, None)
+        #    dg = getattr(_DEFAULTS, group, None)
 
+        #if sg is None and dg is None:
+        #    return True
+        #elif sg is None or dg is None:
+        #    return False
 
         return getattr(sg, param, None) == getattr(dg, param, None)
 

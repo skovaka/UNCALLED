@@ -18,7 +18,7 @@ from ..config import Config
 from ..fast5 import parse_read_ids
 
 OPTS = (
-    Opt("input", "tracks", nargs="+"),
+    Opt("input", "tracks.io", nargs="+"),
     Opt("ref_bounds", "tracks", type=str_to_coord),
     #Opt("layer", "trackplot", default="current", nargs="?"),
     Opt(("-r", "--refstats"), "tracks", default=None, type=comma_split),
