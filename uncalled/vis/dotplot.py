@@ -80,6 +80,7 @@ class Dotplot:
         self.plot(read_id).show(config=self.fig_config)
 
     def _plot(self, read_id, tracks):
+        print(read_id)
 
         #if tracks[0].has_group("cmp"):
         #    cmp_stats = list(tracks[0].layers["cmp"].columns)
@@ -172,9 +173,9 @@ class Dotplot:
             #fig.update_xaxes(row=2, col=cmp_col + i,
             #    title_text=label)
 
-            hover_data[track.name] = pd.concat(track_hover)#.reset_index()
 
             if len(track_hover) > 0:
+                hover_data[track.name] = pd.concat(track_hover)#.reset_index()
                 hover_data[track.name] = track_hover[0]#.reset_index()
 
         if self.prms.bcaln_error:
