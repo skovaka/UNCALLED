@@ -80,8 +80,6 @@ class Dotplot:
         self.plot(read_id).show(config=self.fig_config)
 
     def _plot(self, read_id, tracks):
-        print(read_id)
-
         #if tracks[0].has_group("cmp"):
         #    cmp_stats = list(tracks[0].layers["cmp"].columns)
         #else:

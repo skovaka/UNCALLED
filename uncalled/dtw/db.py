@@ -100,6 +100,56 @@ class Eventalign(TrackIO):
     def close(self):
         self.out.close()
 
+class TrackHDF5(TrackIO):
+    def __init__(self, filename):
+        self.filename = filename
+        new_file = not os.path.exists(filename)
+
+        self.db = pd.HDFStore(filename)
+        self.open = True
+
+        TrackIO.__init__(self)
+
+    def close(self):
+        if self.open:
+            self.db.close()
+            self.open = False
+
+    def init_tables(self):
+        pass
+
+    def init_write(self):
+        pass
+
+    def init_track(self, track):
+        pass
+
+    def init_alignment(self, aln_df):
+        pass 
+
+    def init_fast5(self, filename):
+        return fast5_id
+
+    def init_read(self, read_id, fast5_id):
+        pass 
+
+    def write_layers(self, df, index=["mref","aln_id"]):
+        pass 
+
+    def get_fast5_index(self, track_id=None):
+        pass 
+
+    def query_track(self, name=None):
+        pass
+
+    def query_alignments(self, track_id=None, read_id=None, aln_id=None, coords=None, full_overlap=False, order=None, chunksize=None):
+        pass
+        
+    def query_compare(self, layers, track_id=None, coords=None, aln_id=None):
+        pass
+
+    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, order=["mref"], chunksize=None, full_overlap=False):
+        pass
 
 class TrackSQL(TrackIO):
     def __init__(self, sqlite_db):
@@ -253,9 +303,6 @@ class TrackSQL(TrackIO):
         
         query = self._join_query(query, wheres)
         return pd.read_sql_query(query, self.con, params=params)
-
-    def get_read_ids(self):
-        return set(pd.read_sql_query("SELECT id FROM read", self.con)["id"])
 
     def _add_where(self, wheres, params, name, val):
         if val is None: return

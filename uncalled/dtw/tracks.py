@@ -135,7 +135,9 @@ class Tracks:
         if self.prms.io.output_format == "db":
             self._load_dbs(self.prms.io.output, True)
             self._load_dbs(self.prms.io.input, False)
-        else:
+        elif self.prms.io.output_format == "hdf":
+            pass
+        elif self.prms.io.output_format == "eventalign":
             self.io = Eventalign(self.prms.io.output, "wb")
 
             name = ""
@@ -143,7 +145,7 @@ class Tracks:
             self.output_tracks[name] = track
 
         if self.prms.index_prefix is None:
-            raise RuntimeError("No reference index")
+            raise RuntimeError("Failed to load reference index")
 
         self._aln_track_ids = [t.id for t in self.alns]
 
