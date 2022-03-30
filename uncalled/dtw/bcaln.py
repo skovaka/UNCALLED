@@ -44,7 +44,7 @@ class Bcaln:
         ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
         self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna, kmer_trim=True)
 
-        self.refgap_bps = list()
+        self.ref_gaps = list()
         self.errors = None
 
         self.is_fwd = paf.is_fwd
@@ -104,12 +104,12 @@ class Bcaln:
         errors = list()
 
         if not self.is_rna:
-            qr_i = paf.qr_st
+            read_i = paf.qr_st
         else:
-            qr_i = paf.qr_len - paf.qr_en 
+            read_i = paf.qr_len - paf.qr_en 
 
         mrefs = self.paf_coords.mrefs - 2
-        mr_i = mrefs.min()
+        mref_i = mrefs.min()
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
 
@@ -120,31 +120,31 @@ class Bcaln:
             c = op[0]
             if c in {'=',':'}:
                 l = len(op[1]) if c == '=' else int(op[1])
-                for qr, mr in zip(range(qr_i, qr_i+l), range(mr_i, mr_i+l)):
+                for qr, mr in zip(range(read_i, read_i+l), range(mref_i, mref_i+l)):
                     if mr in mrefs:
                         bp_mref_aln.append((qr,mr))
-                qr_i += l
-                mr_i += l
+                read_i += l
+                mref_i += l
             else:
-                errors.append( (mr_i,"".join(op)) )
+                errors.append( (mref_i,"".join(op)) )
 
                 if c == '*':
-                    bp_mref_aln.append((qr_i,mr_i))
-                    qr_i += 1
-                    mr_i += 1
+                    bp_mref_aln.append((read_i,mref_i))
+                    read_i += 1
+                    mref_i += 1
 
                 elif c == '-':
                     l = len(op[1])
-                    mr_i += l
+                    mref_i += l
 
                 elif c == '+':
                     l = len(op[1])
-                    qr_i += l
+                    read_i += l
 
                 elif c == '~':
                     l = int(op[1][2:-2])
-                    self.refgap_bps.append(qr_i)
-                    mr_i += l
+                    self.ref_gaps.append((mref_i,mref_i+l))
+                    mref_i += l
 
                 else:
                     print("UNIMPLEMENTED ", op)
@@ -164,13 +164,12 @@ class Bcaln:
         if cig is None: return False
 
         bp_mref_aln = list()#defaultdict(list)
-        self.refgap_bps = list()
 
-        #mr_i = self.mref_start
+        #mref_i = self.mref_start
         if not self.is_rna:
-            qr_i = paf.qr_st
+            read_i = paf.qr_st
         else:
-            qr_i = paf.qr_len - paf.qr_en 
+            read_i = paf.qr_len - paf.qr_en 
 
         cig_ops = self.CIG_RE.findall(cig)
 
@@ -178,28 +177,27 @@ class Bcaln:
             cig_ops = list(reversed(cig_ops))
 
         mrefs = self.paf_coords.mrefs - 2
-        mr_i = mrefs.min()
+        mref_i = mrefs.min()
 
         for l,c in cig_ops:
             l = int(l)
             incr_qr = c in self.CIG_INCR_RD
             incr_rf = c in self.CIG_INCR_RF
-            qr_j = qr_i + (l if incr_qr else 1)
-            mr_j = mr_i + (l if incr_rf else 1)
+            read_j = read_i + (l if incr_qr else 1)
+            mref_j = mref_i + (l if incr_rf else 1)
 
             if c == "M":
-                for qr, mr in zip(range(qr_i, qr_j), range(mr_i, mr_j)):
+                for qr, mr in zip(range(read_i, read_j), range(mref_i, mref_j)):
                     if mr in mrefs:
                         bp_mref_aln.append((qr,mr))
             elif c == "N":
-                if mr_i in mrefs:
-                    bp_mref_aln.append((qr_i,mr))
+                self.ref_gaps.append((mref_i,mref_j))
 
             if incr_qr:
-                qr_i = qr_j 
+                read_i = read_j 
 
             if incr_rf:
-                mr_i = mr_j 
+                mref_i = mref_j 
 
         self.bp_mref_aln = pd.DataFrame(bp_mref_aln, columns=["bp","mref"], dtype='Int64')
         self.bp_mref_aln.set_index("bp", inplace=True)
