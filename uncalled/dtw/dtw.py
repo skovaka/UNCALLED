@@ -6,6 +6,8 @@ import pandas as pd
 from collections import defaultdict
 import progressbar as progbar
 
+pd.set_option('display.max_rows', None)
+
 from sklearn.linear_model import TheilSenRegressor
 from ..pafstats import parse_paf
 from ..config import Config, ParamGroup
@@ -134,10 +136,26 @@ class GuidedDTW:
         aln_id, self.coords = tracks.write_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df})
         #TODO return coords?
 
-        self.ref_kmers = self.coords.kmers.sort_index()
+        kmers = self.coords.kmers.sort_index()
 
-        self.bcaln = bcaln.df[bcaln.df.index.isin(self.ref_kmers.index)].sort_index()[["start"]].dropna()
+        self.bcaln = bcaln.df[bcaln.df.index.isin(kmers.index)].sort_index()[["start"]].dropna()
 
+        self.ref_gaps = list(sorted(bcaln.ref_gaps))
+
+        k = kmers.index[0]
+        kmer_blocks = list()
+        for start,end in self.ref_gaps:
+            kmer_blocks.append(kmers.loc[k:start])
+            k = end
+        kmer_blocks.append(kmers.loc[k:])
+
+        self.ref_kmers = pd.concat(kmer_blocks)
+        #self.ref_kmers = kmers
+        
+        #print(kmers)
+        #print(kmer_blocks)
+        #print(self.ref_kmers)
+        #sys.exit(0)
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
@@ -196,6 +214,7 @@ class GuidedDTW:
             mref_st = st
             mref_en = en+1
             block_kmers = self.ref_kmers.loc[mref_st:mref_en]
+            #print(block_kmers)
 
             samp_st = self.bcaln.loc[st,"start"]
             samp_en = self.bcaln.loc[en,"start"]
@@ -211,7 +230,7 @@ class GuidedDTW:
             path = np.flip(dtw.path)
             #TODO shouldn't need to clip, error in bdtw
             path_qrys.append(read_block.index[np.clip(path['qry'], 0, len(read_block))])
-            path_refs.append(mref_st + path['ref'])
+            path_refs.append(block_kmers.index[path['ref']])
 
             if hasattr(dtw, "ll"):
                 band_blocks.append(
@@ -248,7 +267,9 @@ class GuidedDTW:
                 #print(band_lls[-1])
 
                 tgt = starts[q] if q < len(starts) else starts[-1]
-                if r <= tgt - mref_start:
+                #if r <= tgt - mref_start:
+                #print(r, tgt, mref_start, self.ref_kmers.index[r])
+                if r < len(self.ref_kmers) and self.ref_kmers.index[r] <= tgt:
                     r += 1
                 else:
                     q += 1
