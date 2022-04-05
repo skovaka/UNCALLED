@@ -41,7 +41,7 @@ class PoreModel(_PoreModel):
 
         #pd.DataFrame overrides
         if df is not None:
-            vals = _vals_from_df(df)
+            vals = self._vals_from_df(df)
 
         elif self.is_preset(prms.name):
             self._init(name, prms)

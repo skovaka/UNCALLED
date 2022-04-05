@@ -17,7 +17,7 @@ def kmer_array(kmer):
 
         #TODO add option to fully check BP validity
         if not np.all(np.char.str_len(arr) == K):
-            raise RuntimeError("All k-mers must be %d bases long" % nt.K)
+            raise RuntimeError("All k-mers must be %d bases long" % K)
 
         arr = str_to_kmer(arr)
     return KmerArray(arr.astype("uint16"))
