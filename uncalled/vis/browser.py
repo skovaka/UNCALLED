@@ -24,7 +24,7 @@ OPTS = (
     Opt(("-r", "--refstats"), "tracks", default=None, type=comma_split),
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
-    Opt(("-p", "--browser-port"), help="Browser port"),
+    Opt(("-p", "--browser-port"), help="Browser port", default=8000),
     Opt(("-o", "--outfile"), "trackplot"),
 )
 
@@ -252,4 +252,4 @@ def browser(tracks, conf):
 
         return fig, {"display" : "block"}
 
-    app.run_server(port=conf.port, debug=True)
+    app.run_server(port=conf.browser_port, debug=True)
