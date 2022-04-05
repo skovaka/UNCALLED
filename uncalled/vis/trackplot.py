@@ -318,6 +318,7 @@ OPTS = (
     Opt(("--shared-refs-only"), "tracks", action="store_true"),
     Opt(("--shared-reads-only"), "tracks", action="store_true"),
     Opt(("--share-reads"), "trackplot", action="store_true"),
+    Opt(("--hover-read"), "trackplot", action="store_true"),
 
     Opt("--mat", dest="panels",
         metavar="LAYER", action="append", type=panel_opt("mat"),
