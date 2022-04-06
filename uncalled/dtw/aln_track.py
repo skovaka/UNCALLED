@@ -268,9 +268,9 @@ class AlnTrack:
             raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
         return aln_id
         
-    def add_layer_group(self, layers, aln_id=None):
+    def add_layer_group(self, group, layers, aln_id=None):
         aln_id = self._aln_id_or_default(aln_id)
-        df = pd.concat(layers, names=["group", "layer"], axis=1)
+        df = pd.concat({group : layers}, names=["group", "layer"], axis=1)
 
         df.index = pd.MultiIndex.from_product(
                         [df.index, [aln_id]], 

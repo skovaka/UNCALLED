@@ -43,8 +43,16 @@ class Eventalign(TrackIO):
     def write_events(self, track, events):
         contig = track.coords.ref_name
 
-        events = events.set_index("mref")
-        kmers = track.coords.kmers[events.index]
+        if "mref" in events.columns:
+            mrefs = events["mref"]
+            events = events.set_index(track.coords.mref_to_ref(events["mref"]))
+        else:
+            if "ref" in events.columns:
+                events.set_index("ref")
+            mrefs = track.coords.ref_to_mref(events.index)
+        
+
+        kmers = track.coords.kmers[mrefs]
         model_kmers = kmer_to_str(kmer_rev(kmers))
 
         if track.coords.fwd:
@@ -60,10 +68,13 @@ class Eventalign(TrackIO):
         #https://github.com/jts/nanopolish/issues/655
         std_level = (events["current"] - model.model_mean) / model.model_stdv
 
+        stdvs = events["current_stdv"] if "current_stdv" in events else pd.NA
+
         eventalign = pd.DataFrame(
             data = {
                 "contig" : track.coords.ref_name,
-                "position" : track.coords.mref_to_ref(events.index)-2,
+                #"position" : track.coords.mref_to_ref(events.index)-2,
+                "position" : events.index-2,
                 "reference_kmer" : ref_kmers,
                 "read_index" : self.prev_aln_id,
                 #"read_name" : read_id,

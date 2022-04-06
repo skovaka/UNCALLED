@@ -21,7 +21,7 @@ class IOParams(config.ParamGroup):
 IOParams._def_params(
     ("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
     ("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
-    ("output_format", "db", str,  "Output format (db, nanopolish)"),
+    ("output_format", "db", str,  "Output format (db, eventalign)"),
     ("overwrite", False, bool, "Overwrite existing tracks"),
     ("append", False, bool, "Append reads to existing tracks"),
     ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
@@ -386,14 +386,19 @@ class Tracks:
     def write_events(self, events, track_name=None, aln_id=None):
         if self.prms.io.output_format == "db":
             dtw = self.collapse_events(events)
-            self.write_layers({"dtw" : dtw}, track_name, aln_id)
+            self.write_layers("dtw", dtw, track_name, aln_id)
+
         elif self.prms.io.output_format == "eventalign":
             track = self._track_or_default(track_name)
             self.io.write_events(track, events)
         
-    def write_layers(self, layers, track_name=None, aln_id=None):
+    def write_layers(self, group, layers, track_name=None, aln_id=None, cache=True):
         track = self._track_or_default(track_name)
-        df = track.add_layer_group(layers, aln_id)
+
+        if cache:
+            df = track.add_layer_group(group, layers, aln_id)
+        else:
+            df = pd.concat({group : layers}, names=["group", "layer"], axis=1)
 
         if self.prms.io.output_format == "db":
             db = self.track_dbs[track.name]
@@ -459,7 +464,7 @@ class Tracks:
             if group == "dtw":
                 self.write_events(vals, track.name, aln_id)
             else:
-                self.write_layers({group : vals}, track.name, aln_id)
+                self.write_layers(group, vals, track.name, aln_id)
 
         return aln_id, coords
 
