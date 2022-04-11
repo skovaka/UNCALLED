@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 import scipy
 
-from .db import TrackSQL, delete, Eventalign, IOParams
+from .db import TrackSQL, delete, Eventalign, IOParams, INPUT_PARAMS, OUTPUT_PARAMS
 from .aln_track import AlnTrack, LAYERS, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
@@ -224,24 +224,39 @@ class Tracks:
         return self.alns[i]
 
     def _init_io(self):
-        if self.prms.io.output is None:
-            self.output = None
-        else:
-            if self.prms.io.output_format == "db":
-                self.output = TrackSQL(self.prms.io.output, "w", self.conf)
+        in_prms = [getattr(self.prms.io, p) is not None for p in INPUT_PARAMS]
+        out_prms = [getattr(self.prms.io, p) is not None for p in OUTPUT_PARAMS]
+        if np.sum(in_prms) > 1:
+            raise ValueError("No more than one input can be specified")
+        if np.sum(out_prms) > 1:
+            raise ValueError("No more than one output can be specified")
 
-            elif self.prms.io.output_format == "eventalign":
-                self.output = Eventalign(self.prms.io.output, "w", self.conf)
+        if np.any(in_prms):
+            in_format = INPUT_PARAMS[in_prms][0]
+            if in_format == "db_in":
+                self.input = TrackSQL(self.conf, "r")
+            elif in_format == "eventalign_in":
+                raise ValueError("EVENTALGIN NOT SUPPORTED YET")
+            elif in_format == "tombo_in":
+                raise ValueError("TOMBO NOT SUPPORTED YET")
+
+            for track in self.input.tracks:
+                self._add_track(track.name, track)
+        else:
+            self.input = None
+
+        if np.any(out_prms):
+            out_format = OUTPUT_PARAMS[out_prms][0]
+            if out_format == "db_out":
+                self.output = TrackSQL(self.conf, "w")
+            elif out_format == "eventalign_out":
+                self.output = Eventalign(self.conf, "w")
+            print(out_format)
 
             for track in self.output.tracks:
                 self.output_tracks[track.name] = track
-
-        if self.prms.io.input is None:
-            self.input = None
         else:
-            self.input = TrackSQL(self.prms.io.input, "r", self.conf)
-            for track in self.input.tracks:
-                self._add_track(track.name, track)
+            self.output = None
 
     def aln_layers(self, layer_filter=None):
         ret = pd.Index([])
@@ -262,18 +277,13 @@ class Tracks:
         return self.output_tracks[track_name]
 
     def collapse_events(self, dtw):
-        #dtw = dtw.reset_index()
-
         dtw["cuml_mean"] = dtw["length"] * dtw["current"]
 
         grp = dtw.groupby(level=0)
 
-        #mrefs = grp["mref"].first()
-
         lengths = grp["length"].sum()
 
         dtw = pd.DataFrame({
-            #"mref"    : mrefs.astype("int64"),
             "start"  : grp["start"].min().astype("uint32"),
             "length" : lengths.astype("uint32"),
             "current"   : grp["cuml_mean"].sum() / lengths
@@ -282,18 +292,13 @@ class Tracks:
         return dtw.sort_index()
 
     def write_dtw_events(self, events, track_name=None, aln_id=None):
-        #if self.prms.io.output_format == "db":
-        if self.prms.io.output_format != "eventalign":
+        if self.output.FORMAT != "eventalign":
             events = self.collapse_events(events)
             overwrite = False
         else:
             overwrite = True
 
         self.write_layers("dtw", events, track_name, aln_id, overwrite)
-
-        #elif self.prms.io.output_format == "eventalign":
-        #    track = self._track_or_default(track_name)
-        #    self.output.write_dtw_events(track, events)
         
     def write_layers(self, group, layers, track_name=None, aln_id=None, overwrite=False):
         track = self._track_or_default(track_name)

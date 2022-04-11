@@ -21,35 +21,35 @@ from ..argparse import Opt, comma_split
 from ..fast5 import parse_fast5_paths
 from .aln_track import AlnTrack
 
-INPUT_PRMS = ["db_in", "eventalign_in", "tombo_in"]
-OUTPUT_PRMS = ["db_out", "eventalign_out"]
+INPUT_PARAMS = np.array(["db_in", "eventalign_in", "tombo_in"])
+OUTPUT_PARAMS = np.array(["db_out", "eventalign_out"])
 
 class IOParams(config.ParamGroup):
     _name = "io"
 IOParams._def_params(
-    ("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
-    ("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
+    #("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
+    #("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
 
-    #("db_in", None, str, "Input track database"),
-    #("db_out", None, str, "Output track database"),
-    #("eventalign_in", None, str, "Eventalign TSV input file (or \"-\" for stdin)"),
-    #("eventalign_out", None, str, "Eventalign TSV output file (or \"-\" for stdout)"),
-    #("eventalign_index", None, str, "Nanopolish index file"),
-    #("tombo_in", None, str, "Fast5 files containing Tombo alignments"),
+    ("db_in", None, str, "Input track database"),
+    ("db_out", None, str, "Output track database"),
+    ("eventalign_in", None, str, "Eventalign TSV input file (or \"-\" for stdin)"),
+    ("eventalign_out", None, str, "Eventalign TSV output file (or \"-\" for stdout)"),
+    ("eventalign_index", None, str, "Nanopolish index file"),
+    ("tombo_in", None, str, "Fast5 files containing Tombo alignments"),
 
     ("output_format", "db", str,  "Output format (db, eventalign)"),
     ("overwrite", False, bool, "Overwrite existing tracks"),
     ("append", False, bool, "Append reads to existing tracks"),
     ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
-    #ignore_toml={"db_in", "db_out", "eventalign_in", "eventalign_out", "tombo_in", "eventalign_index", "overwrite", "append"},
-    ignore_toml={"input", "output", "output_format", "overwrite", "append"},
+    ignore_toml={"db_in", "db_out", "eventalign_in", "eventalign_out", "tombo_in", "eventalign_index", "overwrite", "append"},
+    #ignore_toml={"input", "output", "output_format", "overwrite", "append"},
     config_add=False
 )
 
 
 class TrackIO:
-    def __init__(self, db_str, mode, conf):
+    def __init__(self, filename, conf, mode):
         self.conf = conf
         self.prms = self.conf.tracks.io
 
@@ -58,21 +58,21 @@ class TrackIO:
         if not hasattr(self, "prev_aln_id"):
             self.prev_aln_id = 0
 
-        if db_str is None:
+        if filename is None:
             self.filename = None
             self.track_names = None
         else:
-            spl = db_str.split(":")
+            spl = filename.split(":")
 
             if len(spl) == 1:
-                self.filename = db_str
+                self.filename = filename
                 self.track_names = None
 
             elif len(spl) == 2:
                 self.filename = spl[0]
                 self.track_names = spl[1].split(",")
             else:
-                raise ValueError("Invalid database specifier format: " + db_str)
+                raise ValueError("Invalid database specifier format: " + filename)
 
         if mode == "w":
             self.write_mode = True
@@ -113,10 +113,13 @@ class TrackIO:
 
 
 class Eventalign(TrackIO):
-    def __init__(self, filename, mode, conf):
-        TrackIO.__init__(self, filename, mode, conf)
+    FORMAT = "eventalign"
 
-        if self.filename is None:
+    def __init__(self, conf, mode):
+        filename = conf.tracks.io.eventalign_in if mode == "r" else conf.tracks.io.eventalign_out
+        TrackIO.__init__(self, filename, conf, mode)
+
+        if self.filename == "-":
             self.out = sys.stdout
         else:
             self.out = open(self.filename, mode)
@@ -216,6 +219,7 @@ class Eventalign(TrackIO):
         self.out.close()
 
 class TrackHDF5(TrackIO):
+    FORMAT = "hdf5"
     def __init__(self, filename, mode, conf):
         TrackIO.__init__(self, filename, mode, conf)
 
@@ -279,8 +283,10 @@ def _db_track_split(db_str):
     return os.path.abspath(filename), track_names
 
 class TrackSQL(TrackIO):
-    def __init__(self, filename, mode, conf):
-        TrackIO.__init__(self, filename, mode, conf)
+    FORMAT = "db"
+    def __init__(self, conf, mode):
+        filename = conf.tracks.io.db_in if mode == "r" else conf.tracks.io.db_out
+        TrackIO.__init__(self, filename, conf, mode)
 
         new_file = not os.path.exists(self.filename)
         self.con = sqlite3.connect(self.filename)
@@ -386,12 +392,12 @@ class TrackSQL(TrackIO):
         try:
             self.init_track(track)
         except Exception as err:
-            if len(self.query_track(name)) > 0:
+            if len(self.query_track(track.name)) > 0:
                 if self.prms.append:
                     pass
                 elif self.prms.overwrite:
                     sys.stderr.write("Deleting existing track...\n")
-                    delete(name, db)
+                    delete(track.name, self)
                     self.init_track(track)
                 else:
                     raise ValueError("Database already contains track named \"%s\". Specify a different name, write to a different file" % name)

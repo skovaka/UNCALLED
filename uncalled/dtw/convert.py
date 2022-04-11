@@ -32,7 +32,7 @@ CONVERT_OPTS = (
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
     Opt(("-a", "--append"), "tracks.io", action="store_true"),
-    Opt(("-o", "--output"), "tracks.io", required=True),
+    Opt(("-o", "--db-out"), "tracks.io", required=True),
 )
 
 NANOPOLISH_OPTS = CONVERT_OPTS + (

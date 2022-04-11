@@ -22,7 +22,7 @@ from ..dtw import Tracks, LAYERS
 from ..dtw.aln_track import parse_layers
 
 COMPARE_OPTS = (
-    Opt("input", "tracks.io"),
+    Opt("db_in", "tracks.io"),
     Opt(("-l", "--read-filter"), "tracks", nargs="+", type=str),
     Opt(("-R", "--ref-bounds"), "tracks"),
     Opt(("-b", "--bcaln"), action="store_true", help="Compare against basecalled alignment. If two tracks input will look for \"bcaln\" group in second track, otherwise will look in the first track."),
@@ -56,7 +56,7 @@ def compare(conf):
             chunk.calc_compare(group_b, calc_jaccard, calc_mean_ref_dist, conf.save)
 
 DUMP_OPTS = (
-    Opt("input", "tracks.io", type=str),
+    Opt("db_in", "tracks.io", type=str),
     Opt("layers", nargs="+",  help="Layers to retrieve or compute"),
     Opt(("-R", "--ref-bounds"), "tracks", type=ref_coords),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),

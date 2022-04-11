@@ -43,8 +43,8 @@ METHODS = {
 
 OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
-    Opt(("-o", "--output"), "tracks.io"),
-    Opt(("-O", "--output-format"), "tracks.io"),
+    Opt(("-o", "--db-out"), "tracks.io"),
+    Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
     Opt(("-a", "--append"), "tracks.io", action="store_true"),
     Opt("--full-overlap", "tracks", action="store_true"),
