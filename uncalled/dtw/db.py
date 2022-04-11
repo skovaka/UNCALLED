@@ -82,6 +82,16 @@ class TrackIO:
             raise ValueError("TrackIO mode must be either \'w\' or \'r\'")
 
     def init_alignment(self, read_id, fast5):
+        if fast5 == self.prev_fast5[0]:
+            fast5_id = self.prev_fast5[1]
+        else:
+            fast5_id = self.init_fast5(fast5)
+            self.prev_fast5 = (fast5, fast5_id)
+
+        if self.prev_read != read_id:
+            self.init_read(read_id, fast5_id)
+            self.prev_read = read_id
+
         self.prev_aln_id += 1
         return self.prev_aln_id
 
@@ -125,18 +135,28 @@ class Eventalign(TrackIO):
         t = AlnTrack(self, None, name, name, self.conf)
         self.tracks.append(t)
 
-    def write_dtw_events(self, track, events):
+    #def write_dtw_events(self, track, events):
+    def write_layers(self, df, index=["mref","aln_id"]):
+        for group in df.columns.levels[0]:
+            if group == "dtw":
+                break
+            return
+
+
+        track = self.tracks[0]
+
+        mrefs = df.index.get_level_values(0)
+        events = df[group].set_index(track.coords.mref_to_ref(mrefs))
+
         contig = track.coords.ref_name
 
-        if "mref" in events.columns:
-            mrefs = events["mref"]
-            events = events.set_index(track.coords.mref_to_ref(events["mref"]))
-        else:
-            if "ref" in events.columns:
-                events.set_index("ref")
-            mrefs = track.coords.ref_to_mref(events.index)
+        #if "mref" in events.columns:
+        #    mrefs = events["mref"]
+        #else:
+        #    if "ref" in events.columns:
+        #        events.set_index("ref")
+        #    mrefs = track.coords.ref_to_mref(events.index)
         
-
         kmers = track.coords.kmers[mrefs]
         model_kmers = kmer_to_str(kmer_rev(kmers))
 
@@ -407,18 +427,6 @@ class TrackSQL(TrackIO):
         track.id = self.cur.lastrowid
         return track.id
 
-    def init_alignment(self, read_id, fast5):
-        if fast5 == self.prev_fast5[0]:
-            fast5_id = self.prev_fast5[1]
-        else:
-            fast5_id = self.init_fast5(fast5)
-            self.prev_fast5 = (fast5, fast5_id)
-
-        if self.prev_read != read_id:
-            self.init_read(read_id, fast5_id)
-            self.prev_read = read_id
-
-        return TrackIO.init_alignment(self, read_id, fast5)
 
     def write_alignment(self, aln_df):
         aln_df.to_sql(

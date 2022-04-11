@@ -280,24 +280,23 @@ class Tracks:
         return dtw.set_index("mref").sort_index()
 
     def write_dtw_events(self, events, track_name=None, aln_id=None):
-        if self.prms.io.output_format == "db":
-            dtw = self.collapse_events(events)
-            self.write_layers("dtw", dtw, track_name, aln_id)
-
-        elif self.prms.io.output_format == "eventalign":
-            track = self._track_or_default(track_name)
-            self.output.write_dtw_events(track, events)
-        
-    def write_layers(self, group, layers, track_name=None, aln_id=None, cache=True):
-        track = self._track_or_default(track_name)
-
-        if cache:
-            df = track.add_layer_group(group, layers, aln_id)
+        #if self.prms.io.output_format == "db":
+        if self.prms.io.output_format != "eventalign":
+            events = self.collapse_events(events)
+            overwrite = False
         else:
-            df = pd.concat({group : layers}, names=["group", "layer"], axis=1)
+            overwrite = True
 
-        if self.prms.io.output_format == "db":
-            self.output.write_layers(df)
+        self.write_layers("dtw", events, track_name, aln_id, overwrite)
+
+        #elif self.prms.io.output_format == "eventalign":
+        #    track = self._track_or_default(track_name)
+        #    self.output.write_dtw_events(track, events)
+        
+    def write_layers(self, group, layers, track_name=None, aln_id=None, overwrite=False):
+        track = self._track_or_default(track_name)
+        df = track.add_layer_group(group, layers, aln_id, overwrite)
+        self.output.write_layers(df)
 
     def write_alignment(self, read_id, fast5, coords, layers={}, track_name=None):
         track = self._track_or_default(track_name)

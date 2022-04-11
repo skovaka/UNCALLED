@@ -268,7 +268,7 @@ class AlnTrack:
             raise ValueError("Must specify aln_id for Track with more than one alignment loaded")
         return aln_id
         
-    def add_layer_group(self, group, layers, aln_id=None):
+    def add_layer_group(self, group, layers, aln_id, overwrite):
         aln_id = self._aln_id_or_default(aln_id)
         df = pd.concat({group : layers}, names=["group", "layer"], axis=1)
 
@@ -276,7 +276,7 @@ class AlnTrack:
                         [df.index, [aln_id]], 
                         names=["mref", "aln_id"])
 
-        if self.layers is None:
+        if self.layers is None or overwrite:
             self.layers = df
         else:
             self.layers = pd.concat([self.layers, df], axis=1)

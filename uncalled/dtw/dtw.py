@@ -180,7 +180,7 @@ class GuidedDTW:
             signal.rescale(reg.coef_, reg.intercept_)
             df = self._calc_dtw(signal)
 
-        self.df = df
+        self.df = df.set_index("mref")
 
         tracks.write_dtw_events(self.df, aln_id=aln_id)
 
