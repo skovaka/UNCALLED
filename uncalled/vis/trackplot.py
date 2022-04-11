@@ -310,7 +310,7 @@ def panel_opt(name):
     return (lambda arg: (name, arg))
 
 OPTS = (
-    Opt("input", "tracks.io", nargs="+"),
+    Opt("input", "tracks.io"),
     Opt("ref_bounds", "tracks", type=str_to_coord),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),

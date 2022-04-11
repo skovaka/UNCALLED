@@ -181,7 +181,7 @@ class Sigplot:
 
 OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
-    Opt("input", "tracks.io", nargs="+"),
+    Opt("input", "tracks.io"),
     Opt(("-o", "--outfile"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),

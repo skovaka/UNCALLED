@@ -18,7 +18,7 @@ from ..fast5 import Fast5Reader
 
 
 OPTS = (
-    Opt("input", "tracks.io", nargs="+", type=str),
+    Opt("input", "tracks.io", type=str),
     Opt("layers", "tracks", type=comma_split,
         help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
     Opt("refstats", type=comma_split,

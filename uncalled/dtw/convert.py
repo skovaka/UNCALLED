@@ -226,7 +226,7 @@ def tombo(conf):
                 "current"   : currents
              }).set_index("mref")
 
-        tracks.write_layers({"dtw" : df}, aln_id=aln_id)
+        tracks.write_layers("dtw", df, aln_id=aln_id)
 
         #track.save_read(fast5_basename)
 

@@ -14,31 +14,111 @@ import pandas as pd
 import sys
 import time
 
+from .. import config
+
 from ..nt import kmer_to_str, kmer_rev, kmer_comp
 from ..argparse import Opt, comma_split
 from ..fast5 import parse_fast5_paths
+from .aln_track import AlnTrack
+
+INPUT_PRMS = ["db_in", "eventalign_in", "tombo_in"]
+OUTPUT_PRMS = ["db_out", "eventalign_out"]
+
+class IOParams(config.ParamGroup):
+    _name = "io"
+IOParams._def_params(
+    ("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
+    ("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
+
+    #("db_in", None, str, "Input track database"),
+    #("db_out", None, str, "Output track database"),
+    #("eventalign_in", None, str, "Eventalign TSV input file (or \"-\" for stdin)"),
+    #("eventalign_out", None, str, "Eventalign TSV output file (or \"-\" for stdout)"),
+    #("eventalign_index", None, str, "Nanopolish index file"),
+    #("tombo_in", None, str, "Fast5 files containing Tombo alignments"),
+
+    ("output_format", "db", str,  "Output format (db, eventalign)"),
+    ("overwrite", False, bool, "Overwrite existing tracks"),
+    ("append", False, bool, "Append reads to existing tracks"),
+    ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
+    ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
+    #ignore_toml={"db_in", "db_out", "eventalign_in", "eventalign_out", "tombo_in", "eventalign_index", "overwrite", "append"},
+    ignore_toml={"input", "output", "output_format", "overwrite", "append"},
+    config_add=False
+)
+
 
 class TrackIO:
-    def __init__(self):
+    def __init__(self, db_str, mode, conf):
+        self.conf = conf
+        self.prms = self.conf.tracks.io
+
+        self.tracks = list()
+
         if not hasattr(self, "prev_aln_id"):
             self.prev_aln_id = 0
 
-    def next_aln_id(self):
+        if db_str is None:
+            self.filename = None
+            self.track_names = None
+        else:
+            spl = db_str.split(":")
+
+            if len(spl) == 1:
+                self.filename = db_str
+                self.track_names = None
+
+            elif len(spl) == 2:
+                self.filename = spl[0]
+                self.track_names = spl[1].split(",")
+            else:
+                raise ValueError("Invalid database specifier format: " + db_str)
+
+        if mode == "w":
+            self.write_mode = True
+        elif mode == "r":
+            self.write_mode = False
+        else:
+            raise ValueError("TrackIO mode must be either \'w\' or \'r\'")
+
+    def init_alignment(self, read_id, fast5):
         self.prev_aln_id += 1
         return self.prev_aln_id
 
+    def init_write_mode(self):
+        if self.track_names is None:
+            name = os.path.splitext(os.path.basename(self.filename))[0]
+            self.track_names = [name]
+
+        if len(self.track_names) > 1:
+            raise ValueError("Can only write to one track")
+        name = self.track_names[0]
+
+        self.prev_fast5 = (None, None)
+        self.prev_read = None
+
+        track = AlnTrack(self, None, name, name, self.conf)
+        self.tracks.append(track)
+        return track
+
 
 class Eventalign(TrackIO):
-    def __init__(self, filename=None, mode="r"):
-        self.mode = "r"
-        if filename is None:
+    def __init__(self, filename, mode, conf):
+        TrackIO.__init__(self, filename, mode, conf)
+
+        if self.filename is None:
             self.out = sys.stdout
         else:
-            self.out = open(filename, mode)
+            self.out = open(self.filename, mode)
 
         self._header = True
 
-        TrackIO.__init__(self)
+    def init_read_mode(self):
+        if len(self.track_names) != 1:
+            raise ValueError("Can only read eventalign TSV into a single track")
+        name = self.track_names[0]
+        t = AlnTrack(self, None, name, name, self.conf)
+        self.tracks.append(t)
 
     def write_events(self, track, events):
         contig = track.coords.ref_name
@@ -99,7 +179,7 @@ class Eventalign(TrackIO):
 
         self._header = False
 
-    def init_alignment(self, alns):
+    def write_alignment(self, alns):
         pass
 
     def init_fast5(self, fast5):
@@ -112,14 +192,14 @@ class Eventalign(TrackIO):
         self.out.close()
 
 class TrackHDF5(TrackIO):
-    def __init__(self, filename):
-        self.filename = filename
+    def __init__(self, filename, mode, conf):
+        TrackIO.__init__(self, filename, mode, conf)
+
         new_file = not os.path.exists(filename)
 
         self.db = pd.HDFStore(filename)
         self.open = True
 
-        TrackIO.__init__(self)
 
     def close(self):
         if self.open:
@@ -129,13 +209,13 @@ class TrackHDF5(TrackIO):
     def init_tables(self):
         pass
 
-    def init_write(self):
+    def init_write_mode(self):
         pass
 
     def init_track(self, track):
         pass
 
-    def init_alignment(self, aln_df):
+    def write_alignment(self, aln_df):
         pass 
 
     def init_fast5(self, filename):
@@ -162,11 +242,24 @@ class TrackHDF5(TrackIO):
     def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, order=["mref"], chunksize=None, full_overlap=False):
         pass
 
+def _db_track_split(db_str):
+    spl = db_str.split(":")
+    if len(spl) == 1:
+        filename = db_str
+        track_names = None
+    elif len(spl) == 2:
+        filename = spl[0]
+        track_names = spl[1].split(",")
+    else:
+        raise ValueError("Invalid database specifier format: " + db_str)
+    return os.path.abspath(filename), track_names
+
 class TrackSQL(TrackIO):
-    def __init__(self, sqlite_db):
-        self.filename = sqlite_db
-        new_file = not os.path.exists(sqlite_db)
-        self.con = sqlite3.connect(sqlite_db)
+    def __init__(self, filename, mode, conf):
+        TrackIO.__init__(self, filename, mode, conf)
+
+        new_file = not os.path.exists(self.filename)
+        self.con = sqlite3.connect(self.filename)
         self.cur = self.con.cursor()
         self.cur.execute("PRAGMA foreign_keys = ON")
         self.con.commit()
@@ -175,11 +268,14 @@ class TrackSQL(TrackIO):
         #if new_file:
         self.init_tables()
 
-        self.prev_aln_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
-        if self.prev_aln_id is None:
-            self.prev_aln_id = 0
+        prev_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
+        if prev_id is not None:
+            self.prev_aln_id = prev_id
 
-        TrackIO.__init__(self)
+        if self.write_mode:
+            self.init_write_mode()
+        else:
+            self.init_read_mode()
 
     def close(self):
         if self.open:
@@ -257,9 +353,45 @@ class TrackSQL(TrackIO):
             );""")
         #self.con.commit()
 
-    def init_write(self):
+    def init_write_mode(self):
+        track = TrackIO.init_write_mode(self)
+
         for table in ["dtw", "bcaln", "cmp"]:
             self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
+
+        try:
+            self.init_track(track)
+        except Exception as err:
+            if len(self.query_track(name)) > 0:
+                if self.prms.append:
+                    pass
+                elif self.prms.overwrite:
+                    sys.stderr.write("Deleting existing track...\n")
+                    delete(name, db)
+                    self.init_track(track)
+                else:
+                    raise ValueError("Database already contains track named \"%s\". Specify a different name, write to a different file" % name)
+            else:
+                raise err
+
+        self.tracks.append(track)
+
+    def init_read_mode(self):
+        df = self.query_track(self.track_names).set_index("name").reindex(self.track_names)
+
+        missing = df["id"].isnull()
+        if missing.any():
+            bad_names = df[missing].index
+            all_names = self.query_track()["name"]
+            raise ValueError("Alignment track not found: \"%s\" (tracks in database: \"%s\")" %
+                             ("\", \"".join(bad_names), "\", \"".join(all_names)))
+
+        for name,row in df.iterrows():
+            conf = config.Config(toml=row.config)
+            t = AlnTrack(self, row["id"], name, row["desc"], conf)
+            self.tracks.append(t)
+
+            self.conf.load_config(conf)
 
     def init_track(self, track):
         self.cur.execute(
@@ -268,10 +400,22 @@ class TrackSQL(TrackIO):
              track.conf.to_toml())
         )
         track.id = self.cur.lastrowid
-        #self.con.commit()
         return track.id
 
-    def init_alignment(self, aln_df):
+    def init_alignment(self, read_id, fast5):
+        if fast5 == self.prev_fast5[0]:
+            fast5_id = self.prev_fast5[1]
+        else:
+            fast5_id = self.init_fast5(fast5)
+            self.prev_fast5 = (fast5, fast5_id)
+
+        if self.prev_read != read_id:
+            self.init_read(read_id, fast5_id)
+            self.prev_read = read_id
+
+        return TrackIO.init_alignment(self, read_id, fast5)
+
+    def write_alignment(self, aln_df):
         aln_df.to_sql(
             "alignment", self.con, 
             if_exists="append", 
