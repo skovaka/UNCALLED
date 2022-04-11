@@ -142,7 +142,6 @@ class Eventalign(TrackIO):
                 break
             return
 
-
         track = self.tracks[0]
 
         mrefs = df.index.get_level_values(0)

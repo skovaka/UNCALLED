@@ -262,22 +262,24 @@ class Tracks:
         return self.output_tracks[track_name]
 
     def collapse_events(self, dtw):
+        #dtw = dtw.reset_index()
+
         dtw["cuml_mean"] = dtw["length"] * dtw["current"]
 
-        grp = dtw.groupby("mref")
+        grp = dtw.groupby(level=0)
 
-        mrefs = grp["mref"].first()
+        #mrefs = grp["mref"].first()
 
         lengths = grp["length"].sum()
 
         dtw = pd.DataFrame({
-            "mref"    : mrefs.astype("int64"),
+            #"mref"    : mrefs.astype("int64"),
             "start"  : grp["start"].min().astype("uint32"),
             "length" : lengths.astype("uint32"),
             "current"   : grp["cuml_mean"].sum() / lengths
         })
 
-        return dtw.set_index("mref").sort_index()
+        return dtw.sort_index()
 
     def write_dtw_events(self, events, track_name=None, aln_id=None):
         #if self.prms.io.output_format == "db":
