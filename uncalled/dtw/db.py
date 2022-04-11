@@ -113,6 +113,11 @@ class Eventalign(TrackIO):
 
         self._header = True
 
+        if self.write_mode:
+            self.init_write_mode()
+        else:
+            self.init_read_mode()
+
     def init_read_mode(self):
         if len(self.track_names) != 1:
             raise ValueError("Can only read eventalign TSV into a single track")
@@ -120,7 +125,7 @@ class Eventalign(TrackIO):
         t = AlnTrack(self, None, name, name, self.conf)
         self.tracks.append(t)
 
-    def write_events(self, track, events):
+    def write_dtw_events(self, track, events):
         contig = track.coords.ref_name
 
         if "mref" in events.columns:

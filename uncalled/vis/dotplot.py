@@ -99,6 +99,8 @@ class Dotplot:
             shared_xaxes=True,
             shared_yaxes=True)
 
+        print(tracks)
+
         tracks_filter,colors_filter = zip(*[(t,c) for t,c in zip(tracks,self.conf.vis.track_colors) if t.name != self.prms.bcaln_track])
         #colors_filter = [t for t in tracks if t.name != self.prms.bcaln_track]
 

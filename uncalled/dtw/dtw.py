@@ -182,7 +182,7 @@ class GuidedDTW:
 
         self.df = df
 
-        tracks.write_events(self.df, aln_id=aln_id)
+        tracks.write_dtw_events(self.df, aln_id=aln_id)
 
         self.empty = False
 

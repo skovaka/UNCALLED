@@ -112,7 +112,6 @@ class Tracks:
         self.alns = list()
         self.output_tracks = dict()
         self._tracks = dict()
-
         
         self._init_io()
 
@@ -157,15 +156,28 @@ class Tracks:
         self.refstats = None
 
         self.coords = coords
-        self._tracks = tracks
-
+        self._tracks = dict()
         self.alns = list()
-        if self._tracks is not None:
-            for name,track in tracks.items():
-                if name in BUILTIN_TRACKS:
-                    setattr(self, name[1:], track)
-                elif isinstance(track, AlnTrack):
-                    self.alns.append(track)
+
+        if tracks is not None:
+            self._add_tracks(tracks)
+
+    def _add_tracks(self, tracks):
+        for name,track in tracks.items():
+            self._add_track(name, track)
+
+    def _add_track(self, name, track):
+        if name in self._tracks:
+            raise KeyError(f"Duplicate track name: {name}")
+        self._tracks[name] = track
+        
+        if name in BUILTIN_TRACKS:
+            setattr(self, name[1:], track)
+        elif isinstance(track, AlnTrack):
+            self.alns.append(track)
+        else:
+            raise ValueError("Unrecognized track type: " + str(track))
+
 
     @property
     def all_empty(self):
@@ -228,8 +240,8 @@ class Tracks:
             self.input = None
         else:
             self.input = TrackSQL(self.prms.io.input, "r", self.conf)
-            self.alns = self.input.tracks
-
+            for track in self.input.tracks:
+                self._add_track(track.name, track)
 
     def aln_layers(self, layer_filter=None):
         ret = pd.Index([])
@@ -267,14 +279,14 @@ class Tracks:
 
         return dtw.set_index("mref").sort_index()
 
-    def write_events(self, events, track_name=None, aln_id=None):
+    def write_dtw_events(self, events, track_name=None, aln_id=None):
         if self.prms.io.output_format == "db":
             dtw = self.collapse_events(events)
             self.write_layers("dtw", dtw, track_name, aln_id)
 
         elif self.prms.io.output_format == "eventalign":
             track = self._track_or_default(track_name)
-            self.io.write_events(track, events)
+            self.output.write_dtw_events(track, events)
         
     def write_layers(self, group, layers, track_name=None, aln_id=None, cache=True):
         track = self._track_or_default(track_name)
@@ -327,7 +339,7 @@ class Tracks:
 
         for group,vals in layers.items():
             if group == "dtw":
-                self.write_events(vals, track.name, aln_id)
+                self.write_dtw_events(vals, track.name, aln_id)
             else:
                 self.write_layers(group, vals, track.name, aln_id)
 
