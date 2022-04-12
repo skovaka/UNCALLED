@@ -6,8 +6,6 @@ import pandas as pd
 from collections import defaultdict
 import progressbar as progbar
 
-pd.set_option('display.max_rows', None)
-
 from sklearn.linear_model import TheilSenRegressor
 from ..pafstats import parse_paf
 from ..config import Config, ParamGroup

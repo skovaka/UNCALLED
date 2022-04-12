@@ -126,10 +126,16 @@ class CoordSpace:
         insc = a.intersection(b)
         return insc.min(),insc.max()
 
-    def ref_slice(self, ref_start, ref_end):
-        st = self.refs.get_loc(ref_start)
-        en = self.refs.get_loc(ref_end-1)+1
-        return self._slice(st,en)
+    def ref_slice(self, ref_start=None, ref_end=None, fwd=None):
+        if ref_start is not None:
+            st = self.refs.get_loc(ref_start)
+        else:
+            st = 0
+        if ref_end is not None:
+            en = self.refs.get_loc(ref_end-1)+1
+        else:
+            en = len(self.refs)
+        return self._slice(st,en,fwd)
 
     def mref_intersect(self, mrefs):
         if self.stranded:

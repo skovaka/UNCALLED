@@ -14,7 +14,7 @@ import scipy.stats
 from . import Tracks
 from .dtw import collapse_events
 from ..config import Config, ParamGroup
-from ..argparse import ArgParser, Opt, FAST5_PARAM
+from ..argparse import ArgParser, Opt, MutexOpts, FAST5_PARAM
 from ..fast5 import Fast5Reader, FAST5_OPTS, parse_read_ids
 from ..index import BWA_OPTS, str_to_coord, RefCoord
 from .. import nt, PoreModel
@@ -39,6 +39,38 @@ NANOPOLISH_OPTS = CONVERT_OPTS + (
     Opt(("-x", "--fast5-index"), "fast5_reader", required=True), 
     Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include")
 )
+
+NEW_OPTS = (
+    Opt("index_prefix", "tracks"),
+    #MutexOpts("input", [
+        Opt("--db-in", "tracks.io"),
+        Opt("--eventalign-in", "tracks.io", nargs="?", const="-"),
+    #]),
+
+    #MutexOpts("output", [
+        Opt("--db-out", "tracks.io"),
+        Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
+    #]),
+
+    Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
+    Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
+    Opt(("-a", "--append"), "tracks.io", action="store_true"),
+)
+
+def new(conf):
+    """New convert interface"""
+    tracks = Tracks(conf=conf)
+
+    for read_id, read in tracks.iter_reads():
+        aln = read.alns[0]
+        read.write_alignment(read_id, read.fast5s.get_read_file(read_id), aln.coords)
+        
+        dtw = aln.layers["dtw"].set_index(aln.coords.ref_to_mref(aln.layer_refs, aln.all_fwd), drop=True)
+        dtw.index.name = "mref"
+        read.write_layers("dtw", dtw)
+
+    tracks.close()
 
 def nanopolish(conf):
     """Convert from nanopolish eventalign TSV to uncalled DTW track"""
@@ -240,6 +272,7 @@ def tombo(conf):
         sys.stderr.write("Warning: no reads were found (try including the --recursive option?)\n")
 
 SUBCMDS = [
+    (new, NEW_OPTS), 
     (nanopolish, NANOPOLISH_OPTS), 
     (tombo, TOMBO_OPTS)
 ]

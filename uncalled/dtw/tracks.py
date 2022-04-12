@@ -155,6 +155,9 @@ class Tracks:
         self._aln_track_ids = parent._aln_track_ids
         self.refstats = None
 
+        self.input = parent.input
+        self.output = parent.output
+
         self.coords = coords
         self._tracks = dict()
         self.alns = list()
@@ -251,7 +254,6 @@ class Tracks:
                 self.output = TrackSQL(self.conf, "w")
             elif out_format == "eventalign_out":
                 self.output = Eventalign(self.conf, "w")
-            print(out_format)
 
             for track in self.output.tracks:
                 self.output_tracks[track.name] = track
@@ -291,8 +293,8 @@ class Tracks:
 
         return dtw.sort_index()
 
-    def write_dtw_events(self, events, track_name=None, aln_id=None):
-        if self.output.FORMAT != "eventalign":
+    def write_dtw_events(self, events=None, track_name=None, aln_id=None):
+        if events is not None and self.output.FORMAT != "eventalign":
             events = self.collapse_events(events)
             overwrite = False
         else:
@@ -300,9 +302,14 @@ class Tracks:
 
         self.write_layers("dtw", events, track_name, aln_id, overwrite)
         
-    def write_layers(self, group, layers, track_name=None, aln_id=None, overwrite=False):
+    def write_layers(self, group, layers=None, track_name=None, aln_id=None, overwrite=False):
+
         track = self._track_or_default(track_name)
-        df = track.add_layer_group(group, layers, aln_id, overwrite)
+        if layers is not None:
+            df = track.add_layer_group(group, layers, aln_id, overwrite)
+        else:
+            df = track.layers[group]
+
         self.output.write_layers(df)
 
     def write_alignment(self, read_id, fast5, coords, layers={}, track_name=None):
@@ -372,6 +379,9 @@ class Tracks:
         else:
             coords = self.coords
 
+        stranded = True
+        fwd = None
+
         tracks = dict()
         for name,track in self._tracks.items():
             if isinstance(track, pd.DataFrame):
@@ -379,10 +389,10 @@ class Tracks:
 
             elif isinstance(track, AlnTrack):
                 tracks[name] = track.slice(coords, reads=reads, order=order)
+                #if stranded:
+                #    if tracks[name].all_fwd():
 
-            #print(reads)
-            #print(tracks[name].alignments)
-            #print(tracks[name].layers)
+
 
         return Tracks(self, coords, tracks)
 

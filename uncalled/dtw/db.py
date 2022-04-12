@@ -116,12 +116,14 @@ class Eventalign(TrackIO):
     FORMAT = "eventalign"
 
     def __init__(self, conf, mode):
+        print(conf.tracks.io.eventalign_in)
         filename = conf.tracks.io.eventalign_in if mode == "r" else conf.tracks.io.eventalign_out
         TrackIO.__init__(self, filename, conf, mode)
 
         if self.filename == "-":
             self.out = sys.stdout
         else:
+            print(self.filename)
             self.out = open(self.filename, mode)
 
         self._header = True
@@ -158,7 +160,7 @@ class Eventalign(TrackIO):
         #    if "ref" in events.columns:
         #        events.set_index("ref")
         #    mrefs = track.coords.ref_to_mref(events.index)
-        
+
         kmers = track.coords.kmers[mrefs]
         model_kmers = kmer_to_str(kmer_rev(kmers))
 
@@ -188,7 +190,7 @@ class Eventalign(TrackIO):
                 "strand" : "t",
                 "event_index" : pd.RangeIndex(0,len(events))[::-1]+1,
                 "event_level_mean" : events["current"],
-                "event_stdv" : events["current_stdv"],
+                "event_stdv" : stdvs,
                 "event_length" : events["length"] / track.conf.read_buffer.sample_rate,
                 "model_kmer" : model_kmers,
                 "model_mean" : model.means[kmers],
@@ -199,7 +201,7 @@ class Eventalign(TrackIO):
             }, index = events.index).sort_values("position")
 
         eventalign.to_csv(
-            self.out, sep="\t", 
+            self.out, sep="\t",
             header=self._header,
             float_format="%.5f",
             index=False)
@@ -286,6 +288,7 @@ class TrackSQL(TrackIO):
     FORMAT = "db"
     def __init__(self, conf, mode):
         filename = conf.tracks.io.db_in if mode == "r" else conf.tracks.io.db_out
+        print(conf.tracks.io.db_out)
         TrackIO.__init__(self, filename, conf, mode)
 
         new_file = not os.path.exists(self.filename)
@@ -658,14 +661,14 @@ class TrackSQL(TrackIO):
             raise ValueError(f"Track does not exist: \"{track_name}\"\n")
         return ids[0][0]
 
-DB_OPT = Opt("db_file", help="Track database file")
+DB_OPT = Opt("db_in", "tracks.io", help="Track database file")
 
 LS_OPTS = (DB_OPT,)
 _LS_QUERY = "SELECT name,desc,COUNT(alignment.id) FROM track " \
             "JOIN alignment ON track.id == track_id GROUP BY name"
 def ls(conf, db=None):
     if db is None:
-        db = TrackSQL(conf.db_file)
+        db = TrackSQL(conf, "r")
     print("\t".join(["Name", "Description", "Alignments"]))
 
     for row in db.cur.execute(_LS_QUERY).fetchall():
@@ -754,18 +757,18 @@ def _set_fast5s(track_id, prms, db):
 MERGE_OPTS = (
     Opt("dbs", nargs="+", type=str, help="Database files to merge. Will write to the first file if \"-o\" is not specified. "),
     #Opt(("-n", "--track_names"), nargs="+", help="Names of tracks to merge. Will merge all tracks if not specified"),
-    Opt(("-o", "--out-db"), type=str, default=None, help="Output database file. Will output to the first input file if not specified"),
+    Opt(("-o", "--db-out"), "tracks.io", type=str, default=None, help="Output database file. Will output to the first input file if not specified"),
 )
 def merge(conf):
     """Merge databases into a single file"""
-    if conf.out_db is None:
-        out_db = conf.dbs[0]
-        in_dbs = conf.dbs[1:]
-    else:
-        in_dbs = conf.dbs
-        out_db = conf.out_db
+    #if conf.out_db is None:
+    #    out_db = conf.dbs[0]
+    #    in_dbs = conf.dbs[1:]
+    #else:
+    in_dbs = conf.dbs
+    #    out_db = conf.out_db
 
-    db = TrackSQL(out_db)
+    db = TrackSQL(conf, "w")
     
     def max_id(table, field="id"):
         i = db.cur.execute(f"SELECT max({field}) FROM {table}").fetchone()[0]

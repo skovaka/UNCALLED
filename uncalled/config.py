@@ -44,8 +44,6 @@ class ParamGroup:
 
     def __init__(self, init=None):
         self._values = dict()
-        #TODO init could store dict, other param group?
-        #if type
 
     def _set(self, name, val):
         """Sets parameter with automatic type conversion"""
@@ -62,6 +60,7 @@ class ParamGroup:
 
             elif val is not None and not isinstance(val, type_):
                 val = type_(val)
+
         return val
     
     @property
@@ -142,13 +141,26 @@ class Config(_Conf):
 
         groups = other._PARAM_GROUPS + list(self._EXTRA_GROUPS.keys())
 
+        def _load_group(group):
+            ogroup = other.get_group(group)
+            sgroup = self.get_group(group)
+            for param in dir(ogroup):
+                if not (param.startswith("_") or (ignore_defaults and other.is_default(param, group))):
+                    val = getattr(ogroup, param)
+                    if isinstance(val, ParamGroup):
+                        _load_group(".".join([group,param]))
+                    else:
+                        setattr(sgroup, param, val)
+
         for group_name in groups:
             ogroup = getattr(other, group_name)
             sgroup = getattr(self, group_name)
+            
+            _load_group(group_name)
 
-            for param in dir(ogroup):
-                if not (param.startswith("_") or (ignore_defaults and other.is_default(param, group_name))):
-                    setattr(sgroup, param, getattr(ogroup, param))
+            #for param in dir(ogroup):
+            #    if not (param.startswith("_") or (ignore_defaults and other.is_default(param, group_name))):
+            #        setattr(sgroup, param, getattr(ogroup, param))
 
     def to_toml(self, filename=None):
 

@@ -194,6 +194,10 @@ class AlnTrack:
         self.alignments = alignments
         self.layers = layers
 
+        if not self.coords.stranded and (self.all_fwd or self.all_rev):
+            self.coords = self.coords.ref_slice(fwd=self.all_fwd)
+            print(self.coords)
+
         isnone = [coords is None, alignments is None, layers is None]
         if np.all(isnone) or len(alignments) == 0:
             return
@@ -467,6 +471,7 @@ class AlnTrack:
         if self.coords.stranded:
             return mrefs
         else:
+            print("UNSTRAND")
             return mrefs[0].union(mrefs[1])
         #return self.layers.index.get_level_values("mref")
 
