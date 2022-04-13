@@ -196,7 +196,6 @@ class AlnTrack:
 
         if not self.coords.stranded and (self.all_fwd or self.all_rev):
             self.coords = self.coords.ref_slice(fwd=self.all_fwd)
-            print(self.coords)
 
         isnone = [coords is None, alignments is None, layers is None]
         if np.all(isnone) or len(alignments) == 0:
@@ -453,9 +452,6 @@ class AlnTrack:
 
             df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
 
-            #print(df)
-
-        
 
     @property
     def read_ids(self):

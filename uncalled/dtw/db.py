@@ -116,14 +116,12 @@ class Eventalign(TrackIO):
     FORMAT = "eventalign"
 
     def __init__(self, conf, mode):
-        print(conf.tracks.io.eventalign_in)
         filename = conf.tracks.io.eventalign_in if mode == "r" else conf.tracks.io.eventalign_out
         TrackIO.__init__(self, filename, conf, mode)
 
         if self.filename == "-":
             self.out = sys.stdout
         else:
-            print(self.filename)
             self.out = open(self.filename, mode)
 
         self._header = True
@@ -288,7 +286,6 @@ class TrackSQL(TrackIO):
     FORMAT = "db"
     def __init__(self, conf, mode):
         filename = conf.tracks.io.db_in if mode == "r" else conf.tracks.io.db_out
-        print(conf.tracks.io.db_out)
         TrackIO.__init__(self, filename, conf, mode)
 
         new_file = not os.path.exists(self.filename)
