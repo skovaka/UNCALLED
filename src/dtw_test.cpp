@@ -70,20 +70,15 @@ int main(int argc, char** argv) {
     Fast5Dict fast5s_test;
     fast5s_test.load_index(fast5_fname);
     auto rd = fast5s_test[query_fname];
-    std::cout << rd.get_id() << "\t" << rd.size() << " READ\n";
 
-    if (false) {
+    //if (false) {
 
-    auto model = PoreModel("r94_dna");
-
-    auto dtwp = DTW_RAW_GLOB;
-    dtwp.dw = dtwp.vw = dtwp.hw = 1;
-    //1,1,1};         //d,v,h
+    auto model = PoreModel<KmerLen::k5>("r94_dna");
 
     EventDetector evdt;
     EventProfiler evpr;
 
-    RefIndex<KLEN> idx(index_prefix);
+    RefIndex<KmerLen::k5> idx(index_prefix);
     idx.load_pacseq();
 
     Fast5Iter fast5s;
@@ -93,18 +88,17 @@ int main(int argc, char** argv) {
 
     auto queries = load_queries(query_fname, fast5s);
 
-    std::cout << fast5s.empty() << "\n";
     while (!fast5s.empty()) {
         //Get next read and corrasponding query
         auto read = fast5s.next_read();
-        std::cout << read.get_id() << "\n";
+        std::cerr << read.get_id() << "\n";
         //std::cerr << "aligning " << read.get_id() << "\n";
         //std::cerr.flush();
 
         Query q = queries[read.get_id()];
 
         std::vector<u16> kmers = idx.get_kmers(q.rf_name, q.rf_st, q.rf_en);
-        if (!q.fwd) kmers = kmers_revcomp<KLEN>(kmers);
+        if (!q.fwd) kmers = kmers_revcomp<KmerLen::k5>(kmers);
 
         float read_mean = 0;
         for (u16 k : kmers) {
@@ -163,19 +157,20 @@ int main(int argc, char** argv) {
 
         auto band_width = static_cast<i32>(signal.size() * 0.05);
 
-        StaticBDTW dtw(signal, kmers, model, band_width, 0.5);
-        //DTWd dtw(signal, kmers, model, DTW_GLOB);
+        auto prms = DTW_PRMS_DEF;
+        prms.band_width = 500;
 
-        auto v = dtw.get_flat_mat();
+        //StaticBDTW dtw(prms, signal, kmers, model);
+        DTWd dtw(signal, kmers, model, prms);
 
-        //if (!out_prefix.empty()) {
-        //    std::string path_fname = out_prefix+read.get_id()+".txt";
-        //    std::ofstream out(path_fname);
-        //    for (auto &t : dtw.get_path()) {
-        //        out << t.ref << "\t" << t.qry << "\n";
-        //    }
-        //    out.close();
-        //}
+        if (!out_prefix.empty()) {
+            std::string path_fname = out_prefix+read.get_id()+".txt";
+            std::ofstream out(path_fname);
+            for (auto &t : dtw.get_path()) {
+                out << t.ref << "\t" << t.qry << "\n";
+            }
+            out.close();
+        }
 
         std::cout << read.get_id() << "\t"
                   << dtw.mean_score() << "\t"
@@ -187,7 +182,7 @@ int main(int argc, char** argv) {
     }
 
 
-    }//end if false
+    //}//end if false
 
     return 0;
 }

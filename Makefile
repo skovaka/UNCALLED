@@ -18,14 +18,14 @@ BIN=bin
 LIB=lib
 #INCLUDE=include
 
-_COMMON_OBJS=mapper.o seed_tracker.o range.o event_detector.o normalizer.o read_buffer.o fast5_reader.o event_profiler.o paf.o pore_model.o nt.o
+_COMMON_OBJS=mapper.o seed_tracker.o range.o event_detector.o normalizer.o read_buffer.o fast5_reader.o event_profiler.o paf.o pore_model.o nt.o dtw.o
 
 _MAP_ORD_OBJS=$(_COMMON_OBJS) realtime_pool.o map_pool_ord.o uncalled_map_ord.o 
 _MAP_OBJS=$(_COMMON_OBJS) map_pool.o uncalled_map.o 
 _SIM_OBJS=$(_COMMON_OBJS) realtime_pool.o simulator.o uncalled_sim.o 
-_DTW_OBJS=dtw_test.o fast5_reader.o read_buffer.o normalizer.o event_detector.o range.o event_profiler.o pore_model.o
+_DTW_OBJS=dtw_test.o dtw.o fast5_reader.o read_buffer.o normalizer.o event_detector.o range.o event_profiler.o pore_model.o
 
-_ALL_OBJS=$(_COMMON_OBJS) realtime_pool.o map_pool.o uncalled_map.o uncalled_map_ord.o simulator.o uncalled_sim.o dtw_test.o
+_ALL_OBJS=$(_COMMON_OBJS) realtime_pool.o map_pool.o uncalled_map.o uncalled_map_ord.o simulator.o uncalled_sim.o dtw_test.o dtw.o
 
 MAP_OBJS = $(patsubst %, $(BUILD)/%, $(_MAP_OBJS))
 MAP_ORD_OBJS = $(patsubst %, $(BUILD)/%, $(_MAP_ORD_OBJS))

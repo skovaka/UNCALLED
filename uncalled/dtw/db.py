@@ -37,6 +37,8 @@ IOParams._def_params(
     ("eventalign_index", None, str, "Nanopolish index file"),
     ("tombo_in", None, str, "Fast5 files containing Tombo alignments"),
 
+    ("init_track", True, bool, "If true will initialze track into \"db_out\""),
+
     ("output_format", "db", str,  "Output format (db, eventalign)"),
     ("overwrite", False, bool, "Overwrite existing tracks"),
     ("append", False, bool, "Append reads to existing tracks"),
@@ -389,20 +391,21 @@ class TrackSQL(TrackIO):
         for table in ["dtw", "bcaln", "cmp"]:
             self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
 
-        try:
-            self.init_track(track)
-        except Exception as err:
-            if len(self.query_track(track.name)) > 0:
-                if self.prms.append:
-                    pass
-                elif self.prms.overwrite:
-                    sys.stderr.write("Deleting existing track...\n")
-                    delete(track.name, self)
-                    self.init_track(track)
+        if self.prms.init_track:
+            try:
+                self.init_track(track)
+            except Exception as err:
+                if len(self.query_track(track.name)) > 0:
+                    if self.prms.append:
+                        pass
+                    elif self.prms.overwrite:
+                        sys.stderr.write("Deleting existing track...\n")
+                        delete(track.name, self)
+                        self.init_track(track)
+                    else:
+                        raise ValueError(f"Database already contains track named \"{ track.name}\". Specify a different name, write to a different file")
                 else:
-                    raise ValueError("Database already contains track named \"%s\". Specify a different name, write to a different file" % name)
-            else:
-                raise err
+                    raise err
 
         self.tracks.append(track)
 
@@ -765,6 +768,9 @@ def merge(conf):
     in_dbs = conf.dbs
     #    out_db = conf.out_db
 
+    conf.tracks.io.init_track = False
+
+    print(conf.tracks.io.db_out)
     db = TrackSQL(conf, "w")
     
     def max_id(table, field="id"):
