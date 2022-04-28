@@ -12,7 +12,7 @@ from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt 
 from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader, FAST5_OPTS
-from .. import DTWd, DTWp, StaticBDTW, BandedDTW, DTW_PRMS_EVT_GLOB, nt, DtwParams
+from .. import GlobalDTW, StaticBDTW, BandedDTW, DTW_PRMS_EVT_GLOB, nt, DtwParams
 
 from ..signal_processor import SignalProcessor
 
@@ -25,7 +25,7 @@ from . import Bcaln, Tracks
 METHODS = {
     "guided" : BandedDTW,
     "static" : StaticBDTW,
-    "global" : DTWd,
+    "global" : GlobalDTW,
 }
 
 #class DtwParams(ParamGroup):

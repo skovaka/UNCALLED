@@ -28,14 +28,14 @@ extern const DtwParams DTW_PRMS_DEF, DTW_PRMS_EVT_GLOB;
 void pybind_dtw(py::module_ &m);
 #endif
 
-class DTWp {
+class GlobalDTW {
     public:
 
     struct Trace {
         u64 qry, ref;
     };
 
-    DTWp(const std::vector<float> &qry_vals,   
+    GlobalDTW(const std::vector<float> &qry_vals,   
         const std::vector<u16> &ref_vals,
         const PoreModel<DTW_KLEN> &model,
         const DtwParams &p) : 
@@ -180,8 +180,8 @@ class DTWp {
     public:
 
     #ifdef PYBIND
-    #define PY_DTW_P_METH(P) c.def(#P, &DTWp::P);
-    static void pybind_defs(pybind11::class_<DTWp> &c) {
+    #define PY_DTW_P_METH(P) c.def(#P, &GlobalDTW::P);
+    static void pybind_defs(pybind11::class_<GlobalDTW> &c) {
         c.def(pybind11::init<const std::vector<float>&, 
                              const std::vector<u16>&,
                              const PoreModel<DTW_KLEN>,
@@ -190,49 +190,20 @@ class DTWp {
         PY_DTW_P_METH(score)
         PY_DTW_P_METH(mean_score)
 
-        c.def_property_readonly("mat", [](DTWp &d) -> pybind11::array_t<float> {
+        c.def_property_readonly("mat", [](GlobalDTW &d) -> pybind11::array_t<float> {
              return pybind11::array_t<float>(
                      {d.ref_vals_.size(), d.qry_vals_.size()},
                      d.mat_.data()
                      );
         });
 
-        c.def_property_readonly("path", [](DTWp &d) -> pybind11::array_t<Trace> {
+        c.def_property_readonly("path", [](GlobalDTW &d) -> pybind11::array_t<Trace> {
              return pybind11::array_t<Trace>(d.path_.size(), d.path_.data());
         });
         PYBIND11_NUMPY_DTYPE(Trace, qry, ref);
     }
     #endif
 };
-
-class DTWd : public DTWp {
-    public: 
-    DTWd(const std::vector<float> &qry_vals,   
-        const std::vector<u16> &ref_vals,
-        const PoreModel<DTW_KLEN> &model,
-        const DtwParams &prms) 
-        : DTWp(qry_vals, ref_vals, model, prms) {}
-
-    private:
-    float costfn(float pA, u16 kmer) {
-        return abs(pA-model_.kmer_current(kmer));
-    }
-
-    public:
-    #ifdef PYBIND
-    #define PY_DTW_D_METH(P) c.def(#P, &DTWd::P);
-    static void pybind_defs(pybind11::class_<DTWd, DTWp> &c) {
-        c.def(pybind11::init<const std::vector<float>&, 
-                             const std::vector<u16>&,
-                             const PoreModel<DTW_KLEN>,
-                             const DtwParams&>());
-        PY_DTW_D_METH(get_path)
-        PY_DTW_D_METH(score)
-        PY_DTW_D_METH(mean_score)
-    }
-    #endif
-};
-
 
 class BandedDTW {
     public:

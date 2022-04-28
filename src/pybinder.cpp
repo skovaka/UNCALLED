@@ -103,11 +103,8 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<StaticBDTW, BandedDTW> static_bdtw(m, "StaticBDTW");
     StaticBDTW::pybind_defs(static_bdtw);
     
-    py::class_<DTWp> dtw_p(m, "DTWp");
-    DTWp::pybind_defs(dtw_p);
-
-    py::class_<DTWd, DTWp> dtw_d(m, "DTWd");
-    DTWd::pybind_defs(dtw_d);
+    py::class_<GlobalDTW> global_dtw(m, "GlobalDTW");
+    GlobalDTW::pybind_defs(global_dtw);
 
     SignalProcessor::pybind_defs(m);
 

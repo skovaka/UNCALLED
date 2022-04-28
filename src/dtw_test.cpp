@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
     while (!fast5s.empty()) {
         //Get next read and corrasponding query
         auto read = fast5s.next_read();
-        std::cerr << read.get_id() << "\n";
+        //std::cerr << read.get_id() << "\n";
         //std::cerr << "aligning " << read.get_id() << "\n";
         //std::cerr.flush();
 
@@ -110,9 +110,9 @@ int main(int argc, char** argv) {
             read_stdv += pow(model.kmer_current(k) - read_mean, 2);
         }
         read_stdv = sqrt(read_stdv / kmers.size());
-        Normalizer norm(read_mean, read_stdv);
+        //Normalizer norm(read_mean, read_stdv);
 
-        //Normalizer norm(model.model_mean(), model.model_stdv());
+        Normalizer norm(model.model_mean(), model.model_stdv());
 
         //Get raw signal
         auto &full_raw = read.get_signal();
@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
         prms.band_width = 500;
 
         //StaticBDTW dtw(prms, signal, kmers, model);
-        DTWd dtw(signal, kmers, model, prms);
+        GlobalDTW dtw(signal, kmers, model, prms);
 
         if (!out_prefix.empty()) {
             std::string path_fname = out_prefix+read.get_id()+".txt";
