@@ -71,7 +71,7 @@ class Config {
     EventProfiler::Params event_profiler = EventProfiler::PRMS_DEF;
     SeedTracker::Params   seed_tracker   = SeedTracker::PRMS_DEF;
     Fast5Reader::Params   fast5_reader   = Fast5Reader::PRMS_DEF;
-    PoreModel<KLEN>::Params pore_model   = PoreModel<KLEN>::PRMS_DEF;
+    PoreModelParams pore_model   = PoreModel<5>::PRMS_DEF;
 
     RealtimeParams        realtime       = REALTIME_PRMS_DEF;
     SimulatorParams       simulator     = SIM_PRMS_DEF;

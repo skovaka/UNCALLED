@@ -578,11 +578,11 @@ class RefIndex {
 
     #ifdef PYBIND
 
-    #define PY_BWA_INDEX_METH(P) c.def(#P, &RefIndex<K,KmerType>::P);
-    #define PY_BWA_INDEX_VEC(P) c.def(#P, py::vectorize(&RefIndex<K,KmerType>::P));
+    #define PY_BWA_INDEX_METH(P) c.def(#P, &RefIndex<ModelType>::P);
+    #define PY_BWA_INDEX_VEC(P) c.def(#P, py::vectorize(&RefIndex<ModelType>::P));
 
     static void pybind_defs(pybind11::module_ m) {
-        py::class_<RefIndex<K,KmerType>> c(m, "_RefIndex");
+        py::class_<RefIndex<ModelType>> c(m, "_RefIndex");
 
         c.def(py::init<>());
         c.def(py::init<const std::string &>());

@@ -28,8 +28,7 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Config> config(m, "_Conf");
     Config::pybind_defs(config);
 
-    py::class_<Mapper> mapper(m, "Mapper");
-    Mapper::pybind_defs(mapper);
+    Mapper::pybind_defs(m);
 
     py::class_<MapPool> map_pool(m, "MapPool");
     MapPool::pybind_defs(map_pool);
@@ -85,8 +84,8 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Range> range(m, "Range");
     Range::pybind_defs(range);
 
-    PoreModelK5::pybind_defs(m);
-    PoreModelK10::pybind_defs(m);
+    PoreModel<5>::pybind_defs(m, "K5");
+    PoreModel<10>::pybind_defs(m, "K10");
 
     m.def("self_align", &self_align);
 
@@ -98,16 +97,22 @@ PYBIND11_MODULE(_uncalled, m) {
     //py::class_<DTW> dtw(m, "DTW");
     //DTW::pybind_defs(dtw);
 
-    py::class_<BandedDTW> banded_dtw(m, "BandedDTW");
-    BandedDTW::pybind_defs(banded_dtw);
+    BandedDTW<PoreModel<5>>::pybind_defs(m, "K5");
+    BandedDTW<PoreModel<10>>::pybind_defs(m, "K10");
 
-    py::class_<StaticBDTW, BandedDTW> static_bdtw(m, "StaticBDTW");
-    StaticBDTW::pybind_defs(static_bdtw);
+    StaticBDTW<PoreModel<5>>::pybind_defs(m, "K5");
+    StaticBDTW<PoreModel<10>>::pybind_defs(m, "K10");
+
+    GlobalDTW<PoreModel<5>>::pybind_defs(m, "K5");
+    GlobalDTW<PoreModel<10>>::pybind_defs(m, "K10");
+
+    //py::class_<StaticBDTW, BandedDTW> static_bdtw(m, "StaticBDTW");
     
-    py::class_<GlobalDTW> global_dtw(m, "GlobalDTW");
-    GlobalDTW::pybind_defs(global_dtw);
+    //py::class_<GlobalDTW> global_dtw(m, "GlobalDTW");
+    //GlobalDTW::pybind_defs(global_dtw);
 
-    SignalProcessor::pybind_defs(m);
+    SignalProcessor<PoreModel<5>>::pybind_defs(m, "K5");
+    SignalProcessor<PoreModel<10>>::pybind_defs(m, "K10");
 
     pybind_dtw(m);
     //py::class_<DTWParams> dtwp(m, "DTWParams");

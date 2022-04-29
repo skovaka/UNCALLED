@@ -51,8 +51,12 @@
 
 //constexpr KmerLen KLEN = KmerLen::k5;
 
-template <class ModelType>
 class Mapper {
+
+    using ModelType = PoreModelK5;
+    using KmerType = typename ModelType::kmer_t;
+    static constexpr auto K = ModelType::KMER_LEN;
+
     public:
 
     typedef struct {
@@ -343,7 +347,9 @@ class Mapper {
 
     public:
 
-    static void pybind_defs(pybind11::class_<Mapper> &map) {
+    static void pybind_defs(pybind11::module_ &m) {
+
+        py::class_<Mapper> map(m, "Mapper");
 
         map.def(pybind11::init());
 

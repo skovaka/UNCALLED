@@ -64,8 +64,8 @@ const char BASE_COMP_C[]
 
 const u8 BASE_COMP_B[] {3, 2, 1, 0};
 
-char base_to_char(u8 base);
-u8 base_comp(u8 base);
+//char base_to_char(u8 base);
+//u8 base_comp(u8 base);
 
 
 #endif

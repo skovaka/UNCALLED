@@ -52,11 +52,9 @@ Mapper::Params Mapper::PRMS {
 };
 
 
-RefIndex<KLEN> Mapper::fmi;
+RefIndex<Mapper::ModelType> Mapper::fmi;
 std::vector<float> Mapper::prob_threshes_;
-
-PoreModel<KLEN> Mapper::model;// = IS_RNA ? pmodel_r94_rna_templ : pmodel_r94_dna_compl;
-
+Mapper::ModelType Mapper::model;
 
 const std::array<u8,Mapper::EVENT_TYPES.size()> Mapper::EVENT_TYPES = {
     Mapper::EVENT_STAY,
@@ -79,7 +77,7 @@ Mapper::Mapper() :
     }
     PATH_TAIL_MOVE = 1 << (PRMS.seed_len-1);
 
-    kmer_probs_ = std::vector<float>(kmer_count<KLEN>());
+    kmer_probs_ = std::vector<float>(ModelType::KMER_COUNT);
 
     PathBuffer::reset_count();//TODO is there a better way?
     prev_paths_ = std::vector<PathBuffer>(PRMS.max_paths);
@@ -87,7 +85,7 @@ Mapper::Mapper() :
     PathBuffer::reset_count();
     next_paths_ = std::vector<PathBuffer>(PRMS.max_paths);
 
-    sources_added_ = std::vector<bool>(kmer_count<KLEN>(), false);
+    sources_added_ = std::vector<bool>(ModelType::KMER_COUNT, false);
 
     prev_size_ = 0;
     event_i_ = 0;
@@ -112,7 +110,7 @@ void Mapper::load_static() {
 
     if (fmi.bwt_loaded()) return;
 
-    model = PoreModel<KLEN>(PRMS.pore_model, false, ReadBuffer::PRMS.seq_fwd);
+    model = ModelType(PRMS.pore_model, false, ReadBuffer::PRMS.seq_fwd);
 
     fmi.load_index(PRMS.bwa_prefix);
     if (!fmi.bwt_loaded()) {
@@ -464,12 +462,12 @@ bool Mapper::map_next() {
     #endif
 
     //TODO: store kmer_probs_ in static array
-    for (u16 kmer = 0; kmer < kmer_probs_.size(); kmer++) {
+    for (KmerType kmer = 0; kmer < kmer_probs_.size(); kmer++) {
         kmer_probs_[kmer] = model.norm_pdf(event, kmer);
     }
 
     Range prev_range;
-    u16 prev_kmer;
+    KmerType prev_kmer;
     float evpr_thresh;
     bool child_found;
 
@@ -512,7 +510,7 @@ bool Mapper::map_next() {
 
         //Add all the neighbors
         for (u8 b = 0; b < BASE_COUNT; b++) {
-            u16 next_kmer = kmer_neighbor<KLEN>(prev_kmer, b);
+            KmerType next_kmer = ModelType::kmer_neighbor(prev_kmer, b);
 
             if (kmer_probs_[next_kmer] < evpr_thresh) {
                 continue;
@@ -562,7 +560,7 @@ bool Mapper::map_next() {
         pdqsort(next_paths_.begin(), next_path);
         //std::sort(next_paths_.begin(), next_path);
 
-        u16 source_kmer;
+        KmerType source_kmer;
         prev_kmer = kmer_probs_.size(); 
 
         Range unchecked_range, source_range;
@@ -639,7 +637,7 @@ bool Mapper::map_next() {
         }
     }
 
-    for (u16 kmer = 0; 
+    for (KmerType kmer = 0; 
          kmer < kmer_probs_.size() && 
             next_path != next_paths_.end(); 
          kmer++) {
@@ -743,7 +741,7 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
         );
 
         #ifdef PYDEBUG
-        u32 ref_len = path.move_count() + KLEN - 1;
+        u32 ref_len = path.move_count() + K - 1;
         auto pac_start = pac_end - ref_len;// + 1;
 
         auto loc = fmi.mrefs_to_ref_coord(pac_start, pac_end, read_.PRMS.seq_fwd);
@@ -778,17 +776,17 @@ void Mapper::update_seeds(PathBuffer &path, bool path_ended) {
 
 u32 Mapper::event_to_bp(u32 evt_i, bool last) const {
     //TODO store bp_per_samp
-    return (evt_i * evdt_.mean_event_len() * ReadBuffer::PRMS.bp_per_samp()) + last*(KLEN - 1);
+    return (evt_i * evdt_.mean_event_len() * ReadBuffer::PRMS.bp_per_samp()) + last*(K - 1);
 }                  
 
 void Mapper::set_ref_loc(const SeedCluster &seeds) {
-    auto loc = fmi.mrefs_to_ref_coord(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
+    auto loc = fmi.mrefs_to_ref_coord(seeds.ref_st_, seeds.ref_en_.end_ + K, read_.PRMS.seq_fwd);
     
     auto rd_st = event_to_bp(seeds.evt_st_ - PRMS.seed_len),
         rd_en = event_to_bp(seeds.evt_en_, true),
         rd_len = event_to_bp(event_i_, true);
 
-    u16 match_count = seeds.total_len_ + KLEN - 1;
+    u16 match_count = seeds.total_len_ + K - 1;
 
     out_.set_read_len(rd_len);
     //TODO clean this up
@@ -824,7 +822,7 @@ void Mapper::PathBuffer::free_buffers() {
     delete[] prob_sums_;
 }
 
-void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
+void Mapper::PathBuffer::make_source(Range &range, KmerType kmer, float prob) {
     length_ = 1;
     consec_stays_ = 0;
     event_moves_ = EVENT_MOVE;
@@ -850,7 +848,7 @@ void Mapper::PathBuffer::make_source(Range &range, u16 kmer, float prob) {
 
 void Mapper::PathBuffer::make_child(PathBuffer &p, 
                                     Range &range,
-                                    u16 kmer, 
+                                    KmerType kmer, 
                                     float prob, 
                                     u8 move) {
 
@@ -1084,7 +1082,7 @@ void Mapper::meta_seeds_out(
     //TODO de-duplicate code
     //should be storing SA coordinate anyway
 
-    auto loc = fmi.translate_loc(seeds.ref_st_, seeds.ref_en_.end_ + KLEN, read_.PRMS.seq_fwd);
+    auto loc = fmi.translate_loc(seeds.ref_st_, seeds.ref_en_.end_ + K, read_.PRMS.seq_fwd);
     
     i64 sa_st;
 
@@ -1138,7 +1136,7 @@ void Mapper::meta_paths_out() {
             << p.fm_range_.length() << "\t";
 
         if (p.is_valid()) {
-            paths_out_ << kmer_to_str<KLEN>(p.kmer_) << "\t";
+            paths_out_ << ModelType::kmer_to_str(p.kmer_) << "\t";
         } else {
             paths_out_ << "NNNNN\t"; //TODO store constant 
         }

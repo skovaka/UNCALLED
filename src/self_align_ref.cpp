@@ -29,14 +29,12 @@
 #include "ref_index.hpp"
 #include "self_align_ref.hpp"
 
-const KmerLen KLEN = KmerLen::k5;
-
 std::vector< std::vector<u64> > self_align(const std::string &bwa_prefix,
                                            u32 sample_dist) {
 
     srand(0);
 
-    RefIndex<KLEN> fmi(bwa_prefix);
+    RefIndex<PoreModel<5>> fmi(bwa_prefix);
 
     //std::vector< std::vector<u8> > seqs;
     //std::ifstream fasta_in(fasta_fname);

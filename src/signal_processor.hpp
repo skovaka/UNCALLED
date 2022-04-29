@@ -14,8 +14,6 @@
 namespace py = pybind11;
 #endif
 
-const KmerLen SIG_KLEN = KmerLen::k5;
-
 struct NormVals {
     i32 start, end;
     float scale, shift;
@@ -32,16 +30,17 @@ struct ProcessedRead {
     }
 };
 
+template <typename ModelType>
 class SignalProcessor {
 
     private:
-    const PoreModel<SIG_KLEN> &model_;
+    const ModelType &model_;
     EventDetector evdt_;
     Normalizer norm_;
 
     public: 
 
-    SignalProcessor(const PoreModel<SIG_KLEN> &model, EventDetector::Params event_prms=EventDetector::PRMS_DEF) : 
+    SignalProcessor(const ModelType &model, EventDetector::Params event_prms=EventDetector::PRMS_DEF) : 
         model_(model),
         evdt_(event_prms) {
         norm_.set_target(model.model_mean(), model.model_stdv());
@@ -89,9 +88,9 @@ class SignalProcessor {
             return py::array_t<T>(r.A.size(), r.A.data()); \
         }, D);
 
-    static void pybind_defs(py::module_ &m) {
-        py::class_<SignalProcessor> s(m, "_SignalProcessor");
-        s.def(pybind11::init<const PoreModel<SIG_KLEN> &, EventDetector::Params>());
+    static void pybind_defs(py::module_ &m, const std::string &suffix) {
+        py::class_<SignalProcessor> s(m, ("_SignalProcessor" + suffix).c_str());
+        s.def(pybind11::init<const ModelType &, EventDetector::Params>());
         s.def("process", &SignalProcessor::process);
 
         PYBIND11_NUMPY_DTYPE(NormVals, start, end, scale, shift);

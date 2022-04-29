@@ -10,15 +10,16 @@
 enum class DTWSubSeq {NONE, ROW, COL};
 enum class DTWCostFn {ABS_DIFF, NORM_PDF, Z_SCORE};
 
-typedef struct {
+struct DtwParams {
     DTWSubSeq subseq;
     float move_cost, stay_cost, skip_cost,
           band_shift;
     i32 band_width, iterations;
     std::string band_mode, cost_fn, mm2_paf;
-} DtwParams;
+};
 
 extern const DtwParams DTW_PRMS_DEF, DTW_PRMS_EVT_GLOB;
+
 #ifdef PYBIND
 #define PY_DTW_PARAM(P, D) p.def_readwrite(#P, &DtwParams::P, D);
 void pybind_dtw(py::module_ &m);
@@ -180,7 +181,9 @@ class GlobalDTW {
 
     #ifdef PYBIND
     #define PY_DTW_P_METH(P) c.def(#P, &GlobalDTW<ModelType>::P);
-    static void pybind_defs(pybind11::class_<GlobalDTW<ModelType>> &c) {
+    //static void pybind_defs(pybind11::class_<GlobalDTW<ModelType>> &c) {
+    static void pybind_defs(pybind11::module_ &m, const std::string &suffix) {
+        pybind11::class_<GlobalDTW> c(m, ("GlobalDTW" + suffix).c_str());
         c.def(pybind11::init<const std::vector<float>&, 
                              const std::vector<KmerType>&,
                              const ModelType&,
@@ -562,7 +565,10 @@ class BandedDTW {
 
     #ifdef PYBIND
     #define PY_BANDED_DTW_METH(P) c.def(#P, &BandedDTW<ModelType>::P);
-    static void pybind_defs(pybind11::class_<BandedDTW<ModelType>> &c) {
+    //static void pybind_defs(pybind11::class_<BandedDTW<ModelType>> &c) {
+    static void pybind_defs(pybind11::module_ &m, const std::string &suffix) {
+        pybind11::class_<BandedDTW<ModelType>> c(m, ("BandedDTW" + suffix).c_str());
+
         c.def(pybind11::init<const DtwParams &,
                              const std::vector<float>&, 
                              const std::vector<KmerType>&,
@@ -638,7 +644,9 @@ class StaticBDTW : public BandedDTW<ModelType> {
     }
 
     #ifdef PYBIND
-    static void pybind_defs(pybind11::class_<StaticBDTW, BandedDTW> &c) {
+    //static void pybind_defs(pybind11::class_<StaticBDTW, BandedDTW<ModelType>> &c) {
+    static void pybind_defs(pybind11::module_ &m, const std::string &suffix) {
+        pybind11::class_<StaticBDTW, BandedDTW<ModelType>> c(m, ("StaticBDTW" + suffix).c_str());
         c.def(pybind11::init<const DtwParams &,
                              const std::vector<float>&, 
                              const std::vector<KmerType>&,

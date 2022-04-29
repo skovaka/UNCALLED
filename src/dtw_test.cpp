@@ -161,35 +161,14 @@ int main(int argc, char** argv) {
 
         auto kmers = idx.get_kmers(q.rf_name, q.rf_st, q.rf_en);
         if (!q.fwd) kmers = model.kmers_revcomp(kmers);
-        //std::vector<float> current;
-        //for (auto k : kmers) {
-        //    current.push_back(model.kmer_current(k));
-        //}
-
-        //auto N = model.kmer_means_.size();
-        ////auto N = model.means.size();
-        //float model_mean = 0;
-        //for (auto m : model.kmer_means_) {
-        ////for (auto m : model.means) {
-        //    //model_mean += m.second;
-        //    model_mean += m;
-        //}
-        //model_mean /= N;
-        //float model_stdv = 0;
-        //for (auto m : model.kmer_means_) {
-        ////for (auto m : model.means) {
-        //    //model_stdv += pow(m.second - model_mean, 2);
-        //    model_stdv += pow(m - model_mean, 2);
-        //}
-        //model_stdv = sqrt(model_stdv / N);
-
-        //Normalizer norm(model_mean, model_stdv);
 
         Normalizer norm(model.model_mean(), model.model_stdv());
 
         //Get raw signal
-        auto &full_raw = read.get_signal();
-        std::vector<float> signal;
+        auto signal = read.get_signal();
+
+        //auto &full_raw = read.get_signal();
+        //std::vector<float> signal;
         //if (q.rd_st != 0 || q.rd_en != 0) {
         //    u32 en = q.rd_en == 0 ? read.size() : q.rd_en;
         //    signal.reserve(en - q.rd_st);
@@ -198,7 +177,7 @@ int main(int argc, char** argv) {
         //        signal.push_back(full_raw[i]);
         //    }
         //} else {
-        signal = full_raw;
+        //signal = full_raw;
         //}
 
         //Create events if needed
