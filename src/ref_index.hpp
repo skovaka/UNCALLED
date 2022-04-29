@@ -33,6 +33,7 @@
 #include <pdqsort.h>
 #include <zlib.h>
 #include <algorithm>
+#include "pore_model.hpp"
 #include "util.hpp"
 #include "nt.hpp"
 #include "range.hpp"
@@ -143,64 +144,28 @@ class RefCoord {
     #endif
 };
 
-//struct Coords {
-//    i64 start, end;
-//
-//    i64 length() const {
-//        return end - start;
-//    }
-//
-//    bool empty() const {
-//        return start >= end;
-//    }
-//};
-//
-//Coords intersect(const Coords &a, const Coords &b) const {
-//    return {max(a.start, b.start), min(a.end, b.end)};
-//}
-//
-//Coords merge(const Coords &a, const Coords &b) const {
-//    return {min(a.start, b.start), max(a.end, b.end)};
-//}
-
-
-//struct MirrorCoords {
-//    u32
-//};
-
-template <KmerLen KLEN>
+template<class ModelType>
 class RefIndex {
     public:
 
-    static void create(const std::string &fasta_fname, 
-                       const std::string &prefix = "",
-                       bool no_bwt=false) {
-
-        std::string prefix_auto = prefix.empty() ? fasta_fname : prefix;
-
-        if (no_bwt) {
-            gzFile fp = xzopen(fasta_fname.c_str(), "r");
-            bns_fasta2bntseq(fp, prefix_auto.c_str(), 0);
-            err_gzclose(fp);
-
-        } else {
-            bwa_idx_build(fasta_fname.c_str(), 
-                          prefix.c_str(), 
-                          BWTALGO_AUTO,
-                          BWA_BLOCK_SIZE);
-        }
-    }
+    using KmerType = typename ModelType::kmer_t;
+    static constexpr auto K = ModelType::KMER_LEN;
 
     RefIndex() :
         index_(NULL),
         bns_(NULL),
         pacseq_(NULL),
-        klen_(KLEN),
-        kmer_ranges_(kmer_count<KLEN>()),
+        kmer_ranges_(ModelType::KMER_COUNT),
         loaded_(false),
         size_(0) {}
 
-    RefIndex(const std::string &prefix, bool pacseq=false, bool bwt=true) : RefIndex() {
+    RefIndex(const std::string &prefix, bool pacseq=false, bool bwt=true) : 
+            index_(NULL),
+            bns_(NULL),
+            pacseq_(NULL),
+            kmer_ranges_(ModelType::KMER_COUNT),
+            loaded_(false),
+            size_(0) {
         if (!prefix.empty()) {
             bns_ = bns_restore(prefix.c_str());
             size_ = 2 * (bns_->l_pac);
@@ -220,17 +185,36 @@ class RefIndex {
         index_ = bwt_restore_bwt(bwt_fname.c_str());
         bwt_restore_sa(sa_fname.c_str(), index_);
 
-        for (u16 k = 0; k < kmer_ranges_.size(); k++) {
+        for (KmerType k = 0; k < kmer_ranges_.size(); k++) {
 
-            Range r = get_base_range(kmer_head<KLEN>(k));
-            for (u8 i = 1; i < KLEN; i++) {
-                r = get_neighbor(r, kmer_base<KLEN>(k, i));
+            Range r = get_base_range(ModelType::kmer_head(k));
+            for (u8 i = 1; i < K; i++) {
+                r = get_neighbor(r, ModelType::kmer_base(k, i));
             }
 
             kmer_ranges_[k] = r;
         }
 
         loaded_ = true;
+    }
+
+    static void create(const std::string &fasta_fname, 
+                       const std::string &prefix = "",
+                       bool no_bwt=false) {
+
+        std::string prefix_auto = prefix.empty() ? fasta_fname : prefix;
+
+        if (no_bwt) {
+            gzFile fp = xzopen(fasta_fname.c_str(), "r");
+            bns_fasta2bntseq(fp, prefix_auto.c_str(), 0);
+            err_gzclose(fp);
+
+        } else {
+            bwa_idx_build(fasta_fname.c_str(), 
+                          prefix.c_str(), 
+                          BWTALGO_AUTO,
+                          BWA_BLOCK_SIZE);
+        }
     }
 
     bool bwt_loaded() {
@@ -263,11 +247,11 @@ class RefIndex {
         return Range(index_->L2[base] + os + 1, index_->L2[base] + oe);
     }
 
-    Range get_kmer_range(u16 kmer) const {
+    Range get_kmer_range(KmerType kmer) const {
         return kmer_ranges_[kmer];
     }
 
-    i64 get_kmer_count(u16 kmer) const {
+    i64 get_kmer_count(KmerType kmer) const {
         return kmer_ranges_[kmer].length();
     }
 
@@ -428,46 +412,46 @@ class RefIndex {
     }
     
     private:
-    kmer_t next_kmer(kmer_t kmer, i64 pac, bool comp) {
-        return kmer_neighbor<KLEN>(kmer, get_base(pac, comp));
+    KmerType next_kmer(KmerType kmer, i64 pac, bool comp) {
+        return ModelType::kmer_neighbor(kmer, get_base(pac, comp));
     }
 
-    void next_kmer(std::vector<kmer_t> &kmers, i64 pac, bool comp) {
+    void next_kmer(std::vector<KmerType> &kmers, i64 pac, bool comp) {
         kmers.push_back(next_kmer(kmers.back(), pac, comp));
     }
 
     public:
-    kmer_t get_kmer(i64 pac, bool comp) {
-        kmer_t kmer = 0;
-        for (auto i = pac; i < pac + KLEN; i++) {
+    KmerType get_kmer(i64 pac, bool comp) {
+        KmerType kmer = 0;
+        for (auto i = pac; i < pac + K; i++) {
             kmer = next_kmer(kmer, i, comp);
         }
         return kmer;
     }
 
-    std::vector<kmer_t> get_kmers(i64 pac_start, i64 pac_end, bool rev, bool comp) {
-        std::vector<kmer_t> ret;
+    std::vector<KmerType> get_kmers(i64 pac_start, i64 pac_end, bool rev, bool comp) {
+        std::vector<KmerType> ret;
         if (!rev) {
             ret.push_back(get_kmer(pac_start, comp));
-            for (auto i = pac_start+KLEN; i < pac_end; i++) {
+            for (auto i = pac_start+K; i < pac_end; i++) {
                 next_kmer(ret, i, comp);
             }
         } else {
-            ret.push_back(kmer_rev<KLEN>(get_kmer(pac_end-KLEN, comp)));
-            for (auto i = pac_end-KLEN-1; i >= pac_start; i--) {
+            ret.push_back(ModelType::kmer_rev(get_kmer(pac_end-K, comp)));
+            for (auto i = pac_end-K-1; i >= pac_start; i--) {
                 next_kmer(ret, i, comp);
             }
         }
         return ret;
     }
 
-    std::vector<kmer_t> get_kmers(const std::string &name, i64 start, i64 end, bool rev=false, bool comp=false) {
+    std::vector<KmerType> get_kmers(const std::string &name, i64 start, i64 end, bool rev=false, bool comp=false) {
         i64 pac_start = ref_to_pac(name, start),
             pac_end = ref_to_pac(name, end);
         return get_kmers(pac_start, pac_end, rev, comp);
     }
     
-    std::vector<kmer_t> get_kmers(i64 mref_start, i64 mref_end, bool is_rna) {
+    std::vector<KmerType> get_kmers(i64 mref_start, i64 mref_end, bool is_rna) {
         bool rev = is_mref_flipped(mref_end-1);
         bool comp = rev != is_rna;
         if (rev) {
@@ -554,14 +538,14 @@ class RefIndex {
             pacseq_(pacseq),
             st_(st),
             en_(en),
-            size_(en_-st_-KLEN) {}
+            size_(en_-st_-K) {}
 
-        u16 operator[](i64 i) {
+        KmerType operator[](i64 i) {
             i += st_;
             auto pst = i >> 2;
             u32 comb = *((u32 *) &pacseq_[pst]);
             auto shift = (i & 3) >> 1;
-            return (u16) ( (comb >> shift) & KMER_MASK );
+            return (KmerType) ( (comb >> shift) & ModelType::KMER_MASK );
         }
 
         i64 size() {
@@ -594,11 +578,11 @@ class RefIndex {
 
     #ifdef PYBIND
 
-    #define PY_BWA_INDEX_METH(P) c.def(#P, &RefIndex<KLEN>::P);
-    #define PY_BWA_INDEX_VEC(P) c.def(#P, py::vectorize(&RefIndex<KLEN>::P));
+    #define PY_BWA_INDEX_METH(P) c.def(#P, &RefIndex<K,KmerType>::P);
+    #define PY_BWA_INDEX_VEC(P) c.def(#P, py::vectorize(&RefIndex<K,KmerType>::P));
 
     static void pybind_defs(pybind11::module_ m) {
-        py::class_<RefIndex<KLEN>> c(m, "_RefIndex");
+        py::class_<RefIndex<K,KmerType>> c(m, "_RefIndex");
 
         c.def(py::init<>());
         c.def(py::init<const std::string &>());
@@ -633,16 +617,16 @@ class RefIndex {
         c.def("ref_to_mref", static_cast<std::pair<i64, i64> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::ref_to_mref));
         c.def("ref_to_mref", pybind11::vectorize(static_cast<i64 (RefIndex::*)(i32, i64, bool, bool)> (&RefIndex::ref_to_mref)));
         c.def("mref_to_ref", pybind11::vectorize(&RefIndex::mref_to_ref));
-        //c.def("get_kmers", static_cast< std::vector<kmer_t> (RefIndex::*)(i64, i64)> (&RefIndex::get_kmers) );
+        //c.def("get_kmers", static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64)> (&RefIndex::get_kmers) );
         
         c.def("get_kmers", 
-            static_cast< std::vector<kmer_t> (RefIndex::*)(i64, i64, bool, bool)> (&RefIndex::get_kmers),
+            static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64, bool, bool)> (&RefIndex::get_kmers),
             py::arg("pac_start"), py::arg("pac_end"), py::arg("rev"), py::arg("comp"));
         c.def("get_kmers", 
-            static_cast< std::vector<kmer_t> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::get_kmers),
+            static_cast< std::vector<KmerType> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::get_kmers),
             py::arg("name"), py::arg("start"), py::arg("end"), py::arg("rev")=false, py::arg("comp")=false);
         c.def("get_kmers", 
-            static_cast< std::vector<kmer_t> (RefIndex::*)(i64, i64, bool)> (&RefIndex::get_kmers),
+            static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64, bool)> (&RefIndex::get_kmers),
             py::arg("miref_start"), py::arg("miref_end"), py::arg("is_rna"));
 
         py::class_<RefLoc> l(m, "RefLoc");
@@ -660,7 +644,6 @@ class RefIndex {
     bwt_t *index_;
     bntseq_t *bns_;
     u8 *pacseq_;
-    KmerLen klen_;
     std::vector<Range> kmer_ranges_;
     bool loaded_;
     size_t size_;

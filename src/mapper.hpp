@@ -49,8 +49,9 @@
 //rematch "params" python module
 #define INDEX_SUFF ".uncl"
 
-constexpr KmerLen KLEN = KmerLen::k5;
+//constexpr KmerLen KLEN = KmerLen::k5;
 
+template <class ModelType>
 class Mapper {
     public:
 
@@ -86,9 +87,8 @@ class Mapper {
 
     static Params PRMS;
 
-    //TODO PRIVATIZE
-    static RefIndex<KLEN> fmi;
-    static PoreModel<KLEN> model;
+    static ModelType model;
+    static RefIndex<ModelType> fmi;
     static std::vector<float> prob_threshes_;
 
     static void load_static();

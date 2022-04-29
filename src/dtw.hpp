@@ -7,10 +7,6 @@
 #include "util.hpp"
 #include "pore_model.hpp"
 
-//TODO don't duplicate klen
-//probably should just set constant, or declare elsewhere
-const KmerLen DTW_KLEN = KmerLen::k5;
-
 enum class DTWSubSeq {NONE, ROW, COL};
 enum class DTWCostFn {ABS_DIFF, NORM_PDF, Z_SCORE};
 
@@ -28,16 +24,19 @@ extern const DtwParams DTW_PRMS_DEF, DTW_PRMS_EVT_GLOB;
 void pybind_dtw(py::module_ &m);
 #endif
 
+template <typename ModelType>
 class GlobalDTW {
     public:
+
+    using KmerType = typename ModelType::kmer_t;
 
     struct Trace {
         u64 qry, ref;
     };
 
     GlobalDTW(const std::vector<float> &qry_vals,   
-        const std::vector<u16> &ref_vals,
-        const PoreModel<DTW_KLEN> &model,
+        const std::vector<KmerType> &ref_vals,
+        const ModelType &model,
         const DtwParams &p) : 
         PRMS(p),
         model_(model),
@@ -142,9 +141,9 @@ class GlobalDTW {
     static constexpr float MAX_COST = FLT_MAX / 2.0;
 
     const DtwParams PRMS;
-    const PoreModel<DTW_KLEN> model_;
+    const ModelType model_;
 
-    const std::vector<u16> ref_vals_;
+    const std::vector<KmerType> ref_vals_;
     const std::vector<float> qry_vals_;
 
     std::vector<float> mat_;
@@ -152,7 +151,7 @@ class GlobalDTW {
     std::vector<Trace> path_;
     float score_sum_;
 
-    float costfn(float pA, u16 kmer) {
+    float costfn(float pA, KmerType kmer) {
         return abs(pA-model_.kmer_current(kmer));
         //return -model_.norm_pdf(pA,kmer);
     }
@@ -180,24 +179,24 @@ class GlobalDTW {
     public:
 
     #ifdef PYBIND
-    #define PY_DTW_P_METH(P) c.def(#P, &GlobalDTW::P);
-    static void pybind_defs(pybind11::class_<GlobalDTW> &c) {
+    #define PY_DTW_P_METH(P) c.def(#P, &GlobalDTW<ModelType>::P);
+    static void pybind_defs(pybind11::class_<GlobalDTW<ModelType>> &c) {
         c.def(pybind11::init<const std::vector<float>&, 
-                             const std::vector<u16>&,
-                             const PoreModel<DTW_KLEN>,
+                             const std::vector<KmerType>&,
+                             const ModelType&,
                              const DtwParams&>());
         PY_DTW_P_METH(get_path)
         PY_DTW_P_METH(score)
         PY_DTW_P_METH(mean_score)
 
-        c.def_property_readonly("mat", [](GlobalDTW &d) -> pybind11::array_t<float> {
+        c.def_property_readonly("mat", [](GlobalDTW<ModelType> &d) -> pybind11::array_t<float> {
              return pybind11::array_t<float>(
                      {d.ref_vals_.size(), d.qry_vals_.size()},
                      d.mat_.data()
                      );
         });
 
-        c.def_property_readonly("path", [](GlobalDTW &d) -> pybind11::array_t<Trace> {
+        c.def_property_readonly("path", [](GlobalDTW<ModelType> &d) -> pybind11::array_t<Trace> {
              return pybind11::array_t<Trace>(d.path_.size(), d.path_.data());
         });
         PYBIND11_NUMPY_DTYPE(Trace, qry, ref);
@@ -205,8 +204,11 @@ class GlobalDTW {
     #endif
 };
 
+template <typename ModelType>
 class BandedDTW {
     public:
+
+    using KmerType = typename ModelType::kmer_t;
 
     struct Coord {
         i32 qry,ref; //quer, reference
@@ -220,9 +222,9 @@ class BandedDTW {
     const DTWCostFn cost_fn_;
 
     const std::vector<float> qry_vals_;
-    const std::vector<u16> ref_vals_;
+    const std::vector<KmerType> ref_vals_;
 
-    const PoreModel<DTW_KLEN> model_;
+    const ModelType model_;
 
     //i32 PRMS.band_width;
 
@@ -245,8 +247,8 @@ class BandedDTW {
     public:
     BandedDTW(const DtwParams &prms,
               const std::vector<float> &qry_vals,   
-              const std::vector<u16> &ref_vals,
-              const PoreModel<DTW_KLEN> &model) :
+              const std::vector<KmerType> &ref_vals,
+              const ModelType &model) :
             PRMS(prms),
             cost_fn_(get_cost_fn(PRMS.cost_fn)),
             qry_vals_(qry_vals),
@@ -256,8 +258,8 @@ class BandedDTW {
 
     BandedDTW(const DtwParams &prms,
               const std::vector<float> &qry_vals,   
-              const std::vector<u16> &ref_vals,
-              const PoreModel<DTW_KLEN> &model,
+              const std::vector<KmerType> &ref_vals,
+              const ModelType &model,
               const std::vector<Coord> &ll) :
                 BandedDTW(prms, qry_vals, ref_vals, model) {
 
@@ -270,10 +272,10 @@ class BandedDTW {
 
     BandedDTW(const DtwParams &prms,
               const std::vector<float> &qry_vals,   
-              const std::vector<u16> &ref_vals,
-              const PoreModel<DTW_KLEN> &model,
+              const std::vector<KmerType> &ref_vals,
+              const ModelType &model,
               const std::vector<std::pair<i32,i32>> &ll) :
-                BandedDTW(prms, qry_vals, ref_vals, model) {
+                BandedDTW<ModelType>(prms, qry_vals, ref_vals, model) {
         //assert(lower.size() == left.size());
 
         ll_.resize(ll.size());
@@ -543,7 +545,7 @@ class BandedDTW {
 
     protected:
 
-    float costfn(float current, u16 kmer) {
+    float costfn(float current, KmerType kmer) {
         switch(cost_fn_) {
             case DTWCostFn::NORM_PDF:
             return -model_.norm_pdf(current, kmer);
@@ -559,31 +561,31 @@ class BandedDTW {
     public:
 
     #ifdef PYBIND
-    #define PY_BANDED_DTW_METH(P) c.def(#P, &BandedDTW::P);
-    static void pybind_defs(pybind11::class_<BandedDTW> &c) {
+    #define PY_BANDED_DTW_METH(P) c.def(#P, &BandedDTW<ModelType>::P);
+    static void pybind_defs(pybind11::class_<BandedDTW<ModelType>> &c) {
         c.def(pybind11::init<const DtwParams &,
                              const std::vector<float>&, 
-                             const std::vector<u16>&,
-                             const PoreModel<DTW_KLEN>&,
+                             const std::vector<KmerType>&,
+                             const ModelType&,
                              const std::vector<Coord>&>());
 
         c.def(pybind11::init<const DtwParams &, 
                              const std::vector<float>&, 
-                             const std::vector<u16>&,
-                             const PoreModel<DTW_KLEN>&,
+                             const std::vector<KmerType>&,
+                             const ModelType&,
                              const std::vector<std::pair<i32,i32>>& >());
         PY_BANDED_DTW_METH(get_path)
         PY_BANDED_DTW_METH(score)
         PY_BANDED_DTW_METH(mean_score)
-        c.def_readonly("ll", &BandedDTW::ll_);
+        c.def_readonly("ll", &BandedDTW<ModelType>::ll_);
         PY_BANDED_DTW_METH(mean_score)
         PY_BANDED_DTW_METH(get_flat_mat)
 
-        c.def_property_readonly("ll", [](BandedDTW &d) -> pybind11::array_t<Coord> {
+        c.def_property_readonly("ll", [](BandedDTW<ModelType> &d) -> pybind11::array_t<Coord> {
              return pybind11::array_t<Coord>(d.ll_.size(), d.ll_.data());
         });
 
-        c.def_property_readonly("path", [](BandedDTW &d) -> pybind11::array_t<Coord> {
+        c.def_property_readonly("path", [](BandedDTW<ModelType> &d) -> pybind11::array_t<Coord> {
              return pybind11::array_t<Coord>(d.path_.size(), d.path_.data());
         });
         PYBIND11_NUMPY_DTYPE(Coord, qry, ref);
@@ -591,32 +593,35 @@ class BandedDTW {
     #endif
 };
 
-class StaticBDTW : public BandedDTW {
+template <typename ModelType>
+class StaticBDTW : public BandedDTW<ModelType> {
 
     public:
+
+    using KmerType = typename ModelType::kmer_t;
 
     StaticBDTW(
            const DtwParams &prms,
            const std::vector<float> &qry_vals,   
-           const std::vector<u16> &ref_vals,
-           const PoreModel<DTW_KLEN> &model) : 
-            BandedDTW(prms, qry_vals, ref_vals, model) {
+           const std::vector<KmerType> &ref_vals,
+           const ModelType &model) : 
+            BandedDTW<ModelType>(prms, qry_vals, ref_vals, model) {
 
         init_mat();
-        fill_mat();
-        traceback();
+        BandedDTW<ModelType>::fill_mat();
+        BandedDTW<ModelType>::traceback();
     }
 
     void init_mat() {
-        auto slope = static_cast<float>(ref_size()) / qry_size();
-        auto shift = static_cast<i32>(PRMS.band_width * PRMS.band_shift);
+        auto slope = static_cast<float>(BandedDTW<ModelType>::ref_size()) / BandedDTW<ModelType>::qry_size();
+        auto shift = static_cast<i32>(BandedDTW<ModelType>::PRMS.band_width * BandedDTW<ModelType>::PRMS.band_shift);
         i32 q = 0, r = 0;
 
         //std::cout << qry_size() << "\t" << ref_size() << " SIZE\n";
         //std::cout << slope << "\t" << shift << " SLOPE\n";
 
-        for (size_t i = 0; i < band_count(); i++) {
-            ll_.push_back({q+shift,r-shift});
+        for (size_t i = 0; i < BandedDTW<ModelType>::band_count(); i++) {
+            BandedDTW<ModelType>::ll_.push_back({q+shift,r-shift});
 
             float down_dist  = std::abs( (r - slope * (q+1)) ),
                   right_dist = std::abs( ((r+1) - slope * q) );
@@ -629,15 +634,15 @@ class StaticBDTW : public BandedDTW {
         //          << ll_.back().qry << "\t"
         //          << ll_.back().ref << "\n";
 
-        BandedDTW::init_mat();
+        BandedDTW<ModelType>::init_mat();
     }
 
     #ifdef PYBIND
     static void pybind_defs(pybind11::class_<StaticBDTW, BandedDTW> &c) {
         c.def(pybind11::init<const DtwParams &,
                              const std::vector<float>&, 
-                             const std::vector<u16>&,
-                             const PoreModel<DTW_KLEN> &>());
+                             const std::vector<KmerType>&,
+                             const ModelType &>());
     }
     #endif
 };

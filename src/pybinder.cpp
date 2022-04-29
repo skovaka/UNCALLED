@@ -49,7 +49,8 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Paf> paf(m, "Paf");
     Paf::pybind_defs(paf);
 
-    RefIndex<KLEN>::pybind_defs(m);//ref_index);
+    RefIndex<PoreModelK5>::pybind_defs(m);//ref_index);
+    RefIndex<PoreModelK10>::pybind_defs(m);//ref_index);
     RefCoord::pybind_defs(m);//ref_index);
     
     py::class_<ReadBuffer> read_buffer(m, "ReadBuffer");
@@ -84,13 +85,13 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Range> range(m, "Range");
     Range::pybind_defs(range);
 
-    PoreModel<KLEN>::pybind_defs(m);
+    PoreModelK5::pybind_defs(m);
+    PoreModelK10::pybind_defs(m);
 
     m.def("self_align", &self_align);
 
     //BP operation functions
-    auto nt_module = m.def_submodule("_nt", "Contains functions and constants for manipulating nucleotides and fixed length k-mers (5-mers) in binary format");
-    nt_pybind_defs<KLEN>(nt_module);
+    //auto nt_module = m.def_submodule("_nt", "Contains functions and constants for manipulating nucleotides and fixed length k-mers (5-mers) in binary format");
 
     m.def("unpack_moves", &unpack_moves);
 
