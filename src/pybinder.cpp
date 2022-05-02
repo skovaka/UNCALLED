@@ -28,9 +28,6 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Config> config(m, "_Conf");
     Config::pybind_defs(config);
 
-    std::cerr << "A\n";
-    std::cout << "a\n";
-
     Mapper::pybind_defs(m);
 
     py::class_<MapPool> map_pool(m, "MapPool");
@@ -51,16 +48,10 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Paf> paf(m, "Paf");
     Paf::pybind_defs(paf);
 
-    std::cerr << "B\n";
-    std::cout << "b\n";
-
     RefIndex<PoreModelK5>::pybind_defs(m, "K5");//ref_index);
     RefIndex<PoreModelK10>::pybind_defs(m, "K10");//ref_index);
     RefCoord::pybind_defs(m);//ref_index);
 
-    std::cerr << "C\n";
-    std::cout << "c\n";
-    
     py::class_<ReadBuffer> read_buffer(m, "ReadBuffer");
     ReadBuffer::pybind_defs(read_buffer);
 
@@ -93,25 +84,12 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Range> range(m, "Range");
     Range::pybind_defs(range);
 
-    std::cerr << "D\n";
-    std::cout << "d\n";
-
     pybind_pore_model_params(m);
     PoreModel<5>::pybind_defs(m, "K5");
     PoreModel<10>::pybind_defs(m, "K10");
 
-
-    std::cerr << "E\n";
-    std::cout << "e\n";
     m.def("self_align", &self_align);
-
-    //BP operation functions
-    //auto nt_module = m.def_submodule("_nt", "Contains functions and constants for manipulating nucleotides and fixed length k-mers (5-mers) in binary format");
-
     m.def("unpack_moves", &unpack_moves);
-
-    //py::class_<DTW> dtw(m, "DTW");
-    //DTW::pybind_defs(dtw);
 
     BandedDTW<PoreModel<5>>::pybind_defs(m, "K5");
     BandedDTW<PoreModel<10>>::pybind_defs(m, "K10");
@@ -122,34 +100,8 @@ PYBIND11_MODULE(_uncalled, m) {
     GlobalDTW<PoreModel<5>>::pybind_defs(m, "K5");
     GlobalDTW<PoreModel<10>>::pybind_defs(m, "K10");
 
-    //py::class_<StaticBDTW, BandedDTW> static_bdtw(m, "StaticBDTW");
-    
-    //py::class_<GlobalDTW> global_dtw(m, "GlobalDTW");
-    //GlobalDTW::pybind_defs(global_dtw);
-
-    std::cerr << "F\n";
-    std::cout << "f\n";
-
     signal_processor_pybind(m);
-    //SignalProcessor<PoreModel<5>>::pybind_defs(m, "K5");
-    //SignalProcessor<PoreModel<10>>::pybind_defs(m, "K10");
-
-    std::cerr << "H\n";
-    std::cout << "h\n";
 
     pybind_dtw(m);
-    std::cerr << "H\n";
-    std::cout << "h\n";
-    //py::class_<DTWParams> dtwp(m, "DTWParams");
-    //dtwp.def_readwrite("dw", &DTWParams::dw);
-    //dtwp.def_readwrite("hw", &DTWParams::hw);
-    //dtwp.def_readwrite("vw", &DTWParams::vw);
-    //m.attr("DTW_EVENT_GLOB") = py::cast(DTW_EVENT_GLOB);
-    //m.attr("DTW_RAW_GLOB") = py::cast(DTW_RAW_GLOB);
-    //m.attr("DTW_GLOB") = py::cast(DTW_GLOB);
-    //m.attr("DTW_EVENT_QSUB") = py::cast(DTW_EVENT_QSUB);
-    //m.attr("DTW_EVENT_RSUB") = py::cast(DTW_EVENT_RSUB);
-    //m.attr("DTW_RAW_QSUB") = py::cast(DTW_EVENT_QSUB);
-    //m.attr("DTW_RAW_RSUB") = py::cast(DTW_EVENT_RSUB);
 }
 
