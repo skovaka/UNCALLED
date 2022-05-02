@@ -28,6 +28,9 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Config> config(m, "_Conf");
     Config::pybind_defs(config);
 
+    std::cerr << "A\n";
+    std::cout << "a\n";
+
     Mapper::pybind_defs(m);
 
     py::class_<MapPool> map_pool(m, "MapPool");
@@ -48,9 +51,15 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Paf> paf(m, "Paf");
     Paf::pybind_defs(paf);
 
-    RefIndex<PoreModelK5>::pybind_defs(m);//ref_index);
-    RefIndex<PoreModelK10>::pybind_defs(m);//ref_index);
+    std::cerr << "B\n";
+    std::cout << "b\n";
+
+    RefIndex<PoreModelK5>::pybind_defs(m, "K5");//ref_index);
+    RefIndex<PoreModelK10>::pybind_defs(m, "K10");//ref_index);
     RefCoord::pybind_defs(m);//ref_index);
+
+    std::cerr << "C\n";
+    std::cout << "c\n";
     
     py::class_<ReadBuffer> read_buffer(m, "ReadBuffer");
     ReadBuffer::pybind_defs(read_buffer);
@@ -84,9 +93,16 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Range> range(m, "Range");
     Range::pybind_defs(range);
 
+    std::cerr << "D\n";
+    std::cout << "d\n";
+
+    pybind_pore_model_params(m);
     PoreModel<5>::pybind_defs(m, "K5");
     PoreModel<10>::pybind_defs(m, "K10");
 
+
+    std::cerr << "E\n";
+    std::cout << "e\n";
     m.def("self_align", &self_align);
 
     //BP operation functions
@@ -111,10 +127,19 @@ PYBIND11_MODULE(_uncalled, m) {
     //py::class_<GlobalDTW> global_dtw(m, "GlobalDTW");
     //GlobalDTW::pybind_defs(global_dtw);
 
-    SignalProcessor<PoreModel<5>>::pybind_defs(m, "K5");
-    SignalProcessor<PoreModel<10>>::pybind_defs(m, "K10");
+    std::cerr << "F\n";
+    std::cout << "f\n";
+
+    signal_processor_pybind(m);
+    //SignalProcessor<PoreModel<5>>::pybind_defs(m, "K5");
+    //SignalProcessor<PoreModel<10>>::pybind_defs(m, "K10");
+
+    std::cerr << "H\n";
+    std::cout << "h\n";
 
     pybind_dtw(m);
+    std::cerr << "H\n";
+    std::cout << "h\n";
     //py::class_<DTWParams> dtwp(m, "DTWParams");
     //dtwp.def_readwrite("dw", &DTWParams::dw);
     //dtwp.def_readwrite("hw", &DTWParams::hw);

@@ -7,7 +7,7 @@ import numpy as np
 from .config import ParamGroup, Config
 from .pafstats import parse_paf
 from . import PoreModel, EventDetector, EventProfiler, Normalizer
-from _uncalled import _SignalProcessor, _ProcessedRead
+from _uncalled import SignalProcessorK5, _ProcessedRead
 
 class ProcessedRead(_ProcessedRead):
     def sample_range(self, start, end):
@@ -17,6 +17,6 @@ class ProcessedRead(_ProcessedRead):
     def to_df(self):
         return pd.DataFrame(self.events)
 
-class SignalProcessor(_SignalProcessor):
+class SignalProcessor(SignalProcessorK5):
     def process(self, read):
-        return ProcessedRead(_SignalProcessor.process(self, read))
+        return ProcessedRead(SignalProcessorK5.process(self, read))

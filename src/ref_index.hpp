@@ -581,8 +581,8 @@ class RefIndex {
     #define PY_BWA_INDEX_METH(P) c.def(#P, &RefIndex<ModelType>::P);
     #define PY_BWA_INDEX_VEC(P) c.def(#P, py::vectorize(&RefIndex<ModelType>::P));
 
-    static void pybind_defs(pybind11::module_ m) {
-        py::class_<RefIndex<ModelType>> c(m, "_RefIndex");
+    static void pybind_defs(pybind11::module_ m, const std::string &suffix) {
+        py::class_<RefIndex<ModelType>> c(m, ("RefIndex" + suffix).c_str());
 
         c.def(py::init<>());
         c.def(py::init<const std::string &>());
@@ -628,13 +628,6 @@ class RefIndex {
         c.def("get_kmers", 
             static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64, bool)> (&RefIndex::get_kmers),
             py::arg("miref_start"), py::arg("miref_end"), py::arg("is_rna"));
-
-        py::class_<RefLoc> l(m, "RefLoc");
-        l.def_readwrite("ref_id", &RefLoc::ref_id);
-        l.def_readwrite("ref_name", &RefLoc::ref_name);
-        l.def_readwrite("start", &RefLoc::start);
-        l.def_readwrite("end", &RefLoc::end);
-        l.def_readwrite("fwd", &RefLoc::fwd);
 
     }
 

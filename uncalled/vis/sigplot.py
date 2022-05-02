@@ -4,8 +4,6 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 
-from .. import nt
-
 from .. import config
 from ..dtw.aln_track import LAYERS
 from ..index import str_to_coord

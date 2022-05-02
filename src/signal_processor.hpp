@@ -88,20 +88,32 @@ class SignalProcessor {
             return py::array_t<T>(r.A.size(), r.A.data()); \
         }, D);
 
-    static void pybind_defs(py::module_ &m, const std::string &suffix) {
-        py::class_<SignalProcessor> s(m, ("_SignalProcessor" + suffix).c_str());
+    static void pybind(py::module_ &m, const std::string &suffix) {
+        py::class_<SignalProcessor> s(m, ("SignalProcessor" + suffix).c_str());
         s.def(pybind11::init<const ModelType &, EventDetector::Params>());
         s.def("process", &SignalProcessor::process);
 
-        PYBIND11_NUMPY_DTYPE(NormVals, start, end, scale, shift);
-
-        py::class_<ProcessedRead> p(m, "_ProcessedRead");
-        p.def(pybind11::init<const ProcessedRead &>());
-        p.def("rescale", &ProcessedRead::rescale);
-        PY_PROC_ARR(Event, events, "Un-normalized events");
-        PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");
     }
     #endif
 
 };
+
+#ifdef PYBIND
+void signal_processor_pybind(py::module_ &m) {
+
+    PYBIND11_NUMPY_DTYPE(NormVals, start, end, scale, shift);
+
+
+    //TODO move to ProcessedRead
+    py::class_<ProcessedRead> p(m, "_ProcessedRead");
+    p.def(pybind11::init<const ProcessedRead &>());
+    p.def("rescale", &ProcessedRead::rescale);
+    PY_PROC_ARR(Event, events, "Un-normalized events");
+    PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");
+
+    SignalProcessor<PoreModel<5>>::pybind(m, "K5");
+    SignalProcessor<PoreModel<10>>::pybind(m, "K10");
+}
+#endif
+
 #endif

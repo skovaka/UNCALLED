@@ -9,18 +9,25 @@ import numpy as np
 import pandas as pd
 import h5py
 
-from _uncalled import _PoreModel
-from . import nt, config
+from _uncalled import PoreModelK5, PoreModelK10, PoreModelParams
+from . import config
 
-class PoreModel(_PoreModel):
+#class PoreModel(_PoreModel):
+class PoreModel:
 
     @staticmethod
     def _param_defaults():
-        return _PoreModel.Params(config._DEFAULTS.pore_model)
+        return PoreModelParams(config._DEFAULTS.pore_model)
 
     def __init__(self, model=None, name=None, reverse=None, complement=None, df=None):
+        self.ModelType = PoreModelK5
+
         if model is not None: 
-            if isinstance(model, _PoreModel):
+            if isinstance(model, PoreModelK5):
+                self._init(name, model)
+                return 
+
+            if isinstance(model, PoreModelK10):
                 self._init(name, model)
                 return 
 
@@ -28,8 +35,8 @@ class PoreModel(_PoreModel):
                 prms = self._param_defaults()
                 prms.name = model
 
-            elif isinstance(model, PoreModel.Params):
-                prms = _PoreModel.Params(model)
+            elif isinstance(model, PoreModelParams):
+                prms = PoreModelParams(model)
 
             else:
                 raise TypeError("PoreModel model must be of type str, PoreModel, or PoreModel.Params")
@@ -43,8 +50,7 @@ class PoreModel(_PoreModel):
         if df is not None:
             vals = self._vals_from_df(df)
 
-        elif self.is_preset(prms.name):
-            self._init(name, prms)
+        elif self._init_preset(prms):
             return
 
         elif os.path.exists(prms.name):
@@ -58,21 +64,45 @@ class PoreModel(_PoreModel):
         else:
             raise ValueError(
                 "PoreModel name must be a filename or one of {%s}" % \
-                ", ".join(_PoreModel.get_preset_names())
+                ", ".join(PoreModelK5.get_preset_names())
             )
+
+        k = int(np.log2(len(vals)) / 2)
+        if k == 5:
+            self.ModelType = PoreModelK5
+        elif k == 10:
+            self.ModelType = PoreModelK10
+        else:
+            raise ValueError(f"Invalid k-mer length: {k}\n")
 
         self._init(name, vals, prms.reverse, prms.complement)
 
     def _init(self, name, *args):
-        _PoreModel.__init__(self, *args)
+        self.instance = self.ModelType(*args)
         if name is not None:
             self.PRMS.name = name
+
+        self.KMERS = np.arange(self.KMER_COUNT)
+        self.KMER_STRS = self.kmer_to_str(self.KMERS)
+
+    def __getattr__(self, name):
+        return self.instance.__getattribute__(name)
+
+    def _init_preset(self, prms):
+        if PoreModelK5.is_preset(prms.name):
+            self.ModelType = PoreModelK5
+        elif PoreModelK10.is_preset(prms.name):
+            self.ModelType = PoreModelK10
+        else:
+            return False
+        self._init(prms.name, prms)
 
     @property
     def name(self):
         return self.PRMS.name
 
     def _vals_from_df(self, df):
+        print(df)
         return np.ravel(df.rename(columns=self.TSV_RENAME) \
                           .sort_values("kmer")[["mean","stdv"]])
                
@@ -96,17 +126,37 @@ class PoreModel(_PoreModel):
         return self._vals_from_df(df)
 
     def __getitem__(self, kmer):
-        return self.means[nt.kmer_array(kmer)]
+        return self.means[self.kmer_array(kmer)]
+
+    def kmer_array(self, kmer):
+        arr = np.array(kmer)
+        if arr.shape == ():
+            arr.shape = 1
+
+        if arr.dtype.type in {np.str_, np.bytes_}:
+
+            #TODO add option to fully check BP validity
+            if not np.all(np.char.str_len(arr) == K):
+                raise RuntimeError("All k-mers must be %d bases long" % K)
+
+            arr = str_to_kmer(arr)
+        return KmerArray(arr.astype("uint16"))
+        #return arr
+
+    def kmer_to_str(self, kmer, dtype=str):
+        if isinstance(kmer, (Sequence, self.ModelType.KmerArray, np.ndarray, pd.Series)):
+            return self.ModelType.kmer_to_arr(kmer).astype(dtype)
+        return dtype(self.ModelType.kmer_to_str(kmer))
 
     def norm_pdf(self, current, kmer):
-        return _PoreModel.norm_pdf(self, current, nt.kmer_array(kmer))
+        return self.instance.norm_pdf(self, current, self.kmer_array(kmer))
 
     def abs_diff(self, current, kmer):
-        return _PoreModel.abs_diff(self, current, nt.kmer_array(kmer))
+        return self.instance.abs_diff(self, current, self.kmer_array(kmer))
 
     def to_df(self):
         return pd.DataFrame({
-            "kmer" : nt.KMER_STRS, 
+            "kmer" : self.KMER_STRS, 
             "mean" : self.means, 
             "stdv" : self.stdvs
         })
@@ -133,18 +183,18 @@ class PoreModel(_PoreModel):
         new_means = self.means * scale + shift
         vals = np.ravel(np.dstack([new_means,self.stdvs]))
 
-        return(PoreModel(_PoreModel(vals), name=self.name), scale, shift)
+        return(PoreModel(self.ModelType(vals), name=self.name), scale, shift)
     
     
     def __repr__(self):
         ret = "<PoreModel mean=%.3f stdv=%.3f>\n" % (self.model_mean, self.model_stdv)
         ret += "kmer    mean    stdv\n"
         def kmer_str(i):
-            return "%s%8.3f%8.3f\n" % (nt.KMER_STRS[i], self.means[i], self.stdvs[i])
-        for i in nt.KMERS[:3]:
+            return "%s%8.3f%8.3f\n" % (self.KMER_STRS[i], self.means[i], self.stdvs[i])
+        for i in self.KMERS[:3]:
             ret += kmer_str(i)
         ret += "...\n"
-        for i in nt.KMERS[-3:]:
+        for i in self.KMERS[-3:]:
             ret += kmer_str(i)
         return ret[:-1]
 

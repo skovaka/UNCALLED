@@ -12,20 +12,18 @@ from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt 
 from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader, FAST5_OPTS
-from .. import GlobalDTW, StaticBDTW, BandedDTW, DTW_PRMS_EVT_GLOB, nt, DtwParams
+from _uncalled import GlobalDTWK5, StaticBDTWK5, BandedDTWK5, DTW_PRMS_EVT_GLOB, DtwParams
 
 from ..signal_processor import SignalProcessor
-
-from _uncalled._nt import KmerArray
 
 from .. import PoreModel
 from . import Bcaln, Tracks
 
 #TODO make this better
 METHODS = {
-    "guided" : BandedDTW,
-    "static" : StaticBDTW,
-    "global" : GlobalDTW,
+    "guided" : BandedDTWK5,
+    "static" : StaticBDTWK5,
+    "global" : GlobalDTWK5,
 }
 
 #class DtwParams(ParamGroup):

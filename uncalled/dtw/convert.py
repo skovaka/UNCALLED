@@ -17,7 +17,7 @@ from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt, MutexOpts, FAST5_PARAM
 from ..fast5 import Fast5Reader, FAST5_OPTS, parse_read_ids
 from ..index import BWA_OPTS, str_to_coord, RefCoord
-from .. import nt, PoreModel
+from .. import PoreModel
 
 import progressbar as progbar
 

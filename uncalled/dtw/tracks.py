@@ -14,7 +14,7 @@ from .aln_track import AlnTrack, LAYERS, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
-from .. import config, nt
+from .. import config
 
 class TracksParams(config.ParamGroup):
     _name = "tracks"

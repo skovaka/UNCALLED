@@ -9,7 +9,7 @@ import time
 
 from .sigplot import Sigplot
 
-from .. import config, nt
+from .. import config
 from ..dtw.aln_track import LAYERS, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks

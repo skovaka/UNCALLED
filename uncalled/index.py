@@ -26,17 +26,16 @@ from __future__ import division
 import sys                         
 import os
 import numpy as np
-import uncalled as unc
 from bisect import bisect_left, bisect_right
 from typing import NamedTuple
 import collections.abc
 
 import pandas as pd
 
-from _uncalled import _RefIndex, _RefCoord
+from _uncalled import RefIndexK5, _RefCoord, self_align
 from .argparse import Opt
 from .config import ParamGroup
-from . import nt
+from . import index
 
 def str_to_coord(coord_str):
     spl = coord_str.split(":")         
@@ -294,7 +293,7 @@ class CoordSpace:
     def __repr__(self):
         return ("%s:%d-%d " % (self.ref_name, self.refs.start, self.refs.stop)) + str(self.mrefs)
 
-class RefIndex(_RefIndex):
+class RefIndex(RefIndexK5):
 
     def mrefs_to_kmers(self, mrefs, is_rna, kmer_trim):
         #if (mrefs.step < 0) == is_rna:
@@ -437,7 +436,7 @@ def main(conf):
 
     bwa_built = True
 
-    for suff in unc.index.UNCL_SUFFS:
+    for suff in index.UNCL_SUFFS:
         if not os.path.exists(prms.index_prefix + suff):
             bwa_built = False
             break
@@ -445,14 +444,14 @@ def main(conf):
     if bwa_built:
         sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % prms.index_prefix)
     else:
-        unc.RefIndex.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
+        RefIndex.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
         
         if prms.no_bwt: 
             sys.stderr.write("Pacseq built\n")
             return
 
     sys.stderr.write("Initializing parameter search\n")
-    p = unc.index.IndexParameterizer(prms)
+    p = index.IndexParameterizer(prms)
 
     p.add_preset("default", tgt_speed=115)
 
@@ -539,7 +538,7 @@ class IndexParameterizer:
         else:
             sample_dist = self.prms.max_sample_dist
 
-        fmlens = unc.self_align(self.prms.index_prefix, sample_dist)
+        fmlens = self_align(self.prms.index_prefix, sample_dist)
         path_kfmlens = [p[self.prms.kmer_len-1:] if len(p) >= self.prms.kmer_len else [1] for p in fmlens]
 
         max_pathlen = 0

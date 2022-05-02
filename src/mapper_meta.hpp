@@ -214,9 +214,9 @@ class MapperMeta : public Mapper {
              return pybind11::array_t<MetaPath>(d.paths.size(), d.paths.data());
         });
 
-        PYBIND11_NUMPY_DTYPE(MetaSeed, ref_id, start, end, fwd, event, path, cluster);
-        PYBIND11_NUMPY_DTYPE(MetaPath, event, id, parent, fm_start, fm_length, kmer, 
-                             length, total_moves, norm_pdf, seed_prob, moves_pac);
+        //PYBIND11_NUMPY_DTYPE(MetaSeed, ref_id, start, end, fwd, event, path, cluster);
+        //PYBIND11_NUMPY_DTYPE(MetaPath, event, id, parent, fm_start, fm_length, kmer, 
+        //                     length, total_moves, norm_pdf, seed_prob, moves_pac);
 
 
         //map.def_static("moves_to_u8", Mapper::moves_to_u8);

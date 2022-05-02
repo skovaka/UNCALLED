@@ -18,7 +18,7 @@ from sklearn.decomposition import PCA
 
 from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
-from .. import nt, PoreModel, config, index 
+from .. import PoreModel, config, index 
 from ..index import load_index, RefCoord
 from .bcaln import Bcaln
 

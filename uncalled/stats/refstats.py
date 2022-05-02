@@ -8,7 +8,7 @@ import pandas as pd
 import scipy.stats
 from collections import defaultdict
 
-from .. import config, nt
+from .. import config
 from ..dtw.tracks import RefstatsSplit, ALL_REFSTATS
 from ..dtw.aln_track import parse_layers
 from ..sigproc import ProcRead

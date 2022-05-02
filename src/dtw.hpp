@@ -202,7 +202,7 @@ class GlobalDTW {
         c.def_property_readonly("path", [](GlobalDTW<ModelType> &d) -> pybind11::array_t<Trace> {
              return pybind11::array_t<Trace>(d.path_.size(), d.path_.data());
         });
-        PYBIND11_NUMPY_DTYPE(Trace, qry, ref);
+        //PYBIND11_NUMPY_DTYPE(Trace, qry, ref);
     }
     #endif
 };
@@ -594,7 +594,7 @@ class BandedDTW {
         c.def_property_readonly("path", [](BandedDTW<ModelType> &d) -> pybind11::array_t<Coord> {
              return pybind11::array_t<Coord>(d.path_.size(), d.path_.data());
         });
-        PYBIND11_NUMPY_DTYPE(Coord, qry, ref);
+        //PYBIND11_NUMPY_DTYPE(Coord, qry, ref);
     }
     #endif
 };

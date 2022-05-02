@@ -58,7 +58,11 @@ struct PoreModelParams {
     bool reverse, complement;
 };
 
-extern const std::unordered_map<std::string, const std::vector<float> &> PORE_MODEL_PRESETS;
+void pybind_pore_model_params(py::module_ &m);
+
+//extern const std::unordered_map<std::string, const std::vector<float> &> PORE_MODEL_PRESETS;
+
+using PresetMap = std::unordered_map<std::string, const std::vector<float> &>;
 
 
 template<KmerLen K, typename KmerType=typename std::conditional<(K <= 8), u16, u32>::type>
@@ -74,6 +78,7 @@ class PoreModel {
 
     static const PoreModelParams PRMS_DEF;
     PoreModelParams PRMS;
+    static const PresetMap PRESETS;
 
     PoreModel(PoreModelParams p) : PRMS(p) {
         loaded_ = false;
@@ -85,9 +90,9 @@ class PoreModel {
 
         if (p.name.empty()) return;
 
-        auto vals = PORE_MODEL_PRESETS.find(PRMS.name);
+        auto vals = PRESETS.find(PRMS.name);
 
-        if (vals != PORE_MODEL_PRESETS.end()) {
+        if (vals != PRESETS.end()) {
             init_vals(vals->second);
         } else {
             init_tsv(PRMS.name);
@@ -175,12 +180,12 @@ class PoreModel {
     }
 
     static bool is_preset(const std::string &name) {
-        return PORE_MODEL_PRESETS.find(name) != PORE_MODEL_PRESETS.end();
+        return PRESETS.find(name) != PRESETS.end();
     }
 
     static std::vector<std::string> get_preset_names() {
         std::vector<std::string> ret;
-        for (auto p : PORE_MODEL_PRESETS) {
+        for (auto p : PRESETS) {
             ret.push_back(p.first);
         }
         return ret;
@@ -437,20 +442,15 @@ class PoreModel {
 	}
 
 
+
     static void pybind_defs(py::module_ &m, const std::string &suffix) {
-        py::class_<PoreModel> c(m, ("_PoreModel" + suffix).c_str());
+        using Class = PoreModel<K,KmerType>;
 
-        py::class_<PoreModelParams> p(m, "PoreModelParams");
+        py::class_<Class> c(m, ("PoreModel" + suffix).c_str());
 
-        p.def(py::init<>());
-        p.def(py::init<PoreModelParams>());
-        PY_MODEL_PARAM(name, "Model preset name or TSV filename");
-        PY_MODEL_PARAM(reverse, "Will reverse (flip) k-mer sequences if True");
-        PY_MODEL_PARAM(complement, "Will complement k-mer sequences if True");
+        c.def_readonly_static("PRMS_DEF", &Class::PRMS_DEF);
 
-        c.def_readonly_static("PRMS_DEF", &PoreModel<K,KmerType>::PRMS_DEF);
-
-        c.def(pybind11::init<const PoreModel<K,KmerType> &>());
+        c.def(pybind11::init<const Class &>());
         c.def(pybind11::init<PoreModelParams>());
         c.def(pybind11::init<const std::string &, bool, bool>(), 
               py::arg("name"), py::arg("reverse")=PRMS_DEF.reverse, py::arg("complement")=PRMS_DEF.complement);
@@ -459,21 +459,21 @@ class PoreModel {
 
 		py::bind_vector<std::vector<KmerType>>(c, "KmerArray", py::buffer_protocol());
 
-        c.def_property_readonly("kmer_count", &PoreModel<K,KmerType>::get_kmer_count, "The number of k-mers in the model");
-        c.def_readwrite("PRMS", &PoreModel<K,KmerType>::PRMS, "PoreModel parameters");
+        c.def_property_readonly("kmer_count", &Class::get_kmer_count, "The number of k-mers in the model");
+        c.def_readwrite("PRMS", &Class::PRMS, "Class parameters");
         PY_MODEL_PROP(model_mean, "The mean of all model k-mer currents");
         PY_MODEL_PROP(model_stdv, "The standard deviation of all model k-mer currents");
 
-        c.def_static("is_preset", &PoreModel<K,KmerType>::is_preset, "List of model preset names");
-        c.def_static("get_preset_names", &PoreModel<K,KmerType>::get_preset_names, "List of model preset names");
+        c.def_static("is_preset", &Class::is_preset, "List of model preset names");
+        c.def_static("get_preset_names", &Class::get_preset_names, "List of model preset names");
 
         c.def_property_readonly("means", 
-            [](PoreModel<K,KmerType> &r) -> pybind11::array_t<float> {
+            [](Class &r) -> pybind11::array_t<float> {
                 return pybind11::array_t<float>(r.kmer_means_.size(), r.kmer_means_.data());
         }, "The expected mean current of each k-mer");
 
         c.def_property_readonly("stdvs",
-            [](PoreModel<K,KmerType> &r) -> pybind11::array_t<float> {
+            [](Class &r) -> pybind11::array_t<float> {
                 return pybind11::array_t<float>(r.kmer_stdvs_.size(), r.kmer_stdvs_.data());
         }, "The expected standard devaition of each k-mer");
 
@@ -481,29 +481,31 @@ class PoreModel {
 
         PY_MODEL_DEFVEC(abs_diff, "Returns the absolute difference between the observed and model current");
 
-        c.def("__getitem__", py::vectorize(&PoreModel<K,KmerType>::kmer_current), "Alias for get_current()");
+        c.def("__getitem__", py::vectorize(&Class::kmer_current), "Alias for get_current()");
 
-        c.def("__len__", &PoreModel::get_kmer_count, "Alias for kmer_count");
+        c.def("__len__", &Class::get_kmer_count, "Alias for kmer_count");
 
-        c.def_readonly_static("K", &PoreModel::KMER_LEN);
-        c.def_readonly_static("KMER_COUNT", &PoreModel::KMER_COUNT);
+        //c.def_readonly_static("K", &Class::KMER_LEN);
+        //c.def_readonly_static("KMER_COUNT", &Class::KMER_COUNT);
+        c.attr("K") = pybind11::cast(Class::KMER_LEN);
+        c.attr("KMER_COUNT") = pybind11::cast(Class::KMER_COUNT);
 
         c.def_static("str_to_kmer",
-                py::vectorize(static_cast< KmerType (*) (KmerTypePy, u32)>(&PoreModel::str_to_kmer)), 
+                py::vectorize(static_cast< KmerType (*) (KmerTypePy, u32)>(&Class::str_to_kmer)), 
                 py::arg("kmer"), py::arg("offs")=0);
 
-        c.def_static("_kmer_to_str",  &PoreModel::kmer_to_str);
-        c.def_static("_kmer_to_arr",  py::vectorize(&PoreModel<K,KmerType>::kmer_to_arr));
+        c.def_static("kmer_to_str",  &Class::kmer_to_str);
+        c.def_static("kmer_to_arr",  py::vectorize(&Class::kmer_to_arr));
 
-        c.def_static("base_to_char", py::vectorize(&PoreModel<K,KmerType>::base_to_char)); 
-        c.def_static("base_comp", py::vectorize(&PoreModel<K,KmerType>::base_comp));
+        c.def_static("base_to_char", py::vectorize(&Class::base_to_char)); 
+        c.def_static("base_comp", py::vectorize(&Class::base_comp));
         
-        c.def_static("kmer_rev",      py::vectorize(&PoreModel<K,KmerType>::kmer_rev));
-        c.def_static("kmer_comp",     py::vectorize(&PoreModel<K,KmerType>::kmer_comp));
-        c.def_static("kmer_revcomp",  py::vectorize(&PoreModel<K,KmerType>::kmer_revcomp));
-        c.def_static("kmer_head",     py::vectorize(&PoreModel<K,KmerType>::kmer_head));
-        c.def_static("kmer_base",     py::vectorize(&PoreModel<K,KmerType>::kmer_base));
-        c.def_static("kmer_neighbor", py::vectorize(&PoreModel<K,KmerType>::kmer_neighbor));
+        c.def_static("kmer_rev",      py::vectorize(&Class::kmer_rev));
+        c.def_static("kmer_comp",     py::vectorize(&Class::kmer_comp));
+        c.def_static("kmer_revcomp",  py::vectorize(&Class::kmer_revcomp));
+        c.def_static("kmer_head",     py::vectorize(&Class::kmer_head));
+        c.def_static("kmer_base",     py::vectorize(&Class::kmer_base));
+        c.def_static("kmer_neighbor", py::vectorize(&Class::kmer_neighbor));
 
 
     }
