@@ -11,34 +11,39 @@ from _uncalled import SignalProcessorK5, SignalProcessorK10, _ProcessedRead
 
 class ProcessedRead(_ProcessedRead):
     def __init__(self, read, raw):
-        self.signal = raw.signal
         _ProcessedRead.__init__(self, read)
+        self.signal = raw.signal
 
     def sample_range(self, start, end):
         mask = (self.events["start"] >= start) & (self.events["start"] <= end)
         return self.to_df()[mask]
 
-    #def get_norm_signal(self, samp_min, samp_max):
-    #    ret = np.zeros(int(samp_max - samp_min))
+    def get_norm_signal(self, samp_min, samp_max):
 
-    #    i = self.norm["end"].searchsorted(samp_min)
+        n = self.norm[0]
+        print(self.norm)
+        print(samp_min, samp_max, n["scale"], n["shift"])
+        return self.signal[samp_min:samp_max] * n["scale"] + n["shift"]
 
-    #    while i < len(self.norm):
-    #        n = self.norm[i]
+        #ret = np.zeros(int(samp_max - samp_min))
+        #i = self.norm[0]["end"].searchsorted(samp_min)
 
-    #        st = int(n["start"])
-    #        if st >= samp_max: break
+        #while i < len(self.norm):
+        #    n = self.norm[i]
 
-    #        en = int(n["end"])-1
+        #    st = int(n["start"])
+        #    if st >= samp_max: break
 
-    #        st = max(st, samp_min)
-    #        en = min(en, samp_max)
+        #    en = int(n["end"])-1
 
-    #        raw = self.signal[st:en]
-    #        ret[st-samp_min:en-samp_min] = (n["scale"] * raw) + n["shift"]
-    #        i += 1
+        #    st = max(st, samp_min)
+        #    en = min(en, samp_max)
 
-    #    return ret
+        #    raw = self.signal[st:en]
+        #    ret[st-samp_min:en-samp_min] = (n["scale"] * raw) + n["shift"]
+        #    i += 1
+
+        return ret
 
     def to_df(self):
         return pd.DataFrame(self.events)

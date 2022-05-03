@@ -50,9 +50,10 @@ IOParams._def_params(
 
 
 class TrackIO:
-    def __init__(self, filename, conf, mode):
+    def __init__(self, filename, conf, model, mode):
         self.conf = conf
         self.prms = self.conf.tracks.io
+        self.model = model
 
         self.tracks = list()
 
@@ -108,7 +109,7 @@ class TrackIO:
         self.prev_fast5 = (None, None)
         self.prev_read = None
 
-        track = AlnTrack(self, None, name, name, self.conf)
+        track = AlnTrack(self, None, name, name, self.conf, self.model)
         self.tracks.append(track)
         return track
 
@@ -116,9 +117,9 @@ class TrackIO:
 class Eventalign(TrackIO):
     FORMAT = "eventalign"
 
-    def __init__(self, conf, mode):
+    def __init__(self, conf, model, mode):
         filename = conf.tracks.io.eventalign_in if mode == "r" else conf.tracks.io.eventalign_out
-        TrackIO.__init__(self, filename, conf, mode)
+        TrackIO.__init__(self, filename, conf, model, mode)
 
         if self.filename == "-":
             self.out = sys.stdout
@@ -136,7 +137,7 @@ class Eventalign(TrackIO):
         if len(self.track_names) != 1:
             raise ValueError("Can only read eventalign TSV into a single track")
         name = self.track_names[0]
-        t = AlnTrack(self, None, name, name, self.conf)
+        t = AlnTrack(self, None, name, name, self.conf, self.model)
         self.tracks.append(t)
 
     #def write_dtw_events(self, track, events):
@@ -285,9 +286,9 @@ def _db_track_split(db_str):
 
 class TrackSQL(TrackIO):
     FORMAT = "db"
-    def __init__(self, conf, mode):
+    def __init__(self, conf, model, mode):
         filename = conf.tracks.io.db_in if mode == "r" else conf.tracks.io.db_out
-        TrackIO.__init__(self, filename, conf, mode)
+        TrackIO.__init__(self, filename, conf, model, mode)
 
         new_file = not os.path.exists(self.filename)
         self.con = sqlite3.connect(self.filename)
@@ -420,7 +421,7 @@ class TrackSQL(TrackIO):
 
         for name,row in df.iterrows():
             conf = config.Config(toml=row.config)
-            t = AlnTrack(self, row["id"], name, row["desc"], conf)
+            t = AlnTrack(self, row["id"], name, row["desc"], conf, self.model)
             self.tracks.append(t)
 
             self.conf.load_config(conf)

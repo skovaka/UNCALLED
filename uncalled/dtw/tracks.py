@@ -107,6 +107,8 @@ class Tracks:
         self.set_layers(self.prms.layers)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers, add_deps=False))
 
+        self.model = PoreModel(self.conf.pore_model) 
+
         #TODO refactor into TrackSQL, abstract into self.io
 
         self.alns = list()
@@ -120,7 +122,7 @@ class Tracks:
 
         self._aln_track_ids = [t.id for t in self.alns]
 
-        self.index = load_index(self.prms.index_prefix)
+        self.index = load_index(self.model.K, self.prms.index_prefix)
 
         self.coords = self._ref_bounds_to_coords(self.prms.ref_bounds)
 
@@ -237,7 +239,7 @@ class Tracks:
         if np.any(in_prms):
             in_format = INPUT_PARAMS[in_prms][0]
             if in_format == "db_in":
-                self.input = TrackSQL(self.conf, "r")
+                self.input = TrackSQL(self.conf, self.model, "r")
             elif in_format == "eventalign_in":
                 raise ValueError("EVENTALGIN NOT SUPPORTED YET")
             elif in_format == "tombo_in":
@@ -251,9 +253,9 @@ class Tracks:
         if np.any(out_prms):
             out_format = OUTPUT_PARAMS[out_prms][0]
             if out_format == "db_out":
-                self.output = TrackSQL(self.conf, "w")
+                self.output = TrackSQL(self.conf, self.model, "w")
             elif out_format == "eventalign_out":
-                self.output = Eventalign(self.conf, "w")
+                self.output = Eventalign(self.conf, self.model, "w")
 
             for track in self.output.tracks:
                 self.output_tracks[track.name] = track

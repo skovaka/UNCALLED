@@ -32,7 +32,7 @@ import collections.abc
 
 import pandas as pd
 
-from _uncalled import RefIndexK5, _RefCoord, self_align
+from _uncalled import RefIndexK5, RefIndexK10, _RefCoord, self_align
 from .argparse import Opt
 from .config import ParamGroup
 from . import index
@@ -293,7 +293,23 @@ class CoordSpace:
     def __repr__(self):
         return ("%s:%d-%d " % (self.ref_name, self.refs.start, self.refs.stop)) + str(self.mrefs)
 
-class RefIndex(RefIndexK5):
+class RefIndex:
+
+    def __init__(self, k, *args, **kwargs):
+        
+        if k == 5:
+            self.InstanceClass = RefIndexK5
+            self.head_clip = 2
+            self.tail_clip = 2
+        else:
+            self.InstanceClass = RefIndexK10
+            self.head_clip = 4
+            self.tail_clip = 5
+
+        self.instance = self.InstanceClass(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return self.instance.__getattribute__(name)
 
     def mrefs_to_kmers(self, mrefs, is_rna, kmer_trim):
         #if (mrefs.step < 0) == is_rna:
@@ -307,9 +323,9 @@ class RefIndex(RefIndexK5):
             kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
             if mrefs.step < 0:
                 kmers = kmers[::-1]
-            ret = pd.Series(index=mrefs[2:-2], data=kmers, name="kmer")
+            ret = pd.Series(index=mrefs[self.head_clip:-self.tail_clip], data=kmers, name="kmer")
         else:
-            kmers = self.get_kmers(mrefs.min()-2, mrefs.max()+3, is_rna)
+            kmers = self.get_kmers(mrefs.min()-self.head_clip, mrefs.max()+self.tail_clip+1, is_rna)
             if mrefs.step < 0:
                 kmers = kmers[::-1]
             ret = pd.Series(index=mrefs, data=kmers, name="kmer")
@@ -373,10 +389,10 @@ class RefIndex(RefIndexK5):
 
 _index_cache = dict()
 
-def load_index(prefix, load_pacseq=True, load_bwt=False, cache=True):
+def load_index(k, prefix, load_pacseq=True, load_bwt=False, cache=True):
     idx = _index_cache.get(prefix, None)
     if idx is None:
-        idx = RefIndex(prefix, load_pacseq, load_bwt)
+        idx = RefIndex(k, prefix, load_pacseq, load_bwt)
         if cache: _index_cache[prefix] = idx
     else:
         if load_pacseq and not idx.pacseq_loaded():

@@ -267,7 +267,7 @@ class Dotplot:
 
     def _plot_bcaln(self, fig, legend, layers):
         fig.add_trace(go.Scattergl(
-            x=layers["bcaln","start"], y=layers.index,#+2, #-1
+            x=layers["bcaln","start"], y=layers.index,#-2, #-1
             #x=layers["bcaln","start"], y=layers.index,#+2, #-1
             name="Basecalled Alignment",
             mode="markers", marker={"size":5,"color":"orange"},
@@ -366,6 +366,7 @@ OPTS = (
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
     Opt(("-b", "--bcaln-track"), "dotplot"),
+    Opt(("-p", "--pore-model"), "pore_model", "name"),
     Opt(("--multi-background"), "sigplot", action="store_true"),
     Opt(("--show-events"), "sigplot", action="store_true"),
     Opt(("--no-model"), "sigplot", action="store_true"),

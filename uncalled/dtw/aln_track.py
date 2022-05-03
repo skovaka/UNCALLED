@@ -174,7 +174,7 @@ class AlnTrack:
         #self.alignments = pd.DataFrame()
         #self.layers = pd.DataFrame()
 
-    def _init_new(self, db, track_id, name, desc, conf, fast5s=None):
+    def _init_new(self, db, track_id, name, desc, conf, model, fast5s=None):
         self.db = db
         self.id = track_id
         self.name = name
@@ -182,10 +182,10 @@ class AlnTrack:
         self.conf = conf
 
         self.fast5s = fast5s #TODO get rid of this
-        self.model = PoreModel(self.conf.pore_model) 
+        self.model = model 
 
     def _init_slice(self, p, coords=None, alignments=None, layers=None, order=["fwd", "ref_start"]):
-        self._init_new(p.db, p.id, p.name, p.desc, p.conf, p.fast5s)
+        self._init_new(p.db, p.id, p.name, p.desc, p.conf, p.model, p.fast5s)
         self.set_data(coords, alignments, layers, order)
 
     def set_data(self, coords, alignments, layers, order=["fwd", "ref_start"]):
@@ -202,6 +202,8 @@ class AlnTrack:
             return
         elif np.any(isnone):
             raise ValueError("Must specify AlnTrack coords, alignments, and layers")
+        print(self.alignments)
+        print(order)
         self.alignments = self.alignments.sort_values(order)
 
         if self.layers.index.names[0] == "mref":
