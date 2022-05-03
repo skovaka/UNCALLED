@@ -15,7 +15,7 @@ namespace py = pybind11;
 #endif
 
 struct NormVals {
-    i32 start, end;
+    u32 start, end;
     float scale, shift;
 };
 
@@ -23,9 +23,32 @@ struct ProcessedRead {
     std::vector<Event> events;
     std::vector<NormVals> norm;
     //std::vector<bool> mask;
+
+    u32 sample_start() const {
+        return events[0].start;
+    }
+
+    u32 sample_end() const {
+        auto e = events.back();
+        return e.start + e.length;
+    }
+
     void rescale(float scale, float shift) {
+        normalize({0, sample_end(), scale, shift});
+    }
+
+    void normalize(NormVals prms) {
+        //auto cmp = [](Event &e, u32 loc) -> bool {
+        //    return e.start < loc;
+        //};
+        //auto st = std::lower_bound(events.begin(), events.end(), prms.start, cmp);
+        //auto en = std::lower_bound(events.begin(), events.end(), prms.end, cmp);
+        //for (auto e = st; e < en; e++) {
+        norm = {prms};
+        
+
         for (auto &e : events) {
-            e.mean = e.mean * scale + shift;
+            e.mean = e.mean * prms.scale + prms.shift;
         }
     }
 };
@@ -52,7 +75,7 @@ class SignalProcessor {
         ret.events = evdt_.get_events(read.get_signal());
 
         auto norm = norm_mom_params(ret.events);
-        ret.rescale(norm.scale, norm.shift);
+        ret.normalize(norm);
         //for (auto &e : ret.events) {
         //    e.mean = e.mean * norm.scale + norm.shift;
         //}
@@ -108,6 +131,8 @@ void signal_processor_pybind(py::module_ &m) {
     py::class_<ProcessedRead> p(m, "_ProcessedRead");
     p.def(pybind11::init<const ProcessedRead &>());
     p.def("rescale", &ProcessedRead::rescale);
+    p.def_property_readonly("sample_start", &ProcessedRead::sample_start);
+    p.def_property_readonly("sample_end", &ProcessedRead::sample_end);
     PY_PROC_ARR(Event, events, "Un-normalized events");
     PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");
 

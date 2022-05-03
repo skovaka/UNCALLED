@@ -48,6 +48,7 @@ OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
     Opt(("-a", "--append"), "tracks.io", action="store_true"),
+    Opt(("-p", "--pore-model"), "pore_model", "name"),
     Opt("--full-overlap", "tracks", action="store_true"),
     #Opt(("-S", "--mask-skips"), "dtw", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
@@ -88,7 +89,7 @@ def main(conf):
         mm2s[paf.qr_name].append(paf)
 
     model = PoreModel(conf.pore_model)
-    sigproc = SignalProcessor(model, conf.event_detector)
+    sigproc = SignalProcessor(model, conf)
 
     #pbar = progbar.ProgressBar(
     #        widgets=[progbar.Percentage(), progbar.Bar(), progbar.ETA()], 

@@ -10,7 +10,7 @@ from ..index import str_to_coord
 from ..dtw.tracks import Tracks
 from ..argparse import Opt, comma_split
 from ..fast5 import parse_read_ids
-from ..sigproc import ProcRead
+from ..signal_processor import SignalProcessor
 
 class SigplotParams(config.ParamGroup):
     _name = "sigplot"
@@ -34,6 +34,8 @@ class Sigplot:
         self.conf, self.prms = config._init_group("sigplot", *args, **kwargs)
         self.tracks = self.prms.tracks #TODO do this better
 
+        self.sigproc = SignalProcessor(self.tracks[0].model, self.conf)
+
         self._legend = set()
 
         #reads = pd.Index([])
@@ -41,6 +43,7 @@ class Sigplot:
         #    reads = reads.union(t.alignments["read_id"]).unique()
         #if len(reads) > self.prms.max_reads:
         #    reads = np.random.choice(reads, self.prms.max_reads, False)
+
         self.reads = np.sort(self.tracks.get_all_reads())
         
     def plot(self, fig=None, row=1, col=1):
@@ -114,9 +117,11 @@ class Sigplot:
             if len(dtws) > 0:
                 track_dtws.append(pd.concat(dtws).sort_index())
 
-        read = ProcRead(track.fast5s[read_id], conf=self.conf)
+        read = self.sigproc.process(track.fast5s[read_id])
+        #read = ProcRead(track.fast5s[read_id], conf=self.conf)
         signal = read.get_norm_signal(samp_min, samp_max)
 
+        print("A", signal)
         #events are in read.norm_sig
 
         #TODO set global signal min/max
@@ -125,6 +130,8 @@ class Sigplot:
         
         samples = np.arange(samp_min, samp_max)[mask]
         signal = signal[mask]
+
+        print("B", signal)
 
         current_min = min(current_min, signal.min())
         current_max = max(current_max, signal.max())

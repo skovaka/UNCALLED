@@ -71,8 +71,10 @@ class PoreModel:
         k = int(np.log2(len(vals)) / 2)
         if k == 5:
             self.ModelType = PoreModelK5
+            #self.kmer_dtype = "uint16"
         elif k == 10:
             self.ModelType = PoreModelK10
+            #self.kmer_dtype = "uint32"
         else:
             raise ValueError(f"Invalid k-mer length: {k}\n")
 
@@ -85,6 +87,10 @@ class PoreModel:
 
         self.KMERS = np.arange(self.KMER_COUNT)
         self.KMER_STRS = self.kmer_to_str(self.KMERS)
+        if self.K > 8:
+            self.kmer_dtype = "uint32"
+        else:
+            self.kmer_dtype = "uint16"
 
 
     def _init_preset(self, prms):
@@ -142,7 +148,7 @@ class PoreModel:
                 raise RuntimeError("All k-mers must be %d bases long" % K)
 
             arr = str_to_kmer(arr)
-        return self.KmerArray(arr.astype("uint16"))
+        return self.KmerArray(arr.astype(self.kmer_dtype))
         #return arr
 
     def kmer_to_str(self, kmer, dtype=str):
