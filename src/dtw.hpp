@@ -181,7 +181,6 @@ class GlobalDTW {
 
     #ifdef PYBIND
     #define PY_DTW_P_METH(P) c.def(#P, &GlobalDTW<ModelType>::P);
-    //static void pybind_defs(pybind11::class_<GlobalDTW<ModelType>> &c) {
     static void pybind_defs(pybind11::module_ &m, const std::string &suffix) {
         pybind11::class_<GlobalDTW> c(m, ("GlobalDTW" + suffix).c_str());
         c.def(pybind11::init<const std::vector<float>&, 
@@ -594,7 +593,7 @@ class BandedDTW {
         c.def_property_readonly("path", [](BandedDTW<ModelType> &d) -> pybind11::array_t<Coord> {
              return pybind11::array_t<Coord>(d.path_.size(), d.path_.data());
         });
-        //PYBIND11_NUMPY_DTYPE(Coord, qry, ref);
+        PYBIND11_NUMPY_DTYPE(Coord, qry, ref);
     }
     #endif
 };

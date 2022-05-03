@@ -16,7 +16,6 @@ import time
 
 from .. import config
 
-#from ..nt import kmer_to_str, kmer_rev, kmer_comp
 from ..argparse import Opt, comma_split
 from ..fast5 import parse_fast5_paths
 from .aln_track import AlnTrack

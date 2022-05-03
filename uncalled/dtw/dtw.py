@@ -12,7 +12,12 @@ from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt 
 from ..index import BWA_OPTS, str_to_coord
 from ..fast5 import Fast5Reader, FAST5_OPTS
-from _uncalled import GlobalDTWK5, StaticBDTWK5, BandedDTWK5, DTW_PRMS_EVT_GLOB, DtwParams
+
+from _uncalled import (
+    GlobalDTWK5, StaticBDTWK5, BandedDTWK5, 
+    GlobalDTWK10, StaticBDTWK10, BandedDTWK10, 
+    DTW_PRMS_EVT_GLOB, DtwParams
+)
 
 from ..signal_processor import SignalProcessor
 
@@ -21,9 +26,9 @@ from . import Bcaln, Tracks
 
 #TODO make this better
 METHODS = {
-    "guided" : BandedDTWK5,
-    "static" : StaticBDTWK5,
-    "global" : GlobalDTWK5,
+    "guided" : {5: BandedDTWK5, 10: BandedDTWK10},
+    "static" : {5: StaticBDTWK5, 10: StaticBDTWK10},
+    "global" : {5: GlobalDTWK5, 10: GlobalDTWK10}
 }
 
 #class DtwParams(ParamGroup):
@@ -95,9 +100,7 @@ def main(conf):
         aligned = False
         for paf in mm2s[read.id]:
             t0 = time.time()
-            #print(pread.norm_events)
             dtw = GuidedDTW(tracks, sigproc, read, paf, conf)
-            #print(time.time()-t0)
 
             sys.stderr.write(f"{read.id}\n")
 
@@ -127,7 +130,6 @@ class GuidedDTW:
             self.df = None
             return
 
-        #print(read.df)
 
         aln_id, self.coords = tracks.write_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df})
         #TODO return coords?
@@ -148,21 +150,18 @@ class GuidedDTW:
         self.ref_kmers = pd.concat(kmer_blocks)
         #self.ref_kmers = kmers
         
-        #print(kmers)
-        #print(kmer_blocks)
-        #print(self.ref_kmers)
-        #sys.exit(0)
+
+        self.model = PoreModel(self.conf.pore_model)
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
-            sys.stderr.write("Error: unrecongized DTW method \"%s\".\n" % method)
-            sys.stderr.write("Must be one of \"%s\".\n" % "\", \"".join(METHODS.keys()))
-            sys.exit()
+            opts = "\", \"".join(METHODS.keys())
+            raise ValueError(f"Error: unrecongized DTW method \"{method}. Must be one of \"{opts}\"")
 
+        if not self.model.K in METHODS[self.method]:
+            raise ValueError(f"Invalid DTW k-mer length: {self.model.K}")
 
-        self.dtw_fn = METHODS[self.method]
-
-        self.model = PoreModel(self.conf.pore_model)
+        self.dtw_fn = METHODS[self.method][self.model.K]
 
         self.samp_min = self.bcaln["start"].min()
         self.samp_max = self.bcaln["start"].max()
@@ -210,7 +209,6 @@ class GuidedDTW:
             mref_st = st
             mref_en = en+1
             block_kmers = self.ref_kmers.loc[mref_st:mref_en]
-            #print(block_kmers)
 
             samp_st = self.bcaln.loc[st,"start"]
             samp_en = self.bcaln.loc[en,"start"]
@@ -222,7 +220,7 @@ class GuidedDTW:
             args = self._get_dtw_args(read_block, mref_st, block_kmers)
 
             dtw = self.dtw_fn(*args)
-
+            
             path = np.flip(dtw.path)
             #TODO shouldn't need to clip, error in bdtw
             path_qrys.append(read_block.index[np.clip(path['qry'], 0, len(read_block))])
@@ -244,8 +242,8 @@ class GuidedDTW:
         common = (
             self.prms,
             read_block['mean'].to_numpy(), 
-            nt.kmer_array(ref_kmers), 
-            self.model)
+            self.model.kmer_array(ref_kmers),  #TODO probably dont need convert
+            self.model.instance)
         qry_len = len(read_block)
         ref_len = len(ref_kmers)
 
@@ -263,8 +261,6 @@ class GuidedDTW:
                 #print(band_lls[-1])
 
                 tgt = starts[q] if q < len(starts) else starts[-1]
-                #if r <= tgt - mref_start:
-                #print(r, tgt, mref_start, self.ref_kmers.index[r])
                 if r < len(self.ref_kmers) and self.ref_kmers.index[r] <= tgt:
                     r += 1
                 else:
@@ -298,38 +294,38 @@ class GuidedDTW:
             'ref_en': ref_st + band_ref_en
         })
 
-def collapse_events(dtw, kmer_str=False, start_col="start", length_col="length", mean_col="current", kmer_col="kmer", mask_skips=False):
-
-    dtw["cuml_mean"] = dtw[length_col] * dtw[mean_col]
-
-    grp = dtw.groupby("mref")
-
-    if kmer_col in dtw:
-        if kmer_str:
-            kmers = [nt.kmer_rev(nt.str_to_kmer(k,0)) for k in grp[kmer_col].first()]
-        else:
-            kmers = grp[kmer_col].first()
-    else:
-        kmers = None
-
-    mrefs = grp["mref"].first()
-
-    lengths = grp[length_col].sum()
-
-    dtw = pd.DataFrame({
-        "mref"    : mrefs.astype("int64"),
-        "start"  : grp[start_col].min().astype("uint32"),
-        "length" : lengths.astype("uint32"),
-        "current"   : grp["cuml_mean"].sum() / lengths
-    })
-
-    if kmers is not None:
-        dtw["kmer"] = kmers.astype("uint16")
-
-    if mask_skips:
-        dtw = dtw[~dtw.duplicated("start", False)]
-
-    return dtw.set_index("mref").sort_index()
+#def collapse_events(dtw, kmer_str=False, start_col="start", length_col="length", mean_col="current", kmer_col="kmer", mask_skips=False):
+#
+#    dtw["cuml_mean"] = dtw[length_col] * dtw[mean_col]
+#
+#    grp = dtw.groupby("mref")
+#
+#    if kmer_col in dtw:
+#        if kmer_str:
+#            kmers = [nt.kmer_rev(nt.str_to_kmer(k,0)) for k in grp[kmer_col].first()]
+#        else:
+#            kmers = grp[kmer_col].first()
+#    else:
+#        kmers = None
+#
+#    mrefs = grp["mref"].first()
+#
+#    lengths = grp[length_col].sum()
+#
+#    dtw = pd.DataFrame({
+#        "mref"    : mrefs.astype("int64"),
+#        "start"  : grp[start_col].min().astype("uint32"),
+#        "length" : lengths.astype("uint32"),
+#        "current"   : grp["cuml_mean"].sum() / lengths
+#    })
+#
+#    if kmers is not None:
+#        dtw["kmer"] = kmers.astype("uint16")
+#
+#    if mask_skips:
+#        dtw = dtw[~dtw.duplicated("start", False)]
+#
+#    return dtw.set_index("mref").sort_index()
 
 class Fast5Processor(Fast5Reader):
     def __next__(self):

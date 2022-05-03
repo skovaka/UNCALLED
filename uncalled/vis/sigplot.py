@@ -58,8 +58,8 @@ class Sigplot:
         return fig
 
             
-    def _plot_bases(self, fig, dtw, ymin, ymax, row, col):
-        bases = nt.kmer_base(dtw["kmers"], 2)
+    def _plot_bases(self, fig, dtw, model, ymin, ymax, row, col):
+        bases = model.kmer_base(dtw["kmers"], 2)
         for base, color in enumerate(self.conf.vis.base_colors):
             base_dtw = dtw[bases == base]
             starts = base_dtw['start']
@@ -77,7 +77,7 @@ class Sigplot:
                 legendgroup="bases",
                 showlegend= color not in self._legend,
                 line={"width" : 0},
-                name=nt.base_to_char(base),
+                name=model.base_to_char(base),
                 legendrank=1
             ), row=row, col=col)
             self._legend.add(color)
@@ -130,7 +130,7 @@ class Sigplot:
         current_max = max(current_max, signal.max())
 
         if len(self.tracks) == 1:
-            self._plot_bases(fig, track_dtws[0], current_min, current_max, row, col)
+            self._plot_bases(fig, track_dtws[0], track.model, current_min, current_max, row, col)
             colors = ["white"]
             dtw_kws = [{}]
         else:
@@ -139,7 +139,7 @@ class Sigplot:
                 ys = np.linspace(current_min, current_max, len(self.tracks)+1)
                 dy = (ys[1]-ys[0])*0.01
                 for dtw,ymin,ymax in zip(track_dtws, ys[:-1], ys[1:]):
-                    self._plot_bases(fig, dtw, ymin+dy, ymax-dy, row, col)
+                    self._plot_bases(fig, dtw, track.model, ymin+dy, ymax-dy, row, col)
 
             colors = self.conf.vis.track_colors
             dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks.alns]

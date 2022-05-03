@@ -12,7 +12,6 @@ from ont_fast5_api.fast5_interface import get_fast5_file
 import scipy.stats
 
 from . import Tracks
-from .dtw import collapse_events
 from ..config import Config, ParamGroup
 from ..argparse import ArgParser, Opt, MutexOpts, FAST5_PARAM
 from ..fast5 import Fast5Reader, FAST5_OPTS, parse_read_ids
@@ -120,7 +119,6 @@ def nanopolish(conf):
                     "event_length" : "length",
                     "event_level_mean" : "current"
                  }).set_index("mref")
-            #df = collapse_events(df, start_col="start_idx", length_col="event_length", mean_col="event_level_mean")[clip:]
 
             fast5_name = f5reader.get_read_file(read_id)
 

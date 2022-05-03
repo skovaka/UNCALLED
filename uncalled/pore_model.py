@@ -62,9 +62,10 @@ class PoreModel:
                 except:
                     raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
         else:
+            models = ", ".join(PoreModelK5.get_preset_names())
             raise ValueError(
-                "PoreModel name must be a filename or one of {%s}" % \
-                ", ".join(PoreModelK5.get_preset_names())
+                f"Unknown PoreModel: {prms.name}. Must be a filename, or one of {models}" \
+                
             )
 
         k = int(np.log2(len(vals)) / 2)
@@ -85,8 +86,6 @@ class PoreModel:
         self.KMERS = np.arange(self.KMER_COUNT)
         self.KMER_STRS = self.kmer_to_str(self.KMERS)
 
-    def __getattr__(self, name):
-        return self.instance.__getattribute__(name)
 
     def _init_preset(self, prms):
         if PoreModelK5.is_preset(prms.name):
@@ -96,13 +95,13 @@ class PoreModel:
         else:
             return False
         self._init(prms.name, prms)
+        return True
 
     @property
     def name(self):
         return self.PRMS.name
 
     def _vals_from_df(self, df):
-        print(df)
         return np.ravel(df.rename(columns=self.TSV_RENAME) \
                           .sort_values("kmer")[["mean","stdv"]])
                
@@ -128,6 +127,9 @@ class PoreModel:
     def __getitem__(self, kmer):
         return self.means[self.kmer_array(kmer)]
 
+    def __getattr__(self, name):
+        return self.instance.__getattribute__(name)
+
     def kmer_array(self, kmer):
         arr = np.array(kmer)
         if arr.shape == ():
@@ -140,7 +142,7 @@ class PoreModel:
                 raise RuntimeError("All k-mers must be %d bases long" % K)
 
             arr = str_to_kmer(arr)
-        return KmerArray(arr.astype("uint16"))
+        return self.KmerArray(arr.astype("uint16"))
         #return arr
 
     def kmer_to_str(self, kmer, dtype=str):

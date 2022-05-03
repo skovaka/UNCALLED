@@ -70,7 +70,7 @@ LAYERS = {
         "kmer" : LayerMeta(str, "Reference k-mer",
             lambda track: track.kmers),
         "base" : LayerMeta(str, "Reference base",
-            lambda track: nt.kmer_base(track.kmers, 2)),
+            lambda track: track.model.kmer_base(track.kmers, 2)),
     }, "bcaln" : {
         "start" : LayerMeta(int, "BC Sample Start"),
         "length" : LayerMeta(int, "BC Sample Length"),

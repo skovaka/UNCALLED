@@ -119,6 +119,7 @@ class Dotplot:
 
             has_bcaln = "bcaln" in track.layers.columns.get_level_values("group")
             only_bcaln = self.prms.bcaln_track == track.name
+            model = track.model
 
             first_aln = True
             for aln_id, aln in track.alignments.iterrows():
@@ -187,7 +188,7 @@ class Dotplot:
             hover_data = pd.concat(hover_data, axis=1)
             hover_coords = hover_data.xs("middle", axis=1, level=2).mean(axis=1)
 
-            hover_kmers = nt.kmer_to_str(
+            hover_kmers = model.kmer_to_str(
                 hover_data.xs("kmer", 1, 2)
                           .fillna(method="pad", axis=1)
                           .iloc[:,-1])
