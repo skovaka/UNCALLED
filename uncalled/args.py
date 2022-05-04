@@ -159,18 +159,6 @@ def add_bwa_opt(p, conf):
     )
 
 def add_ru_opts(p, conf):
-    #TODO: selectively enrich or deplete refs in index
-    p.add_argument(
-            "-c", "--max-chunks", 
-            type=int, default=conf.max_chunks, required=True, 
-            help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set"
-    )
-    p.add_argument(
-            "--chunk-time", 
-            type=float, default=1, required=False, 
-            help="Length of chunks in seconds"
-    )
-
     modes = p.add_mutually_exclusive_group(required=True)
     modes.add_argument(
             "-D", "--deplete", action='store_const', 
@@ -288,6 +276,16 @@ def add_map_opts(p, conf):
             "-e", "--max-events", 
             type=int, default=conf.max_events, 
             help="Will give up on a read after this many events have been processed"
+    )
+    p.add_argument(
+            "-c", "--max-chunks", 
+            type=int, default=conf.max_chunks, 
+            help="Will give up on a read after this many chunks have been processed. Only has effect when --unblock is set"
+    )
+    p.add_argument(
+            "--chunk-time", 
+            type=float, default=1, required=False, 
+            help="Length of chunks in seconds"
     )
 
 def load_conf(argv):

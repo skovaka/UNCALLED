@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 
-__version__ = "2.3"
+__version__ = "2.2.2"
 
 ROOT_DIR = os.getcwd()
 
