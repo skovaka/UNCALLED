@@ -237,7 +237,7 @@ ReadBuffer::ReadBuffer(const hdf5_tools::File &file,
 
     //full_signal_.assign(int_data.begin(), int_data.end());
     for (u16 raw : int_data) {
-		float calibrated = (cal_range * raw / cal_digit) + cal_offset;
+		float calibrated = cal_range * (raw + cal_offset) / cal_digit;
         full_signal_.push_back(calibrated);
     }
 
