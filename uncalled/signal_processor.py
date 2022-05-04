@@ -21,8 +21,6 @@ class ProcessedRead(_ProcessedRead):
     def get_norm_signal(self, samp_min, samp_max):
 
         n = self.norm[0]
-        print(self.norm)
-        print(samp_min, samp_max, n["scale"], n["shift"])
         return self.signal[samp_min:samp_max] * n["scale"] + n["shift"]
 
         #ret = np.zeros(int(samp_max - samp_min))

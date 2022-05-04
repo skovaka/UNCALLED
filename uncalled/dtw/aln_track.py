@@ -202,8 +202,6 @@ class AlnTrack:
             return
         elif np.any(isnone):
             raise ValueError("Must specify AlnTrack coords, alignments, and layers")
-        print(self.alignments)
-        print(order)
         self.alignments = self.alignments.sort_values(order)
 
         if self.layers.index.names[0] == "mref":
@@ -400,7 +398,6 @@ class AlnTrack:
         merge = aln_a.join(aln_b, on="ref", lsuffix="_a", rsuffix="_b") \
                      .dropna(how="all")
 
-        #print(merge)
                      
         starts = merge[["start_a", "start_b"]]
         ends = merge[["end_a", "end_b"]]
@@ -469,7 +466,6 @@ class AlnTrack:
         if self.coords.stranded:
             return mrefs
         else:
-            print("UNSTRAND")
             return mrefs[0].union(mrefs[1])
         #return self.layers.index.get_level_values("mref")
 
