@@ -299,12 +299,12 @@ class RefIndex:
         
         if k == 5:
             self.InstanceClass = RefIndexK5
-            self.head_clip = 2
-            self.tail_clip = 2
-        else:
+            self.trim = (2, 2)
+        elif k == 10:
             self.InstanceClass = RefIndexK10
-            self.head_clip = 4
-            self.tail_clip = 5
+            self.trim = (4, 5)
+        else:
+            raise ValueError(f"Invalid k-mer length: {k}")
 
         self.instance = self.InstanceClass(*args, **kwargs)
 
@@ -318,14 +318,18 @@ class RefIndex:
         #else:
         #   #ref_coord.start += kmer_shift
 
+        if mrefs.step < 0:
+            i,j = reversed(self.trim)
+        else:
+            i,j = self.trim
 
         if kmer_trim:
             kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
             if mrefs.step < 0:
                 kmers = kmers[::-1]
-            ret = pd.Series(index=mrefs[self.head_clip:-self.tail_clip], data=kmers, name="kmer")
+            ret = pd.Series(index=mrefs[i:-j], data=kmers, name="kmer")
         else:
-            kmers = self.get_kmers(mrefs.min()-self.head_clip, mrefs.max()+self.tail_clip+1, is_rna)
+            kmers = self.get_kmers(mrefs.min()-self.trim[0], mrefs.max()+self.trim[1]+1, is_rna)
             if mrefs.step < 0:
                 kmers = kmers[::-1]
             ret = pd.Series(index=mrefs, data=kmers, name="kmer")

@@ -531,7 +531,7 @@ class Tracks:
         df = df.dropna(how="all")
 
         if save:
-            df.rename(index=lambda r: self.alns[0].coords.ref_to_mref(r, True), level=0, inplace=True)
+            df.rename(index=lambda r: self.alns[0].coords.ref_to_mref(r, self.alns[0].all_fwd), level=0, inplace=True)
             self.input.write_layers( #TODO be explicit that output = input
                 pd.concat({"cmp" : df}, names=["group", "layer"], axis=1), 
                 index=["mref", "aln_a", "aln_b", "group_b"])

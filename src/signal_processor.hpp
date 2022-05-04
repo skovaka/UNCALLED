@@ -45,8 +45,6 @@ struct ProcessedRead {
         //auto en = std::lower_bound(events.begin(), events.end(), prms.end, cmp);
         //for (auto e = st; e < en; e++) {
         norm = {prms};
-        
-        std::cout << "MILLIE QUIET " << prms.scale << " " << prms.shift << "\n";
 
         for (auto &e : events) {
             e.mean = e.mean * prms.scale + prms.shift;
@@ -100,11 +98,6 @@ class SignalProcessor {
         NormVals ret;
         ret.start = 0;
         ret.end = events.size();
-        std::cout << "BLAH " 
-                  << norm_.PRMS.tgt_mean << "\t"
-                  << norm_.PRMS.tgt_stdv << "\t"
-                  << mean << "\t"
-                  << stdv << "\n";
         ret.scale = norm_.PRMS.tgt_stdv / stdv;
         ret.shift = norm_.PRMS.tgt_mean - ret.scale * mean;
         return ret;

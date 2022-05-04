@@ -17,7 +17,6 @@ from .. import PoreModel
 from ..index import RefCoord
 
 class Bcaln:
-    K = 4
     CIG_OPS_STR = "MIDNSHP=X"
     CIG_RE = re.compile("(\d+)(["+CIG_OPS_STR+"])")
     CIG_OPS = set(CIG_OPS_STR)
@@ -43,6 +42,8 @@ class Bcaln:
         #ref_coord = RefCoord(paf.rf_name, paf.rf_st-1, paf.rf_en+2, paf.is_fwd)
         ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
         self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna, kmer_trim=True)
+
+        self.kmer_shift = ref_index.trim[not paf.is_fwd]
 
         self.ref_gaps = list()
         self.errors = None
@@ -108,7 +109,7 @@ class Bcaln:
         else:
             read_i = paf.qr_len - paf.qr_en 
 
-        mrefs = self.paf_coords.mrefs - 2
+        mrefs = self.paf_coords.mrefs - self.kmer_shift
         mref_i = mrefs.min()
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
@@ -176,7 +177,7 @@ class Bcaln:
         if paf.is_fwd == self.is_rna:
             cig_ops = list(reversed(cig_ops))
 
-        mrefs = self.paf_coords.mrefs - 2
+        mrefs = self.paf_coords.mrefs - self.kmer_shift
         mref_i = mrefs.min()
 
         for l,c in cig_ops:

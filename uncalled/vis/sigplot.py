@@ -63,9 +63,6 @@ class Sigplot:
             
     def _plot_bases(self, fig, dtw, model, ymin, ymax, row, col):
         bases = model.kmer_base(dtw["kmers"], 2)
-        print(dtw["kmers"])
-        print(bases)
-        print(model.kmer_to_str(dtw["kmers"]))
         for base, color in enumerate(self.conf.vis.base_colors):
             base_dtw = dtw[bases == base]
             starts = base_dtw['start']
@@ -124,19 +121,15 @@ class Sigplot:
         #read = ProcRead(track.fast5s[read_id], conf=self.conf)
         signal = read.get_norm_signal(samp_min, samp_max)
 
-        print("A", signal)
-        #events are in read.norm_sig
 
         #TODO set global signal min/max
         mask = ((signal >= 40) &
                 (signal <= self.conf.event_detector.max_mean))
 
-        print(len(signal), len(read.signal), samp_min, samp_max)
         
         samples = np.arange(samp_min, samp_max)[mask]
         signal = signal[mask]
 
-        print("B", signal)
 
         current_min = min(current_min, signal.min())
         current_max = max(current_max, signal.max())

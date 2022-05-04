@@ -24,6 +24,7 @@ OPTS = (
     Opt(("-r", "--refstats"), "tracks", default=None, type=comma_split),
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
+    Opt("--pore-model", "pore_model", "name"),
     Opt(("-p", "--browser-port"), help="Browser port", default=8000),
     Opt(("-o", "--outfile"), "trackplot"),
 )
