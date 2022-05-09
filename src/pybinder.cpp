@@ -10,6 +10,7 @@
 #include "simulator.hpp"
 #include "signal_processor.hpp"
 #include "dtw.hpp"
+#include "dataframe.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -103,5 +104,6 @@ PYBIND11_MODULE(_uncalled, m) {
     signal_processor_pybind(m);
 
     pybind_dtw(m);
+    pybind_dataframes(m);
 }
 
