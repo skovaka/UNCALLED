@@ -398,6 +398,7 @@ class AlnTrack:
         merge = aln_a.join(aln_b, on="ref", lsuffix="_a", rsuffix="_b") \
                      .dropna(how="all")
 
+        #TODO write C++ version taking two sorted numpy DFs w/ [ref,start,end]
                      
         starts = merge[["start_a", "start_b"]]
         ends = merge[["end_a", "end_b"]]

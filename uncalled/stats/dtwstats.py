@@ -34,6 +34,7 @@ COMPARE_OPTS = (
 
 def compare(conf):
     """Compute distance between alignments of the same reads"""
+    t = time.time()
 
     group_b = "bcaln" if conf.bcaln else "dtw"
 
@@ -47,13 +48,29 @@ def compare(conf):
     calc_mean_ref_dist = all_layers or conf.mean_ref_dist
     
     tracks = Tracks(conf=conf)
+
+    print("Initialized ", time.time()-t)
+    t = time.time()
+    t_all = time.time()
+
     for read_id,chunk in tracks.iter_reads():
+
+        print(read_id)
+        print("    New read ", time.time()-t)
+        t = time.time()
+
         if chunk.any_empty:
             sys.stderr.write(f"Skipping {read_id}\n")
         else:
-            if conf.save:
-                print(read_id)
+            #if conf.save:
+            #    print(read_id)
+            print("    Comparing ", time.time()-t)
             chunk.calc_compare(group_b, calc_jaccard, calc_mean_ref_dist, conf.save)
+
+        print("Read processed ", time.time()-t_all)
+        sys.stdout.flush()
+        t = time.time()
+        t_all = time.time()
 
 DUMP_OPTS = (
     Opt("db_in", "tracks.io", type=str),
@@ -65,6 +82,7 @@ DUMP_OPTS = (
 def dump(conf):
     """Output DTW alignment paths and statistics"""
 
+
     tracks = Tracks(conf=conf)
     #TODO add layer dependencies (compare requires start/length)
     tracks.set_layers(["start", "length", "bcaln.start", "bcaln.length"] + conf.layers)
@@ -75,6 +93,8 @@ def dump(conf):
     need_bc_cmp = "bc_cmp" in layer_groups
 
     header = True
+
+
     for read_id,tracks in tracks.iter_reads():
         for track in tracks:
             if header:
@@ -84,6 +104,7 @@ def dump(conf):
                 print("\t".join(columns))
                 header = False
             sys.stdout.write(track.layers.to_csv(sep="\t", header=False))
+        t = time.time()
 
 SUBCMDS = [
     (compare, COMPARE_OPTS),
