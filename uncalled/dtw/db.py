@@ -313,7 +313,7 @@ class TrackSQL(TrackIO):
         if self.open:
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (mref, aln_id);")
-            #self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (mref, aln_a, aln_b, group_b);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (mref, aln_a, aln_b, group_b);")
             self.con.close()
             self.open = False
 
@@ -463,7 +463,7 @@ class TrackSQL(TrackIO):
             df[group].to_sql(
                 group, self.con, 
                 if_exists="append", 
-                method="multi", chunksize=50000,
+                method="multi", chunksize=999//len(df.columns),
                 index=True, index_label=index)
 
     def get_fast5_index(self, track_id=None):
@@ -632,6 +632,8 @@ class TrackSQL(TrackIO):
 
         t0 = time.time()
 
+        print(query)
+
         ret = pd.read_sql_query(
             query, self.con, 
             index_col=["idx_mref", "idx_aln_id"], 
@@ -668,13 +670,15 @@ _LS_QUERY = "SELECT name,desc,COUNT(alignment.id) FROM track " \
             "JOIN alignment ON track.id == track_id GROUP BY name"
 def ls(conf, db=None):
     if db is None:
-        db = TrackSQL(conf, "r")
+        db = TrackSQL(conf, None, "r")
     print("\t".join(["Name", "Description", "Alignments"]))
 
     for row in db.cur.execute(_LS_QUERY).fetchall():
         print("\t".join(map(str, row)))
 
     db.con.commit()
+
+    db.close()
 
 DELETE_OPTS = (
     DB_OPT,

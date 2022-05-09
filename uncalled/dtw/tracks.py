@@ -523,10 +523,13 @@ class Tracks:
             if len(self.alns) > 2:
                 raise ValueError("Must input one or two tracks to compare dtw to bcaln")
             
+            t = time.time()
             if len(self.alns) == 2:
                 df = self.alns[0].bc_cmp(self.alns[1])
             else:
                 df = self.alns[0].bc_cmp()
+            print("    Compared ", time.time()-t)
+            t = time.time()
 
         df = df.dropna(how="all")
 
@@ -535,8 +538,10 @@ class Tracks:
             self.input.write_layers( #TODO be explicit that output = input
                 pd.concat({"cmp" : df}, names=["group", "layer"], axis=1), 
                 index=["mref", "aln_a", "aln_b", "group_b"])
-        else:
-            print(df.to_csv(sep="\t"))
+        #else:
+        #    print(df.to_csv(sep="\t"))
+        print("    Written ", time.time()-t)
+        t = time.time()
 
     def calc_refstats(self, verbose_refs=False, cov=False):
         if self.prms.refstats is None or len(self.prms.refstats) == 0 or len(self.prms.refstats_layers) == 0 or self.all_empty:
@@ -711,6 +716,9 @@ class Tracks:
             reads = self.prms.read_filter
         if max_reads is None:
             max_reads = self.prms.max_reads
+
+        print("Querying layers")
+        t = time.time()
         
         layer_iter = self.input.query_layers(
             self.db_layers, 
@@ -720,6 +728,9 @@ class Tracks:
             full_overlap=full_overlap, 
             order=["read_id", "mref"],
             chunksize=self.prms.io.ref_chunksize)
+
+        print("    Queried layers ", time.time()-t)
+        t = time.time()
 
         aln_leftovers = pd.DataFrame()
         layer_leftovers = pd.DataFrame()
