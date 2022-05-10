@@ -11,6 +11,7 @@
 #include "signal_processor.hpp"
 #include "dtw.hpp"
 #include "dataframe.hpp"
+#include "compare.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -102,6 +103,8 @@ PYBIND11_MODULE(_uncalled, m) {
     GlobalDTW<PoreModel<10>>::pybind_defs(m, "K10");
 
     signal_processor_pybind(m);
+
+    Compare::pybind(m);
 
     pybind_dtw(m);
     pybind_dataframes(m);

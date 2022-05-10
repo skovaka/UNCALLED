@@ -1,7 +1,7 @@
 #ifdef PYBIND
 #include "dataframe.hpp"
 
-#define BIND_DF(name) name::pybind<name>(m, #name);
+#define BIND_DF(name) name::pybind<name>(m, "_"#name);
 
 constexpr AlnCoords::NameArray AlnCoords::names;
 

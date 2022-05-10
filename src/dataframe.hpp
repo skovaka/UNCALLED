@@ -1,5 +1,7 @@
 #ifdef PYBIND
+
 #ifndef DATAFRAME_HPP
+#define DATAFRAME_HPP
 
 #include <vector>
 #include <pybind11/pybind11.h>
@@ -142,10 +144,10 @@ class DataFrame {
 };
 
 struct AlnCoords : public DataFrame<int, int, int> {
-    static constexpr NameArray names = {"ref", "start", "length"}; 
-    ColType<0> &a = std::get<0>(data_);                      
-    ColType<1> &b = std::get<1>(data_);                      
-    ColType<2> &c = std::get<2>(data_);                      
+    static constexpr NameArray names = {"ref", "start", "end"}; 
+    ColType<0> &ref = std::get<0>(data_);                      
+    ColType<1> &start = std::get<1>(data_);                      
+    ColType<2> &end = std::get<2>(data_);                      
     using DataFrame::DataFrame;                              
 };                                                           
 

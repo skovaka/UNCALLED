@@ -16,6 +16,9 @@ from typing import Callable
 import scipy.stats
 from sklearn.decomposition import PCA
 
+from ..dfs import AlnCoords
+from _uncalled import Compare
+
 from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
 from .. import PoreModel, config, index 
@@ -363,7 +366,7 @@ class AlnTrack:
         df["group_b"] = "dtw"
         return df.set_index(["aln_b", "group_b"], append=True)
 
-    def bc_cmp(self, other=None, write=False):
+    def bc_cmp(self, other, calc_jaccard, calc_mean_ref_dist):
         if other is not None:
             groups_b = other.alignments.groupby("read_id")
 
@@ -378,7 +381,7 @@ class AlnTrack:
                 continue
 
             if other is None:
-                self._compare_alns(dtw, self, id_a, "bcaln", df)
+                self._compare_alns(dtw, self, id_a, "bcaln", df, calc_jaccard, calc_mean_ref_dist)
             else:
                 read_id = aln_a["read_id"]
                 for id_b, aln_b in groups_b.get_group(read_id).iterrows():
@@ -387,21 +390,69 @@ class AlnTrack:
         df["group_b"] = "bcaln"
         return df.set_index(["aln_b", "group_b"], append=True)
 
-
     def _compare_alns(self, aln_a, other, id_b, group, df, calc_jaccard=True, calc_mean_ref_dist=True):
+        aln_b = other.get_aln_layers(id_b, group, ["start","end"], False) \
+                     .reset_index(level="aln_id") \
+                     .rename(columns={"aln_id" : "aln_b"})
+
+        alns_a = aln_a.index.unique(1)
+        if len(alns_a) != 1:
+            raise ValueError("Can only compare two alignments at a time")
+
+        def coords(df):
+            df = df.dropna().reset_index()
+            if df.loc[0,"start"] > df.loc[1,"start"]:
+                end = -df["start"]
+                df["start"] = -df["end"]
+                df["end"] = end
+            return AlnCoords(df)
+        
+        coords_a = coords(aln_a)
+        coords_b = coords(aln_b)
+        
+        compare = Compare(coords_a, coords_b)
+        cmp_df = pd.DataFrame(compare.to_numpy()).dropna(axis=1, how="all")
+        cmp_df["aln_id"] = alns_a[0]
+        cmp_df = cmp_df.set_index(["ref","aln_id"])
+        df["jaccard"] = cmp_df["jaccard"]
+        df["mean_ref_dist"] = cmp_df["mean_ref_dist"]
+
+    def _compare_alns_old(self, aln_a, other, id_b, group, df, calc_jaccard=True, calc_mean_ref_dist=True):
         aln_b = other.get_aln_layers(id_b, group, ["start","end"], False) \
                      .reset_index(level="aln_id") \
                      .rename(columns={"aln_id" : "aln_b"})
         #if group == "bcaln":
         #    aln_b.index = aln_b.index+1
 
+        t = time.time()
+
+        def coords(df):
+            df = df.dropna().reset_index()
+            if df.loc[0,"start"] > df.loc[1,"start"]:
+                end = -df["start"]
+                df["start"] = -df["end"]
+                df["end"] = end
+            return AlnCoords(df)
+        
+        coords_a = coords(aln_a)
+        coords_b = coords(aln_b)
+        
+        compare = Compare(coords_a, coords_b)
+
+        print("Fast?", time.time()-t)
+        t = time.time()
+
+
         merge = aln_a.join(aln_b, on="ref", lsuffix="_a", rsuffix="_b") \
                      .dropna(how="all")
-
-        #TODO write C++ version taking two sorted numpy DFs w/ [ref,start,end]
                      
         starts = merge[["start_a", "start_b"]]
         ends = merge[["end_a", "end_b"]]
+
+        print("ALNS", merge.index.unique(1))
+        print("ALNz", aln_a.index.unique(1))
+        #print(aln_a)
+        #print(aln_b)
 
         df.loc[merge.index, "aln_b"] = merge["aln_b"].astype("Int32")
 
@@ -451,7 +502,11 @@ class AlnTrack:
                     mean_ref_dist[idx] = (sum_a+sum_b) / (weight_a+weight_b)
 
             df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
-
+        print("Slow!", time.time()-t)
+        #cpp = pd.DataFrame(compare.to_numpy()).dropna(axis=1, how="all").set_index("ref")["mean_ref_dist"]
+        #py = df.dropna(axis=1).reset_index(level=1)["mean_ref_dist"]
+        #diffs = (cpp-py).abs()
+        #bad = diffs[diffs > 0.5].index
 
     @property
     def read_ids(self):

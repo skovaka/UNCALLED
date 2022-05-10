@@ -110,7 +110,8 @@ uncalled = Pybind11Extension(
        "src/seed_tracker.cpp", 
        "src/normalizer.cpp", 
        "src/paf.cpp", 
-       "src/range.cpp"
+       "src/range.cpp",
+       "src/dataframe.cpp"
     ],
 
     include_dirs = [

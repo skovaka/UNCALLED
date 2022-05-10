@@ -525,10 +525,10 @@ class Tracks:
             
             t = time.time()
             if len(self.alns) == 2:
-                df = self.alns[0].bc_cmp(self.alns[1])
+                df = self.alns[0].bc_cmp(self.alns[1], calc_jaccard, calc_mean_ref_dist)
             else:
-                df = self.alns[0].bc_cmp()
-            print("    Compared ", time.time()-t)
+                df = self.alns[0].bc_cmp(None, calc_jaccard, calc_mean_ref_dist)
+            print(f"Compared: {time.time()-t:.4f}")
             t = time.time()
 
         df = df.dropna(how="all")
@@ -540,7 +540,6 @@ class Tracks:
                 index=["mref", "aln_a", "aln_b", "group_b"])
         #else:
         #    print(df.to_csv(sep="\t"))
-        print("    Written ", time.time()-t)
         t = time.time()
 
     def calc_refstats(self, verbose_refs=False, cov=False):
@@ -717,7 +716,6 @@ class Tracks:
         if max_reads is None:
             max_reads = self.prms.max_reads
 
-        print("Querying layers")
         t = time.time()
         
         layer_iter = self.input.query_layers(
@@ -729,7 +727,7 @@ class Tracks:
             order=["read_id", "mref"],
             chunksize=self.prms.io.ref_chunksize)
 
-        print("    Queried layers ", time.time()-t)
+        #print("    Queried layers ", time.time()-t)
         t = time.time()
 
         aln_leftovers = pd.DataFrame()

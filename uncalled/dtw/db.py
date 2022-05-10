@@ -632,7 +632,7 @@ class TrackSQL(TrackIO):
 
         t0 = time.time()
 
-        print(query)
+        #print(query)
 
         ret = pd.read_sql_query(
             query, self.con, 

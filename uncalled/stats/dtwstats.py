@@ -46,28 +46,24 @@ def compare(conf):
     all_layers = not (conf.jaccard or conf.mean_ref_dist)
     calc_jaccard = all_layers or conf.jaccard
     calc_mean_ref_dist = all_layers or conf.mean_ref_dist
-    
+
     tracks = Tracks(conf=conf)
 
-    print("Initialized ", time.time()-t)
     t = time.time()
     t_all = time.time()
 
     for read_id,chunk in tracks.iter_reads():
 
-        print(read_id)
-        print("    New read ", time.time()-t)
         t = time.time()
+        print(read_id)
 
         if chunk.any_empty:
             sys.stderr.write(f"Skipping {read_id}\n")
         else:
-            #if conf.save:
-            #    print(read_id)
-            print("    Comparing ", time.time()-t)
+            if conf.save:
+                print(read_id)
             chunk.calc_compare(group_b, calc_jaccard, calc_mean_ref_dist, conf.save)
 
-        print("Read processed ", time.time()-t_all)
         sys.stdout.flush()
         t = time.time()
         t_all = time.time()
