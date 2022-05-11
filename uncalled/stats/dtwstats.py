@@ -53,20 +53,18 @@ def compare(conf):
     t = time.time()
     t_all = time.time()
 
+    t = time.time()
+
     for read_id,chunk in tracks.iter_reads():
-
-        t = time.time()
-
         if chunk.any_empty:
             sys.stderr.write(f"Skipping {read_id}\n")
         else:
-            if conf.save:
-                print(read_id)
+            #if conf.save:
+            #    print(read_id)
             chunk.calc_compare(group_b, calc_jaccard, calc_mean_ref_dist, conf.save)
 
-        sys.stdout.flush()
+        print(f"{read_id}\t{time.time()-t:.4f}")
         t = time.time()
-        t_all = time.time()
 
 DUMP_OPTS = (
     Opt("db_in", "tracks.io", type=str),

@@ -28,7 +28,7 @@ TracksParams._def_params(
     ("shared_reads_only", False, bool, "If true will only contain reads shared between all tracks"),
     ("shared_refs_only", False, bool, "If true will only contain reference positions where all tracks have sufficient coverage (see min_coverage)"),
 
-    ("layers", ["dtw","bcaln","cmp","bc_cmp"], None, "Layers to load (e.g. current, dwell, model_diff)"),
+    ("layers", [], None, "Layers to load (e.g. current, dwell, model_diff)"),
 
     ("load_mat", False, bool, "If true will pivot layers into a matrix"), #TODO change to mat_layers, only do it for them
 
@@ -528,8 +528,6 @@ class Tracks:
                 df = self.alns[0].bc_cmp(self.alns[1], calc_jaccard, calc_mean_ref_dist)
             else:
                 df = self.alns[0].bc_cmp(None, calc_jaccard, calc_mean_ref_dist)
-            print(f"Compared: {time.time()-t:.4f}")
-            t = time.time()
 
         df = df.dropna(how="all")
 

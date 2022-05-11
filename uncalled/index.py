@@ -98,11 +98,11 @@ class CoordSpace:
             self.ref_kmers = None
         elif self.stranded:
             self.ref_kmers = pd.concat(
-                {int(self.fwd) : self.kmers.set_axis(self.mref_to_ref(self.kmers.index))})
+                {int(self.fwd) : self.kmers.set_axis(self.mref_to_ref(self.kmers.index, self.fwd))})
         else:
             self.ref_kmers = pd.concat(
-                {0 : self.kmers[0].set_axis(self.mref_to_ref(self.kmers[0].index)), 
-                 1 : self.kmers[1].set_axis(self.mref_to_ref(self.kmers[1].index))}
+                {0 : self.kmers[0].set_axis(self.mref_to_ref(self.kmers[0].index, False)), 
+                 1 : self.kmers[1].set_axis(self.mref_to_ref(self.kmers[1].index, True))}
             )
 
     @property
@@ -226,8 +226,8 @@ class CoordSpace:
                 return bool(fwd)
         return None
     
-    def mref_to_ref(self, mref):
-        fwd = self.all_mrefs_fwd(mref)
+    def mref_to_ref(self, mref, fwd=None):
+        fwd = fwd if fwd is not None else self.all_mrefs_fwd(mref)
 
         if fwd is None:
             raise ValueError("mref coordinates outside of CoordSpace")
@@ -246,7 +246,7 @@ class CoordSpace:
 
     def mref_to_ref_index(self, mrefs, multi=False):
         if self.stranded:
-            refs = self.mref_to_ref(mrefs)
+            refs = self.mref_to_ref(mrefs, self.fwd)
             fwd_mask = np.full(len(refs), self.fwd)
 
         else:

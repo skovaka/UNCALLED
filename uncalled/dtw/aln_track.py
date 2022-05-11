@@ -211,17 +211,26 @@ class AlnTrack:
             self.layers = self.layers.rename(index=coords.mref_to_ref, level=0)
             self.layers.index.names = ("ref", "aln_id")
 
-        self.layers = self.layers.sort_index()
+            refs = self.layers.index.get_level_values(0)
+            if len(self.layers) > 1 and refs[0] > refs[1]:
+                self.layers = self.layers.iloc[::-1]
+
+        #self.layers = self.layers.sort_index()
 
         self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
 
-        if self.coords.ref_kmers is not None:
-            kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
-            self.kmers = self.coords.ref_kmers.reindex(kidx)
-            self.kmers.index = self.layers.index
+        self._kmers = None
 
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
+
+    @property
+    def kmers(self):
+        if self._kmers is None and self.coords.ref_kmers is not None:
+            kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
+            self._kmers = self.coords.ref_kmers.loc[kidx]
+            self._kmers.index = self.layers.index
+        return self._kmers
 
     @property
     def all_fwd(self):
@@ -240,7 +249,10 @@ class AlnTrack:
             return AlnTrack(self, coords, self.alignments, self.layers)
         layer_refs = self.layers.index.get_level_values("ref")
 
-        layers = self.layers.loc[layer_refs.isin(coords.refs)]
+        #print("ONNE", reads)
+
+        #layers = self.layers.loc[layer_refs.isin(coords.refs)]
+        layers = self.layers.loc[(layer_refs >= coords.refs.min()) & (layer_refs <= coords.refs.max())]
 
         if reads is not None:
             if aln_ids is not None:
