@@ -401,7 +401,7 @@ class AlnTrack:
 
         def coords(df):
             df = df.dropna().reset_index()
-            if df.loc[0,"start"] > df.loc[1,"start"]:
+            if len(df) > 1 and df.loc[0,"start"] > df.loc[1,"start"]:
                 end = -df["start"]
                 df["start"] = -df["end"]
                 df["end"] = end
@@ -411,7 +411,7 @@ class AlnTrack:
         coords_b = coords(aln_b)
         
         compare = Compare(coords_a, coords_b)
-        cmp_df = pd.DataFrame(compare.to_numpy()).dropna(axis=1, how="all")
+        cmp_df = pd.DataFrame(compare.to_numpy())
         cmp_df["aln_id"] = alns_a[0]
         cmp_df = cmp_df.set_index(["ref","aln_id"])
         df["jaccard"] = cmp_df["jaccard"]

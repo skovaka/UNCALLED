@@ -23,7 +23,8 @@ from ..dtw.aln_track import parse_layers
 
 COMPARE_OPTS = (
     Opt("db_in", "tracks.io"),
-    Opt(("-l", "--read-filter"), "tracks", nargs="+", type=str),
+    #Opt(("-l", "--read-filter"), "tracks", nargs="+", type=str),
+    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-R", "--ref-bounds"), "tracks"),
     Opt(("-b", "--bcaln"), action="store_true", help="Compare against basecalled alignment. If two tracks input will look for \"bcaln\" group in second track, otherwise will look in the first track."),
     Opt(("-s", "--save"), action="store_true", help="Will save in database if included, otherwise will output to TSV"),
@@ -55,7 +56,6 @@ def compare(conf):
     for read_id,chunk in tracks.iter_reads():
 
         t = time.time()
-        print(read_id)
 
         if chunk.any_empty:
             sys.stderr.write(f"Skipping {read_id}\n")
