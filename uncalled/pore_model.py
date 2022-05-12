@@ -144,10 +144,10 @@ class PoreModel:
         if arr.dtype.type in {np.str_, np.bytes_}:
 
             #TODO add option to fully check BP validity
-            if not np.all(np.char.str_len(arr) == K):
-                raise RuntimeError("All k-mers must be %d bases long" % K)
+            if not np.all(np.char.str_len(arr) == self.K):
+                raise RuntimeError("All k-mers must be %d bases long" % self.K)
 
-            arr = str_to_kmer(arr)
+            arr = self.str_to_kmer(arr)
         return self.KmerArray(arr.astype(self.kmer_dtype))
         #return arr
 

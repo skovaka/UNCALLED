@@ -360,6 +360,7 @@ class TrackSQL(TrackIO):
                 length INTEGER,
                 current REAL,
                 stdv REAL,
+                kmer INTEGER,
                 FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE
             );""")
         self.cur.execute("""
@@ -678,7 +679,7 @@ def ls(conf, db=None):
 
     db.con.commit()
 
-    db.close()
+    #db.close()
 
 DELETE_OPTS = (
     DB_OPT,

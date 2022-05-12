@@ -409,22 +409,40 @@ class AlnTrack:
         alns_a = aln_a.index.unique(1)
         if len(alns_a) != 1:
             raise ValueError("Can only compare two alignments at a time")
+        
+        has_mref = "mref" in aln_b.index.name
 
-        def coords(df):
+        def coords(df, track):
             df = df.dropna().reset_index()
-            if len(df) > 1 and df.loc[0,"start"] > df.loc[1,"start"]:
+            if not "ref" in df:
+                if not has_mref:
+                    raise ValueError("No reference coordinates in comparison coords")
+                df = df[(df["mref"] >= self.coords.mrefs.min()) & (df["mref"] <= self.coords.mrefs.max())]
+                df["ref"] = self.coords.mref_to_ref(df["mref"])
+                df.sort_values("ref", inplace=True)
+            #if has_mref:
+            #    df["ref"] = df["mref"]
+            if len(df) > 1 and df["start"].iloc[0] > df["start"].iloc[1]:
                 end = -df["start"]
                 df["start"] = -df["end"]
                 df["end"] = end
+                #if has_mref:
+                #    df["ref"] = -df["ref"]
             return AlnCoords(df)
         
-        coords_a = coords(aln_a)
-        coords_b = coords(aln_b)
+        coords_a = coords(aln_a, self)
+        coords_b = coords(aln_b, other)
+
         
         compare = Compare(coords_a, coords_b)
-        cmp_df = pd.DataFrame(compare.to_numpy())
+        cmp_df = pd.DataFrame(compare.to_numpy()).dropna(how="all")
+
         cmp_df["aln_id"] = alns_a[0]
-        cmp_df = cmp_df.set_index(["ref","aln_id"])
+        if has_mref:
+            cmp_df["mref"] = self.coords.ref_to_mref(pd.Index(cmp_df["ref"]))
+            cmp_df = cmp_df.set_index(["mref","aln_id"])
+        else:
+            cmp_df = cmp_df.set_index(["ref","aln_id"])
         df["jaccard"] = cmp_df["jaccard"]
         df["mean_ref_dist"] = cmp_df["mean_ref_dist"]
 

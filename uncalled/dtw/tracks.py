@@ -290,7 +290,8 @@ class Tracks:
         dtw = pd.DataFrame({
             "start"  : grp["start"].min().astype("uint32"),
             "length" : lengths.astype("uint32"),
-            "current"   : grp["cuml_mean"].sum() / lengths
+            "current"   : grp["cuml_mean"].sum() / lengths,
+            "kmer" : grp["kmer"].first()
         })
 
         return dtw.sort_index()
@@ -505,35 +506,44 @@ class Tracks:
                 sys.stderr.write(str(track.alignments))
 
     def calc_compare(self, group_b, calc_jaccard, calc_mean_ref_dist, save):
-        if len(self.alns) == 0:
+        if len(self.alns) > 0:
+            alns = self.alns
+        elif len(self.output_tracks) > 0:
+            alns = list(self.output_tracks.values())
+        else:
             raise ValueError("Must input at least one track")
 
-        cols = self.alns[0].layers.columns.get_level_values("group").unique()
+        cols = alns[0].layers.columns.get_level_values("group").unique()
         if (group_b == "dtw" and "cmp" in cols) or (group_b == "bcaln" and "bc_cmp" in cols):
             sys.stderr.write(f"Read already has compare group. Skipping\n")
             return None
 
         if group_b == "dtw":
-            if len(self.alns) != 2:
+            if len(alns) != 2:
                 raise ValueError("Must input exactly two tracks to compare dtw alignments")
 
-            df = self.alns[0].cmp(self.alns[1], calc_jaccard, calc_mean_ref_dist)
+            df = alns[0].cmp(alns[1], calc_jaccard, calc_mean_ref_dist)
 
         elif group_b == "bcaln":
-            if len(self.alns) > 2:
+            if len(alns) > 2:
                 raise ValueError("Must input one or two tracks to compare dtw to bcaln")
             
             t = time.time()
-            if len(self.alns) == 2:
-                df = self.alns[0].bc_cmp(self.alns[1], calc_jaccard, calc_mean_ref_dist)
+            if len(alns) == 2:
+                df = alns[0].bc_cmp(alns[1], calc_jaccard, calc_mean_ref_dist)
             else:
-                df = self.alns[0].bc_cmp(None, calc_jaccard, calc_mean_ref_dist)
+                df = alns[0].bc_cmp(None, calc_jaccard, calc_mean_ref_dist)
 
         df = df.dropna(how="all")
 
         if save:
-            df.rename(index=lambda r: self.alns[0].coords.ref_to_mref(r, self.alns[0].all_fwd), level=0, inplace=True)
-            self.input.write_layers( #TODO be explicit that output = input
+            if "ref" in df.index.names:
+                df.rename(index=lambda r: alns[0].coords.ref_to_mref(r, alns[0].all_fwd), level=0, inplace=True)
+            if self.output is None:
+                output = self.input
+            else:
+                output = self.output
+            output.write_layers( #TODO be explicit that output = input
                 pd.concat({"cmp" : df}, names=["group", "layer"], axis=1), 
                 index=["mref", "aln_a", "aln_b", "group_b"])
         #else:

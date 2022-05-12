@@ -149,8 +149,6 @@ class GuidedDTW:
         kmer_blocks.append(kmers.loc[k:])
 
         self.ref_kmers = pd.concat(kmer_blocks)
-        #self.ref_kmers = kmers
-        
 
         self.model = PoreModel(self.conf.pore_model)
 
@@ -178,7 +176,12 @@ class GuidedDTW:
 
         self.df = df.set_index("mref")
 
+        self.df["kmer"] = self.ref_kmers.loc[self.df.index]
+
         tracks.write_dtw_events(self.df, aln_id=aln_id)
+
+
+        #tracks.calc_compare("bcaln", True, True, True)
 
         self.empty = False
 
