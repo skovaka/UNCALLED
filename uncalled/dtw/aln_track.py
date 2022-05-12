@@ -249,7 +249,6 @@ class AlnTrack:
             return AlnTrack(self, coords, self.alignments, self.layers)
         layer_refs = self.layers.index.get_level_values("ref")
 
-        #print("ONNE", reads)
 
         #layers = self.layers.loc[layer_refs.isin(coords.refs)]
         layers = self.layers.loc[(layer_refs >= coords.refs.min()) & (layer_refs <= coords.refs.max())]
@@ -451,7 +450,6 @@ class AlnTrack:
         
         compare = Compare(coords_a, coords_b)
 
-        print("Fast?", time.time()-t)
         t = time.time()
 
 
@@ -461,10 +459,6 @@ class AlnTrack:
         starts = merge[["start_a", "start_b"]]
         ends = merge[["end_a", "end_b"]]
 
-        print("ALNS", merge.index.unique(1))
-        print("ALNz", aln_a.index.unique(1))
-        #print(aln_a)
-        #print(aln_b)
 
         df.loc[merge.index, "aln_b"] = merge["aln_b"].astype("Int32")
 
@@ -514,7 +508,6 @@ class AlnTrack:
                     mean_ref_dist[idx] = (sum_a+sum_b) / (weight_a+weight_b)
 
             df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
-        print("Slow!", time.time()-t)
         #cpp = pd.DataFrame(compare.to_numpy()).dropna(axis=1, how="all").set_index("ref")["mean_ref_dist"]
         #py = df.dropna(axis=1).reset_index(level=1)["mean_ref_dist"]
         #diffs = (cpp-py).abs()

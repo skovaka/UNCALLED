@@ -121,7 +121,6 @@ class Sigplot:
         #read = ProcRead(track.fast5s[read_id], conf=self.conf)
         signal = read.get_norm_signal(samp_min, samp_max)
 
-
         #TODO set global signal min/max
         mask = ((signal >= 40) &
                 (signal <= self.conf.event_detector.max_mean))
@@ -129,7 +128,6 @@ class Sigplot:
         
         samples = np.arange(samp_min, samp_max)[mask]
         signal = signal[mask]
-
 
         current_min = min(current_min, signal.min())
         current_max = max(current_max, signal.max())

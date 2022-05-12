@@ -19,8 +19,8 @@ class ProcessedRead(_ProcessedRead):
         return self.to_df()[mask]
 
     def get_norm_signal(self, samp_min, samp_max):
-
         n = self.norm[0]
+        print(self.norm)
         return self.signal[samp_min:samp_max] * n["scale"] + n["shift"]
 
         #ret = np.zeros(int(samp_max - samp_min))
@@ -40,8 +40,7 @@ class ProcessedRead(_ProcessedRead):
         #    raw = self.signal[st:en]
         #    ret[st-samp_min:en-samp_min] = (n["scale"] * raw) + n["shift"]
         #    i += 1
-
-        return ret
+        #return ret
 
     def to_df(self):
         return pd.DataFrame(self.events)
@@ -57,6 +56,8 @@ class SignalProcessor:
 
         if isinstance(model, PoreModel):
             model = model.instance
+
+        print(model)
 
         self.instance = self.InstanceClass(model, conf.event_detector)
 

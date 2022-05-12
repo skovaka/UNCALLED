@@ -73,6 +73,7 @@ class SignalProcessor {
 
         ret.events = evdt_.get_events(read.get_signal());
 
+
         auto norm = norm_mom_params(ret.events);
         ret.normalize(norm);
         //for (auto &e : ret.events) {

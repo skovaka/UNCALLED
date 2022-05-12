@@ -64,6 +64,7 @@ def compare(conf):
             chunk.calc_compare(group_b, calc_jaccard, calc_mean_ref_dist, conf.save)
 
         print(f"{read_id}\t{time.time()-t:.4f}")
+        sys.stdout.flush()
         t = time.time()
 
 DUMP_OPTS = (
