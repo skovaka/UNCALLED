@@ -314,6 +314,10 @@ class TrackSQL(TrackIO):
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (mref, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (mref, aln_a, aln_b, group_b);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_aln_idx ON cmp (aln_a);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_aln_idx ON dtw (aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_aln_idx ON bcaln (aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS aln_read_idx ON alignment (read_id);")
             self.con.close()
             self.open = False
 
@@ -679,7 +683,7 @@ def ls(conf, db=None):
 
     db.con.commit()
 
-    #db.close()
+    db.close()
 
 DELETE_OPTS = (
     DB_OPT,
@@ -687,7 +691,8 @@ DELETE_OPTS = (
 )
 def delete(track_name=None, db=None, conf=None):
     if db is None:
-        db = TrackSQL(conf.db_file)
+        db = TrackSQL(conf)
+
 
     if track_name is None:
         track_name = conf.track_name
@@ -699,7 +704,7 @@ def delete(track_name=None, db=None, conf=None):
     print("Deleted track \"%s\"" % track_name)
 
 EDIT_OPTS = (
-    Opt("db_file", help="Track database file"),
+    DB_OPT,
     Opt("track_name", help="Current track name"),
     Opt(("-N", "--new-name"), default=None, help="New track name"),
     Opt(("-D", "--description"), default=None, help="New track description"),
@@ -708,7 +713,7 @@ EDIT_OPTS = (
 )
 def edit(conf, db=None):
     if db is None:
-        db = TrackSQL(conf.db_file)
+        db = TrackSQL(conf, None, "r")
     track_id = db._verify_track(conf.track_name)
 
     updates = []
@@ -719,9 +724,9 @@ def edit(conf, db=None):
     if conf.description:
         updates.append("desc = ?")
         params.append(conf.description)
-    if len(updates) == 0:
-        sys.stderr.write("No changes made. Must specify new name (-N) or description (-D)\n")
-        return
+    #if len(updates) == 0:
+    #    sys.stderr.write("No changes made. Must specify new name (-N) or description (-D)\n")
+    #    return
     params.append(conf.track_name)
         
     query = "UPDATE track SET " + ", ".join(updates) + " WHERE name == ?"

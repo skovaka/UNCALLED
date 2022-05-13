@@ -44,6 +44,7 @@ namespace py = pybind11;
 
 PYBIND11_MAKE_OPAQUE(std::vector<u16>);
 PYBIND11_MAKE_OPAQUE(std::vector<u32>);
+//PYBIND11_MAKE_OPAQUE(std::vector<u32>);
 #endif
 
 using KmerLen = u8;
@@ -436,7 +437,7 @@ class PoreModel {
 		return ret;
     }
 
-    static KmerType str_to_kmer(KmerTypePy kmer, u32 offs) {
+    static KmerType str_to_kmer(const KmerTypePy &kmer, u32 offs) {
 		auto s = std::string(kmer.data());
 		return str_to_kmer(s, offs);
 	}
@@ -491,7 +492,7 @@ class PoreModel {
         c.attr("KMER_COUNT") = pybind11::cast(Class::KMER_COUNT);
 
         c.def_static("str_to_kmer",
-                py::vectorize(static_cast< KmerType (*) (KmerTypePy, u32)>(&Class::str_to_kmer)), 
+                py::vectorize(static_cast< KmerType (*) (const KmerTypePy &, u32)>(&Class::str_to_kmer)), 
                 py::arg("kmer"), py::arg("offs")=0);
 
         c.def_static("kmer_to_str",  &Class::kmer_to_str);

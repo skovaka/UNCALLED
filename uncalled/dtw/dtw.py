@@ -180,8 +180,7 @@ class GuidedDTW:
 
         tracks.write_dtw_events(self.df, aln_id=aln_id)
 
-
-        #tracks.calc_compare("bcaln", True, True, True)
+        tracks.calc_compare("bcaln", True, True, True)
 
         self.empty = False
 
