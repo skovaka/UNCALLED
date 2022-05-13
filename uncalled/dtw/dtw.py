@@ -88,8 +88,8 @@ def main(conf):
     for paf in pafs:
         mm2s[paf.qr_name].append(paf)
 
-    model = PoreModel(conf.pore_model)
-    sigproc = SignalProcessor(model, conf)
+    #model = PoreModel(conf.pore_model)
+    sigproc = SignalProcessor(tracks.model, conf)
 
     #pbar = progbar.ProgressBar(
     #        widgets=[progbar.Percentage(), progbar.Bar(), progbar.ETA()], 
@@ -150,7 +150,7 @@ class GuidedDTW:
 
         self.ref_kmers = pd.concat(kmer_blocks)
 
-        self.model = PoreModel(self.conf.pore_model)
+        self.model = tracks.model
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
