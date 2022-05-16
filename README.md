@@ -27,7 +27,7 @@ OR
 ```
 > git clone --recursive https://github.com/skovaka/UNCALLED.git
 > cd UNCALLED
-> python3 setup.py install --user
+> pip3 install .
 ```
 
 Requires python >= 3.6, read-until == 3.0.0, pybind11 >= 2.5.0, and GCC >= 4.8.1 (all except GCC are automatically downloaded and installed)
