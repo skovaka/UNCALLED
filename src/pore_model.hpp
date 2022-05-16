@@ -386,6 +386,14 @@ class PoreModel {
         return (u8) ((kmer >> (2 * ((KmerType)K-i-1))) & 0x3);
     }
 
+    static u8 kmer_base_count(KmerType kmer, u8 base) {
+        u8 count = 0;
+        for (auto i = 0; i < K; i++) {
+            count += kmer_base(kmer, i) == base;
+        }
+        return count;
+    }
+
     static std::string kmer_to_str(KmerType kmer) {
         std::string s(K, 'N');
         for (u8 i = 0; i < K; i++) {
@@ -506,6 +514,7 @@ class PoreModel {
         c.def_static("kmer_revcomp",  py::vectorize(&Class::kmer_revcomp));
         c.def_static("kmer_head",     py::vectorize(&Class::kmer_head));
         c.def_static("kmer_base",     py::vectorize(&Class::kmer_base));
+        c.def_static("kmer_base_count",     py::vectorize(&Class::kmer_base_count));
         c.def_static("kmer_neighbor", py::vectorize(&Class::kmer_neighbor));
 
 

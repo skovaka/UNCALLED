@@ -16,9 +16,11 @@ import time
 
 from .. import config
 
+from _uncalled import _Fast5Reader
 from ..argparse import Opt, comma_split
 from ..fast5 import parse_fast5_paths
 from .aln_track import AlnTrack
+from ..pore_model import PoreModel
 
 INPUT_PARAMS = np.array(["db_in", "eventalign_in", "tombo_in"])
 OUTPUT_PARAMS = np.array(["db_out", "eventalign_out"])
@@ -426,10 +428,15 @@ class TrackSQL(TrackIO):
 
         for name,row in df.iterrows():
             conf = config.Config(toml=row.config)
+
+            if self.model is None:
+                self.model = PoreModel(conf.pore_model.name)
+
             t = AlnTrack(self, row["id"], name, row["desc"], conf, self.model)
             self.tracks.append(t)
 
             self.conf.load_config(conf)
+
 
     def init_track(self, track):
         self.cur.execute(
@@ -439,6 +446,12 @@ class TrackSQL(TrackIO):
         )
         track.id = self.cur.lastrowid
         return track.id
+
+    def update_config(self, track):
+        self.cur.execute(
+            "UPDATE track SET config = ? WHERE name = ?",
+            (track.conf.to_toml(), track.name)
+        )
 
 
     def write_alignment(self, aln_df):
@@ -637,7 +650,6 @@ class TrackSQL(TrackIO):
 
         t0 = time.time()
 
-        #print(query)
 
         ret = pd.read_sql_query(
             query, self.con, 
@@ -683,7 +695,7 @@ def ls(conf, db=None):
 
     db.con.commit()
 
-    db.close()
+    #db.close()
 
 DELETE_OPTS = (
     DB_OPT,
@@ -712,9 +724,12 @@ EDIT_OPTS = (
     Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
 )
 def edit(conf, db=None):
+    fast5s = _Fast5Reader.Params(conf.fast5_reader)
+    fast5_change = len(conf.fast5_files) > 0
+    track_name = conf.track_name
     if db is None:
         db = TrackSQL(conf, None, "r")
-    track_id = db._verify_track(conf.track_name)
+    track_id = db._verify_track(track_name)
 
     updates = []
     params = []
@@ -724,21 +739,29 @@ def edit(conf, db=None):
     if conf.description:
         updates.append("desc = ?")
         params.append(conf.description)
-    #if len(updates) == 0:
-    #    sys.stderr.write("No changes made. Must specify new name (-N) or description (-D)\n")
-    #    return
-    params.append(conf.track_name)
+    if fast5_change:
+        updates.append("config = ?")
+        conf.fast5_reader = fast5s
+        del conf.track_name
+        del conf.new_name
+        del conf.description
+        params.append(conf.to_toml())
+    if len(updates) == 0:
+        sys.stderr.write("No changes made. Must specify new name (-N) or description (-D)\n")
+        return
+
+    params.append(track_name)
         
     query = "UPDATE track SET " + ", ".join(updates) + " WHERE name == ?"
     db.cur.execute(query, params)
 
-    if len(conf.fast5_files) > 0:
-        _set_fast5s(track_id, conf.fast5_reader, db)
+    #if len(fast5s) > 0:
+    #    _set_fast5s(track_id, fast5s, db)
         
     db.con.commit()
     db.con.close()
 
-def _set_fast5s(track_id, prms, db):
+def _set_fast5s(track_id, fast5_files, db):
     fast5s = pd.read_sql_query(
         "SELECT fast5.id, filename FROM fast5 " \
         "JOIN read ON fast5.id = fast5_id " \
@@ -748,7 +771,7 @@ def _set_fast5s(track_id, prms, db):
 
     basenames = fast5s["filename"].map(os.path.basename)
 
-    new_paths = {os.path.basename(path) : path for path in parse_fast5_paths(prms.fast5_files, prms.recursive)}
+    new_paths = {os.path.basename(path) : path for path in parse_fast5_paths(fast5_files, True)}
 
     fast5s["filename"] = basenames.map(new_paths)
 
@@ -780,8 +803,7 @@ def merge(conf):
 
     conf.tracks.io.init_track = False
 
-    print(conf.tracks.io.db_out)
-    db = TrackSQL(conf, "w")
+    db = TrackSQL(conf, None, "w")
     
     def max_id(table, field="id"):
         i = db.cur.execute(f"SELECT max({field}) FROM {table}").fetchone()[0]
@@ -821,7 +843,7 @@ def merge(conf):
         db.cur.execute(query)
 
         query = "INSERT INTO dtw "\
-               f"SELECT mref,aln_id+{aln_shift},start,length,current,stdv "\
+               f"SELECT mref,aln_id+{aln_shift},start,length,current,stdv,kmer "\
                 "FROM input.dtw"
         db.cur.execute(query)
 

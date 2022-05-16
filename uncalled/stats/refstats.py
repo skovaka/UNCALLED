@@ -63,12 +63,17 @@ def main(conf):
             columns.append(".".join([stat, group, layer, "stat"]))
             columns.append(".".join([stat, group, layer, "pval"]))
 
+    columns.append("kmer")
+
     print("\t".join(columns))
 
     for chunk in tracks.iter_refs():
         chunk.prms.refstats = conf.refstats
         chunk.prms.refstats_layers = layers
+
         stats = chunk.calc_refstats(conf.verbose_refs, conf.cov)
+        stats["kmer"] = tracks.model.kmer_to_str(chunk.coords.ref_kmers.loc[(int(chunk.coords.fwd), stats.index)])
+
         if conf.verbose_refs:
             stats.index = pd.MultiIndex.from_product([
                 [chunk.coords.ref_name], stats.index, ["+" if chunk.coords.fwd else "-"]

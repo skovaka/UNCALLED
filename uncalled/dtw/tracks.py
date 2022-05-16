@@ -107,7 +107,7 @@ class Tracks:
         self.set_layers(self.prms.layers)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers, add_deps=False))
 
-        self.model = PoreModel(self.conf.pore_model) 
+        self.model = None#PoreModel(self.conf.pore_model) 
 
         #TODO refactor into TrackSQL, abstract into self.io
 
@@ -240,6 +240,7 @@ class Tracks:
             in_format = INPUT_PARAMS[in_prms][0]
             if in_format == "db_in":
                 self.input = TrackSQL(self.conf, self.model, "r")
+                self.model = self.input.model
             elif in_format == "eventalign_in":
                 raise ValueError("EVENTALGIN NOT SUPPORTED YET")
             elif in_format == "tombo_in":
@@ -249,6 +250,9 @@ class Tracks:
                 self._add_track(track.name, track)
         else:
             self.input = None
+
+        if self.model is None:
+            self.model = PoreModel(self.conf.pore_model.name)
 
         if np.any(out_prms):
             out_format = OUTPUT_PARAMS[out_prms][0]

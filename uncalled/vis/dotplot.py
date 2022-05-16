@@ -246,6 +246,7 @@ class Dotplot:
 
         fig.update_xaxes(**axis_kw)
         fig.update_yaxes(**axis_kw)
+        fig.update_yaxes(showticklabels=False)
         #fig.update_yaxes(showspikes=True)
 
         fig.update_xaxes(
