@@ -503,19 +503,19 @@ class PoreModel {
                 py::vectorize(static_cast< KmerType (*) (const KmerTypePy &, u32)>(&Class::str_to_kmer)), 
                 py::arg("kmer"), py::arg("offs")=0);
 
-        c.def_static("kmer_to_str",  &Class::kmer_to_str);
+        c.def_static("kmer_to_str",  &Class::kmer_to_str, "Convert binary k-mers to strings");
         c.def_static("kmer_to_arr",  py::vectorize(&Class::kmer_to_arr));
 
-        c.def_static("base_to_char", py::vectorize(&Class::base_to_char)); 
-        c.def_static("base_comp", py::vectorize(&Class::base_comp));
+        c.def_static("base_to_char", py::vectorize(&Class::base_to_char), "Convert base index to base character"); 
+        c.def_static("base_comp", py::vectorize(&Class::base_comp), "Returns the complement of a base index");
         
-        c.def_static("kmer_rev",      py::vectorize(&Class::kmer_rev));
-        c.def_static("kmer_comp",     py::vectorize(&Class::kmer_comp));
-        c.def_static("kmer_revcomp",  py::vectorize(&Class::kmer_revcomp));
-        c.def_static("kmer_head",     py::vectorize(&Class::kmer_head));
-        c.def_static("kmer_base",     py::vectorize(&Class::kmer_base));
-        c.def_static("kmer_base_count",     py::vectorize(&Class::kmer_base_count));
-        c.def_static("kmer_neighbor", py::vectorize(&Class::kmer_neighbor));
+        c.def_static("kmer_rev",      py::vectorize(&Class::kmer_rev), "Reverses binary k-mers (not complement)");
+        c.def_static("kmer_comp",     py::vectorize(&Class::kmer_comp), "Complements binary k-mers (not reverse)");
+        c.def_static("kmer_revcomp",  py::vectorize(&Class::kmer_revcomp), "Reverse complements binary k-mers");
+        c.def_static("kmer_head",     py::vectorize(&Class::kmer_head), "Returns the first base index in binary k-mers");
+        c.def_static("kmer_base",     py::vectorize(&Class::kmer_base), "Returns the base at the specified index in a binary k-mer");
+        c.def_static("kmer_base_count",     py::vectorize(&Class::kmer_base_count), "Returns the number of occurances of the specified base index in the binary k-mer");
+        c.def_static("kmer_neighbor", py::vectorize(&Class::kmer_neighbor), "Returns the binary k-mer shifted left with the specified base appended");
 
 
     }

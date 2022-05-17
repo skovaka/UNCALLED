@@ -596,6 +596,7 @@ class RefIndex {
         PY_BWA_INDEX_METH(get_neighbor);
         PY_BWA_INDEX_METH(get_kmer_range);
         PY_BWA_INDEX_METH(get_kmer_count);
+        c.def("get_kmer_count", py::vectorize(&RefIndex<ModelType>::get_kmer_count));
         PY_BWA_INDEX_METH(get_base_range);
         PY_BWA_INDEX_METH(fm_to_pac);
         PY_BWA_INDEX_METH(fm_to_mref);
