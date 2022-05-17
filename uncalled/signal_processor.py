@@ -20,7 +20,6 @@ class ProcessedRead(_ProcessedRead):
 
     def get_norm_signal(self, samp_min, samp_max):
         n = self.norm[0]
-        print(self.norm)
         return self.signal[samp_min:samp_max] * n["scale"] + n["shift"]
 
         #ret = np.zeros(int(samp_max - samp_min))
@@ -57,7 +56,6 @@ class SignalProcessor:
         if isinstance(model, PoreModel):
             model = model.instance
 
-        print(model)
 
         self.instance = self.InstanceClass(model, conf.event_detector)
 
