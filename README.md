@@ -396,6 +396,8 @@ This subcommand features `compare`, which measures distance between alignments o
 
 Compute distance between alignments of the same reads
 
+Note: currently the `--save` option will only work if no other comparisons have been saved to the primary track (the first specified track) 
+
 ```
 uncalled layerstats compare [-b] [-s] input [input ...]
 
@@ -410,7 +412,8 @@ optional arguments:
   -b, --bcaln  Compare against basecalled alignment. If two tracks input will
                look for "bcaln" group in second track, otherwise will look in
                the first track. (default: False)
-  -s, --save   Will save in database if included, otherwise will output to TSV
+  -s, --save   Will save in database if included, otherwise will output
+               to TSV. Will be associated with the first track listed.
                (default: False)
 ```
 

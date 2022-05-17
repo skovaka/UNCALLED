@@ -757,8 +757,8 @@ def edit(conf, db=None):
     query = "UPDATE track SET " + ", ".join(updates) + " WHERE name == ?"
     db.cur.execute(query, params)
 
-    #if len(fast5s) > 0:
-    #    _set_fast5s(track_id, fast5s, db)
+    if len(fast5s) > 0:
+        _set_fast5s(track_id, fast5s, db)
         
     db.con.commit()
     db.con.close()
