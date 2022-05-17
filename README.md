@@ -24,7 +24,7 @@ For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0
   - [`browser`: Interactive signal alignment genome browser](#browser)
 - [DTW Analysis](#dtw-analysis)
   - [`refstats`: Calculate per-reference-coordinate statistics](#refstats)
-  - [`dtwstats`: Compute, compare, and query alignment layers](#dtwstats)
+  - [`layerstats`: Compute, compare, and query alignment layers](#layerstats)
 - [Alignment Database](#alignment-database)
 - [Future Work](#future-work)
 - [Release Notes](#release-notes)
@@ -353,7 +353,7 @@ optional arguments:
 
 ## DTW Analysis
 
-These functions compute statistics over reference and read coordinates. `refstats` computes summary and comparison statistics (e.g. Kolmogorov-Smirnov test) over reference coordinates, while `dtwstats` maintains the read-by-reference dimensions of the DTW alignments.
+These functions compute statistics over reference and read coordinates. `refstats` computes summary and comparison statistics (e.g. Kolmogorov-Smirnov test) over reference coordinates, while `layerstats` maintains the read-by-reference dimensions of the DTW alignments.
 
 (Coming soon: `readstats` to compute read-level statistics)
 
@@ -388,7 +388,7 @@ optional arguments:
   -v, --verbose-refs    Output reference name and strand (default: False)
 ```
 
-### `dtwstats`
+### `layerstats`
 
 This subcommand features `compare`, which measures distance between alignments of the same set of reads (e.i. different alignment methods). It also features `dump`, which outputs DTW layers from a database.
 
@@ -397,7 +397,7 @@ This subcommand features `compare`, which measures distance between alignments o
 Compute distance between alignments of the same reads
 
 ```
-uncalled dtwstats compare [-b] [-s] input [input ...]
+uncalled layerstats compare [-b] [-s] input [input ...]
 
 positional arguments:
 input               Input tracks specifier. Should be in the format
@@ -451,8 +451,8 @@ Uncalled4 stores signal alignments as a set of **layers** associated with read a
 | dtw   | model_diff | Difference between predicted (via a pore model) and observed current|
 | dtw   | kmer | Binarized reference k-mer |
 | dtw   | base | Binarized reference base |
-| cmp   | mean_ref_dist | Mean reference distance between two alignments (must first run [`dtwstats compare`](#compare)) |
-| cmp   | jaccard | Raw sample jaccard distances between two alignments (must first run [`dtwstats compare`](#compare)) |
+| cmp   | mean_ref_dist | Mean reference distance between two alignments (must first run [`layerstats compare`](#compare)) |
+| cmp   | jaccard | Raw sample jaccard distances between two alignments (must first run [`layerstats compare`](#compare)) |
 
 Read alignments are grouped into **tracks**, which are stored in an sqlite3 database. When running [`uncalled dtw`](#dtw) or [`uncalled convert`](#convert), you must specify an output database file and an optional track name in the format `<filename.db>:<track_name>`. If only `<filename.db>` is specified, the track name will be the filename without the extension. Multiple tracks can be input as comma-separated track names: `<filename.db>:<track1>,<track2>,...`. You can change the name of a track with [`uncalled db edit`](#db), and also set a human readable description to appear in visualizations.
 

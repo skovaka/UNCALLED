@@ -76,7 +76,7 @@ REFSTAT_LABELS = {
     "q95" : "95% Quantile",
 }
 
-BUILTIN_TRACKS = {"_refstats", "_dtwstats", "_readstats"}
+BUILTIN_TRACKS = {"_refstats", "_layerstats", "_readstats"}
 
 CMP_GROUPS = {"cmp", "bc_cmp"}
 

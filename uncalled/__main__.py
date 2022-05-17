@@ -9,14 +9,14 @@ from . import index, pafstats
 from .rt import realtime, map, sim
 from .dtw import dtw, convert, db
 from .vis import browser, dotplot, sigplot, trackplot
-from .stats import refstats, dtwstats, _readstats
+from .stats import refstats, layerstats, _readstats
 
 SUBCMDS = [
     index, 
     map, sim, pafstats, #realtime, 
     dtw, convert, db,
     browser, dotplot, sigplot, trackplot,
-    refstats, _readstats, dtwstats,
+    refstats, _readstats, layerstats,
 ]
 
 _help_lines = [
@@ -36,7 +36,7 @@ _help_lines = [
     "DTW Analysis:",
     "\trefstats   " + refstats.main.__doc__,
     #"\treadstats  " + _readstats.main.__doc__,
-    "\tdtwstats   " + dtwstats.__doc__.split("\n")[0],"",
+    "\tlayerstats " + layerstats.__doc__.split("\n")[0],"",
     "DTW Visualization:",
     "\tdotplot    " + dotplot.main.__doc__,
     "\ttrackplot  " + trackplot.main.__doc__,
