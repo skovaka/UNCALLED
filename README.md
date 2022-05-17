@@ -99,24 +99,33 @@ positional arguments:
                         directory to search per line
 
 optional arguments:
-  --rna                 Should be set for direct RNA data
   -m MM2_PAF, --mm2-paf MM2_PAF
                         Path to minimap2 alignments of basecalled reads in PAF
                         format. Used to determine where each should be
                         aligned. Should include cigar string. (default: None)
-  -r, --recursive       Will search directories recursively for any file                       
+  --rna                 Should be set for r9.4 direct RNA data
+  -r, --recursive       Will search directories recursively for any file      
                         ending in ".fast5" if true (default: False)
+  -o DB_OUT, --db-out DB_OUT
+                        Output track database specifier. Should be in format
+                        <file.db>[:<track_name>], where file.db is the output
+                        sqlite database. If <track_name> is not specified,
+                        will be same as filename (without extension) (default:
+                        None)
+  --eventalign-out [EVENTALIGN_OUT]                                   
+                        Eventalign TSV output file (or "-"/no argument
+                        for stdout) (default: None)  
+
   -l READ_FILTER, --read-filter READ_FILTER
                         List of read IDs and/or text file(s) containing one
                         read ID per line (default: [])
   -n MAX_READS, --max-reads MAX_READS
                         Maximum number of reads to load. (default: 0)
-  -o OUTPUT, --output OUTPUT
-                        Output track specifier. Should be in format
-                        <file.db>[:<track_name>], where file.db is the output
-                        sqlite database. If <track_name> is not specified,
-                        will be same as filename (without extension) (default:
-                        None)
+  --bc-cmp              Compute distance from basecalled alignment and
+                        store in database (default: False)            
+  -p PORE_MODEL, --pore-model PORE_MODEL                              
+                        Model preset name or TSV filename (default:
+                        r94_dna, or set by --rna)
   -R REF_BOUNDS, --ref-bounds REF_BOUNDS
                         Only load reads which overlap these coordinates
                         (default: None)
@@ -124,6 +133,10 @@ optional arguments:
                         reference bounds (default: False)
   -f, --overwrite       Overwrite existing tracks (default: False)
   -a, --append          Append reads to existing tracks (default: False)
+
+  --bc-cmp              Compute distance from basecalled alignment and
+                        store in database (default: False)            
+
 ```
 
 

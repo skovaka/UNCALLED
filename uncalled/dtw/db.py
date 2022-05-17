@@ -33,8 +33,8 @@ IOParams._def_params(
 
     ("db_in", None, str, "Input track database"),
     ("db_out", None, str, "Output track database"),
-    ("eventalign_in", None, str, "Eventalign TSV input file (or \"-\" for stdin)"),
-    ("eventalign_out", None, str, "Eventalign TSV output file (or \"-\" for stdout)"),
+    ("eventalign_in", None, str, "Eventalign TSV input file (or \"-\"/no argument for stdin)"),
+    ("eventalign_out", None, str, "Eventalign TSV output file (or \"-\"/no argument for stdout)"),
     ("eventalign_index", None, str, "Nanopolish index file"),
     ("tombo_in", None, str, "Fast5 files containing Tombo alignments"),
 
@@ -163,18 +163,20 @@ class Eventalign(TrackIO):
         #        events.set_index("ref")
         #    mrefs = track.coords.ref_to_mref(events.index)
 
+        model = track.model
+
         kmers = track.coords.kmers[mrefs]
-        model_kmers = kmer_to_str(kmer_rev(kmers))
+        if self.conf.is_rna:
+            kmers = model.kmer_rev(kmers)
+        model_kmers = model.kmer_to_str(kmers)
 
         if track.coords.fwd:
             ref_kmers = model_kmers
         else:
-            ref_kmers = kmer_to_str(kmer_comp(kmers))
+            ref_kmers = model.kmer_to_str(model.kmer_comp(kmers))
 
         #read_id = track.alignments.iloc[0]["read_id"]
         #sys.stderr.write(f"{self.prev_aln_id}\t{read_id}\n")
-
-        model = track.model
 
         #https://github.com/jts/nanopolish/issues/655
         std_level = (events["current"] - model.model_mean) / model.model_stdv

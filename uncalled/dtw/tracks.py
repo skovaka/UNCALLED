@@ -291,6 +291,7 @@ class Tracks:
 
         lengths = grp["length"].sum()
 
+
         dtw = pd.DataFrame({
             "start"  : grp["start"].min().astype("uint32"),
             "length" : lengths.astype("uint32"),

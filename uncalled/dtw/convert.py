@@ -86,7 +86,7 @@ def nanopolish(conf):
         conf.eventalign_tsv, sep="\t", chunksize=10000,
         usecols=["read_name","contig","position",
                  "start_idx","event_level_mean",
-                 "event_length","strand"])
+                 "event_length","strand","model_kmer"])
 
     tracks = Tracks(conf=conf)
 
@@ -114,10 +114,15 @@ def nanopolish(conf):
 
             df["mref"] = coords.ref_to_mref(df["position"].to_numpy()+2)
 
+            kmers = tracks.model.str_to_kmer(df["model_kmer"])
+            if conf.is_rna:
+                kmers = tracks.model.kmer_rev(kmers)
+            df["kmer"] = kmers
+
             df = df.rename(columns={
                     "start_idx" : "start",
                     "event_length" : "length",
-                    "event_level_mean" : "current"
+                    "event_level_mean" : "current",
                  }).set_index("mref")
 
             fast5_name = f5reader.get_read_file(read_id)
@@ -244,8 +249,6 @@ def tombo(conf):
 
         #if is_rna == ref_bounds.fwd:
 
-        #lr = scipy.stats.linregress(currents, model[kmers])
-        #currents = lr.slope * currents + lr.intercept
         #TODO store scaling factors in pore model
         currents = currents * 10.868760552593136 + 91.25486108714513
 

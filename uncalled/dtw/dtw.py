@@ -48,6 +48,7 @@ OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
     Opt(("-a", "--append"), "tracks.io", action="store_true"),
+    Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
     Opt(("-p", "--pore-model"), "pore_model", "name"),
     Opt("--full-overlap", "tracks", action="store_true"),
     #Opt(("-S", "--mask-skips"), "dtw", action="store_true"),
@@ -102,6 +103,9 @@ def main(conf):
         for paf in mm2s[read.id]:
             t0 = time.time()
             dtw = GuidedDTW(tracks, sigproc, read, paf, conf)
+
+            if conf.bc_cmp:
+                tracks.calc_compare("bcaln", True, True, True)
 
             sys.stderr.write(f"{read.id}\n")
 
@@ -179,8 +183,6 @@ class GuidedDTW:
         self.df["kmer"] = self.ref_kmers.loc[self.df.index]
 
         tracks.write_dtw_events(self.df, aln_id=aln_id)
-
-        tracks.calc_compare("bcaln", True, True, True)
 
         self.empty = False
 
