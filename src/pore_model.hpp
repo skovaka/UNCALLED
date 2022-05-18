@@ -45,6 +45,8 @@ namespace py = pybind11;
 PYBIND11_MAKE_OPAQUE(std::vector<u16>);
 PYBIND11_MAKE_OPAQUE(std::vector<u32>);
 //PYBIND11_MAKE_OPAQUE(std::vector<u32>);
+
+void pybind_pore_model_params(py::module_ &m);
 #endif
 
 using KmerLen = u8;
@@ -58,8 +60,6 @@ struct PoreModelParams {
     std::string name;
     bool reverse, complement;
 };
-
-void pybind_pore_model_params(py::module_ &m);
 
 //extern const std::unordered_map<std::string, const std::vector<float> &> PORE_MODEL_PRESETS;
 

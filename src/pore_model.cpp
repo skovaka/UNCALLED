@@ -30,6 +30,7 @@ const PresetMap
 template<>
 const PresetMap PoreModel<10>::PRESETS {};
 
+#ifdef PYBIND
 void pybind_pore_model_params(py::module_ &m) {
     py::class_<PoreModelParams> p(m, "PoreModelParams");
     p.def(py::init<>());
@@ -38,3 +39,4 @@ void pybind_pore_model_params(py::module_ &m) {
     PY_MODEL_PARAM(reverse, "Will reverse (flip) k-mer sequences if True");
     PY_MODEL_PARAM(complement, "Will complement k-mer sequences if True");
 }
+#endif
