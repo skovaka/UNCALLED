@@ -35,7 +35,6 @@
 #include <algorithm>
 #include "pore_model.hpp"
 #include "util.hpp"
-#include "nt.hpp"
 #include "range.hpp"
 
 #ifdef PYBIND

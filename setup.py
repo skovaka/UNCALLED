@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
+from glob import glob
 import os
 import subprocess
 import sys
@@ -91,9 +92,8 @@ class pre_build(build_ext):
 uncalled = Pybind11Extension(
     "_uncalled",
 
-    sources = [
+    sources = [ #glob("src/**/*.cpp", recursive=True),
        "src/pore_model.cpp",
-       "src/nt.cpp",
        "src/dtw.cpp",
        "src/pybinder.cpp",
        "src/config.cpp",

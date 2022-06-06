@@ -34,7 +34,6 @@
 #include <iostream>
 #include "event_detector.hpp"
 #include "util.hpp"
-#include "nt.hpp"
 
 #ifdef PYBIND
 #include <pybind11/pybind11.h>
