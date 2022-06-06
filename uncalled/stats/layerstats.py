@@ -18,8 +18,8 @@ from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split, ref_coords
 from ..index import BWA_OPTS
 from ..fast5 import parse_read_ids
-from ..dtw import Tracks, LAYERS
-from ..dtw.aln_track import parse_layers
+from ..dtw import Tracks
+from ..dtw.aln_track import parse_layers, LAYERS
 
 COMPARE_OPTS = (
     Opt("db_in", "tracks.io"),
