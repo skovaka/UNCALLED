@@ -138,8 +138,12 @@ setup(
     python_requires=">=3.6",
 
     setup_requires=[
-        'pybind11>=2.5.0', 
-        'read-until==3.0.0'
+        'pybind11>=2.5.0'
+    ],
+
+    install_requires=[
+        'read-until==3.0.0',
+        'minknow-api>=5.0'
     ],
 
     packages=find_packages(),
