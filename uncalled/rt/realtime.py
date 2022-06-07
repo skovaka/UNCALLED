@@ -28,27 +28,8 @@ import os
 import numpy as np
 
 from .. import index
-from .map import MAPPER_OPTS
-from ..argparse import Opt, MutexOpts
 from .read_until import ReadUntilClient
 
-
-REALTIME_OPTS = (
-    MutexOpts("realtime_mode", [
-        Opt(("-D", "--deplete"), fn="set_rt_deplete"),
-        Opt(("-E", "--enrich"), fn="set_rt_enrich"),
-    ]),
-    MutexOpts("active_chs", [
-        Opt("--even", fn="set_active_chs_even", help="world"),
-        Opt("--odd", fn="set_active_chs_odd", help="Hello"),
-    ])
-)
-
-OPTS = index.BWA_OPTS + MAPPER_OPTS + (
-    Opt("--host", "realtime"),
-    Opt("--port", "realtime"),
-    Opt("--duration", "realtime"),
-) + REALTIME_OPTS
 
 def main(config, client=None):
     """Perform real-time targeted sequencing"""

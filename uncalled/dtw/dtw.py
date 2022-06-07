@@ -8,10 +8,10 @@ import progressbar as progbar
 
 from sklearn.linear_model import TheilSenRegressor
 from ..pafstats import parse_paf
-from ..config import Config, ParamGroup
-from ..argparse import ArgParser, Opt 
-from ..index import BWA_OPTS, str_to_coord
-from ..fast5 import Fast5Reader, FAST5_OPTS
+from ..config import Config
+from ..argparse import ArgParser
+from ..index import str_to_coord
+from ..fast5 import Fast5Reader
 
 from _uncalled import (
     GlobalDTWK5, StaticBDTWK5, BandedDTWK5, 
@@ -31,44 +31,9 @@ METHODS = {
     "global" : {5: GlobalDTWK5, 10: GlobalDTWK10}
 }
 
-#class DtwParams(ParamGroup):
-#    _name = "dtw"
-#
-#DtwParams._def_params(
-#    ("method", "guided", str, "DTW method"),
-#    ("band_width", 50, int, "DTW band width (only applies to BDTW)"),
-#    ("band_shift", 0.5, float, "DTW band shift coefficent (only applies to BDTW)"),
-#    ("mm2_paf", None, str, "Path to minimap2 alignments of basecalled reads in PAF format. Used to determine where each should be aligned. Should include cigar string."),
-##    ("mask_skips", False, bool, "Represent skips as missing data"),
-#)
-
-OPTS = (Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
-    Opt(("-m", "--mm2-paf"), "dtw", required=True),
-    Opt(("-o", "--db-out"), "tracks.io"),
-    Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
-    Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
-    Opt(("-a", "--append"), "tracks.io", action="store_true"),
-    Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
-    Opt(("-p", "--pore-model"), "pore_model", "name"),
-    Opt("--full-overlap", "tracks", action="store_true"),
-    #Opt(("-S", "--mask-skips"), "dtw", action="store_true"),
-    Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
-    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-    #Opt("--method", "dtw", choices=METHODS.keys()),
-    Opt(("-i", "--iterations"), "dtw"),
-    Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
-    Opt("--skip-cost", "dtw"),
-    Opt("--stay-cost", "dtw"),
-    Opt("--move-cost", "dtw"),
-    Opt(("-b", "--band-width"), "dtw"),
-    Opt(("-s", "--band-shift"), "dtw"),
-    Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
-)
-
 def main(conf):
     """Perform DTW alignment guided by basecalled alignments"""
     conf.fast5_reader.load_bc = True
-    conf.proc_read.detect_events = True
     conf.export_static()
 
     tracks = Tracks(conf=conf)
@@ -331,10 +296,3 @@ class GuidedDTW:
 #        dtw = dtw[~dtw.duplicated("start", False)]
 #
 #    return dtw.set_index("mref").sort_index()
-
-class Fast5Processor(Fast5Reader):
-    def __next__(self):
-        return ProcRead(Fast5Reader.__next__(self), conf=self.conf)
-    
-    def __getitem__(self, read_id):
-        return ProcRead(Fast5Reader.__getitem__(self, read_id), conf=self.conf)

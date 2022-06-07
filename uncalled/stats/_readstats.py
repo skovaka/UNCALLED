@@ -10,20 +10,10 @@ import scipy.stats
 from sklearn.decomposition import PCA
 
 from .. import config
-from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split#, ref_coords
-from ..index import BWA_OPTS, str_to_coord
+from ..index import str_to_coord
 from ..fast5 import Fast5Reader
 from ..dtw import Tracks
-
-class ReadstatsParams(config.ParamGroup):
-    _name = "readstats"
-ReadstatsParams._def_params(
-    ("stats", ["model_diff"], None, "Which statistics to compute and output"),
-    ("pca_layer", "current", str, "Which statistics to use for PCA"),
-    ("pca_components", 2, int, "Number of principle components to output for the \"pca\" command."),
-    ("summary_stats", ["mean"], None, "Summary statistics to compute for \"model_diff\" command."),
-)
 
 OPTS = (
     Opt("stats", "readstats", type=comma_split),

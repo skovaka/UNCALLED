@@ -6,28 +6,6 @@ import re
 import uncalled as unc
 from .argparse import Opt
 
-OPTS = (
-    Opt("infile",  
-        type = str, 
-        help = "PAF file output by UNCALLED"
-    ),
-    Opt(("-n", "--max-reads"), 
-        required = False, 
-        type = int, 
-        default = None, 
-        help = "Will only look at first n reads if specified"
-    ),
-    Opt(("-r", "--ref-paf"), 
-        required = False, 
-        type = str, 
-        default = None, 
-        help = "Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA."
-    ),
-    Opt(("-a", "--annotate"), 
-        action = 'store_true', 
-        help = "Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag"
-    ),
-) #end pafstats opts
 
 class PafEntry:
     def __init__(self, line, tags=None):
@@ -199,7 +177,6 @@ def paf_ref_compare(qry, ref, ret_qry=True, check_locs=True, ext=1.5):
                 fn.append(q if ret_qry else rs[0])
 
     return tp, tn, fp, fn, fp_unmap
-
 
 def main(conf):
     """Estimate speed and accuracy from an Uncalled PAF file"""

@@ -12,23 +12,6 @@ from ..argparse import Opt, comma_split
 from ..fast5 import parse_read_ids
 from ..signal_processor import SignalProcessor
 
-class SigplotParams(config.ParamGroup):
-    _name = "sigplot"
-SigplotParams._def_params(
-    ("tracks", None, None, "DTW aligment tracks"),
-    #("ref_bounds", None, str_to_coord, "DTW aligment tracks"),
-    #("reads", None, None, "Reads to plot"),
-    ("max_reads", 10, int, ""),
-    ("show_events", False, bool, "Display event means plotted over signal instead of model current (currently events are computed from scratch)"),
-    ("no_model", False, bool, "Will not plot the expected reference signal if True"),
-    ("multi_background", False, bool, "Will plot multiple stacked background colors for multiple tracks if True"),
-    ("yaxis_fixed", False, bool, ""),
-    ("track_colors", ["purple", "darkgreen", "royalblue", "crimson"], list, ""),
-    #("base_colors", ["#80ff80", "#6b93ff", "#ffbd00", "#ff8080"], list, "Colors for each base (A,C,G,T/U)"), 
-    ("fill_layer", "base", str, ""),
-    ("fill_track", 0, None, "")
-)
-
 class Sigplot:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("sigplot", *args, **kwargs)
@@ -118,7 +101,6 @@ class Sigplot:
                 track_dtws.append(pd.concat(dtws).sort_index())
 
         read = self.sigproc.process(track.fast5s[read_id])
-        #read = ProcRead(track.fast5s[read_id], conf=self.conf)
         signal = read.get_norm_signal(samp_min, samp_max)
 
         #TODO set global signal min/max

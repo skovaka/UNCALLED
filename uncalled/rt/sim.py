@@ -31,9 +31,6 @@ from collections import Counter
 
 from . import realtime
 from _uncalled import Simulator
-from ..argparse import Opt
-from ..index import BWA_OPTS
-from .map import MAPPER_OPTS
 
 SAMP_RATE = 4000
 CHS = np.arange(512)+1
@@ -45,20 +42,6 @@ PROG = " progress "
 SP = '-'*( (NTICKS - len(PROG))//2 - 1)
 PROG_HEADER = '|'+SP+PROG+SP+"|\n"
 
-OPTS = BWA_OPTS + (
-    Opt("fast5s", 
-        nargs = '+', 
-        type = str, 
-        help = "Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
-    ),
-    Opt(("-r", "--recursive"), 
-        action = "store_true"
-    ),
-    Opt("--ctl-seqsum", "simulator"),
-    Opt("--unc-seqsum", "simulator"),
-    Opt("--unc-paf",    "simulator"),
-    Opt("--sim-speed",  "simulator"),
-) + MAPPER_OPTS
 
 def main(config):
     """Simulate real-time targeted sequencing"""

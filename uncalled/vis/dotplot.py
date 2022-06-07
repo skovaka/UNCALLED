@@ -17,17 +17,6 @@ from ..dtw.bcaln import Bcaln
 from ..argparse import Opt, comma_split
 from ..fast5 import parse_read_ids
 
-class DotplotParams(config.ParamGroup):
-    _name = "dotplot"
-DotplotParams._def_params(
-    ("tracks", None, None, "DTW aligment tracks"),
-    ("bcaln_track", None, str, "Only display basecalled alignments from this track"),
-    ("bcaln_error", False, bool, "Display basecalled alignment errors"),
-    ("show_legend", True, bool, "Display legend"),
-    ("select_ref", None, int, "Display a horizontal line at specified reference coordinate"),
-    ("layers", [], None, ""),
-)
-
 class Dotplot:
 
     #TODO
@@ -359,20 +348,6 @@ class Dotplot:
                 legend.add("bcaln_del")
 
 
-OPTS = (
-    Opt("db_in", "tracks.io"),
-    Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot.", required=True),
-    Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
-    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
-    Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
-    Opt(("-b", "--bcaln-track"), "dotplot"),
-    Opt(("-p", "--pore-model"), "pore_model", "name"),
-    Opt(("--multi-background"), "sigplot", action="store_true"),
-    Opt(("--show-events"), "sigplot", action="store_true"),
-    Opt(("--no-model"), "sigplot", action="store_true"),
-    Opt(("--bcaln-error", "-e"), "dotplot", action="store_true"),
-)
 
 def main(conf):
     """Plot signal-to-reference alignment dotplots"""

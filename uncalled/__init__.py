@@ -19,6 +19,8 @@ from _uncalled import *
 print("b", time() - t)
 t = time()
 
+from . import params
+
 from .config import Config
 
 print("c", time() - t)
@@ -42,15 +44,15 @@ from .pore_model import PoreModel
 print("g", time() - t)
 t = time()
 
-from . import dtw
+#from . import dtw
 
 print("h", time() - t)
 t = time()
 
-from . import vis
+#from . import vis
 print("i", time() - t)
 t = time()
-from . import stats 
+#from . import stats 
 print("j", time() - t)
 t = time()
 

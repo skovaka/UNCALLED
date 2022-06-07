@@ -13,23 +13,6 @@ from ..index import str_to_coord
 from ..dtw.tracks import Tracks, REFSTAT_LABELS, COMPARE_REFSTATS
 from ..argparse import Opt, comma_split
 
-class TrackplotParams(config.ParamGroup):
-    _name = "trackplot"
-TrackplotParams._def_params(
-    ("tracks", None, None, "DTW aligment tracks"),
-    ("panels", None, None, "List of tuples specifying which panels to display. First element of each tuple specifies plot type (e.g. mat, box, line, etc.), second element specifies which layer(s) to display."),
-    ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF", "red"], list, ""),
-    ("select_ref", None, str, "Reference Selection"),
-    ("select_read", None, str, "Read Selection"),
-    ("hover_read", False, bool, "If True will display read_id in mat hover"),
-    ("show_legend", True, bool, "If True will display legend"),
-    ("share_reads", False, bool, "If True will only display reads shared by all alignment tracks with shared y-axis"),
-    ("width", None, int, "Figure width"),
-    ("panel_heights", None, None, "Relative height of each panel"),
-    ("min_height", 200, int, "Minimum figure height"),
-    ("outfile", None, str, "Output file"),
-)
-
 _CMP_COLOR = {"colorscale" : "RdYlGn", "cmin" : 0, "cmid" :5, "cmax" : 10, "reversescale":True}
 
 LAYER_COLORS = {
@@ -309,34 +292,6 @@ def mat_opt(layer):
 def panel_opt(name):
     return (lambda arg: (name, arg))
 
-OPTS = (
-    Opt("db_in", "tracks.io"),
-    Opt("ref_bounds", "tracks", type=str_to_coord),
-    Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
-    Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
-    Opt(("-H", "--panel-heights"), "trackplot", nargs="+", type=int),
-    Opt(("--shared-refs-only"), "tracks", action="store_true"),
-    Opt(("--shared-reads-only"), "tracks", action="store_true"),
-    Opt(("--share-reads"), "trackplot", action="store_true"),
-    Opt(("--hover-read"), "trackplot", action="store_true"),
-
-    Opt("--mat", dest="panels",
-        metavar="LAYER", action="append", type=panel_opt("mat"),
-        help="Display a ref-by-read matrix of specified alignment layer"), 
-
-    Opt("--box", dest="panels", #"trackplot", "panels", 
-        metavar="LAYER", action="append", type=panel_opt("box"),
-        help="Display a boxplot of specified layer"), 
-
-    Opt("--line", dest="panels", #"trackplot", "panels", 
-        metavar="LAYER.STAT", action="append", type=panel_opt("line"),
-        help="Display a line plot of specifed layer summary statistic"), 
-
-    Opt("--scatter", dest="panels", #"trackplot", "panels", 
-        metavar="LAYER.STAT", action="append", type=panel_opt("scatter"),
-        help="Display a line plot of specifed layer summary statistic"), 
-    Opt(("-o", "--outfile"), "trackplot"),
-)
 
 def main(conf):
     """Plot alignment tracks and per-reference statistics"""

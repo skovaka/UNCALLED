@@ -34,8 +34,6 @@ import pandas as pd
 
 from _uncalled import RefIndexK5, RefIndexK10, _RefCoord, self_align
 from .argparse import Opt
-from .config import ParamGroup
-from . import index
 
 def str_to_coord(coord_str):
     spl = coord_str.split(":")         
@@ -405,44 +403,7 @@ def load_index(k, prefix, load_pacseq=True, load_bwt=False, cache=True):
             idx.load_index()
     return idx
 
-#Index parameter group
-class IndexParams(ParamGroup):
-    _name = "index"
-IndexParams._def_params(
-    ("fasta_filename", None, str, "FASTA file to index"),
-    ("index_prefix", None, str, "Index output prefix. Will use input fasta filename by default"),
-    ("no_bwt", False, bool, "Will only generate the pacseq if specified, which is much faster to build. Can only be used with DTW subcommands (NOT map, sim, or realtime)"),
-    ("max_sample_dist", 100, int, "Maximum average sampling distance between reference alignments."),
-    ("min_samples", 50000, int, "Minimum number of alignments to produce (approximate, due to deterministically random start locations),"),
-    ("max_samples", 1000000, int, "Maximum number of alignments to produce (approximate, due to deterministically random start locations),"),
-    ("kmer_len", 5, int, "Model k-mer length"),
-    ("matchpr1", 0.6334, float, "Minimum event match probability"),
-    ("matchpr2", 0.9838, float, "Maximum event match probability"),
-    ("pathlen_percentile", 0.05, float, ""),
-    ("max_replen", 100, int, ""),
-    ("probs", None, str, "Find parameters with specified target probabilites (comma separated)"),
-    ("speeds", None, str, "Find parameters with specified speed coefficents (comma separated)"),
-)
 
-BWA_OPTS = (
-    Opt("bwa_prefix", "mapper"),
-    Opt(("-p", "--idx-preset"), "mapper"),
-)
-
-OPTS = (
-    Opt("fasta_filename", "index"),
-    Opt(("-o", "--index-prefix"), "index"),
-    Opt("--no-bwt", "index", action="store_true"),
-    Opt(("-s", "--max-sample-dist"), "index"),
-    Opt("--min-samples", "index"),
-    Opt("--max-samples", "index"),
-    Opt(("-1", "--matchpr1"), "index"),
-    Opt(("-2", "--matchpr2"), "index"),
-    Opt(("-f", "--pathlen-percentile"), "index"),
-    Opt(("-m", "--max-replen"), "index"),
-    Opt("--probs", "index"),
-    Opt("--speeds", "index"),
-)
 
 def main(conf):
     """Build an index from a FASTA reference"""

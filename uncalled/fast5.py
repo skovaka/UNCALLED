@@ -220,10 +220,3 @@ if __name__ == "__main__":
 
     fast5s = Fast5Dict(args.seqsum, args.root, args.recursive)
 
-FAST5_OPTS = (
-    Opt(FAST5_PARAM, "fast5_reader", nargs="+", type=str),
-    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
-    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
-    Opt(("-x", "--fast5-index"), "fast5_reader"),
-    Opt(("-n", "--max-reads"), "fast5_reader")
-)

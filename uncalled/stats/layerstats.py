@@ -14,24 +14,10 @@ import pandas as pd
 import scipy.stats
 
 from .. import config
-from ..sigproc import ProcRead
-from ..argparse import Opt, comma_split, ref_coords
-from ..index import BWA_OPTS
 from ..fast5 import parse_read_ids
 from ..dtw import Tracks
 from ..dtw.aln_track import parse_layers, LAYERS
 
-COMPARE_OPTS = (
-    Opt("db_in", "tracks.io"),
-    #Opt(("-l", "--read-filter"), "tracks", nargs="+", type=str),
-    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
-    Opt(("-R", "--ref-bounds"), "tracks"),
-    Opt(("-b", "--bcaln"), action="store_true", help="Compare against basecalled alignment. If two tracks input will look for \"bcaln\" group in second track, otherwise will look in the first track."),
-    Opt(("-s", "--save"), action="store_true", help="Will save in database if included, otherwise will output to TSV. Will be associated with the first track listed."),
-    Opt(("-j", "--jaccard"), action="store_true", help="Will compute per-reference raw sample jaccard distances. Output by default if no other statistics are specified."),
-    Opt(("-d", "--mean-ref-dist"), action="store_true", help="Will compute mean reference coordinate distances between raw samples of alignments of the same read. Output by default if no other statistics are specified."),
-    #Opt(("-o", "--output"), choices=["db", "tsv"], help="If \"db\" will output into the track database. If \"tsv\" will output a tab-delimited file to stdout."),
-)
 
 def compare(conf):
     """Compute distance between alignments of the same reads"""
@@ -67,13 +53,6 @@ def compare(conf):
         sys.stdout.flush()
         t = time.time()
 
-DUMP_OPTS = (
-    Opt("db_in", "tracks.io", type=str),
-    Opt("layers", nargs="+",  help="Layers to retrieve or compute"),
-    Opt(("-R", "--ref-bounds"), "tracks", type=ref_coords),
-    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
-)
-
 def dump(conf):
     """Output DTW alignment paths and statistics"""
 
@@ -101,8 +80,3 @@ def dump(conf):
                 header = False
             sys.stdout.write(track.layers.to_csv(sep="\t", header=False))
         t = time.time()
-
-SUBCMDS = [
-    (compare, COMPARE_OPTS),
-    (dump, DUMP_OPTS)
-]

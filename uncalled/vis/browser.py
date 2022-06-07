@@ -17,17 +17,6 @@ from ..argparse import Opt, comma_split
 from ..config import Config
 from ..fast5 import parse_read_ids
 
-OPTS = (
-    Opt("db_in", "tracks.io"),
-    Opt("ref_bounds", "tracks", type=str_to_coord),
-    #Opt("layer", "trackplot", default="current", nargs="?"),
-    Opt(("-r", "--refstats"), "tracks", default=None, type=comma_split),
-    Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
-    Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
-    Opt("--pore-model", "pore_model", "name"),
-    Opt(("-p", "--browser-port"), help="Browser port", default=8000),
-    Opt(("-o", "--outfile"), "trackplot"),
-)
 
 def main(conf):
     """Interactive signal alignment genome browser"""

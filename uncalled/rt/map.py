@@ -26,27 +26,7 @@ import sys
 import time
 
 from ..index import check_prefix
-from ..argparse import Opt, CONFIG_PARAM
-from ..index import BWA_OPTS
-from ..fast5 import FAST5_OPTS
 from _uncalled import MapPoolOrd
-
-MAPPER_OPTS = (
-    Opt(("-t", "--threads"), ""),
-    Opt("--num-channels", "read_buffer"),
-    Opt(("-c", "--max-chunks"), "read_buffer"),
-    Opt("--chunk-time", "read_buffer"),
-    Opt("--config",
-        type = str, 
-        default = None, 
-        required = False, 
-        help = "Config file",
-        dest = CONFIG_PARAM
-    ),
-    Opt("--rna", fn="set_r94_rna")
-)
-
-OPTS = BWA_OPTS + FAST5_OPTS + MAPPER_OPTS
 
 def main(conf):
     """Rapidly map fast5 read signal to a reference"""

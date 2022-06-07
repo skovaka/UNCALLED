@@ -25,32 +25,6 @@ from ..pore_model import PoreModel
 INPUT_PARAMS = np.array(["db_in", "eventalign_in", "tombo_in"])
 OUTPUT_PARAMS = np.array(["db_out", "eventalign_out"])
 
-class IOParams(config.ParamGroup):
-    _name = "io"
-IOParams._def_params(
-    #("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
-    #("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
-
-    ("db_in", None, str, "Input track database"),
-    ("db_out", None, str, "Output track database"),
-    ("eventalign_in", None, str, "Eventalign TSV input file (or \"-\"/no argument for stdin)"),
-    ("eventalign_out", None, str, "Eventalign TSV output file (or \"-\"/no argument for stdout)"),
-    ("eventalign_index", None, str, "Nanopolish index file"),
-    ("tombo_in", None, str, "Fast5 files containing Tombo alignments"),
-
-    ("init_track", True, bool, "If true will initialze track into \"db_out\""),
-
-    ("output_format", "db", str,  "Output format (db, eventalign)"),
-    ("overwrite", False, bool, "Overwrite existing tracks"),
-    ("append", False, bool, "Append reads to existing tracks"),
-    ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
-    ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
-    ignore_toml={"db_in", "db_out", "eventalign_in", "eventalign_out", "tombo_in", "eventalign_index", "overwrite", "append"},
-    #ignore_toml={"input", "output", "output_format", "overwrite", "append"},
-    config_add=False
-)
-
-
 class TrackIO:
     def __init__(self, filename, conf, model, mode):
         self.conf = conf
@@ -682,9 +656,6 @@ class TrackSQL(TrackIO):
             raise ValueError(f"Track does not exist: \"{track_name}\"\n")
         return ids[0][0]
 
-DB_OPT = Opt("db_in", "tracks.io", help="Track database file")
-
-LS_OPTS = (DB_OPT,)
 _LS_QUERY = "SELECT name,desc,COUNT(alignment.id) FROM track " \
             "JOIN alignment ON track.id == track_id GROUP BY name"
 def ls(conf, db=None):
@@ -699,10 +670,6 @@ def ls(conf, db=None):
 
     #db.close()
 
-DELETE_OPTS = (
-    DB_OPT,
-    Opt("track_name", help="Name of the track to delete"),
-)
 def delete(track_name=None, db=None, conf=None):
     if db is None:
         db = TrackSQL(conf)
@@ -717,14 +684,6 @@ def delete(track_name=None, db=None, conf=None):
     db.con.commit()
     print("Deleted track \"%s\"" % track_name)
 
-EDIT_OPTS = (
-    DB_OPT,
-    Opt("track_name", help="Current track name"),
-    Opt(("-N", "--new-name"), default=None, help="New track name"),
-    Opt(("-D", "--description"), default=None, help="New track description"),
-    Opt(("-F", "--fast5-files"), "fast5_reader", type=comma_split),
-    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
-)
 def edit(conf, db=None):
     fast5s = _Fast5Reader.Params(conf.fast5_reader)
     fast5_change = len(conf.fast5_files) > 0
@@ -789,11 +748,6 @@ def _set_fast5s(track_id, fast5_files, db):
         if_exists="append",
         index_label="id")
 
-MERGE_OPTS = (
-    Opt("dbs", nargs="+", type=str, help="Database files to merge. Will write to the first file if \"-o\" is not specified. "),
-    #Opt(("-n", "--track_names"), nargs="+", help="Names of tracks to merge. Will merge all tracks if not specified"),
-    Opt(("-o", "--db-out"), "tracks.io", type=str, default=None, help="Output database file. Will output to the first input file if not specified"),
-)
 def merge(conf):
     """Merge databases into a single file"""
     #if conf.out_db is None:
@@ -865,12 +819,5 @@ def merge(conf):
     db.close()
 
 
-        
-SUBCMDS = [
-    (ls, LS_OPTS), 
-    (delete, DELETE_OPTS), 
-    (merge, MERGE_OPTS), 
-    (edit, EDIT_OPTS), 
-]
 
 

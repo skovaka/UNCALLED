@@ -9,37 +9,13 @@ import time
 from collections import defaultdict
 import scipy
 
-from .db import TrackSQL, delete, Eventalign, IOParams, INPUT_PARAMS, OUTPUT_PARAMS
+from .db import TrackSQL, delete, Eventalign, INPUT_PARAMS, OUTPUT_PARAMS
 from .aln_track import AlnTrack, LAYERS, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
 from .. import config
 
-class TracksParams(config.ParamGroup):
-    _name = "tracks"
-TracksParams._def_params(
-    ("io", {}, IOParams, "Track input/output parameters"),
-    ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
-    ("read_filter", None, None, "Only load reads which overlap these coordinates"),
-    ("max_reads", None, int, "Only load reads which overlap these coordinates"),
-    ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
-    ("min_coverage", 1, int, "Reference positions with less than this coverage will be excluded from each track (or all tracks if shared_refs_only is true)"),
-    ("shared_reads_only", False, bool, "If true will only contain reads shared between all tracks"),
-    ("shared_refs_only", False, bool, "If true will only contain reference positions where all tracks have sufficient coverage (see min_coverage)"),
-
-    ("layers", [], None, "Layers to load (e.g. current, dwell, model_diff)"),
-
-    ("load_mat", False, bool, "If true will pivot layers into a matrix"), #TODO change to mat_layers, only do it for them
-
-    ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
-    ("refstats_layers", None, None, "Layers to compute refstats"),
-
-    ("index_prefix", None, str, "BWA index prefix"),
-    ("load_fast5s", True, bool, "Load fast5 files"),
-
-    ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter"}
-)
 
 _REFSTAT_AGGS = {
     "mean" : np.mean, 

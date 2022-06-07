@@ -12,50 +12,12 @@ from ont_fast5_api.fast5_interface import get_fast5_file
 import scipy.stats
 
 from . import Tracks
-from ..config import Config, ParamGroup
-from ..argparse import ArgParser, Opt, MutexOpts, FAST5_PARAM
-from ..fast5 import Fast5Reader, FAST5_OPTS, parse_read_ids
-from ..index import BWA_OPTS, str_to_coord, RefCoord
+from ..fast5 import Fast5Reader
+from ..index import str_to_coord, RefCoord
 from .. import PoreModel
 
 import progressbar as progbar
 
-CONVERT_OPTS = (
-    Opt("index_prefix", "tracks"),
-    Opt(FAST5_PARAM, "fast5_reader", nargs="+", type=str),
-    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
-    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
-    Opt(("-n", "--max-reads"), "fast5_reader"),
-
-    Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
-    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-    Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
-    Opt(("-a", "--append"), "tracks.io", action="store_true"),
-    Opt(("-o", "--db-out"), "tracks.io", required=True),
-)
-
-NANOPOLISH_OPTS = CONVERT_OPTS + (
-    Opt(("-x", "--fast5-index"), "fast5_reader", required=True), 
-    Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include")
-)
-
-NEW_OPTS = (
-    Opt("index_prefix", "tracks"),
-    #MutexOpts("input", [
-        Opt("--db-in", "tracks.io"),
-        Opt("--eventalign-in", "tracks.io", nargs="?", const="-"),
-    #]),
-
-    #MutexOpts("output", [
-        Opt("--db-out", "tracks.io"),
-        Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
-    #]),
-
-    Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
-    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-    Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
-    Opt(("-a", "--append"), "tracks.io", action="store_true"),
-)
 
 def new(conf):
     """New convert interface"""
@@ -149,7 +111,6 @@ def nanopolish(conf):
 
     tracks.close()
 
-TOMBO_OPTS = CONVERT_OPTS 
 def tombo(conf):
     """Convert from Tombo resquiggled fast5s to uncalled DTW track"""
     f5reader = Fast5Reader(conf=conf)
@@ -272,8 +233,3 @@ def tombo(conf):
     if read_count == 0:
         sys.stderr.write("Warning: no reads were found (try including the --recursive option?)\n")
 
-SUBCMDS = [
-    (new, NEW_OPTS), 
-    (nanopolish, NANOPOLISH_OPTS), 
-    (tombo, TOMBO_OPTS)
-]

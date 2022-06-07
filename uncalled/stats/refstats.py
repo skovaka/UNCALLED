@@ -11,24 +11,10 @@ from collections import defaultdict
 from .. import config
 from ..dtw.tracks import RefstatsSplit, ALL_REFSTATS
 from ..dtw.aln_track import parse_layers
-from ..sigproc import ProcRead
 from ..argparse import Opt, comma_split
-from ..index import BWA_OPTS, str_to_coord
+from ..index import str_to_coord
 from ..fast5 import Fast5Reader
 
-
-OPTS = (
-    Opt("db_in", "tracks.io", type=str),
-    Opt("layers", "tracks", type=comma_split,
-        help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
-    Opt("refstats", type=comma_split,
-        help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
-    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-    Opt(("-C", "--min-coverage"), "tracks"),
-    Opt(("--ref-chunksize"), "tracks.io"),
-    Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
-    Opt(("-v", "--verbose-refs"), action="store_true", help="Output reference name and strand"),
-)
 
 def main(conf):
     """Calculate per-reference-coordinate statistics"""
