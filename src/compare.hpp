@@ -14,8 +14,6 @@ namespace py = pybind11;
 
 const auto INF = std::nanf("");
 
-using AlnCoords = PyArray<AlnCoord>;
-
 class Compare {
     public:
     struct Rec {
@@ -27,7 +25,7 @@ class Compare {
 
     std::vector<Rec> rec;
 
-    Compare(PyArray<AlnCoord> &a, PyArray<AlnCoord> &b) {
+    Compare(AlnCoords &a, AlnCoords &b) {
         size_t i = 0, j = 0;
 
         int ref;
