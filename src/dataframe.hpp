@@ -157,7 +157,7 @@ struct AlnCoord {
     int ref, start, end;
 };
 
-struct AlnCoords : public DataFrame<int, int, int> {
+struct AlnCoordsOld : public DataFrame<int, int, int> {
     static constexpr NameArray names = {"ref", "start", "end"}; 
     ColType<0> &ref = std::get<0>(data_);                      
     ColType<1> &start = std::get<1>(data_);                      

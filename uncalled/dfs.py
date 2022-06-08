@@ -1,6 +1,6 @@
 import pandas as pd
 
-from _uncalled import _AlnCoords
+#from _uncalled import _AlnCoords
 
 class DataFrameHelper:
     def _init(self, cls, *args):
@@ -17,7 +17,7 @@ class DataFrameHelper:
             {name : self[name].to_numpy() for name in self.names},
         )
 
-class AlnCoords(_AlnCoords, DataFrameHelper):
-    def __init__(self, *args):
-        self._init(_AlnCoords, *args)
+#class AlnCoords(_AlnCoords, DataFrameHelper):
+#    def __init__(self, *args):
+#        self._init(_AlnCoords, *args)
 

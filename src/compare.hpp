@@ -14,6 +14,8 @@ namespace py = pybind11;
 
 const auto INF = std::nanf("");
 
+using AlnCoords = PyArray<AlnCoord>;
+
 class Compare {
     public:
     struct Rec {
@@ -25,25 +27,25 @@ class Compare {
 
     std::vector<Rec> rec;
 
-    Compare(AlnCoords &a, AlnCoords &b) {
+    Compare(PyArray<AlnCoord> &a, PyArray<AlnCoord> &b) {
         size_t i = 0, j = 0;
 
         int ref;
 
-        while (i < a.height && j < b.height) {
+        while (i < a.size && j < b.size) {
             float jaccard = INF;
 
-            if (i == a.height) {
-                ref = b.ref[j++];
-            } else if (j == b.height) {
-                ref = a.ref[i++];
-            } else if (a.ref[i] < b.ref[j]) {
-                ref = a.ref[i++];
-            } else if (a.ref[i] > b.ref[j]) {
-                ref = b.ref[j++];
+            if (i == a.size) {
+                ref = b[j++].ref;
+            } else if (j == b.size) {
+                ref = a[i++].ref;
+            } else if (a[i].ref < b[j].ref) {
+                ref = a[i++].ref;     
+            } else if (a[i].ref > b[j].ref) {
+                ref = b[j++].ref;
             } else {
-                ref = a.ref[i];
-                jaccard = calc_jaccard(a.start[i], a.end[i], b.start[j], b.end[j]);
+                ref = a[i].ref;
+                jaccard = calc_jaccard(a[i].start, a[i].end, b[j].start, b[j].end);
                 i++;j++;
 
                 rec.push_back({ref, jaccard, INF});
@@ -75,40 +77,40 @@ class Compare {
         struct Coefs {float dist, length;};
         Coefs next_dist(int ref) {
             Coefs c = {0,0};
-            for (; i < a.height; i++) {
-                if (a.ref[i] == ref) break;
-                else if (a.ref[i] > ref) {
+            for (; i < a.size; i++) {
+                if (a[i].ref == ref) break;
+                else if (a[i].ref > ref) {
                     //std::cout << "Skipped\n";
                     return c;
                 }
             }
-            for (; j < b.height; j++) {
-                if (b.end[j] > a.start[i]) break;
+            for (; j < b.size; j++) {
+                if (b[j].end > a[i].start) break;
             }
-            if (ended() || b.start[j] >= a.end[i]) { 
+            if (ended() || b[j].start >= a[i].end) { 
                 //std::cout << "Ended? " << ended() << "\n";
                 return c;
             }
 
             int len,dist;
             do {
-                len = std::min(a.end[i], b.end[j]) - std::max(a.start[i], b.start[j]);
+                len = std::min(a[i].end, b[j].end) - std::max(a[i].start, b[j].start);
                 assert(len > 0);
-                c.dist += len * std::abs(a.ref[i] - b.ref[j]);
+                c.dist += len * std::abs(a[i].ref - b[j].ref);
                 c.length += len;
                 //std::cout << i << " " << j << " " << c.dist << " " << c.length << "\n";
                 j++;
-            } while (j < b.height && b.start[j] < a.end[i]);
+            } while (j < b.size && b[j].start < a[i].end);
 
             do {
                 j--;
-            } while (j > 0 && j < b.height && b.start[j] == b.start[j-1]);
+            } while (j > 0 && j < b.size && b[j].start == b[j-1].start);
 
             return c;
         }
 
         bool ended() const {
-            return i == a.height || j == b.height;
+            return i == a.size || j == b.size;
         }
     };
 

@@ -3,7 +3,7 @@
 
 #define BIND_DF(name) name::pybind<name>(m, "_"#name);
 
-constexpr AlnCoords::NameArray AlnCoords::names;
+constexpr AlnCoordsOld::NameArray AlnCoordsOld::names;
 
 void pybind_dataframes(py::module_ &m) {
     PYBIND11_NUMPY_DTYPE(AlnCoord, ref, start, end);
@@ -12,7 +12,7 @@ void pybind_dataframes(py::module_ &m) {
     PyArray<float>::pybind(m, "PyArrayF32");
     PyArray<int>::pybind(m, "PyArrayI32");  
 
-    BIND_DF(AlnCoords);
+    BIND_DF(AlnCoordsOld);
 }
 
 #endif

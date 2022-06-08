@@ -16,8 +16,8 @@ from typing import Callable
 import scipy.stats
 from sklearn.decomposition import PCA
 
-from ..dfs import AlnCoords
-from _uncalled import Compare
+#from ..dfs import AlnCoords
+from _uncalled import Compare, AlnCoordsNew
 
 from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
@@ -428,7 +428,7 @@ class AlnTrack:
                 df["end"] = end
                 #if has_mref:
                 #    df["ref"] = -df["ref"]
-            return AlnCoords(df)
+            return AlnCoordsNew(df[["ref","start","end"]].to_records(index=False))
         
         coords_a = coords(aln_a, self)
         coords_b = coords(aln_b, other)
@@ -461,7 +461,7 @@ class AlnTrack:
                 end = -df["start"]
                 df["start"] = -df["end"]
                 df["end"] = end
-            return AlnCoords(df)
+            return AlnCoordsNew(df[["ref","start","end"]].to_records(index=False))
         
         coords_a = coords(aln_a)
         coords_b = coords(aln_b)
