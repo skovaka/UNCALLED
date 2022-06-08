@@ -57,10 +57,8 @@ from . import params
 
 from .config import Config
 
-
 config._DEFAULTS = Config()
 config.rc = Config()
-
 
 #SUBCMDS = [
 #    dtw, dotplot, sigplot, browser, convert, 

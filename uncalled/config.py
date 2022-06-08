@@ -24,16 +24,11 @@
 
 import sys                         
 import os
-import argparse
-import numpy as np
-import uncalled as unc
 import toml
-import inspect
 import copy
-from _uncalled import _Conf
 from collections import namedtuple
 
-from . import __title__, __version__, __summary__
+from _uncalled import _Conf
 
 TOML_TYPES = {int, float, str, list, bool}
 

@@ -13,9 +13,21 @@ namespace py = pybind11;
 template<typename T>
 struct PyArray {
 
+    std::vector<T> data_vec;
     py::buffer_info info;
     T *data;
     size_t size;
+
+    PyArray(size_t length, T fill) :
+        data_vec { length, fill },
+        info { data_vec.data(), length },
+        data { data_vec.data() },
+        size { length } {}
+
+    PyArray(T *ptr, size_t length) :
+        info { ptr, length },
+        data { ptr },
+        size { length } {}
 
     PyArray(py::array_t<T> arr) :
         info { arr.request() },
@@ -34,8 +46,8 @@ struct PyArray {
         return py::array_t<T>(size, data);
     }
 
-    static void pybind(py::module_ &m, const std::string &suffix) {
-        py::class_<PyArray> c(m, ("PyArray"+suffix).c_str(), py::buffer_protocol());
+    static void pybind(py::module_ &m, const char *name) {
+        py::class_<PyArray> c(m, name, py::buffer_protocol());
 		c.def(py::init<py::array_t<T>>());
 		c.def_buffer([](PyArray &c) -> py::buffer_info {
 			return py::buffer_info(
@@ -52,8 +64,6 @@ struct PyArray {
 		c.def("__getitem__", &PyArray::operator[]);
 		c.def("__len__", [](PyArray &c) -> size_t {return c.size;});
     }
-
-    private:
 };
 
 
@@ -141,6 +151,10 @@ class DataFrame {
     pybind_col(py::class_<Subclass> &c) {
         return;
     }
+};
+
+struct AlnCoord {
+    int ref, start, end;
 };
 
 struct AlnCoords : public DataFrame<int, int, int> {
