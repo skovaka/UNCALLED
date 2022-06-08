@@ -1,5 +1,5 @@
 from . import config
-from .index import RefCoord
+from . import RefCoord
 
 #Index parameter group
 class IndexParams(config.ParamGroup):

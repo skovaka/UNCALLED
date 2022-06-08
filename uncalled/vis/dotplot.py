@@ -349,7 +349,7 @@ class Dotplot:
 
 
 
-def main(conf):
+def dotplot(conf):
     """Plot signal-to-reference alignment dotplots"""
 
     dotplots = Dotplot(conf=conf)

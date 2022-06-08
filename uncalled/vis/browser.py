@@ -18,7 +18,7 @@ from ..config import Config
 from ..fast5 import parse_read_ids
 
 
-def main(conf):
+def browser(conf):
     """Interactive signal alignment genome browser"""
     conf.tracks.load_mat = True
     #conf.tracks.refstats_layers = ["cmp.mean_ref_dist"]
@@ -26,7 +26,7 @@ def main(conf):
     sys.stderr.write("Loading tracks...\n")
     tracks = Tracks(conf=conf)
     sys.stderr.write("Starting server...\n")
-    browser(tracks, conf)
+    new_browser(tracks, conf)
 
 def _icon_btn(icon, name=None, panel="", hide=False):
     style={"display" : "none" if hide else "inline-block"}
@@ -76,7 +76,7 @@ def _panel(title, name, content, settings=None, hide=False):
         html.Div(ret, id=f"{name}-card", className="w3-card"),
         id=f"{name}-panel", className="w3-panel", style=style)
 
-def browser(tracks, conf):
+def new_browser(tracks, conf):
     external_stylesheets = [
         "https://fonts.googleapis.com/icon?family=Material+Icons",
         "https://www.w3schools.com/w3css/4/w3.css",

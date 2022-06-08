@@ -178,7 +178,7 @@ def paf_ref_compare(qry, ref, ret_qry=True, check_locs=True, ext=1.5):
 
     return tp, tn, fp, fn, fp_unmap
 
-def main(conf):
+def pafstats(conf):
     """Estimate speed and accuracy from an Uncalled PAF file"""
     locs = [p for p in parse_paf(conf.infile, max_reads=conf.max_reads)]
 

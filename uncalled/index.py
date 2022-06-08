@@ -31,49 +31,11 @@ from typing import NamedTuple
 import collections.abc
 
 import pandas as pd
+from . import RefCoord, str_to_coord
 
 from _uncalled import RefIndexK5, RefIndexK10, _RefCoord, self_align
 from .argparse import Opt
 
-def str_to_coord(coord_str):
-    spl = coord_str.split(":")         
-    #name = spl[0]
-    i = 1
-    while True:
-        try:
-            st,en = map(int, spl[i].split("-"))
-            break
-        except ValueError:
-            i += 1
-    name = ":".join(spl[:i])
-    
-    if i < len(spl):
-        return RefCoord(name,st,en)
-    else:                              
-        fwd = spl[i] == "+"
-        return RefCoord(name,st,en,fwd)
-
-class RefCoord(_RefCoord):
-    def __init__(self, *args):
-        if len(args) == 1:
-            args = args[0]
-            if isinstance(args, str):
-                args = self._str_to_tuple(args)
-            if not isinstance(args, tuple):
-                raise ValueError(f"Invalid RefCoord: {args}")
-        _RefCoord.__init__(self, *args)
-
-    def _str_to_tuple(self, coord_str):
-        spl = coord_str.split(":")         
-        name = spl[0]                        
-        st,en = map(int, spl[1].split("-"))
-        
-        if len(spl) == 2:                  
-            return (name,st,en)
-        elif len(spl) == 3 and spl[2] in {"+","-"}:
-            fwd = spl[2] == "+"
-            return (name,st,en,fwd)
-        return None
 
 class CoordSpace:
 
@@ -405,7 +367,7 @@ def load_index(k, prefix, load_pacseq=True, load_bwt=False, cache=True):
 
 
 
-def main(conf):
+def index(conf):
     """Build an index from a FASTA reference"""
         
 #       Uses BWA to generate pacseq and FM index files, then computes reference-specific probability thresholds. The FM index and probability thresholds are only required for Real-Time Enrichment subcommands (see --no-bwt if only interested in DTW analysis)"""

@@ -21,7 +21,7 @@ from _uncalled import Compare
 
 from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
-from .. import PoreModel, config, index 
+from .. import config, index 
 from ..index import load_index, RefCoord
 from .bcaln import Bcaln
 

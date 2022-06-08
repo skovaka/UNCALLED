@@ -26,12 +26,13 @@ import sys
 import os
 import argparse
 import numpy as np
-import uncalled as unc
 import toml
 import inspect
 import copy
-from _uncalled import _Conf
 from collections import namedtuple
+import importlib
+
+from .config import Config
 
 from . import __title__, __version__, __summary__
 
@@ -64,7 +65,7 @@ class ArgParser:
             config=None):
 
         if config is None:
-            self.config = unc.Config()
+            self.config = Config()
         else:
             self.config = config
 
@@ -73,7 +74,7 @@ class ArgParser:
 
         self.parser = argparse.ArgumentParser(
                 description=desc, 
-                #formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+               #formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                 formatter_class=argparse.RawDescriptionHelpFormatter,
                 prog=__title__,
                 usage="%(prog)s [subcommand] [-h] [-v]"
@@ -86,40 +87,41 @@ class ArgParser:
     def _add_subcmds(self, parser, subcmds, desc=None):
         subparsers = parser.add_subparsers(title="Subcommands", description=desc, help=argparse.SUPPRESS
         )
-        for subcmd in subcmds:
+        for cmd,(module,doc,opts) in subcmds.items():
 
-            if isinstance(subcmd, tuple):
-                subcmd, opts = subcmd
-                main_func = subcmd
-            else:
-                opts = getattr(subcmd, "OPTS", None)
-                main_func = getattr(subcmd, "main", None)
+            #if isinstance(subcmd, tuple):
+            #    subcmd, opts = subcmd
+            #    main_func = subcmd
+            #else:
+            #    opts = getattr(subcmd, "OPTS", None)
+            #    main_func = getattr(subcmd, "main", None)
 
-            subcmd_name = subcmd.__name__.split(".")[-1].strip("_")
+            #subcmd_name = subcmd.__name__.split(".")[-1].strip("_")
 
-            if main_func is not None:
-                desc = main_func.__doc__
-            else:
-                desc = subcmd.__doc__
+            #if main_func is not None:
+            #    desc = main_func.__doc__
+            #else:
+            #    desc = subcmd.__doc__
 
             sp = subparsers.add_parser(
-                subcmd_name, prog=" ".join([__title__, subcmd_name]), 
-                description=desc, formatter_class=Formatter
+                cmd, prog=" ".join([__title__, cmd]), 
+                description=doc, formatter_class=Formatter
             )
 
-            if main_func is not None:
-                sp.set_defaults(_cmd=(subcmd_name, main_func))
+            #if main_func is not None:
+            if module is not None:
+                sp.set_defaults(_cmd=(module, cmd))
                 for opt in opts:
                     if type(opt) is Opt:
-                        self._add_opt(subcmd_name, sp, opt)
+                        self._add_opt(cmd, sp, opt)
                     elif type(opt) is MutexOpts:
-                        self._add_mutex_opts(subcmd_name, sp, opt)
+                        self._add_mutex_opts(cmd, sp, opt)
 
-            elif hasattr(subcmd, "SUBCMDS"):
-                self._add_subcmds(sp, subcmd.SUBCMDS, None)
+            elif isinstance(opts, dict):
+                self._add_subcmds(sp, opts, None)
 
             else:
-                raise RuntimeError("Subcommand module \"%s\" does not contain \"main\" function or \"SUBCMDS\" list" % subcmd.__name__)
+                raise RuntimeError(f"Invalid subcommand definition: \"{cmd}\"")
 
     def _add_opt(self, subcmd, parser, opt):
         arg = parser.add_argument(*opt.args, **opt.get_kwargs(self.config))
@@ -146,7 +148,7 @@ class ArgParser:
 
         args = self.parser.parse_args(argv)
 
-        cmd_name, cmd = getattr(args, "_cmd", (None,None))
+        module, cmd = getattr(args, "_cmd", (None,None))
 
         fns =  getattr(args, "_fns", None)
         if fns is not None:
@@ -161,8 +163,8 @@ class ArgParser:
         for name, value in vars(args).items():
 
             if not name.startswith("_") or name in SPECIAL_PARAMS:
-                if (cmd_name,name) in self.dests:
-                    group, param = self.dests[(cmd_name,name)]
+                if (cmd,name) in self.dests:
+                    group, param = self.dests[(cmd,name)]
                 else: 
                     group = self.config
                     param = name
@@ -176,7 +178,7 @@ class ArgParser:
         #if fast5s is not None:
         #    self.config.fast5_reader.fast5_files = unc.fast5.parse_fast5_paths(fast5s, self.config.fast5_reader.recursive)
 
-        return cmd, self.config
+        return module, cmd, self.config
     
     def print_help(self):
         self.parser.print_help()

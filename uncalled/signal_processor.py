@@ -6,7 +6,8 @@ import numpy as np
 
 from .config import ParamGroup, Config
 from .pafstats import parse_paf
-from . import PoreModel, EventDetector, EventProfiler, Normalizer
+from . import EventDetector, EventProfiler, Normalizer
+from .pore_model import PoreModel
 from _uncalled import SignalProcessorK5, SignalProcessorK10, _ProcessedRead
 
 class ProcessedRead(_ProcessedRead):

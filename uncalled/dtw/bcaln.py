@@ -13,7 +13,6 @@ import copy
 from ..pafstats import parse_paf, PafEntry
 from ..config import Config
 from ..argparse import Opt
-from .. import PoreModel
 from ..index import RefCoord
 
 class Bcaln:

@@ -293,7 +293,7 @@ def panel_opt(name):
     return (lambda arg: (name, arg))
 
 
-def main(conf):
+def trackplot(conf):
     """Plot alignment tracks and per-reference statistics"""
     #conf.tracks.layers.append(conf.trackplot.layer)
     #conf.tracks.refstats_layers = [conf.trackplot.layer]

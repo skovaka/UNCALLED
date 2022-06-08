@@ -14,7 +14,7 @@ import scipy.stats
 from . import Tracks
 from ..fast5 import Fast5Reader
 from ..index import str_to_coord, RefCoord
-from .. import PoreModel
+from ..pore_model import PoreModel
 
 import progressbar as progbar
 

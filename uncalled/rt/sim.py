@@ -43,7 +43,7 @@ SP = '-'*( (NTICKS - len(PROG))//2 - 1)
 PROG_HEADER = '|'+SP+PROG+SP+"|\n"
 
 
-def main(config):
+def sim(config):
     """Simulate real-time targeted sequencing"""
     client = Simulator(config)
     load_sim(client, config)

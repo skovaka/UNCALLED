@@ -28,7 +28,7 @@ import time
 from ..index import check_prefix
 from _uncalled import MapPoolOrd
 
-def main(conf):
+def map(conf):
     """Rapidly map fast5 read signal to a reference"""
     check_prefix(conf.bwa_prefix)
 

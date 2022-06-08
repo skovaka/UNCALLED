@@ -1,22 +1,13 @@
-from time import time 
-t = time()
-
 import sys
-import numpy as np
-import pandas as pd
 import textwrap
+import importlib
+
 from .argparse import ArgParser, Opt, MutexOpts, CONFIG_PARAM, FAST5_PARAM, comma_split, ref_coords
+
 from .fast5 import parse_read_ids
 from .index import str_to_coord
-#from ..argparse import Opt, comma_split, ref_coords
+import pandas as pd
 
-#from . import index, map, realtime, sim, pafstats, dtw
-from . import index, pafstats
-from .rt import realtime, map, sim
-from .dtw import dtw, convert, db
-from .vis import browser, dotplot, sigplot, trackplot
-from .stats import refstats, layerstats, _readstats
-print("LOAD", time() - t)
 
 BWA_OPTS = (
     Opt("bwa_prefix", "mapper"),
@@ -140,8 +131,13 @@ DUMP_OPTS = (
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
 )
 
+ALL_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95", "KS"}
+
+def panel_opt(name):
+    return (lambda arg: (name, arg))
+
 CMDS = {
-    "index" : ("Build an index from a FASTA reference", (
+    "index" : ("index", "Build an index from a FASTA reference", (
         Opt("fasta_filename", "index"),
         Opt(("-o", "--index-prefix"), "index"),
         Opt("--no-bwt", "index", action="store_true"),
@@ -156,11 +152,11 @@ CMDS = {
         Opt("--speeds", "index"),
      )), 
 
-    "map" : ("Rapidly map fast5 read signal to a reference",
+    "map" : ("rt.map", "Rapidly map fast5 read signal to a reference",
         BWA_OPTS + FAST5_OPTS + MAPPER_OPTS
     ), 
 
-    "sim" : ("Simulate real-time targeted sequencing",
+    "sim" : ("rt.sim", "Simulate real-time targeted sequencing",
         BWA_OPTS + (
         Opt("fast5s", 
             nargs = '+', 
@@ -177,7 +173,7 @@ CMDS = {
         ) + MAPPER_OPTS
     ), 
 
-    "pafstats" : ("Estimate speed and accuracy from an Uncalled PAF file", (
+    "pafstats" : ("rt.pafstats", "Estimate speed and accuracy from an Uncalled PAF file", (
         Opt("infile",  
             type = str, 
             help = "PAF file output by UNCALLED"
@@ -199,7 +195,7 @@ CMDS = {
             help = "Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag"
         ),
     )), 
-    "dtw" : ("Perform DTW alignment guided by basecalled alignments", (
+    "dtw" : ("dtw.dtw", "Perform DTW alignment guided by basecalled alignments", (
         Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
         Opt(("-m", "--mm2-paf"), "dtw", required=True),
         Opt(("-o", "--db-out"), "tracks.io"),
@@ -222,18 +218,33 @@ CMDS = {
         Opt(("-s", "--band-shift"), "dtw"),
         Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
     )), 
-    "convert" : ("Import DTW alignments produced by other tools into a database", {
-        "new" : ("New convert interface", NEW_OPTS), 
-        "nanopolish" : ("Convert from nanopolish eventalign TSV to uncalled DTW track", NANOPOLISH_OPTS), 
-        "tombo" : ("Convert from Tombo resquiggled fast5s to uncalled DTW track", CONVERT_OPTS)
+    #
+    "convert" : (None, 
+        """Import DTW alignments produced by other tools into a database
+
+        subcommand options:
+        nanopolish  Convert alignments produced by nanopolish eventalign
+        tombo       Convert alignments produced by tomobo resquiggle""", {
+
+        "new"        : ("dtw.convert", "New convert interface", NEW_OPTS), 
+        "nanopolish" : ("dtw.convert", "Convert from nanopolish eventalign TSV to uncalled DTW track", NANOPOLISH_OPTS), 
+        "tombo"      : ("dtw.convert", "Convert from Tombo resquiggled fast5s to uncalled DTW track", CONVERT_OPTS)
     }), 
-    "db" : ("Edit, merge, and ls alignment databases", {
-        "ls"     : ("", LS_OPTS), 
-        "delete" : ("", DELETE_OPTS), 
-        "merge"  : ("", MERGE_OPTS), 
-        "edit"   : ("", EDIT_OPTS), 
+    "db" : (None, 
+        """Edit, merge, and ls alignment databases
+
+        subcommand options:
+        ls       List all tracks in a database
+        delete   Delete a track from a database
+        merge    Merge databases into a single file
+        edit     Rename, change fast5 paths, or set description""", {
+
+        "ls"     : ("dtw.db", "", LS_OPTS), 
+        "delete" : ("dtw.db", "", DELETE_OPTS), 
+        "merge"  : ("dtw.db", "", MERGE_OPTS), 
+        "edit"   : ("dtw.db", "", EDIT_OPTS), 
     }),
-    "refstats" : ("Calculate per-reference-coordinate statistics", (
+    "refstats" : ("stats.refstats", "Calculate per-reference-coordinate statistics", (
         Opt("db_in", "tracks.io", type=str),
         Opt("layers", "tracks", type=comma_split,
             help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
@@ -245,11 +256,11 @@ CMDS = {
         Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
         Opt(("-v", "--verbose-refs"), action="store_true", help="Output reference name and strand"),
     )),
-    "layerstats" : ("Compute, compare, and query alignment layers", {
+    "layerstats" : ("stats.layerstats", "Compute, compare, and query alignment layers", {
         "compare" : ("Compute distance between alignments of the same reads", COMPARE_OPTS),
         "dump" : ("Output DTW alignment paths and statistics", DUMP_OPTS),
     }),
-    "dotplot" : ("Plot signal-to-reference alignment dotplots", (
+    "dotplot" : ("vis.dotplot", "Plot signal-to-reference alignment dotplots", (
         Opt("db_in", "tracks.io"),
         Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot.", required=True),
         Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
@@ -263,7 +274,7 @@ CMDS = {
         Opt(("--no-model"), "sigplot", action="store_true"),
         Opt(("--bcaln-error", "-e"), "dotplot", action="store_true"),
     )),
-    "trackplot" : ("Plot alignment tracks and per-reference statistics", (
+    "trackplot" : ("vis.trackplot", "Plot alignment tracks and per-reference statistics", (
         Opt("db_in", "tracks.io"),
         Opt("ref_bounds", "tracks", type=str_to_coord),
         Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
@@ -291,7 +302,7 @@ CMDS = {
             help="Display a line plot of specifed layer summary statistic"), 
         Opt(("-o", "--outfile"), "trackplot"),
     )),
-    "browser" : ("Interactive signal alignment genome browser", (
+    "browser" : ("vis.browser", "Interactive signal alignment genome browser", (
         Opt("db_in", "tracks.io"),
         Opt("ref_bounds", "tracks", type=str_to_coord),
         #Opt("layer", "trackplot", default="current", nargs="?"),
@@ -304,14 +315,6 @@ CMDS = {
     )),
 }
 
-SUBCMDS = [
-    index, 
-    map, sim, pafstats, #realtime, 
-    dtw, convert, db,
-    browser, dotplot, sigplot, trackplot,
-    refstats, _readstats, layerstats,
-]
-
 _help_lines = [
     "Utility for Nanopore Current ALignment to Large Expanses of DNA", "",
     "subcommand options:",
@@ -321,19 +324,19 @@ _help_lines = [
 #    "\trealtime   " + realtime.main.__doc__,
     "\tmap        Rapidly map fast5 read signal to a reference",
     "\tsim        Simulate real-time targeted sequencing",
-    "\tpafstats   Estimate speed and accuracy from an Uncalled PAF file",
+    "\tpafstats   Estimate speed and accuracy from an Uncalled PAF file", "",
     "Dynamic Time Warping (DTW) Alignment:",
     "\tdtw        Perform DTW alignment guided by basecalled alignments",
     "\tconvert    Import DTW alignments produced by other tools into a database",
-    "\tdb         " + db.__doc__.split("\n")[0], "",
+    "\tdb         Edit, merge, and ls alignment databases", "",
     "DTW Analysis:",
-    "\trefstats   " + refstats.main.__doc__,
+    "\trefstats   Calculate per-reference-coordinate statistics",
     #"\treadstats  " + _readstats.main.__doc__,
-    "\tlayerstats " + layerstats.__doc__.split("\n")[0],"",
+    "\tlayerstats Compute, compare, and query alignment layers", "",
     "DTW Visualization:",
-    "\tdotplot    " + dotplot.main.__doc__,
-    "\ttrackplot  " + trackplot.main.__doc__,
-    "\tbrowser    " + browser.main.__doc__,
+    "\tdotplot    Plot signal-to-reference alignment dotplots",
+    "\ttrackplot  Plot alignment tracks and per-reference statistics",
+    "\tbrowser    Interactive signal alignment genome browser",
     #"\tsigplot    " + sigplot.main.__doc__,
 ]
 
@@ -348,18 +351,16 @@ HELP = "\n".join([
 
 
 def main():
-    t = time()
-    parser = ArgParser(SUBCMDS, HELP)
-    print("Parser", time()-t)
-    t = time()
+    #parser = ArgParser(SUBCMDS, HELP)
+    parser = ArgParser(CMDS, HELP)
 
-    cmd, conf = parser.parse_args()
+    module, cmd, conf = parser.parse_args()
 
-    print("Parsed", time()-t)
-    t = time()
 
-    if cmd is not None:
-        ret = cmd(conf=conf)
+    if module is not None:
+        m = importlib.import_module(f".{module}", "uncalled")
+        fn = getattr(m, cmd)
+        ret = fn(conf=conf)
 
         if isinstance(ret, pd.DataFrame):
             ret.to_csv(sys.stdout, sep="\t")
@@ -367,7 +368,5 @@ def main():
     else:
         parser.print_help()
 
-    print("done", time()-t)
-    t = time()
 if __name__ == "__main__":
     main()

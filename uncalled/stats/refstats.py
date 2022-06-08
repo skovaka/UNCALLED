@@ -16,7 +16,7 @@ from ..index import str_to_coord
 from ..fast5 import Fast5Reader
 
 
-def main(conf):
+def refstats(conf):
     """Calculate per-reference-coordinate statistics"""
     from ..dtw import Tracks
 

@@ -21,7 +21,6 @@ from _uncalled import (
 
 from ..signal_processor import SignalProcessor
 
-from .. import PoreModel
 from . import Bcaln, Tracks
 
 #TODO make this better
@@ -31,7 +30,7 @@ METHODS = {
     "global" : {5: GlobalDTWK5, 10: GlobalDTWK10}
 }
 
-def main(conf):
+def dtw(conf):
     """Perform DTW alignment guided by basecalled alignments"""
     conf.fast5_reader.load_bc = True
     conf.export_static()
@@ -54,7 +53,6 @@ def main(conf):
     for paf in pafs:
         mm2s[paf.qr_name].append(paf)
 
-    #model = PoreModel(conf.pore_model)
     sigproc = SignalProcessor(tracks.model, conf)
 
     #pbar = progbar.ProgressBar(
