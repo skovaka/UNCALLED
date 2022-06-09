@@ -6,6 +6,7 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 import time
+import sys
 
 from .sigplot import Sigplot
 
@@ -33,7 +34,11 @@ class Dotplot:
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
 
-        self.conf.tracks.layers = self.REQ_LAYERS + self.prms.layers
+        req_layers = self.REQ_LAYERS.copy()
+        if self.prms.show_bands:
+            req_layers.append("band")
+
+        self.conf.tracks.layers = req_layers + self.prms.layers
 
         if isinstance(self.prms.tracks, str) or self.prms.tracks is None:
             self.tracks = Tracks(conf=self.conf)
@@ -44,7 +49,7 @@ class Dotplot:
 
         self.layers = list(parse_layers(self.prms.layers, False))
 
-        self.tracks.set_layers(self.REQ_LAYERS + self.layers)
+        self.tracks.set_layers(req_layers + self.layers)
 
         self.conf.load_config(self.tracks.conf)
 
@@ -113,6 +118,25 @@ class Dotplot:
             first_aln = True
             for aln_id, aln in track.alignments.iterrows():
                 layers = track.get_aln_layers(aln_id)
+
+                if self.prms.show_bands:
+                    bands = layers["band"].dropna(how="any")
+                    fig.add_trace(go.Scattergl(
+                        x=bands["sample_start"], 
+                        y=bands.index,
+                        line={"color" : "orange"},
+                        fillcolor="orange",
+                        opacity=0.2,
+                        fill="tonexty",
+                    ), row=2, col=1)
+                    fig.add_trace(go.Scattergl(
+                        x=bands["sample_end"], 
+                        y=bands["ref_end"],
+                        line={"color" : "orange"},
+                        fillcolor="orange",
+                        opacity=0.2,
+                        fill="tonexty",
+                    ), row=2, col=1)
                 
                 if has_bcaln:
                     self._plot_bcaln(fig, legend, layers)
@@ -353,8 +377,16 @@ def dotplot(conf):
     """Plot signal-to-reference alignment dotplots"""
 
     dotplots = Dotplot(conf=conf)
+    save = conf.out_prefix is not None
     for read_id, fig in dotplots.iter_plots():
-        print(read_id)
-        fig.write_html(
-            conf.out_prefix + read_id + ".html", 
-            config=dotplots.fig_config)
+        if save:
+            fig.write_html(
+                conf.out_prefix + read_id + ".html", 
+                config=dotplots.fig_config)
+        else:
+            fig.show(config=dotplots.fig_config)
+            sys.stderr.flush()
+            sys.stdout.write("Press enter to plot next read, or type \"exit\"\n")
+            sys.stdout.flush()
+            choice = sys.stdin.readline().strip().lower()
+            if choice == "exit": break

@@ -16,6 +16,7 @@ struct DtwParams {
           band_shift;
     i32 band_width, iterations;
     std::string band_mode, cost_fn, mm2_paf;
+    bool save_bands;
 };
 
 extern const DtwParams DTW_PRMS_DEF, DTW_PRMS_EVT_GLOB;

@@ -716,7 +716,6 @@ class Tracks:
             order=["read_id", "mref"],
             chunksize=self.prms.io.ref_chunksize)
 
-        #print("    Queried layers ", time.time()-t)
         t = time.time()
 
         aln_leftovers = pd.DataFrame()

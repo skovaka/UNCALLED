@@ -173,7 +173,7 @@ class CoordSpace:
     def all_mrefs_fwd(self, mrefs):
 
         if isinstance(mrefs, (collections.abc.Sequence, np.ndarray, pd.Index, pd.Series)):
-            isin = lambda a,b: a.isin(b).all()
+            isin = lambda a,b: a.dropna().isin(b).all()
         else:
             isin = lambda a,b: a in b
 

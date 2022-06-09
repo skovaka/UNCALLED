@@ -10,12 +10,6 @@ from typing import NamedTuple
 import pandas as pd
 import copy
 
-from dataclasses import dataclass
-from typing import Callable
-
-import scipy.stats
-from sklearn.decomposition import PCA
-
 from ..dfs import AlnCoords
 from _uncalled import Compare
 
@@ -33,14 +27,6 @@ DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
 
 
 LayerMeta = namedtuple("LayerMeta", ["type", "label", "fn", "deps"], defaults=[None,None])
-
-#@dataclass 
-#class LayerMeta:
-#    _type : type
-#    label : str
-#    fn    : Callable = None
-#    deps  : list = None
-
 
 #TODO probably move this to AlnTrack
 LAYERS = {
@@ -85,6 +71,13 @@ LAYERS = {
             [("bcaln", "start"), ("bcaln", "length")]),
         "bp" : LayerMeta(int, "Basecaller Base Index"),
         "error" : LayerMeta(str, "Basecalled Alignment Error"),
+    }, "band" : {
+        "mref_end" : LayerMeta(int, "Mirror Ref. End"),
+        "ref_end" : LayerMeta(int, "Mirror Ref. End",
+            lambda track: track.coords.mref_to_ref(track.layers["band","mref_end"]),
+            [("band", "mref_end")]),
+        "sample_start" : LayerMeta(int, "Raw Sample Start"),
+        "sample_end" : LayerMeta(int, "Raw Sample End"),
     }, "cmp" : {
         "jaccard" : LayerMeta(int, "Jaccard Distance", None, 
             [("dtw", "start"), ("dtw", "end"), ("dtw", "length")]),

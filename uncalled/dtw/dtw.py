@@ -147,6 +147,9 @@ class GuidedDTW:
 
         tracks.write_dtw_events(self.df, aln_id=aln_id)
 
+        if self.bands is not None:
+            tracks.write_layers("band", self.bands, aln_id=aln_id)
+
         self.empty = False
 
     def renormalize(self, signal, aln):
@@ -162,49 +165,38 @@ class GuidedDTW:
         path_qrys = list()
         path_refs = list()
 
-        band_blocks = list()
+        mref_st = self.bcaln.index[0]
+        mref_en = self.bcaln.index[-1]+1
 
-        #bc = self.bcaln.df.sort_index()
-        block_min = self.bcaln.index[0]
-        block_max = self.bcaln.index[-1]
+        kmers = self.ref_kmers.loc[mref_st:mref_en]
 
-        #TODO for spliced RNA, must find gaps in mref index
-        #block_starts = np.insert(self.bcaln.ref_gaps, 0, block_min)
-        #block_ends   = np.append(self.bcaln.ref_gaps, block_max)
-        #for st, en in zip(block_starts, block_ends):
+        samp_st = self.bcaln.loc[mref_st,"start"]
+        samp_en = self.bcaln.loc[mref_en-1,"start"]
 
-        for st, en in [(block_min, block_max)]:
-            mref_st = st
-            mref_en = en+1
-            block_kmers = self.ref_kmers.loc[mref_st:mref_en]
+        read_block = signal.sample_range(samp_st, samp_en)
 
-            samp_st = self.bcaln.loc[st,"start"]
-            samp_en = self.bcaln.loc[en,"start"]
+        block_signal = read_block['mean'].to_numpy()
+        
+        args = self._get_dtw_args(read_block, mref_st, kmers)
 
-            read_block = signal.sample_range(samp_st, samp_en)
+        dtw = self.dtw_fn(*args)
+        
+        path = np.flip(dtw.path)
+        #TODO shouldn't need to clip, error in bdtw
+        evts = read_block.index[np.clip(path['qry'], 0, len(read_block))]
+        mrefs = kmers.index[path['ref']]
 
-            block_signal = read_block['mean'].to_numpy()
-            
-            args = self._get_dtw_args(read_block, mref_st, block_kmers)
+        if self.prms.save_bands and hasattr(dtw, "ll"):
+            self.bands = self._ll_to_df(dtw.ll, read_block, mref_st, len(kmers))
+        else:
+            self.bands = None
 
-            dtw = self.dtw_fn(*args)
-            
-            path = np.flip(dtw.path)
-            #TODO shouldn't need to clip, error in bdtw
-            path_qrys.append(read_block.index[np.clip(path['qry'], 0, len(read_block))])
-            path_refs.append(block_kmers.index[path['ref']])
-
-            if hasattr(dtw, "ll"):
-                band_blocks.append(
-                    self._ll_to_df(dtw.ll, read_block, mref_st, len(block_kmers))
-                )
-
-        return pd.DataFrame({'mref': np.concatenate(path_refs)}, 
-                               index = np.concatenate(path_qrys),
-                               dtype='Int32') \
-                  .join(signal.to_df()) \
-                  .drop(columns=['mask'], errors='ignore') \
-                  .rename(columns={'mean' : 'current', 'stdv' : 'current_stdv'})
+        return pd.DataFrame({'mref': mrefs}, 
+                            index = evts,
+                            dtype='Int32') \
+                 .join(signal.to_df()) \
+                 .drop(columns=['mask'], errors='ignore') \
+                 .rename(columns={'mean' : 'current', 'stdv' : 'current_stdv'})
 
     def _get_dtw_args(self, read_block, mref_start, ref_kmers):
         common = (
@@ -220,6 +212,8 @@ class GuidedDTW:
             band_count = qry_len + ref_len
             band_lls = list()
 
+            #print(self.bcaln)
+
             starts = self.bcaln.index[self.bcaln["start"].searchsorted(read_block['start'])]
 
             q = r = 0
@@ -234,6 +228,8 @@ class GuidedDTW:
                 else:
                     q += 1
 
+            #print(band_lls)
+
             return common + (band_lls, )
 
         elif self.method == "static":
@@ -243,24 +239,45 @@ class GuidedDTW:
             return common + (DTW_GLOB,)
 
     #TODO store in ReadAln metadata
-    def _ll_to_df(self, ll, read_block, ref_st, ref_len):
-        block_qry_st = np.clip(ll['qry'],                 0, len(read_block)-1)
-        block_qry_en = np.clip(ll['qry']-self.prms.band_width, 0, len(read_block)-1)
-        block_ref_st = np.clip(ll['ref'],                 0, ref_len-1)
-        block_ref_en = np.clip(ll['ref']+self.prms.band_width, 0, ref_len-1)
+    def _ll_to_df(self, ll, read_block, min_mref, ref_len):
+        qry_st = np.clip(ll['qry'],                 0, len(read_block)-1)
+        qry_en = np.clip(ll['qry']-self.prms.band_width, 0, len(read_block)-1)
+        mref_st = min_mref + np.clip(ll['ref'],                 0, ref_len-1)
+        mref_en = min_mref + np.clip(ll['ref']+self.prms.band_width, 0, ref_len-1)
+
+        sample_starts = read_block['start'].iloc[qry_en].to_numpy()
+        sample_ends = read_block["start"].iloc[qry_st].to_numpy() + read_block["length"].iloc[qry_st].to_numpy()
                                               
-        band_samps = read_block['start'].to_numpy()
-        band_ref_st = np.zeros(len(band_samps))
-        band_ref_en = band_ref_st + ref_len
+        #band_samps = read_block['start'].to_numpy()
+        #band_ref_st = np.zeros(len(band_samps))
+        #band_ref_en = band_ref_st + ref_len
+        #band_ref_st[qry_st] = block_ref_st
+        #band_ref_en[qry_en] = block_ref_en+1
 
-        band_ref_st[block_qry_st] = block_ref_st
-        band_ref_en[block_qry_en] = block_ref_en+1
+        grp = pd.DataFrame({
+                "mref" : mref_st,
+                "mref_end" : mref_en,
+                "sample_start" : sample_starts,
+                "sample_end" : sample_ends,
+              }).groupby("mref")
 
-        return pd.DataFrame({
-            'samp': band_samps, 
-            'ref_st': ref_st + band_ref_st, 
-            'ref_en': ref_st + band_ref_en
+        df = pd.DataFrame({
+            "mref_end" : grp["mref_end"].first(),
+            "sample_start" : grp["sample_start"].max(),
+            "sample_end" : grp["sample_end"].min(),
         })
+
+        #print(qry_st[:5], qry_en[-5:])
+        #print(sample_starts[:5], sample_starts[-5:], len(sample_starts))
+        #print(sample_ends[:5], sample_ends[-5:], len(sample_ends))
+        #print(band_samps[:5], band_samps[-5:], len(band_samps))
+        return df
+
+        #return pd.DataFrame({
+        #    'samp': band_samps, 
+        #    'ref_st': ref_st + band_ref_st, 
+        #    'ref_en': ref_st + band_ref_en
+        #})
 
 #def collapse_events(dtw, kmer_str=False, start_col="start", length_col="length", mean_col="current", kmer_col="kmer", mask_skips=False):
 #

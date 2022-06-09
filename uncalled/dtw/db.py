@@ -287,13 +287,15 @@ class TrackSQL(TrackIO):
 
     def close(self):
         if self.open:
+            self.cur.execute("CREATE INDEX IF NOT EXISTS aln_read_idx ON alignment (read_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_aln_idx ON dtw (aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (mref, aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_aln_idx ON bcaln (aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS band_idx ON band (mref, aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS band_aln_idx ON band (aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (mref, aln_a, aln_b, group_b);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_aln_idx ON cmp (aln_a);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_aln_idx ON dtw (aln_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_aln_idx ON bcaln (aln_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS aln_read_idx ON alignment (read_id);")
             self.con.close()
             self.open = False
 
@@ -364,12 +366,21 @@ class TrackSQL(TrackIO):
                 FOREIGN KEY (aln_a) REFERENCES alignment (id) ON DELETE CASCADE,
                 FOREIGN KEY (aln_b) REFERENCES alignment (id) ON DELETE CASCADE
             );""")
+        self.cur.execute("""
+            CREATE TABLE IF NOT EXISTS band (
+                aln_id INTEGER,
+                mref INTEGER,
+                mref_end INTEGER,
+                sample_start INTEGER,
+                sample_end INTEGER,
+                FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE
+            );""")
         #self.con.commit()
 
     def init_write_mode(self):
         track = TrackIO.init_write_mode(self)
 
-        for table in ["dtw", "bcaln", "cmp"]:
+        for table in ["dtw", "bcaln", "cmp", "band"]:
             self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
 
         if self.prms.init_track:
@@ -621,8 +632,6 @@ class TrackSQL(TrackIO):
 
         query = self._join_query(select, wheres, ["idx_"+o if o in {"aln_id","mref"} else o for o in order])
 
-
-
         ret = pd.read_sql_query(
             query, self.con, 
             index_col=["idx_mref", "idx_aln_id"], 
@@ -798,6 +807,11 @@ def merge(conf):
         query = "INSERT INTO bcaln "\
                f"SELECT mref,aln_id+{aln_shift},start,length,bp,error "\
                 "FROM input.bcaln"
+        db.cur.execute(query)
+
+        query = "INSERT INTO band "\
+               f"SELECT aln_id+{aln_shift},mref,mref_end,sample_start,sample_end "\
+                "FROM input.band"
         db.cur.execute(query)
 
         query = "INSERT INTO cmp "\

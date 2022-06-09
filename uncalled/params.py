@@ -77,6 +77,7 @@ DotplotParams._def_params(
     ("bcaln_track", None, str, "Only display basecalled alignments from this track"),
     ("bcaln_error", False, bool, "Display basecalled alignment errors"),
     ("show_legend", True, bool, "Display legend"),
+    ("show_bands", True, bool, "Display DTW bands (if present in DB)"),
     ("select_ref", None, int, "Display a horizontal line at specified reference coordinate"),
     ("layers", [], None, ""),
 )
