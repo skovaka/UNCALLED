@@ -8,6 +8,7 @@ from .fast5 import parse_read_ids
 from .index import str_to_coord
 import pandas as pd
 
+import cProfile
 
 BWA_OPTS = (
     Opt("bwa_prefix", "mapper"),
@@ -360,12 +361,17 @@ def main():
 
 
     if module is not None:
+
         m = importlib.import_module(f".{module}", "uncalled")
         fn = getattr(m, cmd)
-        ret = fn(conf=conf)
-
-        if isinstance(ret, pd.DataFrame):
-            ret.to_csv(sys.stdout, sep="\t")
+        if conf.cprof is not None:
+            cProfile.runctx(f"fn(conf=conf)",
+             {"fn" : fn, "conf": conf},{},
+             conf.cprof)
+        else:
+            ret = fn(conf=conf)
+            if isinstance(ret, pd.DataFrame):
+                ret.to_csv(sys.stdout, sep="\t")
 
     else:
         parser.print_help()

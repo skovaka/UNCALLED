@@ -73,6 +73,7 @@ class ArgParser:
                 usage="%(prog)s [subcommand] [-h] [-v]"
         )
 
+        self.parser.add_argument("--cprof", type=str, default=None, help=argparse.SUPPRESS)
         self.parser.add_argument("-v", "--version", action="version", version=__version__)
 
         self._add_subcmds(self.parser, subcmds, None)

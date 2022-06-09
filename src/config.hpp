@@ -63,6 +63,7 @@ class Config {
 
     Mode mode;
     u16 threads;
+    bool cprof;
 
     Mapper::Params        mapper         = Mapper::PRMS;
     ReadBuffer::Params    read_buffer    = ReadBuffer::PRMS;
@@ -78,19 +79,10 @@ class Config {
     MapOrdParams          map_pool_ord   = MAP_ORD_PRMS_DEF;
     DtwParams             dtw            = DTW_PRMS_DEF;
 
-    Config() : mode(Mode::UNDEF), threads(1) {}
+    Config() : mode(Mode::UNDEF), threads(1), cprof(false) {}
 
     Config(Mode m) : Config() {
         mode = m;
-
-        switch (mode) {
-
-        case Mode::MAP_ORD:
-            break;
-
-        default:
-            break;
-        }
     }
 
     void set_mode_map_ord() {

@@ -212,8 +212,6 @@ class GuidedDTW:
             band_count = qry_len + ref_len
             band_lls = list()
 
-            #print(self.bcaln)
-
             starts = self.bcaln.index[self.bcaln["start"].searchsorted(read_block['start'])]
 
             q = r = 0
@@ -247,12 +245,6 @@ class GuidedDTW:
 
         sample_starts = read_block['start'].iloc[qry_en].to_numpy()
         sample_ends = read_block["start"].iloc[qry_st].to_numpy() + read_block["length"].iloc[qry_st].to_numpy()
-                                              
-        #band_samps = read_block['start'].to_numpy()
-        #band_ref_st = np.zeros(len(band_samps))
-        #band_ref_en = band_ref_st + ref_len
-        #band_ref_st[qry_st] = block_ref_st
-        #band_ref_en[qry_en] = block_ref_en+1
 
         grp = pd.DataFrame({
                 "mref" : mref_st,
@@ -267,10 +259,6 @@ class GuidedDTW:
             "sample_end" : grp["sample_end"].min(),
         })
 
-        #print(qry_st[:5], qry_en[-5:])
-        #print(sample_starts[:5], sample_starts[-5:], len(sample_starts))
-        #print(sample_ends[:5], sample_ends[-5:], len(sample_ends))
-        #print(band_samps[:5], band_samps[-5:], len(band_samps))
         return df
 
         #return pd.DataFrame({
