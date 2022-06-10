@@ -41,6 +41,7 @@ LAYERS = {
         "start" : LayerMeta(int, "Sample Start"),
         "length" : LayerMeta(int, "Sample Length"),
         "current" : LayerMeta(float, "Current (pA)"),
+        "kmer" : LayerMeta(str, "Reference k-mer"),
         "end" : LayerMeta(int, "Sample End",  
             lambda track: track.layers["dtw","start"] + track.layers["dtw","length"],
             [("dtw", "start"), ("dtw", "length")]),
@@ -51,15 +52,13 @@ LAYERS = {
             lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate,
             [("dtw", "length")]),
         "model" : LayerMeta(float, "Model Current",
-            lambda track: track.model[track.kmers],
-            [("dtw", "current")]),
+            lambda track: track.model[track.layers["dtw","kmer"]],
+            [("dtw", "kmer")]),
         "model_diff" : LayerMeta(float, "Model pA Diff.",
-            lambda track: track.layers["dtw","current"] - track.model[track.kmers],
-            [("dtw", "current")]),
-        "kmer" : LayerMeta(str, "Reference k-mer",
-            lambda track: track.kmers),
+            lambda track: track.layers["dtw","current"] - track.model[track.layers["dtw","kmer"]],
+            [("dtw", "current"),("dtw","kmer")]),
         "base" : LayerMeta(str, "Reference base",
-            lambda track: track.model.kmer_base(track.kmers, 2)),
+            lambda track: track.model.kmer_base(track.layers["dtw","kmer"], 2)),
     }, "bcaln" : {
         "start" : LayerMeta(int, "BC Sample Start"),
         "length" : LayerMeta(int, "BC Sample Length"),
@@ -212,18 +211,8 @@ class AlnTrack:
 
         self.layer_fwds = self.alignments.loc[self.layer_aln_ids, "fwd"].to_numpy()
 
-        self._kmers = None
-
         self.has_fwd = np.any(self.alignments['fwd'])
         self.has_rev = not np.all(self.alignments['fwd'])
-
-    @property
-    def kmers(self):
-        if self._kmers is None and self.coords.ref_kmers is not None:
-            kidx = pd.MultiIndex.from_arrays([self.layer_fwds, self.layer_refs])
-            self._kmers = self.coords.ref_kmers.loc[kidx]
-            self._kmers.index = self.layers.index
-        return self._kmers
 
     @property
     def all_fwd(self):

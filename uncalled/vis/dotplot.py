@@ -121,7 +121,7 @@ class Dotplot:
                               .loc[(slice(None),aln_id), slice(None)] \
                               .droplevel("aln_id")
 
-                if self.prms.show_bands:
+                if self.prms.show_bands and "band" in layers:
                     bands = layers["band"].dropna(how="any")
                     fig.add_trace(go.Scattergl(
                         x=bands["sample_start"], 

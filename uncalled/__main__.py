@@ -258,9 +258,9 @@ CMDS = {
         Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
         Opt(("-v", "--verbose-refs"), action="store_true", help="Output reference name and strand"),
     )),
-    "layerstats" : ("stats.layerstats", "Compute, compare, and query alignment layers", {
-        "compare" : ("Compute distance between alignments of the same reads", COMPARE_OPTS),
-        "dump" : ("Output DTW alignment paths and statistics", DUMP_OPTS),
+    "layerstats" : (None, "Compute, compare, and query alignment layers", {
+        "compare" : ("stats.layerstats", "Compute distance between alignments of the same reads", COMPARE_OPTS),
+        "dump" : ("stats.layerstats", "Output DTW alignment paths and statistics", DUMP_OPTS),
     }),
     "dotplot" : ("vis.dotplot", "Plot signal-to-reference alignment dotplots", (
         Opt("db_in", "tracks.io"),

@@ -45,7 +45,7 @@ class Sigplot:
 
             
     def _plot_bases(self, fig, dtw, model, ymin, ymax, row, col):
-        bases = model.kmer_base(dtw["kmers"], 2)
+        bases = model.kmer_base(dtw["kmer"], 2)
         for base, color in enumerate(self.conf.vis.base_colors):
             base_dtw = dtw[bases == base]
             starts = base_dtw['start']
@@ -84,10 +84,8 @@ class Sigplot:
             dtws = list()
             
             for aln_id,aln in alns.iterrows():
-                dtw = track.layers["dtw"].xs(aln_id, level="aln_id")
-                #dtw["kmers"] = track.coords.ref_kmers.loc[(aln.fwd, dtw.index)]
-                dtw["kmers"] = track.kmers.xs(aln_id, level="aln_id")
-                dtw["model_current"] = track.model[dtw["kmers"]]
+                dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln_id")
+                dtw["model_current"] = track.model[dtw["kmer"]]
                 dtws.append(dtw)
 
                 max_i = dtw["start"].argmax()
