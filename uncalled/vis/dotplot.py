@@ -117,7 +117,9 @@ class Dotplot:
 
             first_aln = True
             for aln_id, aln in track.alignments.iterrows():
-                layers = track.get_aln_layers(aln_id)
+                layers = track.layers \
+                              .loc[(slice(None),aln_id), slice(None)] \
+                              .droplevel("aln_id")
 
                 if self.prms.show_bands:
                     bands = layers["band"].dropna(how="any")
@@ -195,7 +197,8 @@ class Dotplot:
                 if not ("bcaln","error") in track.layers.columns: 
                     continue
                 for aln_id, aln in track.alignments.iterrows():
-                    self._plot_errors(fig, legend, track.get_aln_layers(aln_id))
+                    layers = track.layers.loc[(slice(None),aln_id)].droplevel("aln_id")
+                    self._plot_errors(fig, legend, layers)
 
         if len(hover_data) > 0:
             hover_data = pd.concat(hover_data, axis=1)

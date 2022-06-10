@@ -302,18 +302,18 @@ class AlnTrack:
 
     def calc_layers(self, layers):
         for group, layer in layers:
-            if not group in self.layers or not layer in self.layers[group].columns:
+            if not (group, layer) in self.layers.columns:
                 meta = LAYERS[group][layer]
 
                 #Make sure layer dependencies exist
-                if not self.empty and (meta.deps is None or len(self.layers.columns.intersection(meta.deps)) == len(meta.deps)):
-                    fn = meta.fn
-                    if fn is None:
-                        raise ValueError("Layer not found: {group}.{layer}")
-                    vals = fn(self)
-                    self.layers[group,layer] = vals
-                else:
-                    self.layers[group,layer] = pd.NA
+                #if not self.empty and (meta.deps is None or len(self.layers.columns.intersection(meta.deps)) == len(meta.deps)):
+                fn = meta.fn
+                if fn is None:
+                    raise ValueError("Layer not found: {group}.{layer}")
+                vals = fn(self)
+                self.layers[group,layer] = vals
+            #else:
+            #    print("NO", group, layer)
 
     def load_mat(self):
         df = self.layers.copy()
@@ -337,21 +337,6 @@ class AlnTrack:
         self.mat = self.mat.iloc[order]
         self.alignments = self.alignments.iloc[order]
 
-    def get_aln_layers(self, aln_id, group=None, layers=None, drop_level=True):
-        if aln_id not in self.layers.index.get_level_values("aln_id"):
-            return None
-
-        if layers is not None:
-            self.calc_layers([(group, layer) for layer in layers])
-
-        df = self.layers.xs(aln_id, level="aln_id", drop_level=drop_level)#.set_index(self.layer_refs)
-
-        if group is None:
-            return df
-        if layers is None:
-            return df[group]
-        return df[group][layers]
-
     def cmp(self, other, calc_jaccard, calc_mean_ref_dist):
         groups_b = other.alignments.groupby("read_id")
 
@@ -362,7 +347,8 @@ class AlnTrack:
 
         for id_a, aln_a in self.alignments.iterrows():
             read_id = aln_a["read_id"]
-            dtw_a = self.get_aln_layers(id_a, "dtw", ["start","end"], False)
+            self.calc_layers([("dtw","end")])
+            dtw_a = self.layers.loc[(slice(None),id_a),"dtw"][["start","end"]]
 
             for id_b, aln_b in groups_b.get_group(read_id).iterrows():
                 self._compare_alns(dtw_a, other, id_b, "dtw", df, calc_jaccard, calc_mean_ref_dist)
@@ -380,7 +366,9 @@ class AlnTrack:
         )
 
         for id_a, aln_a in self.alignments.iterrows():
-            dtw = self.get_aln_layers(id_a, "dtw", ["start","end"], False)
+            self.calc_layers([("dtw","end")])
+            dtw = self.layers.loc[(slice(None),id_a),"dtw"][["start","end"]]
+
             if dtw is None:
                 continue
 
@@ -395,9 +383,13 @@ class AlnTrack:
         return df.set_index(["aln_b", "group_b"], append=True)
 
     def _compare_alns(self, aln_a, other, id_b, group, df, calc_jaccard=True, calc_mean_ref_dist=True):
-        aln_b = other.get_aln_layers(id_b, group, ["start","end"], False) \
-                     .reset_index(level="aln_id") \
-                     .rename(columns={"aln_id" : "aln_b"})
+
+        other.calc_layers([(group,"end")])
+
+        aln_b = other.layers \
+                   .loc[(slice(None),id_b),group][["start","end"]] \
+                   .reset_index(level="aln_id") \
+                   .rename(columns={"aln_id" : "aln_b"})
 
         alns_a = aln_a.index.unique(1)
         if len(alns_a) != 1:
@@ -413,14 +405,11 @@ class AlnTrack:
                 df = df[(df["mref"] >= self.coords.mrefs.min()) & (df["mref"] <= self.coords.mrefs.max())]
                 df["ref"] = self.coords.mref_to_ref(df["mref"])
                 df.sort_values("ref", inplace=True)
-            #if has_mref:
-            #    df["ref"] = df["mref"]
+
             if len(df) > 1 and df["start"].iloc[0] > df["start"].iloc[1]:
                 end = -df["start"]
                 df["start"] = -df["end"]
                 df["end"] = end
-                #if has_mref:
-                #    df["ref"] = -df["ref"]
             return AlnCoords(df)
             #return _AlnCoords(df[_AlnCoords.columns].to_records(index=False))
         
@@ -439,91 +428,6 @@ class AlnTrack:
             cmp_df = cmp_df.set_index(["ref","aln_id"])
         df["jaccard"] = cmp_df["jaccard"]
         df["mean_ref_dist"] = cmp_df["mean_ref_dist"]
-
-    def _compare_alns_old(self, aln_a, other, id_b, group, df, calc_jaccard=True, calc_mean_ref_dist=True):
-        aln_b = other.get_aln_layers(id_b, group, ["start","end"], False) \
-                     .reset_index(level="aln_id") \
-                     .rename(columns={"aln_id" : "aln_b"})
-        #if group == "bcaln":
-        #    aln_b.index = aln_b.index+1
-
-        t = time.time()
-
-        def coords(df):
-            df = df.dropna().reset_index()
-            if df.loc[0,"start"] > df.loc[1,"start"]:
-                end = -df["start"]
-                df["start"] = -df["end"]
-                df["end"] = end
-            return _AlnCoords(df[_AlnCoords.names].to_records(index=False))
-        
-        coords_a = coords(aln_a)
-        coords_b = coords(aln_b)
-        
-        compare = Compare(coords_a, coords_b)
-
-        t = time.time()
-
-
-        merge = aln_a.join(aln_b, on="ref", lsuffix="_a", rsuffix="_b") \
-                     .dropna(how="all")
-                     
-        starts = merge[["start_a", "start_b"]]
-        ends = merge[["end_a", "end_b"]]
-
-
-        df.loc[merge.index, "aln_b"] = merge["aln_b"].astype("Int32")
-
-        if calc_jaccard:
-            df.loc[merge.index, "jaccard"] = 1 - (
-                (ends.min(axis=1) - starts.max(axis=1)).clip(0) /
-                (ends.max(axis=1) - starts.min(axis=1)))
-        #else:
-        #    jaccard = pd.NA
-
-        if calc_mean_ref_dist:
-            intvs_a = pd.IntervalIndex.from_arrays(merge["start_a"], merge["end_a"])
-            intvs_b = pd.IntervalIndex.from_arrays(merge["start_b"], merge["end_b"])
-
-            mean_ref_dist = pd.Series(index=merge.index)
-            refs = merge.index.get_level_values(0)
-
-            def weighted_dist(idxs, idx_b, swap):
-                if swap:
-                    a = "b"
-                    b = "a"
-                else:
-                    a = "a"
-                    b = "b"
-                coord_a = merge.loc[idxs]
-                coord_b = merge.loc[idx_b]
-                samp_overlaps = coord_a["end_"+a].clip(upper=coord_b["end_"+b]) - coord_a["start_"+a].clip(lower=coord_b["start_"+b])
-                ref_dists = np.abs(idxs.get_level_values(0).to_numpy()-idx_b[0])
-                return np.sum(samp_overlaps), np.sum(ref_dists * samp_overlaps)
-
-            for i,idx in enumerate(merge.index):
-                ref,_ = idx
-
-                if not pd.isnull(intvs_b[i]):
-                    ovr_a = merge.index[intvs_a.overlaps(intvs_b[i])]
-                    weight_a, sum_a = weighted_dist(ovr_a,idx, False)
-                else:
-                    weight_a = sum_a = 0
-
-                if not pd.isnull(intvs_a[i]):
-                    ovr_b = merge.index[intvs_b.overlaps(intvs_a[i])]
-                    weight_b, sum_b = weighted_dist(ovr_b,idx, True)
-                else:
-                    weight_b = sum_b = 0
-
-                if weight_a + weight_b > 0:
-                    mean_ref_dist[idx] = (sum_a+sum_b) / (weight_a+weight_b)
-
-            df.loc[merge.index, "mean_ref_dist"] = mean_ref_dist
-        #cpp = pd.DataFrame(compare.to_numpy()).dropna(axis=1, how="all").set_index("ref")["mean_ref_dist"]
-        #py = df.dropna(axis=1).reset_index(level=1)["mean_ref_dist"]
-        #diffs = (cpp-py).abs()
-        #bad = diffs[diffs > 0.5].index
 
     @property
     def read_ids(self):
