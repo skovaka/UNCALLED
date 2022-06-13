@@ -88,7 +88,7 @@ class Bcaln:
         else:
             self.coords = self.paf_coords
 
-        self.df = df
+        self.df = df.iloc[2:-2]
 
 
     @property

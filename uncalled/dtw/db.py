@@ -115,7 +115,7 @@ class Eventalign(TrackIO):
         self.tracks.append(t)
 
     #def write_dtw_events(self, track, events):
-    def write_layers(self, df, index=["mref","aln_id"]):
+    def write_layers(self, df, index=["pac","aln_id"]):
         for group in df.columns.levels[0]:
             if group == "dtw":
                 break
@@ -123,21 +123,15 @@ class Eventalign(TrackIO):
 
         track = self.tracks[0]
 
-        mrefs = df.index.get_level_values(0)
-        events = df[group].set_index(track.coords.mref_to_ref(mrefs))
+        pacs = df.index.get_level_values(0)
+        events = df[group].set_index(track.coords.pac_to_ref(pacs))
 
         contig = track.coords.ref_name
 
-        #if "mref" in events.columns:
-        #    mrefs = events["mref"]
-        #else:
-        #    if "ref" in events.columns:
-        #        events.set_index("ref")
-        #    mrefs = track.coords.ref_to_mref(events.index)
-
         model = track.model
 
-        kmers = track.coords.kmers[mrefs]
+        #kmers = track.coords.kmers[mrefs]
+        kmers = track.layers["dtw","kmers"]
         if self.conf.is_rna:
             kmers = model.kmer_rev(kmers)
         model_kmers = model.kmer_to_str(kmers)
@@ -158,11 +152,9 @@ class Eventalign(TrackIO):
         eventalign = pd.DataFrame(
             data = {
                 "contig" : track.coords.ref_name,
-                #"position" : track.coords.mref_to_ref(events.index)-2,
                 "position" : events.index-2,
                 "reference_kmer" : ref_kmers,
                 "read_index" : self.prev_aln_id,
-                #"read_name" : read_id,
                 "strand" : "t",
                 "event_index" : pd.RangeIndex(0,len(events))[::-1]+1,
                 "event_level_mean" : events["current"],
@@ -230,7 +222,7 @@ class TrackHDF5(TrackIO):
     def init_read(self, read_id, fast5_id):
         pass 
 
-    def write_layers(self, df, index=["mref","aln_id"]):
+    def write_layers(self, df, index=["pac","aln_id"]):
         pass 
 
     def get_fast5_index(self, track_id=None):
@@ -245,7 +237,7 @@ class TrackHDF5(TrackIO):
     def query_compare(self, layers, track_id=None, coords=None, aln_id=None):
         pass
 
-    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, order=["mref"], chunksize=None, full_overlap=False):
+    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, order=["pac"], chunksize=None, full_overlap=False):
         pass
 
 def _db_track_split(db_str):
@@ -288,13 +280,13 @@ class TrackSQL(TrackIO):
     def close(self):
         if self.open:
             self.cur.execute("CREATE INDEX IF NOT EXISTS aln_read_idx ON alignment (read_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (mref, aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (pac, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_aln_idx ON dtw (aln_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (mref, aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (pac, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_aln_idx ON bcaln (aln_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS band_idx ON band (mref, aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS band_idx ON band (pac, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS band_aln_idx ON band (aln_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (mref, aln_a, aln_b, group_b);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (pac, aln_a, aln_b, group_b);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_aln_idx ON cmp (aln_a);")
             self.con.close()
             self.open = False
@@ -336,7 +328,7 @@ class TrackSQL(TrackIO):
             );""")
         self.cur.execute("""
             CREATE TABLE IF NOT EXISTS dtw (
-                mref INTEGER,
+                pac INTEGER,
                 aln_id INTEGER,
                 start INTEGER,
                 length INTEGER,
@@ -347,7 +339,7 @@ class TrackSQL(TrackIO):
             );""")
         self.cur.execute("""
             CREATE TABLE IF NOT EXISTS bcaln (
-                mref INTEGER,
+                pac INTEGER,
                 aln_id INTEGER,
                 start INTEGER,
                 length INTEGER,
@@ -357,7 +349,7 @@ class TrackSQL(TrackIO):
             );""")
         self.cur.execute("""
             CREATE TABLE IF NOT EXISTS cmp (
-                mref INTEGER,
+                pac INTEGER,
                 aln_a INTEGER,
                 aln_b INTEGER,
                 group_b TEXT DEFAULT "dtw",
@@ -369,8 +361,8 @@ class TrackSQL(TrackIO):
         self.cur.execute("""
             CREATE TABLE IF NOT EXISTS band (
                 aln_id INTEGER,
-                mref INTEGER,
-                mref_end INTEGER,
+                pac INTEGER,
+                pac_end INTEGER,
                 sample_start INTEGER,
                 sample_end INTEGER,
                 FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE
@@ -461,7 +453,7 @@ class TrackSQL(TrackIO):
     def init_read(self, read_id, fast5_id):
         self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
 
-    def write_layers(self, df, index=["mref","aln_id"]):
+    def write_layers(self, df, index=["pac","aln_id"]):
         for group in df.columns.levels[0]:
             df[group].to_sql(
                 group, self.con, 
@@ -536,7 +528,7 @@ class TrackSQL(TrackIO):
     def query_compare(self, layers, track_id=None, coords=None, aln_id=None):
         dtw = False
         bcaln = False
-        fields = {"mref", "aln_a", "aln_b", "group_b"}
+        fields = {"pac", "aln_a", "aln_b", "group_b"}
         for group,layer in layers:
             if group == "cmp": dtw = True
             if group == "bc_cmp": bcaln = True
@@ -560,24 +552,18 @@ class TrackSQL(TrackIO):
         self._add_where(wheres, params, "aln_a", aln_id)
 
         if coords is not None:
-            if coords.stranded:
-                wheres.append("(mref >= ? AND mref <= ?)")
-                params += [str(coords.mrefs.min()), str(coords.mrefs.max())]
-            else:
-                wheres.append("((mref >= ? AND mref <= ?) OR (mref >= ? AND mref <= ?))")
-
-                params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
-                params += [str(coords.mrefs[False].min()), str(coords.mrefs[False].max())]
+            wheres.append("(pac >= ? AND pac <= ?)")
+            params += [str(coords.pacs.min()), str(coords.pacs.max())]
 
         query = self._join_query(select, wheres)
 
         return pd.read_sql_query(
             query, self.con, 
-            index_col=["mref", "aln_a", "aln_b", "group_b"], 
+            index_col=["pac", "aln_a", "aln_b", "group_b"], 
             params=params)
 
 
-    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, order=["mref"], chunksize=None, full_overlap=False):
+    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, order=["fwd","pac"], chunksize=None, full_overlap=False):
 
 
         group_layers = collections.defaultdict(list)
@@ -595,34 +581,30 @@ class TrackSQL(TrackIO):
             if group not in tables:
                 tables.append(group)
 
-        fields += ["%s.%s AS idx_%s" % (tables[0],idx,idx) for idx in ("mref", "aln_id")]
+        fields += ["%s.%s AS idx_%s" % (tables[0],idx,idx) for idx in ("pac", "aln_id")]
+        fields.append("fwd")
 
         select = "SELECT " + ", ".join(fields) + " FROM " + tables[0]
         for table in tables[1:]:
-            select += " LEFT JOIN %s ON %s.aln_id == idx_aln_id AND %s.mref == idx_mref" % ((table,)*3)
+            select += " LEFT JOIN %s ON %s.aln_id == idx_aln_id AND %s.pac == idx_pac" % ((table,)*3)
 
         wheres = list()
         params = list()
 
-        if track_id is not None or read_id is not None:
-            select += " JOIN alignment ON id = idx_aln_id"
-            if track_id is not None:
-                self._add_where(wheres, params, "track_id", track_id)
-            if read_id is not None:
-                self._add_where(wheres, params, "read_id", read_id)
+        #if track_id is not None or read_id is not None or "fwd" in order:
+        select += " JOIN alignment ON id = idx_aln_id"
+        if track_id is not None:
+            self._add_where(wheres, params, "track_id", track_id)
+        if read_id is not None:
+            self._add_where(wheres, params, "read_id", read_id)
 
         if "cmp" in group_layers:
             self._add_where(wheres, params, "group_b", "bcaln")
 
         if coords is not None:
-            if coords.stranded:
-                wheres.append("(idx_mref >= ? AND idx_mref <= ?)")
-                params += [str(coords.mrefs.min()), str(coords.mrefs.max())]
-            else:
-                wheres.append("((idx_mref >= ? AND idx_mref <= ?) OR (idx_mref >= ? AND idx_mref <= ?))")
+            wheres.append("(idx_pac >= ? AND idx_pac <= ?)")
+            params += [str(coords.pacs.min()), str(coords.pacs.max())]
 
-                params += [str(coords.mrefs[True].min()), str(coords.mrefs[True].max())]
-                params += [str(coords.mrefs[False].min()), str(coords.mrefs[False].max())]
             if full_overlap:
                 wheres.append("ref_name = ? AND ref_start < ? AND ref_end > ?")
                 params.append(coords.ref_name)
@@ -630,11 +612,11 @@ class TrackSQL(TrackIO):
 
         self._add_where(wheres, params, "idx_aln_id", aln_id)
 
-        query = self._join_query(select, wheres, ["idx_"+o if o in {"aln_id","mref"} else o for o in order])
+        query = self._join_query(select, wheres, ["idx_"+o if o in {"aln_id","pac"} else o for o in order])
 
         ret = pd.read_sql_query(
             query, self.con, 
-            index_col=["idx_mref", "idx_aln_id"], 
+            index_col=["fwd", "idx_pac", "idx_aln_id"], 
             params=params, chunksize=chunksize)
 
         def make_groups(df):
@@ -643,7 +625,7 @@ class TrackSQL(TrackIO):
                 gdf = df[layers]
                 grouped[group] = df[layers].rename(columns=renames)
             df = pd.concat(grouped, names=("group", "layer"), axis=1)
-            df.index.names = ("mref", "aln_id")
+            df.index.names = ("fwd", "pac", "aln_id")
             return df
                 
         if chunksize is None:
@@ -800,22 +782,22 @@ def merge(conf):
         db.cur.execute(query)
 
         query = "INSERT INTO dtw "\
-               f"SELECT mref,aln_id+{aln_shift},start,length,current,stdv,kmer "\
+               f"SELECT pac,aln_id+{aln_shift},start,length,current,stdv,kmer "\
                 "FROM input.dtw"
         db.cur.execute(query)
 
         query = "INSERT INTO bcaln "\
-               f"SELECT mref,aln_id+{aln_shift},start,length,bp,error "\
+               f"SELECT pac,aln_id+{aln_shift},start,length,bp,error "\
                 "FROM input.bcaln"
         db.cur.execute(query)
 
         query = "INSERT INTO band "\
-               f"SELECT aln_id+{aln_shift},mref,mref_end,sample_start,sample_end "\
+               f"SELECT aln_id+{aln_shift},pac,pac_end,sample_start,sample_end "\
                 "FROM input.band"
         db.cur.execute(query)
 
         query = "INSERT INTO cmp "\
-               f"SELECT mref,aln_a+{aln_shift},aln_b+{aln_shift},group_b,mean_ref_dist,jaccard "\
+               f"SELECT pac,aln_a+{aln_shift},aln_b+{aln_shift},group_b,mean_ref_dist,jaccard "\
                 "FROM input.cmp"
         db.cur.execute(query)
 

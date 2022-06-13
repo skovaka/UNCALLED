@@ -189,18 +189,19 @@ def tombo(conf):
         coords = tracks.index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True, kmer_trim=True)
         aln_id,_ = tracks.write_alignment(read.read_id, fast5_name, coords)
 
-        tombo_events = pd.DataFrame(np.array(handle["Events"])).iloc[clip:]
+        tombo_events = pd.DataFrame(np.array(handle["Events"]))#.iloc[clip:]
+
+        print(coords)
+        print(end-start)
         
         if not ref_bounds.fwd:
             tombo_events = tombo_events[::-1]
             
-
         tombo_start = handle["Events"].attrs["read_start_rel_to_raw"]
         
         raw_len = len(read.get_raw_data())
         starts = tombo_events["start"]
 
-        kmers = coords.kmers#.sort_index()
 
         lengths = tombo_events["length"]
         currents = tombo_events["norm_mean"]
@@ -209,16 +210,23 @@ def tombo(conf):
             starts = raw_len - tombo_start - starts - tombo_events["length"]
 
         #if is_rna == ref_bounds.fwd:
+        refs = coords.refs[2:-2]
+        #kmers = coords.ref_kmers.droplevel(0).loc[coords.refs]
+        #print(list(model.kmer_to_str(coords.kmers)[:10]))
+        #print(list(tombo_events["base"][:15]))
+        #print(len(coords.refs), len(coords.mrefs), len(coords.kmers), len(starts))
+        #print(coords.refs)
 
         #TODO store scaling factors in pore model
         currents = currents * 10.868760552593136 + 91.25486108714513
 
         df = pd.DataFrame({
-                "mref" : kmers.index,
+                #"ref" : coords.refs,
                 "start"  : starts,
                 "length" : lengths,
-                "current"   : currents
-             }).set_index("mref")
+                "current"   : currents,
+                "kmer" : coords.kmers.reset_index(drop=True)
+             }, index=refs)#.set_index("refs")
 
         tracks.write_layers("dtw", df, aln_id=aln_id)
 

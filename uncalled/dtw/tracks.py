@@ -287,14 +287,21 @@ class Tracks:
         self.write_layers("dtw", events, track_name, aln_id, overwrite)
         
     def write_layers(self, group, layers=None, track_name=None, aln_id=None, overwrite=False):
-
         track = self._track_or_default(track_name)
+
+        if layers.index.names[0] == "mref":
+            layers = layers.rename(index=self.index.mref_to_ref, level=0)
+        elif layers.index.names[0] == "pac":
+            layers = layers.rename(index=self.index.pac_to_ref, level=0)
+
+        layers.index.names = ("ref",)
+
         if layers is not None:
             df = track.add_layer_group(group, layers, aln_id, overwrite)
         else:
             df = track.layers[group]
 
-        self.output.write_layers(df)
+        self.output.write_layers(df.rename(index=track.coords.ref_to_pac, level=0))
 
     def write_alignment(self, read_id, fast5, coords, layers={}, track_name=None):
         track = self._track_or_default(track_name)
@@ -427,7 +434,7 @@ class Tracks:
         if load_mat is None:
             load_mat = self.prms.load_mat
 
-        layers = self.input.query_layers(self.db_layers, self._aln_track_ids, self.coords, full_overlap=full_overlap, read_id=read_filter)
+        layers = self.input.query_layers(self.db_layers, self._aln_track_ids, self.coords, full_overlap=full_overlap, read_id=read_filter).droplevel(0)
 
         ids = layers.index.get_level_values("aln_id").unique().to_numpy()
 
@@ -471,8 +478,8 @@ class Tracks:
         for track in self.alns:
             def _add_group(group, df):
                 df = df.reset_index(["aln_b", "group_b"])
-                df = df[df.index.get_level_values("mref").isin(track.layer_mrefs)]
-                df.rename(index=track.coords.mref_to_ref, level=0, inplace=True)
+                df = df[df.index.get_level_values("pac").isin(track.layer_pacs)]
+                df.rename(index=track.coords.pac_to_ref, level=0, inplace=True)
                 df.index.names = ["ref", "aln_id"]
                 df = pd.concat({group : df.reindex(track.layers.index)}, axis=1)
                 track.layers = pd.concat([track.layers, df], axis=1).dropna(axis=1,how="all")
@@ -519,14 +526,14 @@ class Tracks:
 
         if save:
             if "ref" in df.index.names:
-                df.rename(index=lambda r: alns[0].coords.ref_to_mref(r, alns[0].all_fwd), level=0, inplace=True)
+                df.rename(index=lambda r: alns[0].coords.ref_to_pac(r), level=0, inplace=True)
             if self.output is None:
                 output = self.input
             else:
                 output = self.output
             output.write_layers( #TODO be explicit that output = input
                 pd.concat({"cmp" : df}, names=["group", "layer"], axis=1), 
-                index=["mref", "aln_a", "aln_b", "group_b"])
+                index=["pac", "aln_a", "aln_b", "group_b"])
         #else:
         #    print(df.to_csv(sep="\t"))
         t = time.time()
@@ -613,44 +620,49 @@ class Tracks:
             self.db_layers, 
             self._aln_track_ids, 
             coords=coords, 
-            order=["mref"],
+            order=["fwd","pac"],
             chunksize=self.prms.io.ref_chunksize)
 
         t0 = time.time()
 
-        def get_full_coords(mref):
-            chunk_refs = self.index.mrefs_to_ref_coord(mref, mref, not self.conf.is_rna)
-            seq_refs = RefCoord(chunk_refs.name, 0, chunk_refs.ref_len, chunk_refs.fwd)
+        def get_full_coords(idx):
+            fwd = idx[0]
+            pac = idx[1]
+            rid = self.pac_to_ref_id(pac)
+            ref_len = self.get_ref_len(rid)
+            ref_name = self.get_ref_name(rid)
+            seq_refs = RefCoord(ref_name, 0, ref_len, fwd)
             return self.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=False)
 
-        def next_coords(seq_coords, mrefs):
-            if len(mrefs) > 1:
-                mrefs = mrefs[:-1]
+        def next_coords(seq_coords, idx):
+            if len(idx) > 1:
+                idx = idx[:-1]
 
-            coords = seq_coords.mref_intersect(mrefs)
+            coords = seq_coords.pac_intersect(idx)
             if coords is None:
-                seq_coords = get_full_coords(mrefs[0])
-                coords = seq_coords.mref_intersect(mrefs)
+                seq_coords = get_full_coords(idx[0])
+                coords = seq_coords.pac_intersect(idx)
 
             return seq_coords, coords
 
         chunk = next(layer_iter)
-        seq_coords = get_full_coords(chunk.index.get_level_values("mref")[0])
+        seq_coords = get_full_coords(chunk.index[0])
 
         t0 = time.time()
                 
         while len(chunk) > 0:
 
-            if len(chunk.index.get_level_values("mref").unique()) <= 1:
+            if len(chunk.index.get_level_values("pac").unique()) <= 1:
                 chunk = pd.concat([chunk, next(layer_iter, pd.DataFrame())])
 
-            chunk_mrefs = chunk.index.get_level_values("mref").unique()
+            coord_idx = chunk.index.droplevel("aln_id").unique()
+            #chunk_mrefs = chunk.index.get_level_values("pac").unique()
 
-            seq_coords, coords = next_coords(seq_coords, chunk_mrefs)
+            seq_coords, coords = next_coords(seq_coords, chunk.index)
 
             coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
 
-            i = chunk_mrefs.difference(coords.mrefs)
+            i = coord_idx.get_level_values(1).difference(coords.pacs)
             leftovers = chunk.loc[i]
             layers = chunk.drop(index=i)
 
@@ -663,9 +675,6 @@ class Tracks:
 
             if not ret.all_empty:
                 yield ret
-
-    def _mref_to_coords(self, mref):
-        pass
 
     def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
         
@@ -713,7 +722,7 @@ class Tracks:
             read_id=reads,
             coords=self.coords, 
             full_overlap=full_overlap, 
-            order=["read_id", "mref"],
+            order=["read_id", "fwd", "pac"],
             chunksize=self.prms.io.ref_chunksize)
 
         t = time.time()
@@ -771,20 +780,22 @@ class Tracks:
 
             mask = track_covs >= self.prms.min_coverage
             if not np.any(mask):
-                mrefs = pd.Index([])
+                idx = pd.Index([])
             elif self.prms.shared_refs_only:
                 track_counts = pd.MultiIndex.from_tuples(track_covs[mask].index) \
-                                   .get_level_values(0) \
+                                   .droplevel("aln_id") \
                                    .value_counts()
 
-                mrefs = track_counts.index[track_counts == len(self.alns)]
+                idx = track_counts.index[track_counts == len(self.alns)]
             else:
-                mrefs = track_covs[mask].index.get_level_values(0).unique()
+                idx = track_covs[mask].index.droplevel("aln_id").unique()
 
             
-            layers = layers.loc[(mrefs,slice(None))]
+            layers = layers.loc[idx+(slice(None),)]
             layer_alns = layers.index.get_level_values("aln_id")
             alignments = alignments.loc[layer_alns.unique()]
+
+        layers = layers.droplevel(0)
 
         aln_groups = alignments.groupby("track_id").groups
         for parent in self.alns:

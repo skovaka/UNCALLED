@@ -280,6 +280,14 @@ class RefIndex {
         return -1;
     }
 
+    i32 mref_to_ref_id(i64 mref) {
+        return pac_to_ref_id(mref_to_pac(mref));
+    }
+
+    i32 pac_to_ref_id(i64 pac) {
+        return bns_pos2rid(bns_, pac);
+    }
+
     bool is_mref_flipped(i64 i) const {
         return i >= static_cast<i32>(size() / 2);
     }
@@ -293,11 +301,6 @@ class RefIndex {
             return size() - mref + 1;
         }
         return mref;
-    }
-
-    i32 get_ref_id(i64 ref) {
-        auto pac = mref_to_pac(ref);
-        return bns_pos2rid(bns_, pac);
     }
 
     std::string get_ref_name(u32 rid) {
@@ -599,6 +602,8 @@ class RefIndex {
         PY_BWA_INDEX_METH(get_base_range);
         PY_BWA_INDEX_METH(fm_to_pac);
         PY_BWA_INDEX_METH(fm_to_mref);
+        PY_BWA_INDEX_METH(mref_to_pac);
+        PY_BWA_INDEX_METH(ref_to_pac);
         PY_BWA_INDEX_METH(size);
         PY_BWA_INDEX_METH(mrefs_to_ref_coord);
         PY_BWA_INDEX_METH(get_seqs);
@@ -611,7 +616,8 @@ class RefIndex {
         PY_BWA_INDEX_METH(is_mref_fwd);
         PY_BWA_INDEX_METH(is_mref_flipped);
         PY_BWA_INDEX_VEC(get_base);
-        c.def("get_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::get_ref_id) );
+        c.def("pac_to_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::pac_to_ref_id) );
+        c.def("mref_to_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::mref_to_ref_id) );
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(const std::string &)> (&RefIndex::get_ref_id));
         //c.def("get_kmers_new", &RefIndex::get_kmers_new);
         c.def("ref_to_mref", static_cast<std::pair<i64, i64> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::ref_to_mref));

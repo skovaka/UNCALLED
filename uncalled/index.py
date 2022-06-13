@@ -39,18 +39,30 @@ from .argparse import Opt
 
 class CoordSpace:
 
-    def __init__(self, ref_name, refs, mrefs, fwd, kmers):
+    def __init__(self, ref_name, refs, mrefs, fwd, kmers, pac_shift):
         self.ref_name = ref_name
         self.refs = refs
         self.mrefs = mrefs
         self.fwd = fwd
+        self.pac_shift = pac_shift
+        self.pacs = refs + pac_shift
 
         self.set_kmers(kmers)
 
-        if self.stranded and not isinstance(mrefs, pd.Index):
-            raise ValueError("mrefs must be pandas.Index for stranded CoordSpace")
+        if self.stranded:
+            #if mrefs.step < 0:
+            #    self.refs = self.refs[::-1]
+            #    self.pacs = self.pacs[::-1]
+            if not isinstance(mrefs, pd.Index):
+                raise ValueError("mrefs must be pandas.Index for stranded CoordSpace")
         if not self.stranded and not isinstance(mrefs, tuple):
             raise ValueError("mrefs must be tuple for stranded CoordSpace")
+
+    def pac_to_ref(self, pac):
+        return pac - self.pac_shift
+
+    def ref_to_pac(self, ref):
+        return ref + self.pac_shift
 
     def set_kmers(self, kmers):
         self.kmers = kmers
@@ -119,6 +131,22 @@ class CoordSpace:
 
         return self._slice(st,en,fwd_in)
 
+    def pac_intersect(self, coords):
+        if self.stranded:
+            pacs = coords[coords.get_loc(self.fwd)].get_level_values(1)
+        else:
+            pacs = coords.get_level_values(1)
+
+        minmax = self._minmax_intersect(self.pacs, pacs)
+        if np.any(np.isnan(minmax)):
+            return None
+        bounds = self.pacs.get_indexer(minmax)
+
+        st,en = sorted(bounds)
+        en += 1
+
+        return self._slice(st,en,self.fwd)
+
     def _slice(self, st, en, fwd=None):
         refs = self.refs[st:en]
 
@@ -140,7 +168,7 @@ class CoordSpace:
 
         #elif not stranded_out:
 
-        return CoordSpace(self.ref_name, refs, mrefs, fwd, kmers)
+        return CoordSpace(self.ref_name, refs, mrefs, fwd, kmers, self.pac_shift)
 
     def ref_to_mref(self, ref, fwd=None):
         if isinstance(ref, (collections.abc.Sequence, np.ndarray, pd.Index)):
@@ -348,8 +376,9 @@ class RefIndex:
 
         fwd = ref_coord.fwd if ref_coord.stranded else None 
 
+        pac_shift = self.get_pac_shift(ref_coord.name)
 
-        return CoordSpace(ref_coord.name, refs, mrefs, fwd, kmers)
+        return CoordSpace(ref_coord.name, refs, mrefs, fwd, kmers, pac_shift)
 
 _index_cache = dict()
 

@@ -32,7 +32,7 @@ LayerMeta = namedtuple("LayerMeta", ["type", "label", "fn", "deps"], defaults=[N
 LAYERS = {
     "ref" : {
         "coord" : LayerMeta(int, "Reference Coordinate", 
-            lambda track: track.coords.mref_to_ref(track.layer_mrefs)),
+            lambda track: track.coords.pac_to_ref(track.layer_pacs)),
         "name" : LayerMeta(str, "Reference Name",
             lambda track: [track.coords.ref_name]*len(track.layers)),
         "fwd" : LayerMeta(bool, "Is on fwd strand",
@@ -71,10 +71,10 @@ LAYERS = {
         "bp" : LayerMeta(int, "Basecaller Base Index"),
         "error" : LayerMeta(str, "Basecalled Alignment Error"),
     }, "band" : {
-        "mref_end" : LayerMeta(int, "Mirror Ref. End"),
+        "pac_end" : LayerMeta(int, "Mirror Ref. End"),
         "ref_end" : LayerMeta(int, "Mirror Ref. End",
-            lambda track: track.coords.mref_to_ref(track.layers["band","mref_end"]),
-            [("band", "mref_end")]),
+            lambda track: track.coords.pac_to_ref(track.layers["band","pac_end"]),
+            [("band", "pac_end")]),
         "sample_start" : LayerMeta(int, "Raw Sample Start"),
         "sample_end" : LayerMeta(int, "Raw Sample End"),
     }, "cmp" : {
@@ -199,8 +199,8 @@ class AlnTrack:
             raise ValueError("Must specify AlnTrack coords, alignments, and layers")
         self.alignments = self.alignments.sort_values(order)
 
-        if self.layers.index.names[0] == "mref":
-            self.layers = self.layers.rename(index=coords.mref_to_ref, level=0)
+        if self.layers.index.names[0] == "pac":
+            self.layers = self.layers.rename(index=coords.pac_to_ref, level=0)
             self.layers.index.names = ("ref", "aln_id")
 
             refs = self.layers.index.get_level_values(0)
@@ -273,7 +273,7 @@ class AlnTrack:
 
         df.index = pd.MultiIndex.from_product(
                         [df.index, [aln_id]], 
-                        names=["mref", "aln_id"])
+                        names=["ref", "aln_id"])
 
         if self.layers is None or overwrite:
             self.layers = df
@@ -309,6 +309,7 @@ class AlnTrack:
         #df["aln_id"] = df.index.get_level_values("aln_id")
         df = df.reset_index()
 
+        #print(df)
         self.mat = df.pivot(index="aln_id", columns=["ref"]) \
                      .rename_axis(("group","layer","ref"), axis=1) \
                      .sort_index(axis=1)
@@ -384,17 +385,10 @@ class AlnTrack:
         if len(alns_a) != 1:
             raise ValueError("Can only compare two alignments at a time")
         
-        has_mref = "mref" in aln_b.index.name
+        has_pac = "pac" in aln_b.index.name
 
         def coords(df, track):
             df = df.dropna().reset_index()
-            if not "ref" in df:
-                if not has_mref:
-                    raise ValueError("No reference coordinates in comparison coords")
-                df = df[(df["mref"] >= self.coords.mrefs.min()) & (df["mref"] <= self.coords.mrefs.max())]
-                df["ref"] = self.coords.mref_to_ref(df["mref"])
-                df.sort_values("ref", inplace=True)
-
             if len(df) > 1 and df["start"].iloc[0] > df["start"].iloc[1]:
                 end = -df["start"]
                 df["start"] = -df["end"]
@@ -404,15 +398,14 @@ class AlnTrack:
         
         coords_a = coords(aln_a, self)
         coords_b = coords(aln_b, other)
-
         
         compare = Compare(coords_a, coords_b)
         cmp_df = pd.DataFrame(compare.to_numpy()).dropna(how="all")
 
         cmp_df["aln_id"] = alns_a[0]
-        if has_mref:
-            cmp_df["mref"] = self.coords.ref_to_mref(pd.Index(cmp_df["ref"]))
-            cmp_df = cmp_df.set_index(["mref","aln_id"])
+        if has_pac:
+            cmp_df["pac"] = self.coords.ref_to_pac(pd.Index(cmp_df["ref"]))
+            cmp_df = cmp_df.set_index(["pac","aln_id"])
         else:
             cmp_df = cmp_df.set_index(["ref","aln_id"])
         df["jaccard"] = cmp_df["jaccard"]
@@ -427,15 +420,9 @@ class AlnTrack:
         return self.layers.index.get_level_values("aln_id")
 
     @property
-    def layer_mrefs(self):
-        mrefs = self.coords.ref_to_mref(self.layer_refs)
-        if self.coords.stranded:
-            return mrefs
-        else:
-            return mrefs[0].union(mrefs[1])
-        #return self.layers.index.get_level_values("mref")
+    def layer_pacs(self):
+        return self.coords.ref_to_pac(self.layer_refs)
 
     @property
     def layer_refs(self):
-        #return self.coords.mref_to_ref_index(self.layer_mrefs)
         return self.layers.index.get_level_values("ref")
