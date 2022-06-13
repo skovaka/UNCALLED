@@ -261,8 +261,8 @@ class TrackSQL(TrackIO):
         new_file = not os.path.exists(self.filename)
         self.con = sqlite3.connect(self.filename)
         self.cur = self.con.cursor()
-        #self.cur.execute("PRAGMA foreign_keys = ON")
-        #self.con.commit()
+        self.cur.execute("PRAGMA foreign_keys = ON")
+        self.con.commit()
         self.open = True
 
         #if new_file:

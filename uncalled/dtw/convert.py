@@ -189,13 +189,14 @@ def tombo(conf):
         coords = tracks.index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True, kmer_trim=True)
         aln_id,_ = tracks.write_alignment(read.read_id, fast5_name, coords)
 
-        tombo_events = pd.DataFrame(np.array(handle["Events"]))#.iloc[clip:]
+        tombo_events = np.array(handle["Events"])[clip:]
 
         print(coords)
         print(end-start)
+        print(tombo_events)
         
-        if not ref_bounds.fwd:
-            tombo_events = tombo_events[::-1]
+        #if not ref_bounds.fwd:
+        #    tombo_events = tombo_events[::-1]
             
         tombo_start = handle["Events"].attrs["read_start_rel_to_raw"]
         
@@ -211,7 +212,7 @@ def tombo(conf):
 
         #if is_rna == ref_bounds.fwd:
         refs = coords.refs[2:-2]
-        #kmers = coords.ref_kmers.droplevel(0).loc[coords.refs]
+        kmers = coords.ref_kmers.droplevel(0).loc[refs]
         #print(list(model.kmer_to_str(coords.kmers)[:10]))
         #print(list(tombo_events["base"][:15]))
         #print(len(coords.refs), len(coords.mrefs), len(coords.kmers), len(starts))
@@ -225,8 +226,13 @@ def tombo(conf):
                 "start"  : starts,
                 "length" : lengths,
                 "current"   : currents,
-                "kmer" : coords.kmers.reset_index(drop=True)
+                "kmer" : kmers
              }, index=refs)#.set_index("refs")
+
+        print(len(refs))
+        print(len(starts))
+        print(starts)
+        print(df)
 
         tracks.write_layers("dtw", df, aln_id=aln_id)
 
