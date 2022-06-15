@@ -60,6 +60,9 @@ from .config import Config
 config._DEFAULTS = Config()
 config.rc = Config()
 
+from .pore_model import PoreModel
+from .fast5 import Fast5Reader
+
 #SUBCMDS = [
 #    dtw, dotplot, sigplot, browser, convert, 
 #    (compare, COMPARE_OPTS), 

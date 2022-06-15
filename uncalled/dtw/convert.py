@@ -191,10 +191,6 @@ def tombo(conf):
 
         tombo_events = np.array(handle["Events"])[clip:]
 
-        print(coords)
-        print(end-start)
-        print(tombo_events)
-        
         #if not ref_bounds.fwd:
         #    tombo_events = tombo_events[::-1]
             
@@ -228,11 +224,6 @@ def tombo(conf):
                 "current"   : currents,
                 "kmer" : kmers
              }, index=refs)#.set_index("refs")
-
-        print(len(refs))
-        print(len(starts))
-        print(starts)
-        print(df)
 
         tracks.write_layers("dtw", df, aln_id=aln_id)
 

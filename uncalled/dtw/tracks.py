@@ -628,9 +628,9 @@ class Tracks:
         def get_full_coords(idx):
             fwd = idx[0]
             pac = idx[1]
-            rid = self.pac_to_ref_id(pac)
-            ref_len = self.get_ref_len(rid)
-            ref_name = self.get_ref_name(rid)
+            rid = self.index.pac_to_ref_id(pac)
+            ref_len = self.index.get_ref_len(rid)
+            ref_name = self.index.get_ref_name(rid)
             seq_refs = RefCoord(ref_name, 0, ref_len, fwd)
             return self.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=False)
 

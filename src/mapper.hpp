@@ -53,7 +53,7 @@
 
 class Mapper {
 
-    using ModelType = PoreModelK5;
+    using ModelType = PoreModel<5>;
     using KmerType = typename ModelType::kmer_t;
     static constexpr auto K = ModelType::KMER_LEN;
 

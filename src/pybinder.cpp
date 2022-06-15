@@ -24,6 +24,21 @@ std::vector<bool> unpack_moves(u64 moves, u8 length) {
     return ret;
 }
 
+template<size_t K>
+void pybind_kmer(py::module_ &m) {
+    std::string suffix = "K"+std::to_string(K);
+    PoreModel<K>::pybind_defs(m, suffix);
+    RefIndex<PoreModel<K>>::pybind_defs(m, suffix);//ref_index);
+    BandedDTW<PoreModel<K>>::pybind_defs(m, suffix);
+    StaticBDTW<PoreModel<K>>::pybind_defs(m, suffix);
+    GlobalDTW<PoreModel<K>>::pybind_defs(m, suffix);
+}
+
+template<size_t ...Ks>
+void pybind_kmers(py::module_ &m) {
+    ([&] {pybind_kmer<Ks>(m);} (), ...);
+}
+
 PYBIND11_MODULE(_uncalled, m) {
     m.doc() = R"pbdoc(UNCALLED: a Utility for Nanopore Current ALignment to Large Expanses of DNA)pbdoc";
 
@@ -50,8 +65,6 @@ PYBIND11_MODULE(_uncalled, m) {
     py::class_<Paf> paf(m, "Paf");
     Paf::pybind_defs(paf);
 
-    RefIndex<PoreModelK5>::pybind_defs(m, "K5");//ref_index);
-    RefIndex<PoreModelK10>::pybind_defs(m, "K10");//ref_index);
     RefCoord::pybind_defs(m);//ref_index);
 
     py::class_<ReadBuffer> read_buffer(m, "ReadBuffer");
@@ -87,20 +100,14 @@ PYBIND11_MODULE(_uncalled, m) {
     Range::pybind_defs(range);
 
     pybind_pore_model_params(m);
-    PoreModel<5>::pybind_defs(m, "K5");
-    PoreModel<10>::pybind_defs(m, "K10");
+
+    py::bind_vector<std::vector<u8>>(m, "ArrayU8", py::buffer_protocol());
+    py::bind_vector<std::vector<u16>>(m, "ArrayU16", py::buffer_protocol());
+    py::bind_vector<std::vector<u32>>(m, "ArrayU32", py::buffer_protocol());
+    pybind_kmers<4,5,6,7,8,9,10,11,12>(m);
 
     m.def("self_align", &self_align);
     m.def("unpack_moves", &unpack_moves);
-
-    BandedDTW<PoreModel<5>>::pybind_defs(m, "K5");
-    BandedDTW<PoreModel<10>>::pybind_defs(m, "K10");
-
-    StaticBDTW<PoreModel<5>>::pybind_defs(m, "K5");
-    StaticBDTW<PoreModel<10>>::pybind_defs(m, "K10");
-
-    GlobalDTW<PoreModel<5>>::pybind_defs(m, "K5");
-    GlobalDTW<PoreModel<10>>::pybind_defs(m, "K10");
 
     signal_processor_pybind(m);
 

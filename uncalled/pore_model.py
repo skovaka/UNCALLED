@@ -1,16 +1,24 @@
-import sys
-import time
-import glob
 import os
-import re
 from collections import Sequence
 
 import numpy as np
 import pandas as pd
 import h5py
 
-from _uncalled import PoreModelK5, PoreModelK10, PoreModelParams
+from _uncalled import PoreModelK4, PoreModelK5, PoreModelK6, PoreModelK7, PoreModelK8, PoreModelK9, PoreModelK10, PoreModelK11, PoreModelK12, PoreModelParams, ArrayU32, ArrayU16
 from . import config
+
+_MODEL_TYPES = {
+    4 : PoreModelK4,
+    5 : PoreModelK5,
+    6 : PoreModelK6,
+    7 : PoreModelK7,
+    8 : PoreModelK8,
+    9 : PoreModelK9,
+    10 : PoreModelK4,
+    11 : PoreModelK4,
+    12 : PoreModelK4,
+}
 
 #class PoreModel(_PoreModel):
 class PoreModel:
@@ -46,7 +54,6 @@ class PoreModel:
         if reverse is not None: prms.reverse = reverse
         if complement is not None: prms.complement = complement
 
-        #pd.DataFrame overrides
         if df is not None:
             vals = self._vals_from_df(df)
 
@@ -69,14 +76,15 @@ class PoreModel:
             )
 
         k = int(np.log2(len(vals)) / 2)
-        if k == 5:
-            self.ModelType = PoreModelK5
-            #self.kmer_dtype = "uint16"
-        elif k == 10:
-            self.ModelType = PoreModelK10
-            #self.kmer_dtype = "uint32"
-        else:
+        #if 
+        #if k == 5:
+        #    self.ModelType = PoreModelK5
+        #    #self.kmer_dtype = "uint16"
+        #elif k == 10:
+        #    self.ModelType = PoreModelK10
+        if not k in _MODEL_TYPES:
             raise ValueError(f"Invalid k-mer length: {k}\n")
+        self.ModelType = _MODEL_TYPES[k]
 
         self._init(name, vals, prms.reverse, prms.complement)
 
@@ -89,8 +97,10 @@ class PoreModel:
         self.KMER_STRS = self.kmer_to_str(self.KMERS)
         if self.K > 8:
             self.kmer_dtype = "uint32"
+            self.array_type = ArrayU32
         else:
             self.kmer_dtype = "uint16"
+            self.array_type = ArrayU16
 
 
     def _init_preset(self, prms):
@@ -148,11 +158,12 @@ class PoreModel:
                 raise RuntimeError("All k-mers must be %d bases long" % self.K)
 
             arr = self.str_to_kmer(arr)
-        return self.KmerArray(arr.astype(self.kmer_dtype))
+        return self.array_type(arr.astype(self.kmer_dtype))
         #return arr
 
     def kmer_to_str(self, kmer, dtype=str):
-        if isinstance(kmer, (Sequence, self.ModelType.KmerArray, np.ndarray, pd.Series)):
+        #, self.ModelType.KmerArray
+        if isinstance(kmer, (Sequence, np.ndarray, pd.Series)):
             return self.ModelType.kmer_to_arr(kmer).astype(dtype)
         return dtype(self.ModelType.kmer_to_str(kmer))
 

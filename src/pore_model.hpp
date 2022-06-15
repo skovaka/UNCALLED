@@ -46,6 +46,7 @@ PYBIND11_MAKE_OPAQUE(std::vector<u32>);
 //PYBIND11_MAKE_OPAQUE(std::vector<u32>);
 
 void pybind_pore_model_params(py::module_ &m);
+
 #endif
 
 using KmerLen = u8;
@@ -60,23 +61,21 @@ struct PoreModelParams {
     bool reverse, complement;
 };
 
-//extern const std::unordered_map<std::string, const std::vector<float> &> PORE_MODEL_PRESETS;
+extern const PoreModelParams PORE_MODEL_PRMS_DEF;
 
 using PresetMap = std::unordered_map<std::string, const std::vector<float> &>;
 
-
-template<KmerLen K, typename KmerType=typename std::conditional<(K <= 8), u16, u32>::type>
+template<KmerLen K, typename KmerType=typename std::conditional<(K < 8), u16, u32>::type>
 class PoreModel {
 
     public:
     static constexpr KmerType KMER_MASK = (1 << (2*K)) - 1,
                      KMER_COUNT = static_cast<KmerType>(pow(BASE_COUNT, K));
-    static constexpr u8 KMER_LEN = K;
-
+    static constexpr KmerLen KMER_LEN = K;
+    static const KmerLen SHIFT;
 
     using kmer_t = KmerType;
 
-    static const PoreModelParams PRMS_DEF;
     PoreModelParams PRMS;
     static const PresetMap PRESETS;
 
@@ -99,7 +98,7 @@ class PoreModel {
         }
     }
 
-    PoreModel() : PoreModel(PRMS_DEF) {
+    PoreModel() : PoreModel(PORE_MODEL_PRMS_DEF) {
     }
 
     PoreModel(const std::vector<float> &means_stdvs, bool reverse, bool complement) 
@@ -456,16 +455,14 @@ class PoreModel {
 
         py::class_<Class> c(m, ("PoreModel" + suffix).c_str());
 
-        c.def_readonly_static("PRMS_DEF", &Class::PRMS_DEF);
-
         c.def(pybind11::init<const Class &>());
         c.def(pybind11::init<PoreModelParams>());
         c.def(pybind11::init<const std::string &, bool, bool>(), 
-              py::arg("name"), py::arg("reverse")=PRMS_DEF.reverse, py::arg("complement")=PRMS_DEF.complement);
+              py::arg("name"), py::arg("reverse")=PORE_MODEL_PRMS_DEF.reverse, py::arg("complement")=PORE_MODEL_PRMS_DEF.complement);
         c.def(pybind11::init<const std::vector<float> &, bool, bool>(), 
-              py::arg("vals"), py::arg("reverse")=PRMS_DEF.reverse, py::arg("complement")=PRMS_DEF.complement);
-
-		py::bind_vector<std::vector<KmerType>>(c, "KmerArray", py::buffer_protocol());
+              py::arg("vals"), py::arg("reverse")=PORE_MODEL_PRMS_DEF.reverse, py::arg("complement")=PORE_MODEL_PRMS_DEF.complement);
+        
+        //c.attr("KmerArray") = m.attr("PyArray;
 
         c.def_property_readonly("kmer_count", &Class::get_kmer_count, "The number of k-mers in the model");
         c.def_readwrite("PRMS", &Class::PRMS, "Class parameters");
@@ -522,7 +519,7 @@ class PoreModel {
     #endif
 };
 
-using PoreModelK5 = PoreModel<5,u16>;
-using PoreModelK10 = PoreModel<10,u32>;
+//using PoreModelK5 = PoreModel<5,u16>;
+//using PoreModelK10 = PoreModel<10,u32>;
 
 #endif
