@@ -131,7 +131,7 @@ class Eventalign(TrackIO):
         model = track.model
 
         #kmers = track.coords.kmers[mrefs]
-        kmers = track.layers["dtw","kmers"]
+        kmers = track.layers["dtw","kmer"]
         if self.conf.is_rna:
             kmers = model.kmer_rev(kmers)
         model_kmers = model.kmer_to_str(kmers)

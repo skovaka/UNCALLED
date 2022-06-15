@@ -404,6 +404,11 @@ class RefIndex {
         return pac - bns_->anns[rid].offset;
     }
 
+    i64 pac_to_ref(i64 pac) {
+        i32 rid = bns_pos2rid(bns_, pac);
+        return pac - bns_->anns[rid].offset;
+    }
+
     u8 get_base(i64 pac, bool comp=false) {
         if (pac < 0 || pac > static_cast<i64>(size() / 2)) { //TODO better size definition
             throw std::out_of_range("Base out of range");
@@ -602,7 +607,8 @@ class RefIndex {
         PY_BWA_INDEX_METH(get_base_range);
         PY_BWA_INDEX_METH(fm_to_pac);
         PY_BWA_INDEX_METH(fm_to_mref);
-        PY_BWA_INDEX_METH(mref_to_pac);
+        PY_BWA_INDEX_VEC(mref_to_pac);
+        PY_BWA_INDEX_VEC(pac_to_ref);
         PY_BWA_INDEX_METH(ref_to_pac);
         PY_BWA_INDEX_METH(size);
         PY_BWA_INDEX_METH(mrefs_to_ref_coord);

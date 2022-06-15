@@ -101,6 +101,8 @@ class GuidedDTW:
         aln_id, self.coords = tracks.write_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df})
         #TODO return coords?
 
+        self.index = tracks.index
+
         kmers = self.coords.kmers.sort_index()
 
         self.bcaln = bcaln.df[bcaln.df.index.isin(kmers.index)].sort_index()[["start"]].dropna()
@@ -242,18 +244,22 @@ class GuidedDTW:
         mref_st = min_mref + np.clip(ll['ref'],                 0, ref_len-1)
         mref_en = min_mref + np.clip(ll['ref']+self.prms.band_width, 0, ref_len-1)
 
+        print(mref_en)
+        pac_st = self.index.mref_to_pac(mref_en)
+        pac_en = self.index.mref_to_pac(mref_st)
+
         sample_starts = read_block['start'].iloc[qry_en].to_numpy()
         sample_ends = read_block["start"].iloc[qry_st].to_numpy() + read_block["length"].iloc[qry_st].to_numpy()
 
         grp = pd.DataFrame({
-                "mref" : mref_st,
-                "mref_end" : mref_en,
+                "pac" : pac_st,
+                "pac_end" : pac_en,
                 "sample_start" : sample_starts,
                 "sample_end" : sample_ends,
-              }).groupby("mref")
+              }).groupby("pac")
 
         df = pd.DataFrame({
-            "mref_end" : grp["mref_end"].first(),
+            "pac_end" : grp["pac_end"].first(),
             "sample_start" : grp["sample_start"].max(),
             "sample_end" : grp["sample_end"].min(),
         })

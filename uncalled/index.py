@@ -64,6 +64,9 @@ class CoordSpace:
     def ref_to_pac(self, ref):
         return ref + self.pac_shift
 
+    def mref_to_pac(self, mref):
+        return self.pac_shift + self.mref_to_ref(mref)
+
     def set_kmers(self, kmers):
         self.kmers = kmers
         if kmers is None:
