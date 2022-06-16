@@ -411,7 +411,7 @@ class RefIndex {
 
     u8 get_base(i64 pac, bool comp=false) {
         if (pac < 0 || pac > static_cast<i64>(size() / 2)) { //TODO better size definition
-            throw std::out_of_range("Base out of range");
+            throw std::out_of_range("Base out of range: " + std::to_string(pac));
         }
         size_t i = pac >> 2,
                shift = ((pac & 3) ^ 3) << 1;

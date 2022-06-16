@@ -555,7 +555,6 @@ class Tracks:
                 refstats[track.name] = None
                 continue
 
-
             refstats[track.name] = groups.agg(stats.layer_agg)
             rename = ({
                 old[-1] : new
@@ -658,13 +657,14 @@ class Tracks:
             coord_idx = chunk.index.droplevel("aln_id").unique()
             #chunk_mrefs = chunk.index.get_level_values("pac").unique()
 
-            seq_coords, coords = next_coords(seq_coords, chunk.index)
+            seq_coords, coords = next_coords(seq_coords, coord_idx)
 
+            
             coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
 
-            i = coord_idx.get_level_values(1).difference(coords.pacs)
-            leftovers = chunk.loc[i]
-            layers = chunk.drop(index=i)
+            mask = (chunk.index.get_level_values(0) == coords.fwd) & chunk.index.get_level_values(1).isin(coords.pacs)
+            layers = chunk[mask]
+            leftovers = chunk[~mask]
 
             aln_ids = layers.index.unique("aln_id").to_numpy()
             alns = self.input.query_alignments(self._aln_track_ids, aln_id=aln_ids)
@@ -783,15 +783,14 @@ class Tracks:
                 idx = pd.Index([])
             elif self.prms.shared_refs_only:
                 track_counts = pd.MultiIndex.from_tuples(track_covs[mask].index) \
-                                   .droplevel("aln_id") \
+                                   .droplevel(2) \
                                    .value_counts()
 
-                idx = track_counts.index[track_counts == len(self.alns)]
+                idx = pd.MultiIndex.from_tuples(track_counts.index[track_counts == len(self.alns)])
             else:
                 idx = track_covs[mask].index.droplevel("aln_id").unique()
 
-            
-            layers = layers.loc[idx+(slice(None),)]
+            layers = layers.loc[(idx.get_level_values(0),idx.get_level_values(1),slice(None)), slice(None)]
             layer_alns = layers.index.get_level_values("aln_id")
             alignments = alignments.loc[layer_alns.unique()]
 
