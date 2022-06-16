@@ -386,21 +386,29 @@ class AlnTrack:
             raise ValueError("Can only compare two alignments at a time")
         
         has_pac = "pac" in aln_b.index.name
+        flip = self.all_fwd == self.conf.is_rna
 
         def coords(df, track):
             df = df.dropna().reset_index()
-            if len(df) > 1 and df["start"].iloc[0] > df["start"].iloc[1]:
+            #if len(df) > 1 and df["start"].iloc[0] > df["start"].iloc[1]:
+            if flip:
+                #df = df[::-1]
+                #df["ref"] = -df["ref"]
                 end = -df["start"]
                 df["start"] = -df["end"]
                 df["end"] = end
             return AlnCoords(df)
             #return _AlnCoords(df[_AlnCoords.columns].to_records(index=False))
-        
+
         coords_a = coords(aln_a, self)
         coords_b = coords(aln_b, other)
-        
+
         compare = Compare(coords_a, coords_b)
         cmp_df = pd.DataFrame(compare.to_numpy()).dropna(how="all")
+
+        #if flip:
+        #    cmp_df = cmp_df[::-1]
+        #    cmp_df["ref"] = -cmp_df["ref"]
 
         cmp_df["aln_id"] = alns_a[0]
         if has_pac:
@@ -410,6 +418,8 @@ class AlnTrack:
             cmp_df = cmp_df.set_index(["ref","aln_id"])
         df["jaccard"] = cmp_df["jaccard"]
         df["mean_ref_dist"] = cmp_df["mean_ref_dist"]
+
+
 
     @property
     def read_ids(self):
