@@ -15,9 +15,9 @@ _MODEL_TYPES = {
     7 : PoreModelK7,
     8 : PoreModelK8,
     9 : PoreModelK9,
-    10 : PoreModelK4,
-    11 : PoreModelK4,
-    12 : PoreModelK4,
+    10 : PoreModelK10,
+    11 : PoreModelK11,
+    12 : PoreModelK12,
 }
 
 #class PoreModel(_PoreModel):
