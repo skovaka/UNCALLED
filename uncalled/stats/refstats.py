@@ -54,6 +54,7 @@ def refstats(conf):
     print("\t".join(columns))
 
     for chunk in tracks.iter_refs():
+        print(chunk.coords)
         chunk.prms.refstats = conf.refstats
         chunk.prms.refstats_layers = layers
 

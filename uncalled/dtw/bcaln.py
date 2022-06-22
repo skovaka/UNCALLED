@@ -42,7 +42,9 @@ class Bcaln:
         ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
         self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna, kmer_trim=True)
 
-        self.kmer_shift = ref_index.trim[not paf.is_fwd]
+        self.kmer_shift = ref_index.trim#[not paf.is_fwd]
+        #if paf.is_fwd == self.is_rna:
+        #self.kmer_shift = self.kmer_shift[::-1]
 
         self.ref_gaps = list()
         self.errors = None
@@ -80,6 +82,7 @@ class Bcaln:
 
         if self.clip_coords is not None:
             mrefs = df.index.intersection(self.clip_coords.mrefs[self.is_fwd])
+            mrefs.name = "mref"
 
             self.coords = self.clip_coords.mref_intersect(mrefs=df.index)
 
@@ -88,7 +91,7 @@ class Bcaln:
         else:
             self.coords = self.paf_coords
 
-        self.df = df.iloc[2:-2]
+        self.df = df.iloc[self.kmer_shift[0]:-self.kmer_shift[1]]
 
 
     @property
@@ -108,7 +111,7 @@ class Bcaln:
         else:
             read_i = paf.qr_len - paf.qr_en 
 
-        mrefs = self.paf_coords.mrefs - self.kmer_shift
+        mrefs = self.paf_coords.mrefs - self.kmer_shift[0]
         mref_i = mrefs.min()
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
@@ -176,7 +179,7 @@ class Bcaln:
         if paf.is_fwd == self.is_rna:
             cig_ops = list(reversed(cig_ops))
 
-        mrefs = self.paf_coords.mrefs - self.kmer_shift
+        mrefs = self.paf_coords.mrefs - self.kmer_shift[0]
         mref_i = mrefs.min()
 
         for l,c in cig_ops:

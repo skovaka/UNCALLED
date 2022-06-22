@@ -57,6 +57,9 @@ LAYERS = {
         "model_diff" : LayerMeta(float, "Model pA Diff.",
             lambda track: track.layers["dtw","current"] - track.model[track.layers["dtw","kmer"]],
             [("dtw", "current"),("dtw","kmer")]),
+        "abs_diff" : LayerMeta(float, "Abs. Model Diff.",
+            lambda track: (track.layers["dtw","current"] - track.model[track.layers["dtw","kmer"]]).abs(),
+            [("dtw", "current"),("dtw","kmer")]),
         "base" : LayerMeta(str, "Reference base",
             lambda track: track.model.kmer_base(track.layers["dtw","kmer"], 2)),
     }, "bcaln" : {

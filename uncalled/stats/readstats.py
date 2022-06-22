@@ -15,17 +15,9 @@ from ..index import str_to_coord
 from ..fast5 import Fast5Reader
 from ..dtw import Tracks
 
-OPTS = (
-    Opt("stats", "readstats", type=comma_split),
-    Opt("db_in", "tracks.io", nargs="+", type=str),
-    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-    #Opt(("-p", "--pca-components"), "readstats"),
-    #Opt(("-L", "--pca-layer"), "readstats"),
-    Opt(("-s", "--summary-stats"), "readstats", type=comma_split),
-)
 
-class _Readstats:
-    STATS = {"model_diff", "pca",} #"speed", "hierclust", "kmeans"
+class Readstats:
+    STATS = {"abs_diff", "pca",} #"speed", "hierclust", "kmeans"
 
     def __call__(self, *args, **kwargs):
         conf, prms = config._init_group("readstats", *args, **kwargs)
@@ -35,6 +27,8 @@ class _Readstats:
         else:
             stats = [prms.stats]
 
+        for stat in stats:
+            conf.tracks.layers.append(stat)
         
         io = Tracks(conf=conf)
 
@@ -63,13 +57,13 @@ class _Readstats:
     #def _summary_stats(track, layer, stats)
 
     @staticmethod
-    def model_diff(read_id, track, summary_stats=None, prms=None):
+    def abs_diff(read_id, track, summary_stats=None, prms=None):
         if summary_stats is None:
             if prms is None:
-                raise ValueError("Must specify summary_stats or ReadstatsParams for readstats.model_diff")
+                raise ValueError("Must specify summary_stats or ReadstatsParams for readstats.abs_diff")
             summary_stats = prms.summary_stats
 
-        layer = "model_diff"
+        layer = "abs_diff"
 
         rows = list()
         for aln_id,aln in track.alignments.iterrows():
@@ -78,7 +72,7 @@ class _Readstats:
 
             for stat in summary_stats:
                 name = ".".join([layer, stat])
-                row.append(_Readstats._DESC_FNS[stat](desc))
+                row.append(Readstats._DESC_FNS[stat](desc))
             rows.append(row)
             
         return pd.DataFrame(rows, columns=["aln_id", "read_id"] + summary_stats)
@@ -100,9 +94,7 @@ class _Readstats:
 
         return df
 
-readstats = _Readstats()
-
-def main(*args, **argv):
+def readstats(*args, **argv):
     """Perform per-read analyses of DTW alignments"""
-    df = readstats(*args, **argv)
+    df = Readstats()(*args, **argv)
     #print(df.to_csv(sep="\t"))

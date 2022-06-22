@@ -135,9 +135,6 @@ void signal_processor_pybind(py::module_ &m) {
     p.def_property_readonly("sample_end", &ProcessedRead::sample_end);
     PY_PROC_ARR(Event, events, "Un-normalized events");
     PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");
-
-    SignalProcessor<PoreModel<5>>::pybind(m, "K5");
-    SignalProcessor<PoreModel<10>>::pybind(m, "K10");
 }
 #endif
 

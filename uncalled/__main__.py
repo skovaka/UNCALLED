@@ -107,6 +107,7 @@ EDIT_OPTS = (
     Opt(("-F", "--fast5-files"), "fast5_reader", type=comma_split),
     Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
 )
+
 MERGE_OPTS = (
     Opt("dbs", nargs="+", type=str, help="Database files to merge. Will write to the first file if \"-o\" is not specified. "),
     #Opt(("-n", "--track_names"), nargs="+", help="Names of tracks to merge. Will merge all tracks if not specified"),
@@ -130,6 +131,15 @@ DUMP_OPTS = (
     Opt("layers", nargs="+",  help="Layers to retrieve or compute"),
     Opt(("-R", "--ref-bounds"), "tracks", type=ref_coords),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
+)
+
+READSTATS_OPTS = (
+    Opt("db_in", "tracks.io", type=str),
+    Opt("stats", "readstats", type=comma_split),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
+    #Opt(("-p", "--pca-components"), "readstats"),
+    #Opt(("-L", "--pca-layer"), "readstats"),
+    Opt(("-s", "--summary-stats"), "readstats", type=comma_split),
 )
 
 ALL_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95", "KS"}
@@ -258,7 +268,12 @@ CMDS = {
         Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
         Opt(("-v", "--verbose-refs"), action="store_true", help="Output reference name and strand"),
     )),
-    "layerstats" : (None, "Compute, compare, and query alignment layers", {
+    "readstats" : ("stats.readstats", "", READSTATS_OPTS),
+    "layerstats" : (None, 
+            """Compute distance between alignments of the same reads\n"""
+            """subcommand options:\n""" 
+            """compare  Compute distance between alignments of the same reads\n"""
+            """dump     Output DTW alignment paths and statistics\n""", {
         "compare" : ("stats.layerstats", "Compute distance between alignments of the same reads", COMPARE_OPTS),
         "dump" : ("stats.layerstats", "Output DTW alignment paths and statistics", DUMP_OPTS),
     }),
@@ -334,7 +349,7 @@ _help_lines = [
     "\tdb         Edit, merge, and ls alignment databases", "",
     "DTW Analysis:",
     "\trefstats   Calculate per-reference-coordinate statistics",
-    #"\treadstats  " + _readstats.main.__doc__,
+    "\treadstats  Perform per-read analyses of DTW alignments",
     "\tlayerstats Compute, compare, and query alignment layers", "",
     "DTW Visualization:",
     "\tdotplot    Plot signal-to-reference alignment dotplots",

@@ -15,6 +15,7 @@ from ..fast5 import Fast5Reader
 
 from _uncalled import (
     GlobalDTWK5, StaticBDTWK5, BandedDTWK5, 
+    GlobalDTWK9, StaticBDTWK9, BandedDTWK9, 
     GlobalDTWK10, StaticBDTWK10, BandedDTWK10, 
     DTW_PRMS_EVT_GLOB, DtwParams
 )
@@ -25,9 +26,9 @@ from . import Bcaln, Tracks
 
 #TODO make this better
 METHODS = {
-    "guided" : {5: BandedDTWK5, 10: BandedDTWK10},
-    "static" : {5: StaticBDTWK5, 10: StaticBDTWK10},
-    "global" : {5: GlobalDTWK5, 10: GlobalDTWK10}
+        "guided" : {5: BandedDTWK5, 10: BandedDTWK10, 9: BandedDTWK9},
+        "static" : {5: StaticBDTWK5, 10: StaticBDTWK10, 9: StaticBDTWK9},
+        "global" : {5: GlobalDTWK5, 10: GlobalDTWK10, 10: GlobalDTWK9}
 }
 
 def dtw(conf):

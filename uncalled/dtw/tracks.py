@@ -102,7 +102,7 @@ class Tracks:
 
         self.coords = self._ref_bounds_to_coords(self.prms.ref_bounds)
 
-        if self.coords is not None:
+        if self.coords is not None and  len(self._aln_track_ids) > 0:
             self.load()
 
         if self.prms.load_fast5s and self.input is not None:

@@ -33,7 +33,7 @@ import collections.abc
 import pandas as pd
 from . import RefCoord, str_to_coord
 
-from _uncalled import RefIndexK5, RefIndexK10, _RefCoord, self_align
+from _uncalled import RefIndexK5, RefIndexK9, RefIndexK10, _RefCoord, self_align
 from .argparse import Opt
 
 
@@ -291,6 +291,9 @@ class RefIndex:
         if k == 5:
             self.InstanceClass = RefIndexK5
             self.trim = (2, 2)
+        elif k == 9:
+            self.InstanceClass = RefIndexK9
+            self.trim = (4, 4)
         elif k == 10:
             self.InstanceClass = RefIndexK10
             self.trim = (4, 5)
@@ -309,10 +312,10 @@ class RefIndex:
         #else:
         #   #ref_coord.start += kmer_shift
 
-        if mrefs.step < 0:
-            i,j = reversed(self.trim)
-        else:
-            i,j = self.trim
+        i,j = reversed(self.trim)
+        #if (mrefs.step > 0) == is_rna:
+        #else:
+        #    i,j = self.trim
 
         if kmer_trim:
             kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
@@ -320,7 +323,7 @@ class RefIndex:
                 kmers = kmers[::-1]
             ret = pd.Series(index=mrefs[i:-j], data=kmers, name="kmer")
         else:
-            kmers = self.get_kmers(mrefs.min()-self.trim[0], mrefs.max()+self.trim[1]+1, is_rna)
+            kmers = self.get_kmers(mrefs.min()-i, mrefs.max()+j+1, is_rna)
             if mrefs.step < 0:
                 kmers = kmers[::-1]
             ret = pd.Series(index=mrefs, data=kmers, name="kmer")

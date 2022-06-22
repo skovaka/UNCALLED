@@ -25,18 +25,20 @@ std::vector<bool> unpack_moves(u64 moves, u8 length) {
 }
 
 template<size_t K>
-void pybind_kmer(py::module_ &m) {
+size_t pybind_kmer(py::module_ &m) {
     std::string suffix = "K"+std::to_string(K);
     PoreModel<K>::pybind_defs(m, suffix);
     RefIndex<PoreModel<K>>::pybind_defs(m, suffix);//ref_index);
     BandedDTW<PoreModel<K>>::pybind_defs(m, suffix);
     StaticBDTW<PoreModel<K>>::pybind_defs(m, suffix);
     GlobalDTW<PoreModel<K>>::pybind_defs(m, suffix);
+    SignalProcessor<PoreModel<K>>::pybind(m, suffix);
+    return K;
 }
 
 template<size_t ...Ks>
 void pybind_kmers(py::module_ &m) {
-    ([&] {pybind_kmer<Ks>(m);} (), ...);
+    auto _ = {(pybind_kmer<Ks>(m))...};
 }
 
 PYBIND11_MODULE(_uncalled, m) {
