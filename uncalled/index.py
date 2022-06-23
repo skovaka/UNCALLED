@@ -33,7 +33,7 @@ import collections.abc
 import pandas as pd
 from . import RefCoord, str_to_coord
 
-from _uncalled import RefIndexK5, RefIndexK9, RefIndexK10, _RefCoord, self_align
+from _uncalled import RefIndexK5, RefIndexK9, RefIndexK10, RefIndexK11, _RefCoord, self_align
 from .argparse import Opt
 
 
@@ -297,6 +297,9 @@ class RefIndex:
         elif k == 10:
             self.InstanceClass = RefIndexK10
             self.trim = (4, 5)
+        elif k == 11:
+            self.InstanceClass = RefIndexK11
+            self.trim = (5, 5)
         else:
             raise ValueError(f"Invalid k-mer length: {k}")
 
