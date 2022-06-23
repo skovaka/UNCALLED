@@ -40,7 +40,7 @@ class Bcaln:
 
         #ref_coord = RefCoord(paf.rf_name, paf.rf_st-1, paf.rf_en+2, paf.is_fwd)
         ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
-        self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna, kmer_trim=True)
+        self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna, kmer_trim=False)
 
         self.kmer_shift = ref_index.trim#[not paf.is_fwd]
         #if paf.is_fwd == self.is_rna:
