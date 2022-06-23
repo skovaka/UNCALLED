@@ -414,7 +414,7 @@ def index(conf):
 
     bwa_built = True
 
-    for suff in index.UNCL_SUFFS:
+    for suff in UNCL_SUFFS:
         if not os.path.exists(prms.index_prefix + suff):
             bwa_built = False
             break
