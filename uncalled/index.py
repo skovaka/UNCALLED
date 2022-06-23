@@ -397,7 +397,7 @@ def load_index(k, prefix, load_pacseq=True, load_bwt=False, cache=True):
         if load_pacseq and not idx.pacseq_loaded():
             idx.load_pacseq()
         if load_bwt and not idx.bwt_loaded():
-            idx.load_index()
+            idx.load_index(prefix)
     return idx
 
 
