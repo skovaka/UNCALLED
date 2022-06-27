@@ -88,6 +88,10 @@ def new_browser(tracks, conf):
     layer_opts = [
         {"label" : LAYERS[group][layer].label, "value" : f"{group}.{layer}"}
         for group,layer in tracks.aln_layers(PLOT_LAYERS)]
+    
+    track_opts = [
+        {"label" : t.desc, "value" : t.name}
+        for t in tracks.alns]
 
     app.layout = html.Div(children=[
         html.Div(
@@ -104,11 +108,18 @@ def new_browser(tracks, conf):
                             clearable=False, multi=False,
                             className="w3-padding",
                             id="trackplot-layer"),
+
                         dcc.Graph(#[dcc.Loading(type="circle"),
                             id="trackplot",
                             config = {"scrollZoom" : True, "displayModeBar" : True})
 
                     ], settings=[
+                        dcc.Dropdown(
+                            options=track_opts,
+                            value=tracks.track_names,
+                            clearable=False, multi=True, searchable=False,
+                            className="w3-padding",
+                            id="track-dropdown"),
                         dcc.Checklist(
                             id="trackplot-checklist",
                             className="w3-container w3-padding",
@@ -157,11 +168,12 @@ def new_browser(tracks, conf):
         Output("selected-ref", "children"),
         Output("selected-read", "children"),
         Output("read-changed", "children"),
+        Input("track-dropdown", "value"),
         Input("trackplot-checklist", "value"),
         Input("trackplot-layer", "value"),
         Input("trackplot", "clickData"),
         State("selected-read", "children"))
-    def update_trackplot(checklist, layer, click, prev_read):
+    def update_trackplot(track_names, checklist, layer, click, prev_read):
         table = list()
         ref = aln = read = None
         card_style = {"display" : "none"}
@@ -171,13 +183,13 @@ def new_browser(tracks, conf):
         chunk = tracks
         uirev = True
 
-        if "full_overlap" in checklist:
-            chunk = chunk.slice_full_overlap()
-            #uirev = False
+        shared_reads = "share_reads" in checklist
+        full_overlap = "full_overlap" in checklist
 
-        if "share_reads" in checklist:
-            chunk = chunk.slice_shared_reads()
-            #uirev = False
+        if len(track_names) == 0:
+            track_names = None
+
+        chunk = chunk.slice(tracks=track_names, shared_reads=shared_reads, full_overlap=full_overlap)
 
         if click is not None:
             coord = click["points"][0]
@@ -216,24 +228,26 @@ def new_browser(tracks, conf):
         Output("dotplot-panel", "style"),
         #State("selected-read", "children"),
         #Input("dotplot-btn", "n_clicks"))
+        Input("track-dropdown", "value"),
         Input("dotplot-checklist", "value"),
         Input("trackplot-layer", "value"),
         Input("selected-ref", "children"),
         Input("selected-read", "children"),
         Input("read-changed", "children"))
-    def update_trackplot(flags, layer, ref, read, read_changed):
+    def update_dotplot(track_names, flags, layer, ref, read, read_changed):
         if read is None:
             return {}, {"display" : "hidden"}
 
         flags = set(flags)
-        #print("CHANGE", read_changed)
 
         conf = Config(conf=tracks.conf)
         conf.sigplot.multi_background="multi_background" in flags
         conf.sigplot.no_model="show_model" not in flags
 
+        chunk = tracks.slice(tracks=track_names if len(track_names) > 0 else None)
+
         fig = Dotplot(
-            tracks, 
+            chunk, 
             select_ref=ref, 
             show_legend="show_legend" in flags,
             layers=list(parse_layer(layer)),

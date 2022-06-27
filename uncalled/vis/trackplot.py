@@ -130,7 +130,7 @@ class Trackplot:
         self.fig.update_xaxes(side='top', showticklabels=True, row=1, col=1)
         self.fig.update_xaxes(showticklabels=True, row=n_rows, col=1)
 
-        height = max(700, 100*np.sum(panel_heights))
+        height = 350*np.sqrt(np.sum(panel_heights))
 
         self.fig.update_layout(
             dragmode="pan", 

@@ -174,6 +174,10 @@ class Tracks:
                 return True
         return False
 
+    @property
+    def track_names(self):
+        return list(self._tracks.keys())
+
     def _ref_bounds_to_coords(self, ref_bounds):
         if ref_bounds is not None:
             if isinstance(ref_bounds, str):
@@ -358,7 +362,7 @@ class Tracks:
             raise RuntimeError("No input tracks have been loaded")
 
     #TODO read_ids, track_alns, max_cov(?)
-    def slice(self, ref_start=None, ref_end=None, reads=None, order=["fwd","ref_start"]):
+    def slice(self, ref_start=None, ref_end=None, reads=None, order=["fwd","ref_start"], tracks=None, full_overlap=False, shared_reads=False):
         if self.coords is None:
             raise IndexError("Cannot slice empty Tracks")
 
@@ -373,17 +377,28 @@ class Tracks:
         stranded = True
         fwd = None
 
+        if full_overlap:
+            reads = self.get_full_overlap(reads)
+
+        if shared_reads:
+            if reads is None:
+                reads = self.get_shared_reads()
+            else:
+                reads = self.get_shared_reads().intersection(reads)
+            order = "read_id"
+                
+        if tracks is None:
+            track_names = set(self.track_names)
+        else:
+            track_names = set(tracks)
         tracks = dict()
         for name,track in self._tracks.items():
+            if name not in track_names: continue
             if isinstance(track, pd.DataFrame):
                 tracks[name] = track.loc[coords.refs]
 
             elif isinstance(track, AlnTrack):
                 tracks[name] = track.slice(coords, reads=reads, order=order)
-                #if stranded:
-                #    if tracks[name].all_fwd():
-
-
 
         return Tracks(self, coords, tracks)
 
@@ -400,11 +415,7 @@ class Tracks:
                 read_ids = read_ids.union(track.read_ids)
         return read_ids
 
-    def slice_shared_reads(self):
-        return self.slice(reads=self.get_shared_reads(), order="read_id")
-
-    def slice_full_overlap(self):
-        read_ids = None
+    def get_full_overlap(self, read_ids=None):
         rmin = self.coords.refs.min()
         rmax = self.coords.refs.max()
         for track in self.alns:
@@ -413,8 +424,7 @@ class Tracks:
                 read_ids = pd.Index(alns["read_id"])
             else:
                 read_ids = read_ids.intersection(alns["read_id"])
-
-        return self.slice(reads=read_ids)
+        return read_ids
             
     def load(self, ref_bounds=None, full_overlap=None, read_filter=None, load_mat=False):
         self._verify_read()

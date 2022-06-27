@@ -142,10 +142,42 @@ READSTATS_OPTS = (
     Opt(("-s", "--summary-stats"), "readstats", type=comma_split),
 )
 
-ALL_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95", "KS"}
+TRACKPLOT_OPTS = (
+        Opt("db_in", "tracks.io"),
+        Opt("ref_bounds", "tracks", type=str_to_coord),
+        Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
+        Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
+        Opt(("-H", "--panel-heights"), "trackplot", nargs="+", type=int),
+        Opt(("--shared-refs-only"), "tracks", action="store_true"),
+        Opt(("--shared-reads-only"), "tracks", action="store_true"),
+        Opt(("--share-reads"), "trackplot", action="store_true"),
+        Opt(("--hover-read"), "trackplot", action="store_true"),
+        Opt(("-o", "--outfile"), "trackplot"),
+    )
+
 
 def panel_opt(name):
     return (lambda arg: (name, arg))
+
+TRACKPLOT_PANEL_OPTS = (
+    Opt("--mat", dest="panels",
+        metavar="LAYER", action="append", type=panel_opt("mat"),
+        help="Display a ref-by-read matrix of specified alignment layer"), 
+
+    Opt("--box", dest="panels", #"trackplot", "panels", 
+        metavar="LAYER", action="append", type=panel_opt("box"),
+        help="Display a boxplot of specified layer"), 
+
+    Opt("--line", dest="panels", #"trackplot", "panels", 
+        metavar="LAYER.STAT", action="append", type=panel_opt("line"),
+        help="Display a line plot of specifed layer summary statistic"), 
+
+    Opt("--scatter", dest="panels", #"trackplot", "panels", 
+        metavar="LAYER.STAT", action="append", type=panel_opt("scatter"),
+        help="Display a line plot of specifed layer summary statistic"), 
+)
+
+ALL_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95", "KS"}
 
 CMDS = {
     "index" : ("index", "Build an index from a FASTA reference", (
@@ -292,34 +324,7 @@ CMDS = {
         Opt(("--no-model"), "sigplot", action="store_true"),
         Opt(("--bcaln-error", "-e"), "dotplot", action="store_true"),
     )),
-    "trackplot" : ("vis.trackplot", "Plot alignment tracks and per-reference statistics", (
-        Opt("db_in", "tracks.io"),
-        Opt("ref_bounds", "tracks", type=str_to_coord),
-        Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
-        Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
-        Opt(("-H", "--panel-heights"), "trackplot", nargs="+", type=int),
-        Opt(("--shared-refs-only"), "tracks", action="store_true"),
-        Opt(("--shared-reads-only"), "tracks", action="store_true"),
-        Opt(("--share-reads"), "trackplot", action="store_true"),
-        Opt(("--hover-read"), "trackplot", action="store_true"),
-
-        Opt("--mat", dest="panels",
-            metavar="LAYER", action="append", type=panel_opt("mat"),
-            help="Display a ref-by-read matrix of specified alignment layer"), 
-
-        Opt("--box", dest="panels", #"trackplot", "panels", 
-            metavar="LAYER", action="append", type=panel_opt("box"),
-            help="Display a boxplot of specified layer"), 
-
-        Opt("--line", dest="panels", #"trackplot", "panels", 
-            metavar="LAYER.STAT", action="append", type=panel_opt("line"),
-            help="Display a line plot of specifed layer summary statistic"), 
-
-        Opt("--scatter", dest="panels", #"trackplot", "panels", 
-            metavar="LAYER.STAT", action="append", type=panel_opt("scatter"),
-            help="Display a line plot of specifed layer summary statistic"), 
-        Opt(("-o", "--outfile"), "trackplot"),
-    )),
+    "trackplot" : ("vis.trackplot", "Plot alignment tracks and per-reference statistics", TRACKPLOT_OPTS+TRACKPLOT_PANEL_OPTS),
     "browser" : ("vis.browser", "Interactive signal alignment genome browser", (
         Opt("db_in", "tracks.io"),
         Opt("ref_bounds", "tracks", type=str_to_coord),
