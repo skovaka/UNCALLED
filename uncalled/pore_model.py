@@ -40,6 +40,7 @@ class PoreModel:
 
             elif isinstance(model, PoreModelParams):
                 prms = PoreModelParams(model)
+                is_preset = model.name in PORE_MODEL_PRESETS
 
             else:
                 raise TypeError("PoreModel model must be of type str, PoreModel, or PoreModel.Params")
