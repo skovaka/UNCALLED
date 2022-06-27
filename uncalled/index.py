@@ -425,14 +425,14 @@ def index(conf):
     if bwa_built:
         sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % prms.index_prefix)
     else:
-        RefIndex.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
+        RefIndexK5.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
         
         if prms.no_bwt: 
             sys.stderr.write("Pacseq built\n")
             return
 
     sys.stderr.write("Initializing parameter search\n")
-    p = index.IndexParameterizer(prms)
+    p = IndexParameterizer(prms)
 
     p.add_preset("default", tgt_speed=115)
 

@@ -51,15 +51,25 @@ void pybind_pore_model_params(py::module_ &m);
 
 using KmerLen = u8;
 
-typedef struct {
-    KmerLen k;
-    std::vector<float> means_stdvs;
-} ModelPreset;
-
 struct PoreModelParams {
     std::string name;
+    int k, shift;
     bool reverse, complement;
 };
+
+struct PoreModelPreset {
+    PoreModelParams prms;
+    const std::vector<float> &vals;
+};
+
+extern const std::vector<PoreModelPreset> PORE_MODEL_PRESETS;
+
+//std::vector<std::string> get_pore_model_names() {
+//    std::vector<std::string> ret;
+//    for (auot &p : PORE_MODEL_PRESETS) {
+//        return ret.push_back(p.name);
+//    }
+//}
 
 extern const PoreModelParams PORE_MODEL_PRMS_DEF;
 
@@ -72,12 +82,43 @@ class PoreModel {
     static constexpr KmerType KMER_MASK = (1 << (2*K)) - 1,
                      KMER_COUNT = static_cast<KmerType>(pow(BASE_COUNT, K));
     static constexpr KmerLen KMER_LEN = K;
-    static const KmerLen SHIFT;
+    //static const KmerLen SHIFT;
 
     using kmer_t = KmerType;
 
-    PoreModelParams PRMS;
+    static bool PRESETS_LOADED;
+    static std::unordered_map<std::string, const PoreModelPreset &> MODEL_PRESETS;
     static const PresetMap PRESETS;
+
+    inline static bool load_presets() {
+        if (!PRESETS_LOADED) {
+            for (const auto &preset : PORE_MODEL_PRESETS) {
+                if (preset.prms.k == K) {
+                    MODEL_PRESETS[preset.prms.name] = preset;
+                }
+            }
+            return (PRESETS_LOADED = true);
+        }
+        return false;
+    }
+
+    static bool is_preset(const std::string &name) {
+        return PRESETS.find(name) != PRESETS.end();
+    }
+
+    static std::vector<std::string> get_preset_names() {
+        std::vector<std::string> ret;
+        for (auto p : PRESETS) {
+            ret.push_back(p.first);
+        }
+        return ret;
+    }
+
+    PoreModelParams PRMS;
+
+    std::vector<float> kmer_means_, kmer_stdvs_, kmer_2vars_, lognorm_denoms_;
+    float model_mean_, model_stdv_;
+    bool loaded_, compl_;
 
     PoreModel(PoreModelParams p) : PRMS(p) {
         loaded_ = false;
@@ -176,18 +217,6 @@ class PoreModel {
         init_stdv();
 
         loaded_ = true;
-    }
-
-    static bool is_preset(const std::string &name) {
-        return PRESETS.find(name) != PRESETS.end();
-    }
-
-    static std::vector<std::string> get_preset_names() {
-        std::vector<std::string> ret;
-        for (auto p : PRESETS) {
-            ret.push_back(p.first);
-        }
-        return ret;
     }
 
     float norm_pdf(float samp, KmerType kmer) const {
@@ -293,10 +322,6 @@ class PoreModel {
     u32 get_kmer_count() const {
         return KMER_COUNT;
     }
-
-    std::vector<float> kmer_means_, kmer_stdvs_, kmer_2vars_, lognorm_denoms_;
-    float model_mean_, model_stdv_;
-    bool loaded_, compl_;
 
     void init_stdv() {
         model_stdv_ = 0;
@@ -518,6 +543,9 @@ class PoreModel {
 
     #endif
 };
+
+template <KmerLen K, typename T>
+bool PoreModel<K,T>::PRESETS_LOADED = false;
 
 //using PoreModelK5 = PoreModel<5,u16>;
 //using PoreModelK10 = PoreModel<10,u32>;
