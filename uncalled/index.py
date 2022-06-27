@@ -33,7 +33,7 @@ import collections.abc
 import pandas as pd
 from . import RefCoord, str_to_coord
 
-from _uncalled import RefIndexK5, RefIndexK9, RefIndexK10, _RefCoord, self_align
+from _uncalled import RefIndexK5, RefIndexK9, RefIndexK10, RefIndexK11, _RefCoord, self_align
 from .argparse import Opt
 
 
@@ -297,6 +297,9 @@ class RefIndex:
         elif k == 10:
             self.InstanceClass = RefIndexK10
             self.trim = (4, 5)
+        elif k == 11:
+            self.InstanceClass = RefIndexK11
+            self.trim = (5, 5)
         else:
             raise ValueError(f"Invalid k-mer length: {k}")
 
@@ -397,7 +400,7 @@ def load_index(k, prefix, load_pacseq=True, load_bwt=False, cache=True):
         if load_pacseq and not idx.pacseq_loaded():
             idx.load_pacseq()
         if load_bwt and not idx.bwt_loaded():
-            idx.load_index()
+            idx.load_index(prefix)
     return idx
 
 
@@ -422,14 +425,14 @@ def index(conf):
     if bwa_built:
         sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % prms.index_prefix)
     else:
-        RefIndex.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
+        RefIndexK5.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
         
         if prms.no_bwt: 
             sys.stderr.write("Pacseq built\n")
             return
 
     sys.stderr.write("Initializing parameter search\n")
-    p = index.IndexParameterizer(prms)
+    p = IndexParameterizer(prms)
 
     p.add_preset("default", tgt_speed=115)
 

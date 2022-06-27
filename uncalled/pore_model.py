@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import h5py
 
-from _uncalled import PoreModelK4, PoreModelK5, PoreModelK6, PoreModelK7, PoreModelK8, PoreModelK9, PoreModelK10, PoreModelK11, PoreModelK12, PoreModelParams, ArrayU32, ArrayU16
+from _uncalled import PoreModelK4, PoreModelK5, PoreModelK6, PoreModelK7, PoreModelK8, PoreModelK9, PoreModelK10, PoreModelK11, PoreModelK12, PoreModelParams, ArrayU32, ArrayU16, PORE_MODEL_PRESETS
 from . import config
 
 _MODEL_TYPES = {
@@ -20,6 +20,8 @@ _MODEL_TYPES = {
     12 : PoreModelK12,
 }
 
+PRESETS = {p.prms.name : p for p in PORE_MODEL_PRESETS}
+
 #class PoreModel(_PoreModel):
 class PoreModel:
 
@@ -31,15 +33,14 @@ class PoreModel:
         self.ModelType = PoreModelK5
 
         if model is not None: 
-            if isinstance(model, PoreModelK5):
-                self._init(name, model)
-                return 
-
-            if isinstance(model, PoreModelK10):
+            if isinstance(getattr(model, "PRMS", None), PoreModelParams):
                 self._init(name, model)
                 return 
 
             if isinstance(model, str):
+                #if model in PRESETS:
+                #    prms = PRESETS[model]
+                #else:
                 prms = self._param_defaults()
                 prms.name = model
 
@@ -76,14 +77,9 @@ class PoreModel:
             )
 
         k = int(np.log2(len(vals)) / 2)
-        #if 
-        #if k == 5:
-        #    self.ModelType = PoreModelK5
-        #    #self.kmer_dtype = "uint16"
-        #elif k == 10:
-        #    self.ModelType = PoreModelK10
         if not k in _MODEL_TYPES:
             raise ValueError(f"Invalid k-mer length: {k}\n")
+
         self.ModelType = _MODEL_TYPES[k]
 
         self._init(name, vals, prms.reverse, prms.complement)

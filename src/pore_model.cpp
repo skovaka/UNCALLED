@@ -21,9 +21,17 @@
 
 const PoreModelParams PORE_MODEL_PRMS_DEF {
     name       : "r94_dna",
+    k          : 5,
+    shift      : 2,
     reverse    : false,
-    complement : false
+    complement : false,
 };
+
+const std::vector<PoreModelPreset> PORE_MODEL_PRESETS {{
+    {{"r94_dna", 5, 2, false, false}, model_r94_dna_vals},
+    {{"r94_rna", 5, 2, false, false}, model_r94_rna_vals},
+    {{"r94_rna_tombo", 5, 2, false, false}, model_r94_rna_tombo_vals}
+}};
 
 template<>
 const PresetMap 
@@ -42,14 +50,14 @@ template<> const PresetMap PoreModel<10>::PRESETS = {};
 template<> const PresetMap PoreModel<11>::PRESETS = {};
 template<> const PresetMap PoreModel<12>::PRESETS = {};
 
-template <> const KmerLen PoreModel<4>::SHIFT = 1;
-template <> const KmerLen PoreModel<5>::SHIFT = 2;
-template <> const KmerLen PoreModel<6>::SHIFT = 2;
-template <> const KmerLen PoreModel<7>::SHIFT = 3;
-template <> const KmerLen PoreModel<8>::SHIFT = 3;
-template <> const KmerLen PoreModel<9>::SHIFT = 4;
-template <> const KmerLen PoreModel<10>::SHIFT = 4;
-template <> const KmerLen PoreModel<12>::SHIFT = 5;
+//template <> const KmerLen PoreModel<4>::SHIFT = 1;
+//template <> const KmerLen PoreModel<5>::SHIFT = 2;
+//template <> const KmerLen PoreModel<6>::SHIFT = 2;
+//template <> const KmerLen PoreModel<7>::SHIFT = 3;
+//template <> const KmerLen PoreModel<8>::SHIFT = 3;
+//template <> const KmerLen PoreModel<9>::SHIFT = 4;
+//template <> const KmerLen PoreModel<10>::SHIFT = 4;
+//template <> const KmerLen PoreModel<12>::SHIFT = 5;
 
 #ifdef PYBIND
 
@@ -58,7 +66,15 @@ void pybind_pore_model_params(py::module_ &m) {
     p.def(py::init<>());
     p.def(py::init<PoreModelParams>());
     PY_MODEL_PARAM(name, "Model preset name or TSV filename");
+    PY_MODEL_PARAM(k, "K-mer length");
+    PY_MODEL_PARAM(shift, "K-mer shift");
     PY_MODEL_PARAM(reverse, "Will reverse (flip) k-mer sequences if True");
     PY_MODEL_PARAM(complement, "Will complement k-mer sequences if True");
+
+    py::class_<PoreModelPreset> pre(m, "PoreModelPresets");
+    pre.def_readwrite("prms", &PoreModelPreset::prms);
+    //pre.def_readwrite("vals", &PoreModelPreset::vals);
+
+    m.attr("PORE_MODEL_PRESETS") = py::cast(PORE_MODEL_PRESETS);
 }
 #endif
