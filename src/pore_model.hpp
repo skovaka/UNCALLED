@@ -62,7 +62,8 @@ struct PoreModelPreset {
     const std::vector<float> &vals;
 };
 
-extern const std::vector<PoreModelPreset> PORE_MODEL_PRESETS;
+//extern const std::vector<PoreModelPreset> PORE_MODEL_PRESETS;
+extern const std::unordered_map<std::string, PoreModelPreset> PORE_MODEL_PRESETS;
 
 //std::vector<std::string> get_pore_model_names() {
 //    std::vector<std::string> ret;
@@ -87,20 +88,20 @@ class PoreModel {
     using kmer_t = KmerType;
 
     static bool PRESETS_LOADED;
-    static std::unordered_map<std::string, const PoreModelPreset &> MODEL_PRESETS;
+    static std::unordered_map<std::string, PoreModelPreset &> MODEL_PRESETS;
     static const PresetMap PRESETS;
 
-    inline static bool load_presets() {
-        if (!PRESETS_LOADED) {
-            for (const auto &preset : PORE_MODEL_PRESETS) {
-                if (preset.prms.k == K) {
-                    MODEL_PRESETS[preset.prms.name] = preset;
-                }
-            }
-            return (PRESETS_LOADED = true);
-        }
-        return false;
-    }
+    //inline static bool load_presets() {
+    //    if (!PRESETS_LOADED) {
+    //        for (auto &preset : PORE_MODEL_PRESETS) {
+    //            if (preset.prms.k == K) {
+    //                MODEL_PRESETS[preset.prms.name] = preset;
+    //            }
+    //        }
+    //        return (PRESETS_LOADED = true);
+    //    }
+    //    return false;
+    //}
 
     static bool is_preset(const std::string &name) {
         return PRESETS.find(name) != PRESETS.end();
@@ -130,10 +131,11 @@ class PoreModel {
 
         if (p.name.empty()) return;
 
-        auto vals = PRESETS.find(PRMS.name);
+        //load_presets();
+        auto preset = PORE_MODEL_PRESETS.find(PRMS.name);
 
-        if (vals != PRESETS.end()) {
-            init_vals(vals->second);
+        if (preset != PORE_MODEL_PRESETS.end()) {
+            init_vals(preset->second.vals);
         } else {
             init_tsv(PRMS.name);
         }

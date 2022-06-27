@@ -27,10 +27,10 @@ const PoreModelParams PORE_MODEL_PRMS_DEF {
     complement : false,
 };
 
-const std::vector<PoreModelPreset> PORE_MODEL_PRESETS {{
-    {{"r94_dna", 5, 2, false, false}, model_r94_dna_vals},
-    {{"r94_rna", 5, 2, false, false}, model_r94_rna_vals},
-    {{"r94_rna_tombo", 5, 2, false, false}, model_r94_rna_tombo_vals}
+const std::unordered_map<std::string, PoreModelPreset> PORE_MODEL_PRESETS {{
+    {"r94_dna", {{"r94_dna", 5, 2, false, false}, model_r94_dna_vals}},
+    {"r94_rna", {{"r94_rna", 5, 2, false, false}, model_r94_rna_vals}},
+    {"r94_rna_tombo", {{"r94_rna_tombo", 5, 2, false, false}, model_r94_rna_tombo_vals}}
 }};
 
 template<>

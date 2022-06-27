@@ -13,6 +13,7 @@ import copy
 from ..dfs import AlnCoords
 from _uncalled import Compare
 
+from ..pore_model import PoreModel
 from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
 from .. import config, index 
@@ -172,7 +173,7 @@ class AlnTrack:
         #self.alignments = pd.DataFrame()
         #self.layers = pd.DataFrame()
 
-    def _init_new(self, db, track_id, name, desc, conf, model, fast5s=None):
+    def _init_new(self, db, track_id, name, desc, conf, model=None, fast5s=None):
         self.db = db
         self.id = track_id
         self.name = name
@@ -180,7 +181,11 @@ class AlnTrack:
         self.conf = conf
 
         self.fast5s = fast5s #TODO get rid of this
-        self.model = model 
+
+        if model is not None:
+            self.model = model 
+        else:
+            self.model = PoreModel(conf.pore_model)
 
     def _init_slice(self, p, coords=None, alignments=None, layers=None, order=["fwd", "ref_start"]):
         self._init_new(p.db, p.id, p.name, p.desc, p.conf, p.model, p.fast5s)

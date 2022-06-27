@@ -1,26 +1,18 @@
 import os
 from collections import Sequence
 
+import sys
 import numpy as np
 import pandas as pd
 import h5py
 
-from _uncalled import PoreModelK4, PoreModelK5, PoreModelK6, PoreModelK7, PoreModelK8, PoreModelK9, PoreModelK10, PoreModelK11, PoreModelK12, PoreModelParams, ArrayU32, ArrayU16, PORE_MODEL_PRESETS
+from _uncalled import PoreModelParams, ArrayU32, ArrayU16, PORE_MODEL_PRESETS
+import _uncalled
 from . import config
 
-_MODEL_TYPES = {
-    4 : PoreModelK4,
-    5 : PoreModelK5,
-    6 : PoreModelK6,
-    7 : PoreModelK7,
-    8 : PoreModelK8,
-    9 : PoreModelK9,
-    10 : PoreModelK10,
-    11 : PoreModelK11,
-    12 : PoreModelK12,
-}
+#PRESETS = {p.prms.name : p for p in PORE_MODEL_PRESETS}
 
-PRESETS = {p.prms.name : p for p in PORE_MODEL_PRESETS}
+CACHE = dict()
 
 #class PoreModel(_PoreModel):
 class PoreModel:
@@ -29,20 +21,22 @@ class PoreModel:
     def _param_defaults():
         return PoreModelParams(config._DEFAULTS.pore_model)
 
-    def __init__(self, model=None, name=None, reverse=None, complement=None, df=None):
-        self.ModelType = PoreModelK5
+    def __init__(self, model=None, name=None, reverse=None, complement=None, df=None, cache=True):
+        is_preset = False
 
         if model is not None: 
             if isinstance(getattr(model, "PRMS", None), PoreModelParams):
-                self._init(name, model)
+                self._init(model.prms, model)
                 return 
 
             if isinstance(model, str):
-                #if model in PRESETS:
-                #    prms = PRESETS[model]
-                #else:
-                prms = self._param_defaults()
-                prms.name = model
+
+                if model in PORE_MODEL_PRESETS:
+                    prms = PORE_MODEL_PRESETS[model].prms
+                    is_preset = True
+                else:
+                    prms = self._param_defaults()
+                    prms.name = model
 
             elif isinstance(model, PoreModelParams):
                 prms = PoreModelParams(model)
@@ -51,43 +45,56 @@ class PoreModel:
                 raise TypeError("PoreModel model must be of type str, PoreModel, or PoreModel.Params")
         else:
             prms = self._param_defaults()
+            if df is None: is_preset = True
 
         if reverse is not None: prms.reverse = reverse
         if complement is not None: prms.complement = complement
 
+        vals = None
+
         if df is not None:
             vals = self._vals_from_df(df)
 
-        elif self._init_preset(prms):
+        elif cache and prms.name in CACHE:
+            sys.stderr.write(f"Using cached model: {prms.name}\n")
+            self._init(prms, CACHE[prms.name])
             return
 
-        elif os.path.exists(prms.name):
-            try:
-                vals = self._vals_from_tsv(prms.name)
-            except:
+        elif not is_preset:
+            if os.path.exists(prms.name):
                 try:
-                    vals = self._vals_from_hdf5(prms.name)
+                    vals = self._vals_from_tsv(prms.name)
                 except:
-                    raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
+                    try:
+                        vals = self._vals_from_hdf5(prms.name)
+                    except:
+                        raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
+            else:
+                models = ", ".join(PORE_MODEL_PRESETS.keys())
+                raise ValueError(
+                    f"Unknown PoreModel: {prms.name}. Must be a filename, or one of {models}" \
+                    
+                )
+
+        if vals is not None:
+            prms.k = int(np.log2(len(vals)) / 2)
+            self._init_new(prms, vals, prms.reverse, prms.complement)
         else:
-            models = ", ".join(PoreModelK5.get_preset_names())
-            raise ValueError(
-                f"Unknown PoreModel: {prms.name}. Must be a filename, or one of {models}" \
-                
-            )
+            self._init_new(prms, prms)
+            
+        if cache:
+            CACHE[prms.name] = self.instance
 
-        k = int(np.log2(len(vals)) / 2)
-        if not k in _MODEL_TYPES:
-            raise ValueError(f"Invalid k-mer length: {k}\n")
+    def _init_new(self, prms, *args):
+        ModelType = getattr(_uncalled, f"PoreModelK{prms.k}")
+        self._init(prms, ModelType(*args))
 
-        self.ModelType = _MODEL_TYPES[k]
+    def _init(self, prms, instance):
+        self.instance = instance
+        self.ModelType = type(instance)
 
-        self._init(name, vals, prms.reverse, prms.complement)
-
-    def _init(self, name, *args):
-        self.instance = self.ModelType(*args)
-        if name is not None:
-            self.PRMS.name = name
+        if prms.name is not None:
+            self.PRMS.name = prms.name
 
         self.KMERS = np.arange(self.KMER_COUNT)
         self.KMER_STRS = self.kmer_to_str(self.KMERS)
@@ -97,17 +104,6 @@ class PoreModel:
         else:
             self.kmer_dtype = "uint16"
             self.array_type = ArrayU16
-
-
-    def _init_preset(self, prms):
-        if PoreModelK5.is_preset(prms.name):
-            self.ModelType = PoreModelK5
-        elif PoreModelK10.is_preset(prms.name):
-            self.ModelType = PoreModelK10
-        else:
-            return False
-        self._init(prms.name, prms)
-        return True
 
     @property
     def name(self):

@@ -406,10 +406,11 @@ class TrackSQL(TrackIO):
         for name,row in df.iterrows():
             conf = config.Config(toml=row.config)
 
-            if self.model is None:
-                self.model = PoreModel(conf.pore_model.name)
+            t = AlnTrack(self, row["id"], name, row["desc"], conf)
 
-            t = AlnTrack(self, row["id"], name, row["desc"], conf, self.model)
+            if self.model is None:
+                self.model = t.model
+
             self.tracks.append(t)
 
             self.conf.load_config(conf)
