@@ -104,7 +104,9 @@ class GuidedDTW:
 
         self.index = tracks.index
 
-        kmers = self.coords.kmers.sort_index()
+        #kmers = self.coords.kmers.sort_index()
+        mrefs = bcaln.df.index.get_level_values(0)
+        kmers = tracks.index.mrefs_to_kmers(bcaln.coords.mrefs, conf.is_rna, True).sort_index()
 
         self.bcaln = bcaln.df[bcaln.df.index.isin(kmers.index)].sort_index()[["start"]].dropna()
 

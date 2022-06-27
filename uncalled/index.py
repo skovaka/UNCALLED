@@ -312,10 +312,10 @@ class RefIndex:
         #else:
         #   #ref_coord.start += kmer_shift
 
-        i,j = reversed(self.trim)
-        #if (mrefs.step > 0) == is_rna:
-        #else:
-        #    i,j = self.trim
+        if (mrefs.step > 0) == is_rna:
+            i,j = self.trim
+        else:
+            i,j = reversed(self.trim)
 
         if kmer_trim:
             kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
