@@ -309,15 +309,12 @@ class AlnTrack:
                     raise ValueError("Layer not found: {group}.{layer}")
                 vals = fn(self)
                 self.layers[group,layer] = vals
-            #else:
-            #    print("NO", group, layer)
 
     def load_mat(self):
         df = self.layers.copy()
         #df["aln_id"] = df.index.get_level_values("aln_id")
         df = df.reset_index()
 
-        #print(df)
         self.mat = df.pivot(index="aln_id", columns=["ref"]) \
                      .rename_axis(("group","layer","ref"), axis=1) \
                      .sort_index(axis=1)

@@ -246,7 +246,7 @@ CMDS = {
         Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
         Opt(("-a", "--append"), "tracks.io", action="store_true"),
         Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
-        Opt(("-p", "--pore-model"), "pore_model", "name"),
+        Opt(("-p", "--pore-model"), "pore_model", "name", default=None),
         Opt("--save-bands", "dtw", action="store_true"),
         Opt("--full-overlap", "tracks", action="store_true"),
         #Opt(("-S", "--mask-skips"), "dtw", action="store_true"),

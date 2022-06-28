@@ -21,12 +21,14 @@ class PoreModel:
     def _param_defaults():
         return PoreModelParams(config._DEFAULTS.pore_model)
 
-    def __init__(self, model=None, name=None, reverse=None, complement=None, df=None, cache=True):
+    def __init__(self, model=None, name=None, reverse=None, complement=None, df=None, extra_cols=False, cache=True):
         is_preset = False
+
+        self._cols = dict()
 
         if model is not None: 
             if isinstance(getattr(model, "PRMS", None), PoreModelParams):
-                self._init(model.prms, model)
+                self._init(model.prms, model.instance)
                 return 
 
             if isinstance(model, str):
@@ -51,6 +53,9 @@ class PoreModel:
         if reverse is not None: prms.reverse = reverse
         if complement is not None: prms.complement = complement
 
+        self.extra_cols = extra_cols
+        self.extra = pd.DataFrame() if self.extra_cols else None
+
         vals = None
 
         if df is not None:
@@ -63,13 +68,13 @@ class PoreModel:
 
         elif not is_preset:
             if os.path.exists(prms.name):
-                try:
-                    vals = self._vals_from_tsv(prms.name)
-                except:
-                    try:
-                        vals = self._vals_from_hdf5(prms.name)
-                    except:
-                        raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
+                vals = self._vals_from_tsv(prms.name)
+                #try:
+                #except:
+                #    try:
+                #        vals = self._vals_from_hdf5(prms.name)
+                #    except:
+                #        raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
             else:
                 models = ", ".join(PORE_MODEL_PRESETS.keys())
                 raise ValueError(
@@ -106,14 +111,13 @@ class PoreModel:
             self.kmer_dtype = "uint16"
             self.array_type = ArrayU16
 
+        self._cols["mean"] = self.means
+        self._cols["stdv"] = self.stdvs
+
     @property
     def name(self):
         return self.PRMS.name
 
-    def _vals_from_df(self, df):
-        return np.ravel(df.rename(columns=self.TSV_RENAME) \
-                          .sort_values("kmer")[["mean","stdv"]])
-               
     COLUMNS = {"kmer", "mean", "stdv"}
     TSV_RENAME = {
         "level_mean" : "mean", 
@@ -121,8 +125,16 @@ class PoreModel:
         "sd"         : "stdv"
     }
 
+    def _vals_from_df(self, df):
+        df = df.rename(columns=self.TSV_RENAME)
+        extra = df.columns.difference(self.COLUMNS)
+        for col in extra:
+            self._cols[col] = df[col].to_numpy()
+        return np.ravel(df.sort_values("kmer")[["mean","stdv"]])
+               
+
     def _usecol(self, name):
-        return name in self.COLUMNS or name in self.TSV_RENAME
+        return self.extra_cols or name in self.COLUMNS or name in self.TSV_RENAME
 
     def _vals_from_tsv(self, filename):
         df = pd.read_csv(filename, sep="\t", comment="#", usecols=self._usecol)
@@ -133,8 +145,15 @@ class PoreModel:
         df = pd.DataFrame(handle["model"][()]).reset_index()
         return self._vals_from_df(df)
 
-    def __getitem__(self, kmer):
-        return self.means[self.kmer_array(kmer)]
+    def keys(self):
+        return self._cols.keys()
+
+    def __getitem__(self, idx):
+        #TODO store master self._fields = {"mean" : self.means, ..., extra...}
+        #no, maybe just wrap in series
+        if isinstance(idx, str):
+            return self._cols[idx]
+        return self.means[self.kmer_array(idx)]
 
     def __getattr__(self, name):
         return self.instance.__getattribute__(name)
@@ -166,12 +185,13 @@ class PoreModel:
     def abs_diff(self, current, kmer):
         return self.instance.abs_diff(self, current, self.kmer_array(kmer))
 
-    def to_df(self):
-        return pd.DataFrame({
-            "kmer" : self.KMER_STRS, 
-            "mean" : self.means, 
-            "stdv" : self.stdvs
-        })
+    def to_df(self, kmer_str=True):
+        df = pd.DataFrame(self._cols)
+
+        if kmer_str:
+            df["kmer"] = self.KMER_STRS 
+
+        return df
 
     def to_tsv(self, out=None):
         return self.to_df().to_csv(out, sep="\t", index=False)
@@ -203,6 +223,7 @@ class PoreModel:
         ret += "kmer    mean    stdv\n"
         def kmer_str(i):
             return "%s%8.3f%8.3f\n" % (self.KMER_STRS[i], self.means[i], self.stdvs[i])
+
         for i in self.KMERS[:3]:
             ret += kmer_str(i)
         ret += "...\n"

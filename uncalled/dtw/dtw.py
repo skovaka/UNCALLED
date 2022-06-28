@@ -222,7 +222,6 @@ class GuidedDTW:
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
             for i in range(band_count):
                 band_lls.append( (int(q+shift), int(r-shift)) )
-                #print(band_lls[-1])
 
                 tgt = starts[q] if q < len(starts) else starts[-1]
                 if r < len(self.ref_kmers) and self.ref_kmers.index[r] <= tgt:
@@ -230,7 +229,6 @@ class GuidedDTW:
                 else:
                     q += 1
 
-            #print(band_lls)
 
             return common + (band_lls, )
 
@@ -247,7 +245,6 @@ class GuidedDTW:
         mref_st = min_mref + np.clip(ll['ref'],                 0, ref_len-1)
         mref_en = min_mref + np.clip(ll['ref']+self.prms.band_width, 0, ref_len-1)
 
-        print(mref_en)
         pac_st = self.index.mref_to_pac(mref_en)
         pac_en = self.index.mref_to_pac(mref_st)
 
