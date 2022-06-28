@@ -656,7 +656,7 @@ def ls(conf, db=None):
 
 def delete(track_name=None, db=None, conf=None):
     if db is None:
-        db = TrackSQL(conf)
+        db = TrackSQL(conf, None, "r")
 
 
     if track_name is None:
@@ -700,7 +700,7 @@ def edit(conf, db=None):
     query = "UPDATE track SET " + ", ".join(updates) + " WHERE name == ?"
     db.cur.execute(query, params)
 
-    if len(fast5s) > 0:
+    if fast5_change:
         _set_fast5s(track_id, fast5s, db)
         
     db.con.commit()
