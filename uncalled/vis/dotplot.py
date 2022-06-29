@@ -130,6 +130,8 @@ class Dotplot:
                         fillcolor="orange",
                         opacity=0.2,
                         fill="tonexty",
+                        name="DTW Band",
+                        legendgroup="band",
                     ), row=2, col=1)
                     fig.add_trace(go.Scattergl(
                         x=bands["sample_end"], 
@@ -138,6 +140,8 @@ class Dotplot:
                         fillcolor="orange",
                         opacity=0.2,
                         fill="tonexty",
+                        legendgroup="band",
+                        showlegend=False
                     ), row=2, col=1)
                 
                 if has_bcaln:
