@@ -625,11 +625,10 @@ class Tracks:
             coords = self.coords
 
         t0 = time.time()
-        layer_iter = self.input.query_layers(
+        layer_iter = self.input.iter_refs(
             self.db_layers, 
             self._aln_track_ids, 
             coords=coords, 
-            order=["fwd","pac"],
             chunksize=self.prms.io.ref_chunksize)
 
         t0 = time.time()
@@ -732,7 +731,7 @@ class Tracks:
             read_id=reads,
             coords=self.coords, 
             full_overlap=full_overlap, 
-            order=["read_id", "fwd", "pac"],
+            order=["read_id", "pac"],
             chunksize=self.prms.io.ref_chunksize)
 
         t = time.time()

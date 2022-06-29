@@ -280,6 +280,7 @@ class TrackSQL(TrackIO):
     def close(self):
         if self.open:
             self.cur.execute("CREATE INDEX IF NOT EXISTS aln_read_idx ON alignment (read_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS aln_fwd_idx ON alignment (fwd);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (pac, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_aln_idx ON dtw (aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (pac, aln_id);")
@@ -563,9 +564,18 @@ class TrackSQL(TrackIO):
             index_col=["pac", "aln_a", "aln_b", "group_b"], 
             params=params)
 
+    def iter_refs(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, chunksize=None, full_overlap=False):
+        if fwd is not None:
+            strands = [int(fwd)]
+        else:
+            strands = [1, 0]
 
-    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, order=["fwd","pac"], chunksize=None, full_overlap=False):
+        for fwd in strands:
+            chunks = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, ["pac"], chunksize, full_overlap)
+            for c in chunks:
+                yield c
 
+    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], chunksize=None, full_overlap=False):
 
         group_layers = collections.defaultdict(list)
         renames = dict()
@@ -598,6 +608,8 @@ class TrackSQL(TrackIO):
             self._add_where(wheres, params, "track_id", track_id)
         if read_id is not None:
             self._add_where(wheres, params, "read_id", read_id)
+        if fwd is not None:
+            self._add_where(wheres, params, "fwd", fwd)
 
         if "cmp" in group_layers:
             self._add_where(wheres, params, "group_b", "bcaln")
@@ -631,7 +643,7 @@ class TrackSQL(TrackIO):
                 
         if chunksize is None:
             return make_groups(ret)
-
+        
         return (make_groups(df) for df in ret)
     
     def _verify_track(self, track_name):
