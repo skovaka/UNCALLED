@@ -10,16 +10,17 @@ from _uncalled import PoreModelParams, ArrayU32, ArrayU16, PORE_MODEL_PRESETS
 import _uncalled
 from . import config
 
-#PRESETS = {p.prms.name : p for p in PORE_MODEL_PRESETS}
-
 CACHE = dict()
 
-#class PoreModel(_PoreModel):
 class PoreModel:
 
     @staticmethod
     def _param_defaults():
         return PoreModelParams(config._DEFAULTS.pore_model)
+
+    @staticmethod
+    def get_kmer_shift(k):
+        return (k - 1) // 2
 
     def __init__(self, model=None, name=None, reverse=None, complement=None, df=None, extra_cols=False, cache=True):
         is_preset = False
@@ -92,7 +93,9 @@ class PoreModel:
             CACHE[prms.name] = self.instance
 
     def _init_new(self, prms, *args):
-        ModelType = getattr(_uncalled, f"PoreModelK{prms.k}")
+        ModelType = getattr(_uncalled, f"PoreModelK{prms.k}", None)
+        if ModelType is None:
+            raise ValueError(f"Invalid k-mer length {prms.k}")
         self._init(prms, ModelType(*args))
 
     def _init(self, prms, instance):

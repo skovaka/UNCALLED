@@ -33,7 +33,8 @@ import collections.abc
 import pandas as pd
 from . import RefCoord, str_to_coord
 
-from _uncalled import RefIndexK5, RefIndexK9, RefIndexK10, RefIndexK11, _RefCoord, self_align
+import _uncalled
+from .pore_model import PoreModel
 from .argparse import Opt
 
 
@@ -287,21 +288,28 @@ class CoordSpace:
 class RefIndex:
 
     def __init__(self, k, *args, **kwargs):
+
+        self.InstanceClass = getattr(_uncalled, f"RefIndexK{k}", None)
+        if self.InstanceClass is None:
+            raise ValueError(f"Invalid k-mer length {k}")
+
+        shift = PoreModel.get_kmer_shift(k)
+        self.trim = (shift, k-shift-1)
         
-        if k == 5:
-            self.InstanceClass = RefIndexK5
-            self.trim = (2, 2)
-        elif k == 9:
-            self.InstanceClass = RefIndexK9
-            self.trim = (4, 4)
-        elif k == 10:
-            self.InstanceClass = RefIndexK10
-            self.trim = (4, 5)
-        elif k == 11:
-            self.InstanceClass = RefIndexK11
-            self.trim = (5, 5)
-        else:
-            raise ValueError(f"Invalid k-mer length: {k}")
+        #if k == 5:
+        #    self.InstanceClass = RefIndexK5
+        #    self.trim = (2, 2)
+        #elif k == 9:
+        #    self.InstanceClass = RefIndexK9
+        #    self.trim = (4, 4)
+        #elif k == 10:
+        #    self.InstanceClass = RefIndexK10
+        #    self.trim = (4, 5)
+        #elif k == 11:
+        #    self.InstanceClass = RefIndexK11
+        #    self.trim = (5, 5)
+        #else:
+        #    raise ValueError(f"Invalid k-mer length: {k}")
 
         self.instance = self.InstanceClass(*args, **kwargs)
 
@@ -519,7 +527,7 @@ class IndexParameterizer:
         else:
             sample_dist = self.prms.max_sample_dist
 
-        fmlens = self_align(self.prms.index_prefix, sample_dist)
+        fmlens = _uncalled.self_align(self.prms.index_prefix, sample_dist)
         path_kfmlens = [p[self.prms.kmer_len-1:] if len(p) >= self.prms.kmer_len else [1] for p in fmlens]
 
         max_pathlen = 0

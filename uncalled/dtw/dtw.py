@@ -13,22 +13,23 @@ from ..argparse import ArgParser
 from ..index import str_to_coord
 from ..fast5 import Fast5Reader
 
-from _uncalled import (
-    GlobalDTWK5, StaticBDTWK5, BandedDTWK5, 
-    GlobalDTWK9, StaticBDTWK9, BandedDTWK9, 
-    GlobalDTWK10, StaticBDTWK10, BandedDTWK10, 
-    DTW_PRMS_EVT_GLOB, DtwParams
-)
+import _uncalled
 
 from ..signal_processor import SignalProcessor
 
 from . import Bcaln, Tracks
 
 #TODO make this better
+#METHODS = {
+#        "guided" : {5: BandedDTWK5, 10: BandedDTWK10, 9: BandedDTWK9},
+#        "static" : {5: StaticBDTWK5, 10: StaticBDTWK10, 9: StaticBDTWK9},
+#        "global" : {5: GlobalDTWK5, 10: GlobalDTWK10, 10: GlobalDTWK9}
+#}
+
 METHODS = {
-        "guided" : {5: BandedDTWK5, 10: BandedDTWK10, 9: BandedDTWK9},
-        "static" : {5: StaticBDTWK5, 10: StaticBDTWK10, 9: StaticBDTWK9},
-        "global" : {5: GlobalDTWK5, 10: GlobalDTWK10, 10: GlobalDTWK9}
+        "guided" : "BandedDTW", 
+        "static" : "StaticBDTW",
+        "global" : "GlobalDTW", 
 }
 
 def dtw(conf):
@@ -128,10 +129,11 @@ class GuidedDTW:
             opts = "\", \"".join(METHODS.keys())
             raise ValueError(f"Error: unrecongized DTW method \"{method}. Must be one of \"{opts}\"")
 
-        if not self.model.K in METHODS[self.method]:
-            raise ValueError(f"Invalid DTW k-mer length: {self.model.K}")
+        method = METHODS[self.method]
+        self.dtw_fn = getattr(_uncalled, f"{method}K{self.model.K}", None)
 
-        self.dtw_fn = METHODS[self.method][self.model.K]
+        if self.dtw_fn is None:
+            raise ValueError(f"Invalid DTW k-mer length {self.model.K}")
 
         self.samp_min = self.bcaln["start"].min()
         self.samp_max = self.bcaln["start"].max()

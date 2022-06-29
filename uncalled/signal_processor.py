@@ -8,11 +8,11 @@ from .config import ParamGroup, Config
 from .pafstats import parse_paf
 from . import EventDetector, EventProfiler, Normalizer
 from .pore_model import PoreModel
-from _uncalled import SignalProcessorK5, SignalProcessorK9, SignalProcessorK10, _ProcessedRead
+import _uncalled
 
-class ProcessedRead(_ProcessedRead):
+class ProcessedRead(_uncalled._ProcessedRead):
     def __init__(self, read, raw):
-        _ProcessedRead.__init__(self, read)
+        _uncalled._ProcessedRead.__init__(self, read)
         self.signal = raw.signal
 
     def sample_range(self, start, end):
@@ -45,15 +45,12 @@ class ProcessedRead(_ProcessedRead):
     def to_df(self):
         return pd.DataFrame(self.events)
 
-KMER_CLASSES = {
-    5  : SignalProcessorK5,
-    9  : SignalProcessorK9,
-    10 : SignalProcessorK10,
-}
-
 class SignalProcessor:
     def __init__(self, model, conf):
-        self.InstanceClass = KMER_CLASSES[model.K]
+
+        self.InstanceClass = getattr(_uncalled, f"SignalProcessorK{model.K}", None)
+        if self.InstanceClass is None:
+            raise ValueError(f"Invalid k-mer length {model.K}")
 
         if isinstance(model, PoreModel):
             model = model.instance
