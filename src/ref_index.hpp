@@ -289,7 +289,7 @@ class RefIndex {
     }
 
     bool is_mref_flipped(i64 i) const {
-        return i >= static_cast<i32>(size() / 2);
+        return i >= static_cast<i64>(size() / 2);
     }
 
     bool is_mref_fwd(i64 i, bool is_rna) const {

@@ -199,7 +199,7 @@ class GuidedDTW:
 
         return pd.DataFrame({'mref': mrefs}, 
                             index = evts,
-                            dtype='Int32') \
+                            dtype='Int64') \
                  .join(signal.to_df()) \
                  .drop(columns=['mask'], errors='ignore') \
                  .rename(columns={'mean' : 'current', 'stdv' : 'current_stdv'})
