@@ -6,6 +6,7 @@
 #include <cfloat>
 #include "util.hpp"
 #include "pore_model.hpp"
+#include "dataframe.hpp"
 
 enum class DTWSubSeq {NONE, ROW, COL};
 enum class DTWCostFn {ABS_DIFF, NORM_PDF, Z_SCORE};
@@ -207,15 +208,19 @@ class GlobalDTW {
     #endif
 };
 
+struct Coord {
+    i32 qry,ref; //quer, reference
+};
+
+#ifdef PYBIND
+//PyArray<Coord> get_guided_bands(PyArray<i32> bc_refs, PyArray<i32> bc_samps, PyArray<i32> event_samps);
+#endif
+
 template <typename ModelType>
 class BandedDTW {
     public:
 
     using KmerType = typename ModelType::kmer_t;
-
-    struct Coord {
-        i32 qry,ref; //quer, reference
-    };
 
     public:
     enum Move {D, H, V}; //Horizontal, vertical, diagonal
@@ -224,8 +229,8 @@ class BandedDTW {
     const DtwParams PRMS;
     const DTWCostFn cost_fn_;
 
-    const std::vector<float> qry_vals_;
-    const std::vector<KmerType> ref_vals_;
+    const std::vector<float> &qry_vals_;
+    const std::vector<KmerType> &ref_vals_;
 
     const ModelType model_;
 
@@ -594,7 +599,6 @@ class BandedDTW {
         c.def_property_readonly("path", [](BandedDTW<ModelType> &d) -> pybind11::array_t<Coord> {
              return pybind11::array_t<Coord>(d.path_.size(), d.path_.data());
         });
-        PYBIND11_NUMPY_DTYPE(Coord, qry, ref);
     }
     #endif
 };

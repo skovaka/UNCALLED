@@ -106,11 +106,6 @@ class SignalProcessor {
 
     #ifdef PYBIND
 
-    #define PY_PROC_ARR(T, A, D) p.def_property_readonly(#A, \
-        [](ProcessedRead &r) -> py::array_t<T> { \
-            return py::array_t<T>(r.A.size(), r.A.data()); \
-        }, D);
-
     static void pybind(py::module_ &m, const std::string &suffix) {
         py::class_<SignalProcessor> s(m, ("SignalProcessor" + suffix).c_str());
         s.def(pybind11::init<const ModelType &, EventDetector::Params>());
@@ -121,11 +116,16 @@ class SignalProcessor {
 
 };
 
+#define PY_PROC_ARR(T, A, D) p.def_property_readonly(#A, \
+    [](ProcessedRead &r) -> py::array_t<T> { \
+        return py::array_t<T>(r.A.size(), r.A.data()); \
+    }, D);
+
+
 #ifdef PYBIND
 void signal_processor_pybind(py::module_ &m) {
 
     PYBIND11_NUMPY_DTYPE(NormVals, start, end, scale, shift);
-
 
     //TODO move to ProcessedRead
     py::class_<ProcessedRead> p(m, "_ProcessedRead");

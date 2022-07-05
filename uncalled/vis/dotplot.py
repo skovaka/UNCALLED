@@ -288,7 +288,7 @@ class Dotplot:
 
     def _plot_bcaln(self, fig, legend, layers):
         fig.add_trace(go.Scattergl(
-            x=layers["bcaln","start"], y=layers.index,#-2, #-1
+            x=layers["bcaln","middle"], y=layers.index,#-2, #-1
             #x=layers["bcaln","start"], y=layers.index,#+2, #-1
             name="Basecalled Alignment",
             mode="markers", marker={"size":5,"color":"orange"},

@@ -19,13 +19,6 @@ from ..signal_processor import SignalProcessor
 
 from . import Bcaln, Tracks
 
-#TODO make this better
-#METHODS = {
-#        "guided" : {5: BandedDTWK5, 10: BandedDTWK10, 9: BandedDTWK9},
-#        "static" : {5: StaticBDTWK5, 10: StaticBDTWK10, 9: StaticBDTWK9},
-#        "global" : {5: GlobalDTWK5, 10: GlobalDTWK10, 10: GlobalDTWK9}
-#}
-
 METHODS = {
         "guided" : "BandedDTW", 
         "static" : "StaticBDTW",
@@ -216,23 +209,25 @@ class GuidedDTW:
         #should maybe move to C++
         if self.method == "guided":
             band_count = qry_len + ref_len
-            band_lls = list()
 
-            starts = self.bcaln.index[self.bcaln["start"].searchsorted(read_block['start'])]
-
-            q = r = 0
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
-            for i in range(band_count):
-                band_lls.append( (int(q+shift), int(r-shift)) )
 
-                tgt = starts[q] if q < len(starts) else starts[-1]
-                if r < len(self.ref_kmers) and self.ref_kmers.index[r] <= tgt:
-                    r += 1
-                else:
-                    q += 1
+            ar = _uncalled.PyArrayI32
+            bands = _uncalled.get_guided_bands(ar(self.bcaln.index), ar(self.bcaln["start"]), ar(read_block['start']), shift)
 
+            #starts = self.bcaln.index[self.bcaln["start"].searchsorted(read_block['start'])]
+            #bands = list()
+            #q = r = 0
+            #for i in range(band_count):
+            #    bands.append( (int(q+shift), int(r-shift)) )
 
-            return common + (band_lls, )
+            #    tgt = starts[q] if q < len(starts) else starts[-1]
+            #    if r < len(self.ref_kmers) and self.ref_kmers.index[r] <= tgt:
+            #        r += 1
+            #    else:
+            #        q += 1
+
+            return common + (bands, )
 
         elif self.method == "static":
             return common

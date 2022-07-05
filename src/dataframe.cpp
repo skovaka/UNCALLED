@@ -3,8 +3,14 @@
 
 decltype(AlnCoords::columns) AlnCoords::columns;
 
+#define BIND_DF(name) name::pybind<name>(m, "_"#name);
+
+constexpr AlnCoordsDF::NameArray AlnCoordsDF::names;
+
 void pybind_dataframes(py::module_ &m) {
     AlnCoords::pybind_rec<AlnCoords>(m);
+
+    BIND_DF(AlnCoordsDF)
 
     PyArray<float>::pybind(m, "PyArrayF32");
     PyArray<int>::pybind(m, "PyArrayI32");  
