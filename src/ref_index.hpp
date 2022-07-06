@@ -298,7 +298,7 @@ class RefIndex {
 
     i64 mref_to_pac(i64 mref) {
         if (is_mref_flipped(mref)) {
-            return size() - mref + 1;
+            return size() - mref - 1;
         }
         return mref;
     }
@@ -363,9 +363,13 @@ class RefIndex {
         return INT_MAX;
     } 
 
+    //TODO overload same function below
     i64 get_pac_shift(const std::string &ref_name) {
-        auto rid = get_ref_id(ref_name);
-        return bns_->anns[rid].offset;
+        return get_ref_shift(get_ref_id(ref_name));
+    }
+
+    i64 get_ref_shift(i32 ref_id) {
+        return bns_->anns[ref_id].offset;
     }
 
     bool pacseq_loaded() const {

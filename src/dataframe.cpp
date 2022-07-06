@@ -1,5 +1,6 @@
 #ifdef PYBIND
 #include "dataframe.hpp"
+#include "util.hpp"
 
 decltype(AlnCoords::columns) AlnCoords::columns;
 
@@ -14,9 +15,10 @@ void pybind_dataframes(py::module_ &m) {
 
     PyArray<float>::pybind(m, "PyArrayF32");
     PyArray<int>::pybind(m, "PyArrayI32");  
-    //PyArray<u8>::pybind(m, "PyArrayU8");  
-    //PyArray<u16>::pybind(m, "PyArrayU16");  
-    //PyArray<u32>::pybind(m, "PyArrayU32");  
+    PyArray<i64>::pybind(m, "PyArrayI64");  
+    PyArray<u8>::pybind(m, "PyArrayU8");  
+    PyArray<u16>::pybind(m, "PyArrayU16");  
+    PyArray<u32>::pybind(m, "PyArrayU32");  
 }
 
 #endif

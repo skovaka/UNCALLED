@@ -140,9 +140,18 @@ class GuidedDTW:
             signal.rescale(reg.coef_, reg.intercept_)
             df = self._calc_dtw(signal)
 
+        df["kmer"] = self.ref_kmers.loc[df["mref"]].to_numpy()
         self.df = df.set_index("mref")
 
-        self.df["kmer"] = self.ref_kmers.loc[self.df.index]
+        #self.df = df.set_index("mref")
+        #print(self.df.index)
+        #i0 = self.index.mref_to_pac(df["mref"])
+        #print(i0)
+        #i1 = self.index.pac_to_ref(i0)
+        #print(i1)
+        #i2 = self.coords.ref_to_mref(i1)
+        #print(i2)
+        #self.df["kmer"] = self.ref_kmers.loc[self.df.index]
 
         tracks.write_dtw_events(self.df, aln_id=aln_id)
 

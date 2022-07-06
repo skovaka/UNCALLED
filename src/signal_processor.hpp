@@ -20,6 +20,8 @@ struct NormVals {
 };
 
 struct ProcessedRead {
+    //std::vector<i32> event_starts, event_lengths;
+    //std::vector<float> event_means, event_stdvs;
     std::vector<Event> events;
     std::vector<NormVals> norm;
     //std::vector<bool> mask;
@@ -50,6 +52,16 @@ struct ProcessedRead {
             e.mean = e.mean * prms.scale + prms.shift;
         }
     }
+
+    #ifdef PYBIND
+    void set_events(py::array_t<Event> arr) {
+        auto evts = PyArray<Event>(arr);
+        events.reserve(evts.size);
+        for (size_t i = 0; i < evts.size; i++) {
+            events.push_back(evts[i]);
+        }
+    }
+    #endif
 };
 
 template <typename ModelType>
@@ -129,10 +141,12 @@ void signal_processor_pybind(py::module_ &m) {
 
     //TODO move to ProcessedRead
     py::class_<ProcessedRead> p(m, "_ProcessedRead");
+    p.def(pybind11::init());
     p.def(pybind11::init<const ProcessedRead &>());
     p.def("rescale", &ProcessedRead::rescale);
     p.def_property_readonly("sample_start", &ProcessedRead::sample_start);
     p.def_property_readonly("sample_end", &ProcessedRead::sample_end);
+    p.def("set_events", &ProcessedRead::set_events);
     PY_PROC_ARR(Event, events, "Un-normalized events");
     PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");
 }

@@ -11,6 +11,7 @@
 #include "signal_processor.hpp"
 #include "dtw.hpp"
 #include "dataframe.hpp"
+#include "eventalign.hpp"
 #include "compare.hpp"
 
 namespace py = pybind11;
@@ -24,15 +25,20 @@ std::vector<bool> unpack_moves(u64 moves, u8 length) {
     return ret;
 }
 
+
 template<size_t K>
 size_t pybind_kmer(py::module_ &m) {
     std::string suffix = "K"+std::to_string(K);
-    PoreModel<K>::pybind_defs(m, suffix);
-    RefIndex<PoreModel<K>>::pybind_defs(m, suffix);//ref_index);
-    BandedDTW<PoreModel<K>>::pybind_defs(m, suffix);
-    StaticBDTW<PoreModel<K>>::pybind_defs(m, suffix);
-    GlobalDTW<PoreModel<K>>::pybind_defs(m, suffix);
-    SignalProcessor<PoreModel<K>>::pybind(m, suffix);
+    using Model = PoreModel<K>;
+    Model::pybind_defs(m, suffix);
+    RefIndex<Model>::pybind_defs(m, suffix);//ref_index);
+    BandedDTW<Model>::pybind_defs(m, suffix);
+    StaticBDTW<Model>::pybind_defs(m, suffix);
+    GlobalDTW<Model>::pybind_defs(m, suffix);
+    SignalProcessor<Model>::pybind(m, suffix);
+    //m.def(("write_eventalign_"+suffix).c_str(), write_eventalign<PoreModel<K>>);
+    auto fn = write_eventalign<Model>;
+    m.def(("write_eventalign_"+suffix).c_str(), fn);
     return K;
 }
 

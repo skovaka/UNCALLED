@@ -11,9 +11,15 @@ from .pore_model import PoreModel
 import _uncalled
 
 class ProcessedRead(_uncalled._ProcessedRead):
-    def __init__(self, read, raw):
-        _uncalled._ProcessedRead.__init__(self, read)
-        self.signal = raw.signal
+    def __init__(self, read, raw=None):
+        if isinstance(read, pd.DataFrame):
+            _uncalled._ProcessedRead.__init__(self)
+            read = read[["mean","stdv","start","length"]].to_records(index=False)
+            self.set_events(read)
+        else:
+            _uncalled._ProcessedRead.__init__(self, read)
+
+        self.signal = raw.signal if raw is not None else None
 
     def sample_range(self, start, end):
         mask = (self.events["start"] >= start) & (self.events["start"] <= end)

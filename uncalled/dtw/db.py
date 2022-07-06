@@ -15,10 +15,11 @@ import sys
 
 from .. import config
 
-from _uncalled import _Fast5Reader
+import _uncalled
 from ..fast5 import parse_fast5_paths
 from .aln_track import AlnTrack
 from ..pore_model import PoreModel
+from ..signal_processor import ProcessedRead
 
 INPUT_PARAMS = np.array(["db_in", "eventalign_in", "tombo_in"])
 OUTPUT_PARAMS = np.array(["db_out", "eventalign_out"])
@@ -122,6 +123,36 @@ class Eventalign(TrackIO):
             return
 
         track = self.tracks[0]
+        df = df.sort_index()
+
+        pacs = df.index.get_level_values(0)
+        events = df[group].set_index(track.coords.pac_to_ref(pacs))
+
+        model = track.model
+        kmers = events["kmer"]
+
+        std_level = (events["current"] - model.model_mean) / model.model_stdv
+
+        evts = events.rename(columns={"current" : "mean", "current_stdv" : "stdv"})
+        read = ProcessedRead(evts)
+        sys.stdout.flush()
+
+        eventalign = _uncalled.write_eventalign_K5(
+            self.conf, model.instance, self.prev_aln_id, track.coords.fwd, read,
+            track.coords.ref_name, events.index-2, kmers, 
+            np.arange(len(events))[::-1]+1, #TODO properly rep skips?
+            std_level) #TODO compute internally?
+
+        self.out.write(eventalign)
+
+    def write_layers_old(self, df, index=["pac","aln_id"]):
+        for group in df.columns.levels[0]:
+            if group == "dtw":
+                break
+            return
+
+        track = self.tracks[0]
+        df = df.sort_index()
 
         pacs = df.index.get_level_values(0)
         events = df[group].set_index(track.coords.pac_to_ref(pacs))
@@ -129,44 +160,57 @@ class Eventalign(TrackIO):
         contig = track.coords.ref_name
 
         model = track.model
+        kmers = events["kmer"]
 
-        #kmers = track.coords.kmers[mrefs]
-        kmers = track.layers["dtw","kmer"]
+        std_level = (events["current"] - model.model_mean) / model.model_stdv
+
         if self.conf.is_rna:
-            kmers = model.kmer_rev(kmers)
-        model_kmers = model.kmer_to_str(kmers)
+            model_kmers = model.kmer_rev(kmers)
+        else:
+            model_kmers = kmers
 
         if track.coords.fwd:
             ref_kmers = model_kmers
         else:
-            ref_kmers = model.kmer_to_str(model.kmer_comp(kmers))
+            ref_kmers = model.kmer_comp(model_kmers)
 
         #read_id = track.alignments.iloc[0]["read_id"]
         #sys.stderr.write(f"{self.prev_aln_id}\t{read_id}\n")
 
         #https://github.com/jts/nanopolish/issues/655
-        std_level = (events["current"] - model.model_mean) / model.model_stdv
 
         stdvs = events["current_stdv"] if "current_stdv" in events else pd.NA
+
+        #i32 read_idx, bool fwd,
+        #ProcessedRead read, 
+        #py::array_t<i64> pac_np,
+        #py::array_t<typename ModelType::kmer_t> model_kmer_np,
+        #py::array_t<i32> event_index_np,
+        #py::array_t<float> std_level_np) {
+
 
         eventalign = pd.DataFrame(
             data = {
                 "contig" : track.coords.ref_name,
                 "position" : events.index-2,
-                "reference_kmer" : ref_kmers,
+                "reference_kmer" : model.kmer_to_str(ref_kmers),
                 "read_index" : self.prev_aln_id,
                 "strand" : "t",
                 "event_index" : pd.RangeIndex(0,len(events))[::-1]+1,
                 "event_level_mean" : events["current"],
                 "event_stdv" : stdvs,
                 "event_length" : events["length"] / track.conf.read_buffer.sample_rate,
-                "model_kmer" : model_kmers,
+                "model_kmer" : model.kmer_to_str(model_kmers),
                 "model_mean" : model.means[kmers],
                 "model_stdv" : model.stdvs[kmers],
                 "standardized_level" : std_level,
                 "start_idx" : events["start"],
                 "end_idx" : events["start"] + events["length"],
-            }, index = events.index).sort_values("position")
+            }, index = events.index)#.sort_values("position")
+
+        #print(eventalign[:20])
+        #sys.stdout.flush()
+
 
         eventalign.to_csv(
             self.out, sep="\t",
@@ -681,7 +725,7 @@ def delete(track_name=None, db=None, conf=None):
     print("Deleted track \"%s\"" % track_name)
 
 def edit(conf, db=None):
-    fast5s = _Fast5Reader.Params(conf.fast5_reader)
+    fast5s = _uncalled._Fast5Reader.Params(conf.fast5_reader)
     fast5_change = len(conf.fast5_files) > 0
     track_name = conf.track_name
     if db is None:

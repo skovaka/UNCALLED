@@ -294,9 +294,11 @@ class Tracks:
         track = self._track_or_default(track_name)
 
         if layers.index.names[0] == "mref":
-            layers = layers.rename(index=self.index.mref_to_ref, level=0)
+            layers = layers.set_index(self.index.mref_to_ref(layers.index))
         elif layers.index.names[0] == "pac":
-            layers = layers.rename(index=self.index.pac_to_ref, level=0)
+            layers = layers.set_index(self.index.pac_to_ref(layers.index))
+        #elif layers.index.names[0] == "ref":
+        #    layers = layers.set_index(self.index.ref_to_pac(layers.index))
 
         layers.index.names = ("ref",)
 
@@ -305,7 +307,12 @@ class Tracks:
         else:
             df = track.layers[group]
 
-        self.output.write_layers(df.rename(index=track.coords.ref_to_pac, level=0))
+        pacs = track.coords.ref_to_pac(df.index.levels[0])
+        idx = df.index.set_levels(pacs, 0)
+        df = df.set_index(idx)
+        df.index.names = ("pac", "aln_id")
+        self.output.write_layers(df)
+        #self.output.write_layers(df)
 
     def write_alignment(self, read_id, fast5, coords, layers={}, track_name=None):
         track = self._track_or_default(track_name)
