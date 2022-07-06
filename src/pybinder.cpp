@@ -33,7 +33,7 @@ size_t pybind_kmer(py::module_ &m) {
     Model::pybind_defs(m, suffix);
     RefIndex<Model>::pybind_defs(m, suffix);//ref_index);
     BandedDTW<Model>::pybind_defs(m, suffix);
-    StaticBDTW<Model>::pybind_defs(m, suffix);
+    //StaticBDTW<Model>::pybind_defs(m, suffix);
     GlobalDTW<Model>::pybind_defs(m, suffix);
     SignalProcessor<Model>::pybind(m, suffix);
     //m.def(("write_eventalign_"+suffix).c_str(), write_eventalign<PoreModel<K>>);

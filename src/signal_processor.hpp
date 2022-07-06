@@ -56,8 +56,8 @@ struct ProcessedRead {
     #ifdef PYBIND
     void set_events(py::array_t<Event> arr) {
         auto evts = PyArray<Event>(arr);
-        events.reserve(evts.size);
-        for (size_t i = 0; i < evts.size; i++) {
+        events.reserve(evts.size());
+        for (size_t i = 0; i < evts.size(); i++) {
             events.push_back(evts[i]);
         }
     }

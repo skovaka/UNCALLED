@@ -27,6 +27,7 @@ extern const DtwParams DTW_PRMS_DEF, DTW_PRMS_EVT_GLOB;
 void pybind_dtw(py::module_ &m);
 #endif
 
+
 template <typename ModelType>
 class GlobalDTW {
     public:
@@ -212,6 +213,18 @@ struct Coord {
     i32 qry,ref; //quer, reference
 };
 
+//struct Alignment {
+//    std::vector<Coord> path;
+//    float score;
+//
+//    static void pybind(py::module_ &m) {
+//        c.def_property_readonly("path", [](Alignment &d) -> pybind11::array_t<Coord> {
+//             return pybind11::array_t<Trace>(d.path_.size(), d.path_.data());
+//        });
+//        c.def_readonly("score", &Alignment::score);
+//    }
+//};
+
 #ifdef PYBIND
 //PyArray<Coord> get_guided_bands(PyArray<i32> bc_refs, PyArray<i32> bc_samps, PyArray<i32> event_samps);
 #endif
@@ -229,8 +242,9 @@ class BandedDTW {
     const DtwParams PRMS;
     const DTWCostFn cost_fn_;
 
-    const std::vector<float> &qry_vals_;
-    const std::vector<KmerType> &ref_vals_;
+    const PyArray<float> &qry_vals_;
+    const PyArray<KmerType> &ref_vals_;
+    const PyArray<Coord> &ll_;
 
     const ModelType model_;
 
@@ -238,7 +252,6 @@ class BandedDTW {
 
     //std::vector< std::pair<i32,i32> > ll_;
     std::vector<float> mat_;
-    std::vector<Coord> ll_;
     std::vector<Move> bcrumbs_;
     std::vector<Coord> path_;
     float score_sum_;
@@ -254,55 +267,61 @@ class BandedDTW {
 
     public:
     BandedDTW(const DtwParams &prms,
-              const std::vector<float> &qry_vals,   
-              const std::vector<KmerType> &ref_vals,
-              const ModelType &model) :
+              const PyArray<float> &qry_vals,   
+              const PyArray<KmerType> &ref_vals,
+              const ModelType &model,
+              const PyArray<Coord> &ll) :
             PRMS(prms),
             cost_fn_(get_cost_fn(PRMS.cost_fn)),
             qry_vals_(qry_vals),
             ref_vals_(ref_vals),
+            ll_(ll),
             model_(model) {
-    }
-
-    BandedDTW(const DtwParams &prms,
-              const std::vector<float> &qry_vals,   
-              const std::vector<KmerType> &ref_vals,
-              const ModelType &model,
-              const std::vector<Coord> &ll) :
-                BandedDTW(prms, qry_vals, ref_vals, model) {
-
-        ll_ = ll;
-
         init_mat();
         fill_mat();          
         traceback();
     }
 
-    BandedDTW(const DtwParams &prms,
-              const std::vector<float> &qry_vals,   
-              const std::vector<KmerType> &ref_vals,
-              const ModelType &model,
-              const std::vector<std::pair<i32,i32>> &ll) :
-                BandedDTW<ModelType>(prms, qry_vals, ref_vals, model) {
-        //assert(lower.size() == left.size());
+    //BandedDTW(const DtwParams &prms,
+    //          const PyArray<float> &qry_vals,   
+    //          const PyArray<KmerType> &ref_vals,
+    //          const ModelType &model,
+    //          const PyArray<Coord> &ll) :
+    //            BandedDTW(prms, qry_vals, ref_vals, model) {
 
-        ll_.resize(ll.size());
-        //for (size_t i = 0; i < lower.size(); i++) {
-        for (size_t i = 0; i < ll.size(); i++) {
-            ll_[i] = {ll[i].first, ll[i].second};
-        }
+    //    //ll_.resize(ll.size());
+    //    ////for (size_t i = 0; i < lower.size(); i++) {
+    //    //for (size_t i = 0; i < ll.size(); i++) {
+    //    //    ll_[i] = ll[i];
+    //    //}
 
-        init_mat();
-        fill_mat();          
-        traceback();
-    }
+    //}
+
+    //BandedDTW(const DtwParams &prms,
+    //          const PyArray<float> &qry_vals,   
+    //          const PyArray<KmerType> &ref_vals,
+    //          const ModelType &model,
+    //          const std::vector<std::pair<i32,i32>> &ll) :
+    //            BandedDTW<ModelType>(prms, qry_vals, ref_vals, model) {
+    //    //assert(lower.size() == left.size());
+
+    //    ll_.resize(ll.size());
+    //    //for (size_t i = 0; i < lower.size(); i++) {
+    //    for (size_t i = 0; i < ll.size(); i++) {
+    //        ll_[i] = {ll[i].first, ll[i].second};
+    //    }
+
+    //    init_mat();
+    //    fill_mat();          
+    //    traceback();
+    //}
 
     u32 band_count() const {
         return ref_size() + qry_size() - 1;
     }
 
     template <typename T>
-    bool in_range(i32 i, const std::vector<T> &v) {
+    bool in_range(i32 i, const PyArray<T> &v) {
         return static_cast<u32>(i) >= 0 && static_cast<u32>(i) < v.size();
     }
 
@@ -575,25 +594,26 @@ class BandedDTW {
         pybind11::class_<BandedDTW<ModelType>> c(m, ("BandedDTW" + suffix).c_str());
 
         c.def(pybind11::init<const DtwParams &,
-                             const std::vector<float>&, 
-                             const std::vector<KmerType>&,
+                             const PyArray<float>&, 
+                             const PyArray<KmerType>&,
                              const ModelType&,
-                             const std::vector<Coord>&>());
+                             const PyArray<Coord>&>());
 
-        c.def(pybind11::init<const DtwParams &, 
-                             const std::vector<float>&, 
-                             const std::vector<KmerType>&,
-                             const ModelType&,
-                             const std::vector<std::pair<i32,i32>>& >());
+        //c.def(pybind11::init<const DtwParams &, 
+        //                     const std::vector<float>&, 
+        //                     const std::vector<KmerType>&,
+        //                     const ModelType&,
+        //                     const std::vector<std::pair<i32,i32>>& >());
+
         PY_BANDED_DTW_METH(get_path)
         PY_BANDED_DTW_METH(score)
         PY_BANDED_DTW_METH(mean_score)
-        c.def_readonly("ll", &BandedDTW<ModelType>::ll_);
+        //c.def_readonly("ll", BandedDTW<ModelType>::ll_);
         PY_BANDED_DTW_METH(mean_score)
         PY_BANDED_DTW_METH(get_flat_mat)
 
         c.def_property_readonly("ll", [](BandedDTW<ModelType> &d) -> pybind11::array_t<Coord> {
-             return pybind11::array_t<Coord>(d.ll_.size(), d.ll_.data());
+             return pybind11::array_t<Coord>(d.ll_.size(), d.ll_.data);
         });
 
         c.def_property_readonly("path", [](BandedDTW<ModelType> &d) -> pybind11::array_t<Coord> {
@@ -603,60 +623,60 @@ class BandedDTW {
     #endif
 };
 
-template <typename ModelType>
-class StaticBDTW : public BandedDTW<ModelType> {
-
-    public:
-
-    using KmerType = typename ModelType::kmer_t;
-
-    StaticBDTW(
-           const DtwParams &prms,
-           const std::vector<float> &qry_vals,   
-           const std::vector<KmerType> &ref_vals,
-           const ModelType &model) : 
-            BandedDTW<ModelType>(prms, qry_vals, ref_vals, model) {
-
-        init_mat();
-        BandedDTW<ModelType>::fill_mat();
-        BandedDTW<ModelType>::traceback();
-    }
-
-    void init_mat() {
-        auto slope = static_cast<float>(BandedDTW<ModelType>::ref_size()) / BandedDTW<ModelType>::qry_size();
-        auto shift = static_cast<i32>(BandedDTW<ModelType>::PRMS.band_width * BandedDTW<ModelType>::PRMS.band_shift);
-        i32 q = 0, r = 0;
-
-        //std::cout << qry_size() << "\t" << ref_size() << " SIZE\n";
-        //std::cout << slope << "\t" << shift << " SLOPE\n";
-
-        for (size_t i = 0; i < BandedDTW<ModelType>::band_count(); i++) {
-            BandedDTW<ModelType>::ll_.push_back({q+shift,r-shift});
-
-            float down_dist  = std::abs( (r - slope * (q+1)) ),
-                  right_dist = std::abs( ((r+1) - slope * q) );
-            if (down_dist < right_dist) q += 1;
-            else r += 1;
-        }
-
-        //std::cout << ll_.front().qry << "\t"
-        //          << ll_.front().ref << "\n"
-        //          << ll_.back().qry << "\t"
-        //          << ll_.back().ref << "\n";
-
-        BandedDTW<ModelType>::init_mat();
-    }
-
-    #ifdef PYBIND
-    //static void pybind_defs(pybind11::class_<StaticBDTW, BandedDTW<ModelType>> &c) {
-    static void pybind_defs(pybind11::module_ &m, const std::string &suffix) {
-        pybind11::class_<StaticBDTW, BandedDTW<ModelType>> c(m, ("StaticBDTW" + suffix).c_str());
-        c.def(pybind11::init<const DtwParams &,
-                             const std::vector<float>&, 
-                             const std::vector<KmerType>&,
-                             const ModelType &>());
-    }
-    #endif
-};
+//template <typename ModelType>
+//class StaticBDTW : public BandedDTW<ModelType> {
+//
+//    public:
+//
+//    using KmerType = typename ModelType::kmer_t;
+//
+//    StaticBDTW(
+//           const DtwParams &prms,
+//           const std::vector<float> &qry_vals,   
+//           const std::vector<KmerType> &ref_vals,
+//           const ModelType &model) : 
+//            BandedDTW<ModelType>(prms, qry_vals, ref_vals, model) {
+//
+//        init_mat();
+//        BandedDTW<ModelType>::fill_mat();
+//        BandedDTW<ModelType>::traceback();
+//    }
+//
+//    void init_mat() {
+//        auto slope = static_cast<float>(BandedDTW<ModelType>::ref_size()) / BandedDTW<ModelType>::qry_size();
+//        auto shift = static_cast<i32>(BandedDTW<ModelType>::PRMS.band_width * BandedDTW<ModelType>::PRMS.band_shift);
+//        i32 q = 0, r = 0;
+//
+//        //std::cout << qry_size() << "\t" << ref_size() << " SIZE\n";
+//        //std::cout << slope << "\t" << shift << " SLOPE\n";
+//
+//        for (size_t i = 0; i < BandedDTW<ModelType>::band_count(); i++) {
+//            BandedDTW<ModelType>::ll_.push_back({q+shift,r-shift});
+//
+//            float down_dist  = std::abs( (r - slope * (q+1)) ),
+//                  right_dist = std::abs( ((r+1) - slope * q) );
+//            if (down_dist < right_dist) q += 1;
+//            else r += 1;
+//        }
+//
+//        //std::cout << ll_.front().qry << "\t"
+//        //          << ll_.front().ref << "\n"
+//        //          << ll_.back().qry << "\t"
+//        //          << ll_.back().ref << "\n";
+//
+//        BandedDTW<ModelType>::init_mat();
+//    }
+//
+//    #ifdef PYBIND
+//    //static void pybind_defs(pybind11::class_<StaticBDTW, BandedDTW<ModelType>> &c) {
+//    static void pybind_defs(pybind11::module_ &m, const std::string &suffix) {
+//        pybind11::class_<StaticBDTW, BandedDTW<ModelType>> c(m, ("StaticBDTW" + suffix).c_str());
+//        c.def(pybind11::init<const DtwParams &,
+//                             const std::vector<float>&, 
+//                             const std::vector<KmerType>&,
+//                             const ModelType &>());
+//    }
+//    #endif
+//};
 
 #endif

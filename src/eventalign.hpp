@@ -42,7 +42,7 @@ std::string write_eventalign(
 
     std::stringstream ss;
 
-    for (size_t i = 0; i < ref.size; i++) {
+    for (size_t i = 0; i < ref.size(); i++) {
         auto &evt = read.events[i];
         auto kmer = kmers[i], model_kmer = kmer;
         if (!conf.read_buffer.seq_fwd) model_kmer = model.kmer_rev(kmer);

@@ -236,13 +236,13 @@ class GuidedDTW:
             #    else:
             #        q += 1
 
-            return common + (bands, )
+            return (self.prms, _uncalled.PyArrayF32(read_block['mean']), _uncalled.PyArrayU16(ref_kmers), self.model.instance, _uncalled.PyArrayCoord(bands))
 
-        elif self.method == "static":
-            return common
+        #elif self.method == "static":
+        #    return common
 
         else:
-            return common + (DTW_GLOB,)
+            return (self.prms, read_block['mean'].to_numpy(), self.model.kmer_array(ref_kmers), self.model.instance, DTW_GLOB)
 
     #TODO store in ReadAln metadata
     def _ll_to_df(self, ll, read_block, min_mref, ref_len):

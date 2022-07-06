@@ -30,12 +30,12 @@ class Compare {
 
         int ref;
 
-        while (i < a.size && j < b.size) {
+        while (i < a.size() && j < b.size()) {
             float jaccard = INF;
 
-            if (i == a.size) {
+            if (i == a.size()) {
                 ref = b[j++].ref;
-            } else if (j == b.size) {
+            } else if (j == b.size()) {
                 ref = a[i++].ref;
             } else if (a[i].ref < b[j].ref) {
                 ref = a[i++].ref;     
@@ -75,14 +75,14 @@ class Compare {
         struct Coefs {float dist, length;};
         Coefs next_dist(int ref) {
             Coefs c = {0,0};
-            for (; i < a.size; i++) {
+            for (; i < a.size(); i++) {
                 if (a[i].ref == ref) break;
                 else if (a[i].ref > ref) {
                     //std::cout << "Skipped\n";
                     return c;
                 }
             }
-            for (; j < b.size; j++) {
+            for (; j < b.size(); j++) {
                 if (b[j].end > a[i].start) break;
             }
             if (ended() || b[j].start >= a[i].end) { 
@@ -98,17 +98,17 @@ class Compare {
                 c.length += len;
                 //std::cout << i << " " << j << " " << c.dist << " " << c.length << "\n";
                 j++;
-            } while (j < b.size && b[j].start < a[i].end);
+            } while (j < b.size() && b[j].start < a[i].end);
 
             do {
                 j--;
-            } while (j > 0 && j < b.size && b[j].start == b[j-1].start);
+            } while (j > 0 && j < b.size() && b[j].start == b[j-1].start);
 
             return c;
         }
 
         bool ended() const {
-            return i == a.size || j == b.size;
+            return i == a.size() || j == b.size();
         }
     };
 

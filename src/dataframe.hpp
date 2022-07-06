@@ -16,29 +16,29 @@ struct PyArray {
     std::vector<T> data_vec;
     py::buffer_info info;
     T *data;
-    size_t size;
+    size_t size_;
 
     PyArray(size_t length, T fill) :
         data_vec { length, fill },
         info { data_vec.data(), length },
         data { data_vec.data() },
-        size { length } {}
+        size_ { length } {}
 
     PyArray(T *ptr, size_t length) :
         info { ptr, length },
         data { ptr },
-        size { length } {}
+        size_ { length } {}
 
     PyArray(py::array_t<T> arr) :
         info { arr.request() },
         data { static_cast<T*>(info.ptr) },
-        size { static_cast<size_t>(info.shape[0]) } {}
+        size_ { static_cast<size_t>(info.shape[0]) } {}
 
     PyArray(const PyArray &) = delete;
     PyArray &operator=(const PyArray &) = delete;
     PyArray(PyArray&&) = default;
 
-    T &operator[](size_t i) {
+    T &operator[](size_t i) const {
         return data[i];
     }
 
@@ -47,11 +47,15 @@ struct PyArray {
     }
 
     T *end() const {
-        return &data[size];
+        return &data[size_];
     }
 
     py::array_t<T> to_numpy() {
-        return py::array_t<T>(size, data);
+        return py::array_t<T>(size_, data);
+    }
+
+    size_t size() const {
+        return size_;
     }
 
     template < typename Subclass = PyArray<T> >
@@ -64,14 +68,14 @@ struct PyArray {
 				sizeof(T),                          
 				py::format_descriptor<T>::format(), 
 				1,                                  
-				{c.size},
+				{c.size_},
 				{sizeof(T)}
 			);
 		});
 		c.def("to_numpy", &Subclass::to_numpy);
 
 		c.def("__getitem__", &Subclass::operator[]);
-		c.def("__len__", [](Subclass &c) -> size_t {return c.size;});
+		c.def("__len__", &Subclass::size);
 
         return c;
     }
@@ -129,14 +133,14 @@ class DataFrame {
     }
 
     size_t init_height() {
-        auto size = std::get<0>(data_).size;
+        auto size = std::get<0>(data_).size();
         return init_height<1>(size);
     }
 
     template <size_t I>
     typename std::enable_if<I < width, size_t>::type
     init_height(size_t size) {
-        if (std::get<I>(data_).size != size) {
+        if (std::get<I>(data_).size() != size) {
             throw std::runtime_error("All DataFrame columns must be same size");
         }
         return init_height<I+1>(size);
