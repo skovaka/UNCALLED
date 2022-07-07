@@ -9,7 +9,7 @@ const DtwParams
 
 #ifdef PYBIND
 py::array_t<Coord> get_guided_bands(PyArray<i32> &bc_refs, PyArray<i32> &bc_samps, PyArray<i32> &event_samps, i32 shift) {
-    size_t nbands = (bc_refs[bc_refs.size-1]-bc_refs[0]+2) + event_samps.size;
+    size_t nbands = (bc_refs[bc_refs.size()-1]-bc_refs[0]+2) + event_samps.size();
     auto ret = py::array_t<Coord>(nbands);
     auto bands = PyArray<Coord>(ret);
 
@@ -19,9 +19,9 @@ py::array_t<Coord> get_guided_bands(PyArray<i32> &bc_refs, PyArray<i32> &bc_samp
         bands[b].qry = j + shift;
         bands[b].ref = r - ref_start - shift;
 
-		if (i == bc_refs.size) j++;
+		if (i == bc_refs.size()) j++;
         else if (r < bc_refs[i]) r++;
-		else if (j == event_samps.size-1 || bc_samps[i] < event_samps[j]) {
+		else if (j == event_samps.size()-1 || bc_samps[i] < event_samps[j]) {
             i++;
             r++;
         } else j++;
