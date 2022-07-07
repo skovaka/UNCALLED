@@ -105,14 +105,15 @@ class PoreModel:
         if prms.name is not None:
             self.PRMS.name = prms.name
 
-        self.KMERS = np.arange(self.KMER_COUNT)
-        self.KMER_STRS = self.kmer_to_str(self.KMERS)
         if self.K > 8:
             self.kmer_dtype = "uint32"
             self.array_type = ArrayU32
         else:
             self.kmer_dtype = "uint16"
             self.array_type = ArrayU16
+
+        self.KMERS = np.arange(self.KMER_COUNT)
+        self.KMER_STRS = self.kmer_to_str(self.KMERS)
 
         self._cols["mean"] = self.means
         self._cols["stdv"] = self.stdvs
@@ -178,8 +179,10 @@ class PoreModel:
 
     def kmer_to_str(self, kmer, dtype=str):
         #, self.ModelType.KmerArray
-        if isinstance(kmer, (Sequence, np.ndarray, pd.Series)):
+        if isinstance(kmer, (Sequence, np.ndarray, pd.Series, self.array_type)):
             return self.ModelType.kmer_to_arr(kmer).astype(dtype)
+        else:
+            print(type(kmer), "NO")
         return dtype(self.ModelType.kmer_to_str(kmer))
 
     def norm_pdf(self, current, kmer):

@@ -290,26 +290,12 @@ class RefIndex:
     def __init__(self, k, *args, **kwargs):
 
         self.InstanceClass = getattr(_uncalled, f"RefIndexK{k}", None)
-        if self.InstanceClass is None:
+        self.Model = getattr(_uncalled, f"PoreModelK{k}", None)
+        if self.InstanceClass is None or self.Model is None:
             raise ValueError(f"Invalid k-mer length {k}")
 
         shift = PoreModel.get_kmer_shift(k)
         self.trim = (shift, k-shift-1)
-        
-        #if k == 5:
-        #    self.InstanceClass = RefIndexK5
-        #    self.trim = (2, 2)
-        #elif k == 9:
-        #    self.InstanceClass = RefIndexK9
-        #    self.trim = (4, 4)
-        #elif k == 10:
-        #    self.InstanceClass = RefIndexK10
-        #    self.trim = (4, 5)
-        #elif k == 11:
-        #    self.InstanceClass = RefIndexK11
-        #    self.trim = (5, 5)
-        #else:
-        #    raise ValueError(f"Invalid k-mer length: {k}")
 
         self.instance = self.InstanceClass(*args, **kwargs)
 
@@ -433,7 +419,7 @@ def index(conf):
     if bwa_built:
         sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % prms.index_prefix)
     else:
-        RefIndexK5.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
+        _uncalled.RefIndexK5.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
         
         if prms.no_bwt: 
             sys.stderr.write("Pacseq built\n")
