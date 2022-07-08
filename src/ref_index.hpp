@@ -440,20 +440,41 @@ class RefIndex {
         return kmer;
     }
 
+    std::vector<KmerType> get_kmers(std::vector<std::pair<i64, i64>> pac_blocks, bool rev, bool comp) {
+        std::vector<KmerType> kmers;
+        for (auto &b : pac_blocks) {
+            get_kmers(b.first, b.second, rev, comp, kmers);
+        }
+        return kmers;
+    }
+
     std::vector<KmerType> get_kmers(i64 pac_start, i64 pac_end, bool rev, bool comp) {
-        std::vector<KmerType> ret;
+        std::vector<KmerType> kmers;
+        get_kmers(pac_start, pac_end, rev, comp, kmers);
+        return kmers;
+    }
+
+    void get_kmers(i64 pac_start, i64 pac_end, bool rev, bool comp, std::vector<KmerType> &kmers) {
         if (!rev) {
-            ret.push_back(get_kmer(pac_start, comp));
-            for (auto i = pac_start+K; i < pac_end; i++) {
-                next_kmer(ret, i, comp);
+            auto i = pac_start;
+            if (kmers.size() == 0) {
+                kmers.push_back(get_kmer(i, comp));
+                i += K;
+            }
+            for (; i < pac_end; i++) {
+                next_kmer(kmers, i, comp);
             }
         } else {
-            ret.push_back(ModelType::kmer_rev(get_kmer(pac_end-K, comp)));
-            for (auto i = pac_end-K-1; i >= pac_start; i--) {
-                next_kmer(ret, i, comp);
+            auto i = pac_end-1;
+            if (kmers.size() == 0) {
+                kmers.push_back(ModelType::kmer_rev(get_kmer(pac_end-K, comp)));
+                i -= K;
+            }
+            //for (auto i = pac_end-K-1; i >= pac_start; i--) {
+            for (; i >= pac_start; i--) {
+                next_kmer(kmers, i, comp);
             }
         }
-        return ret;
     }
 
     std::vector<KmerType> get_kmers(const std::string &name, i64 start, i64 end, bool rev=false, bool comp=false) {
@@ -638,6 +659,11 @@ class RefIndex {
         c.def("get_kmers", 
             static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64, bool, bool)> (&RefIndex::get_kmers),
             py::arg("pac_start"), py::arg("pac_end"), py::arg("rev"), py::arg("comp"));
+
+        c.def("get_kmers", 
+            static_cast< std::vector<KmerType> (RefIndex::*)(std::vector<std::pair<i64, i64>>, bool, bool)> (&RefIndex::get_kmers),
+            py::arg("pac_blocks"), py::arg("rev"), py::arg("comp"));
+
         c.def("get_kmers", 
             static_cast< std::vector<KmerType> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::get_kmers),
             py::arg("name"), py::arg("start"), py::arg("end"), py::arg("rev")=false, py::arg("comp")=false);

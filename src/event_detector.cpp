@@ -348,5 +348,32 @@ Event EventDetector::create_event(u32 evt_en) {
 }
 
 
+//EventDetectorMeta::EventDetectorMeta(Params prms) : EventDetector(prms) {
+//    
+//}
+
+/*
+EventDetectorMeta::EventDetectorMeta() : EventDetectorMeta(PRMS_DEF) {
+    dbg_.init_window(long_detector.window_length);
+    dbg_.init_window(short_detector.window_length);
+}
+
+void EventDetectorMeta::reset() {
+    EventDetector::reset();
+    dgb_.clear();
+}
+
+float EventDetectorMeta::compute_tstat(u32 w_length) {
+    auto tstat = EventDetector::compute_tstat(w_length);
+    dbg_[w_length].tstats.push_back(tstat);
+    return tstat;
+}
+
+bool EventDetectorMeta::peak_detect(float current_value, EventDetector::Detector &detector) {
+    auto peak = EventDetector::peak_detect(current_value, detector);
+    if (peak) dbg_[detector.window_length].push_back(buf_mid);
+    return peak;
+}
+*/
 //=====================stop===================
 

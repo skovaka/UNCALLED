@@ -8,6 +8,7 @@
 #define _INCL_EVENT_DETECTOR
 
 #include <vector>
+#include <unordered_map>
 #include "util.hpp"
 
 #ifdef PYBIND
@@ -175,6 +176,29 @@ class EventDetector {
 
     Detector short_detector, long_detector;
 };
+
+
+//class EventDetectorMeta : public EventDetector {
+//    struct Dbg {
+//        std::unordered_map<int, std::vector<float>> tstats;
+//        std::unordered_map<int, std::vector<u32>> peaks;
+//
+//        void init_window(u32 window_length) {
+//            tstats[window_length] = {};
+//            peaks[window_length] = {};
+//        }
+//
+//        void reset() {
+//            for (auto &i : tstats) i.second.clear();
+//            for (auto &i : peaks) i.second.clear();
+//        }
+//    };
+//
+//    EventDetectorMeta();
+//    void reset();
+//    float compute_tstat(u32 w_length);
+//    peak_detect(float current_value, EventDetector::Detector &detector);
+//};
 
 
 #endif                          /* EVENT_DETECTION_H */
