@@ -86,6 +86,7 @@ class TrackIO:
 
         track = AlnTrack(self, None, name, name, self.conf, self.model)
         self.tracks.append(track)
+
         return track
 
 
@@ -107,6 +108,10 @@ class Eventalign(TrackIO):
             self.init_write_mode()
         else:
             self.init_read_mode()
+
+    def init_write_mode(self):
+        TrackIO.init_write_mode(self)
+        self.out.write("contig\tposition\treference_kmer\tread_index\tstrand\tevent_index\tevent_level_mean\tevent_stdv\tevent_length\tmodel_kmer\tmodel_mean\tmodel_stdv\tstandardized_level\tstart_idx\tend_idx\n")
 
     def init_read_mode(self):
         if len(self.track_names) != 1:

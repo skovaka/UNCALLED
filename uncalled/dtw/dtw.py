@@ -95,6 +95,8 @@ class GuidedDTW:
 
         aln_id, self.coords = tracks.write_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df})
         #TODO return coords?
+        print(read.id)
+        sys.stdout.flush()
 
         self.index = tracks.index
 
@@ -106,12 +108,35 @@ class GuidedDTW:
 
         self.ref_gaps = list(sorted(bcaln.ref_gaps))
 
-        k = kmers.index[0]
+        prev = k = kmers.index[0]
+        
         kmer_blocks = list()
-        for start,end in self.ref_gaps:
-            kmer_blocks.append(kmers.loc[k:start])
-            k = end
-        kmer_blocks.append(kmers.loc[k:])
+        gap_lens = list()
+        ref_shift = 0
+
+        self.block_coords = list()
+        block_st = self.bcaln.index[0]
+        shift = block_st
+        for gap_st, gap_en in self.ref_gaps:
+            self.block_coords.append((block_st, gap_st, shift))
+            block_st = gap_en
+            shift += gap_en-gap_st
+        self.block_coords.append((block_st,self.bcaln.index[-1]+1,shift))
+        #print(self.block_coords)
+
+        kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
+
+        #print(self.block_coords)
+        #print(kmer_blocks)
+        #print(self.bcaln)
+
+        #kmer_blocks = list()
+        #shift = 0
+        #for st,en,gap in block_coords:
+        #    block = kmers.loc[st:en]
+        #    #block.index -= shift
+        #    kmer_blocks.append(block)
+        #    shift += gap
 
         self.ref_kmers = pd.concat(kmer_blocks)
 
@@ -140,18 +165,10 @@ class GuidedDTW:
             signal.rescale(reg.coef_, reg.intercept_)
             df = self._calc_dtw(signal)
 
+
         df["kmer"] = self.ref_kmers.loc[df["mref"]].to_numpy()
         self.df = df.set_index("mref")
 
-        #self.df = df.set_index("mref")
-        #print(self.df.index)
-        #i0 = self.index.mref_to_pac(df["mref"])
-        #print(i0)
-        #i1 = self.index.pac_to_ref(i0)
-        #print(i1)
-        #i2 = self.coords.ref_to_mref(i1)
-        #print(i2)
-        #self.df["kmer"] = self.ref_kmers.loc[self.df.index]
 
         tracks.write_dtw_events(self.df, aln_id=aln_id)
 
@@ -176,7 +193,8 @@ class GuidedDTW:
         mref_st = self.bcaln.index[0]
         mref_en = self.bcaln.index[-1]+1
 
-        kmers = self.ref_kmers.loc[mref_st:mref_en]
+        #kmers = self.ref_kmers.loc[mref_st:mref_en]
+        kmers = self.ref_kmers
 
         samp_st = self.bcaln.loc[mref_st,"start"]
         samp_en = self.bcaln.loc[mref_en-1,"start"]
@@ -187,7 +205,9 @@ class GuidedDTW:
         
         args = self._get_dtw_args(read_block, mref_st, kmers)
 
+
         dtw = self.dtw_fn(*args)
+
         
         path = np.flip(dtw.path)
         #TODO shouldn't need to clip, error in bdtw
@@ -222,7 +242,16 @@ class GuidedDTW:
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
 
             ar = _uncalled.PyArrayI32
-            bands = _uncalled.get_guided_bands(ar(self.bcaln.index), ar(self.bcaln["start"]), ar(read_block['start']), shift)
+            mrefs = np.array(self.bcaln.index)
+            for st,en,sh in self.block_coords:
+                mrefs[self.bcaln.index.isin(pd.RangeIndex(st,en))] -= sh
+            #print(mrefs)
+
+            bands = _uncalled.get_guided_bands(ar(mrefs), ar(self.bcaln["start"]), ar(read_block['start']), band_count, shift)
+            #rmoves = np.diff(bands["ref"])
+            #qmoves = np.diff(bands["qry"])
+            #print(bands)
+            #print(np.all(rmoves ^ qmoves))
 
             #starts = self.bcaln.index[self.bcaln["start"].searchsorted(read_block['start'])]
             #bands = list()
@@ -236,7 +265,7 @@ class GuidedDTW:
             #    else:
             #        q += 1
 
-            return (self.prms, _uncalled.PyArrayF32(read_block['mean']), _uncalled.PyArrayU16(ref_kmers), self.model.instance, _uncalled.PyArrayCoord(bands))
+            return (self.prms, _uncalled.PyArrayF32(read_block['mean']), _uncalled.PyArrayU16(ref_kmers.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         #elif self.method == "static":
         #    return common

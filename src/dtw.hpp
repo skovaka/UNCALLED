@@ -277,9 +277,17 @@ class BandedDTW {
             ref_vals_(ref_vals),
             ll_(ll),
             model_(model) {
+        //std::cout << "DTW\n";
+        //std::cout.flush();
         init_mat();
+        //std::cout << "init\n";
+        //std::cout.flush();
         fill_mat();          
+        //std::cout << "mat\n";
+        //std::cout.flush();
         traceback();
+        //std::cout << "trace\n";
+        //std::cout.flush();
     }
 
     //BandedDTW(const DtwParams &prms,
