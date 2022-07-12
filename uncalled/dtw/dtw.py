@@ -96,51 +96,46 @@ class GuidedDTW:
         aln_id, self.coords = tracks.write_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df})
         #TODO return coords?
         print(read.id)
-        sys.stdout.flush()
+        #sys.stdout.flush()
 
         self.index = tracks.index
+        self.model = tracks.model
 
-        #kmers = self.coords.kmers.sort_index()
-        mrefs = bcaln.df.index.get_level_values(0)
-        kmers = tracks.index.mrefs_to_kmers(bcaln.coords.mrefs, conf.is_rna, True).sort_index()
-
-        self.bcaln = bcaln.df[bcaln.df.index.isin(kmers.index)].sort_index()[["start"]].dropna()
+        self.bcaln = bcaln.df
 
         self.ref_gaps = list(sorted(bcaln.ref_gaps))
 
-        prev = k = kmers.index[0]
-        
         kmer_blocks = list()
         gap_lens = list()
         ref_shift = 0
 
+        mref_min = self.coords.mrefs.min()-2
+        mref_max = self.coords.mrefs.max()+3
+
         self.block_coords = list()
-        block_st = self.bcaln.index[0]
+        block_st = mref_min
         shift = block_st
         for gap_st, gap_en in self.ref_gaps:
-            self.block_coords.append((block_st, gap_st, shift))
+            self.block_coords.append([block_st, gap_st, shift])
             block_st = gap_en
             shift += gap_en-gap_st
-        self.block_coords.append((block_st,self.bcaln.index[-1]+1,shift))
-        #print(self.block_coords)
+        self.block_coords.append([block_st,mref_max,shift])
 
-        kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
+        #kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
+        new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], conf.is_rna)
 
-        #print(self.block_coords)
-        #print(kmer_blocks)
-        #print(self.bcaln)
+        self.block_coords[0][0] += 2
+        self.block_coords[-1][1] -= 2
+        mrefs = np.concatenate([np.arange(s,e) for s,e,_ in self.block_coords])
 
-        #kmer_blocks = list()
-        #shift = 0
-        #for st,en,gap in block_coords:
-        #    block = kmers.loc[st:en]
-        #    #block.index -= shift
-        #    kmer_blocks.append(block)
-        #    shift += gap
+        #self.ref_kmers = pd.concat(kmer_blocks)
+        self.ref_kmers = pd.Series(new_kmers, index=mrefs)
+        #old = pd.concat(kmer_blocks)
 
-        self.ref_kmers = pd.concat(kmer_blocks)
+        #print(list(new_kmers))
+        #print(list(self.ref_kmers))
+        #print(len(new_kmers), len(self.ref_kmers))
 
-        self.model = tracks.model
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
@@ -194,16 +189,16 @@ class GuidedDTW:
         mref_en = self.bcaln.index[-1]+1
 
         #kmers = self.ref_kmers.loc[mref_st:mref_en]
-        kmers = self.ref_kmers
+        #kmers = self.ref_kmers
 
-        samp_st = self.bcaln.loc[mref_st,"start"]
-        samp_en = self.bcaln.loc[mref_en-1,"start"]
+        samp_st = self.bcaln.iloc[0]["start"]
+        samp_en = self.bcaln.iloc[-1]["start"] + self.bcaln.iloc[-1]["length"]
 
         read_block = signal.sample_range(samp_st, samp_en)
 
         block_signal = read_block['mean'].to_numpy()
         
-        args = self._get_dtw_args(read_block, mref_st, kmers)
+        args = self._get_dtw_args(read_block, mref_st, self.ref_kmers)
 
 
         dtw = self.dtw_fn(*args)
@@ -212,7 +207,7 @@ class GuidedDTW:
         path = np.flip(dtw.path)
         #TODO shouldn't need to clip, error in bdtw
         evts = read_block.index[np.clip(path['qry'], 0, len(read_block))]
-        mrefs = kmers.index[path['ref']]
+        mrefs = self.ref_kmers.index[path['ref']]
 
         if self.prms.save_bands and hasattr(dtw, "ll"):
             self.bands = self._ll_to_df(dtw.ll, read_block, mref_st, len(kmers))

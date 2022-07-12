@@ -41,7 +41,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
-
 namespace py = pybind11;
 #endif
 
@@ -482,17 +481,30 @@ class RefIndex {
             pac_end = ref_to_pac(name, end);
         return get_kmers(pac_start, pac_end, rev, comp);
     }
+
+    std::vector<KmerType> get_kmers(std::vector<std::pair<i64, i64>> mref_blocks, bool is_rna) {
+        std::vector<KmerType> kmers;
+        for (auto &b : mref_blocks) {
+            get_kmers(b.first, b.second, is_rna, kmers);
+        }
+        return kmers;
+    }
     
     std::vector<KmerType> get_kmers(i64 mref_start, i64 mref_end, bool is_rna) {
+        std::vector<KmerType> kmers;
+        get_kmers(mref_start, mref_end, is_rna, kmers);
+        return kmers;
+    }
+
+    void get_kmers(i64 mref_start, i64 mref_end, bool is_rna, std::vector<KmerType> &kmers) {
         bool rev = is_mref_flipped(mref_end-1);
         bool comp = rev != is_rna;
         if (rev) {
-            return get_kmers(size()-mref_end, size()-mref_start, true, comp);
+            get_kmers(size()-mref_end, size()-mref_start, true, comp, kmers);
+        } else {
+            get_kmers(mref_start, mref_end, false, comp, kmers);
         }
-        return get_kmers(mref_start, mref_end, false, comp);
     }
-
-
 
     using FwdRevCoords = std::pair< std::vector<i64>, std::vector<i64> >;
 
@@ -665,7 +677,12 @@ class RefIndex {
             py::arg("pac_blocks"), py::arg("rev"), py::arg("comp"));
 
         c.def("get_kmers", 
+            static_cast< std::vector<KmerType> (RefIndex::*)(std::vector<std::pair<i64, i64>>, bool)> (&RefIndex::get_kmers),
+            py::arg("mref_blocks"), py::arg("is_rna"));
+
+        c.def("get_kmers", 
             static_cast< std::vector<KmerType> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::get_kmers),
+
             py::arg("name"), py::arg("start"), py::arg("end"), py::arg("rev")=false, py::arg("comp")=false);
         c.def("get_kmers", 
             static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64, bool)> (&RefIndex::get_kmers),
