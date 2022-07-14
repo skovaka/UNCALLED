@@ -209,19 +209,24 @@ class PoreModel:
         shift = tgt_mean - scale * np.mean(current)
         return scale, shift
 
-    def get_normalized(self, *args):
-        if len(args) == 2:
-            tgt_mean,tgt_stdv = args
-        elif len(args) == 1:
-            model = args[0]
-            tgt_mean = model.model_mean
-            tgt_stdv = model.model_stdv
+    def norm_mad_params(self, current):
+        shift = np.median(current)
+        scale = 1 / np.median(np.abs(current - shift))
+        shift *= -scale
+        return scale, shift
 
-        scale,shift = self.norm_mom_params(self.means, tgt_mean, tgt_stdv)
-        new_means = self.means * scale + shift
-        vals = np.ravel(np.dstack([new_means,self.stdvs]))
+    def get_normalized(self, scale, shift):
+        #if len(args) == 2:
+        #    tgt_mean,tgt_stdv = args
+        #elif len(args) == 1:
+        #    model = args[0]
+        #    tgt_mean = model.model_mean
+        #    tgt_stdv = model.model_stdv
+        #scale,shift = self.norm_mom_params(self.means, tgt_mean, tgt_stdv)
 
-        return(PoreModel(self.ModelType(vals), name=self.name), scale, shift)
+        means = self.means * scale + shift
+        vals = np.ravel(np.dstack([means,self.stdvs]))
+        return PoreModel(self.ModelType(vals), name=self.name)
     
     
     def __repr__(self):
