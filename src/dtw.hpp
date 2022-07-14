@@ -243,7 +243,7 @@ class BandedDTW {
     const DTWCostFn cost_fn_;
 
     const PyArray<float> &qry_vals_;
-    const PyArray<KmerType> &ref_vals_;
+    const std::vector<KmerType> &ref_vals_;
     const PyArray<Coord> &ll_;
 
     const ModelType model_;
@@ -268,7 +268,7 @@ class BandedDTW {
     public:
     BandedDTW(const DtwParams &prms,
               const PyArray<float> &qry_vals,   
-              const PyArray<KmerType> &ref_vals,
+              const std::vector<KmerType> &ref_vals,
               const ModelType &model,
               const PyArray<Coord> &ll) :
             PRMS(prms),
@@ -330,6 +330,11 @@ class BandedDTW {
 
     template <typename T>
     bool in_range(i32 i, const PyArray<T> &v) {
+        return static_cast<u32>(i) >= 0 && static_cast<u32>(i) < v.size();
+    }
+
+    template <typename T>
+    bool in_range(i32 i, const std::vector<T> &v) {
         return static_cast<u32>(i) >= 0 && static_cast<u32>(i) < v.size();
     }
 
@@ -603,7 +608,7 @@ class BandedDTW {
 
         c.def(pybind11::init<const DtwParams &,
                              const PyArray<float>&, 
-                             const PyArray<KmerType>&,
+                             const std::vector<KmerType>&,
                              const ModelType&,
                              const PyArray<Coord>&>());
 

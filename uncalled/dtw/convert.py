@@ -21,6 +21,7 @@ import progressbar as progbar
 
 def new(conf):
     """New convert interface"""
+    conf.tracks.layers = ["dtw"]
     tracks = Tracks(conf=conf)
 
     for read_id, read in tracks.iter_reads():

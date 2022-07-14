@@ -317,6 +317,7 @@ class AlnTrack:
 
         self.mat = df.pivot(index="aln_id", columns=["ref"]) \
                      .rename_axis(("group","layer","ref"), axis=1) \
+                     .reindex(self.coords.refs, axis=1, level=2) \
                      .sort_index(axis=1)
 
         self.mat = self.mat.reindex(self.alignments.index, copy=False)

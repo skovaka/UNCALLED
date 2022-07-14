@@ -713,7 +713,7 @@ def ls(conf, db=None):
 
     db.con.commit()
 
-    #db.close()
+    db.close()
 
 def delete(track_name=None, db=None, conf=None):
     if db is None:

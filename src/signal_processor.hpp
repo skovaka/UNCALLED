@@ -77,7 +77,7 @@ class SignalProcessor {
     SignalProcessor(const ModelType &model, EventDetector::Params event_prms=EventDetector::PRMS_DEF) : 
         model_(model),
         evdt_(event_prms) {
-        norm_.set_target(model.model_mean(), model.model_stdv());
+        set_norm_tgt(model.model_mean(), model.model_stdv());
     }
 
     ProcessedRead process(const ReadBuffer &read) {
@@ -93,6 +93,10 @@ class SignalProcessor {
         //}
 
         return ret;
+    }
+
+    void set_norm_tgt(float mean, float stdv) {
+        norm_.set_target(mean, stdv);
     }
 
     NormVals norm_mom_params(const std::vector<Event> &events) {
@@ -122,6 +126,7 @@ class SignalProcessor {
         py::class_<SignalProcessor> s(m, ("SignalProcessor" + suffix).c_str());
         s.def(pybind11::init<const ModelType &, EventDetector::Params>());
         s.def("process", &SignalProcessor::process);
+        s.def("set_norm_tgt", &SignalProcessor::set_norm_tgt);
 
     }
     #endif

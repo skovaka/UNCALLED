@@ -14,6 +14,8 @@ class ProcessedRead(_uncalled._ProcessedRead):
     def __init__(self, read, raw=None):
         if isinstance(read, pd.DataFrame):
             _uncalled._ProcessedRead.__init__(self)
+            if not "stdv" in read.columns:
+                read["stdv"] = 0
             read = read[["mean","stdv","start","length"]].to_records(index=False)
             self.set_events(read)
         else:

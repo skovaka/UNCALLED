@@ -282,7 +282,7 @@ class Tracks:
         return dtw.sort_index()
 
     def write_dtw_events(self, events=None, track_name=None, aln_id=None):
-        if events is not None and self.output.FORMAT != "eventalign":
+        if events is not None:# and self.output.FORMAT != "eventalign":
             events = self.collapse_events(events)
             overwrite = False
         else:
@@ -796,17 +796,21 @@ class Tracks:
 
             mask = track_covs >= self.prms.min_coverage
             if not np.any(mask):
-                idx = pd.Index([])
+                idx = layers.index[:0]
             elif self.prms.shared_refs_only:
                 track_counts = pd.MultiIndex.from_tuples(track_covs[mask].index) \
                                    .droplevel(2) \
                                    .value_counts()
 
-                idx = pd.MultiIndex.from_tuples(track_counts.index[track_counts == len(self.alns)])
+                shared = track_counts.index[track_counts == len(self.alns)]
+                if len(shared) == 0: 
+                    idx = layers.index[:0]
+                else:
+                    idx = pd.MultiIndex.from_tuples(shared)
             else:
-                idx = track_covs[mask].index.droplevel("aln_id").unique()
+                idx = track_covs[mask].index.unique()
 
-            layers = layers.loc[(idx.get_level_values(0),idx.get_level_values(1),slice(None)), slice(None)]
+            layers = layers.loc[(idx.get_level_values(0),idx.get_level_values(1),slice(None))]
             layer_alns = layers.index.get_level_values("aln_id")
             alignments = alignments.loc[layer_alns.unique()]
 

@@ -133,7 +133,7 @@ uncalled = Pybind11Extension(
 
     libraries = ["bwa", "z", "dl", "m"],
 
-    extra_compile_args = ["-std=c++11", "-O3"],
+    extra_compile_args = ["-std=c++11", "-O3", "-g"],
 
     define_macros = [("PYBIND", None)]#, ("PYDEBUG", None)]
 )

@@ -60,6 +60,7 @@ def dtw(conf):
         aligned = False
         for paf in mm2s[read.id]:
             t0 = time.time()
+            #print(paf)
             dtw = GuidedDTW(tracks, sigproc, read, paf, conf)
 
             if conf.bc_cmp:
@@ -109,8 +110,11 @@ class GuidedDTW:
         gap_lens = list()
         ref_shift = 0
 
-        mref_min = self.coords.mrefs.min()-2
-        mref_max = self.coords.mrefs.max()+3
+        mref_min = self.coords.mrefs.min()#-self.index.trim[0]
+        mref_max = self.coords.mrefs.max()+1#+self.index.trim[1]
+
+        #print(self.coords)
+        #print(mref_max-mref_min, mref_min, mref_max)
 
         self.block_coords = list()
         block_st = mref_min
@@ -124,18 +128,14 @@ class GuidedDTW:
         #kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
         new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], conf.is_rna)
 
-        self.block_coords[0][0] += 2
-        self.block_coords[-1][1] -= 2
+        self.block_coords[0][0] += self.index.trim[1]
+        self.block_coords[-1][1] -= self.index.trim[0]
         mrefs = np.concatenate([np.arange(s,e) for s,e,_ in self.block_coords])
 
         #self.ref_kmers = pd.concat(kmer_blocks)
         self.ref_kmers = pd.Series(new_kmers, index=mrefs)
-        #old = pd.concat(kmer_blocks)
 
-        #print(list(new_kmers))
-        #print(list(self.ref_kmers))
-        #print(len(new_kmers), len(self.ref_kmers))
-
+        ref_means = self.model[self.ref_kmers]
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
@@ -150,6 +150,8 @@ class GuidedDTW:
 
         self.samp_min = self.bcaln["start"].min()
         self.samp_max = self.bcaln["start"].max()
+
+        sigproc.set_norm_tgt(ref_means.mean(), ref_means.std())
 
         signal = sigproc.process(read)
 
@@ -185,8 +187,8 @@ class GuidedDTW:
         path_qrys = list()
         path_refs = list()
 
-        mref_st = self.bcaln.index[0]
-        mref_en = self.bcaln.index[-1]+1
+        #mref_st = self.bcaln.index[0]
+        #mref_en = self.bcaln.index[-1]+1
 
         #kmers = self.ref_kmers.loc[mref_st:mref_en]
         #kmers = self.ref_kmers
@@ -198,7 +200,7 @@ class GuidedDTW:
 
         block_signal = read_block['mean'].to_numpy()
         
-        args = self._get_dtw_args(read_block, mref_st, self.ref_kmers)
+        args = self._get_dtw_args(read_block, self.ref_kmers)
 
 
         dtw = self.dtw_fn(*args)
@@ -221,12 +223,7 @@ class GuidedDTW:
                  .drop(columns=['mask'], errors='ignore') \
                  .rename(columns={'mean' : 'current', 'stdv' : 'current_stdv'})
 
-    def _get_dtw_args(self, read_block, mref_start, ref_kmers):
-        common = (
-            self.prms,
-            read_block['mean'].to_numpy(), 
-            self.model.kmer_array(ref_kmers),  #TODO probably dont need convert
-            self.model.instance)
+    def _get_dtw_args(self, read_block, ref_kmers):
         qry_len = len(read_block)
         ref_len = len(ref_kmers)
 
@@ -237,30 +234,22 @@ class GuidedDTW:
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
 
             ar = _uncalled.PyArrayI32
-            mrefs = np.array(self.bcaln.index)
+            #mrefs = np.array(ref_kmers.index) #np.array(self.bcaln.index)
+            aln = self.bcaln[self.bcaln.index.isin(ref_kmers.index)]
+            mrefs = np.array(aln.index)
             for st,en,sh in self.block_coords:
-                mrefs[self.bcaln.index.isin(pd.RangeIndex(st,en))] -= sh
-            #print(mrefs)
+                mrefs[aln.index.isin(pd.RangeIndex(st,en))] -= sh
 
-            bands = _uncalled.get_guided_bands(ar(mrefs), ar(self.bcaln["start"]), ar(read_block['start']), band_count, shift)
+            #print
+
+            bands = _uncalled.get_guided_bands(ar(mrefs), ar(aln["start"]), ar(read_block['start']), band_count, shift)
+
             #rmoves = np.diff(bands["ref"])
             #qmoves = np.diff(bands["qry"])
             #print(bands)
             #print(np.all(rmoves ^ qmoves))
-
-            #starts = self.bcaln.index[self.bcaln["start"].searchsorted(read_block['start'])]
-            #bands = list()
-            #q = r = 0
-            #for i in range(band_count):
-            #    bands.append( (int(q+shift), int(r-shift)) )
-
-            #    tgt = starts[q] if q < len(starts) else starts[-1]
-            #    if r < len(self.ref_kmers) and self.ref_kmers.index[r] <= tgt:
-            #        r += 1
-            #    else:
-            #        q += 1
-
-            return (self.prms, _uncalled.PyArrayF32(read_block['mean']), _uncalled.PyArrayU16(ref_kmers.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
+            
+            return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.array_type(ref_kmers.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         #elif self.method == "static":
         #    return common
