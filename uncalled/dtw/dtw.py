@@ -25,6 +25,7 @@ METHODS = {
         "global" : "GlobalDTW", 
 }
 
+
 def dtw(conf):
     """Perform DTW alignment guided by basecalled alignments"""
     conf.fast5_reader.load_bc = True
@@ -154,11 +155,7 @@ class GuidedDTW:
         self.samp_max = self.bcaln["start"].max()
 
         sigproc.set_norm_tgt(ref_means.mean(), ref_means.std())
-
         signal = sigproc.process(read)
-        #signal.rescale(*self.model.norm_mad_params(signal.events["mean"]))
-        #print(signal.signal)
-        #print(signal.events["mean"])
 
         df = self._calc_dtw(signal)
 
