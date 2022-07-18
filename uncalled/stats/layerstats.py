@@ -78,5 +78,6 @@ def dump(conf):
                     for col in track.layers.columns]
                 print("\t".join(columns))
                 header = False
-            sys.stdout.write(track.layers.to_csv(sep="\t", header=False))
+            layers = track.layers.dropna(axis=0, how="any")
+            sys.stdout.write(layers.to_csv(sep="\t", header=False))
         t = time.time()

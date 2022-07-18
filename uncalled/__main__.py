@@ -298,7 +298,6 @@ CMDS = {
         Opt(("-C", "--min-coverage"), "tracks"),
         Opt(("--ref-chunksize"), "tracks.io"),
         Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
-        Opt(("-v", "--verbose-refs"), action="store_true", help="Output reference name and strand"),
     )),
     "readstats" : ("stats.readstats", "", READSTATS_OPTS),
     "layerstats" : (None, 

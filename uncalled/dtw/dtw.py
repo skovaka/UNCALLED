@@ -98,9 +98,6 @@ class GuidedDTW:
             return
 
         aln_id, self.coords = tracks.write_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df})
-        #TODO return coords?
-        print(read.id)
-        #sys.stdout.flush()
 
         self.index = tracks.index
         self.model = tracks.model

@@ -555,7 +555,7 @@ class Tracks:
         #    print(df.to_csv(sep="\t"))
         t = time.time()
 
-    def calc_refstats(self, verbose_refs=False, cov=False):
+    def calc_refstats(self, cov=False):
         if self.prms.refstats is None or len(self.prms.refstats) == 0 or len(self.prms.refstats_layers) == 0 or self.all_empty:
             self.refstats = None
             return None

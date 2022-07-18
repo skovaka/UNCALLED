@@ -31,10 +31,10 @@ def refstats(conf):
     stats = RefstatsSplit(conf.refstats, len(tracks.alns))
     layers = list(parse_layers(conf.tracks.layers, False))
 
-    if conf.verbose_refs:
-        columns = ["ref_name", "ref", "strand"]
-    else:
-        columns = ["ref"]
+    #if conf.verbose_refs:
+    columns = ["ref_name", "ref", "strand"]
+    #else:
+    #    columns = ["ref"]
 
     for track in tracks.alns:
         name = track.name
@@ -57,11 +57,11 @@ def refstats(conf):
         chunk.prms.refstats = conf.refstats
         chunk.prms.refstats_layers = layers
 
-        stats = chunk.calc_refstats(conf.verbose_refs, conf.cov)
+        stats = chunk.calc_refstats(conf.cov)
         stats["kmer"] = tracks.model.kmer_to_str(chunk.coords.ref_kmers.loc[(int(chunk.coords.fwd), stats.index)])
 
-        if conf.verbose_refs:
-            stats.index = pd.MultiIndex.from_product([
-                [chunk.coords.ref_name], stats.index, ["+" if chunk.coords.fwd else "-"]
-            ])
+        #if conf.verbose_refs:
+        stats.index = pd.MultiIndex.from_product([
+            [chunk.coords.ref_name], stats.index, ["+" if chunk.coords.fwd else "-"]
+        ])
         sys.stdout.write(stats.to_csv(sep="\t",header=False,na_rep=0))
