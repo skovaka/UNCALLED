@@ -216,7 +216,7 @@ def tombo(conf):
         #print(coords.refs)
 
         #TODO store scaling factors in pore model
-        currents = currents * 10.868760552593136 + 91.25486108714513
+        #currents = currents * 10.868760552593136 + 91.25486108714513
 
         df = pd.DataFrame({
                 #"ref" : coords.refs,

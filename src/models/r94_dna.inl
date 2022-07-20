@@ -1,7 +1,7 @@
 #ifndef _INCL_MODEL_R94_DNA
 #define _INCL_MODEL_R94_DNA
 
-#include "pore_model.hpp"
+#include "../pore_model.hpp"
 
 const std::vector<float> model_r94_dna_vals = {
         85.083612,	1.517846, //AAAAA
@@ -1027,12 +1027,11 @@ const std::vector<float> model_r94_dna_vals = {
         98.045635,	1.708404, //TTTTA
         94.016860,	1.569772, //TTTTC
         96.127181,	1.623511, //TTTTG
-        90.405465,	1.513907  //TTTTT
+        90.405465,	1.513907, //TTTTT
 };
 
-//const PoreModelPreset model_r94_dna {
-//    {"r94_dna", 5, 2, false, false},
-//    model_r94_dna_vals
-//};
+const PoreModelPreset model_r94_dna {
+    {"r94_dna", false, false, 5, 2}, model_r94_dna_vals
+};
 
 #endif

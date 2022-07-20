@@ -84,7 +84,7 @@ class TrackIO:
         self.prev_fast5 = (None, None)
         self.prev_read = None
 
-        track = AlnTrack(self, None, name, name, self.conf, self.model)
+        track = AlnTrack(self, None, name, name, self.conf)
         self.tracks.append(track)
 
         return track

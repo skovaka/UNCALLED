@@ -100,6 +100,7 @@ class Config {
         //TODO make mapper store pore_model group
         mapper.pore_model  = "r94_rna";
         pore_model.name    = "r94_rna";
+        pore_model.reverse    = true;
 
         mapper.min_seed_prob = -3.0;
         mapper.max_paths     = 10000;

@@ -232,7 +232,7 @@ class Tracks:
             self.input = None
 
         if self.model is None:
-            self.model = PoreModel(self.conf.pore_model.name)
+            self.model = PoreModel(self.conf.pore_model)
 
         if np.any(out_prms):
             out_format = OUTPUT_PARAMS[out_prms][0]

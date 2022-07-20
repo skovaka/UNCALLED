@@ -45,7 +45,7 @@ class PoreModel:
                     prms.name = model
 
             elif isinstance(model, PoreModelParams):
-                prms = PoreModelParams(model)
+                prms = model
                 is_preset = model.name in PORE_MODEL_PRESETS
 
             else:
@@ -72,13 +72,13 @@ class PoreModel:
 
         elif not is_preset:
             if os.path.exists(prms.name):
-                vals = self._vals_from_tsv(prms.name)
-                #try:
-                #except:
-                #    try:
-                #        vals = self._vals_from_hdf5(prms.name)
-                #    except:
-                #        raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
+                try:
+                    vals = self._vals_from_tsv(prms.name)
+                except:
+                    try:
+                        vals = self._vals_from_hdf5(prms.name)
+                    except:
+                        raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
             else:
                 models = ", ".join(PORE_MODEL_PRESETS.keys())
                 raise ValueError(
@@ -184,8 +184,6 @@ class PoreModel:
         #, self.ModelType.KmerArray
         if isinstance(kmer, (Sequence, np.ndarray, pd.Series, self.array_type)):
             return self.ModelType.kmer_to_arr(kmer).astype(dtype)
-        else:
-            print(type(kmer), "NO")
         return dtype(self.ModelType.kmer_to_str(kmer))
 
     def norm_pdf(self, current, kmer):
