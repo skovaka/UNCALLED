@@ -1,7 +1,7 @@
 #include "pore_model.hpp"
 #include "models/r94_dna.inl"
-#include "models/r94_rna_new.inl"
-#include "models/r94_rna_tombo_new.inl"
+#include "models/r94_rna.inl"
+#include "models/r94_rna_tombo.inl"
 
 const PoreModelParams PORE_MODEL_PRMS_DEF {
     name       : "r94_dna",
