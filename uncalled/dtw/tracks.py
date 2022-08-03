@@ -308,7 +308,7 @@ class Tracks:
             df = track.layers[group]
 
         pacs = track.coords.ref_to_pac(df.index.levels[0])
-        idx = df.index.set_levels(pacs, 0)
+        idx = df.index.set_levels(levels=pacs, level=0)
         df = df.set_index(idx)
         df.index.names = ("pac", "aln_id")
         self.output.write_layers(df)
@@ -548,11 +548,11 @@ class Tracks:
                 output = self.input
             else:
                 output = self.output
+            df = pd.concat({"cmp" : df}, names=["group", "layer"], axis=1)
             output.write_layers( #TODO be explicit that output = input
-                pd.concat({"cmp" : df}, names=["group", "layer"], axis=1), 
+                df, 
                 index=["pac", "aln_a", "aln_b", "group_b"])
-        #else:
-        #    print(df.to_csv(sep="\t"))
+
         t = time.time()
 
     def calc_refstats(self, cov=False):

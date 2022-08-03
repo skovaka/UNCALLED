@@ -395,7 +395,7 @@ class AlnTrack:
         flip = self.all_fwd == self.conf.is_rna
 
         def coords(df, track):
-            df = df.dropna().reset_index()
+            df = df.dropna().sort_index().reset_index()
             if flip:
                 #df = df[::-1]
                 #df["ref"] = -df["ref"]
@@ -403,6 +403,7 @@ class AlnTrack:
                 df["start"] = -df["end"]
                 df["end"] = end
             return AlnCoords(df)
+
 
         coords_a = coords(aln_a, self)
         coords_b = coords(aln_b, other)

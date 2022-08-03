@@ -693,7 +693,7 @@ class TrackSQL(TrackIO):
         if chunksize is None:
             return make_groups(ret)
         
-        return (make_groups(df) for df in ret)
+        return (make_groups(df) for df in ret if len(df) > 0)
     
     def _verify_track(self, track_name):
         ids = self.cur.execute("SELECT id FROM track WHERE name == ?", (track_name,)).fetchall()
