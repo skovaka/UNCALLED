@@ -281,16 +281,16 @@ class Tracks:
 
         return dtw.sort_index()
 
-    def write_dtw_events(self, events=None, track_name=None, aln_id=None):
+    def write_dtw_events(self, events=None, track_name=None, aln_id=None, read=None):
         if events is not None:# and self.output.FORMAT != "eventalign":
             events = self.collapse_events(events)
             overwrite = False
         else:
             overwrite = True
 
-        self.write_layers("dtw", events, track_name, aln_id, overwrite)
+        self.write_layers("dtw", events, track_name, aln_id, overwrite, read)
         
-    def write_layers(self, group, layers=None, track_name=None, aln_id=None, overwrite=False):
+    def write_layers(self, group, layers=None, track_name=None, aln_id=None, overwrite=False, read=None):
         track = self._track_or_default(track_name)
 
         if layers.index.names[0] == "mref":
@@ -311,7 +311,7 @@ class Tracks:
         idx = df.index.set_levels(pacs, 0)
         df = df.set_index(idx)
         df.index.names = ("pac", "aln_id")
-        self.output.write_layers(df)
+        self.output.write_layers(df, read=read)
         #self.output.write_layers(df)
 
     def write_alignment(self, read_id, fast5, coords, layers={}, track_name=None):

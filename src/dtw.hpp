@@ -16,7 +16,7 @@ struct DtwParams {
     float move_cost, stay_cost, skip_cost,
           band_shift;
     i32 band_width, iterations;
-    std::string band_mode, cost_fn, mm2_paf;
+    std::string norm_mode, band_mode, cost_fn, mm2_paf;
     bool save_bands;
 };
 

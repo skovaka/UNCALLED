@@ -151,7 +151,9 @@ class GuidedDTW:
         self.samp_min = self.bcaln["start"].min()
         self.samp_max = self.bcaln["start"].max()
 
-        sigproc.set_norm_tgt(ref_means.mean(), ref_means.std())
+        if self.prms.norm_mode == "ref_mom":
+            sigproc.set_norm_tgt(ref_means.mean(), ref_means.std())
+
         signal = sigproc.process(read)
 
         df = self._calc_dtw(signal)
@@ -165,8 +167,7 @@ class GuidedDTW:
         df["kmer"] = self.ref_kmers.loc[df["mref"]].to_numpy()
         self.df = df.set_index("mref")
 
-
-        tracks.write_dtw_events(self.df, aln_id=aln_id)
+        tracks.write_dtw_events(self.df, aln_id=aln_id, read=signal)
 
         if self.bands is not None:
             tracks.write_layers("band", self.bands, aln_id=aln_id)

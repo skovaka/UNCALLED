@@ -27,8 +27,10 @@ class ProcessedRead(_uncalled._ProcessedRead):
         mask = (self.events["start"] >= start) & (self.events["start"] <= end)
         return self.to_df()[mask]
 
-    def get_norm_signal(self, samp_min, samp_max):
+    def get_norm_signal(self, samp_min=0, samp_max=None):
         n = self.norm[0]
+        if samp_max is None:
+            samp_max = len(self.signal)
         return self.signal[samp_min:samp_max] * n["scale"] + n["shift"]
 
         #ret = np.zeros(int(samp_max - samp_min))

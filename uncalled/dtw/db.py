@@ -111,7 +111,9 @@ class Eventalign(TrackIO):
 
     def init_write_mode(self):
         TrackIO.init_write_mode(self)
-        self.out.write("contig\tposition\treference_kmer\tread_index\tstrand\tevent_index\tevent_level_mean\tevent_stdv\tevent_length\tmodel_kmer\tmodel_mean\tmodel_stdv\tstandardized_level\tstart_idx\tend_idx\n")
+        #self.out.write("contig\tposition\treference_kmer\tread_index\tstrand\tevent_index\tevent_level_mean\tevent_stdv\tevent_length\tmodel_kmer\tmodel_mean\tmodel_stdv\tstandardized_level\tstart_idx\tend_idx\n")
+        #self.out.write("contig\tposition\treference_kmer\tread_name\tstrand\tevent_index\tevent_level_mean\tevent_stdv\tevent_length\tmodel_kmer\tmodel_mean\tmodel_stdv\tstandardized_level\tstart_idx\tend_idx\tsamples\n")
+        self.out.write("contig\tposition\treference_kmer\tread_name\tstrand\tevent_index\tevent_level_mean\tevent_stdv\tevent_length\tmodel_kmer\tmodel_mean\tmodel_stdv\tstandardized_level\tsamples\n")
 
     def init_read_mode(self):
         if len(self.track_names) != 1:
@@ -121,7 +123,7 @@ class Eventalign(TrackIO):
         self.tracks.append(t)
 
     #def write_dtw_events(self, track, events):
-    def write_layers(self, df, index=["pac","aln_id"]):
+    def write_layers(self, df, read, index=["pac","aln_id"]):
         for group in df.columns.levels[0]:
             if group == "dtw":
                 break
@@ -139,14 +141,20 @@ class Eventalign(TrackIO):
         std_level = (events["current"] - model.model_mean) / model.model_stdv
 
         evts = events.rename(columns={"current" : "mean", "current_stdv" : "stdv"})
-        read = ProcessedRead(evts)
-        sys.stdout.flush()
+        #read = ProcessedRead(evts)
+
+        if read is not None:
+            signal = read.get_norm_signal()
+        else:
+            signal = []
+
+        read_id = track.alignments["read_id"].iloc[0]
 
         eventalign = _uncalled.write_eventalign_K5(
             self.conf, model.instance, self.prev_aln_id, track.coords.fwd, read,
             track.coords.ref_name, events.index-2, kmers, 
             np.arange(len(events))[::-1]+1, #TODO properly rep skips?
-            std_level) #TODO compute internally?
+            std_level, read_id, signal) #TODO compute internally?
 
         self.out.write(eventalign)
 
@@ -271,7 +279,7 @@ class TrackHDF5(TrackIO):
     def init_read(self, read_id, fast5_id):
         pass 
 
-    def write_layers(self, df, index=["pac","aln_id"]):
+    def write_layers(self, df, index=["pac","aln_id"], read=None):
         pass 
 
     def get_fast5_index(self, track_id=None):
@@ -504,7 +512,7 @@ class TrackSQL(TrackIO):
     def init_read(self, read_id, fast5_id):
         self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
 
-    def write_layers(self, df, index=["pac","aln_id"]):
+    def write_layers(self, df, index=["pac","aln_id"], read=None):
         for group in df.columns.levels[0]:
             df[group].to_sql(
                 group, self.con, 
@@ -713,7 +721,7 @@ def ls(conf, db=None):
 
     db.con.commit()
 
-    db.close()
+    #db.close()
 
 def delete(track_name=None, db=None, conf=None):
     if db is None:

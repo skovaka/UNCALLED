@@ -31,12 +31,15 @@ std::string write_eventalign(
         const std::string &ref_name, py::array_t<i64> ref_np,
         py::array_t<typename ModelType::kmer_t> kmer_np,
         py::array_t<i32> event_index_np,
-        py::array_t<float> std_level_np) {
+        py::array_t<float> std_level_np,
+        std::string read_id,
+        py::array_t<float> signal_np) {
 
     auto ref = PyArray<i64>(ref_np);
     auto kmers = PyArray<typename ModelType::kmer_t>(kmer_np);
     auto event_index = PyArray<i32>(event_index_np);
     auto std_level = PyArray<float>(std_level_np);
+    auto signal = PyArray<float>(signal_np);
 
     float sample_rate = conf.read_buffer.sample_rate;
 
@@ -49,13 +52,17 @@ std::string write_eventalign(
         auto ref_kmer = model_kmer;
         if (!fwd) ref_kmer = model.kmer_comp(ref_kmer);
 
-        //std::cout 
-        ss
-            << ref_name << "\t"
-            << ref[i] << "\t"
-            << model.kmer_to_str(ref_kmer) << "\t"
-            << read_idx << "\t"
-            << "t" << "\t"
+        ss << ref_name << "\t"
+           << ref[i] << "\t"
+           << model.kmer_to_str(ref_kmer) << "\t";
+
+        if (read_id.empty()) {
+            ss << read_idx; 
+        } else {
+            ss << read_id;
+        }
+
+        ss  << "\t" << "t" << "\t"
             << event_index[i] << "\t"
             << evt.mean << "\t"
             << evt.stdv << "\t"
@@ -63,9 +70,18 @@ std::string write_eventalign(
             << ModelType::kmer_to_str(model_kmer) << "\t"
             << model.kmer_means_[kmer] << "\t"
             << model.kmer_stdvs_[kmer] << "\t"
-            << std_level[i] << "\t"
-            << evt.start << "\t"
-            << evt.start + evt.length << "\n";
+            << std_level[i];
+            //<< evt.start << "\t"
+            //<< evt.start + evt.length; //<< "\n";
+
+        if (signal.size() > 0) {
+            ss << "\t" << signal[evt.start];
+            for (size_t j = 1; j < evt.length; j++) {
+                ss << "," << signal[evt.start+j];
+            }
+        }
+
+        ss << "\n";
     }
     return ss.str();
 }

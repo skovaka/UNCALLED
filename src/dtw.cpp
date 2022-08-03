@@ -2,9 +2,9 @@
 
 const DtwParams
     DTW_PRMS_DEF = {
-        DTWSubSeq::NONE, 1, 1, 1, 0.5, 100, 0, "guided", "abs_diff", "", false,
+        DTWSubSeq::NONE, 1, 1, 1, 0.5, 100, 0, "ref_mom", "guided", "abs_diff", "", false,
     }, DTW_PRMS_EVT_GLOB = {
-        DTWSubSeq::NONE, 2, 1, 100, 0, 0, 0, "", "abs_diff", "", false,
+        DTWSubSeq::NONE, 2, 1, 100, 0, 0, 0, "", "ref_mom", "abs_diff", "", false,
     };
 
 #ifdef PYBIND
@@ -36,6 +36,7 @@ void pybind_dtw(py::module_ &m) {
     PYBIND11_NUMPY_DTYPE(Coord, qry, ref);
     py::class_<DtwParams> p(m, "DtwParams");
     PY_DTW_PARAM(band_mode, "DTW band mode (\"guided\", \"static\", or \"\"/\"none\")");
+    PY_DTW_PARAM(norm_mode, "Normalization method");
     PY_DTW_PARAM(mm2_paf, "Path to minimap2 alignments of basecalled reads in PAF format. Used to determine where each should be aligned. Should include cigar string.");
     PY_DTW_PARAM(cost_fn, "DTW cost function");
     PY_DTW_PARAM(move_cost, "DTW event move (diagonal) penalty");

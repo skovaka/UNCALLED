@@ -243,6 +243,8 @@ CMDS = {
         Opt(("-m", "--mm2-paf"), "dtw", required=True),
         Opt(("-o", "--db-out"), "tracks.io"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
+        Opt("--eventalign-flags", "tracks.io", type=comma_split),
+        #Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include"),
         Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
         Opt(("-a", "--append"), "tracks.io", action="store_true"),
         Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
@@ -260,7 +262,7 @@ CMDS = {
         Opt("--move-cost", "dtw"),
         Opt(("-b", "--band-width"), "dtw"),
         Opt(("-s", "--band-shift"), "dtw"),
-        Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
+        Opt(("-N", "--norm-mode"), "dtw", choices=["ref_mom", "model_mom"]),
     )), 
     #
     "convert" : (None, 
