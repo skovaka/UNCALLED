@@ -142,18 +142,27 @@ READSTATS_OPTS = (
     Opt(("-s", "--summary-stats"), "readstats", type=comma_split),
 )
 
+REFPLOT_OPTS = (
+    Opt("db_in", "tracks.io"),
+    Opt("ref_bounds", "tracks", type=str_to_coord),
+    Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
+    Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
+    Opt(("-L", "--layer"), "refplot"),
+    #Opt(("-o", "--outfile"), "vis"),
+)
+
 TRACKPLOT_OPTS = (
-        Opt("db_in", "tracks.io"),
-        Opt("ref_bounds", "tracks", type=str_to_coord),
-        Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
-        Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
-        Opt(("-H", "--panel-heights"), "trackplot", nargs="+", type=int),
-        Opt(("--shared-refs-only"), "tracks", action="store_true"),
-        Opt(("--shared-reads-only"), "tracks", action="store_true"),
-        Opt(("--share-reads"), "trackplot", action="store_true"),
-        Opt(("--hover-read"), "trackplot", action="store_true"),
-        Opt(("-o", "--outfile"), "trackplot"),
-    )
+    Opt("db_in", "tracks.io"),
+    Opt("ref_bounds", "tracks", type=str_to_coord),
+    Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
+    Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
+    Opt(("-H", "--panel-heights"), "trackplot", nargs="+", type=int),
+    Opt(("--shared-refs-only"), "tracks", action="store_true"),
+    Opt(("--shared-reads-only"), "tracks", action="store_true"),
+    Opt(("--share-reads"), "trackplot", action="store_true"),
+    Opt(("--hover-read"), "trackplot", action="store_true"),
+    Opt(("-o", "--outfile"), "trackplot"),
+)
 
 
 def panel_opt(name):
@@ -325,6 +334,7 @@ CMDS = {
         Opt(("--no-model"), "sigplot", action="store_true"),
         Opt(("--bcaln-error", "-e"), "dotplot", action="store_true"),
     )),
+    "refplot" : ("vis.refplot", "Plot alignment tracks and per-reference statistics", REFPLOT_OPTS),
     "trackplot" : ("vis.trackplot", "Plot alignment tracks and per-reference statistics", TRACKPLOT_OPTS+TRACKPLOT_PANEL_OPTS),
     "browser" : ("vis.browser", "Interactive signal alignment genome browser", (
         Opt("db_in", "tracks.io"),

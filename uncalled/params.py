@@ -73,6 +73,13 @@ TracksParams._def_params(
     ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter"}
 )
 
+class VisParams(config.ParamGroup):
+    _name = "vis"
+VisParams._def_params(
+    ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF", "#d90000"], list, "Track Colors"),
+    ("base_colors", ["#80ff80", "#6b93ff", "#ffe543", "#ff8080"], list, "Colors for each base (A,C,G,T/U)"), 
+)
+
 class DotplotParams(config.ParamGroup):
     _name = "dotplot"
 DotplotParams._def_params(
@@ -96,18 +103,26 @@ SigplotParams._def_params(
     ("no_model", False, bool, "Will not plot the expected reference signal if True"),
     ("multi_background", False, bool, "Will plot multiple stacked background colors for multiple tracks if True"),
     ("yaxis_fixed", False, bool, ""),
-    ("track_colors", ["purple", "darkgreen", "royalblue", "crimson"], list, ""),
+    #("track_colors", ["purple", "darkgreen", "royalblue", "crimson"], list, ""),
     #("base_colors", ["#80ff80", "#6b93ff", "#ffbd00", "#ff8080"], list, "Colors for each base (A,C,G,T/U)"), 
     ("fill_layer", "base", str, ""),
     ("fill_track", 0, None, "")
+)
+
+class RefplotParams(config.ParamGroup):
+    _name = "refplot"
+RefplotParams._def_params(
+    ("tracks", None, None, "DTW aligment tracks"),
+    ("layer", "current", str, ""),
+    ("plot", None, str, "Type of plot to display (hist, violin, box)"),
 )
 
 class TrackplotParams(config.ParamGroup):
     _name = "trackplot"
 TrackplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
-    ("panels", None, None, "List of tuples specifying which panels to display. First element of each tuple specifies plot type (e.g. mat, box, line, etc.), second element specifies which layer(s) to display."),
-    ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF", "red"], list, ""),
+    ("panels", None, None, "List of tuples specifying which panels to display. First element of each tuple specifies plot type (mat, box, line, scatter), second element specifies which layer(s) to display."),
+    #("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF", "red"], list, ""),
     ("select_ref", None, str, "Reference Selection"),
     ("select_read", None, str, "Read Selection"),
     ("hover_read", False, bool, "If True will display read_id in mat hover"),
@@ -128,9 +143,3 @@ ReadstatsParams._def_params(
     ("summary_stats", ["mean"], None, "Summary statistics to compute for \"model_diff\" command."),
 )
 
-class VisParams(config.ParamGroup):
-    _name = "vis"
-VisParams._def_params(
-    ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF", "#d90000"], list, "Track Colors"),
-    ("base_colors", ["#80ff80", "#6b93ff", "#ffe543", "#ff8080"], list, "Colors for each base (A,C,G,T/U)"), 
-)

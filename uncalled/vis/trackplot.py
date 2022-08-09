@@ -220,15 +220,14 @@ class Trackplot:
                 q3=stats["q75"],
                 upperfence=stats["q95"],
                 name=track.desc,
-                #fillcolor=self.prms.track_colors[j],
-                line_color=self.prms.track_colors[j]
+                line_color=self.conf.vis.track_colors[j]
             ), row=row, col=1)
 
     def _line(self, row, layer):
-        self._refstat(row, layer, "line")#line_color=self.prms.track_colors[j])
+        self._refstat(row, layer, "line")
 
     def _scatter(self, row, layer):
-        self._refstat(row, layer, "scatter")#mode="markers", marker={"size" : 3, "color" : self.prms.track_colors[j]})
+        self._refstat(row, layer, "scatter")
 
     def _stat_kw(self, plot, color):
         if plot == "line":
@@ -269,7 +268,7 @@ class Trackplot:
                 #showlegend=i==0,
                 x=stats.index,
                 y=stats,
-                **self._stat_kw(plot, self.prms.track_colors[j])
+                **self._stat_kw(plot, self.conf.vis.track_colors[j])
             ), row=row, col=1)
 
 
