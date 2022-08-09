@@ -385,7 +385,6 @@ optional arguments:
                         Number of reference coordinates to query for iteration
                         (default: 10000)
   -c, --cov             Output track coverage for each reference position (default: False)
-  -v, --verbose-refs    Output reference name and strand (default: False)
 ```
 
 ### `layerstats`

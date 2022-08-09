@@ -63,7 +63,6 @@ def dtw(conf):
         aligned = False
         for paf in mm2s[read.id]:
             t0 = time.time()
-            #print(paf)
             dtw = GuidedDTW(tracks, sigproc, read, paf, conf)
 
             if conf.bc_cmp:
@@ -112,9 +111,6 @@ class GuidedDTW:
 
         mref_min = self.coords.mrefs.min()#-self.index.trim[0]
         mref_max = self.coords.mrefs.max()+1#+self.index.trim[1]
-
-        #print(self.coords)
-        #print(mref_max-mref_min, mref_min, mref_max)
 
         self.block_coords = list()
         block_st = mref_min
@@ -243,13 +239,8 @@ class GuidedDTW:
             #print
 
             bands = _uncalled.get_guided_bands(ar(mrefs), ar(aln["start"]), ar(read_block['start']), band_count, shift)
-
-            #rmoves = np.diff(bands["ref"])
-            #qmoves = np.diff(bands["qry"])
-            #print(bands)
-            #print(np.all(rmoves ^ qmoves))
             
-            return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.array_type(ref_kmers.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
+            return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(ref_kmers), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         #elif self.method == "static":
         #    return common

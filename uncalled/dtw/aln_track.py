@@ -404,6 +404,7 @@ class AlnTrack:
                 df["end"] = end
             return AlnCoords(df)
 
+
         coords_a = coords(aln_a, self)
         coords_b = coords(aln_b, other)
 
