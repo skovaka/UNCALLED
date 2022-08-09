@@ -23,6 +23,13 @@ class ProcessedRead(_uncalled._ProcessedRead):
 
         self.signal = raw.signal if raw is not None else None
 
+    def set_events(self, df):
+        if isinstance(df, pd.DataFrame):
+            if not "stdv" in df.columns:
+                df["stdv"] = 0
+            df = df[["mean","stdv","start","length"]].to_records(index=False)
+        _uncalled._ProcessedRead.set_events(self, df)
+
     def sample_range(self, start, end):
         mask = (self.events["start"] >= start) & (self.events["start"] <= end)
         return self.to_df()[mask]

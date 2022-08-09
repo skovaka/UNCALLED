@@ -141,6 +141,7 @@ class Eventalign(TrackIO):
         std_level = (events["current"] - model.model_mean) / model.model_stdv
 
         evts = events.rename(columns={"current" : "mean", "current_stdv" : "stdv"})
+        read.set_events(evts)
         #read = ProcessedRead(evts)
 
         if read is not None:
