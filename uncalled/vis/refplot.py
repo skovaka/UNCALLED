@@ -30,7 +30,14 @@ class Refplot:
 
         names = [t.name for t in self.tracks]
 
-        self.refs = self.tracks.coords.refs
+        if self.prms.kmer_coord is None:
+            self.refs = self.tracks.coords.refs
+        else:
+            st = en = self.prms.kmer_coord 
+            st -= self.tracks.index.trim[0]
+            en += self.tracks.index.trim[1] + 1
+            self.refs = pd.RangeIndex(st, en)
+
         self.layer, = parse_layer(self.prms.layer)
 
         self.fig = make_subplots(
@@ -40,7 +47,10 @@ class Refplot:
             #vertical_spacing=0.125/n_rows)
 
         self.fig.update_layout(
-            title=self.tracks.coords.ref_name, title_x=0.5, title_y=0.05
+            title=self.tracks.coords.ref_name, title_x=0.5, title_y=0.05,
+            height=300,
+            margin=dict(l=75,r=25,b=75,t=25),
+            showlegend=False,
         )
 
         #if self.prms.share_reads:
@@ -73,8 +83,7 @@ class Refplot:
                         marker={
                             "line_width" : 0,
                             "color" : self.conf.vis.track_colors[i],
-                    }),
-                    row=1, col=r+1
+                    }), row=1, col=r+1
                 )
                 self.fig.update_xaxes(title=str(ref), row=1, col=r+1)
 

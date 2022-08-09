@@ -115,6 +115,7 @@ RefplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
     ("layer", "current", str, ""),
     ("plot", None, str, "Type of plot to display (hist, violin, box)"),
+    ("kmer_coord", None, int, "Center position of k-mer to display"),
 )
 
 class TrackplotParams(config.ParamGroup):

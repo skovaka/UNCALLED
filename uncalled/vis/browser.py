@@ -9,6 +9,7 @@ import sys
 
 from .trackplot import Trackplot, PLOT_LAYERS
 from .dotplot import Dotplot
+from .refplot import Refplot
 from .. import config
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
@@ -130,12 +131,29 @@ def new_browser(tracks, conf):
                                 {"label" : "Full overlap", "value" : "full_overlap"},
                                 {"label" : "Shared reads only", "value" : "share_reads"},
                             ], value=["show_legend"])
-                ])
-            , className="w3-half"),
+                ]) #end trackplot panel
+            , className="w3-half"), #end trackplot div
 
             html.Div([
                 _panel("Selection", "selection",
                         html.Table([], id="info-table")),
+
+                _panel("Refplot", "refplot",
+                    content=dcc.Graph(
+                        id="refplot",
+                        config = {"scrollZoom" : True, "displayModeBar" : True}
+                    ), settings=[
+                        dcc.Checklist(
+                            id="refplot-checklist",
+                            className="w3-container w3-padding",
+                            labelStyle={"display" : "block"},
+                            inputClassName="w3-padding",
+                            options=[
+                                {"label" : "Show legend", "value" : "show_legend"},
+                                {"label" : "Show model current", "value" : "show_model"},
+                                {"label" : "Always color bases", "value" : "multi_background"},
+                            ], value=["show_legend", "show_model"])
+                    ], hide=True),
 
                 _panel("Dotplot", "dotplot",
                     content=dcc.Graph(
@@ -154,6 +172,8 @@ def new_browser(tracks, conf):
                             ], value=["show_legend", "show_model"])
                     ], hide=True),
             ], className="w3-half"),
+            html.Div([
+            ], className="w3-full"),
 
         ]),
         html.Div(style={"display" : "none"}, id="selected-read"),
@@ -252,6 +272,39 @@ def new_browser(tracks, conf):
             show_legend="show_legend" in flags,
             layers=list(parse_layer(layer)),
             conf=conf).plot(read)
+        #fig.update_layout(uirevision=read_changed)
+
+        return fig, {"display" : "block"}
+
+
+    @app.callback(
+        Output("refplot", "figure"),
+        Output("refplot-panel", "style"),
+        #State("selected-read", "children"),
+        #Input("dotplot-btn", "n_clicks"))
+        Input("track-dropdown", "value"),
+        Input("dotplot-checklist", "value"),
+        Input("trackplot-layer", "value"),
+        Input("selected-ref", "children"),
+        Input("selected-read", "children"),
+        Input("read-changed", "children"))
+    def update_refplot(track_names, flags, layer, ref, read, read_changed):
+        if read is None:
+            return {}, {"display" : "hidden"}
+
+        flags = set(flags)
+
+        conf = Config(conf=tracks.conf)
+        conf.sigplot.multi_background="multi_background" in flags
+        conf.sigplot.no_model="show_model" not in flags
+
+        chunk = tracks.slice(tracks=track_names if len(track_names) > 0 else None)
+
+        fig = Refplot(
+            chunk, 
+            layer=layer,
+            kmer_coord=ref,
+            conf=conf).fig
         #fig.update_layout(uirevision=read_changed)
 
         return fig, {"display" : "block"}
