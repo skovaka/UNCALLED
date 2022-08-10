@@ -89,7 +89,7 @@ class Dotplot:
             column_widths=column_widths,
             vertical_spacing=0.01,
             horizontal_spacing=0.01,
-            subplot_titles = [read_id], #+ None*(2*len(column_widths)-1)
+            #subplot_titles = [read_id], #+ None*(2*len(column_widths)-1)
             shared_xaxes=True,
             shared_yaxes=True)
 
@@ -277,12 +277,16 @@ class Dotplot:
 
         fig.update_layout(
             #hovermode="x unified",
-            margin={"t":50, "b":50},
+            margin={"l":25,"r":25},#, "b":50},
             barmode="overlay",
             hoverdistance=20,
             dragmode="pan", 
             showlegend=self.prms.show_legend,
-            legend={"bgcolor" : "#e6edf6"})#, scroll_zoom=True)
+            legend={
+                "y" : 1.05, "yanchor" : "bottom",
+                #"x" : 0, "xanchor" : "left",
+                "traceorder" : "normal",
+                "orientation" : "h", "bgcolor" : "#e6edf6"})#, scroll_zoom=True)
 
         return fig
 

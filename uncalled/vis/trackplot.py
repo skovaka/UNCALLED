@@ -103,7 +103,7 @@ class Trackplot:
             row_heights=panel_heights,
             shared_xaxes=True, 
             shared_yaxes=self.prms.share_reads, 
-            x_title=ref_title,
+            #x_title=ref_title,
             #y_title="Reads",
             vertical_spacing=0.125/n_rows)
 
@@ -127,15 +127,15 @@ class Trackplot:
         #    cax.update(LAYER_COLORS[self.prms.layer])
         #self.fig.update_layout(coloraxis=cax)
 
-        self.fig.update_xaxes(side='top', showticklabels=True, row=1, col=1)
-        self.fig.update_xaxes(showticklabels=True, row=n_rows, col=1)
+        self.fig.update_xaxes(title={"text" : ref_title, "standoff" : 5}, side='top', showticklabels=True, row=1, col=1)
+        self.fig.update_xaxes(showticklabels=False, row=n_rows, col=1)
 
         height = 350*np.sqrt(np.sum(panel_heights))
 
         self.fig.update_layout(
             dragmode="pan", 
             autosize=True, height=height,
-            margin={"t":50},
+            margin=dict(t=75, r=50, l=50),
             legend={"x":1,"y":1,"xanchor":"left"},
             showlegend=self.prms.show_legend,
             coloraxis_showscale=self.prms.show_legend,
@@ -196,11 +196,14 @@ class Trackplot:
 
         cax = {"colorbar" : {
             "title" : layer_label,
-             "y" : 0.5, "len" : 0.5, 
-             "yanchor" : "top"}}
+            "y" : 0, #"len" : 0.5, 
+            "yanchor" : "top",
+            "orientation" : "h"
+        }}
         if (group,layer) in LAYER_COLORS:
             cax.update(LAYER_COLORS[(group,layer)])
         self.fig.update_layout(coloraxis=cax)
+        #self.fig.update_traces(coloraxis_orientation="v", selector={"type" : "heatmap"})
         
     def _box(self, row, layer):
         (group,layer), = parse_layer(layer)

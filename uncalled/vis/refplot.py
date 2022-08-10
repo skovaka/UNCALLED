@@ -32,36 +32,57 @@ class Refplot:
 
         if self.prms.kmer_coord is None:
             self.refs = self.tracks.coords.refs
+            mid_plot = len(self.refs)//2
         else:
             st = en = self.prms.kmer_coord 
             st -= self.tracks.index.trim[0]
             en += self.tracks.index.trim[1] + 1
             self.refs = pd.RangeIndex(st, en)
+            mid_plot = self.tracks.index.trim[0]
 
         self.layer, = parse_layer(self.prms.layer)
 
+        subplot_titles = list()
+        if self.prms.kmer_coord is not None:
+            for i in range(len(self.refs)):
+                shift = i-mid_plot
+                if shift < 0:
+                    subplot_titles.append(f"{shift}")
+                elif shift == 0:
+                    subplot_titles.append("Selection")
+                else:
+                    subplot_titles.append(f"+{shift}")
+
         self.fig = make_subplots(
             rows=1, cols=len(self.refs), 
+            horizontal_spacing=0.025,
+            subplot_titles=subplot_titles,
             shared_xaxes=True, 
             shared_yaxes=True)
             #vertical_spacing=0.125/n_rows)
 
         self.fig.update_layout(
-            title=self.tracks.coords.ref_name, title_x=0.5, title_y=0.05,
+            dragmode="pan", 
             height=300,
-            margin=dict(l=75,r=25,b=75,t=25),
+            margin=dict(l=65,r=25,b=60,t=55),
             showlegend=False,
         )
 
+        self.fig.update_xaxes(title=self.tracks.coords.ref_name, row=1, col=mid_plot+1)
+            #title=self.tracks.coords.ref_name, title_x=0.5, title_y=0.05,
+
         #if self.prms.share_reads:
-        self.fig.update_yaxes(title=LAYERS[self.layer[0]][self.layer[1]].label,row=1,col=1)
-        self.fig.update_xaxes(matches="x", showticklabels=False)
+        self.fig.update_yaxes(
+            title={"text" : LAYERS[self.layer[0]][self.layer[1]].label, "standoff" : 8},
+            row=1,col=1)
+        self.fig.update_xaxes(matches="x", tickvals=[0], tickmode="array")
+
 
         legend = set()
 
         for r,ref in enumerate(self.refs):
             for i,track in enumerate(self.tracks.alns):
-                vals = track.layers.loc[ref,self.layer]
+                vals = track.layers.loc[ref,self.layer].dropna()
                 counts, bins = np.histogram(vals, bins=25)
                 dens = counts / counts.sum()
                 if len(self.tracks.alns) == 2 and i == 1:
@@ -85,7 +106,8 @@ class Refplot:
                             "color" : self.conf.vis.track_colors[i],
                     }), row=1, col=r+1
                 )
-                self.fig.update_xaxes(title=str(ref), row=1, col=r+1)
+                self.fig.update_xaxes(ticktext=[str(ref)], row=1, col=r+1)
+                
 
     def show(self):
         fig_conf = {
