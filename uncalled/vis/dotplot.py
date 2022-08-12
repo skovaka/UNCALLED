@@ -277,7 +277,7 @@ class Dotplot:
 
         fig.update_layout(
             #hovermode="x unified",
-            margin={"l":25,"r":25},#, "b":50},
+            margin={"l":50,"r":50},#, "b":50},
             barmode="overlay",
             hoverdistance=20,
             dragmode="pan", 
