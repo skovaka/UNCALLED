@@ -107,6 +107,7 @@ class Fast5Reader:
         self.prms.max_reads = conf_prms.max_reads
         self.prms.max_buffer = conf_prms.max_buffer
         self.prms.load_bc = conf_prms.load_bc
+        self.prms.bc_group = conf_prms.bc_group
 
         if isinstance(index, str): 
             if len(index) > 0:

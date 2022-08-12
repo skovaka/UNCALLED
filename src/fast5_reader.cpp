@@ -32,7 +32,8 @@ const typename Fast5Reader::Params Fast5Reader::PRMS_DEF = {
     max_reads  : 0,
     max_buffer : 100,
     recursive  : false,
-    load_bc    : false
+    load_bc    : false,
+    bc_group : "000",
 };
 
 const std::string 
@@ -43,7 +44,10 @@ const std::string
     SINGLE_RAW_PATH  = "/Raw/Reads",
     SINGLE_CH_PATH = "/UniqueGlobalKey/channel_id",
 
-    ANALYSIS_PATH    = "/Analyses";
+    //ANALYSIS_PATH    = "",
+
+    GUPPY_SEG_PREFIX = "/Analyses/Segmentation_",
+    GUPPY_BC_PREFIX = "/Analyses/Basecall_1D_";
 
 Fast5Reader::Fast5Reader() : 
     Fast5Reader(PRMS_DEF) {}
@@ -84,23 +88,28 @@ bool Fast5Reader::open_fast5(u32 i) {
 Fast5Read::Paths Fast5Reader::get_subpaths(const std::string &path) {
     Fast5Read::Paths subpaths;
 
+    std::string analysis_prefix;
+
     switch (fmt_) {
         case Format::SINGLE:
-            subpaths.raw      = path;
-            subpaths.channel  = SINGLE_CH_PATH;
-            subpaths.analysis = ANALYSIS_PATH;
+            subpaths.raw     = path;
+            subpaths.channel = SINGLE_CH_PATH;
+            analysis_prefix  = "";
             break;
         case Format::MULTI:
-            subpaths.raw      = path + MULTI_RAW_PATH;
-            subpaths.channel  = path + MULTI_CH_PATH;
-            subpaths.analysis = path + ANALYSIS_PATH;
+            subpaths.raw     = path + MULTI_RAW_PATH;
+            subpaths.channel = path + MULTI_CH_PATH;
+            analysis_prefix  = path;
             break;
         default:
             std::cerr << "Error: unrecognized fast5 format\n";
     }
 
-    if (!PRMS.load_bc) {
-        subpaths.analysis = "";
+    if (PRMS.load_bc) {
+        subpaths.basecall = analysis_prefix + GUPPY_BC_PREFIX + PRMS.bc_group;
+        subpaths.segmentation = analysis_prefix +GUPPY_SEG_PREFIX + PRMS.bc_group;
+    } else {
+        subpaths.basecall = subpaths.segmentation = "";
     }
     
     return subpaths;

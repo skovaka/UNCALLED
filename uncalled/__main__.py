@@ -261,6 +261,7 @@ CMDS = {
         Opt(("-b", "--band-width"), "dtw"),
         Opt(("-s", "--band-shift"), "dtw"),
         Opt(("-N", "--norm-len"), "normalizer", "len", default=0),
+        Opt("--bc-group", "fast5_reader"),
     )), 
     #
     "convert" : (None, 

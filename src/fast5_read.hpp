@@ -25,16 +25,15 @@
 #include "hdf5_tools.hpp"
 #include "read_buffer_bc.hpp"
 
-const std::string
-    GUPPY_SEG_SMRY_PATH = "/Segmentation_000/Summary/segmentation",
-    GUPPY_BC_MOVE_PATH = "/Basecall_1D_000/BaseCalled_template/Move",
-    GUPPY_BC_SMRY_PATH = "/Basecall_1D_000/Summary/basecall_1d_template";
+const std::string GUPPY_SEG_SMRY = "/Summary/segmentation",
+                  GUPPY_BC_MOVE = "/BaseCalled_template/Move",
+                  GUPPY_BC_SMRY = "/Summary/basecall_1d_template";
 
 class Fast5Read : public ReadBufferBC {
     public:
 
     struct Paths {
-        std::string raw, channel, analysis;
+        std::string raw, channel, basecall, segmentation;
     };
 
     Fast5Read() : ReadBufferBC() {}
@@ -63,20 +62,20 @@ class Fast5Read : public ReadBufferBC {
               cal_offset = atof(ch_attrs["offset"].c_str());
 
         //Load BC data if path exists
-        if (!paths.analysis.empty() && file.group_exists(paths.analysis)) {
+        if (!paths.basecall.empty() && file.group_exists(paths.basecall)) {
             bc_loaded_ = true;
 
             //Template start from guppy segmentation
-            std::string seg_path = paths.analysis + GUPPY_SEG_SMRY_PATH;
+            std::string seg_path = paths.segmentation + GUPPY_SEG_SMRY;
             auto seg_attrs = file.get_attr_map(seg_path);
             template_start_ = atoi(seg_attrs["first_sample_template"].c_str());
     
             //Guppy BaseCalled Event constant length (stride)
-            auto bc_attrs = file.get_attr_map(paths.analysis + GUPPY_BC_SMRY_PATH);
+            auto bc_attrs = file.get_attr_map(paths.basecall + GUPPY_BC_SMRY);
             bce_stride_ = atoi(bc_attrs["block_stride"].c_str());
 
             //Read guppy bce moves
-            std::string bc_move_path = paths.analysis + GUPPY_BC_MOVE_PATH;
+            std::string bc_move_path = paths.basecall + GUPPY_BC_MOVE;
             file.read(bc_move_path, moves_);
 
         } else {
