@@ -208,7 +208,7 @@ class GuidedDTW:
         mrefs = self.ref_kmers.index[path['ref']]
 
         if self.prms.save_bands and hasattr(dtw, "ll"):
-            self.bands = self._ll_to_df(dtw.ll, read_block, mref_st, len(kmers))
+            self.bands = self._ll_to_df(dtw.ll, read_block, mrefs[0], len(self.ref_kmers))
         else:
             self.bands = None
 

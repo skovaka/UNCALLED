@@ -51,6 +51,7 @@ class Fast5Reader {
         std::string fast5_index;
         u32 max_reads, max_buffer;
         bool recursive, load_bc;
+        std::string bc_group;
 
         bool load_fast5_files(const std::string &filename) {
             fast5_files = read_txt_file(filename);
@@ -143,8 +144,9 @@ class Fast5Reader {
         );
         PY_FAST5_READER_PRM(max_reads, "Maximum number of reads to load.");
         PY_FAST5_READER_PRM(max_buffer, "Maximum number of reads to store in memory.");
-        PY_FAST5_READER_PRM(load_bc, "Will load basecaller data if true");
         PY_FAST5_READER_PRM(recursive, "Will search directories recursively for any file ending in \".fast5\" if true");
+        PY_FAST5_READER_PRM(load_bc, "Will load basecaller data if true");
+        PY_FAST5_READER_PRM(bc_group, "Which basecaller analysis group number to use (including leading zeros)");
             
     }
 

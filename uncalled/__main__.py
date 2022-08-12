@@ -272,6 +272,7 @@ CMDS = {
         Opt(("-b", "--band-width"), "dtw"),
         Opt(("-s", "--band-shift"), "dtw"),
         Opt(("-N", "--norm-mode"), "dtw", choices=["ref_mom", "model_mom"]),
+        Opt("--bc-group", "fast5_reader"),
     )), 
     #
     "convert" : (None, 
