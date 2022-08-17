@@ -91,7 +91,9 @@ class Bcaln:
         else:
             self.coords = self.paf_coords
 
-        self.df = df.iloc[self.kmer_shift[0]:-self.kmer_shift[1]]
+        df = df.set_index(df.index - self.kmer_shift[0])
+
+        self.df = df.iloc[self.kmer_shift[0]:]#:-self.kmer_shift[1]]
 
 
     @property
@@ -111,7 +113,7 @@ class Bcaln:
         else:
             read_i = paf.qr_len - paf.qr_en 
 
-        mrefs = self.paf_coords.mrefs - self.kmer_shift[0]
+        mrefs = self.paf_coords.mrefs# - self.kmer_shift[0]
         mref_i = mrefs.min()
 
         cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
@@ -179,7 +181,7 @@ class Bcaln:
         if paf.is_fwd == self.is_rna:
             cig_ops = list(reversed(cig_ops))
 
-        mrefs = self.paf_coords.mrefs - self.kmer_shift[0]
+        mrefs = self.paf_coords.mrefs# - self.kmer_shift[0]
         mref_i = mrefs.min()
 
         for l,c in cig_ops:

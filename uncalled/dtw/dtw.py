@@ -68,7 +68,7 @@ def dtw(conf):
             if conf.bc_cmp:
                 tracks.calc_compare("bcaln", True, True, True)
 
-            sys.stderr.write(f"{read.id}\n")
+            sys.stderr.write(f"{read.id}\t{paf.is_fwd}\n")
 
             if dtw.df is None:
                 sys.stderr.write("# dtw failed\n")
@@ -114,7 +114,7 @@ class GuidedDTW:
 
         self.block_coords = list()
         block_st = mref_min
-        shift = block_st
+        shift = block_st#+5
         for gap_st, gap_en in self.ref_gaps:
             self.block_coords.append([block_st, gap_st, shift])
             block_st = gap_en
@@ -183,13 +183,15 @@ class GuidedDTW:
         path_qrys = list()
         path_refs = list()
 
-        #mref_st = self.bcaln.index[0]
+        #mref_st = self.ref_kmers.index[0]
+        mref_st = self.bcaln.index[self.bcaln.index.searchsorted(self.ref_kmers.index[0])]
         #mref_en = self.bcaln.index[-1]+1
 
         #kmers = self.ref_kmers.loc[mref_st:mref_en]
         #kmers = self.ref_kmers
 
-        samp_st = self.bcaln.iloc[0]["start"]
+        samp_st = self.bcaln.loc[mref_st]["start"]
+        #samp_st = self.bcaln.iloc[0]["start"]
         samp_en = self.bcaln.iloc[-1]["start"] + self.bcaln.iloc[-1]["length"]
 
         read_block = signal.sample_range(samp_st, samp_en)
@@ -235,8 +237,6 @@ class GuidedDTW:
             mrefs = np.array(aln.index)
             for st,en,sh in self.block_coords:
                 mrefs[aln.index.isin(pd.RangeIndex(st,en))] -= sh
-
-            #print
 
             bands = _uncalled.get_guided_bands(ar(mrefs), ar(aln["start"]), ar(read_block['start']), band_count, shift)
             
