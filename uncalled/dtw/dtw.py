@@ -65,14 +65,15 @@ def dtw(conf):
             t0 = time.time()
             dtw = GuidedDTW(tracks, sigproc, read, paf, conf)
 
-            if conf.bc_cmp:
-                tracks.calc_compare("bcaln", True, True, True)
-
-            sys.stderr.write(f"{read.id}\t{paf.is_fwd}\n")
-
             if dtw.df is None:
                 sys.stderr.write("# dtw failed\n")
                 continue
+
+            if conf.bc_cmp:
+                tracks.calc_compare("bcaln", True, True, True)
+
+            sys.stderr.write(f"{read.id}\n")
+
             aligned = True
 
         if aligned:
@@ -185,14 +186,16 @@ class GuidedDTW:
 
         #mref_st = self.ref_kmers.index[0]
         mref_st = self.bcaln.index[self.bcaln.index.searchsorted(self.ref_kmers.index[0])]
+        mref_en = self.bcaln.index[self.bcaln.index.searchsorted(self.ref_kmers.index[-1])]
         #mref_en = self.bcaln.index[-1]+1
 
         #kmers = self.ref_kmers.loc[mref_st:mref_en]
         #kmers = self.ref_kmers
 
         samp_st = self.bcaln.loc[mref_st]["start"]
+        samp_en = self.bcaln.loc[mref_en]["start"] + self.bcaln.loc[mref_en]["length"]
         #samp_st = self.bcaln.iloc[0]["start"]
-        samp_en = self.bcaln.iloc[-1]["start"] + self.bcaln.iloc[-1]["length"]
+        #samp_en = self.bcaln.iloc[-1]["start"] + self.bcaln.iloc[-1]["length"]
 
         read_block = signal.sample_range(samp_st, samp_en)
 

@@ -104,6 +104,8 @@ class Dotplot:
 
         coords = None
 
+        flipped = True
+
         for i,track in enumerate(tracks):
 
             track_hover = list()
@@ -115,11 +117,15 @@ class Dotplot:
             only_bcaln = self.prms.bcaln_track == track.name
             model = track.model
 
+
             first_aln = True
             for aln_id, aln in track.alignments.iterrows():
                 layers = track.layers \
                               .loc[(slice(None),aln_id), slice(None)] \
                               .droplevel("aln_id")
+
+                
+                flipped = flipped and aln["fwd"] == self.conf.is_rna
 
                 if self.prms.show_bands and "band" in layers:
                     bands = layers["band"].dropna(how="any")
@@ -152,7 +158,9 @@ class Dotplot:
                         x=layers["dtw","start"], y=layers.index,
                         name=track.desc,
                         legendgroup=track.name,
-                        line={"color":self.conf.vis.track_colors[i], "width":2, "shape" : "vh"},
+                        line={
+                            "color":self.conf.vis.track_colors[i], 
+                            "width":2, "shape" : "vh" if flipped else "hv" },
                         hoverinfo="skip",
                         showlegend=first_aln
                     ), row=2, col=1)
@@ -242,7 +250,8 @@ class Dotplot:
                 showlegend=False
             ), row=2,col=1)
 
-        if not track.empty and track.all_fwd == self.conf.is_rna:
+        #if not track.empty and track.all_fwd == self.conf.is_rna:
+        if flipped:
             fig.update_yaxes(autorange="reversed", row=2, col=1)
             fig.update_yaxes(autorange="reversed", row=2, col=2)
 

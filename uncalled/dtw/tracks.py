@@ -480,7 +480,6 @@ class Tracks:
             return
 
         self.cmp = self.input.query_compare(self.cmp_layers, self._aln_track_ids, self.coords, aln_ids)
-        #TODO add aln_ids
 
         groups = self.cmp.index.get_level_values("group_b").unique()
         if "bcaln" in groups:
@@ -501,14 +500,14 @@ class Tracks:
                 df = pd.concat({group : df.reindex(track.layers.index)}, axis=1)
                 track.layers = pd.concat([track.layers, df], axis=1).dropna(axis=1,how="all")
 
-            try:
-                if bcalns is not None:
-                    _add_group("bc_cmp", bcalns)
-                if dtws is not None:
-                    _add_group("cmp", dtws)
-            except:
-                sys.stderr.write("Failed to write compare group\n")
-                sys.stderr.write(str(track.alignments))
+            #try:
+            if bcalns is not None:
+                _add_group("bc_cmp", bcalns)
+            if dtws is not None:
+                _add_group("cmp", dtws)
+            #except:
+            #    sys.stderr.write("Failed to write compare group\n")
+            #    sys.stderr.write(str(track.alignments))
 
     def calc_compare(self, group_b, calc_jaccard, calc_mean_ref_dist, save):
         if len(self.alns) > 0:

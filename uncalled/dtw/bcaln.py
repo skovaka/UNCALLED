@@ -84,21 +84,21 @@ class Bcaln:
             mrefs = df.index.intersection(self.clip_coords.mrefs[self.is_fwd])
             mrefs.name = "mref"
 
-            self.coords = self.clip_coords.mref_intersect(mrefs=df.index)
-
-            #mrefs = df.index.intersect(self.clip_coords.mrefs[self.is_fwd])
             df = df.reindex(index=mrefs, copy=False)
+            self.coords = self.clip_coords#.mref_intersect(mrefs=self.df.index)
         else:
             self.coords = self.paf_coords
+
 
         df = df.set_index(df.index - self.kmer_shift[0])
 
         self.df = df.iloc[self.kmer_shift[0]:]#:-self.kmer_shift[1]]
+        self.coords = self.coords.mref_intersect(mrefs=self.df.index)
 
 
     @property
     def empty(self):
-        return not hasattr(self, "df") or len(self.df) <= 2
+        return not hasattr(self, "df") or len(self.df) <= sum(self.kmer_shift)
 
     def parse_cs(self, paf):
         cs = paf.tags.get('cs', (None,)*2)[0]
