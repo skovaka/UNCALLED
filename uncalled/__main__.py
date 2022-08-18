@@ -10,6 +10,20 @@ import pandas as pd
 
 import cProfile
 
+INDEX_OPTS = (
+        Opt("fasta_filename", "index"),
+        Opt(("-o", "--index-prefix"), "index"),
+        Opt("--no-bwt", "index", action="store_true"),
+        Opt(("-s", "--max-sample-dist"), "index"),
+        Opt("--min-samples", "index"),
+        Opt("--max-samples", "index"),
+        Opt(("-1", "--matchpr1"), "index"),
+        Opt(("-2", "--matchpr2"), "index"),
+        Opt(("-f", "--pathlen-percentile"), "index"),
+        Opt(("-m", "--max-replen"), "index"),
+        Opt("--probs", "index"),
+        Opt("--speeds", "index"),
+     )
 BWA_OPTS = (
     Opt("bwa_prefix", "mapper"),
     Opt(("-p", "--idx-preset"), "mapper"),
@@ -38,6 +52,21 @@ MAPPER_OPTS = (
     Opt("--rna", fn="set_r94_rna")
 )
 
+SIM_OPTS = BWA_OPTS + (
+    Opt("fast5s", 
+        nargs = '+', 
+        type = str, 
+        help = "Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
+    ),
+    Opt(("-r", "--recursive"), 
+        action = "store_true"
+    ),
+    Opt("--ctl-seqsum", "simulator"),
+    Opt("--unc-seqsum", "simulator"),
+    Opt("--unc-paf",    "simulator"),
+    Opt("--sim-speed",  "simulator"),
+) + MAPPER_OPTS
+
 RT_OPTS = (
     MutexOpts("realtime_mode", [
         Opt(("-D", "--deplete"), fn="set_rt_deplete"),
@@ -49,10 +78,60 @@ RT_OPTS = (
     ])
 )
 
+PAF_OPTS = (
+    Opt("infile",  
+        type = str, 
+        help = "PAF file output by UNCALLED"
+    ),
+    Opt(("-n", "--max-reads"), 
+        required = False, 
+        type = int, 
+        default = None, 
+        help = "Will only look at first n reads if specified"
+    ),
+    Opt(("-r", "--ref-paf"), 
+        required = False, 
+        type = str, 
+        default = None, 
+        help = "Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA."
+    ),
+    Opt(("-a", "--annotate"), 
+        action = 'store_true', 
+        help = "Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag"
+    ),
+)
+
 REALTIME_OPTS = BWA_OPTS + MAPPER_OPTS + (
     Opt("--host", "realtime"),
     Opt("--port", "realtime"),
     Opt("--duration", "realtime"),
+) 
+DTW_OPTS = (
+    Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
+    Opt(("-m", "--mm2-paf"), "dtw", required=True),
+    Opt(("-o", "--db-out"), "tracks.io"),
+    Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
+    Opt("--eventalign-flags", "tracks.io", type=comma_split),
+    #Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include"),
+    Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
+    Opt(("-a", "--append"), "tracks.io", action="store_true"),
+    Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
+    Opt(("-p", "--pore-model"), "pore_model", "name", default=None),
+    Opt("--save-bands", "dtw", action="store_true"),
+    Opt("--full-overlap", "tracks", action="store_true"),
+    #Opt(("-S", "--mask-skips"), "dtw", action="store_true"),
+    Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
+    #Opt("--method", "dtw", choices=METHODS.keys()),
+    Opt(("-i", "--iterations"), "dtw"),
+    Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
+    Opt("--skip-cost", "dtw"),
+    Opt("--stay-cost", "dtw"),
+    Opt("--move-cost", "dtw"),
+    Opt(("-b", "--band-width"), "dtw"),
+    Opt(("-s", "--band-shift"), "dtw"),
+    Opt(("-N", "--norm-mode"), "dtw", choices=["ref_mom", "model_mom"]),
+    Opt("--bc-group", "fast5_reader"),
 ) + RT_OPTS
 
 CONVERT_OPTS = (
@@ -189,92 +268,16 @@ TRACKPLOT_PANEL_OPTS = (
 ALL_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95", "KS"}
 
 CMDS = {
-    "index" : ("index", "Build an index from a FASTA reference", (
-        Opt("fasta_filename", "index"),
-        Opt(("-o", "--index-prefix"), "index"),
-        Opt("--no-bwt", "index", action="store_true"),
-        Opt(("-s", "--max-sample-dist"), "index"),
-        Opt("--min-samples", "index"),
-        Opt("--max-samples", "index"),
-        Opt(("-1", "--matchpr1"), "index"),
-        Opt(("-2", "--matchpr2"), "index"),
-        Opt(("-f", "--pathlen-percentile"), "index"),
-        Opt(("-m", "--max-replen"), "index"),
-        Opt("--probs", "index"),
-        Opt("--speeds", "index"),
-     )), 
-
-    "map" : ("rt.map", "Rapidly map fast5 read signal to a reference",
-        BWA_OPTS + FAST5_OPTS + MAPPER_OPTS
-    ), 
-
-    "sim" : ("rt.sim", "Simulate real-time targeted sequencing",
-        BWA_OPTS + (
-        Opt("fast5s", 
-            nargs = '+', 
-            type = str, 
-            help = "Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
-        ),
-        Opt(("-r", "--recursive"), 
-            action = "store_true"
-        ),
-        Opt("--ctl-seqsum", "simulator"),
-        Opt("--unc-seqsum", "simulator"),
-        Opt("--unc-paf",    "simulator"),
-        Opt("--sim-speed",  "simulator"),
-        ) + MAPPER_OPTS
-    ), 
-
-    "pafstats" : ("rt.pafstats", "Estimate speed and accuracy from an Uncalled PAF file", (
-        Opt("infile",  
-            type = str, 
-            help = "PAF file output by UNCALLED"
-        ),
-        Opt(("-n", "--max-reads"), 
-            required = False, 
-            type = int, 
-            default = None, 
-            help = "Will only look at first n reads if specified"
-        ),
-        Opt(("-r", "--ref-paf"), 
-            required = False, 
-            type = str, 
-            default = None, 
-            help = "Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA."
-        ),
-        Opt(("-a", "--annotate"), 
-            action = 'store_true', 
-            help = "Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag"
-        ),
-    )), 
-    "dtw" : ("dtw.dtw", "Perform DTW alignment guided by basecalled alignments", (
-        Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
-        Opt(("-m", "--mm2-paf"), "dtw", required=True),
-        Opt(("-o", "--db-out"), "tracks.io"),
-        Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
-        Opt("--eventalign-flags", "tracks.io", type=comma_split),
-        #Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include"),
-        Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
-        Opt(("-a", "--append"), "tracks.io", action="store_true"),
-        Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
-        Opt(("-p", "--pore-model"), "pore_model", "name", default=None),
-        Opt("--save-bands", "dtw", action="store_true"),
-        Opt("--full-overlap", "tracks", action="store_true"),
-        #Opt(("-S", "--mask-skips"), "dtw", action="store_true"),
-        Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
-        Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-        #Opt("--method", "dtw", choices=METHODS.keys()),
-        Opt(("-i", "--iterations"), "dtw"),
-        Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
-        Opt("--skip-cost", "dtw"),
-        Opt("--stay-cost", "dtw"),
-        Opt("--move-cost", "dtw"),
-        Opt(("-b", "--band-width"), "dtw"),
-        Opt(("-s", "--band-shift"), "dtw"),
-        Opt(("-N", "--norm-mode"), "dtw", choices=["ref_mom", "model_mom"]),
-        Opt("--bc-group", "fast5_reader"),
-    )), 
-    #
+    "index" : ("index", 
+        "Build an index from a FASTA reference", INDEX_OPTS), 
+    "map" : ("rt.map", 
+        "Rapidly map fast5 read signal to a reference", BWA_OPTS + FAST5_OPTS + MAPPER_OPTS), 
+    "sim" : ("rt.sim", 
+        "Simulate real-time targeted sequencing", SIM_OPTS),
+    "pafstats" : ("rt.pafstats", 
+        "Estimate speed and accuracy from an Uncalled PAF file", PAF_OPTS), 
+    "dtw" : ("dtw.dtw", 
+        "Perform DTW alignment guided by basecalled alignments", DTW_OPTS), 
     "convert" : (None, 
         """Import DTW alignments produced by other tools into a database
 
@@ -295,10 +298,10 @@ CMDS = {
         merge    Merge databases into a single file
         edit     Rename, change fast5 paths, or set description""", {
 
-        "ls"     : ("dtw.db", "", LS_OPTS), 
-        "delete" : ("dtw.db", "", DELETE_OPTS), 
-        "merge"  : ("dtw.db", "", MERGE_OPTS), 
-        "edit"   : ("dtw.db", "", EDIT_OPTS), 
+        "ls"     : ("dtw.io.sqlite", "", LS_OPTS), 
+        "delete" : ("dtw.io.sqlite", "", DELETE_OPTS), 
+        "merge"  : ("dtw.io.sqlite", "", MERGE_OPTS), 
+        "edit"   : ("dtw.io.sqlite", "", EDIT_OPTS), 
     }),
     "refstats" : ("stats.refstats", "Calculate per-reference-coordinate statistics", (
         Opt("db_in", "tracks.io", type=str),

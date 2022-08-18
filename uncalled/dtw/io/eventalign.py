@@ -3,6 +3,7 @@ import pandas as pd
 import sys
 from ..aln_track import AlnTrack
 from . import TrackIO
+import _uncalled
 
 class Eventalign(TrackIO):
     FORMAT = "eventalign"
@@ -25,9 +26,28 @@ class Eventalign(TrackIO):
 
     def init_write_mode(self):
         TrackIO.init_write_mode(self)
-        #self.out.write("contig\tposition\treference_kmer\tread_index\tstrand\tevent_index\tevent_level_mean\tevent_stdv\tevent_length\tmodel_kmer\tmodel_mean\tmodel_stdv\tstandardized_level\tstart_idx\tend_idx\n")
-        #self.out.write("contig\tposition\treference_kmer\tread_name\tstrand\tevent_index\tevent_level_mean\tevent_stdv\tevent_length\tmodel_kmer\tmodel_mean\tmodel_stdv\tstandardized_level\tstart_idx\tend_idx\tsamples\n")
-        self.out.write("contig\tposition\treference_kmer\tread_name\tstrand\tevent_index\tevent_level_mean\tevent_stdv\tevent_length\tmodel_kmer\tmodel_mean\tmodel_stdv\tstandardized_level\tsamples\n")
+
+        flags = set(self.prms.eventalign_flags)
+        self.write_read_name = "print-read-names" in flags
+        self.write_signal_index = "signal-index" in flags
+        self.write_samples = "samples" in flags
+
+        header = ["contig", "position", "reference_kmer"]
+
+        if self.write_read_name:
+            header.append("read_name")
+        else:
+            header.append("read_idx")
+
+        header += ["strand", "event_index", "event_level_mean", "event_stdv", "event_length", "model_kmer", "model_mean", "model_stdv", "standardized_level"]
+
+        if self.write_signal_index:
+            header += ["start_idx", "end_idx"]
+
+        if self.write_samples:
+            header += ["samples"]
+
+        self.out.write("\t".join(header) + "\n")
 
     def init_read_mode(self):
         if len(self.track_names) != 1:
@@ -58,18 +78,23 @@ class Eventalign(TrackIO):
         read.set_events(evts)
         #read = ProcessedRead(evts)
 
-        if read is not None:
+        if self.write_samples:
             signal = read.get_norm_signal()
         else:
             signal = []
 
-        read_id = track.alignments["read_id"].iloc[0]
+        if self.write_read_name:
+            read_id = track.alignments["read_id"].iloc[0]
+        else:
+            read_id = str(self.prev_aln_id)
 
         eventalign = _uncalled.write_eventalign_K5(
-            self.conf, model.instance, self.prev_aln_id, track.coords.fwd, read,
-            track.coords.ref_name, events.index-2, kmers, 
+            self.conf, model.instance, read_id, track.coords.fwd, read,
+            track.coords.ref_name, events.index-2, 
+            self.write_signal_index,
+            kmers, 
             np.arange(len(events))[::-1]+1, #TODO properly rep skips?
-            std_level, read_id, signal) #TODO compute internally?
+            std_level, signal) #TODO compute internally?
 
         self.out.write(eventalign)
 

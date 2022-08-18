@@ -26,13 +26,14 @@ template <typename ModelType>
 std::string write_eventalign(
         Config &conf,
         ModelType &model,
-        i32 read_idx, bool fwd,
+        std::string read_id,
+        bool fwd,
         ProcessedRead read, 
         const std::string &ref_name, py::array_t<i64> ref_np,
+        bool signal_index,
         py::array_t<typename ModelType::kmer_t> kmer_np,
         py::array_t<i32> event_index_np,
         py::array_t<float> std_level_np,
-        std::string read_id,
         py::array_t<float> signal_np) {
 
     auto ref = PyArray<i64>(ref_np);
@@ -54,25 +55,22 @@ std::string write_eventalign(
 
         ss << ref_name << "\t"
            << ref[i] << "\t"
-           << model.kmer_to_str(ref_kmer) << "\t";
+           << model.kmer_to_str(ref_kmer) << "\t"
+           << read_id << "\t"
+           << "t" << "\t"
+           << event_index[i] << "\t"
+           << evt.mean << "\t"
+           << evt.stdv << "\t"
+           << (evt.length / sample_rate) << "\t"
+           << ModelType::kmer_to_str(model_kmer) << "\t"
+           << model.kmer_means_[kmer] << "\t"
+           << model.kmer_stdvs_[kmer] << "\t"
+           << std_level[i];
 
-        if (read_id.empty()) {
-            ss << read_idx; 
-        } else {
-            ss << read_id;
+        if (signal_index) {
+           ss << "\t" << evt.start << "\t"
+              << evt.start + evt.length; //<< "\n";
         }
-
-        ss  << "\t" << "t" << "\t"
-            << event_index[i] << "\t"
-            << evt.mean << "\t"
-            << evt.stdv << "\t"
-            << (evt.length / sample_rate) << "\t"
-            << ModelType::kmer_to_str(model_kmer) << "\t"
-            << model.kmer_means_[kmer] << "\t"
-            << model.kmer_stdvs_[kmer] << "\t"
-            << std_level[i];
-            //<< evt.start << "\t"
-            //<< evt.start + evt.length; //<< "\n";
 
         if (signal.size() > 0) {
             ss << "\t" << signal[evt.start];

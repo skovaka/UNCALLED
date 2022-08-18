@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 import scipy
 
-from .io import TrackSQL, delete, Eventalign, INPUT_PARAMS, OUTPUT_PARAMS
+from .io import TrackSQL, Eventalign, INPUT_PARAMS, OUTPUT_PARAMS
 from .aln_track import AlnTrack, LAYERS, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel

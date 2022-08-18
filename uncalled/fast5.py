@@ -8,8 +8,6 @@ from _uncalled import _Fast5Dict, _Fast5Iter, _Fast5Reader
 import uncalled as unc
 import re
 
-from .argparse import FAST5_PARAM, Opt
-
 def is_fast5(fname):
     return fname.endswith(".fast5")
 

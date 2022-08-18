@@ -20,7 +20,7 @@ IndexParams._def_params(
     ("speeds", None, str, "Find parameters with specified speed coefficents (comma separated)"),
 )
 
-eventalign_flags = "\", \"".join(["samples"])#, "scale-events", "print-read-names", "signal-index"]
+eventalign_flags = "\", \"".join(["print-read-names", "signal-index", "samples"])#, "scale-events"]
 
 class IOParams(config.ParamGroup):
     _name = "io"
@@ -33,7 +33,7 @@ IOParams._def_params(
     ("eventalign_in", None, str, "Eventalign TSV input file (or \"-\"/no argument for stdin)"),
     ("eventalign_out", None, str, "Eventalign TSV output file (or \"-\"/no argument for stdout)"),
     ("eventalign_index", None, str, "Nanopolish index file"),
-    ("eventalign_flags", None, str, f"Eventalign optional flags (comma-separated list of \"\"{eventalign_flags}\")"),
+    ("eventalign_flags", [], list, f"Eventalign optional flags (comma-separated list of \"\"{eventalign_flags}\")"),
     ("tombo_in", None, str, "Fast5 files containing Tombo alignments"),
 
     ("init_track", True, bool, "If true will initialze track into \"db_out\""),
