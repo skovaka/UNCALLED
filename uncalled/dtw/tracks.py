@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 import scipy
 
-from .io import TrackSQL, Eventalign, INPUT_PARAMS, OUTPUT_PARAMS
+from .io import TrackSQL, TSV, Eventalign, INPUT_PARAMS, OUTPUT_PARAMS
 from .aln_track import AlnTrack, LAYERS, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
@@ -90,6 +90,8 @@ class Tracks:
         self.alns = list()
         self.output_tracks = dict()
         self._tracks = dict()
+        self.new_alignment = False
+        self.new_layers = []
         
         self._init_io()
 
@@ -132,6 +134,8 @@ class Tracks:
         self.fast5s = parent.fast5s
         self._aln_track_ids = parent._aln_track_ids
         self.refstats = None
+        self.new_alignment = parent.new_alignment
+        self.new_layers = parent.new_layers
 
         self.input = parent.input
         self.output = parent.output
@@ -238,6 +242,8 @@ class Tracks:
             out_format = OUTPUT_PARAMS[out_prms][0]
             if out_format == "db_out":
                 self.output = TrackSQL(self.conf, self.model, "w")
+            elif out_format == "tsv_out":
+                self.output = TSV(self.conf, self.model, "w")
             elif out_format == "eventalign_out":
                 self.output = Eventalign(self.conf, self.model, "w")
 
@@ -257,12 +263,15 @@ class Tracks:
     
     def _track_or_default(self, track_name):
         if track_name is None:
-            return self.output.tracks[0]
-            #if len(self.output_tracks) == 1:
-            #    track_name, = self.output_tracks
-            #else:
-            #    raise ValueError("Must specify track name when using multiple output tracks")
-        return self.output_tracks[track_name]
+            if self.output is not None:
+                return self.output.tracks[0]
+            else:
+                return self.alns[0]
+        if len(self.output_tracks) > 0:
+            return self.output_tracks[track_name]
+        if self.alns[0].name == track_name:
+            return self.alns[0]
+        raise ValueError(f"Unknown track: {track_name}")
 
     def collapse_events(self, dtw):
         dtw["cuml_mean"] = dtw["length"] * dtw["current"]
@@ -271,6 +280,7 @@ class Tracks:
 
         lengths = grp["length"].sum()
 
+        #event_lens = grep["start"].length()
 
         dtw = pd.DataFrame({
             "start"  : grp["start"].min().astype("uint32"),
@@ -288,9 +298,9 @@ class Tracks:
         else:
             overwrite = True
 
-        self.write_layers("dtw", events, track_name, aln_id, overwrite, read)
+        self.add_layers("dtw", events, track_name, aln_id, overwrite, read)
         
-    def write_layers(self, group, layers=None, track_name=None, aln_id=None, overwrite=False, read=None):
+    def add_layers(self, group, layers=None, track_name=None, aln_id=None, overwrite=False, read=None):
         track = self._track_or_default(track_name)
 
         if layers.index.names[0] == "mref":
@@ -307,17 +317,34 @@ class Tracks:
         else:
             df = track.layers[group]
 
-        pacs = track.coords.ref_to_pac(df.index.levels[0])
-        idx = df.index.set_levels(levels=pacs, level=0)
-        df = df.set_index(idx)
-        df.index.names = ("pac", "aln_id")
-        self.output.write_layers(df, read=read)
-        #self.output.write_layers(df)
+        self.new_layers.append(group)
 
-    def write_alignment(self, read_id, fast5, coords, layers={}, track_name=None):
+
+    def write_alignment(self, track_name=None):
         track = self._track_or_default(track_name)
 
-        aln_id = self.output.init_alignment(read_id, fast5)
+        if self.output is not None:
+            out = self.output
+        else:
+            out = self.input
+
+        if self.new_alignment:
+            out.write_alignment(track.alignments)
+
+        layers = track.layers_pac_index
+        layers = layers.drop(columns=[
+            layer for layer in layers.columns
+            if layer[0] not in self.new_layers or LAYERS[layer[0]][layer[1]].fn is not None])
+
+        if len(layers.columns) > 0:
+            out.write_layers(layers)
+
+    def init_alignment(self, read_id, fast5, coords, layers={}, read=None, track_name=None):
+        track = self._track_or_default(track_name)
+        self.new_alignment = True
+        self.new_layers = []
+
+        aln_id = self.output.init_alignment(read_id, fast5, read=read)
 
         if len(layers) > 0:
             starts = None
@@ -346,7 +373,6 @@ class Tracks:
                 "samp_end" : [samp_end],
                 "tags" : [""]}).set_index("id")
         
-        self.output.write_alignment(track.alignments)
 
         track.layers = None
 
@@ -356,7 +382,7 @@ class Tracks:
             if group == "dtw":
                 self.write_dtw_events(vals, track.name, aln_id)
             else:
-                self.write_layers(group, vals, track.name, aln_id)
+                self.add_layers(group, vals, track.name, aln_id)
 
         return aln_id, coords
 
@@ -435,6 +461,8 @@ class Tracks:
             
     def load(self, ref_bounds=None, full_overlap=None, read_filter=None, load_mat=False):
         self._verify_read()
+        self.new_alignment = True
+        self.new_layers = []
 
         if ref_bounds is not None:
             self.coords = self._ref_bounds_to_coords(ref_bounds)
@@ -539,20 +567,7 @@ class Tracks:
                 df = alns[0].bc_cmp(None, calc_jaccard, calc_mean_ref_dist)
 
         df = df.dropna(how="all")
-
-        if save:
-            if "ref" in df.index.names:
-                df.rename(index=lambda r: alns[0].coords.ref_to_pac(r), level=0, inplace=True)
-            if self.output is None:
-                output = self.input
-            else:
-                output = self.output
-            df = pd.concat({"cmp" : df}, names=["group", "layer"], axis=1)
-            output.write_layers( #TODO be explicit that output = input
-                df, 
-                index=["pac", "aln_a", "aln_b", "group_b"])
-
-        t = time.time()
+        self.add_layers("cmp", df)
 
     def calc_refstats(self, cov=False):
         if self.prms.refstats is None or len(self.prms.refstats) == 0 or len(self.prms.refstats_layers) == 0 or self.all_empty:
@@ -783,6 +798,8 @@ class Tracks:
 
     def _tables_to_tracks(self, coords, alignments, layers):
         tracks = dict()
+        self.new_alignment = False
+        self.new_layers = []
 
         layer_alns = layers.index.get_level_values("aln_id")
 

@@ -212,13 +212,15 @@ class TrackSQL(TrackIO):
     def init_read(self, read_id, fast5_id):
         self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
 
-    def write_layers(self, df, index=["pac","aln_id"], read=None):
-        for group in df.columns.levels[0]:
-            df[group].to_sql(
-                group, self.con, 
-                if_exists="append", 
-                method="multi", chunksize=999//len(df.columns),
-                index=True, index_label=index)
+    def write_layer_group(self, group, df):
+        if group == "bc_cmp": group = "cmp"
+        if group == "cmp":
+            df = df.droplevel("aln_id")
+        df.to_sql(
+            group, self.con, 
+            if_exists="append", 
+            method="multi", chunksize=999//len(df.columns),
+            index=True)
 
     def get_fast5_index(self, track_id=None):
         query = "SELECT read.id AS read_id, filename FROM read " +\

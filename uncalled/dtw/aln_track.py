@@ -27,23 +27,23 @@ MODEL_DIFF_LAYER = "model_diff"
 DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
 
 
-LayerMeta = namedtuple("LayerMeta", ["type", "label", "fn", "deps"], defaults=[None,None])
+LayerMeta = namedtuple("LayerMeta", ["dtype", "label", "fn", "deps"], defaults=[None,None])
 
 #TODO probably move this to AlnTrack
 LAYERS = {
     "ref" : {
-        "coord" : LayerMeta(int, "Reference Coordinate", 
+        "coord" : LayerMeta("Int64", "Reference Coordinate", 
             lambda track: track.coords.pac_to_ref(track.layer_pacs)),
         "name" : LayerMeta(str, "Reference Name",
             lambda track: [track.coords.ref_name]*len(track.layers)),
         "fwd" : LayerMeta(bool, "Is on fwd strand",
             lambda track: [track.coords.fwd]*len(track.layers)),
     }, "dtw" : {
-        "start" : LayerMeta(int, "Sample Start"),
-        "length" : LayerMeta(int, "Sample Length"),
+        "start" : LayerMeta("Int32", "Sample Start"),
+        "length" : LayerMeta("Int32", "Sample Length"),
         "current" : LayerMeta(float, "Current (pA)"),
         "kmer" : LayerMeta(str, "Reference k-mer"),
-        "end" : LayerMeta(int, "Sample End",  
+        "end" : LayerMeta("Int32", "Sample End",  
             lambda track: track.layers["dtw","start"] + track.layers["dtw","length"],
             [("dtw", "start"), ("dtw", "length")]),
         "middle" : LayerMeta(float, "Sample Middle",  
@@ -64,32 +64,38 @@ LAYERS = {
         "base" : LayerMeta(str, "Reference base",
             lambda track: track.model.kmer_base(track.layers["dtw","kmer"], 2)),
     }, "bcaln" : {
-        "start" : LayerMeta(int, "BC Sample Start"),
-        "length" : LayerMeta(int, "BC Sample Length"),
-        "end" : LayerMeta(int, "Sample End",  
+        "start" : LayerMeta("Int32", "BC Sample Start"),
+        "length" : LayerMeta("Int32", "BC Sample Length"),
+        "end" : LayerMeta("Int32", "Sample End",  
             lambda track: track.layers["bcaln","start"] + track.layers["bcaln","length"],
             [("bcaln", "start"), ("bcaln", "length")]),
         "middle" : LayerMeta(float, "Sample Middle",  
             lambda track: track.layers["bcaln","start"] + (track.layers["bcaln","length"] / 2),
             [("bcaln", "start"), ("bcaln", "length")]),
-        "bp" : LayerMeta(int, "Basecaller Base Index"),
+        "bp" : LayerMeta("Int32", "Basecaller Base Index"),
         "error" : LayerMeta(str, "Basecalled Alignment Error"),
     }, "band" : {
-        "pac_end" : LayerMeta(int, "Mirror Ref. End"),
-        "ref_end" : LayerMeta(int, "Mirror Ref. End",
+        "pac_end" : LayerMeta("Int32", "Mirror Ref. End"),
+        "ref_end" : LayerMeta("Int32", "Mirror Ref. End",
             lambda track: track.coords.pac_to_ref(track.layers["band","pac_end"]),
             [("band", "pac_end")]),
-        "sample_start" : LayerMeta(int, "Raw Sample Start"),
-        "sample_end" : LayerMeta(int, "Raw Sample End"),
+        "sample_start" : LayerMeta("Int32", "Raw Sample Start"),
+        "sample_end" : LayerMeta("Int32", "Raw Sample End"),
     }, "cmp" : {
-        "jaccard" : LayerMeta(int, "Jaccard Distance", None, 
+        "aln_a" : LayerMeta("Int32", "Compare alignment V"),
+        "aln_b" : LayerMeta("Int32", "Compare alignment A"),
+        "group_b" : LayerMeta(str, "Compare type"),
+        "jaccard" : LayerMeta("Int32", "Jaccard Distance", None, 
             [("dtw", "start"), ("dtw", "end"), ("dtw", "length")]),
-        "mean_ref_dist" : LayerMeta(int, "Mean Ref. Distance", None,
+        "mean_ref_dist" : LayerMeta("Int32", "Mean Ref. Distance", None,
             [("dtw", "start"), ("dtw", "end"), ("dtw", "length")]),
     }, "bc_cmp" : {
-        "jaccard" : LayerMeta(int, "Jaccard Distance", None, 
+        "aln_a" : LayerMeta("Int32", "Compare alignment V"),
+        "aln_b" : LayerMeta("Int32", "Compare alignment A"),
+        "group_b" : LayerMeta(str, "Compare type"),
+        "jaccard" : LayerMeta("Int32", "Jaccard Distance", None, 
             [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end"), ("bcaln", "length")]),
-        "mean_ref_dist" : LayerMeta(int, "Mean Ref. Distance", None,                   
+        "mean_ref_dist" : LayerMeta("Int32", "Mean Ref. Distance", None,                   
             [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end"), ("bcaln", "length")]),
     }
 }
@@ -350,15 +356,15 @@ class AlnTrack:
                 self._compare_alns(dtw_a, other, id_b, "dtw", df, calc_jaccard, calc_mean_ref_dist)
 
         df["group_b"] = "dtw"
-        return df.set_index(["aln_b", "group_b"], append=True)
+        return df#.set_index(["aln_b", "group_b"], append=True)
 
     def bc_cmp(self, other, calc_jaccard, calc_mean_ref_dist):
         if other is not None:
             groups_b = other.alignments.groupby("read_id")
 
         df = pd.DataFrame(
-            columns=["aln_b", "group_b", "mean_ref_dist", "jaccard"],
-            index = self.layers.index
+            columns=["aln_a", "aln_b", "group_b", "mean_ref_dist", "jaccard"],
+            index = self.layer_refs
         )
 
         for id_a, aln_a in self.alignments.iterrows():
@@ -376,7 +382,7 @@ class AlnTrack:
                     self._compare_alns(dtw, other, id_b, "bcaln", df)
 
         df["group_b"] = "bcaln"
-        return df.set_index(["aln_b", "group_b"], append=True)
+        return df#.set_index(["aln_b", "group_b"], append=True)
 
     def _compare_alns(self, aln_a, other, id_b, group, df, calc_jaccard=True, calc_mean_ref_dist=True):
 
@@ -416,14 +422,16 @@ class AlnTrack:
 
         cmp_df = pd.DataFrame(compare.to_numpy()).dropna(how="all")
 
-        cmp_df["aln_id"] = alns_a[0]
+        #cmp_df["aln_b"] = alns_b[0]
         if has_pac:
             cmp_df["pac"] = self.coords.ref_to_pac(pd.Index(cmp_df["ref"]))
-            cmp_df = cmp_df.set_index(["pac","aln_id"])
+            cmp_df = cmp_df.set_index("pac")
         else:
-            cmp_df = cmp_df.set_index(["ref","aln_id"])
+            cmp_df = cmp_df.set_index("ref")
         df["jaccard"] = cmp_df["jaccard"]
         df["mean_ref_dist"] = cmp_df["mean_ref_dist"]
+        df["aln_a"] = alns_a[0]
+        df["aln_b"] = id_b
 
 
 
@@ -438,6 +446,11 @@ class AlnTrack:
     @property
     def layer_pacs(self):
         return self.coords.ref_to_pac(self.layer_refs)
+
+    @property
+    def layers_pac_index(self):
+        index = pd.MultiIndex.from_arrays([self.coords.ref_to_pac(self.layer_refs), self.layers.index.get_level_values("aln_id")], names=["pac","aln_id"])
+        return self.layers.set_index(index, drop=True)
 
     @property
     def layer_refs(self):

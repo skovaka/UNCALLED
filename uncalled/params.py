@@ -30,8 +30,12 @@ IOParams._def_params(
 
     ("db_in", None, str, "Input track database"),
     ("db_out", None, str, "Output track database"),
-    ("eventalign_in", None, str, "Eventalign TSV input file (or \"-\"/no argument for stdin)"),
-    ("eventalign_out", None, str, "Eventalign TSV output file (or \"-\"/no argument for stdout)"),
+
+    ("tsv_out", None, str, "TSV output file (or \"-\"/no argument for stdout)"),
+    ("tsv_na", "*", str, "Missing value representation for TSV output"),
+
+    ("eventalign_in", None, str, "Eventalign (nanopolish) input file (or \"-\"/no argument for stdin)"),
+    ("eventalign_out", None, str, "Eventalign (nanopolish) output file (or \"-\"/no argument for stdout)"),
     ("eventalign_index", None, str, "Nanopolish index file"),
     ("eventalign_flags", [], list, f"Eventalign optional flags (comma-separated list of \"\"{eventalign_flags}\")"),
     ("tombo_in", None, str, "Fast5 files containing Tombo alignments"),

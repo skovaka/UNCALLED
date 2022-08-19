@@ -26,11 +26,12 @@ def new(conf):
 
     for read_id, read in tracks.iter_reads():
         aln = read.alns[0]
-        read.write_alignment(read_id, read.fast5s.get_read_file(read_id), aln.coords)
+        read.init_alignment(read_id, read.fast5s.get_read_file(read_id), aln.coords)
         
         dtw = aln.layers["dtw"].set_index(aln.coords.ref_to_mref(aln.layer_refs, aln.all_fwd), drop=True)
         dtw.index.name = "mref"
-        read.write_layers("dtw", dtw)
+        read.add_layers("dtw", dtw)
+        read.write_alignment()
 
     tracks.close()
 
@@ -90,7 +91,8 @@ def nanopolish(conf):
 
             fast5_name = f5reader.get_read_file(read_id)
 
-            tracks.write_alignment(read_id, fast5_name, coords, {"dtw" : df})
+            tracks.init_alignment(read_id, fast5_name, coords, {"dtw" : df})
+            tracks.write_alignment()
             print(read_id)
 
     leftover = pd.DataFrame()
@@ -188,7 +190,7 @@ def tombo(conf):
         sig_fwd = ref_bounds.fwd != is_rna
 
         coords = tracks.index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True, kmer_trim=True)
-        aln_id,_ = tracks.write_alignment(read.read_id, fast5_name, coords)
+        aln_id,_ = tracks.init_alignment(read.read_id, fast5_name, coords)
 
         tombo_events = np.array(handle["Events"])[clip:]
 
@@ -226,7 +228,8 @@ def tombo(conf):
                 "kmer" : kmers
              }, index=refs)#.set_index("refs")
 
-        tracks.write_layers("dtw", df, aln_id=aln_id)
+        tracks.add_layers("dtw", df, aln_id=aln_id)
+        tracks.write_alignment()
 
         #track.save_read(fast5_basename)
 

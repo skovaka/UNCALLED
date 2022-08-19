@@ -57,17 +57,16 @@ class Eventalign(TrackIO):
         self.tracks.append(t)
 
     #def write_dtw_events(self, track, events):
-    def write_layers(self, df, read, index=["pac","aln_id"]):
-        for group in df.columns.levels[0]:
-            if group == "dtw":
-                break
+    #def write_layers(self, df, read, index=["pac","aln_id"]):
+    def write_layer_group(self, group, df):
+        if group != "dtw": 
             return
 
         track = self.tracks[0]
         df = df.sort_index()
 
         pacs = df.index.get_level_values(0)
-        events = df[group].set_index(track.coords.pac_to_ref(pacs))
+        events = df.set_index(track.coords.pac_to_ref(pacs))
 
         model = track.model
         kmers = events["kmer"]
@@ -75,7 +74,7 @@ class Eventalign(TrackIO):
         std_level = (events["current"] - model.model_mean) / model.model_stdv
 
         evts = events.rename(columns={"current" : "mean", "current_stdv" : "stdv"})
-        read.set_events(evts)
+        self.read.set_events(evts)
         #read = ProcessedRead(evts)
 
         if self.write_samples:
@@ -89,7 +88,7 @@ class Eventalign(TrackIO):
             read_id = str(self.prev_aln_id)
 
         eventalign = _uncalled.write_eventalign_K5(
-            self.conf, model.instance, read_id, track.coords.fwd, read,
+            self.conf, model.instance, read_id, track.coords.fwd, self.read,
             track.coords.ref_name, events.index-2, 
             self.write_signal_index,
             kmers, 

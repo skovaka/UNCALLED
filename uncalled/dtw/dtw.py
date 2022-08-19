@@ -62,17 +62,18 @@ def dtw(conf):
     for read in fast5s:
         aligned = False
         for paf in mm2s[read.id]:
-            t0 = time.time()
+            sys.stderr.write(f"{read.id}\n")
+
             dtw = GuidedDTW(tracks, sigproc, read, paf, conf)
 
             if dtw.df is None:
-                sys.stderr.write("# dtw failed\n")
+                sys.stderr.write(f"Warning: {read.id} failed\n")
                 continue
 
             if conf.bc_cmp:
                 tracks.calc_compare("bcaln", True, True, True)
 
-            sys.stderr.write(f"{read.id}\n")
+            tracks.write_alignment()
 
             aligned = True
 
@@ -97,7 +98,9 @@ class GuidedDTW:
             self.df = None
             return
 
-        aln_id, self.coords = tracks.write_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df})
+        signal = sigproc.process(read)
+
+        aln_id, self.coords = tracks.init_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, read=signal)
 
         self.index = tracks.index
         self.model = tracks.model
@@ -151,7 +154,6 @@ class GuidedDTW:
         if self.prms.norm_mode == "ref_mom":
             sigproc.set_norm_tgt(ref_means.mean(), ref_means.std())
 
-        signal = sigproc.process(read)
 
         df = self._calc_dtw(signal)
 
@@ -167,7 +169,7 @@ class GuidedDTW:
         tracks.write_dtw_events(self.df, aln_id=aln_id, read=signal)
 
         if self.bands is not None:
-            tracks.write_layers("band", self.bands, aln_id=aln_id)
+            tracks.add_layers("band", self.bands, aln_id=aln_id)
 
         self.empty = False
 

@@ -110,6 +110,8 @@ DTW_OPTS = (
     Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt(("-o", "--db-out"), "tracks.io"),
+    Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
+    Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
     Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
     #Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include"),

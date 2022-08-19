@@ -22,13 +22,15 @@ from ...pore_model import PoreModel
 from ...signal_processor import ProcessedRead
 
 INPUT_PARAMS = np.array(["db_in", "eventalign_in", "tombo_in"])
-OUTPUT_PARAMS = np.array(["db_out", "eventalign_out"])
+OUTPUT_PARAMS = np.array(["db_out", "tsv_out", "eventalign_out"])
 
 class TrackIO:
     def __init__(self, filename, conf, model, mode):
         self.conf = conf
         self.prms = self.conf.tracks.io
         self.model = model
+
+        self.read = None
 
         self.tracks = list()
 
@@ -58,7 +60,8 @@ class TrackIO:
         else:
             raise ValueError("TrackIO mode must be either \'w\' or \'r\'")
 
-    def init_alignment(self, read_id, fast5):
+    def init_alignment(self, read_id, fast5, read):
+        self.read = read
         if fast5 == self.prev_fast5[0]:
             fast5_id = self.prev_fast5[1]
         else:
@@ -89,7 +92,13 @@ class TrackIO:
 
         return track
 
+    def write_layers(self, layers, index=["pac","aln_id"]):
+        for group in layers.columns.unique(0):
+            df = layers[group].dropna(axis=0, how="all")
+            self.write_layer_group(group, df)
+
 from .sqlite import TrackSQL
+from .tsv import TSV
 from .eventalign import Eventalign
 
 class TrackHDF5(TrackIO):
