@@ -41,7 +41,7 @@ class TSV(TrackIO):
                 for col in df.columns]
             self.out.write("\t".join(columns) + "\n")
             self._header = False
-        self.out.write(df.to_csv(sep="\t", header=False, na_rep="*"))
+        self.out.write(df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False))
 
     def write_alignment(self, alns):
         pass

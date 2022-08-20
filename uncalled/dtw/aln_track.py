@@ -197,11 +197,13 @@ class AlnTrack:
         self._init_new(p.db, p.id, p.name, p.desc, p.conf, p.model, p.fast5s)
         self.set_data(coords, alignments, layers, order)
 
+
     def set_data(self, coords, alignments, layers, order=["fwd", "ref_start"]):
 
         self.coords = coords
         self.alignments = alignments
         self.layers = layers
+
 
         if not self.coords.stranded and (self.all_fwd or self.all_rev):
             self.coords = self.coords.ref_slice(fwd=self.all_fwd)
@@ -288,6 +290,10 @@ class AlnTrack:
         df.index = pd.MultiIndex.from_product(
                         [df.index, [aln_id]], 
                         names=["ref", "aln_id"])
+
+        for layer in df:
+            if pd.api.types.is_integer_dtype(df[layer]):
+                df[layer] = df[layer].astype(LAYERS[layer[0]][layer[1]].dtype)
 
         if self.layers is None or overwrite:
             self.layers = df
