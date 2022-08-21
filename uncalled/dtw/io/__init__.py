@@ -92,10 +92,6 @@ class TrackIO:
 
         return track
 
-    def write_layers(self, layers, index=["pac","aln_id"]):
-        for group in layers.columns.unique(0):
-            df = layers[group].dropna(axis=0, how="all")
-            self.write_layer_group(group, df)
 
 from .sqlite import TrackSQL
 from .tsv import TSV

@@ -212,6 +212,11 @@ class TrackSQL(TrackIO):
     def init_read(self, read_id, fast5_id):
         self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
 
+    def write_layers(self, track):
+        for group in track.layers_pac_index.columns.unique(0):
+            df = layers[group].dropna(axis=0, how="all")
+            self.write_layer_group(group, df)
+
     def write_layer_group(self, group, df):
         if group == "bc_cmp": group = "cmp"
         if group == "cmp":

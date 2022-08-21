@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import sys
-from ..aln_track import AlnTrack
+from ..aln_track import AlnTrack, LAYER_META
 from . import TrackIO
 import _uncalled
 
@@ -26,6 +26,7 @@ class TSV(TrackIO):
         TrackIO.init_write_mode(self)
         
         self._header = True
+        self.columns = None
 
     def init_read_mode(self):
         raise RuntimeError("Reading from TSV not yet supported")
@@ -33,14 +34,19 @@ class TSV(TrackIO):
         #t = AlnTrack(self, None, name, name, self.conf, self.model)
         #self.tracks.append(t)
 
-    def write_layers(self, df):
-        df = df.reset_index()
+    def write_layers(self, track):
+        df = track.layers_desc_index.reset_index()#.reset_index()
+
         if self._header:
-            columns = [
+            self.columns = LAYER_META.index.intersection(df.columns)
+            labels = [
                 ".".join([c for c in col if len(c) > 0]) 
-                for col in df.columns]
-            self.out.write("\t".join(columns) + "\n")
+                for col in self.columns]
+            self.out.write("\t".join(labels) + "\n")
             self._header = False
+
+        df = df.loc[:,self.columns]
+
         self.out.write(df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False))
 
     def write_alignment(self, alns):

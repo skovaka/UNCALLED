@@ -300,22 +300,17 @@ class Tracks:
 
         self.add_layers("dtw", events, track_name, aln_id, overwrite, read)
         
-    def add_layers(self, group, layers=None, track_name=None, aln_id=None, overwrite=False, read=None):
+    def add_layers(self, group, layers, track_name=None, aln_id=None, overwrite=False, read=None):
         track = self._track_or_default(track_name)
 
         if layers.index.names[0] == "mref":
             layers = layers.set_index(self.index.mref_to_ref(layers.index))
         elif layers.index.names[0] == "pac":
             layers = layers.set_index(self.index.pac_to_ref(layers.index))
-        #elif layers.index.names[0] == "ref":
-        #    layers = layers.set_index(self.index.ref_to_pac(layers.index))
 
         layers.index.names = ("ref",)
 
-        if layers is not None:
-            df = track.add_layer_group(group, layers, aln_id, overwrite)
-        else:
-            df = track.layers[group]
+        track.add_layer_group(group, layers, aln_id, overwrite)
 
         self.new_layers.append(group)
 
@@ -337,7 +332,7 @@ class Tracks:
             if layer[0] not in self.new_layers or LAYERS[layer[0]][layer[1]].fn is not None])
 
         if len(layers.columns) > 0:
-            out.write_layers(layers)
+            out.write_layers(track)#layers)
 
     def init_alignment(self, read_id, fast5, coords, layers={}, read=None, track_name=None):
         track = self._track_or_default(track_name)
