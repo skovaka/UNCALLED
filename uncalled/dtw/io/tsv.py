@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import sys
-from ..aln_track import AlnTrack, LAYER_META
+from ..aln_track import AlnTrack, LAYER_META, parse_layers
 from . import TrackIO
 import _uncalled
 
@@ -24,9 +24,10 @@ class TSV(TrackIO):
 
     def init_write_mode(self):
         TrackIO.init_write_mode(self)
-        
+
+        print(self.prms.tsv_cols)
+        self.columns = pd.MultiIndex.from_tuples(parse_layers(self.prms.tsv_cols))
         self._header = True
-        self.columns = None
 
     def init_read_mode(self):
         raise RuntimeError("Reading from TSV not yet supported")
@@ -35,10 +36,11 @@ class TSV(TrackIO):
         #self.tracks.append(t)
 
     def write_layers(self, track):
-        df = track.layers_desc_index.reset_index()#.reset_index()
+        df = track.layers_desc_index#.reset_index()
+        df = df[self.columns.intersection(df.columns)].dropna(how="all", axis=0).reset_index()
 
         if self._header:
-            self.columns = LAYER_META.index.intersection(df.columns)
+            self.columns = df.columns
             labels = [
                 ".".join([c for c in col if len(c) > 0]) 
                 for col in self.columns]

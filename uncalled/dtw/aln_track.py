@@ -43,6 +43,7 @@ LAYERS = {
         "kmer" : _Layer(str, "Reference k-mer"),
         "start" : _Layer("Int32", "Sample Start"),
         "length" : _Layer("Int32", "Sample Length"),
+        "event_count" : _Layer(float, "Event Count"),
         "end" : _Layer("Int32", "Sample End",  
             lambda track: track.layers["dtw","start"] + track.layers["dtw","length"],
             [("dtw", "start"), ("dtw", "length")]),

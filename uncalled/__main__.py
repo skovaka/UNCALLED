@@ -111,6 +111,7 @@ DTW_OPTS = (
     Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt(("-o", "--db-out"), "tracks.io"),
     Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
+    Opt("--tsv-cols", "tracks.io", type=comma_split, default="ref,dtw"),
     Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
     Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     Opt("--eventalign-flags", "tracks.io", type=comma_split),

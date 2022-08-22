@@ -32,6 +32,7 @@ IOParams._def_params(
     ("db_out", None, str, "Output track database"),
 
     ("tsv_out", None, str, "TSV output file (or \"-\"/no argument for stdout)"),
+    ("tsv_cols", None, list, "TSV file output alignment layers"),
     ("tsv_na", "*", str, "Missing value representation for TSV output"),
 
     ("eventalign_in", None, str, "Eventalign (nanopolish) input file (or \"-\"/no argument for stdin)"),

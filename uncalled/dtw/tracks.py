@@ -280,14 +280,17 @@ class Tracks:
 
         lengths = grp["length"].sum()
 
-        #event_lens = grep["start"].length()
 
         dtw = pd.DataFrame({
             "start"  : grp["start"].min().astype("uint32"),
             "length" : lengths.astype("uint32"),
             "current"   : grp["cuml_mean"].sum() / lengths,
-            "kmer" : grp["kmer"].first()
+            "kmer" : grp["kmer"].first(),
+            "event_count" : grp["start"].count(),
         })
+
+        skip_counts = dtw["start"].value_counts().loc[dtw["start"]].to_numpy()
+        dtw["event_count"] /= skip_counts
 
         return dtw.sort_index()
 

@@ -92,6 +92,7 @@ class TrackSQL(TrackIO):
                 length INTEGER,
                 current REAL,
                 stdv REAL,
+                event_count REAL,
                 kmer INTEGER,
                 FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE
             );""")
@@ -213,7 +214,8 @@ class TrackSQL(TrackIO):
         self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
 
     def write_layers(self, track):
-        for group in track.layers_pac_index.columns.unique(0):
+        layers = track.layers_pac_index
+        for group in layers.columns.unique(0):
             df = layers[group].dropna(axis=0, how="all")
             self.write_layer_group(group, df)
 
