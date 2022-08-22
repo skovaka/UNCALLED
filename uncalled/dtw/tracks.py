@@ -91,7 +91,7 @@ class Tracks:
         self.output_tracks = dict()
         self._tracks = dict()
         self.new_alignment = False
-        self.new_layers = []
+        self.new_layers = set()
         
         self._init_io()
 
@@ -315,7 +315,7 @@ class Tracks:
 
         track.add_layer_group(group, layers, aln_id, overwrite)
 
-        self.new_layers.append(group)
+        self.new_layers.add(group)
 
 
     def write_alignment(self, track_name=None):
@@ -329,18 +329,18 @@ class Tracks:
         if self.new_alignment:
             out.write_alignment(track.alignments)
 
-        layers = track.layers_pac_index
-        layers = layers.drop(columns=[
-            layer for layer in layers.columns
-            if layer[0] not in self.new_layers or LAYERS[layer[0]][layer[1]].fn is not None])
+        #layers = track.layers_pac_index
+        #layers = layers.drop(columns=[
+        #    layer for layer in layers.columns
+        #    if not (layer[0] in self.new_layers or LAYER_META.loc[layer,"base"])])
 
-        if len(layers.columns) > 0:
-            out.write_layers(track)#layers)
+        if len(self.new_layers) > 0:
+            out.write_layers(track, self.new_layers)
 
     def init_alignment(self, read_id, fast5, coords, layers={}, read=None, track_name=None):
         track = self._track_or_default(track_name)
         self.new_alignment = True
-        self.new_layers = []
+        self.new_layers = set()
 
         aln_id = self.output.init_alignment(read_id, fast5, read=read)
 
@@ -460,7 +460,7 @@ class Tracks:
     def load(self, ref_bounds=None, full_overlap=None, read_filter=None, load_mat=False):
         self._verify_read()
         self.new_alignment = True
-        self.new_layers = []
+        self.new_layers = set()
 
         if ref_bounds is not None:
             self.coords = self._ref_bounds_to_coords(ref_bounds)
@@ -797,7 +797,7 @@ class Tracks:
     def _tables_to_tracks(self, coords, alignments, layers):
         tracks = dict()
         self.new_alignment = False
-        self.new_layers = []
+        self.new_layers = set()
 
         layer_alns = layers.index.get_level_values("aln_id")
 

@@ -20,13 +20,6 @@ from .. import config, index
 from ..index import load_index, RefCoord
 from .bcaln import Bcaln
 
-KMER_LAYER       = "kmer"
-CURRENT_LAYER    = "current"
-DWELL_LAYER      = "dwell"
-MODEL_DIFF_LAYER = "model_diff"
-DEFAULT_LAYERS = [CURRENT_LAYER, DWELL_LAYER, MODEL_DIFF_LAYER]
-
-
 _Layer = namedtuple("_Layer", ["dtype", "label", "fn", "deps"], defaults=[None,None])
 
 #TODO probably move this to AlnTrack

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import sys
 
-from ..aln_track import AlnTrack
+from ..aln_track import AlnTrack, LAYER_META
 from ... import config
 from . import TrackIO
 
@@ -213,11 +213,12 @@ class TrackSQL(TrackIO):
     def init_read(self, read_id, fast5_id):
         self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
 
-    def write_layers(self, track):
+    def write_layers(self, track, groups):
         layers = track.layers_pac_index
-        for group in layers.columns.unique(0):
+        for group in groups:
             df = layers[group].dropna(axis=0, how="all")
-            self.write_layer_group(group, df)
+            base_layers = df.columns.intersection(LAYER_META[LAYER_META["base"]].loc[group].index)
+            self.write_layer_group(group, df[base_layers])
 
     def write_layer_group(self, group, df):
         if group == "bc_cmp": group = "cmp"
