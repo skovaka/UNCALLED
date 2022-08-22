@@ -17,6 +17,7 @@ _CMP_COLOR = {"colorscale" : "RdYlGn", "cmin" : 0, "cmid" :5, "cmax" : 10, "reve
 
 LAYER_COLORS = {
     ("dtw", "model_diff") : {"colorscale" : "RdBu", "cmid" : 0, "cmax" : 20, "cmin" : -20, "reversescale":True},
+    ("dtw", "events_log2") : {"colorscale" : "Picnic", "cmid" : 0, "cmax" : 2, "cmin" : -2, "reversescale":True},
     ("dtw", "current") : {"colorscale" : "viridis"},
     ("dtw", "dwell") : {"colorscale" : "viridis", "cmin" : 0, "cmax" : 25},
     ("cmp", "mean_ref_dist") : _CMP_COLOR,
@@ -35,7 +36,7 @@ DEFAULT_HEIGHTS = {
 }
 
 PLOT_LAYERS = {
-    ("dtw", "current"), ("dtw", "dwell"), ("dtw", "model_diff"),
+    ("dtw", "current"), ("dtw", "dwell"), ("dtw", "model_diff"), ("dtw", "events_log2"),
     ("cmp", "mean_ref_dist"), ("bc_cmp", "mean_ref_dist"),
     ("cmp", "jaccard"), ("bc_cmp", "jaccard"), #("bcaln", "error"), 
 }

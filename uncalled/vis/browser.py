@@ -224,7 +224,7 @@ def new_browser(tracks, conf):
 
                 table.append(html.Tr(html.Td(html.B("%s:%d" % (chunk.coords.ref_name, ref)), colSpan=2)))
                 table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
-                for l in ["current", "dwell", "model_diff"]:
+                for l in ["current", "dwell", "model_diff", "events"]:
                     table.append(html.Tr([
                         html.Td(html.B(LAYERS["dtw"][l].label)), 
                         html.Td("%.3f"%layers[l], style={"text-align":"right"})]))

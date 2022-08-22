@@ -35,7 +35,7 @@ class TSV(TrackIO):
         #t = AlnTrack(self, None, name, name, self.conf, self.model)
         #self.tracks.append(t)
 
-    def write_layers(self, track):
+    def write_layers(self, track, groups):
         df = track.layers_desc_index#.reset_index()
         df = df[self.columns.intersection(df.columns)].dropna(how="all", axis=0).reset_index()
 

@@ -58,12 +58,11 @@ class Eventalign(TrackIO):
 
     #def write_dtw_events(self, track, events):
     #def write_layers(self, df, read, index=["pac","aln_id"]):
-    def write_layer_group(self, group, df):
-        if group != "dtw": 
+    def write_layers(self, track, groups):
+        if "dtw" not in groups: 
             return
 
-        track = self.tracks[0]
-        df = df.sort_index()
+        df = track.layers["dtw"].dropna(how="all").sort_index()
 
         pacs = df.index.get_level_values(0)
         events = df.set_index(track.coords.pac_to_ref(pacs))

@@ -286,11 +286,11 @@ class Tracks:
             "length" : lengths.astype("uint32"),
             "current"   : grp["cuml_mean"].sum() / lengths,
             "kmer" : grp["kmer"].first(),
-            "event_count" : grp["start"].count(),
+            "events" : grp["start"].count(),
         })
 
         skip_counts = dtw["start"].value_counts().loc[dtw["start"]].to_numpy()
-        dtw["event_count"] /= skip_counts
+        dtw["events"] /= skip_counts
 
         return dtw.sort_index()
 

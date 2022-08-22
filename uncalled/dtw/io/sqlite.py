@@ -92,7 +92,7 @@ class TrackSQL(TrackIO):
                 length INTEGER,
                 current REAL,
                 stdv REAL,
-                event_count REAL,
+                events REAL DEFAULT 1,
                 kmer INTEGER,
                 FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE
             );""")
