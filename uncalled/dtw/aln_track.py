@@ -203,13 +203,27 @@ class AlnTrack:
         self._init_new(p.db, p.id, p.name, p.desc, p.conf, p.model, p.fast5s)
         self.set_data(coords, alignments, layers, order)
 
+    def _parse_layers(self, df):
+        if df.index.names[0] == "pac":
+            df = df.rename(index=self.coords.pac_to_ref, level=0)
+            df.index.names = ("ref", "aln_id")
+
+            refs = df.index.get_level_values(0)
+            if len(df) > 1 and refs[0] > refs[1]:
+                df = df.iloc[::-1]
+
+        if self.conf.tracks.mask_skips is not None and ("dtw","events") in df.columns:
+            skips = df["dtw","events"] < 1
+            if self.conf.tracks.mask_skips == "all":
+                df = df.drop(index=df.index[skips])
+            
+        return df
 
     def set_data(self, coords, alignments, layers, order=["fwd", "ref_start"]):
 
         self.coords = coords
         self.alignments = alignments
-        self.layers = layers
-
+        self.layers = self._parse_layers(layers)
 
         if not self.coords.stranded and (self.all_fwd or self.all_rev):
             self.coords = self.coords.ref_slice(fwd=self.all_fwd)
@@ -221,13 +235,6 @@ class AlnTrack:
             raise ValueError("Must specify AlnTrack coords, alignments, and layers")
         self.alignments = self.alignments.sort_values(order)
 
-        if self.layers.index.names[0] == "pac":
-            self.layers = self.layers.rename(index=coords.pac_to_ref, level=0)
-            self.layers.index.names = ("ref", "aln_id")
-
-            refs = self.layers.index.get_level_values(0)
-            if len(self.layers) > 1 and refs[0] > refs[1]:
-                self.layers = self.layers.iloc[::-1]
 
         #self.layers = self.layers.sort_index()
 
@@ -296,11 +303,11 @@ class AlnTrack:
         df = df.astype(LAYER_META.loc[df.columns, "dtype"], copy=False)
 
         if self.layers is None or overwrite:
-            self.layers = df #pd.DataFrame({
+            self.layers = self._parse_layers(df) #pd.DataFrame({
             #    layer : df[layer].astype(LAYER_META.loc[layer,"dtype"]) 
             #    for layer in df}, columns=df.columns)
         else:
-            self.layers = pd.concat([self.layers, df], axis=1)
+            self.layers = pd.concat([self.layers, self._parse_layers(df)], axis=1)
             #for layer in df:
             #    self.layers[layer] = df[layer]#.astype(LAYER_META.loc[layer,"dtype"])
 
