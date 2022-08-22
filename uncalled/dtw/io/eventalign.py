@@ -37,7 +37,7 @@ class Eventalign(TrackIO):
         if self.write_read_name:
             header.append("read_name")
         else:
-            header.append("read_idx")
+            header.append("read_index")
 
         header += ["strand", "event_index", "event_level_mean", "event_stdv", "event_length", "model_kmer", "model_mean", "model_stdv", "standardized_level"]
 
