@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import sys
 from ..aln_track import AlnTrack
+from ...signal_processor import ProcessedRead
 from . import TrackIO
 import _uncalled
 
@@ -65,7 +66,7 @@ class Eventalign(TrackIO):
         df = track.layers["dtw"].dropna(how="all").sort_index()
 
         pacs = df.index.get_level_values(0)
-        events = df.set_index(track.coords.pac_to_ref(pacs))
+        events = df.droplevel(1)#.set_index(track.coords.pac_to_ref(pacs))
 
         model = track.model
         kmers = events["kmer"]
@@ -73,11 +74,16 @@ class Eventalign(TrackIO):
         std_level = (events["current"] - model.model_mean) / model.model_stdv
 
         evts = events.rename(columns={"current" : "mean", "current_stdv" : "stdv"})
-        self.read.set_events(evts)
-        #read = ProcessedRead(evts)
+        if self.read is not None:
+            self.read.set_events(evts)
+            read = self.read
+        else:
+            read = ProcessedRead(evts)
 
         if self.write_samples:
             signal = read.get_norm_signal()
+            if len(signal) == 0:
+                raise RuntimeError("Failed to output read signal")
         else:
             signal = []
 
@@ -87,7 +93,7 @@ class Eventalign(TrackIO):
             read_id = str(self.prev_aln_id)
 
         eventalign = _uncalled.write_eventalign_K5(
-            self.conf, model.instance, read_id, track.coords.fwd, self.read,
+            self.conf, model.instance, read_id, track.coords.fwd, read,
             track.coords.ref_name, events.index-2, 
             self.write_signal_index,
             kmers, 

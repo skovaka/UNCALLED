@@ -167,6 +167,7 @@ NEW_OPTS = (
         Opt("--db-out", "tracks.io"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     #]),
+    Opt("--eventalign-flags", "tracks.io", type=comma_split),
 
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),

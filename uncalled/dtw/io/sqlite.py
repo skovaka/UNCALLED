@@ -562,7 +562,7 @@ def merge(conf):
         db.cur.execute(query)
 
         query = "INSERT INTO dtw "\
-               f"SELECT pac,aln_id+{aln_shift},start,length,current,stdv,kmer "\
+               f"SELECT pac,aln_id+{aln_shift},start,length,current,stdv,events,kmer "\
                 "FROM input.dtw"
         db.cur.execute(query)
 
