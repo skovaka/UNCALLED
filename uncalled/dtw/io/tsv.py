@@ -25,7 +25,6 @@ class TSV(TrackIO):
     def init_write_mode(self):
         TrackIO.init_write_mode(self)
 
-        print(self.prms.tsv_cols)
         self.columns = pd.MultiIndex.from_tuples(parse_layers(self.prms.tsv_cols))
         self._header = True
 

@@ -115,6 +115,9 @@ DTW_OPTS = (
     Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
     Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
+
+    Opt("--mask-skips", "tracks", nargs="?", const="all"),
+
     #Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include"),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
     Opt(("-a", "--append"), "tracks.io", action="store_true"),
@@ -127,9 +130,9 @@ DTW_OPTS = (
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt("--method", "dtw", choices=METHODS.keys()),
     Opt(("-i", "--iterations"), "dtw"),
-    Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
-    Opt("--skip-cost", "dtw"),
-    Opt("--stay-cost", "dtw"),
+        Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
+        Opt("--skip-cost", "dtw"),
+        Opt("--stay-cost", "dtw"),
     Opt("--move-cost", "dtw"),
     Opt(("-b", "--band-width"), "dtw"),
     Opt(("-s", "--band-shift"), "dtw"),
@@ -168,6 +171,7 @@ NEW_OPTS = (
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     #]),
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
+    Opt("--mask-skips", "tracks", nargs="?", const="all"),
 
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),

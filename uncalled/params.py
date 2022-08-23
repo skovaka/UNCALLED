@@ -60,6 +60,7 @@ TracksParams._def_params(
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),
     ("max_reads", None, int, "Only load reads which overlap these coordinates"),
+    ("mask_skips", None, None, "Either \"all\" to mask all skips, or \"keep_best\" to mask all but the closest to the model"),
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("min_coverage", 1, int, "Reference positions with less than this coverage will be excluded from each track (or all tracks if shared_refs_only is true)"),
     ("shared_reads_only", False, bool, "If true will only contain reads shared between all tracks"),
