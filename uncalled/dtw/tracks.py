@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 
 import sys, os
 import sqlite3
@@ -334,7 +333,7 @@ class Tracks:
         #    layer for layer in layers.columns
         #    if not (layer[0] in self.new_layers or LAYER_META.loc[layer,"base"])])
 
-        if len(self.new_layers) > 0:
+        if len(self.new_layers) > 0 and len(track.layers) > 0:
             out.write_layers(track, self.new_layers)
 
     def init_alignment(self, read_id, fast5, coords, layers={}, read=None, track_name=None):

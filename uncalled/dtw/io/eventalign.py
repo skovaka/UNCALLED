@@ -73,6 +73,12 @@ class Eventalign(TrackIO):
 
         std_level = (events["current"] - model.model_mean) / model.model_stdv
 
+        event_counts = events["events"]
+        event_index = (event_counts.cumsum() - event_counts.iloc[0]).astype(int)
+        if True: #TODO check for flipped ref
+            event_index = event_index.max() - event_index
+        event_index += 1
+
         evts = events.rename(columns={"current" : "mean", "current_stdv" : "stdv"})
         if self.read is not None:
             self.read.set_events(evts)
@@ -97,7 +103,7 @@ class Eventalign(TrackIO):
             track.coords.ref_name, events.index-2, 
             self.write_signal_index,
             kmers, 
-            np.arange(len(events))[::-1]+1, #TODO properly rep skips?
+            event_index, #TODO properly rep skips?
             std_level, signal) #TODO compute internally?
 
         self.out.write(eventalign)

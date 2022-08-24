@@ -28,8 +28,7 @@ def new(conf):
         aln = read.alns[0]
         read.init_alignment(read_id, read.fast5s.get_read_file(read_id), aln.coords)
         
-        dtw = aln.layers["dtw"].set_index(aln.coords.ref_to_mref(aln.layer_refs, aln.all_fwd), drop=True)
-        dtw.index.name = "mref"
+        dtw = aln.layers["dtw"].droplevel(1)#.set_index(aln.coords.ref_to_mref(aln.layer_refs, aln.all_fwd), drop=True)
         read.add_layers("dtw", dtw)
         read.write_alignment()
 
