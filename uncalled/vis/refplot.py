@@ -8,7 +8,7 @@ import sys
 
 from .. import config
 from ..fast5 import parse_read_ids
-from ..dtw.aln_track import LAYERS, parse_layer, parse_layers
+from ..dtw.layers import LAYER_META, parse_layer, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks, REFSTAT_LABELS, COMPARE_REFSTATS
 from ..argparse import Opt, comma_split
@@ -73,7 +73,7 @@ class Refplot:
 
         #if self.prms.share_reads:
         self.fig.update_yaxes(
-            title={"text" : LAYERS[self.layer[0]][self.layer[1]].label, "standoff" : 8},
+            title={"text" : LAYER_META.loc[self.layer,"label"], "standoff" : 8},
             row=1,col=1)
         self.fig.update_xaxes(matches="x", tickvals=[0], tickmode="array")
 

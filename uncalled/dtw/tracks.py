@@ -9,7 +9,8 @@ from collections import defaultdict
 import scipy
 
 from .io import TrackSQL, TSV, Eventalign, INPUT_PARAMS, OUTPUT_PARAMS
-from .aln_track import AlnTrack, LAYERS, parse_layers
+from .aln_track import AlnTrack
+from .layers import LAYER_META, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
@@ -197,7 +198,7 @@ class Tracks:
         self.fn_layers = list()
         self.cmp_layers = list()
         for group, layer in parse_layers(layers):
-            if LAYERS[group][layer].fn is None:
+            if LAYER_META.loc[(group,layer),"fn"] is None:
                 if group in CMP_GROUPS:
                     self.cmp_layers.append((group, layer))
                 else:

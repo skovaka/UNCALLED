@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 import sys
-from ..aln_track import AlnTrack, LAYER_META, parse_layers
+from ..aln_track import AlnTrack
+from ..layers import LAYER_META, parse_layers
 from . import TrackIO
 import _uncalled
 

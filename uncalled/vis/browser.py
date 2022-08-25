@@ -13,7 +13,7 @@ from .refplot import Refplot
 from .. import config
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
-from ..dtw.aln_track import LAYERS, parse_layer
+from ..dtw.layers import LAYER_META, parse_layer
 from ..argparse import Opt, comma_split
 from ..config import Config
 from ..fast5 import parse_read_ids
@@ -87,7 +87,7 @@ def new_browser(tracks, conf):
     app.title = "Uncalled4 Browser"
 
     layer_opts = [
-        {"label" : LAYERS[group][layer].label, "value" : f"{group}.{layer}"}
+        {"label" : LAYER_META.loc[(group,layer),"label"], "value" : f"{group}.{layer}"}
         for group,layer in tracks.aln_layers(PLOT_LAYERS)]
     
     track_opts = [
@@ -226,7 +226,7 @@ def new_browser(tracks, conf):
                 table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
                 for l in ["current", "dwell", "model_diff", "events"]:
                     table.append(html.Tr([
-                        html.Td(html.B(LAYERS["dtw"][l].label)), 
+                        html.Td(html.B(LAYER_META.loc[("dtw",l), "label"])), 
                         html.Td("%.3f"%layers[l], style={"text-align":"right"})]))
 
                 card_style = {"display" : "block"}

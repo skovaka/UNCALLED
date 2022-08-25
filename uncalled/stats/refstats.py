@@ -10,7 +10,7 @@ from collections import defaultdict
 
 from .. import config
 from ..dtw.tracks import RefstatsSplit, ALL_REFSTATS
-from ..dtw.aln_track import parse_layers
+from ..dtw.layers import parse_layers
 from ..argparse import Opt, comma_split
 from ..index import str_to_coord
 from ..fast5 import Fast5Reader

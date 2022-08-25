@@ -8,7 +8,7 @@ import sys
 
 from .. import config
 from ..fast5 import parse_read_ids
-from ..dtw.aln_track import LAYERS, parse_layer, parse_layers
+from ..dtw.layers import LAYER_META, parse_layer, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks, REFSTAT_LABELS, COMPARE_REFSTATS
 from ..argparse import Opt, comma_split
@@ -147,7 +147,7 @@ class Trackplot:
     def _mat(self, row, layer):
         (group,layer), = parse_layer(layer)
 
-        layer_label = LAYERS[group][layer].label
+        layer_label = LAYER_META.loc[(group,layer),"label"]
 
         t0 = time.time()
         for i,track in enumerate(self.tracks.alns):
@@ -209,7 +209,7 @@ class Trackplot:
     def _box(self, row, layer):
         (group,layer), = parse_layer(layer)
 
-        layer_label = LAYERS[group][layer].label
+        layer_label = LAYER_META.loc[(group,layer),"label"]
 
         self.fig.update_yaxes(title_text=layer_label, row=row, col=1)
         for j,track in enumerate(self.tracks.alns):
@@ -248,7 +248,7 @@ class Trackplot:
         (group, layer), = parse_layer(".".join(spl[:-1]))
         stat = spl[-1]
 
-        layer_label = LAYERS[group][layer].label
+        layer_label = LAYER_META.loc[(group,layer),"label"]
         stat_label = REFSTAT_LABELS[stat]
 
         if stat in COMPARE_REFSTATS:

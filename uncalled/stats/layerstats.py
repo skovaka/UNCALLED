@@ -16,7 +16,7 @@ import scipy.stats
 from .. import config
 from ..fast5 import parse_read_ids
 from ..dtw import Tracks
-from ..dtw.aln_track import parse_layers, LAYERS
+from ..dtw.layers import parse_layers
 
 
 def compare(conf):
@@ -26,9 +26,9 @@ def compare(conf):
     group_b = "bcaln" if conf.bcaln else "dtw"
 
     if conf.bcaln:
-        conf.tracks.layers += [("bc_cmp", "mean_ref_dist")] #LAYERS["bc_cmp"]["mean_ref_dist"].deps
+        conf.tracks.layers += [("bc_cmp", "mean_ref_dist")] 
     else:
-        conf.tracks.layers += [("cmp", "mean_ref_dist")] #LAYERS["cmp"]["mean_ref_dist"].deps
+        conf.tracks.layers += [("cmp", "mean_ref_dist")] 
 
     all_layers = not (conf.jaccard or conf.mean_ref_dist)
     calc_jaccard = all_layers or conf.jaccard

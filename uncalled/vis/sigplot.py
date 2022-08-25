@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 
 from .. import config
-from ..dtw.aln_track import LAYERS
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
 from ..argparse import Opt, comma_split

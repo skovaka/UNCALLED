@@ -11,7 +11,7 @@ import sys
 from .sigplot import Sigplot
 
 from .. import config
-from ..dtw.aln_track import LAYERS, parse_layers
+from ..dtw.layers import LAYER_META, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
 from ..dtw.bcaln import Bcaln
@@ -184,7 +184,6 @@ class Dotplot:
 
                     elif layer in layers and len(layers[layer].dropna()) > 0:
                         color= "rgba(255,0,0,1)"
-                        #label = LAYERS["cmp"][stat].label
                         fig.add_trace(go.Bar(
                             x=track.layers[layer].fillna(1.0), 
                             y=track.layer_refs, #TODO try vhv
@@ -226,7 +225,7 @@ class Dotplot:
             hover_rows = [
                 "<b>" + coords.ref_name + ":%{y:,d} [%{text}]</b>"
             ]
-            labels = [LAYERS[g][l].label for g,l in hover_layers[2:]]
+            labels = [LAYER_META.loc[(g,l),"label"] for g,l in hover_layers[2:]]
 
             for i,label in enumerate(labels):
                 s = label
@@ -265,7 +264,7 @@ class Dotplot:
 
         for i,(group,layer) in enumerate(self.layers):
             fig.update_xaxes(row=2, col=i+2,
-                title_text=LAYERS[group][layer].label)
+                title_text=LAYER_META.loc[(group,layer),"label"])
 
         axis_kw = dict(
             showspikes=True,
