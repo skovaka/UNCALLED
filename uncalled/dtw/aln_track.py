@@ -37,8 +37,7 @@ class AlnTrack:
         #self.alignments = pd.DataFrame()
         #self.layers = pd.DataFrame()
 
-    def _init_new(self, db, track_id, name, desc, conf, model=None, fast5s=None):
-        self.db = db
+    def _init_new(self, track_id, name, desc, conf, model=None, fast5s=None):
         self.id = track_id
         self.name = name
         self.desc = desc
@@ -52,7 +51,7 @@ class AlnTrack:
             self.model = PoreModel(conf.pore_model)
 
     def _init_slice(self, p, coords=None, alignments=None, layers=None, order=["fwd", "ref_start"]):
-        self._init_new(p.db, p.id, p.name, p.desc, p.conf, p.model, p.fast5s)
+        self._init_new(p.id, p.name, p.desc, p.conf, p.model, p.fast5s)
         self.set_data(coords, alignments, layers, order)
 
     def _parse_layers(self, df):

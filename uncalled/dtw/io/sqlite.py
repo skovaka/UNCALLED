@@ -11,9 +11,9 @@ from . import TrackIO
 
 class TrackSQL(TrackIO):
     FORMAT = "db"
-    def __init__(self, conf, model, mode):
+    def __init__(self, conf, mode):
         filename = conf.tracks.io.db_in if mode == "r" else conf.tracks.io.db_out
-        TrackIO.__init__(self, filename, conf, model, mode)
+        TrackIO.__init__(self, filename, conf, mode)
 
         new_file = not os.path.exists(self.filename)
         self.con = sqlite3.connect(self.filename)
@@ -129,28 +129,32 @@ class TrackSQL(TrackIO):
         #self.con.commit()
 
     def init_write_mode(self):
-        track = TrackIO.init_write_mode(self)
+        TrackIO.init_write_mode(self)
 
         for table in ["dtw", "bcaln", "cmp", "band"]:
             self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
 
+        track = self.tracks.iloc[0]
+
         if self.prms.init_track:
             try:
-                self.init_track(track)
+                tid = self.write_track(track)
             except Exception as err:
-                if len(self.query_track(track.name)) > 0:
+                if len(self.query_track(track["name"])) > 0:
                     if self.prms.append:
                         pass
                     elif self.prms.overwrite:
                         sys.stderr.write("Deleting existing track...\n")
-                        delete(track.name, self)
-                        self.init_track(track)
+                        delete(track["name"], self)
+                        tid = self.write_track(track)
                     else:
                         raise ValueError(f"Database already contains track named \"{ track.name}\". Specify a different name, write to a different file")
                 else:
                     raise err
 
-        self.tracks.append(track)
+        self.tracks.iloc[0]["id"] = tid
+
+        #self.tracks.append(track)
 
     def init_read_mode(self):
         df = self.query_track(self.track_names).set_index("name").reindex(self.track_names)
@@ -162,27 +166,22 @@ class TrackSQL(TrackIO):
             raise ValueError("Alignment track not found: \"%s\" (tracks in database: \"%s\")" %
                              ("\", \"".join(bad_names), "\", \"".join(all_names)))
 
-        for name,row in df.iterrows():
-            conf = config.Config(toml=row.config)
+        self.init_tracks(df.reset_index())
 
-            t = AlnTrack(self, row["id"], name, row["desc"], conf)
-
-            if self.model is None:
-                self.model = t.model
-
-            self.tracks.append(t)
-
-            self.conf.load_config(conf)
+        #for name,row in df.iterrows():
+        #    conf = config.Config(toml=row.config)
+        #    t = AlnTrack(self, row["id"], name, row["desc"], conf)
+        #    self.tracks.append(t)
+        #    self.conf.load_config(conf)
 
 
-    def init_track(self, track):
+    def write_track(self, track):
         self.cur.execute(
             "INSERT INTO track (name,desc,config) VALUES (?,?,?)",
-            (track.name, track.desc, 
-             track.conf.to_toml())
+            (track["name"], track["desc"], track["config"])
         )
-        track.id = self.cur.lastrowid
-        return track.id
+        track_id = self.cur.lastrowid
+        return track_id
 
     def update_config(self, track):
         self.cur.execute(

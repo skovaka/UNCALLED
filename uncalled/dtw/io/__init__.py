@@ -25,14 +25,13 @@ INPUT_PARAMS = np.array(["db_in", "eventalign_in", "tombo_in"])
 OUTPUT_PARAMS = np.array(["db_out", "tsv_out", "eventalign_out"])
 
 class TrackIO:
-    def __init__(self, filename, conf, model, mode):
+    def __init__(self, filename, conf, mode):
         self.conf = conf
         self.prms = self.conf.tracks.io
-        self.model = model
 
         self.read = None
 
-        self.tracks = list()
+        self.tracks = None #list()
 
         if not hasattr(self, "prev_aln_id"):
             self.prev_aln_id = 0
@@ -87,10 +86,28 @@ class TrackIO:
         self.prev_fast5 = (None, None)
         self.prev_read = None
 
-        track = AlnTrack(self, None, name, name, self.conf)
-        self.tracks.append(track)
+        return self.init_track(None, name, name, self.conf.to_toml())
+        #track = AlnTrack(self, None, name, name, self.conf)
+        #self.tracks.append(track)
+        #return track
 
-        return track
+    def init_track(self, id, name, desc, conf):
+        row = pd.DataFrame({
+            "id" : id,
+            "name" : name,
+            "desc" : desc,
+            "config" : conf
+        }, index=[0])
+        self.init_tracks(row)
+        return row
+
+    def init_tracks(self, df):
+        if self.tracks is None:
+            self.tracks = df
+        else:
+            self.tracks = pd.concat([self.tracks, df])
+            
+        
 
 
 from .sqlite import TrackSQL

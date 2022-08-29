@@ -139,6 +139,7 @@ class Tracks:
 
         self.input = parent.input
         self.output = parent.output
+        self.output_track = parent.output_track
 
         self.coords = coords
         self._tracks = dict()
@@ -220,18 +221,22 @@ class Tracks:
         if np.sum(out_prms) > 1:
             raise ValueError("No more than one output can be specified")
 
+        tracks = list()
+
         if np.any(in_prms):
             in_format = INPUT_PARAMS[in_prms][0]
             if in_format == "db_in":
-                self.input = TrackSQL(self.conf, self.model, "r")
-                self.model = self.input.model
+                self.input = TrackSQL(self.conf, "r")
+                #self.model = self.input.model
             elif in_format == "eventalign_in":
                 raise ValueError("EVENTALGIN NOT SUPPORTED YET")
             elif in_format == "tombo_in":
                 raise ValueError("TOMBO NOT SUPPORTED YET")
 
-            for track in self.input.tracks:
-                self._add_track(track.name, track)
+            tracks.append(self.input.tracks)
+
+            #for track in self.input.tracks:
+            #    self._add_track(track.name, track)
         else:
             self.input = None
 
@@ -241,16 +246,25 @@ class Tracks:
         if np.any(out_prms):
             out_format = OUTPUT_PARAMS[out_prms][0]
             if out_format == "db_out":
-                self.output = TrackSQL(self.conf, self.model, "w")
+                self.output = TrackSQL(self.conf, "w")
             elif out_format == "tsv_out":
-                self.output = TSV(self.conf, self.model, "w")
+                self.output = TSV(self.conf, "w")
             elif out_format == "eventalign_out":
-                self.output = Eventalign(self.conf, self.model, "w")
+                self.output = Eventalign(self.conf, "w")
 
-            for track in self.output.tracks:
-                self.output_tracks[track.name] = track
+            tracks.append(self.output.tracks)
+            self.output_track = self.output.tracks.iloc[0]["name"]
+            #for track in self.output.tracks:
+            #    self.output_tracks[track.name] = track
         else:
             self.output = None
+            self.output_track = self.input.tracks.iloc[0]["name"]
+
+        for _,row in pd.concat(tracks).iterrows():
+            conf = config.Config(toml=row["config"])
+            self.conf.load_config(conf)
+            track = AlnTrack(row["id"], row["name"], row["desc"], conf)
+            self._add_track(track.name, track)
 
     def aln_layers(self, layer_filter=None):
         ret = pd.Index([])
@@ -263,14 +277,9 @@ class Tracks:
     
     def _track_or_default(self, track_name):
         if track_name is None:
-            if self.output is not None:
-                return self.output.tracks[0]
-            else:
-                return self.alns[0]
-        if len(self.output_tracks) > 0:
-            return self.output_tracks[track_name]
-        if self.alns[0].name == track_name:
-            return self.alns[0]
+            return self._tracks[self.output_track]
+        elif track_name in self._tracks:
+            return self._tracks[track_name]
         raise ValueError(f"Unknown track: {track_name}")
 
     def collapse_events(self, dtw):

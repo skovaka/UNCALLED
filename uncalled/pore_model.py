@@ -66,7 +66,6 @@ class PoreModel:
             vals = self._vals_from_df(df)
 
         elif cache and prms.name in CACHE:
-            sys.stderr.write(f"Using cached model: {prms.name}\n")
             self._init(prms, CACHE[prms.name])
             return
 

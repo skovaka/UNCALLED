@@ -57,7 +57,6 @@ def compare(conf):
 def dump(conf):
     """Output DTW alignment paths and statistics"""
 
-
     tracks = Tracks(conf=conf)
     #TODO add layer dependencies (compare requires start/length)
     #tracks.set_layers(["start", "length", "bcaln.start", "bcaln.length"] + conf.layers)

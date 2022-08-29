@@ -9,9 +9,9 @@ import _uncalled
 class TSV(TrackIO):
     FORMAT = "tsv"
 
-    def __init__(self, conf, model, mode):
+    def __init__(self, conf, mode):
         filename = conf.tracks.io.tsv_out
-        TrackIO.__init__(self, filename, conf, model, mode)
+        TrackIO.__init__(self, filename, conf, mode)
 
         if self.filename == "-":
             self.out = sys.stdout
