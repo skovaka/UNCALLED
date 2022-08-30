@@ -102,10 +102,10 @@ class TrackSQL(TrackIO):
                 aln_id INTEGER,
                 start INTEGER,
                 length INTEGER,
-                bp INTEGER,
-                error TEXT,
+                indel INTEGER,
                 FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE
             );""")
+                #kmer INTEGER,
         self.cur.execute("""
             CREATE TABLE IF NOT EXISTS cmp (
                 pac INTEGER,

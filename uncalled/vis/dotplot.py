@@ -28,7 +28,7 @@ class Dotplot:
     REQ_LAYERS = [
         "start", "length", "middle", 
         "current", "dwell", "kmer", "base", 
-        "bcaln.middle", "bcaln.error"
+        "bcaln.middle"
     ]
 
     def __init__(self, *args, **kwargs):
@@ -203,13 +203,13 @@ class Dotplot:
                 hover_data[track.name] = pd.concat(track_hover)#.reset_index()
                 hover_data[track.name] = track_hover[0]#.reset_index()
 
-        if self.prms.bcaln_error:
-            for i,track in enumerate(tracks):
-                if not ("bcaln","error") in track.layers.columns: 
-                    continue
-                for aln_id, aln in track.alignments.iterrows():
-                    layers = track.layers.loc[(slice(None),aln_id)].droplevel("aln_id")
-                    self._plot_errors(fig, legend, layers)
+        #if self.prms.bcaln_error:
+        #    for i,track in enumerate(tracks):
+        #        if not ("bcaln","error") in track.layers.columns: 
+        #            continue
+        #        for aln_id, aln in track.alignments.iterrows():
+        #            layers = track.layers.loc[(slice(None),aln_id)].droplevel("aln_id")
+        #            self._plot_errors(fig, legend, layers)
 
         if len(hover_data) > 0:
             hover_data = pd.concat(hover_data, axis=1)
@@ -312,83 +312,83 @@ class Dotplot:
         legend.add("bcaln_starts")
 
 
-    def _plot_errors(self, fig, legend, layers):
-        if ("bcaln","error") not in layers.columns:
-            return 
+    #def _plot_errors(self, fig, legend, layers):
+    #    if ("bcaln","error") not in layers.columns:
+    #        return 
 
-        errors = layers["bcaln","error"].dropna()
-        sub = errors[errors.str.startswith("*")].str.slice(2)
+    #    errors = layers["bcaln","error"].dropna()
+    #    sub = errors[errors.str.startswith("*")].str.slice(2)
 
-        ins = errors[errors.str.startswith("+")]\
-                    .str.slice(1)\
-                    .map(list).explode()
+    #    ins = errors[errors.str.startswith("+")]\
+    #                .str.slice(1)\
+    #                .map(list).explode()
 
-        del_ = errors[errors.str.startswith("-")]\
-               .str.slice(1)\
-               .map(list).explode()
+    #    del_ = errors[errors.str.startswith("-")]\
+    #           .str.slice(1)\
+    #           .map(list).explode()
 
-        #TODO global vis params
-        #colors = ["#80ff80", "#6b93ff", "#ffbd00", "#ff8080"]
-        linewidth = 3
-        size = 15
-        for b,base in enumerate(["a","c","g","t"]):
-            refs = sub.index[sub.str.match(base)]
-            if len(refs) > 0:
-                fig.add_trace(go.Scattergl(
-                    x=layers.loc[refs, ("bcaln","start")],
-                    y=refs+2,
-                    mode="markers",
-                    marker_line_color=self.conf.vis.base_colors[b],
-                    marker_line_width=linewidth,
-                    marker_size=size,
-                    marker_symbol="x-thin",
-                    #hoverinfo="skip",
-                    legendgroup="Bcaln Error",
-                    name="SUB",
-                    showlegend="bcaln_sub" not in legend,
-                    legendrank=3
-                ), row=2, col=1)
-                legend.add("bcaln_sub")
+    #    #TODO global vis params
+    #    #colors = ["#80ff80", "#6b93ff", "#ffbd00", "#ff8080"]
+    #    linewidth = 3
+    #    size = 15
+    #    for b,base in enumerate(["a","c","g","t"]):
+    #        refs = sub.index[sub.str.match(base)]
+    #        if len(refs) > 0:
+    #            fig.add_trace(go.Scattergl(
+    #                x=layers.loc[refs, ("bcaln","start")],
+    #                y=refs+2,
+    #                mode="markers",
+    #                marker_line_color=self.conf.vis.base_colors[b],
+    #                marker_line_width=linewidth,
+    #                marker_size=size,
+    #                marker_symbol="x-thin",
+    #                #hoverinfo="skip",
+    #                legendgroup="Bcaln Error",
+    #                name="SUB",
+    #                showlegend="bcaln_sub" not in legend,
+    #                legendrank=3
+    #            ), row=2, col=1)
+    #            legend.add("bcaln_sub")
 
-            refs = ins.index[ins.str.match(base)]
-            if len(refs) > 0:
-                fig.add_trace(go.Scattergl(
-                    x=layers.loc[refs, ("bcaln","start")],
-                    y=refs+2,
-                    mode="markers",
-                    marker_line_color=self.conf.vis.base_colors[b],
-                    marker_line_width=linewidth,
-                    marker_size=size,
-                    marker_symbol="cross-thin",
-                    #hoverinfo="skip",
-                    legendgroup="Bcaln Error",
-                    name="INS",
-                    showlegend="bcaln_ins" not in legend,
-                    legendrank=4
-                ), row=2, col=1)
-                legend.add("bcaln_ins")
+    #        refs = ins.index[ins.str.match(base)]
+    #        if len(refs) > 0:
+    #            fig.add_trace(go.Scattergl(
+    #                x=layers.loc[refs, ("bcaln","start")],
+    #                y=refs+2,
+    #                mode="markers",
+    #                marker_line_color=self.conf.vis.base_colors[b],
+    #                marker_line_width=linewidth,
+    #                marker_size=size,
+    #                marker_symbol="cross-thin",
+    #                #hoverinfo="skip",
+    #                legendgroup="Bcaln Error",
+    #                name="INS",
+    #                showlegend="bcaln_ins" not in legend,
+    #                legendrank=4
+    #            ), row=2, col=1)
+    #            legend.add("bcaln_ins")
 
-            refs = del_.index[del_.str.match(base)]
-            if len(refs) > 0:
-                starts = layers[("bcaln","start")].dropna()
-                idxs = starts.index.get_indexer(refs,method="nearest")
-                samps = starts.iloc[idxs]
+    #        refs = del_.index[del_.str.match(base)]
+    #        if len(refs) > 0:
+    #            starts = layers[("bcaln","start")].dropna()
+    #            idxs = starts.index.get_indexer(refs,method="nearest")
+    #            samps = starts.iloc[idxs]
 
-                fig.add_trace(go.Scattergl(
-                    x=samps,
-                    y=refs+2,
-                    mode="markers",
-                    marker_line_color=self.conf.vis.base_colors[b],
-                    marker_line_width=linewidth,
-                    marker_size=size,
-                    marker_symbol="line-ew",
-                    #hoverinfo="skip",
-                    name="DEL",
-                    legendgroup="Bcaln Error",
-                    showlegend="bcaln_del" not in legend,
-                    legendrank=5
-                ), row=2, col=1)
-                legend.add("bcaln_del")
+    #            fig.add_trace(go.Scattergl(
+    #                x=samps,
+    #                y=refs+2,
+    #                mode="markers",
+    #                marker_line_color=self.conf.vis.base_colors[b],
+    #                marker_line_width=linewidth,
+    #                marker_size=size,
+    #                marker_symbol="line-ew",
+    #                #hoverinfo="skip",
+    #                name="DEL",
+    #                legendgroup="Bcaln Error",
+    #                showlegend="bcaln_del" not in legend,
+    #                legendrank=5
+    #            ), row=2, col=1)
+    #            legend.add("bcaln_del")
 
 
 

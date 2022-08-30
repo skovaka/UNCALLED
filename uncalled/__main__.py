@@ -117,6 +117,7 @@ DTW_OPTS = (
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
 
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
+    Opt("--mask-indels", "tracks"),
 
     #Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include"),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),

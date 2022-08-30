@@ -51,8 +51,9 @@ LAYERS = {
         "middle" : _Layer(float, "Sample Middle",  
             lambda track: track.layers["bcaln","start"] + (track.layers["bcaln","length"] / 2),
             [("bcaln", "start"), ("bcaln", "length")]),
-        "bp" : _Layer("Int32", "Basecaller Base Index"),
-        "error" : _Layer(str, "Basecalled Alignment Error"),
+        #"bp" : _Layer("Int32", "Basecaller Base Index"),
+        #"error" : _Layer(str, "Basecalled Alignment Error"),
+        "indel" : _Layer("Int32", "Basecalled Alignment Indel"),
     }, "band" : {
         "pac_end" : _Layer("Int32", "Mirror Ref. End"),
         "ref_end" : _Layer("Int32", "Mirror Ref. End",

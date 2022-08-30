@@ -74,11 +74,12 @@ class Bcaln:
             "mref"    : grp["mref"].first().astype("int64"),
             "start"  : grp["start"].min().astype("uint32"),
             "length" : grp["length"].sum().astype("uint32"),
-            "bp"   : grp["bp"].first()
+            "indel" : grp["indel"].first()
         }).set_index("mref")
 
+        #print((df["indel"] < 0).mean(), (df["indel"] > 0).mean())
 
-        df = pd.concat([df, self.errors], axis=1)
+        #df = pd.concat([df, self.errors], axis=1)
 
         if self.clip_coords is not None:
             mrefs = df.index.intersection(self.clip_coords.mrefs[self.is_fwd])
@@ -184,6 +185,8 @@ class Bcaln:
         mrefs = self.paf_coords.mrefs# - self.kmer_shift[0]
         mref_i = mrefs.min()
 
+        insert_len = 0
+
         for l,c in cig_ops:
             l = int(l)
             incr_qr = c in self.CIG_INCR_RD
@@ -191,20 +194,29 @@ class Bcaln:
             read_j = read_i + (l if incr_qr else 1)
             mref_j = mref_i + (l if incr_rf else 1)
 
+            #CIG_INCR_RD = CIG_INCR_ALL | {'I','S'}
+            #CIG_INCR_RF = CIG_INCR_ALL | {'D','N'}
+
             if c == "M":
                 for qr, mr in zip(range(read_i, read_j), range(mref_i, mref_j)):
-                    if mr in mrefs:
-                        bp_mref_aln.append((qr,mr))
-            elif c == "N":
-                self.ref_gaps.append((mref_i,mref_j))
+                    #if mr in mrefs:
+                    bp_mref_aln.append((qr,mr,insert_len))
+                    insert_len = 0
+            elif c == "I":
+                insert_len = l
 
-            if incr_qr:
-                read_i = read_j 
+            elif c in {'D','N'}:
+                for rf in range(mref_i, mref_j):
+                    bp_mref_aln.append((read_i,rf,-l))
+                    
+                #TODO do this based on indel field
+                if c == "N":
+                    self.ref_gaps.append((mref_i,mref_j))
+                
+            if incr_qr: read_i = read_j 
+            if incr_rf: mref_i = mref_j 
 
-            if incr_rf:
-                mref_i = mref_j 
-
-        self.bp_mref_aln = pd.DataFrame(bp_mref_aln, columns=["bp","mref"], dtype='Int64')
+        self.bp_mref_aln = pd.DataFrame(bp_mref_aln, columns=["bp","mref","indel"], dtype='Int64')
         self.bp_mref_aln.set_index("bp", inplace=True)
 
         return True

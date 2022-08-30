@@ -63,6 +63,9 @@ class AlnTrack:
             if len(df) > 1 and refs[0] > refs[1]:
                 df = df.iloc[::-1]
 
+        if self.conf.tracks.mask_indels is not None and ("bcaln","indel") in df.columns:
+            df = df[df["bcaln","indel"].abs() < self.conf.tracks.mask_indels]
+
         if self.conf.tracks.mask_skips is not None and ("dtw","events") in df.columns:
             skips = df["dtw","events"] < 1
             if self.conf.tracks.mask_skips == "all":
