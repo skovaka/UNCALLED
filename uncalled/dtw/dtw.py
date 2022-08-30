@@ -62,7 +62,7 @@ def dtw(conf):
     for read in fast5s:
         aligned = False
         for paf in mm2s[read.id]:
-            #sys.stderr.write(f"{read.id}\n")
+            sys.stderr.write(f"{read.id}\n")
 
             dtw = GuidedDTW(tracks, sigproc, read, paf, conf)
 

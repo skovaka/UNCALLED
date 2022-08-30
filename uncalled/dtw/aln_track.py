@@ -66,6 +66,7 @@ class AlnTrack:
         if self.conf.tracks.mask_indels is not None and ("bcaln","indel") in df.columns:
             df = df[df["bcaln","indel"].abs() < self.conf.tracks.mask_indels]
 
+
         if self.conf.tracks.mask_skips is not None and ("dtw","events") in df.columns:
             skips = df["dtw","events"] < 1
             if self.conf.tracks.mask_skips == "all":
@@ -74,7 +75,6 @@ class AlnTrack:
                 sdf = df[skips].set_index(("dtw","start"), append=True)
                 diffs = (sdf["dtw","current"] - self.model[sdf["dtw","kmer"]]) \
                         .abs().sort_index(level=2).min(axis=0, level=2)
-                print(diffs)
             
         return df
 
@@ -166,7 +166,8 @@ class AlnTrack:
             #    layer : df[layer].astype(LAYER_META.loc[layer,"dtype"]) 
             #    for layer in df}, columns=df.columns)
         else:
-            self.layers = pd.concat([self.layers, self._parse_layers(df)], axis=1)
+            #TODO don't always parse every layer twice
+            self.layers = self._parse_layers(pd.concat([self.layers, df], axis=1))
             #for layer in df:
             #    self.layers[layer] = df[layer]#.astype(LAYER_META.loc[layer,"dtype"])
 
