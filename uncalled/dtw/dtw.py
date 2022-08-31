@@ -105,7 +105,7 @@ class GuidedDTW:
         self.index = tracks.index
         self.model = tracks.model
 
-        self.bcaln = bcaln.df
+        self.bcaln = bcaln.df#[bcaln.df["indel"] == 0]
 
         self.ref_gaps = list(sorted(bcaln.ref_gaps))
 

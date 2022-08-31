@@ -71,8 +71,10 @@ class AlnTrack:
             skips = df["dtw","events"] < 1
             if self.conf.tracks.mask_skips == "all":
                 df = df[~skips]
+
             elif self.conf.tracks.mask_skips == "keep_best":
                 sdf = df[skips].set_index(("dtw","start"), append=True)
+                sdf.index.names = ("ref", "aln_id", "start")
                 diffs = (sdf["dtw","current"] - self.model[sdf["dtw","kmer"]]) \
                         .abs().sort_index(level=2).min(axis=0, level=2)
             
