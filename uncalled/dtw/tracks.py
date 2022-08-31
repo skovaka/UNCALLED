@@ -346,6 +346,9 @@ class Tracks:
         if len(self.new_layers) > 0 and len(track.layers) > 0:
             out.write_layers(track, self.new_layers)
 
+    def set_read(self, read):
+        self.output.read = read
+
     def init_alignment(self, read_id, fast5, coords, layers={}, read=None, track_name=None):
         track = self._track_or_default(track_name)
         self.new_alignment = True

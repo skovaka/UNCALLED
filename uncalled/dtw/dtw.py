@@ -153,6 +153,8 @@ class GuidedDTW:
 
         if self.prms.norm_mode == "ref_mom":
             sigproc.set_norm_tgt(ref_means.mean(), ref_means.std())
+            signal = sigproc.process(read)
+            tracks.set_read(signal)
 
 
         df = self._calc_dtw(signal)
