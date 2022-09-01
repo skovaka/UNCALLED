@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 import scipy
 
-from .io import TrackSQL, TSV, Eventalign, INPUT_PARAMS, OUTPUT_PARAMS
+from .io import TrackSQL, TSV, Eventalign, BAM, INPUT_PARAMS, OUTPUT_PARAMS
 from .aln_track import AlnTrack
 from .layers import LAYER_META, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
@@ -107,7 +107,8 @@ class Tracks:
         if self.coords is not None and  len(self._aln_track_ids) > 0:
             self.load()
 
-        if self.prms.load_fast5s and self.input is not None:
+        #TODO use consistent interface with dtw.dtw
+        if self.prms.load_fast5s and isinstance(self.input, TrackSQL):
             fast5_reads = list()
             fast5_reads.append(self.input.get_fast5_index(self._aln_track_ids))
             fast5_reads = pd.concat(fast5_reads)
@@ -227,7 +228,8 @@ class Tracks:
             in_format = INPUT_PARAMS[in_prms][0]
             if in_format == "db_in":
                 self.input = TrackSQL(self.conf, "r")
-                #self.model = self.input.model
+            elif in_format == "bam_in":
+                self.input = BAM(self.conf, "r")
             elif in_format == "eventalign_in":
                 raise ValueError("EVENTALGIN NOT SUPPORTED YET")
             elif in_format == "tombo_in":
@@ -251,8 +253,11 @@ class Tracks:
                 self.output = TSV(self.conf, "w")
             elif out_format == "eventalign_out":
                 self.output = Eventalign(self.conf, "w")
+            elif out_format == "bam_out":
+                self.output = self.input
 
-            tracks.append(self.output.tracks)
+            if self.output != self.input:
+                tracks.append(self.output.tracks)
             self.output_track = self.output.tracks.iloc[0]["name"]
             #for track in self.output.tracks:
             #    self.output_tracks[track.name] = track

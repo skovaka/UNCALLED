@@ -21,8 +21,8 @@ from ...fast5 import parse_fast5_paths
 from ...pore_model import PoreModel
 from ...signal_processor import ProcessedRead
 
-INPUT_PARAMS = np.array(["db_in", "eventalign_in", "tombo_in"])
-OUTPUT_PARAMS = np.array(["db_out", "tsv_out", "eventalign_out"])
+INPUT_PARAMS = np.array(["db_in", "eventalign_in", "tombo_in", "bam_in"])
+OUTPUT_PARAMS = np.array(["db_out", "tsv_out", "eventalign_out", "bam_out"])
 
 class TrackIO:
     def __init__(self, filename, conf, mode):
@@ -107,11 +107,20 @@ class TrackIO:
         else:
             self.tracks = pd.concat([self.tracks, df])
             
-        
+    def write_alignment(self, alns):
+        pass
+
+    def init_fast5(self, fast5):
+        pass
+
+    def init_read(self, read_id, fast5_id):
+        pass
+
 
 
 from .sqlite import TrackSQL
 from .tsv import TSV
+from .bam import BAM
 from .eventalign import Eventalign
 
 class TrackHDF5(TrackIO):
