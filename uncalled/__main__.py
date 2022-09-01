@@ -148,6 +148,8 @@ DTW_OPTS = (
 CONVERT_OPTS = (
     Opt("index_prefix", "tracks"),
     Opt(FAST5_PARAM, "fast5_reader", nargs="+", type=str),
+    #Opt("--fast5s", "fast5_reader", "fast5_files", type=comma_split),
+    #Opt("--fast5-index", "fast5_reader"),
     Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
     Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
     Opt(("-n", "--max-reads"), "fast5_reader"),
@@ -243,6 +245,30 @@ REFPLOT_OPTS = (
     #Opt(("-o", "--outfile"), "vis"),
 )
 
+DOTPLOT_OPTS = (
+    Opt("db_in", "tracks.io", nargs="?"),
+    Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+    Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
+
+    Opt("--ref", "tracks", "index_prefix"), 
+    Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
+    Opt(("-x", "--fast5-index"), "fast5_reader"),
+    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+    Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
+
+    Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
+    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
+    Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
+    Opt(("-b", "--bcaln-track"), "dotplot"),
+    Opt(("-p", "--pore-model"), "pore_model", "name"),
+    Opt(("--multi-background"), "sigplot", action="store_true"),
+    Opt(("--show-events"), "sigplot", action="store_true"),
+    Opt(("--show-bands"), "dotplot", action="store_true"),
+    Opt(("--no-model"), "sigplot", action="store_true"),
+    Opt(("--bcaln-error", "-e"), "dotplot", action="store_true"),
+)
+
 TRACKPLOT_OPTS = (
     Opt("db_in", "tracks.io"),
     Opt("ref_bounds", "tracks", type=str_to_coord),
@@ -336,21 +362,7 @@ CMDS = {
         "compare" : ("stats.layerstats", "Compute distance between alignments of the same reads", COMPARE_OPTS),
         "dump" : ("stats.layerstats", "Output DTW alignment paths and statistics", DUMP_OPTS),
     }),
-    "dotplot" : ("vis.dotplot", "Plot signal-to-reference alignment dotplots", (
-        Opt("db_in", "tracks.io"),
-        Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
-        Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
-        Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-        Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
-        Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
-        Opt(("-b", "--bcaln-track"), "dotplot"),
-        Opt(("-p", "--pore-model"), "pore_model", "name"),
-        Opt(("--multi-background"), "sigplot", action="store_true"),
-        Opt(("--show-events"), "sigplot", action="store_true"),
-        Opt(("--show-bands"), "dotplot", action="store_true"),
-        Opt(("--no-model"), "sigplot", action="store_true"),
-        Opt(("--bcaln-error", "-e"), "dotplot", action="store_true"),
-    )),
+    "dotplot" : ("vis.dotplot", "Plot signal-to-reference alignment dotplots", DOTPLOT_OPTS),
     "refplot" : ("vis.refplot", "Plot alignment tracks and per-reference statistics", REFPLOT_OPTS),
     "trackplot" : ("vis.trackplot", "Plot alignment tracks and per-reference statistics", TRACKPLOT_OPTS+TRACKPLOT_PANEL_OPTS),
     "browser" : ("vis.browser", "Interactive signal alignment genome browser", (

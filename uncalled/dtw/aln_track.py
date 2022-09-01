@@ -189,6 +189,7 @@ class AlnTrack:
 
     def calc_layers(self, layers):
         for group, layer in layers:
+            if not group in self.layers: continue
             if not (group, layer) in self.layers.columns:
                 meta = LAYER_META.loc[(group,layer)]
 

@@ -108,17 +108,19 @@ class Tracks:
             self.load()
 
         #TODO use consistent interface with dtw.dtw
-        if self.prms.load_fast5s and isinstance(self.input, TrackSQL):
-            fast5_reads = list()
-            fast5_reads.append(self.input.get_fast5_index(self._aln_track_ids))
-            fast5_reads = pd.concat(fast5_reads)
-            files = fast5_reads["filename"].unique()
-            self.fast5s = Fast5Reader(
-                index=fast5_reads, 
-                conf=self.conf)
+        if self.prms.load_fast5s:
+            if isinstance(self.input, TrackSQL):
+                fast5_reads = list()
+                fast5_reads.append(self.input.get_fast5_index(self._aln_track_ids))
+                fast5_reads = pd.concat(fast5_reads)
+                files = fast5_reads["filename"].unique()
+                self.fast5s = Fast5Reader(
+                    index=fast5_reads, 
+                    conf=self.conf)
 
-            reads = fast5_reads["read_id"]
-            self.reads = pd.Index(reads[~reads.duplicated()])
+            elif len(self.conf.fast5_reader.fast5_files) > 0:
+                self.fast5s = Fast5Reader(conf=self.conf)
+            else: return
 
             for track in self.alns:
                 track.fast5s = self.fast5s
@@ -264,6 +266,7 @@ class Tracks:
         else:
             self.output = None
             self.output_track = self.input.tracks.iloc[0]["name"]
+
 
         for _,row in pd.concat(tracks).iterrows():
             conf = config.Config(toml=row["config"])
@@ -760,7 +763,23 @@ class Tracks:
             max_reads = self.prms.max_reads
 
         t = time.time()
+
+        aln_iter = self.input.iter_alns(
+            self.db_layers, 
+            self._aln_track_ids,
+            self.coords,
+            read_id=reads,
+            full_overlap=full_overlap,
+            ref_index=self.index)
+
+        for alignments,layers in aln_iter:
+            for ref_name,ref_alns in alignments.groupby("ref_name"):
+                coords = self._alns_to_coords(ref_alns)
+                cache = self._tables_to_tracks(coords, ref_alns, layers)
+                for ret in cache.iter_reads_slice():
+                    yield ret
         
+        """
         layer_iter = self.input.query_layers(
             self.db_layers, 
             self._aln_track_ids,
@@ -810,6 +829,7 @@ class Tracks:
                 cache = self._tables_to_tracks(coords, ref_alns, layer_leftovers)
                 for ret in cache.iter_reads_slice():
                     yield ret
+        """
 
     def _tables_to_tracks(self, coords, alignments, layers):
         tracks = dict()
