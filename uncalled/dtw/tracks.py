@@ -88,7 +88,6 @@ class Tracks:
         #TODO refactor into TrackSQL, abstract into self.io
 
         self.alns = list()
-        self.output_tracks = dict()
         self._tracks = dict()
         self.new_alignment = False
         self.new_layers = set()
@@ -132,7 +131,6 @@ class Tracks:
         self.set_layers(self.prms.layers)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers, add_deps=False))
 
-        self.output_tracks = parent.output_tracks
         self.index = parent.index
         self.fast5s = parent.fast5s
         self._aln_track_ids = parent._aln_track_ids
@@ -555,34 +553,58 @@ class Tracks:
             #    sys.stderr.write("Failed to write compare group\n")
             #    sys.stderr.write(str(track.alignments))
 
-    def calc_compare(self, group_b, calc_jaccard, calc_mean_ref_dist, save):
+    def calc_compare(self, group_b, single_track, save):
         if len(self.alns) > 0:
             alns = self.alns
-        elif len(self.output_tracks) > 0:
-            alns = list(self.output_tracks.values())
+        #elif len(self.output_tracks) > 0:
+        #    alns = list(self.output_tracks.values())
         else:
             raise ValueError("Must input at least one track")
 
-        cols = alns[0].layers.columns.get_level_values("group").unique()
+        #if single_track:
+        #    if self.output_track is None:
+        #        track_a = self.alns[0]
+        #    else:
+        #        track_a = self._tracks[self.output_track]
+        #    track_b = track_a
+        #elif len(self.alns) == 1:
+        #    track_a = self.alns[0]
+        #elif self.output_track is not None:
+        
+        if self.output_track is not None:
+            track_a = self._tracks[self.output_track]
+        elif single_track or len(self.alns) == 1:
+            track_a = self.alns[0]
+        else:
+            track_a = self.alns[0]
+
+        if single_track or len(self.alns) == 1:
+            track_b = track_a
+        else:
+            for track_b in self.alns:
+                if track_b != track_a: break
+
+        cols = track_a.layers.columns.get_level_values("group").unique()
         if (group_b == "dtw" and "cmp" in cols) or (group_b == "bcaln" and "bc_cmp" in cols):
             sys.stderr.write(f"Read already has compare group. Skipping\n")
             return None
 
         if group_b == "dtw":
-            if len(alns) != 2:
+            if track_a == track_b:
                 raise ValueError("Must input exactly two tracks to compare dtw alignments")
 
-            df = alns[0].cmp(alns[1], calc_jaccard, calc_mean_ref_dist)
+            df = track_a.cmp(track_b, True, True)
 
         elif group_b == "bcaln":
-            if len(alns) > 2:
-                raise ValueError("Must input one or two tracks to compare dtw to bcaln")
-            
-            t = time.time()
-            if len(alns) == 2:
-                df = alns[0].bc_cmp(alns[1], calc_jaccard, calc_mean_ref_dist)
-            else:
-                df = alns[0].bc_cmp(None, calc_jaccard, calc_mean_ref_dist)
+            df = track_a.bc_cmp(track_b, True, True)
+            #if len(alns) > 2:
+            #    raise ValueError("Must input one or two tracks to compare dtw to bcaln")
+            #
+            #t = time.time()
+            #if len(alns) == 2:
+            #    df = track_a.bc_cmp(alns[1], calc_jaccard, calc_mean_ref_dist)
+            #else:
+            #    df = track_a.bc_cmp(None, calc_jaccard, calc_mean_ref_dist)
 
         df = df.dropna(how="all")
         self.add_layers("cmp", df)

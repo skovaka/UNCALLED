@@ -1,14 +1,15 @@
 import numpy as np
 import pandas as pd
 import sys
+import pysam
+import array
+import os
+from collections import defaultdict
 from ..aln_track import AlnTrack
 from ..layers import LAYER_META, parse_layers
 from ...index import RefCoord
 from . import TrackIO
 import _uncalled 
-import pysam
-import array
-import os
 
 class BAM(TrackIO):
     FORMAT = "bam"
@@ -29,12 +30,20 @@ class BAM(TrackIO):
         name = os.path.basename(filename)
         self.init_track(1, name, name, self.conf.to_toml())
 
-        #TODO temporary until I replace PAF file with BAM input
-        if self.conf.tracks.io.bam_out is not None:
-            self.in_alns = {
-                (aln.query_name, aln.reference_name, aln.reference_start+2) : aln
-                for aln in self.input if not aln.is_unmapped
-            }
+        #TODO really not good, should stream by default
+        #if self.conf.tracks.io.bam_out is not None:
+        self.in_alns = defaultdict(list)
+        for aln in self.iter_sam():
+            self.in_alns[aln.query_name].append(aln)
+
+    def get_alns(self, read_id):
+        return self.in_alns[read_id]
+
+    def get_aln(self, read_id, ref_name, ref_start):
+        for aln in self.in_alns[read_id]:
+            if aln.reference_name == ref_name and aln.reference_start == ref_start:
+                return aln
+        return None
 
     def init_write_mode(self):
         if self.conf.tracks.io.bam_out is None:
@@ -54,9 +63,8 @@ class BAM(TrackIO):
 
     def write_layers(self, track, groups):
         aln = track.alignments.iloc[0]
-        k = (aln["read_id"], aln["ref_name"], aln["ref_start"])
-        if not k in self.in_alns: return
-        sam = self.in_alns[k]
+        sam = self.get_aln(aln["read_id"], aln["ref_name"], aln["ref_start"])
+        if sam is None: return
 
         refs = track.coords.refs[2:-2]
 
@@ -96,11 +104,18 @@ class BAM(TrackIO):
 
         self.output.write(sam)
 
+    #TODO more query options
+    def iter_sam(self, unmapped=False):
+        #if self.conf.tracks.ref_bounds is not None
+        for sam in self.input:
+            if unmapped or not sam.is_unmapped:
+                yield sam
+
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
         
         aln_id = 0
 
-        for sam in self.input:
+        for sam in self.iter_sam():
             ref_start, ref_end = sam.get_tag("sr")
             ref_bounds = RefCoord(sam.reference_name, ref_start, ref_end, not sam.is_reverse)
             coords = ref_index.get_coord_space(ref_bounds, is_rna=self.conf.is_rna, load_kmers=True, kmer_trim=False)
@@ -137,14 +152,6 @@ class BAM(TrackIO):
 
 
             layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1).sort_index()
-
-            #def make_groups(df):
-            #    grouped = dict()
-            #    for group, layers in group_layers.items():
-            #        gdf = df[layers]
-            #        grouped[group] = df[layers].rename(columns=renames)
-            #    df = pd.concat(grouped, names=("group", "layer"), axis=1)
-            #    df.index.names = ("fwd", "pac", "aln_id")
 
             alns = pd.DataFrame({
                     "id" : [aln_id],

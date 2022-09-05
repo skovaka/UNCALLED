@@ -108,7 +108,7 @@ REALTIME_OPTS = BWA_OPTS + MAPPER_OPTS + (
 ) 
 DTW_OPTS = (
     Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
-    Opt(("-m", "--mm2-paf"), "dtw", required=True),
+    #Opt(("-m", "--mm2-paf"), "dtw", required=True),
     Opt(("-o", "--db-out"), "tracks.io"),
     Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
 

@@ -244,7 +244,7 @@ class AlnTrack:
         return df#.set_index(["aln_b", "group_b"], append=True)
 
     def bc_cmp(self, other, calc_jaccard, calc_mean_ref_dist):
-        if other is not None:
+        if other != self:
             groups_b = other.alignments.groupby("read_id")
 
         df = pd.DataFrame(
@@ -259,7 +259,7 @@ class AlnTrack:
             if dtw is None:
                 continue
 
-            if other is None:
+            if other == self:
                 self._compare_alns(dtw, self, id_a, "bcaln", df, calc_jaccard, calc_mean_ref_dist)
             else:
                 read_id = aln_a["read_id"]
@@ -267,6 +267,7 @@ class AlnTrack:
                     self._compare_alns(dtw, other, id_b, "bcaln", df)
 
         df["group_b"] = "bcaln"
+        print(df)
         return df#.set_index(["aln_b", "group_b"], append=True)
 
     def _compare_alns(self, aln_a, other, id_b, group, df, calc_jaccard=True, calc_mean_ref_dist=True):
