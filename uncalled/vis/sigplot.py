@@ -103,7 +103,6 @@ class Sigplot:
         #TODO set global signal min/max
         mask = ((signal >= 40) &
                 (signal <= self.conf.event_detector.max_mean))
-
         
         samples = np.arange(samp_min, samp_max)[mask]
         signal = signal[mask]

@@ -13,6 +13,8 @@ from ..argparse import ArgParser
 from ..index import str_to_coord
 from ..fast5 import Fast5Reader
 
+from .io import BAM
+
 import _uncalled
 
 from ..signal_processor import SignalProcessor
@@ -41,37 +43,26 @@ def dtw(conf):
 
     read_filter = fast5s.get_read_filter()
 
-    pafs = parse_paf(
-        conf.dtw.mm2_paf, 
-        ref_bounds=conf.tracks.ref_bounds, 
-        read_filter=read_filter,
-        full_overlap=conf.tracks.full_overlap)
-
-    mm2s = defaultdict(list)
-    for paf in pafs:
-        mm2s[paf.qr_name].append(paf)
+    if not isinstance(tracks.input, BAM):
+        raise ValueError("Must specify BAM input")
 
     sigproc = SignalProcessor(tracks.model, conf)
-
-    #pbar = progbar.ProgressBar(
-    #        widgets=[progbar.Percentage(), progbar.Bar(), progbar.ETA()], 
-    #        maxval=len(mm2s)).start()
 
     n_reads = 0
 
     for read in fast5s:
         aligned = False
-        for paf in mm2s[read.id]:
+        for aln in tracks.input.get_alns(read.id):
             sys.stderr.write(f"{read.id}\n")
 
-            dtw = GuidedDTW(tracks, sigproc, read, paf, conf)
+            dtw = GuidedDTW(tracks, sigproc, read, aln, conf)
 
             if dtw.df is None:
                 sys.stderr.write(f"Warning: {read.id} failed\n")
                 continue
 
             if conf.bc_cmp:
-                tracks.calc_compare("bcaln", True, True, True)
+                tracks.calc_compare("bcaln", True, True)
 
             tracks.write_alignment()
 
@@ -89,11 +80,11 @@ class GuidedDTW:
 
     #TODO do more in constructor using prms, not in main
     #def __init__(self, track, read, paf, conf=None, **kwargs):
-    def __init__(self, tracks, sigproc, read, paf, conf=None, **kwargs):
+    def __init__(self, tracks, sigproc, read, aln, conf=None, **kwargs):
         self.conf = read.conf if conf is None else conf
         self.prms = self.conf.dtw
 
-        bcaln = Bcaln(conf, tracks.index, read, paf, tracks.coords)
+        bcaln = Bcaln(conf, tracks.index, read, aln, tracks.coords)
         if bcaln.empty:
             self.df = None
             return

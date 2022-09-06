@@ -341,6 +341,14 @@ class TrackSQL(TrackIO):
             for c in chunks:
                 yield c
 
+    def query(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
+        layers = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, order, None, full_overlap)
+
+        aln_ids = layers.index.unique("aln_id").to_numpy()
+        alignments = self.query_alignments(aln_id=aln_ids)
+
+        return alignments, layers
+
     def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], chunksize=None, full_overlap=False):
 
         group_layers = collections.defaultdict(list)
@@ -411,6 +419,42 @@ class TrackSQL(TrackIO):
             return make_groups(ret)
         
         return (make_groups(df) for df in ret if len(df) > 0)
+
+    def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
+        layer_iter = self.query_layers(
+            layers, track_id, coords, aln_id, read_id, fwd,
+            ["read_id", "pac"], self.prms.ref_chunksize, full_overlap) 
+
+        aln_leftovers = pd.DataFrame()
+        layer_leftovers = pd.DataFrame()
+
+        for layers in layer_iter:
+            ids = layers.index \
+                        .get_level_values("aln_id") \
+                        .unique() \
+                        .difference(aln_leftovers.index) \
+                        .to_numpy()
+            if len(ids) > 0:
+                alignments = self.query_alignments(aln_id=ids)
+            else:
+                alignments = pd.DataFrame()
+
+            alignments = pd.concat([aln_leftovers, alignments])
+            layers = pd.concat([layer_leftovers, layers])
+
+            aln_end = alignments["read_id"] == alignments["read_id"].iloc[-1]
+            aln_leftovers = alignments.loc[aln_end]
+            alignments = alignments.loc[~aln_end]
+
+            layer_end = layers.index.get_level_values("aln_id").isin(aln_leftovers.index)
+            layer_leftovers = layers.loc[layer_end]
+            layers = layers.loc[~layer_end]
+            layer_alns = layers.index.get_level_values("aln_id")
+
+            yield alignments, layers
+
+        if len(aln_leftovers) > 0:
+            yield aln_leftovers, layer_leftovers
     
     def _verify_track(self, track_name):
         ids = self.cur.execute("SELECT id FROM track WHERE name == ?", (track_name,)).fetchall()

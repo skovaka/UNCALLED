@@ -395,6 +395,7 @@ class Dotplot:
 def dotplot(conf):
     """Plot signal-to-reference alignment dotplots"""
 
+    #conf.fast5_reader.load_bc = True
     dotplots = Dotplot(conf=conf)
     save = conf.out_prefix is not None
     for read_id, fig in dotplots.iter_plots():

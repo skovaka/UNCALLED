@@ -189,16 +189,18 @@ class AlnTrack:
 
     def calc_layers(self, layers):
         for group, layer in layers:
+            if not group in self.layers: continue
             if not (group, layer) in self.layers.columns:
                 meta = LAYER_META.loc[(group,layer)]
 
                 #Make sure layer dependencies exist
-                #if not self.empty and (meta.deps is None or len(self.layers.columns.intersection(meta.deps)) == len(meta.deps)):
-                fn = meta["fn"]
-                if fn is None:
-                    raise ValueError("Layer not found: {group}.{layer}")
-                vals = fn(self)
-                self.layers[group,layer] = vals
+                if not self.empty and (meta["deps"] is None or len(self.layers.columns.intersection(meta["deps"])) == len(meta["deps"])):
+
+                    fn = meta["fn"]
+                    if fn is None:
+                        raise ValueError("Layer not found: {group}.{layer}")
+                    vals = fn(self)
+                    self.layers[group,layer] = vals
 
     def load_mat(self):
         df = self.layers.copy()
@@ -243,7 +245,7 @@ class AlnTrack:
         return df#.set_index(["aln_b", "group_b"], append=True)
 
     def bc_cmp(self, other, calc_jaccard, calc_mean_ref_dist):
-        if other is not None:
+        if other != self:
             groups_b = other.alignments.groupby("read_id")
 
         df = pd.DataFrame(
@@ -258,7 +260,7 @@ class AlnTrack:
             if dtw is None:
                 continue
 
-            if other is None:
+            if other == self:
                 self._compare_alns(dtw, self, id_a, "bcaln", df, calc_jaccard, calc_mean_ref_dist)
             else:
                 read_id = aln_a["read_id"]

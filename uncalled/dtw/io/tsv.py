@@ -51,15 +51,6 @@ class TSV(TrackIO):
 
         self.out.write(df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False))
 
-    def write_alignment(self, alns):
-        pass
-
-    def init_fast5(self, fast5):
-        pass
-
-    def init_read(self, read_id, fast5_id):
-        pass
-
     def close(self):
         self.out.close()
 

@@ -39,7 +39,10 @@ class Bcaln:
         self.clip_coords = clip_coords
 
         #ref_coord = RefCoord(paf.rf_name, paf.rf_st-1, paf.rf_en+2, paf.is_fwd)
-        ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
+        #ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
+        self.is_fwd = not paf.is_reverse
+
+        ref_coord = RefCoord(paf.reference_name, paf.reference_start, paf.reference_end, self.is_fwd)
         self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna, load_kmers=False)
 
         self.kmer_shift = ref_index.trim#[not paf.is_fwd]
@@ -49,8 +52,7 @@ class Bcaln:
         self.ref_gaps = list()
         self.errors = None
 
-        self.is_fwd = paf.is_fwd
-        self.flip_ref = paf.is_fwd == self.is_rna
+        self.flip_ref = self.is_fwd == self.is_rna
 
         if not read.bc_loaded or (not self.parse_cs(paf) and not self.parse_cigar(paf)):
             return
@@ -102,17 +104,17 @@ class Bcaln:
         return not hasattr(self, "df") or len(self.df) <= sum(self.kmer_shift)
 
     def parse_cs(self, paf):
-        cs = paf.tags.get('cs', (None,)*2)[0]
-        if cs is None: return False
+        if not paf.has_tag("cs"): return False
+        cs = paf.get_tag('cs', (None,)*2)[0]
 
         #TODO rename to general cig/cs
         bp_mref_aln = list()
         errors = list()
 
         if not self.is_rna:
-            read_i = paf.qr_st
+            read_i = paf.query_start
         else:
-            read_i = paf.qr_len - paf.qr_en 
+            read_i = paf.query_length - paf.query_end
 
         mrefs = self.paf_coords.mrefs# - self.kmer_shift[0]
         mref_i = mrefs.min()
@@ -166,20 +168,22 @@ class Bcaln:
         return True        
 
     def parse_cigar(self, paf):
-        cig = paf.tags.get('cg', (None,)*2)[0]
+        #cig = paf.tags.get('cg', (None,)*2)[0]
+        cig = paf.cigarstring
         if cig is None: return False
 
         bp_mref_aln = list()#defaultdict(list)
 
-        #mref_i = self.mref_start
-        if not self.is_rna:
-            read_i = paf.qr_st
-        else:
-            read_i = paf.qr_len - paf.qr_en 
+        #print(paf.query_alignment_start, paf.query_alignment_end)
+        #if not self.is_rna:
+        #    read_i = paf.query_alignment_start
+        #else:
+        #    read_i = paf.infer_query_length() - paf.query_alignment_end
+        read_i = 0
 
         cig_ops = self.CIG_RE.findall(cig)
 
-        if paf.is_fwd == self.is_rna:
+        if self.is_fwd == self.is_rna:
             cig_ops = list(reversed(cig_ops))
 
         mrefs = self.paf_coords.mrefs# - self.kmer_shift[0]

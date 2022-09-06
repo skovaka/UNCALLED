@@ -47,7 +47,7 @@ def compare(conf):
         else:
             #if conf.save:
             #    print(read_id)
-            chunk.calc_compare(group_b, calc_jaccard, calc_mean_ref_dist, conf.save)
+            chunk.calc_compare(group_b, False, conf.save)
             chunk.write_alignment()
 
         print(f"{read_id}\t{time.time()-t:.4f}")

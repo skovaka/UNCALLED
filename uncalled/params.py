@@ -35,6 +35,9 @@ IOParams._def_params(
     ("tsv_cols", None, list, "TSV file output alignment layers"),
     ("tsv_na", "*", str, "Missing value representation for TSV output"),
 
+    ("bam_in", None, str, "BAM input file (or \"-\"/no argument for stdin)"),
+    ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
+
     ("eventalign_in", None, str, "Eventalign (nanopolish) input file (or \"-\"/no argument for stdin)"),
     ("eventalign_out", None, str, "Eventalign (nanopolish) output file (or \"-\"/no argument for stdout)"),
     ("eventalign_index", None, str, "Nanopolish index file"),
