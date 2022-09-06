@@ -35,6 +35,9 @@ class BAM(TrackIO):
         self.in_alns = defaultdict(list)
         for aln in self.iter_sam():
             self.in_alns[aln.query_name].append(aln)
+        self.input.reset()
+
+        self.aln_id_in = 1
 
     def get_alns(self, read_id):
         return self.in_alns[read_id]
@@ -63,8 +66,9 @@ class BAM(TrackIO):
 
     def write_layers(self, track, groups):
         aln = track.alignments.iloc[0]
-        sam = self.get_aln(aln["read_id"], aln["ref_name"], aln["ref_start"])
-        if sam is None: return
+        sam = self.get_aln(aln["read_id"], aln["ref_name"], aln["ref_start"]-2)
+        if sam is None: 
+            return
 
         refs = track.coords.refs[2:-2]
 
@@ -111,61 +115,138 @@ class BAM(TrackIO):
             if unmapped or not sam.is_unmapped:
                 yield sam
 
+    def _parse_sam(self, sam, coords):
+        samp_bounds = sam.get_tag("ss")
+
+        norm_scale, norm_shift = sam.get_tag("sn")
+        dac = np.array(sam.get_tag("sc"))
+        current = (dac/norm_scale)-norm_shift
+        current[dac == self.INF_U16] = np.nan
+        
+        length = sam.get_tag("sl")
+
+        fwd = int(not sam.is_reverse)
+        ref_start, ref_end = sam.get_tag("sr")
+        refs = pd.RangeIndex(ref_start, ref_end)
+        pacs = coords.ref_to_pac(refs)
+
+        kmers = coords.ref_kmers.loc[fwd].loc[refs].to_numpy()
+
+        dtw = pd.DataFrame(
+            {"current" : current, "length" : length, "kmer" : kmers},
+            index=pd.MultiIndex.from_product([[fwd], pacs, [self.aln_id_in]],
+                                             names=("fwd","pac","aln_id"))
+        )
+
+        if samp_bounds[0] < samp_bounds[1]:
+            samp_start, samp_end = samp_bounds
+        else:
+            samp_end, samp_start = samp_bounds
+            dtw = dtw.iloc[::-1]
+
+        start = np.full(len(dtw), samp_start, dtype="int32")
+        start[1:] += dtw["length"].cumsum().iloc[:-1].to_numpy("int32")
+        dtw["start"] = start
+
+        layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1).sort_index()
+
+        layers["dtw", "length"] = layers["dtw", "length"].replace(0, pd.NA)#.astype("int32")
+        layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("int32")
+
+        aln = pd.DataFrame({
+                "id" : [self.aln_id_in],
+                "track_id" : [1],
+                "read_id" : [sam.query_name],
+                "ref_name" : [coords.ref_name],
+                "ref_start" : [ref_start],
+                "ref_end" : [ref_end],
+                "fwd" :     [fwd],
+                "samp_start" : [samp_start],
+                "samp_end" : [samp_end],
+                "tags" : [""]}).set_index("id")
+
+        self.aln_id_in += 1
+
+        return aln, layers
+
+    def query(self, layers, track_id, coords, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
+        itr = self.input.fetch(coords.ref_name, coords.refs.min(), coords.refs.max())
+
+        alignments = list()
+        layers = list()
+
+        if read_id is not None and len(read_id) > 0:
+            read_ids = set(read_id)
+        else:
+            read_ids = None
+
+        for sam in itr:
+            if read_ids is not None and sam.query_name is not read_ids:
+                continue
+            a,l = self._parse_sam(sam, coords)
+            alignments.append(a)
+            layers.append(l)
+
+        return pd.concat(alignments), pd.concat(layers)
+
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
         
         aln_id = 0
 
+        if read_id is not None and len(read_id) > 0:
+            read_ids = set(read_id)
+        else:
+            read_ids = None
+
         for sam in self.iter_sam():
+            if read_ids is not None and sam.query_name not in read_ids:
+                continue
             ref_start, ref_end = sam.get_tag("sr")
             ref_bounds = RefCoord(sam.reference_name, ref_start, ref_end, not sam.is_reverse)
             coords = ref_index.get_coord_space(ref_bounds, is_rna=self.conf.is_rna, load_kmers=True, kmer_trim=False)
 
-            #refs = pd.RangeIndex(*sam.get_tag("sr"), name="ref")
-            samp_bounds = sam.get_tag("ss")
+            ##refs = pd.RangeIndex(*sam.get_tag("sr"), name="ref")
+            #samp_bounds = sam.get_tag("ss")
 
-            norm_scale, norm_shift = sam.get_tag("sn")
-            dac = np.array(sam.get_tag("sc"))
-            current = (dac/norm_scale)-norm_shift
-            current[dac == self.INF_U16] = np.nan
-            
-            length = sam.get_tag("sl")
+            #norm_scale, norm_shift = sam.get_tag("sn")
+            #dac = np.array(sam.get_tag("sc"))
+            #current = (dac/norm_scale)-norm_shift
+            #current[dac == self.INF_U16] = np.nan
+            #
+            #length = sam.get_tag("sl")
 
-            dtw = pd.DataFrame(
-                {"current" : current, "length" : length, "kmer" : coords.ref_kmers.to_numpy()},
-                index=pd.MultiIndex.from_product([[int(coords.fwd)], coords.pacs, [aln_id]], 
-                                                 names=("fwd","pac","aln_id"))
-            )
+            #dtw = pd.DataFrame(
+            #    {"current" : current, "length" : length, "kmer" : coords.ref_kmers.to_numpy()},
+            #    index=pd.MultiIndex.from_product([[int(coords.fwd)], coords.pacs, [aln_id]], 
+            #                                     names=("fwd","pac","aln_id"))
+            #)
 
-            
-            if samp_bounds[0] < samp_bounds[1]:
-                samp_start, samp_end = samp_bounds
-            else:
-                samp_end, samp_start = samp_bounds
-                dtw = dtw.iloc[::-1]
-
-            start = np.full(len(dtw), samp_start, dtype="int32")
-            start[1:] += dtw["length"].cumsum().iloc[:-1].to_numpy("int32")
-            dtw["start"] = start#[::-1]
+            #
+            #if samp_bounds[0] < samp_bounds[1]:
+            #    samp_start, samp_end = samp_bounds
+            #else:
+            #    samp_end, samp_start = samp_bounds
+            #    dtw = dtw.iloc[::-1]
 
             #start = np.full(len(dtw), samp_start, dtype="int32")
             #start[1:] += dtw["length"].cumsum().iloc[:-1].to_numpy("int32")
+            #dtw["start"] = start
 
+            #layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1).sort_index()
 
-            layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1).sort_index()
+            #alns = pd.DataFrame({
+            #        "id" : [aln_id],
+            #        "track_id" : [1],
+            #        "read_id" : [sam.query_name],
+            #        "ref_name" : [coords.ref_name],
+            #        "ref_start" : [coords.refs.start],
+            #        "ref_end" : [coords.refs.stop],
+            #        "fwd" :     [int(coords.fwd)],
+            #        "samp_start" : [samp_start],
+            #        "samp_end" : [samp_end],
+            #        "tags" : [""]}).set_index("id")
 
-            alns = pd.DataFrame({
-                    "id" : [aln_id],
-                    "track_id" : [1],
-                    "read_id" : [sam.query_name],
-                    "ref_name" : [coords.ref_name],
-                    "ref_start" : [coords.refs.start],
-                    "ref_end" : [coords.refs.stop],
-                    "fwd" :     [int(coords.fwd)],
-                    "samp_start" : [samp_start],
-                    "samp_end" : [samp_end],
-                    "tags" : [""]}).set_index("id")
-
-            yield alns, layers
+            yield self._parse_sam(sam, coords)
 
             aln_id += 1
 

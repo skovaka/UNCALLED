@@ -2,7 +2,7 @@
 #include "dataframe.hpp"
 #include "util.hpp"
 
-decltype(AlnCoords::columns) AlnCoords::columns;
+constexpr decltype(AlnCoords::columns) AlnCoords::columns;
 
 #define BIND_DF(name) name::pybind<name>(m, "_"#name);
 

@@ -98,13 +98,11 @@ class Sigplot:
                 track_dtws.append(pd.concat(dtws).sort_index())
 
         read = self.sigproc.process(track.fast5s[read_id])
-        print("SIGNAL", len(read.signal), samp_min, samp_max)
         signal = read.get_norm_signal(samp_min, samp_max)
 
         #TODO set global signal min/max
         mask = ((signal >= 40) &
                 (signal <= self.conf.event_detector.max_mean))
-
         
         samples = np.arange(samp_min, samp_max)[mask]
         signal = signal[mask]

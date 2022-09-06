@@ -194,12 +194,13 @@ class AlnTrack:
                 meta = LAYER_META.loc[(group,layer)]
 
                 #Make sure layer dependencies exist
-                #if not self.empty and (meta.deps is None or len(self.layers.columns.intersection(meta.deps)) == len(meta.deps)):
-                fn = meta["fn"]
-                if fn is None:
-                    raise ValueError("Layer not found: {group}.{layer}")
-                vals = fn(self)
-                self.layers[group,layer] = vals
+                if not self.empty and (meta["deps"] is None or len(self.layers.columns.intersection(meta["deps"])) == len(meta["deps"])):
+
+                    fn = meta["fn"]
+                    if fn is None:
+                        raise ValueError("Layer not found: {group}.{layer}")
+                    vals = fn(self)
+                    self.layers[group,layer] = vals
 
     def load_mat(self):
         df = self.layers.copy()

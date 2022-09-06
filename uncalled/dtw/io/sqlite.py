@@ -341,6 +341,14 @@ class TrackSQL(TrackIO):
             for c in chunks:
                 yield c
 
+    def query(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
+        layers = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, order, None, full_overlap)
+
+        aln_ids = layers.index.unique("aln_id").to_numpy()
+        alignments = self.query_alignments(aln_id=aln_ids)
+
+        return alignments, layers
+
     def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], chunksize=None, full_overlap=False):
 
         group_layers = collections.defaultdict(list)

@@ -116,6 +116,9 @@ class TrackIO:
     def init_read(self, read_id, fast5_id):
         pass
 
+    def query_compare(self, layers, track_id=None, coords=None, aln_id=None):
+        pass
+
 
 
 from .sqlite import TrackSQL

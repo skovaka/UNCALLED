@@ -495,12 +495,13 @@ class Tracks:
         if load_mat is None:
             load_mat = self.prms.load_mat
 
-        layers = self.input.query_layers(self.db_layers, self._aln_track_ids, self.coords, full_overlap=full_overlap, read_id=read_filter).droplevel(0)
+        #layers = self.input.query_layers(self.db_layers, self._aln_track_ids, self.coords, full_overlap=full_overlap, read_id=read_filter).droplevel(0)
+        #ids = layers.index.get_level_values("aln_id").unique().to_numpy()
+        #alignments = self.input.query_alignments(aln_id=ids)#self._aln_track_ids, coords=self.coords, full_overlap=full_overlap)
 
-        ids = layers.index.get_level_values("aln_id").unique().to_numpy()
+        alignments, layers = self.input.query(self.db_layers, self._aln_track_ids, self.coords, full_overlap=full_overlap, read_id=read_filter)
 
-        alignments = self.input.query_alignments(aln_id=ids)#self._aln_track_ids, coords=self.coords, full_overlap=full_overlap)
-
+        layers = layers.droplevel(0)
 
         for track in self.alns:
             track_alns = alignments[alignments["track_id"] == track.id]
@@ -510,7 +511,7 @@ class Tracks:
             track.set_data(self.coords, track_alns, track_layers)
             track.calc_layers(self.fn_layers)
         
-        self.load_compare(ids)
+        self.load_compare(alignments.index.to_numpy())
         self.calc_refstats()
 
         if load_mat:
@@ -524,6 +525,9 @@ class Tracks:
             return
 
         self.cmp = self.input.query_compare(self.cmp_layers, self._aln_track_ids, self.coords, aln_ids)
+
+        if self.cmp is None:
+            return
 
         groups = self.cmp.index.get_level_values("group_b").unique()
         if "bcaln" in groups:
@@ -925,5 +929,5 @@ class Tracks:
     def close(self):
         if self.input is not None:
             self.input.close()
-        if self.output is not None:
+        if self.output is not None and self.output != self.input:
             self.output.close()
