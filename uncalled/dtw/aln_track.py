@@ -267,7 +267,6 @@ class AlnTrack:
                     self._compare_alns(dtw, other, id_b, "bcaln", df)
 
         df["group_b"] = "bcaln"
-        print(df)
         return df#.set_index(["aln_b", "group_b"], append=True)
 
     def _compare_alns(self, aln_a, other, id_b, group, df, calc_jaccard=True, calc_mean_ref_dist=True):

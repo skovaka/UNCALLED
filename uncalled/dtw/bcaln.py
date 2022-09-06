@@ -42,7 +42,7 @@ class Bcaln:
         #ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
         self.is_fwd = not paf.is_reverse
 
-        ref_coord = RefCoord(paf.reference_name, paf.reference_start, paf.reference_end-1, self.is_fwd)
+        ref_coord = RefCoord(paf.reference_name, paf.reference_start, paf.reference_end, self.is_fwd)
         self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna, load_kmers=False)
 
         self.kmer_shift = ref_index.trim#[not paf.is_fwd]
@@ -174,10 +174,12 @@ class Bcaln:
 
         bp_mref_aln = list()#defaultdict(list)
 
-        if not self.is_rna:
-            read_i = paf.query_alignment_start
-        else:
-            read_i = paf.infer_query_length() - paf.query_alignment_end
+        #print(paf.query_alignment_start, paf.query_alignment_end)
+        #if not self.is_rna:
+        #    read_i = paf.query_alignment_start
+        #else:
+        #    read_i = paf.infer_query_length() - paf.query_alignment_end
+        read_i = 0
 
         cig_ops = self.CIG_RE.findall(cig)
 
