@@ -427,7 +427,7 @@ _LS_QUERY = "SELECT name,desc,COUNT(alignment.id) FROM track " \
             "JOIN alignment ON track.id == track_id GROUP BY name"
 def ls(conf, db=None):
     if db is None:
-        db = TrackSQL(conf, None, "r")
+        db = TrackSQL(conf, "r")
     print("\t".join(["Name", "Description", "Alignments"]))
 
     for row in db.cur.execute(_LS_QUERY).fetchall():
