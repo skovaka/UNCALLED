@@ -74,11 +74,14 @@ class Eventalign(TrackIO):
 
         std_level = (events["current"] - model.model_mean) / model.model_stdv
 
-        event_counts = events["events"]
-        event_index = (event_counts.cumsum() - event_counts.iloc[0]).astype(int)
-        if True: #TODO check for flipped ref
-            event_index = event_index.max() - event_index
-        event_index += 1
+        if "events" in events:
+            event_counts = events["events"]
+            event_index = (event_counts.cumsum() - event_counts.iloc[0]).astype(int)
+            if True: #TODO check for flipped ref
+                event_index = event_index.max() - event_index
+            event_index += 1
+        else:
+            event_index = np.arange(len(events))
 
         evts = events.rename(columns={"current" : "mean", "current_stdv" : "stdv"})
         if self.read is not None:

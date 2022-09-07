@@ -168,18 +168,25 @@ NANOPOLISH_OPTS = CONVERT_OPTS + (
 
 NEW_OPTS = (
     Opt("index_prefix", "tracks"),
-    #MutexOpts("input", [
+    MutexOpts("input", [
         Opt("--db-in", "tracks.io"),
+        Opt("--bam-in", "tracks.io"),
         Opt("--eventalign-in", "tracks.io", nargs="?", const="-"),
-    #]),
+    ]),
 
-    #MutexOpts("output", [
+    MutexOpts("output", [
         Opt("--db-out", "tracks.io"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
-    #]),
+        Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
+    ]),
+    Opt("--tsv-cols", "tracks.io", type=comma_split),
+
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
 
+    Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
+    Opt(("-x", "--fast5-index"), "fast5_reader"),
+    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
