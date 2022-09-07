@@ -140,7 +140,6 @@ class CoordSpace:
             try:
                 pacs = coords[coords.get_loc(int(self.fwd))].get_level_values(1)
             except:
-                sys.stderr.write(f"Skipping {self.fwd}\t{coords}\n")
                 return None
         else:
             pacs = coords.get_level_values(1)

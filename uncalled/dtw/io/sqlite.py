@@ -151,6 +151,9 @@ class TrackSQL(TrackIO):
                         raise ValueError(f"Database already contains track named \"{ track.name}\". Specify a different name, write to a different file")
                 else:
                     raise err
+        else:
+            tid = 0
+
 
         self.tracks.iloc[0]["id"] = tid
 
@@ -481,7 +484,7 @@ def ls(conf, db=None):
 
 def delete(track_name=None, db=None, conf=None):
     if db is None:
-        db = TrackSQL(conf, None, "r")
+        db = TrackSQL(conf, "r")
 
     if track_name is None:
         track_name = conf.track_name
@@ -495,7 +498,7 @@ def edit(conf, db=None):
     fast5_change = len(conf.fast5_files) > 0
     track_name = conf.track_name
     if db is None:
-        db = TrackSQL(conf, None, "r")
+        db = TrackSQL(conf, "r")
     track_id = db._verify_track(track_name)
 
     updates = []
@@ -565,7 +568,7 @@ def merge(conf):
 
     conf.tracks.io.init_track = False
 
-    db = TrackSQL(conf, None, "w")
+    db = TrackSQL(conf, "w")
     
     def max_id(table, field="id"):
         i = db.cur.execute(f"SELECT max({field}) FROM {table}").fetchone()[0]
@@ -610,7 +613,7 @@ def merge(conf):
         db.cur.execute(query)
 
         query = "INSERT INTO bcaln "\
-               f"SELECT pac,aln_id+{aln_shift},start,length,bp,error "\
+               f"SELECT pac,aln_id+{aln_shift},start,length,indel "\
                 "FROM input.bcaln"
         db.cur.execute(query)
 

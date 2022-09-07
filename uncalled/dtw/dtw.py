@@ -86,6 +86,7 @@ class GuidedDTW:
 
         bcaln = Bcaln(conf, tracks.index, read, aln, tracks.coords)
         if bcaln.empty:
+            print(bcaln.df)
             self.df = None
             return
 

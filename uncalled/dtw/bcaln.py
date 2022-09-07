@@ -10,7 +10,6 @@ import pandas as pd
 import scipy.stats
 import copy
 
-from ..pafstats import parse_paf, PafEntry
 from ..config import Config
 from ..argparse import Opt
 from ..index import RefCoord
@@ -32,21 +31,21 @@ class Bcaln:
     ERR_WIDTHS = [0,0,5]
 
 
-    def __init__(self, conf, ref_index, read, paf, clip_coords=None):
+    def __init__(self, conf, ref_index, read, sam, clip_coords=None):
 
         self.is_rna = conf.is_rna
 
         self.clip_coords = clip_coords
 
-        #ref_coord = RefCoord(paf.rf_name, paf.rf_st-1, paf.rf_en+2, paf.is_fwd)
-        #ref_coord = RefCoord(paf.rf_name, paf.rf_st, paf.rf_en, paf.is_fwd)
-        self.is_fwd = not paf.is_reverse
+        #ref_coord = RefCoord(sam.rf_name, sam.rf_st-1, sam.rf_en+2, sam.is_fwd)
+        #ref_coord = RefCoord(sam.rf_name, sam.rf_st, sam.rf_en, sam.is_fwd)
+        self.is_fwd = not sam.is_reverse
 
-        ref_coord = RefCoord(paf.reference_name, paf.reference_start, paf.reference_end, self.is_fwd)
-        self.paf_coords = ref_index.get_coord_space(ref_coord, self.is_rna, load_kmers=False)
+        ref_coord = RefCoord(sam.reference_name, sam.reference_start, sam.reference_end, self.is_fwd)
+        self.sam_coords = ref_index.get_coord_space(ref_coord, self.is_rna, load_kmers=False)
 
-        self.kmer_shift = ref_index.trim#[not paf.is_fwd]
-        #if paf.is_fwd == self.is_rna:
+        self.kmer_shift = ref_index.trim#[not sam.is_fwd]
+        #if sam.is_fwd == self.is_rna:
         #self.kmer_shift = self.kmer_shift[::-1]
 
         self.ref_gaps = list()
@@ -54,8 +53,15 @@ class Bcaln:
 
         self.flip_ref = self.is_fwd == self.is_rna
 
-        if not read.bc_loaded or (not self.parse_cs(paf) and not self.parse_cigar(paf)):
-            return
+        if read.bc_loaded:
+            moves = read.moves
+        elif sam.has_tag("mv"):
+            moves = np.array(sam.get_tag("mv"))[1:]
+        else:
+            raise RuntimeError(f"Basecaller \"moves\" not found for read {read.id}")
+            
+        if not self.parse_cigar(sam):
+            raise RuntimeError(f"Cigar string not found for read {read.id}")
 
         #TODO make c++ build this 
         moves = np.array(read.moves, bool)
@@ -90,7 +96,7 @@ class Bcaln:
             df = df.reindex(index=mrefs, copy=False)
             self.coords = self.clip_coords#.mref_intersect(mrefs=self.df.index)
         else:
-            self.coords = self.paf_coords
+            self.coords = self.sam_coords
 
 
         df = df.set_index(df.index - self.kmer_shift[0])
@@ -103,82 +109,18 @@ class Bcaln:
     def empty(self):
         return not hasattr(self, "df") or len(self.df) <= sum(self.kmer_shift)
 
-    def parse_cs(self, paf):
-        if not paf.has_tag("cs"): return False
-        cs = paf.get_tag('cs', (None,)*2)[0]
-
-        #TODO rename to general cig/cs
-        bp_mref_aln = list()
-        errors = list()
-
-        if not self.is_rna:
-            read_i = paf.query_start
-        else:
-            read_i = paf.query_length - paf.query_end
-
-        mrefs = self.paf_coords.mrefs# - self.kmer_shift[0]
-        mref_i = mrefs.min()
-
-        cs_ops = re.findall("(=|:|\*|\+|-|~)([A-Za-z0-9]+)", cs)
-
-        if self.flip_ref:
-            cs_ops = reversed(cs_ops)
-
-        for op in cs_ops:
-            c = op[0]
-            if c in {'=',':'}:
-                l = len(op[1]) if c == '=' else int(op[1])
-                for qr, mr in zip(range(read_i, read_i+l), range(mref_i, mref_i+l)):
-                    if mr in mrefs:
-                        bp_mref_aln.append((qr,mr))
-                read_i += l
-                mref_i += l
-            else:
-                errors.append( (mref_i,"".join(op)) )
-
-                if c == '*':
-                    bp_mref_aln.append((read_i,mref_i))
-                    read_i += 1
-                    mref_i += 1
-
-                elif c == '-':
-                    l = len(op[1])
-                    mref_i += l
-
-                elif c == '+':
-                    l = len(op[1])
-                    read_i += l
-
-                elif c == '~':
-                    l = int(op[1][2:-2])
-                    self.ref_gaps.append((mref_i,mref_i+l))
-                    mref_i += l
-
-                else:
-                    print("UNIMPLEMENTED ", op)
-
-        self.bp_mref_aln = pd.DataFrame(bp_mref_aln, columns=["bp","mref"], dtype='Int64')
-        self.bp_mref_aln.set_index("bp", inplace=True)
-
-        #TODO type shouldn't have to be 64 bit
-        self.errors = pd.DataFrame(errors, columns=["mref","error"]) \
-                       .set_index("mref").groupby(level=0) \
-                       .transform(lambda errs: ",".join(errs))
-
-        return True        
-
-    def parse_cigar(self, paf):
-        #cig = paf.tags.get('cg', (None,)*2)[0]
-        cig = paf.cigarstring
+    def parse_cigar(self, sam):
+        #cig = sam.tags.get('cg', (None,)*2)[0]
+        cig = sam.cigarstring
         if cig is None: return False
 
         bp_mref_aln = list()#defaultdict(list)
 
-        #print(paf.query_alignment_start, paf.query_alignment_end)
+        #print(sam.query_alignment_start, sam.query_alignment_end)
         #if not self.is_rna:
-        #    read_i = paf.query_alignment_start
+        #    read_i = sam.query_alignment_start
         #else:
-        #    read_i = paf.infer_query_length() - paf.query_alignment_end
+        #    read_i = sam.infer_query_length() - sam.query_alignment_end
         read_i = 0
 
         cig_ops = self.CIG_RE.findall(cig)
@@ -186,7 +128,7 @@ class Bcaln:
         if self.is_fwd == self.is_rna:
             cig_ops = list(reversed(cig_ops))
 
-        mrefs = self.paf_coords.mrefs# - self.kmer_shift[0]
+        mrefs = self.sam_coords.mrefs# - self.kmer_shift[0]
         mref_i = mrefs.min()
 
         insert_len = 0
