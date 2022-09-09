@@ -28,7 +28,7 @@ class Refplot:
         if self.tracks.refstats is None:
             self.tracks.calc_refstats()
 
-        names = [t.name for t in self.tracks]
+        names = [t.name for t in self.tracks.alns]
 
         if self.prms.kmer_coord is None:
             self.refs = self.tracks.coords.refs

@@ -84,13 +84,13 @@ class Trackplot:
 
         #self.tracks.load_refs(load_mat=True)
 
-        names = [t.name for t in self.tracks]
+        names = [t.name for t in self.tracks.alns]
 
         if self.prms.panel_heights is None:
             panel_heights = list()
             for panel,_ in self.prms.panels:
                 if MULTIROW_PANEL[panel]:
-                    panel_heights += [DEFAULT_HEIGHTS[panel]] * len(self.tracks)
+                    panel_heights += [DEFAULT_HEIGHTS[panel]] * len(self.tracks.alns)
                 else:
                     panel_heights.append(DEFAULT_HEIGHTS[panel])
         else:

@@ -46,7 +46,7 @@ def dtw(conf):
     if not isinstance(tracks.input, BAM):
         raise ValueError("Must specify BAM input")
 
-    sigproc = SignalProcessor(tracks.model, conf)
+    sigproc = SignalProcessor(tracks[tracks.output_track].model, conf)
 
     n_reads = 0
 
@@ -95,7 +95,7 @@ class GuidedDTW:
         aln_id, self.coords = tracks.init_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, read=signal)
 
         self.index = tracks.index
-        self.model = tracks.model
+        self.model = sigproc.model
 
         self.bcaln = bcaln.df#[bcaln.df["indel"] == 0]
 

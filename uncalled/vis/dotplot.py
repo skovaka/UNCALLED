@@ -93,7 +93,7 @@ class Dotplot:
             shared_xaxes=True,
             shared_yaxes=True)
 
-        tracks_filter,colors_filter = zip(*[(t,c) for t,c in zip(tracks,self.conf.vis.track_colors) if t.name != self.prms.bcaln_track])
+        tracks_filter,colors_filter = zip(*[(t,c) for t,c in zip(tracks.alns,self.conf.vis.track_colors) if t.name != self.prms.bcaln_track])
         #colors_filter = [t for t in tracks if t.name != self.prms.bcaln_track]
 
         Sigplot(tracks, conf=self.conf).plot(fig)
@@ -106,7 +106,7 @@ class Dotplot:
 
         flipped = True
 
-        for i,track in enumerate(tracks):
+        for i,track in enumerate(tracks.alns):
 
             track_hover = list()
 

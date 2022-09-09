@@ -69,9 +69,10 @@ class SignalProcessor:
         if self.InstanceClass is None:
             raise ValueError(f"Invalid k-mer length {model.K}")
 
+        self.model = model
+
         if isinstance(model, PoreModel):
             model = model.instance
-
 
         self.instance = self.InstanceClass(model, conf.event_detector)
 

@@ -205,10 +205,13 @@ class Tracks:
                 self.fn_layers.append((group, layer))
 
     def __len__(self):
-        return len(self.alns)
+        return len(self._tracks)
+
+    def keys(self):
+        return self._tracks.keys()
 
     def __getitem__(self, i):
-        return self.alns[i]
+        return self._tracks[i]
 
     def _init_io(self):
         in_prms = [getattr(self.prms.io, p) is not None for p in INPUT_PARAMS]
@@ -258,12 +261,19 @@ class Tracks:
             self.output = None
             self.output_track = self.input.tracks.iloc[0]["name"]
 
+        self.model = None
 
         for _,row in pd.concat(tracks).iterrows():
             conf = config.Config(toml=row["config"])
             self.conf.load_config(conf)
             track = AlnTrack(row["id"], row["name"], row["desc"], conf)
             self._add_track(track.name, track)
+
+            if self.model is None:
+                self.model = track.model
+            elif self.model.K != track.model.K:
+                raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
+
 
     def aln_layers(self, layer_filter=None):
         ret = pd.Index([])

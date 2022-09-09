@@ -52,6 +52,7 @@ def nanopolish(conf):
                  "event_length","strand","model_kmer"])
 
     tracks = Tracks(conf=conf)
+    model = tracks[tracks.output_track].model
 
     def add_alns(events):
         groups = events.groupby(["contig", "read_name"])
@@ -77,9 +78,9 @@ def nanopolish(conf):
 
             df["mref"] = coords.ref_to_mref(df["position"].to_numpy()+2)
 
-            kmers = tracks.model.str_to_kmer(df["model_kmer"])
+            kmers = model.str_to_kmer(df["model_kmer"])
             if conf.is_rna:
-                kmers = tracks.model.kmer_rev(kmers)
+                kmers = model.kmer_rev(kmers)
             df["kmer"] = kmers
 
             df = df.rename(columns={
