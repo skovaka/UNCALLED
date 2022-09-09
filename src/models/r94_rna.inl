@@ -1031,7 +1031,7 @@ const std::vector<float> model_r94_rna_vals = {
 };
 
 const PoreModelPreset model_r94_rna {
-    {"r94_rna", false, false, 5, 2}, model_r94_rna_vals
+    {"r94_rna", true, false, 5, 2}, model_r94_rna_vals
 };
 
 #endif

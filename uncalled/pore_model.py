@@ -37,6 +37,7 @@ class PoreModel:
 
             if isinstance(model, str):
 
+                #TODO this will override all other parameters, maybe fine but should clarify
                 if model in PORE_MODEL_PRESETS:
                     prms = PORE_MODEL_PRESETS[model].prms
                     is_preset = True
@@ -45,8 +46,11 @@ class PoreModel:
                     prms.name = model
 
             elif isinstance(model, PoreModelParams):
-                prms = model
                 is_preset = model.name in PORE_MODEL_PRESETS
+                if is_preset:
+                    prms = PORE_MODEL_PRESETS[model.name].prms
+                else:
+                    prms = model
 
             else:
                 raise TypeError("PoreModel model must be of type str, PoreModel, or PoreModel.Params")

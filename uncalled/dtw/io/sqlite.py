@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 import sys
 
-from ..aln_track import AlnTrack, LAYER_META
+from ..aln_track import AlnTrack
+from ..layers import LAYER_META, LAYER_DB_GROUPS
 from ... import config
 from . import TrackIO
 
@@ -160,6 +161,18 @@ class TrackSQL(TrackIO):
         #self.tracks.append(track)
 
     def init_read_mode(self):
+        self.table_columns = dict()
+        for table in LAYER_DB_GROUPS:
+            info = pd.read_sql_query(f"PRAGMA table_info({table})", self.con)
+            if not table in LAYER_META.index.get_level_values(0): continue
+            layers = LAYER_META.loc[table].query("base").index
+            missing = layers.difference(info["name"])
+            if len(missing) > 0:
+                n = len(missing)
+                missing = "\", \"".join(missing)
+                sys.stderr.write(f"Warning: \"{table}\" table missing {n} columns (\"{missing}\")\n")
+            self.table_columns[table] = layers.intersection(info["name"])
+
         df = self.query_track(self.track_names).set_index("name").reindex(self.track_names)
 
         missing = df["id"].isnull()
@@ -359,6 +372,8 @@ class TrackSQL(TrackIO):
         fields = list()
         tables = list()
         for group,layer in layers:
+            if not layer in self.table_columns[group]: 
+                continue
             if group == "bc_cmp":
                 group = "cmp"
             field = group + "." + layer

@@ -83,10 +83,6 @@ class Tracks:
         self.set_layers(self.prms.layers)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers, add_deps=False))
 
-        self.model = None#PoreModel(self.conf.pore_model) 
-
-        #TODO refactor into TrackSQL, abstract into self.io
-
         self.alns = list()
         self._tracks = dict()
         self.new_alignment = False
@@ -241,9 +237,6 @@ class Tracks:
             #    self._add_track(track.name, track)
         else:
             self.input = None
-
-        if self.model is None:
-            self.model = PoreModel(self.conf.pore_model)
 
         if np.any(out_prms):
             out_format = OUTPUT_PARAMS[out_prms][0]

@@ -89,6 +89,8 @@ LAYER_META = pd.concat([
 
 LAYER_META["base"] = LAYER_META["fn"].isna()
 
+LAYER_DB_GROUPS = ["dtw", "bcaln", "cmp", "band"]
+
 def parse_layer(layer):
     
     if isinstance(layer, str):
