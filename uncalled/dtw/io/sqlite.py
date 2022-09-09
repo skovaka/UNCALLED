@@ -13,7 +13,7 @@ from . import TrackIO
 class TrackSQL(TrackIO):
     FORMAT = "db"
     def __init__(self, conf, mode):
-        filename = conf.tracks.io.db_in if mode == "r" else conf.tracks.io.db_out
+        filename = conf.tracks.io.sql_in if mode == "r" else conf.tracks.io.sql_out
         TrackIO.__init__(self, filename, conf, mode)
 
         new_file = not os.path.exists(self.filename)

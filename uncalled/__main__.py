@@ -109,11 +109,15 @@ REALTIME_OPTS = BWA_OPTS + MAPPER_OPTS + (
 DTW_OPTS = (
     Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
     #Opt(("-m", "--mm2-paf"), "dtw", required=True),
-    Opt(("-o", "--db-out"), "tracks.io"),
-    Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
 
     Opt("--bam-in", "tracks.io", nargs="?", const="-"),
-    Opt("--bam-out", "tracks.io", nargs="?", const="-"),
+
+    MutexOpts("output", [
+        Opt("--sql-out", "tracks.io"),
+        Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
+        Opt("--bam-out", "tracks.io", nargs="?", const="-"),
+    ]),
+
 
     Opt("--tsv-cols", "tracks.io", type=comma_split, default="ref,dtw"),
     Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
@@ -158,7 +162,7 @@ CONVERT_OPTS = (
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
     Opt(("-a", "--append"), "tracks.io", action="store_true"),
-    Opt(("-o", "--db-out"), "tracks.io", required=True),
+    Opt(("-o", "--sql-out"), "tracks.io"),
 )
 
 NANOPOLISH_OPTS = CONVERT_OPTS + (
@@ -169,13 +173,13 @@ NANOPOLISH_OPTS = CONVERT_OPTS + (
 NEW_OPTS = (
     Opt("index_prefix", "tracks"),
     MutexOpts("input", [
-        Opt("--db-in", "tracks.io"),
+        Opt("--sql-in", "tracks.io"),
         Opt("--bam-in", "tracks.io"),
         Opt("--eventalign-in", "tracks.io", nargs="?", const="-"),
     ]),
 
     MutexOpts("output", [
-        Opt("--db-out", "tracks.io"),
+        Opt("--sql-out", "tracks.io"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
     ]),
@@ -193,7 +197,7 @@ NEW_OPTS = (
     Opt(("-a", "--append"), "tracks.io", action="store_true"),
 )
 
-DB_OPT = Opt("db_in", "tracks.io", help="Track database file")
+DB_OPT = Opt("sql_in", "tracks.io", help="Track database file")
 
 LS_OPTS = (DB_OPT,)
 DELETE_OPTS = (
@@ -212,11 +216,11 @@ EDIT_OPTS = (
 MERGE_OPTS = (
     Opt("dbs", nargs="+", type=str, help="Database files to merge. Will write to the first file if \"-o\" is not specified. "),
     #Opt(("-n", "--track_names"), nargs="+", help="Names of tracks to merge. Will merge all tracks if not specified"),
-    Opt(("-o", "--db-out"), "tracks.io", type=str, default=None, help="Output database file. Will output to the first input file if not specified"),
+    Opt(("-o", "--sql-out"), "tracks.io", type=str, default=None, help="Output database file. Will output to the first input file if not specified"),
 )
 
 COMPARE_OPTS = (
-    Opt("db_in", "tracks.io"),
+    Opt("--sql-in", "tracks.io"),
     #Opt(("-l", "--read-filter"), "tracks", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-R", "--ref-bounds"), "tracks"),
@@ -228,14 +232,14 @@ COMPARE_OPTS = (
 )
 
 DUMP_OPTS = (
-    Opt("db_in", "tracks.io", type=str),
+    Opt("--sql-in", "tracks.io"),
     Opt("layers", nargs="+",  help="Layers to retrieve or compute"),
     Opt(("-R", "--ref-bounds"), "tracks", type=ref_coords),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
 )
 
 READSTATS_OPTS = (
-    Opt("db_in", "tracks.io", type=str),
+    Opt("--sql-in", "tracks.io"),
     Opt("stats", "readstats", type=comma_split),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt(("-p", "--pca-components"), "readstats"),
@@ -244,7 +248,7 @@ READSTATS_OPTS = (
 )
 
 REFPLOT_OPTS = (
-    Opt("db_in", "tracks.io"),
+    Opt("--sql-in", "tracks.io"),
     Opt("ref_bounds", "tracks", type=str_to_coord),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
@@ -253,7 +257,7 @@ REFPLOT_OPTS = (
 )
 
 DOTPLOT_OPTS = (
-    Opt("db_in", "tracks.io", nargs="?"),
+    Opt("--sql-in", "tracks.io"),
     Opt("--bam-in", "tracks.io", nargs="?", const="-"),
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
 
@@ -278,7 +282,7 @@ DOTPLOT_OPTS = (
 
 TRACKPLOT_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
-    Opt("db_in", "tracks.io", nargs="?"),
+    Opt("--sql-in", "tracks.io"),
     Opt("--bam-in", "tracks.io", nargs="?", const="-"),
 
     Opt("--ref", "tracks", "index_prefix"), 
@@ -300,7 +304,7 @@ TRACKPLOT_OPTS = (
 
 BROWSER_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
-    Opt("db_in", "tracks.io", nargs="?"),
+    Opt("--sql-in", "tracks.io"),
     Opt("--bam-in", "tracks.io", nargs="?", const="-"),
 
     Opt("--ref", "tracks", "index_prefix"), 
@@ -378,11 +382,11 @@ CMDS = {
         "edit"   : ("dtw.io.sqlite", "", EDIT_OPTS), 
     }),
     "refstats" : ("stats.refstats", "Calculate per-reference-coordinate statistics", (
-        Opt("db_in", "tracks.io", type=str),
         Opt("layers", "tracks", type=comma_split,
             help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
         Opt("refstats", type=comma_split,
             help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
+        Opt("--sql-in", "tracks.io"),
         Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
         Opt(("-C", "--min-coverage"), "tracks"),
         Opt(("--ref-chunksize"), "tracks.io"),

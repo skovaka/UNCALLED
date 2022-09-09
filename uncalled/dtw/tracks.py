@@ -225,7 +225,7 @@ class Tracks:
 
         if np.any(in_prms):
             in_format = INPUT_PARAMS[in_prms][0]
-            if in_format == "db_in":
+            if in_format == "sql_in":
                 self.input = TrackSQL(self.conf, "r")
             elif in_format == "bam_in":
                 self.input = BAM(self.conf, "r")
@@ -243,7 +243,7 @@ class Tracks:
 
         if np.any(out_prms):
             out_format = OUTPUT_PARAMS[out_prms][0]
-            if out_format == "db_out":
+            if out_format == "sql_out":
                 self.output = TrackSQL(self.conf, "w")
             elif out_format == "tsv_out":
                 self.output = TSV(self.conf, "w")

@@ -21,8 +21,8 @@ from ...fast5 import parse_fast5_paths
 from ...pore_model import PoreModel
 from ...signal_processor import ProcessedRead
 
-INPUT_PARAMS = np.array(["db_in", "eventalign_in", "tombo_in", "bam_in"])
-OUTPUT_PARAMS = np.array(["db_out", "tsv_out", "eventalign_out", "bam_out"])
+INPUT_PARAMS = np.array(["sql_in", "eventalign_in", "tombo_in", "bam_in"])
+OUTPUT_PARAMS = np.array(["sql_out", "tsv_out", "eventalign_out", "bam_out"])
 
 class TrackIO:
     def __init__(self, filename, conf, mode):

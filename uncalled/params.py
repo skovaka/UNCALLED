@@ -28,8 +28,11 @@ IOParams._def_params(
     #("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
     #("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
 
-    ("db_in", None, str, "Input track database"),
-    ("db_out", None, str, "Output track database"),
+    #("db_in", None, str, "Input track database"),
+    #("db_out", None, str, "Output track database"),
+
+    ("sql_in", None, str, "Input track database"),
+    ("sql_out", None, str, "Output track database"),
 
     ("tsv_out", None, str, "TSV output file (or \"-\"/no argument for stdout)"),
     ("tsv_cols", None, list, "TSV file output alignment layers"),
@@ -44,14 +47,14 @@ IOParams._def_params(
     ("eventalign_flags", [], list, f"Eventalign optional flags (comma-separated list of \"\"{eventalign_flags}\")"),
     ("tombo_in", None, str, "Fast5 files containing Tombo alignments"),
 
-    ("init_track", True, bool, "If true will initialze track into \"db_out\""),
+    ("init_track", True, bool, "If true will initialze track"),
 
     ("output_format", "db", str,  "Output format (db, eventalign)"),
     ("overwrite", False, bool, "Overwrite existing tracks"),
     ("append", False, bool, "Append reads to existing tracks"),
     ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
-    ignore_toml={"db_in", "db_out", "eventalign_in", "eventalign_out", "tombo_in", "eventalign_index", "overwrite", "append"},
+    ignore_toml={"bam_in", "bam_out", "sql_in", "sql_out", "eventalign_in", "eventalign_out", "tombo_in", "eventalign_index", "overwrite", "append"},
     #ignore_toml={"input", "output", "output_format", "overwrite", "append"},
     config_add=False
 )
