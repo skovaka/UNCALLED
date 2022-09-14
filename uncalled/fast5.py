@@ -83,6 +83,7 @@ class Fast5Reader:
 
         conf_prms = self.conf.fast5_reader
         self.prms = _Fast5Iter.Params()
+        self.indexed = False
 
         #TODO all very hacky. should be refactored into C++
 

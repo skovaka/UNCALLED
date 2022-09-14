@@ -63,10 +63,3 @@ config.rc = Config()
 from .pore_model import PoreModel
 from .fast5 import Fast5Reader
 from .index import RefIndex, load_index
-
-#SUBCMDS = [
-#    dtw, dotplot, sigplot, browser, convert, 
-#    (compare, COMPARE_OPTS), 
-#    (method_compare, METHOD_COMPARE_OPTS),
-#    (refstats, REFSTATS_OPTS),
-#]

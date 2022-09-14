@@ -13,14 +13,6 @@ import numpy as np
 import pandas as pd
 import sys
 
-
-import _uncalled
-
-from ..aln_track import AlnTrack
-from ...fast5 import parse_fast5_paths
-from ...pore_model import PoreModel
-from ...signal_processor import ProcessedRead
-
 INPUT_PARAMS = np.array(["sql_in", "eventalign_in", "tombo_in", "bam_in"])
 OUTPUT_PARAMS = np.array(["sql_out", "tsv_out", "eventalign_out", "bam_out"])
 
@@ -87,9 +79,6 @@ class TrackIO:
         self.prev_read = None
 
         return self.init_track(None, name, name, self.conf.to_toml())
-        #track = AlnTrack(self, None, name, name, self.conf)
-        #self.tracks.append(track)
-        #return track
 
     def init_track(self, id, name, desc, conf):
         row = pd.DataFrame({
@@ -125,58 +114,7 @@ from .sqlite import TrackSQL
 from .tsv import TSV
 from .bam import BAM
 from .eventalign import Eventalign
-
-class TrackHDF5(TrackIO):
-    FORMAT = "hdf5"
-    def __init__(self, filename, mode, conf):
-        TrackIO.__init__(self, filename, mode, conf)
-
-        new_file = not os.path.exists(filename)
-
-        self.db = pd.HDFStore(filename)
-        self.open = True
-
-
-    def close(self):
-        if self.open:
-            self.db.close()
-            self.open = False
-
-    def init_tables(self):
-        pass
-
-    def init_write_mode(self):
-        pass
-
-    def init_track(self, track):
-        pass
-
-    def write_alignment(self, aln_df):
-        pass 
-
-    def init_fast5(self, filename):
-        return fast5_id
-
-    def init_read(self, read_id, fast5_id):
-        pass 
-
-    def write_layers(self, df, index=["pac","aln_id"], read=None):
-        pass 
-
-    def get_fast5_index(self, track_id=None):
-        pass 
-
-    def query_track(self, name=None):
-        pass
-
-    def query_alignments(self, track_id=None, read_id=None, aln_id=None, coords=None, full_overlap=False, order=None, chunksize=None):
-        pass
-        
-    def query_compare(self, layers, track_id=None, coords=None, aln_id=None):
-        pass
-
-    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, order=["pac"], chunksize=None, full_overlap=False):
-        pass
+from .tombo import Tombo
 
 def _db_track_split(db_str):
     spl = db_str.split(":")
@@ -191,4 +129,19 @@ def _db_track_split(db_str):
     return os.path.abspath(filename), track_names
 
 
+def convert(conf):
+    """Convert between signal alignment file formats"""
+    from .. import Tracks
+
+    conf.tracks.layers = ["dtw"]
+    tracks = Tracks(conf=conf)
+
+    for read_id, read in tracks.iter_reads():
+        sys.stderr.write(f"{read_id}\n")
+        aln = read.alns[0]
+        read.init_alignment(read_id, read.get_read_fast5(read_id), aln.coords, {"dtw" : aln.layers["dtw"].droplevel(1)})
+        
+        read.write_alignment()
+
+    tracks.close()
 

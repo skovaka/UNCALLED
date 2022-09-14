@@ -15,8 +15,8 @@ const PoreModelParams PORE_MODEL_PRMS_DEF {
 using M = PoreModelPreset;
 const std::unordered_map<std::string, PoreModelPreset> PORE_MODEL_PRESETS {{
     M{ {"r94_rna", true, false, 5, 2}, model_r94_rna_vals }.map(),
+    M{ {"r94_rna_tombo", true, false, 5, 2}, model_r94_rna_tombo_vals }.map(),
     M{ {"r94_dna", false, false, 5, 2}, model_r94_dna_vals }.map(),
-    M{ {"r94_rna_tombo", false, false, 5, 2}, model_r94_rna_tombo_vals }.map(),
     M{ {"r9.4_dna_450bps_6mer_npl", false, false, 6, 2}, model_r9_4_dna_450bps_6mer_npl }.map()
 }};
 

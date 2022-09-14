@@ -100,9 +100,12 @@ class Sigplot:
         read = self.sigproc.process(track.fast5s[read_id])
         signal = read.get_norm_signal(samp_min, samp_max)
 
+        sig_med = np.median(signal)
+        sig_win = signal.std()*4 #, signal.min(), signal.max())
+
         #TODO set global signal min/max
-        mask = ((signal >= 40) &
-                (signal <= self.conf.event_detector.max_mean))
+        mask = ((signal >= sig_med - sig_win) &
+                (signal <= sig_med + sig_win))
         
         samples = np.arange(samp_min, samp_max)[mask]
         signal = signal[mask]

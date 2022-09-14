@@ -136,11 +136,10 @@ class Eventalign(TrackIO):
 
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
-        read_filter = read_id
+        read_filter = set(self.conf.fast5_reader.read_filter)
 
         sample_rate = self.conf.read_buffer.sample_rate
 
-        sys.stderr.write("Parsing TSV\n")
         csv_iter = pd.read_csv(
             self.conf.tracks.io.eventalign_in, sep="\t", chunksize=10000,
             usecols=["read_name","contig","position", "event_index",
@@ -222,7 +221,7 @@ class Eventalign(TrackIO):
 
             for alns,layers in iter_layers(events, aln_id):
                 yield alns,layers
-                
+
         if len(leftover) > 0:
             for alns,layers in iter_layers(leftover, aln_id):
                 yield alns,layers

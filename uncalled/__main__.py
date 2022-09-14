@@ -149,33 +149,34 @@ DTW_OPTS = (
     Opt("--bc-group", "fast5_reader"),
 ) + RT_OPTS
 
+#CONVERT_OPTS = (
+#    Opt("index_prefix", "tracks"),
+#    Opt(FAST5_PARAM, "fast5_reader", nargs="+", type=str),
+#    #Opt("--fast5s", "fast5_reader", "fast5_files", type=comma_split),
+#    #Opt("--fast5-index", "fast5_reader"),
+#    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+#    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
+#    Opt(("-n", "--max-reads"), "fast5_reader"),
+#
+#    Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
+#    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
+#    Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
+#    Opt(("-a", "--append"), "tracks.io", action="store_true"),
+#    Opt(("-o", "--sql-out"), "tracks.io"),
+#)
+#
+#NANOPOLISH_OPTS = CONVERT_OPTS + (
+#    Opt(("-x", "--fast5-index"), "fast5_reader", required=True), 
+#    Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include")
+#)
+
 CONVERT_OPTS = (
-    Opt("index_prefix", "tracks"),
-    Opt(FAST5_PARAM, "fast5_reader", nargs="+", type=str),
-    #Opt("--fast5s", "fast5_reader", "fast5_files", type=comma_split),
-    #Opt("--fast5-index", "fast5_reader"),
-    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
-    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
-    Opt(("-n", "--max-reads"), "fast5_reader"),
-
-    Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
-    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-    Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
-    Opt(("-a", "--append"), "tracks.io", action="store_true"),
-    Opt(("-o", "--sql-out"), "tracks.io"),
-)
-
-NANOPOLISH_OPTS = CONVERT_OPTS + (
-    Opt(("-x", "--fast5-index"), "fast5_reader", required=True), 
-    Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include")
-)
-
-NEW_OPTS = (
     Opt("index_prefix", "tracks"),
     MutexOpts("input", [
         Opt("--sql-in", "tracks.io"),
         Opt("--bam-in", "tracks.io"),
         Opt("--eventalign-in", "tracks.io", nargs="?", const="-"),
+        Opt("--tombo-in", "tracks.io"),
     ]),
 
     MutexOpts("output", [
@@ -183,12 +184,14 @@ NEW_OPTS = (
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
     ]),
+
     Opt("--tsv-cols", "tracks.io", type=comma_split),
 
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
 
     Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
+    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
     Opt(("-x", "--fast5-index"), "fast5_reader"),
     Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
@@ -356,17 +359,7 @@ CMDS = {
         "Estimate speed and accuracy from an Uncalled PAF file", PAF_OPTS), 
     "dtw" : ("dtw.dtw", 
         "Perform DTW alignment guided by basecalled alignments", DTW_OPTS), 
-    "convert" : (None, 
-        """Import DTW alignments produced by other tools into a database
-
-        subcommand options:
-        nanopolish  Convert alignments produced by nanopolish eventalign
-        tombo       Convert alignments produced by tomobo resquiggle""", {
-
-        "new"        : ("dtw.convert", "New convert interface", NEW_OPTS), 
-        "nanopolish" : ("dtw.convert", "Convert from nanopolish eventalign TSV to uncalled DTW track", NANOPOLISH_OPTS), 
-        "tombo"      : ("dtw.convert", "Convert from Tombo resquiggled fast5s to uncalled DTW track", CONVERT_OPTS)
-    }), 
+    "convert" : ("dtw.io", "Convert between signal alignment file formats", CONVERT_OPTS),
     "db" : (None, 
         """Edit, merge, and ls alignment databases
 

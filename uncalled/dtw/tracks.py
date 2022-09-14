@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 import scipy
 
-from .io import TrackSQL, TSV, Eventalign, BAM, INPUT_PARAMS, OUTPUT_PARAMS
+from .io import TrackSQL, TSV, Eventalign, Tombo, BAM, INPUT_PARAMS, OUTPUT_PARAMS
 from .aln_track import AlnTrack
 from .layers import LAYER_META, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
@@ -232,7 +232,7 @@ class Tracks:
             elif in_format == "eventalign_in":
                 self.input = Eventalign(self.conf, "r")
             elif in_format == "tombo_in":
-                raise ValueError("TOMBO NOT SUPPORTED YET")
+                self.input = Tombo(self.conf, "r")
 
             self.conf.load_config(self.input.conf)
 
@@ -277,6 +277,12 @@ class Tracks:
             elif self.model.K != track.model.K:
                 raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
 
+    def get_read_fast5(self, read_id):
+        if self.fast5s is not None and self.fast5s.indexed:
+            return self.fast5s.get_read_file(read_id)
+        elif getattr(self.input, "read_id_in", None) == read_id:
+            return self.input.fast5_in
+        raise RuntimeError("Could not determine fast5 filename, may need to provide fast5 index (-x)")
 
     def aln_layers(self, layer_filter=None):
         ret = pd.Index([])
@@ -811,58 +817,6 @@ class Tracks:
                 for ret in cache.iter_reads_slice():
                     yield ret
         
-        """
-        layer_iter = self.input.query_layers(
-            self.db_layers, 
-            self._aln_track_ids,
-            read_id=reads,
-            coords=self.coords, 
-            full_overlap=full_overlap, 
-            order=["read_id", "pac"],
-            chunksize=self.prms.io.ref_chunksize)
-
-        t = time.time()
-
-        aln_leftovers = pd.DataFrame()
-        layer_leftovers = pd.DataFrame()
-
-        for layers in layer_iter:
-            ids = layers.index \
-                        .get_level_values("aln_id") \
-                        .unique() \
-                        .difference(aln_leftovers.index) \
-                        .to_numpy()
-            if len(ids) > 0:
-                alignments = self.input.query_alignments(aln_id=ids)
-            else:
-                alignments = pd.DataFrame()
-
-            alignments = pd.concat([aln_leftovers, alignments])
-            layers = pd.concat([layer_leftovers, layers])
-
-            aln_end = alignments["read_id"] == alignments["read_id"].iloc[-1]
-            aln_leftovers = alignments.loc[aln_end]
-            alignments = alignments.loc[~aln_end]
-
-            layer_end = layers.index.get_level_values("aln_id").isin(aln_leftovers.index)
-            layer_leftovers = layers.loc[layer_end]
-            layers = layers.loc[~layer_end]
-            layer_alns = layers.index.get_level_values("aln_id")
-
-            for ref_name,ref_alns in alignments.groupby("ref_name"):
-                coords = self._alns_to_coords(ref_alns)
-                cache = self._tables_to_tracks(coords, ref_alns, layers)
-                for ret in cache.iter_reads_slice():
-                    yield ret
-
-        if len(aln_leftovers) > 0:
-            for ref_name,ref_alns in aln_leftovers.groupby("ref_name"):
-                coords = self._alns_to_coords(ref_alns)
-                cache = self._tables_to_tracks(coords, ref_alns, layer_leftovers)
-                for ret in cache.iter_reads_slice():
-                    yield ret
-        """
-
     def _tables_to_tracks(self, coords, alignments, layers):
         tracks = dict()
         self.new_alignment = False
