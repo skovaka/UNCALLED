@@ -166,6 +166,8 @@ class AlnTrack:
             pd.concat({group : layers}, names=["group", "layer"], axis=1)
         }, names=["aln_id", "ref"]).reorder_levels(["ref","aln_id"])
 
+        df = df[LAYER_META.index.intersection(df.columns)]
+
         df = df.astype(LAYER_META.loc[df.columns, "dtype"], copy=False)
 
         if self.layers is None or overwrite:

@@ -230,9 +230,11 @@ class Tracks:
             elif in_format == "bam_in":
                 self.input = BAM(self.conf, "r")
             elif in_format == "eventalign_in":
-                raise ValueError("EVENTALGIN NOT SUPPORTED YET")
+                self.input = Eventalign(self.conf, "r")
             elif in_format == "tombo_in":
                 raise ValueError("TOMBO NOT SUPPORTED YET")
+
+            self.conf.load_config(self.input.conf)
 
             tracks.append(self.input.tracks)
 
@@ -268,6 +270,7 @@ class Tracks:
             self.conf.load_config(conf)
             track = AlnTrack(row["id"], row["name"], row["desc"], conf)
             self._add_track(track.name, track)
+
 
             if self.model is None:
                 self.model = track.model

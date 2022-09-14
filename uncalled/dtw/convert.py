@@ -26,16 +26,21 @@ def new(conf):
 
     for read_id, read in tracks.iter_reads():
         aln = read.alns[0]
-        read.init_alignment(read_id, read.fast5s.get_read_file(read_id), aln.coords)
+        read.init_alignment(read_id, read.fast5s.get_read_file(read_id), aln.coords, {"dtw" : aln.layers["dtw"].droplevel(1)})
         
-        dtw = aln.layers["dtw"].droplevel(1)#.set_index(aln.coords.ref_to_mref(aln.layer_refs, aln.all_fwd), drop=True)
-        read.add_layers("dtw", dtw)
+        #dtw = aln.layers["dtw"].droplevel(1)#.set_index(aln.coords.ref_to_mref(aln.layer_refs, aln.all_fwd), drop=True)
+        #read.add_layers("dtw", dtw)
         read.write_alignment()
 
     tracks.close()
 
 def nanopolish(conf):
     """Convert from nanopolish eventalign TSV to uncalled DTW track"""
+
+    if conf.pore_model.name == "r94_dna":
+        conf.pore_model.name = "r9.4_dna_450bps_6mer_npl"
+
+    #model = PoreModel(conf.pore_model)
 
     f5reader = Fast5Reader(conf=conf)
     conf.fast5_reader.load_bc = True
@@ -47,12 +52,14 @@ def nanopolish(conf):
     sys.stderr.write("Parsing TSV\n")
     csv_iter = pd.read_csv(
         conf.eventalign_tsv, sep="\t", chunksize=10000,
-        usecols=["read_name","contig","position",
-                 "start_idx","event_level_mean",
+        usecols=["read_name","contig","position", "event_index",
+                 "start_idx","event_level_mean","model_mean",
                  "event_length","strand","model_kmer"])
 
     tracks = Tracks(conf=conf)
     model = tracks[tracks.output_track].model
+
+    kmer_trim = tracks.index.trim#[not sam.is_fwd]
 
     def add_alns(events):
         groups = events.groupby(["contig", "read_name"])
@@ -61,26 +68,23 @@ def nanopolish(conf):
             if not (read_filter is None or read_id in read_filter):
                 continue
 
+            df.drop(df.index[df["model_mean"] == 0], inplace=True)
+
             start = df["position"].min()
             end = df["position"].max()+1
-            fwd = df["strand"].iloc[0] == "t"
+            
+            fwd = df["event_index"].iloc[0] < df["event_index"].iloc[-1]
 
-            #start = aln_attrs["mapped_start"]-2
-            #end = aln_attrs["mapped_end"]+2
-            if start < 0:
-                clip = -start
-                start = 0
-            else:
-                clip = 0
 
             ref_coord = RefCoord(contig, start, end, fwd)
             coords = tracks.index.get_coord_space(ref_coord, conf.is_rna, kmer_trim=True)
 
-            df["mref"] = coords.ref_to_mref(df["position"].to_numpy()+2)
+            df["mref"] = coords.ref_to_mref(df["position"].to_numpy()+kmer_trim[0])
 
             kmers = model.str_to_kmer(df["model_kmer"])
             if conf.is_rna:
                 kmers = model.kmer_rev(kmers)
+
             df["kmer"] = kmers
 
             df = df.rename(columns={
@@ -93,7 +97,6 @@ def nanopolish(conf):
 
             tracks.init_alignment(read_id, fast5_name, coords, {"dtw" : df})
             tracks.write_alignment()
-            print(read_id)
 
     leftover = pd.DataFrame()
 
@@ -212,10 +215,6 @@ def tombo(conf):
         #if is_rna == ref_bounds.fwd:
         refs = coords.refs[2:-2]
         kmers = coords.ref_kmers.droplevel(0).loc[refs]
-        #print(list(model.kmer_to_str(coords.kmers)[:10]))
-        #print(list(tombo_events["base"][:15]))
-        #print(len(coords.refs), len(coords.mrefs), len(coords.kmers), len(starts))
-        #print(coords.refs)
 
         #TODO store scaling factors in pore model
         #currents = currents * 10.868760552593136 + 91.25486108714513

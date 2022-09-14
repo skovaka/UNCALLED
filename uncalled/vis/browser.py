@@ -23,7 +23,7 @@ def browser(conf):
     """Interactive signal alignment genome browser"""
     conf.tracks.load_mat = True
     #conf.tracks.refstats_layers = ["cmp.mean_ref_dist"]
-    conf.tracks.layers=["dtw","bcaln","cmp","bc_cmp"]
+    conf.tracks.layers=["dtw","dtw.dwell","dtw.middle","bcaln.middle","bcaln","cmp","bc_cmp"]
     sys.stderr.write("Loading tracks...\n")
     tracks = Tracks(conf=conf)
     sys.stderr.write("Starting server...\n")

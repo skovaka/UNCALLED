@@ -104,9 +104,9 @@ def parse_layer(layer):
         group,layer = spl
     #TODO allow for full group specification
     elif len(spl) == 1:
-        if layer in LAYERS:
+        if layer in LAYER_META.index.get_level_values(0):
             group = layer
-            for layer in LAYERS[group].keys():
+            for layer in LAYER_META.loc[group].query("base").index:
                 yield (group, layer)
             return
         group = "dtw"

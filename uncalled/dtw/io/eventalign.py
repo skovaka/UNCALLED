@@ -3,6 +3,8 @@ import pandas as pd
 import sys
 from ..aln_track import AlnTrack
 from ...signal_processor import ProcessedRead
+from ...index import str_to_coord, RefCoord
+from ...pore_model import PoreModel
 from . import TrackIO
 import _uncalled
 
@@ -51,10 +53,15 @@ class Eventalign(TrackIO):
         self.out.write("\t".join(header) + "\n")
 
     def init_read_mode(self):
-        if len(self.track_names) != 1:
-            raise ValueError("Can only read eventalign TSV into a single track")
-        name = self.track_names[0]
-        self.init_track(None, name, name, self.conf.to_toml())
+        #if len(self.track_names) != 1:
+        #    raise ValueError("Can only read eventalign TSV into a single track")
+        #name = self.track_names[0]
+        name = self.filename
+        
+        if self.conf.pore_model.name == "r94_dna":
+            self.conf.pore_model.name = "r9.4_dna_450bps_6mer_npl"
+
+        self.init_track(1, name, name, self.conf.to_toml())
         #t = AlnTrack(self, None, name, name, self.conf)
         #self.tracks.append(t)
 
@@ -111,6 +118,115 @@ class Eventalign(TrackIO):
             std_level, signal) #TODO compute internally?
 
         self.out.write(eventalign)
+
+    #def init_fast5(self, filename):
+
+    #    row = self.cur.execute("SELECT id FROM fast5 WHERE filename = ?", (filename,)).fetchone()
+    #    if row is not None:
+    #        return row[0]
+    #        
+    #    self.cur.execute("INSERT INTO fast5 (filename) VALUES (?)", (filename,))
+    #    fast5_id = self.cur.lastrowid
+    #    #self.con.commit()
+
+    #    return fast5_id
+
+    #def init_read(self, read_id, fast5_id):
+    #    self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
+
+    def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
+
+        read_filter = read_id
+
+        sample_rate = self.conf.read_buffer.sample_rate
+
+        sys.stderr.write("Parsing TSV\n")
+        csv_iter = pd.read_csv(
+            self.conf.tracks.io.eventalign_in, sep="\t", chunksize=10000,
+            usecols=["read_name","contig","position", "event_index",
+                     "start_idx","event_level_mean","model_mean",
+                     "event_length","strand","model_kmer"])
+
+        model = PoreModel(self.conf.pore_model)
+
+        kmer_trim = ref_index.trim
+
+        aln_id = 1
+
+        def iter_layers(events, aln_id):
+            groups = events.groupby(["contig", "read_name"])
+            for (contig,read_id), df in groups:
+
+                if not (read_filter is None or read_id in read_filter):
+                    continue
+
+                df.drop(df.index[df["model_mean"] == 0], inplace=True)
+
+                start = df["position"].min()
+                end = df["position"].max()+1
+                
+                fwd = int(df["event_index"].iloc[0] < df["event_index"].iloc[-1])
+
+                ref_coord = RefCoord(contig, start, end, fwd)
+                coords = ref_index.get_coord_space(ref_coord, self.conf.is_rna, kmer_trim=True)
+
+                kmers = model.str_to_kmer(df["model_kmer"])
+                if self.conf.is_rna:
+                    kmers = model.kmer_rev(kmers)
+
+                df["kmer"] = kmers
+
+                pacs = coords.ref_to_pac(df["position"].to_numpy()+kmer_trim[0])
+
+                layers = df.rename(columns={
+                        "start_idx" : "start",
+                        "event_length" : "length",
+                        "event_level_mean" : "current",
+                     }).set_index(pd.MultiIndex.from_product(
+                        [[fwd], pacs, [aln_id]], names=("fwd","pac","aln_id")))
+
+                samp_start = layers["start"].min()
+                e = layers["start"].argmax()
+                samp_end = layers["start"].iloc[e] + layers["length"].iloc[e]
+
+                layers = pd.concat({"dtw" : layers}, names=("group","layer"), axis=1).sort_index()
+
+
+                alns = pd.DataFrame({
+                        "id" : [aln_id],
+                        "track_id" : [1],
+                        "read_id" : [read_id],
+                        "ref_name" : [coords.ref_name],
+                        "ref_start" : [coords.refs.start],
+                        "ref_end" : [coords.refs.stop],
+                        "fwd" :     [coords.fwd],
+                        "samp_start" : [samp_start],
+                        "samp_end" : [samp_end],
+                        "tags" : [""]}).set_index("id")
+
+                aln_id += 1
+
+                yield alns,layers
+
+        leftover = pd.DataFrame()
+
+        for events in csv_iter:
+            events['event_length'] = np.round(events['event_length'] * sample_rate).astype(int)
+            events['sum'] = events['event_level_mean'] * events['event_length']
+
+            events = pd.concat([leftover, events])
+
+            i = events["read_name"] == events["read_name"].iloc[-1]
+            leftover = events[i]
+            events = events[~i]
+
+            for alns,layers in iter_layers(events, aln_id):
+                yield alns,layers
+                
+        if len(leftover) > 0:
+            for alns,layers in iter_layers(leftover, aln_id):
+                yield alns,layers
+
 
     def write_alignment(self, alns):
         pass

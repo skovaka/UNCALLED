@@ -1030,8 +1030,5 @@ const std::vector<float> model_r94_rna_tombo_vals = {
 	-1.162271, 0.225253, //TTTTT
 };
 
-const PoreModelPreset model_r94_rna_tombo {
-    {"r94_rna_tombo", false, false, 5, 2}, model_r94_rna_tombo_vals
-};
 
 #endif

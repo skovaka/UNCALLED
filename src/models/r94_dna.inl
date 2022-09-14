@@ -1030,8 +1030,5 @@ const std::vector<float> model_r94_dna_vals = {
         90.405465,	1.513907, //TTTTT
 };
 
-const PoreModelPreset model_r94_dna {
-    {"r94_dna", false, false, 5, 2}, model_r94_dna_vals
-};
 
 #endif
