@@ -35,7 +35,7 @@ LAYERS = {
             lambda track: track.model[track.layers["dtw","kmer"]],
             [("dtw", "kmer")]),
         "model_diff" : _Layer(float, "Model pA Diff.",
-            lambda track: track.layers["dtw","current"] - track.model[track.layers["dtw","kmer"]],
+            lambda track: track.layers["dtw","current"].dropna() - track.model[track.layers["dtw","kmer"].dropna()],
             [("dtw", "current"),("dtw","kmer")]),
         "abs_diff" : _Layer(float, "Abs. Model Diff.",
             lambda track: (track.layers["dtw","current"] - track.model[track.layers["dtw","kmer"]]).abs(),
@@ -102,7 +102,6 @@ def parse_layer(layer):
 
     if len(spl) == 2:
         group,layer = spl
-    #TODO allow for full group specification
     elif len(spl) == 1:
         if layer in LAYER_META.index.get_level_values(0):
             group = layer

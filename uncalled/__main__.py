@@ -119,7 +119,7 @@ DTW_OPTS = (
     ]),
 
 
-    Opt("--tsv-cols", "tracks.io", type=comma_split, default="ref,dtw"),
+    Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
     Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
     Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
@@ -185,7 +185,7 @@ CONVERT_OPTS = (
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
     ]),
 
-    Opt("--tsv-cols", "tracks.io", type=comma_split),
+    Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
 
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),

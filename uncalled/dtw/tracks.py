@@ -79,8 +79,6 @@ class Tracks:
 
     def _init_new(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("tracks", copy_conf=True, *args, **kwargs)
-
-        self.set_layers(self.prms.layers)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers, add_deps=False))
 
         self.alns = list()
@@ -89,6 +87,8 @@ class Tracks:
         self.new_layers = set()
         
         self._init_io()
+
+        self.set_layers(self.prms.layers)
 
         if self.prms.index_prefix is None:
             raise RuntimeError("Failed to load reference index")

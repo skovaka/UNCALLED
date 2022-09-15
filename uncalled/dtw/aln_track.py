@@ -191,8 +191,7 @@ class AlnTrack:
 
     def calc_layers(self, layers):
         for group, layer in layers:
-            if not group in self.layers: continue
-            if not (group, layer) in self.layers.columns:
+            if group in self.layers and (group, layer) not in self.layers.columns:
                 meta = LAYER_META.loc[(group,layer)]
 
                 #Make sure layer dependencies exist
@@ -351,8 +350,8 @@ class AlnTrack:
     @property
     def layers_desc_index(self):
         index = pd.MultiIndex.from_arrays(
-            [self.layer_refs, self.layer_strands])
-        return pd.concat({self.coords.ref_name : self.layers.set_index(index, drop=True)}, names=[("ref","name"),("ref","coord"),("ref","strand")])
+            [self.layer_refs, self.layer_strands, self.layer_aln_ids])
+        return pd.concat({self.coords.ref_name : self.layers.set_index(index, drop=True)}, names=[("ref","name"),("ref","coord"),("ref","strand"),"aln_id"])
 
         stats.index = pd.MultiIndex.from_product([
             [chunk.coords.ref_name], stats.index, ["+" if chunk.coords.fwd else "-"]
