@@ -118,7 +118,8 @@ class Config(_Conf):
 
     def _param_writable(self, name, val, group=None):
         if group is not None: 
-            if name in getattr(getattr(self, group), "_ignore_toml", {}):
+            if (name in getattr(getattr(self, group), "_ignore_toml", {}) 
+                or name == "read_filter"): #TODO not great - should wrap Fast5Params in ParamGroup
                 return False
         return (not self.is_default(name, group) and
                 not name.startswith("_") and

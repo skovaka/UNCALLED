@@ -4,10 +4,12 @@ import sys
 import pysam
 import array
 import os
+import re
 from collections import defaultdict
 from ..aln_track import AlnTrack
 from ..layers import LAYER_META, parse_layers
 from ...index import RefCoord
+from ... import Config
 from . import TrackIO
 import _uncalled 
 
@@ -27,8 +29,19 @@ class BAM(TrackIO):
         filename = self.conf.tracks.io.bam_in
         self.input = pysam.AlignmentFile(filename, "rb")
 
+        toml = None
+        if "CO" in self.input.header:
+            for line in self.input.header["CO"]:
+                if not line.startswith("UNC:"): continue
+                toml = re.sub(r"(?<!\\);", "\n", line[4:]).replace("\\;",";")
+                conf = Config(toml=toml)
+                self.conf.load_config(conf)
+
+        if toml is None:
+            toml = self.conf.to_toml()
+
         name = os.path.basename(filename)
-        self.init_track(1, name, name, self.conf.to_toml())
+        self.init_track(1, name, name, toml)
 
         #TODO really not good, should stream by default
         #if self.conf.tracks.io.bam_out is not None:
@@ -39,6 +52,26 @@ class BAM(TrackIO):
 
         self.aln_id_in = 1
 
+    def init_write_mode(self):
+        if self.conf.tracks.io.bam_out is None:
+            self.output = None
+            return
+        TrackIO.init_write_mode(self)
+
+        if len(self.conf.fast5_reader.fast5_index) == 0:
+            sys.stderr.write("Warning: no fast5 index specified\n")
+
+        #Store config toml in single-line comment with newlines replaced by semicolons
+        conf_line = self.conf.to_toml() \
+                        .replace(";", "\\;") \
+                        .replace("\n", ";")   
+        header = self.input.header.to_dict()
+        if not "CO" in header:
+            header["CO"] = list()
+        header["CO"].append("UNC:" + conf_line)
+
+        self.output = pysam.AlignmentFile(self.conf.tracks.io.bam_out, "wb", header=header)#template=self.input)
+
     def get_alns(self, read_id):
         return self.in_alns[read_id]
 
@@ -47,20 +80,6 @@ class BAM(TrackIO):
             if aln.reference_name == ref_name and aln.reference_start == ref_start:
                 return aln
         return None
-
-    def init_write_mode(self):
-        if self.conf.tracks.io.bam_out is None:
-            self.output = None
-            return
-        TrackIO.init_write_mode(self)
-        self.output = pysam.AlignmentFile(self.conf.tracks.io.bam_out, "wb", template=self.input)
-
-    def get_header(self, track):
-        return {"HD" : {"VN" : "1.0"},
-                "SQ" : [
-                    {"SN" : name, "LN" : length}
-                    for name, length in track.index.get_seqs()
-                ]}
 
     INF_U16 = np.iinfo(np.uint16).max
 
