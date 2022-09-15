@@ -75,9 +75,9 @@ Note that UNCALLED uses the [BWA](https://github.com/lh3/bwa) FM Index to encode
 
 ## DTW Alignment and Storage
 
-The following subcommands generate and update dynamic time warping (DTW) alignment tracks. Several output formats are supported, specified by the flags `--<fmt>-in/--<fmt>-out`. Only input and output can be specified per command, and not all inputs are supported for each command. Output formats are summarized below:
+Commands for generating, reading, and converting nanopore signal alignments are described in the following sections. Several input output formats are supported, specified by the flags `--<fmt>-in/--<fmt>-out`. Only one input and output can be specified per command, and not all inputs are supported for each command. Output formats are summarized below:
 
-- `--sql-in/--sql-out`: Sqlite3 database format. This is the most versitile format, but also the slowest. It is currently the only format supported by all DTW-related subcommands as it supports random access and storage of all datatypes. Multiple tracks can be stored in one database, and track names can be specified in the format `<file.db>:<track_name1>[,<track_name2>...]`
+- `--sql-in/--sql-out`: Sqlite3 database format. This is the most versitile format, but also the slowest. It is currently the only format supported by all DTW-related subcommands, since it supports random access and storage of many datatypes. Multiple tracks can be stored in one database, and track names can be specified in the format `<file.db>:<track_name1>[,<track_name2>...]`
 - `--bam-in/--bam-out`: Experimental storage of alignments in BAM tags. This is distinct from nanopolish's "--sam" option in that it stores all information in tags, preserving basecalled alignment information, and includes per-reference current levels so FAST5 files don't need to be accessed for most operations. Sorted and indexed BAM files can be loaded by `browser`, and we plan to eventually support BAM input for all commands.
 - `--eventalign-in/--eventalign-out`: Nanopolish "eventalign" format. Can be used to import nanopolish alignments, or to use Uncalled4/Tombo alignments with tools which accept Nanopolish alignments. For `--eventalign-in`, read IDs (`--print-read-names`) and sample coordaintes (`signal-index`) must be included. Use the `--eventalign-flags` option to include these and other optional fields with `--eventalign-out`
 - `--tsv-out`: General tab-seperated-values output. Can specify which layers to output with the "--tsv-cols" option (see [Alignment Layers](#alignment-layers) for options)
@@ -120,7 +120,7 @@ usage: uncalled convert [-h] [--sql-in SQL_IN | --bam-in BAM_IN | --eventalign-i
                         [--mask-skips [MASK_SKIPS]] [--fast5s FAST5S [FAST5S ...]]          
                         [-l READ_FILTER] [-x FAST5_INDEX] [-r] [--rna] [-R REF_BOUNDS] [-f] [-a]
                         index_prefix       
-```:w
+```
                                                                                               
 
 ### `db`
