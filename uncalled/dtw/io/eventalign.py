@@ -137,6 +137,7 @@ class Eventalign(TrackIO):
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
         read_filter = set(self.conf.fast5_reader.read_filter)
+        print(read_filter)
 
         sample_rate = self.conf.read_buffer.sample_rate
 
@@ -156,7 +157,7 @@ class Eventalign(TrackIO):
             groups = events.groupby(["contig", "read_name"])
             for (contig,read_id), df in groups:
 
-                if not (read_filter is None or read_id in read_filter):
+                if len(read_filter) > 0 and read_id not in read_filter:
                     continue
 
                 df.drop(df.index[df["model_mean"] == 0], inplace=True)
@@ -164,14 +165,16 @@ class Eventalign(TrackIO):
                 start = df["position"].min()
                 end = df["position"].max()+1
                 
-                fwd = int(df["event_index"].iloc[0] < df["event_index"].iloc[-1])
+                kmers = model.str_to_kmer(df["model_kmer"])
+                if self.conf.is_rna:
+                    kmers = model.kmer_rev(kmers)
+                    fwd = int(df["event_index"].iloc[0] > df["event_index"].iloc[-1])
+                else:
+                    fwd = int(df["event_index"].iloc[0] < df["event_index"].iloc[-1])
 
                 ref_coord = RefCoord(contig, start, end, fwd)
                 coords = ref_index.get_coord_space(ref_coord, self.conf.is_rna, kmer_trim=True)
 
-                kmers = model.str_to_kmer(df["model_kmer"])
-                if self.conf.is_rna:
-                    kmers = model.kmer_rev(kmers)
 
                 df["kmer"] = kmers
 
@@ -189,7 +192,6 @@ class Eventalign(TrackIO):
                 samp_end = layers["start"].iloc[e] + layers["length"].iloc[e]
 
                 layers = pd.concat({"dtw" : layers}, names=("group","layer"), axis=1).sort_index()
-
 
                 alns = pd.DataFrame({
                         "id" : [aln_id],

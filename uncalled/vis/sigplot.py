@@ -101,7 +101,7 @@ class Sigplot:
         signal = read.get_norm_signal(samp_min, samp_max)
 
         sig_med = np.median(signal)
-        sig_win = signal.std()*4 #, signal.min(), signal.max())
+        sig_win = signal.std()*3 #, signal.min(), signal.max())
 
         #TODO set global signal min/max
         mask = ((signal >= sig_med - sig_win) &

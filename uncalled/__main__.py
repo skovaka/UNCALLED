@@ -260,8 +260,12 @@ REFPLOT_OPTS = (
 )
 
 DOTPLOT_OPTS = (
-    Opt("--sql-in", "tracks.io"),
-    Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+    MutexOpts("input", [
+        Opt("--sql-in", "tracks.io"),
+        Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+        Opt("--eventalign-in", "tracks.io", nargs="?", const="-"),
+    ]),
+
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
 
     Opt("--ref", "tracks", "index_prefix"), 
@@ -275,7 +279,7 @@ DOTPLOT_OPTS = (
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
     Opt(("-b", "--bcaln-track"), "dotplot"),
-    Opt(("-p", "--pore-model"), "pore_model", "name"),
+    #Opt(("-p", "--pore-model"), "pore_model", "name"),
     Opt(("--multi-background"), "sigplot", action="store_true"),
     Opt(("--show-events"), "sigplot", action="store_true"),
     Opt(("--show-bands"), "dotplot", action="store_true"),
