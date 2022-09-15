@@ -35,7 +35,7 @@ IOParams._def_params(
     ("sql_out", None, str, "Output track database"),
 
     ("tsv_out", None, str, "TSV output file (or \"-\"/no argument for stdout)"),
-    ("tsv_cols", None, list, "TSV file output alignment layers"),
+    ("tsv_cols", None, list, "TSV file output alignment layers (comma-separated, can also include \"read_id\""),
     ("tsv_na", "*", str, "Missing value representation for TSV output"),
 
     ("bam_in", None, str, "BAM input file (or \"-\"/no argument for stdin)"),

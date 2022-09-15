@@ -107,21 +107,20 @@ REALTIME_OPTS = BWA_OPTS + MAPPER_OPTS + (
     Opt("--duration", "realtime"),
 ) 
 DTW_OPTS = (
+    Opt("--bam-in", "tracks.io", nargs="?", const="-", required=True),
     Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
-    #Opt(("-m", "--mm2-paf"), "dtw", required=True),
 
-    Opt("--bam-in", "tracks.io", nargs="?", const="-"),
 
     MutexOpts("output", [
         Opt("--sql-out", "tracks.io"),
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
         Opt("--bam-out", "tracks.io", nargs="?", const="-"),
+        Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     ]),
 
 
     Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
     Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
-    Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
 
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
@@ -147,7 +146,7 @@ DTW_OPTS = (
     Opt(("-s", "--band-shift"), "dtw"),
     Opt(("-N", "--norm-mode"), "dtw", choices=["ref_mom", "model_mom"]),
     Opt("--bc-group", "fast5_reader"),
-) + RT_OPTS
+)
 
 #CONVERT_OPTS = (
 #    Opt("index_prefix", "tracks"),
@@ -289,8 +288,10 @@ DOTPLOT_OPTS = (
 
 TRACKPLOT_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
-    Opt("--sql-in", "tracks.io"),
-    Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+    MutexOpts("input", [
+		Opt("--sql-in", "tracks.io"),
+		Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+	]),
 
     Opt("--ref", "tracks", "index_prefix"), 
     Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
@@ -311,8 +312,10 @@ TRACKPLOT_OPTS = (
 
 BROWSER_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
-    Opt("--sql-in", "tracks.io"),
-    Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+    MutexOpts("input", [
+		Opt("--sql-in", "tracks.io"),
+		Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+	]),
 
     Opt("--ref", "tracks", "index_prefix"), 
     Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
@@ -393,10 +396,8 @@ CMDS = {
     "layerstats" : (None, 
             """Compute distance between alignments of the same reads\n"""
             """subcommand options:\n""" 
-            """compare  Compute distance between alignments of the same reads\n"""
-            """dump     Output DTW alignment paths and statistics\n""", {
+            """compare  Compute distance between alignments of the same reads\n""", {
         "compare" : ("stats.layerstats", "Compute distance between alignments of the same reads", COMPARE_OPTS),
-        "dump" : ("stats.layerstats", "Output DTW alignment paths and statistics", DUMP_OPTS),
     }),
     "dotplot" : ("vis.dotplot", "Plot signal-to-reference alignment dotplots", DOTPLOT_OPTS),
     "refplot" : ("vis.refplot", "Plot alignment tracks and per-reference statistics", REFPLOT_OPTS),
@@ -416,7 +417,7 @@ _help_lines = [
     "\tpafstats   Estimate speed and accuracy from an Uncalled PAF file", "",
     "Dynamic Time Warping (DTW) Alignment:",
     "\tdtw        Perform DTW alignment guided by basecalled alignments",
-    "\tconvert    Import DTW alignments produced by other tools into a database",
+    "\tconvert    Convert between signal alignment file formats",
     "\tdb         Edit, merge, and ls alignment databases", "",
     "DTW Analysis:",
     "\trefstats   Calculate per-reference-coordinate statistics",
