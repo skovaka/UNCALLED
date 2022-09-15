@@ -147,6 +147,7 @@ requires=[
     'scipy>=1.5.4',
     'toml>=0.10.2',
     'ont_fast5_api',
+    'pysam'
 ],
 
 setup(
