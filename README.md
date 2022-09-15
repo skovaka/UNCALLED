@@ -8,6 +8,8 @@ A toolkit for nanopore signal alignment, analysis, and visualization
 
 Features an alignment algorithm guided by Guppy metadata, methods for comparing Tombo and Nanopolish alignments,  epigenetic modification detection statistics, and interactive alignment visualizations
 
+Uncalled4 is under active development, and things like command line arguments and file formats may change in future versions. It has primarily been developed on r9.4 RNA data, and certain functionalities may not work for DNA yet.
+
 For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0731), see the [main branch](https://github.com/skovaka/UNCALLED)
 
 ## Table of Contents
