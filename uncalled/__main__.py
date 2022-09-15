@@ -278,7 +278,7 @@ DOTPLOT_OPTS = (
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
     Opt(("-b", "--bcaln-track"), "dotplot"),
-    #Opt(("-p", "--pore-model"), "pore_model", "name"),
+    Opt(("-p", "--pore-model"), "pore_model", "name", default=None),
     Opt(("--multi-background"), "sigplot", action="store_true"),
     Opt(("--show-events"), "sigplot", action="store_true"),
     Opt(("--show-bands"), "dotplot", action="store_true"),

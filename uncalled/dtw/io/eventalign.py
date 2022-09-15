@@ -52,6 +52,7 @@ class Eventalign(TrackIO):
 
         self.out.write("\t".join(header) + "\n")
 
+
     def init_read_mode(self):
         #if len(self.track_names) != 1:
         #    raise ValueError("Can only read eventalign TSV into a single track")
@@ -84,7 +85,7 @@ class Eventalign(TrackIO):
         if "events" in events:
             event_counts = events["events"]
             event_index = (event_counts.cumsum() - event_counts.iloc[0]).astype(int)
-            if True: #TODO check for flipped ref
+            if track.all_rev: #TODO check for flipped ref
                 event_index = event_index.max() - event_index
             event_index += 1
         else:
@@ -108,8 +109,10 @@ class Eventalign(TrackIO):
             read_id = track.alignments["read_id"].iloc[0]
         else:
             read_id = str(self.prev_aln_id)
+        
+        writer = self.writer = getattr(_uncalled, f"write_eventalign_K{model.K}")
 
-        eventalign = _uncalled.write_eventalign_K5(
+        eventalign = writer(
             self.conf, model.instance, read_id, track.coords.fwd, read,
             track.coords.ref_name, events.index-2, 
             self.write_signal_index,
@@ -137,7 +140,6 @@ class Eventalign(TrackIO):
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
         read_filter = set(self.conf.fast5_reader.read_filter)
-        print(read_filter)
 
         sample_rate = self.conf.read_buffer.sample_rate
 
@@ -165,10 +167,11 @@ class Eventalign(TrackIO):
                 start = df["position"].min()
                 end = df["position"].max()+1
                 
+                fwd = int( (df["event_index"].iloc[0] < df["event_index"].iloc[-1]) == (df["position"].iloc[0] < df["position"].iloc[-1]))
+
                 kmers = model.str_to_kmer(df["model_kmer"])
                 if self.conf.is_rna:
                     kmers = model.kmer_rev(kmers)
-                    fwd = int(df["event_index"].iloc[0] > df["event_index"].iloc[-1])
                 else:
                     fwd = int(df["event_index"].iloc[0] < df["event_index"].iloc[-1])
 
