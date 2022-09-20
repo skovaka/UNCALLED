@@ -2,6 +2,7 @@
 #include "normalizer.hpp"
 
 const Normalizer::Params Normalizer::PRMS_DEF = {
+    mode : "model_mom",
     len : 6000,
     tgt_mean : 90.20827,
     tgt_stdv : 12.83266

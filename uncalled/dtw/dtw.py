@@ -86,11 +86,13 @@ class GuidedDTW:
 
         bcaln = Bcaln(conf, tracks.index, read, aln, tracks.coords)
         if bcaln.empty:
-            print(bcaln.df)
             self.df = None
             return
+        
+        signal = sigproc.process(read, False)
 
-        signal = sigproc.process(read)
+        #if self.conf.normalizer.mode == "ref_mom":
+        #    signal.normalize(
 
         aln_id, self.coords = tracks.init_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, read=signal)
 
@@ -142,18 +144,22 @@ class GuidedDTW:
 
         self.samp_min = self.bcaln["start"].min()
         self.samp_max = self.bcaln["start"].max()
+        self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
         if self.prms.norm_mode == "ref_mom":
-            sigproc.set_norm_tgt(ref_means.mean(), ref_means.std())
-            signal = sigproc.process(read)
-            tracks.set_read(signal)
-
+            signal.normalize_mom(ref_means.mean(), ref_means.std(), self.evt_start, self.evt_end)
+        elif self.prms.norm_mode == "model_mom":
+            signal.normalize_mom(self.model.model_mean, self.model.model_stdv, self.evt_start, self.evt_end)
+        else:
+            raise ValueError(f"Unknown normalization mode: {self.prms.norm_mode}")
+            
+        tracks.set_read(signal)
 
         df = self._calc_dtw(signal)
 
         for i in range(self.prms.iterations-1):
             reg = self.renormalize(signal, df)
-            signal.rescale(reg.coef_, reg.intercept_)
+            signal.normalize(reg.coef_, reg.intercept_)
             df = self._calc_dtw(signal)
 
 
@@ -193,7 +199,7 @@ class GuidedDTW:
         #samp_st = self.bcaln.iloc[0]["start"]
         #samp_en = self.bcaln.iloc[-1]["start"] + self.bcaln.iloc[-1]["length"]
 
-        read_block = signal.sample_range(samp_st, samp_en)
+        read_block = signal.to_df()[self.evt_start:self.evt_end]#.sample_range(samp_st, samp_en)
 
         block_signal = read_block['mean'].to_numpy()
         

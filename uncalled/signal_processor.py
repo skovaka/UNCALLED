@@ -30,9 +30,19 @@ class ProcessedRead(_uncalled._ProcessedRead):
             df = df[["mean","stdv","start","length"]].to_records(index=False)
         _uncalled._ProcessedRead.set_events(self, df)
 
+    def event_bounds(self, samp_start, samp_end):
+        start = np.searchsorted(self.events["start"], samp_start)
+        end = np.searchsorted(self.events["start"], samp_end)
+        if start > 0: start -= 1
+        return start, end
+        #if start > len(self.events): return start,start
+        #if start > 0 && self.events["start"][start]
+
     def sample_range(self, start, end):
-        mask = (self.events["start"] >= start) & (self.events["start"] <= end)
-        return self.to_df()[mask]
+        #mask = (self.events["start"] >= start) & (self.events["start"] <= end)
+        #return self.to_df()[mask]
+        evt_st,evt_en = self.event_bounds(start, end)
+        return self.to_df()[evt_st:evt_en]
 
     def get_norm_signal(self, samp_min=0, samp_max=None):
         n = self.norm[0]
@@ -79,5 +89,5 @@ class SignalProcessor:
     def __getattr__(self, name):
         return self.instance.__getattribute__(name)
 
-    def process(self, read):
-        return ProcessedRead(self.instance.process(read), read)
+    def process(self, read, normalize=False):
+        return ProcessedRead(self.instance.process(read, normalize), read)

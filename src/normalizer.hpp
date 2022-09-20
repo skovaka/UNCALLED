@@ -10,9 +10,11 @@
 #include <pybind11/numpy.h>
 #endif
 
+
 class Normalizer {
     public:
     struct Params {
+        std::string mode;
         u32 len;
         float tgt_mean;
         float tgt_stdv;
@@ -79,6 +81,7 @@ class Normalizer {
         PY_NORM_METH(full, "Returns true if no more signal can be added without erasing the oldest signal");
 
         pybind11::class_<Params> p(c, "Params");
+        PY_NORM_PRM(mode, "Normalization mode (ref_mom, model_mom)")
         PY_NORM_PRM(len, "The length of the normalization buffer")
         PY_NORM_PRM(tgt_mean, "Normalization target mean")
         PY_NORM_PRM(tgt_stdv, "Normalization target standard deviation")

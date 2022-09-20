@@ -97,7 +97,7 @@ class Sigplot:
             if len(dtws) > 0:
                 track_dtws.append(pd.concat(dtws).sort_index())
 
-        read = self.sigproc.process(track.fast5s[read_id])
+        read = self.sigproc.process(track.fast5s[read_id], True)
         signal = read.get_norm_signal(samp_min, samp_max)
 
         sig_med = np.median(signal)
