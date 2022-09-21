@@ -30,7 +30,7 @@ from .config import Config
 from . import __title__, __version__, __summary__
 
 FAST5_PARAM = "fast5_files"
-CONFIG_PARAM = "config_toml"
+CONFIG_PARAM = "config"
 SPECIAL_PARAMS = {FAST5_PARAM, CONFIG_PARAM}
 
 def comma_split(s):
