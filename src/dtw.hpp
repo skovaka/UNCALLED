@@ -277,52 +277,10 @@ class BandedDTW {
             ref_vals_(ref_vals),
             ll_(ll),
             model_(model) {
-        //std::cout << "DTW\n";
-        //std::cout.flush();
         init_mat();
-        //std::cout << "init\n";
-        //std::cout.flush();
         fill_mat();          
-        //std::cout << "mat\n";
-        //std::cout.flush();
         traceback();
-        //std::cout << "trace\n";
-        //std::cout.flush();
     }
-
-    //BandedDTW(const DtwParams &prms,
-    //          const PyArray<float> &qry_vals,   
-    //          const PyArray<KmerType> &ref_vals,
-    //          const ModelType &model,
-    //          const PyArray<Coord> &ll) :
-    //            BandedDTW(prms, qry_vals, ref_vals, model) {
-
-    //    //ll_.resize(ll.size());
-    //    ////for (size_t i = 0; i < lower.size(); i++) {
-    //    //for (size_t i = 0; i < ll.size(); i++) {
-    //    //    ll_[i] = ll[i];
-    //    //}
-
-    //}
-
-    //BandedDTW(const DtwParams &prms,
-    //          const PyArray<float> &qry_vals,   
-    //          const PyArray<KmerType> &ref_vals,
-    //          const ModelType &model,
-    //          const std::vector<std::pair<i32,i32>> &ll) :
-    //            BandedDTW<ModelType>(prms, qry_vals, ref_vals, model) {
-    //    //assert(lower.size() == left.size());
-
-    //    ll_.resize(ll.size());
-    //    //for (size_t i = 0; i < lower.size(); i++) {
-    //    for (size_t i = 0; i < ll.size(); i++) {
-    //        ll_[i] = {ll[i].first, ll[i].second};
-    //    }
-
-    //    init_mat();
-    //    fill_mat();          
-    //    traceback();
-    //}
 
     u32 band_count() const {
         return ref_size() + qry_size() - 1;

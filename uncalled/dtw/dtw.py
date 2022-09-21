@@ -147,11 +147,13 @@ class GuidedDTW:
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
         if self.prms.norm_mode == "ref_mom":
-            signal.normalize_mom(ref_means.mean(), ref_means.std(), self.evt_start, self.evt_end)
+            signal.normalize_mom(ref_means.mean(), ref_means.std())#, self.evt_start, self.evt_end)
         elif self.prms.norm_mode == "model_mom":
             signal.normalize_mom(self.model.model_mean, self.model.model_stdv, self.evt_start, self.evt_end)
         else:
             raise ValueError(f"Unknown normalization mode: {self.prms.norm_mode}")
+
+        #print(signal.events["mean"].mean(), signal.events["mean"].std())
             
         tracks.set_read(signal)
 

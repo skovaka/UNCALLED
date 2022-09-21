@@ -2,6 +2,7 @@
 #define _INCL_SIGNAL_PROCESSOR
 
 #include <deque>
+#include <valarray>
 #include "read_buffer.hpp"
 #include "event_detector.hpp"
 #include "normalizer.hpp"
@@ -37,21 +38,46 @@ struct ProcessedRead {
 
 
     std::pair<float,float> get_moments(size_t event_start, size_t event_end) {
-        auto len = event_end - event_start;
-        float mean = 0, stdv = 0;
-        for (size_t i = event_start; i < event_end; i++) {
-            mean += events[i].mean;
-        }
-        mean /= len;
-        
-        //for (auto &e : events) {
-        for (size_t i = event_start; i < event_end; i++) {
-            float delta = events[i].mean - mean;
-            stdv += delta*delta;
-        }
-        stdv = sqrt(stdv / len);
+        size_t n = event_end - event_start;
+        std::valarray<float> event_means(n);
 
-        return {mean, stdv};
+        size_t i = 0;
+        for (size_t j = event_start; j < event_end; j++) {
+            event_means[i++] = events[j].mean;
+        }
+
+        //auto mean = event_means.sum() / n;
+        //auto deltas = event_means - mean;
+
+        //const std::valarray<float>  filt_means = std::valarray<float>(event_means[std::abs(deltas) < 3.5*stdv]);
+        //mean = filt_means.sum() / n;
+        //auto deltas_f = filt_means - mean;
+        //stdv = sqrt((deltas_f*deltas_f).sum() / n);
+
+        std::sort(std::begin(event_means), std::end(event_means));
+        auto median = event_means[event_means.size()/2];
+        auto deltas = event_means - median;
+
+        auto stdv = sqrt((deltas*deltas).sum() / n);
+
+        //stdv = (event_means * event_means).sum() / event_means.size()
+
+        //auto len = event_end - event_start;
+        //float mean = 0, stdv = 0;
+        //for (size_t i = event_start; i < event_end; i++) {
+        //    mean += events[i].mean;
+        //}
+        //mean /= len;
+        //
+        ////for (auto &e : events) {
+        //for (size_t i = event_start; i < event_end; i++) {
+        //    float delta = events[i].mean - mean;
+        //    stdv += delta*delta;
+        //}
+        //stdv = sqrt(stdv / len);
+
+        //return {mean, stdv};
+        return {median, stdv};
     }
 
     void normalize(NormVals prms) {
