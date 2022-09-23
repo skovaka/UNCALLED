@@ -22,9 +22,9 @@ from ..signal_processor import SignalProcessor
 from . import Bcaln, Tracks
 
 METHODS = {
-        "guided" : "BandedDTW", 
-        "static" : "StaticBDTW",
-        "global" : "GlobalDTW", 
+    "guided" : "BandedDTW", 
+    "static" : "StaticBDTW",
+    "global" : "GlobalDTW", 
 }
 
 
@@ -146,15 +146,21 @@ class GuidedDTW:
         self.samp_max = self.bcaln["start"].max()
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
-        if self.prms.norm_mode == "ref_mom":
+        if self.conf.normalizer.mode == "ref_mom":
+            tgt = (ref_means.mean(), ref_means.std())
             signal.normalize_mom(ref_means.mean(), ref_means.std())#, self.evt_start, self.evt_end)
-        elif self.prms.norm_mode == "model_mom":
-            signal.normalize_mom(self.model.model_mean, self.model.model_stdv, self.evt_start, self.evt_end)
+        elif self.conf.normalizer.mode == "model_mom":
+            tgt = (self.model.model_mean, self.model.model_stdv)
         else:
             raise ValueError(f"Unknown normalization mode: {self.prms.norm_mode}")
 
-        #print(signal.events["mean"].mean(), signal.events["mean"].std())
-            
+        print(self.conf.normalizer.median)
+
+        if self.conf.normalizer.full_read:
+            signal.normalize_mom(*tgt)
+        else:
+            signal.normalize_mom(*tgt, self.evt_start, self.evt_end)
+
         tracks.set_read(signal)
 
         df = self._calc_dtw(signal)

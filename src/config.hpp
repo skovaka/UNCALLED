@@ -67,7 +67,7 @@ class Config {
 
     Mapper::Params        mapper         = Mapper::PRMS;
     ReadBuffer::Params    read_buffer    = ReadBuffer::PRMS;
-    Normalizer::Params    normalizer     = Normalizer::PRMS_DEF;
+    NormalizerParams    normalizer     = NORMALIZER_PRMS_DEF;
     EventDetector::Params event_detector = EventDetector::PRMS_DEF;
     EventProfiler::Params event_profiler = EventProfiler::PRMS_DEF;
     SeedTracker::Params   seed_tracker   = SeedTracker::PRMS_DEF;

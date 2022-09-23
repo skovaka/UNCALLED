@@ -139,7 +139,9 @@ DTW_OPTS = (
     Opt("--move-cost", "dtw"),
     Opt(("-b", "--band-width"), "dtw"),
     Opt(("-s", "--band-shift"), "dtw"),
-    Opt(("-N", "--norm-mode"), "dtw", choices=["ref_mom", "model_mom"]),
+    Opt(("-N", "--norm-mode"), "normalizer", "mode", choices=["ref_mom", "model_mom"]),
+    Opt("--norm-median", "normalizer", "median", action="store_true"),
+    Opt("--norm-seg", "normalizer", "full_read", action="store_false"),
     Opt("--bc-group", "fast5_reader"),
     CONFIG_OPT,
 )

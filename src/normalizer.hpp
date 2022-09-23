@@ -10,22 +10,30 @@
 #include <pybind11/numpy.h>
 #endif
 
+struct NormalizerParams {
+    std::string mode;
+    bool median, full_read;
+    u32 len;
+    float tgt_mean;
+    float tgt_stdv;
+};
+
+const NormalizerParams NORMALIZER_PRMS_DEF = {
+    mode : "model_mom",
+    median : false,
+    full_read : true,
+    len : 6000,
+    tgt_mean : 90.20827,
+    tgt_stdv : 12.83266
+};
 
 class Normalizer {
     public:
-    struct Params {
-        std::string mode;
-        u32 len;
-        float tgt_mean;
-        float tgt_stdv;
-    };
 
-    static Params const PRMS_DEF;
+    NormalizerParams PRMS;
 
-    Params PRMS;
-
-    Normalizer() : Normalizer(PRMS_DEF) {};
-    Normalizer(Params p);
+    Normalizer() : Normalizer(NORMALIZER_PRMS_DEF) {};
+    Normalizer(NormalizerParams p);
     Normalizer(float tgt_mean, float tgt_stdv);
 
     void set_length(u32 len);
@@ -53,13 +61,13 @@ class Normalizer {
     #ifdef PYBIND
 
     #define PY_NORM_METH(P, D) c.def(#P, &Normalizer::P, D);
-    #define PY_NORM_PRM(P, D) p.def_readwrite(#P, &Normalizer::Params::P, D);
+    #define PY_NORM_PRM(P, D) p.def_readwrite(#P, &NormalizerParams::P, D);
 
     public:
 
     static void pybind_defs(pybind11::class_<Normalizer> &c) {
         c.def(pybind11::init());
-        c.def(pybind11::init<Params>());
+        c.def(pybind11::init<NormalizerParams>());
         c.def(pybind11::init<float, float>());
 
         PY_NORM_METH(set_target, "Sets target mean and standard deviation");
@@ -80,8 +88,10 @@ class Normalizer {
         PY_NORM_METH(empty, "Returns true if all signal has been read from the buffer");
         PY_NORM_METH(full, "Returns true if no more signal can be added without erasing the oldest signal");
 
-        pybind11::class_<Params> p(c, "Params");
+        pybind11::class_<NormalizerParams> p(c, "NormalizerParams");
         PY_NORM_PRM(mode, "Normalization mode (ref_mom, model_mom)")
+        PY_NORM_PRM(median, "Use the current median instead of mean for normalization")
+        PY_NORM_PRM(full_read, "Normalize based on the full read signal, rather than just the segment(s) which will be aligned")
         PY_NORM_PRM(len, "The length of the normalization buffer")
         PY_NORM_PRM(tgt_mean, "Normalization target mean")
         PY_NORM_PRM(tgt_stdv, "Normalization target standard deviation")

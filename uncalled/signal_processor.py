@@ -84,7 +84,7 @@ class SignalProcessor:
         if isinstance(model, PoreModel):
             model = model.instance
 
-        self.instance = self.InstanceClass(model, conf.event_detector)
+        self.instance = self.InstanceClass(model, conf.event_detector, conf.normalizer)
 
     def __getattr__(self, name):
         return self.instance.__getattribute__(name)

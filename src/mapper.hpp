@@ -80,7 +80,7 @@ class Mapper {
         std::string pore_model; //TODO use PoreModel::params
 
         SeedTracker::Params seed_tracker;
-        Normalizer::Params normalizer;
+        NormalizerParams normalizer;
         EventDetector::Params event_detector;
         EventProfiler::Params event_profiler;
 

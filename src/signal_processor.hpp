@@ -23,6 +23,7 @@ struct NormVals {
 struct ProcessedRead {
     //std::vector<i32> event_starts, event_lengths;
     //std::vector<float> event_means, event_stdvs;
+    NormalizerParams norm_prms;
     std::vector<Event> events;
     std::vector<NormVals> norm;
     //std::vector<bool> mask;
@@ -46,38 +47,21 @@ struct ProcessedRead {
             event_means[i++] = events[j].mean;
         }
 
-        //auto mean = event_means.sum() / n;
-        //auto deltas = event_means - mean;
-
         //const std::valarray<float>  filt_means = std::valarray<float>(event_means[std::abs(deltas) < 3.5*stdv]);
-        //mean = filt_means.sum() / n;
-        //auto deltas_f = filt_means - mean;
-        //stdv = sqrt((deltas_f*deltas_f).sum() / n);
 
-        std::sort(std::begin(event_means), std::end(event_means));
-        auto median = event_means[event_means.size()/2];
-        auto deltas = event_means - median;
+        float avg;
 
+        if (norm_prms.median) {
+            std::sort(std::begin(event_means), std::end(event_means));
+            avg = event_means[n / 2];
+        } else {
+            avg = event_means.sum() / n;
+        }
+
+        auto deltas = event_means - avg;
         auto stdv = sqrt((deltas*deltas).sum() / n);
 
-        //stdv = (event_means * event_means).sum() / event_means.size()
-
-        //auto len = event_end - event_start;
-        //float mean = 0, stdv = 0;
-        //for (size_t i = event_start; i < event_end; i++) {
-        //    mean += events[i].mean;
-        //}
-        //mean /= len;
-        //
-        ////for (auto &e : events) {
-        //for (size_t i = event_start; i < event_end; i++) {
-        //    float delta = events[i].mean - mean;
-        //    stdv += delta*delta;
-        //}
-        //stdv = sqrt(stdv / len);
-
-        //return {mean, stdv};
-        return {median, stdv};
+        return {avg, stdv};
     }
 
     void normalize(NormVals prms) {
@@ -129,11 +113,11 @@ class SignalProcessor {
     const ModelType &model_;
     EventDetector evdt_;
     Normalizer norm_;
-    Normalizer::Params norm_prms_;
+    NormalizerParams norm_prms_;
 
     public: 
 
-    SignalProcessor(const ModelType &model, EventDetector::Params event_prms=EventDetector::PRMS_DEF, Normalizer::Params norm_prms=Normalizer::PRMS_DEF) : 
+    SignalProcessor(const ModelType &model, EventDetector::Params event_prms=EventDetector::PRMS_DEF, NormalizerParams norm_prms=NORMALIZER_PRMS_DEF) : 
         model_(model),
         evdt_(event_prms),
         norm_prms_(norm_prms) {
@@ -142,7 +126,7 @@ class SignalProcessor {
     }
 
     ProcessedRead process(const ReadBuffer &read, bool normalize=true) {
-        ProcessedRead ret = {};
+        ProcessedRead ret = {norm_prms_};
 
         ret.events = evdt_.get_events(read.get_signal());
         
@@ -170,7 +154,7 @@ class SignalProcessor {
 
     static void pybind(py::module_ &m, const std::string &suffix) {
         py::class_<SignalProcessor> s(m, ("SignalProcessor" + suffix).c_str());
-        s.def(pybind11::init<const ModelType &, EventDetector::Params>());
+        s.def(pybind11::init<const ModelType &, EventDetector::Params, NormalizerParams>());
         s.def("process", &SignalProcessor::process);
         s.def("set_norm_tgt", &SignalProcessor::set_norm_tgt);
 
