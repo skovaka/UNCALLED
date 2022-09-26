@@ -16,6 +16,13 @@ import sys
 INPUT_PARAMS = np.array(["sql_in", "eventalign_in", "tombo_in", "bam_in"])
 OUTPUT_PARAMS = np.array(["sql_out", "tsv_out", "eventalign_out", "bam_out"])
 
+OUT_EXT = {
+    "sql_out" : "db", 
+    "tsv_out" : "tsv", 
+    "eventalign_out" : "txt", 
+    "bam_out" : "bam"
+}
+
 class TrackIO:
     def __init__(self, filename, conf, mode):
         self.conf = conf
@@ -31,7 +38,7 @@ class TrackIO:
         if filename is None:
             self.filename = None
             self.track_names = None
-        else:
+        elif isinstance(filename, str):
             spl = filename.split(":")
 
             if len(spl) == 1:
@@ -115,6 +122,7 @@ from .tsv import TSV
 from .bam import BAM
 from .eventalign import Eventalign
 from .tombo import Tombo
+from .guppy import Guppy
 
 def _db_track_split(db_str):
     spl = db_str.split(":")

@@ -158,6 +158,7 @@ class Config(_Conf):
             #    if not (param.startswith("_") or (ignore_defaults and other.is_default(param, group_name))):
             #        setattr(sgroup, param, getattr(ogroup, param))
 
+
     def to_toml(self, filename=None):
 
         def fmt(val):
@@ -215,6 +216,13 @@ class Config(_Conf):
             else:
                 if self.is_default(name):
                     setattr(self, name, val)
+
+    #support pickling via toml
+    def __setstate__(self, toml):
+        self.load_toml(toml)
+
+    def __getstate__(self):
+        return self.to_toml()
 
     def get_group(self, group_name):
         """Returns the group based on the group name"""

@@ -38,7 +38,7 @@ IOParams._def_params(
     ("tsv_cols", None, list, "TSV file output alignment layers (comma-separated, can also include \"read_id\""),
     ("tsv_na", "*", str, "Missing value representation for TSV output"),
 
-    ("bam_in", None, str, "BAM input file (or \"-\"/no argument for stdin)"),
+    ("bam_in", None, None, "BAM input file (or \"-\"/no argument for stdin)"),
     ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
 
     ("eventalign_in", None, str, "Eventalign (nanopolish) input file (or \"-\"/no argument for stdin)"),
@@ -46,6 +46,8 @@ IOParams._def_params(
     ("eventalign_index", None, str, "Nanopolish index file"),
     ("eventalign_flags", [], list, f"Eventalign optional flags (comma-separated list of \"\"{eventalign_flags}\")"),
     ("tombo_in", None, str, "Fast5 files containing Tombo alignments"),
+
+    ("guppy_in", None, str, "Guppy directory containing sequencing summary, BAM files, and FAST5s"),
 
     ("init_track", True, bool, "If true will initialze track"),
 

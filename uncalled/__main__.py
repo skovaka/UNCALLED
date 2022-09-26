@@ -44,7 +44,7 @@ MAPPER_OPTS = (
     Opt(("-t", "--threads"), ""),
     Opt("--num-channels", "read_buffer"),
     Opt(("-c", "--max-chunks"), "read_buffer"),
-    Opt("--chunk-time", "read_buffer"),
+    
     Opt("--rna", fn="set_r94_rna"),
     CONFIG_OPT,
 )
@@ -104,6 +104,7 @@ REALTIME_OPTS = BWA_OPTS + MAPPER_OPTS + (
     Opt("--duration", "realtime"),
 ) 
 DTW_OPTS = (
+    Opt("--guppy-in", "tracks.io"),
     Opt("--bam-in", "tracks.io", nargs="?", const="-", required=True),
     Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
 

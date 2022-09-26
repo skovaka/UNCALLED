@@ -13,13 +13,15 @@ from ..argparse import ArgParser
 from ..index import str_to_coord
 from ..fast5 import Fast5Reader
 
-from .io import BAM
+from .io import BAM, Guppy
 
 import _uncalled
 
 from ..signal_processor import SignalProcessor
 
 from . import Bcaln, Tracks
+
+import multiprocessing as mp
 
 METHODS = {
     "guided" : "BandedDTW", 
@@ -29,6 +31,24 @@ METHODS = {
 
 
 def dtw(conf):
+    if conf.tracks.io.guppy_in is None:
+        run_dtw(conf)
+        return
+
+    guppy_in = Guppy(conf, "r")
+
+    #for config in guppy_in.iter_batches():
+    #    print(config.tracks.io.bam_out)
+
+    with mp.Pool(processes=4) as pool:
+        for _ in pool.imap_unordered(run_dtw, guppy_in.iter_batches()):
+            print("blah")
+            pass
+    print("done")
+
+def run_dtw(conf):
+    print("HERE")
+
     """Perform DTW alignment guided by basecalled alignments"""
     conf.fast5_reader.load_bc = True
     conf.export_static()

@@ -237,9 +237,6 @@ class Tracks:
             self.conf.load_config(self.input.conf)
 
             tracks.append(self.input.tracks)
-
-            #for track in self.input.tracks:
-            #    self._add_track(track.name, track)
         else:
             self.input = None
 
