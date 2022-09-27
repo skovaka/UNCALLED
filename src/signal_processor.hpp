@@ -38,6 +38,10 @@ struct ProcessedRead {
     }
 
 
+    std::pair<float,float> get_moments(size_t event_start, size_t event_end) {
+        size_t n = event_end - event_start;
+        std::valarray<float> event_means(n);
+
 
         //const std::valarray<float>  filt_means = std::valarray<float>(event_means[std::abs(deltas) < 3.5*stdv]);
 
@@ -46,13 +50,12 @@ struct ProcessedRead {
         if (norm_prms.median) {
             std::sort(std::begin(event_means), std::end(event_means));
             avg = event_means[n / 2];
-            mean = event_means.sum() / n;
+            //mean = event_means.sum() / n;
         } else {
-            avg = mean = event_means.sum() / n;
+            avg = event_means.sum() / n;
         }
 
-        auto deltas = event_means - mean;
-       // auto deltas = event_means - (event_means.sum()/n);
+        auto deltas = event_means - avg;
         auto stdv = sqrt((deltas*deltas).sum() / n);
 
         return {avg, stdv};
