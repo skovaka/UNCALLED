@@ -73,9 +73,6 @@ class Guppy(TrackIO):
 
     def init_read_mode(self):
         name = self.filename
-        
-        if self.conf.pore_model.name == "r94_rna":
-            self.conf.pore_model.name = "r94_rna_guppy"
 
         self.conf.fast5_reader.fast5_files = [self.prms.guppy_in]
 
@@ -90,14 +87,15 @@ class Guppy(TrackIO):
                 if not batch in self.batches:
                     self.batches.add(batch)
 
-                    self.conf.tracks.io.bam_in = self.bams[batch][0]
-                    self.conf.fast5_files = [os.path.join(fast5_dir, row["filename"])]
+                    conf = Config(self.conf)
+                    conf.tracks.io.guppy_in = None
+                    conf.tracks.io.bam_in = self.bams[batch][0]
+                    conf.fast5_files = [os.path.join(fast5_dir, row["filename"])]
 
                     sbatch = ".".join(map(str, batch))
-                    setattr(self.conf.tracks.io, self.out_fmt, f"{self.out_prefix}{sbatch}.{OUT_EXT[self.out_fmt]}")
+                    setattr(conf.tracks.io, self.out_fmt, f"{self.out_prefix}{sbatch}.{OUT_EXT[self.out_fmt]}")
 
-                    print(self.conf)
-                    yield Config(self.conf)
+                    yield conf
 
 
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):

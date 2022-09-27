@@ -19,7 +19,7 @@ struct NormalizerParams {
 };
 
 const NormalizerParams NORMALIZER_PRMS_DEF = {
-    mode : "model_mom",
+    mode : "ref_mom",
     median : false,
     full_read : true,
     len : 6000,

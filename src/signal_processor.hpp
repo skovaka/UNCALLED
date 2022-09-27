@@ -38,27 +38,21 @@ struct ProcessedRead {
     }
 
 
-    std::pair<float,float> get_moments(size_t event_start, size_t event_end) {
-        size_t n = event_end - event_start;
-        std::valarray<float> event_means(n);
-
-        size_t i = 0;
-        for (size_t j = event_start; j < event_end; j++) {
-            event_means[i++] = events[j].mean;
-        }
 
         //const std::valarray<float>  filt_means = std::valarray<float>(event_means[std::abs(deltas) < 3.5*stdv]);
 
-        float avg;
+        float avg, mean;
 
         if (norm_prms.median) {
             std::sort(std::begin(event_means), std::end(event_means));
             avg = event_means[n / 2];
+            mean = event_means.sum() / n;
         } else {
-            avg = event_means.sum() / n;
+            avg = mean = event_means.sum() / n;
         }
 
-        auto deltas = event_means - avg;
+        auto deltas = event_means - mean;
+       // auto deltas = event_means - (event_means.sum()/n);
         auto stdv = sqrt((deltas*deltas).sum() / n);
 
         return {avg, stdv};
@@ -131,7 +125,7 @@ class SignalProcessor {
         ret.events = evdt_.get_events(read.get_signal());
         
         if (normalize) {
-            if (norm_prms_.mode == "model_mom") {
+            if (norm_prms_.mode == "model_mom" || norm_prms_.mode == "ref_mom") {
                 ret.normalize_mom(norm_prms_.tgt_mean, norm_prms_.tgt_stdv);
             } else {
                 throw std::runtime_error("Normalization mode not supported: " + norm_prms_.mode); 

@@ -41,13 +41,10 @@ def dtw(conf):
     #    print(config.tracks.io.bam_out)
 
     with mp.Pool(processes=4) as pool:
-        for _ in pool.imap_unordered(run_dtw, guppy_in.iter_batches()):
-            print("blah")
+        for _ in pool.imap_unordered(run_dtw, guppy_in.iter_batches(), chunksize=1):
             pass
-    print("done")
 
 def run_dtw(conf):
-    print("HERE")
 
     """Perform DTW alignment guided by basecalled alignments"""
     conf.fast5_reader.load_bc = True
@@ -173,8 +170,6 @@ class GuidedDTW:
             tgt = (self.model.model_mean, self.model.model_stdv)
         else:
             raise ValueError(f"Unknown normalization mode: {self.prms.norm_mode}")
-
-        print(self.conf.normalizer.median)
 
         if self.conf.normalizer.full_read:
             signal.normalize_mom(*tgt)

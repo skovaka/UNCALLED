@@ -104,7 +104,7 @@ class BAM(TrackIO):
         dc = np.round((dtw["current"]+ shift) * scale)#.astype("uint16")
 
         dc = dc.fillna(self.INF_U16).to_numpy(np.uint16)
-        lens = dtw["length"].reindex(refs, fill_value=0).to_numpy(np.uint16)
+        lens = dtw["length"].reindex(refs).to_numpy(np.uint16, na_value=0)
 
         #sam.set_tag("sc", dc.tobytes().hex(), "H") #hex format
         #sam.set_tag("sl", lens.tobytes().hex(), "H") #hex formt
