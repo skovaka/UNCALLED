@@ -40,9 +40,20 @@ def dtw(conf):
     #for config in guppy_in.iter_batches():
     #    print(config.tracks.io.bam_out)
 
-    with mp.Pool(processes=4) as pool:
-        for _ in pool.imap_unordered(run_dtw, guppy_in.iter_batches(), chunksize=1):
-            pass
+    pbar = progbar.ProgressBar(len(guppy_in.fast5_paths), widgets=[
+        progbar.Timer(),
+        progbar.Bar(),
+        progbar.ETA(),
+    ])
+
+    with mp.Pool(processes=conf.threads) as pool:
+        sys.stderr.write(f"Using {conf.threads} processes\n")
+        pbar.start()
+        for i,_ in enumerate(pool.imap_unordered(run_dtw, guppy_in.iter_batches(), chunksize=1)):
+            pbar.update(i)
+
+    tracks.close()
+    pbar.finish()
 
 def run_dtw(conf):
 
@@ -70,7 +81,7 @@ def run_dtw(conf):
     for read in fast5s:
         aligned = False
         for aln in tracks.input.get_alns(read.id):
-            sys.stderr.write(f"{read.id}\n")
+            #sys.stderr.write(f"{read.id}\n")
 
             dtw = GuidedDTW(tracks, sigproc, read, aln, conf)
 
@@ -164,10 +175,22 @@ class GuidedDTW:
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
         if self.conf.normalizer.mode == "ref_mom":
-            tgt = (ref_means.mean(), ref_means.std())
+            
+            if self.conf.normalizer.median:
+                med = np.median(ref_means)
+                #tgt = (med, np.median(np.abs(med-ref_means)))
+                tgt = (med, np.median(np.abs(med-ref_means)))
+            else:
+                tgt = (ref_means.mean(), ref_means.std())
+
+
             signal.normalize_mom(ref_means.mean(), ref_means.std())#, self.evt_start, self.evt_end)
         elif self.conf.normalizer.mode == "model_mom":
-            tgt = (self.model.model_mean, self.model.model_stdv)
+            if self.conf.normalizer.median:
+                med = self.model.means.median()
+                tgt = (med, np.median(np.abs(med-self.model.means)))
+            else:
+                tgt = (self.model.model_mean, self.model.model_stdv)
         else:
             raise ValueError(f"Unknown normalization mode: {self.prms.norm_mode}")
 

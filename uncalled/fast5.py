@@ -166,6 +166,7 @@ class Fast5Reader:
         groups = {
             fast5_paths[os.path.basename(fast5)] : list(index.loc[rows, "read_id"])
             for fast5,rows in groups.items()
+            if os.path.basename(fast5) in fast5_paths
         }
 
         self._dict = _Fast5Dict(groups, self.prms)

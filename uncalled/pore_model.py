@@ -91,6 +91,7 @@ class PoreModel:
 
         if vals is not None:
             prms.k = int(np.log2(len(vals)) / 2)
+            prms.shift = PoreModel.get_kmer_shift(prms.k)
             self._init_new(prms, vals, prms.reverse, prms.complement)
         else:
             self._init_new(prms, prms)
@@ -110,6 +111,8 @@ class PoreModel:
 
         if prms.name is not None:
             self.PRMS.name = prms.name
+        self.PRMS.k = prms.k
+        self.PRMS.shift = prms.shift
 
         if self.K > 8:
             self.kmer_dtype = "uint32"
@@ -127,6 +130,10 @@ class PoreModel:
     @property
     def name(self):
         return self.PRMS.name
+
+    @property
+    def kmer_trim(self):
+        return (self.PRMS.shift, self.K-self.PRMS.shift-1)
 
     COLUMNS = {"kmer", "mean", "stdv"}
     TSV_RENAME = {

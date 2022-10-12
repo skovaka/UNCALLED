@@ -9,6 +9,7 @@ from collections import defaultdict
 from ..aln_track import AlnTrack
 from ..layers import LAYER_META, parse_layers
 from ...index import RefCoord
+from ... import PoreModel
 from ... import Config
 from . import TrackIO
 import _uncalled 
@@ -61,6 +62,10 @@ class BAM(TrackIO):
         if len(self.conf.fast5_reader.fast5_index) == 0:
             sys.stderr.write("Warning: no fast5 index specified\n")
 
+        #TODO load from AlnTrack instance (initialized by Tracks)
+        self.model = PoreModel(self.conf.pore_model)
+        self.kmer_trim = self.model.kmer_trim
+
         #Store config toml in single-line comment with newlines replaced by semicolons
         conf_line = self.conf.to_toml() \
                         .replace(";", "\\;") \
@@ -85,11 +90,11 @@ class BAM(TrackIO):
 
     def write_layers(self, track, groups):
         aln = track.alignments.iloc[0]
-        sam = self.get_aln(aln["read_id"], aln["ref_name"], aln["ref_start"]-2)
+        sam = self.get_aln(aln["read_id"], aln["ref_name"], aln["ref_start"]-self.kmer_trim[0])
         if sam is None: 
             return
 
-        refs = track.coords.refs[2:-2]
+        refs = track.coords.refs[self.kmer_trim[0]:self.kmer_trim[1]]
 
         dtw = track.layers["dtw"].reset_index(level=1).reindex(refs)
 
@@ -111,6 +116,7 @@ class BAM(TrackIO):
         #cur = dtw["current"].to_numpy().astype(float)
         #sam.set_tag("sc", array.array("f", cur)) #float current
         #sam.set_tag("sl", ",".join(map(str,lens))) #str lens
+
 
         if dtw["start"].iloc[0] < dtw["start"].iloc[-1]:
             sample_start = dtw["start"].iloc[0]

@@ -24,6 +24,9 @@ class Guppy(TrackIO):
         if not os.path.isdir(self.dir):
             raise FileNotFoundError(f"Guppy directory does not exist: {self.dir}")
 
+        #if len(self.conf.fast5_reader.fast5_index) > 0:
+        #    seqsum_fname = self.conf.fast5_reader.fast5_index
+        #else:
         seqsum_fname = os.path.join(self.dir, "sequencing_summary.txt")
         if not os.path.isfile(seqsum_fname):
             raise FileNotFoundError(f"Guppy directory must contain sequencing_summary.txt")
@@ -39,6 +42,11 @@ class Guppy(TrackIO):
             for fname in files:
                 if fname.endswith(".bam"):
                     m = bam_re.match(fname)
+                    
+                    #TODO need to support multiple BAM inputs to load failed reads
+                    if "fail" in fname:
+                         continue
+
                     if m is None:
                         raise RuntimeError(f"Unknown Guppy BAM filename format: {fname}")
                     runid = m.group(1)

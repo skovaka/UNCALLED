@@ -59,7 +59,7 @@ class TSV(TrackIO):
 
         for col in self.extras:
             df[col] = EXTRA_FNS[col](track,df)
-        df.reset_index(inplace=True)
+        df.reset_index(inplace=True, drop=True)
 
         if self._header:
             self.columns = df.columns

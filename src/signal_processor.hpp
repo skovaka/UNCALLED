@@ -42,10 +42,14 @@ struct ProcessedRead {
         size_t n = event_end - event_start;
         std::valarray<float> event_means(n);
 
+        size_t i = 0;
+        for (size_t j = event_start; j < event_end; j++) {
+            event_means[i++] = events[j].mean;
+        }
 
         //const std::valarray<float>  filt_means = std::valarray<float>(event_means[std::abs(deltas) < 3.5*stdv]);
 
-        float avg, mean;
+        float avg, dev;
 
         if (norm_prms.median) {
             std::sort(std::begin(event_means), std::end(event_means));
@@ -56,9 +60,16 @@ struct ProcessedRead {
         }
 
         auto deltas = event_means - avg;
-        auto stdv = sqrt((deltas*deltas).sum() / n);
 
-        return {avg, stdv};
+        if (norm_prms.median) {
+            auto delta_abs = std::valarray<float>(std::abs(deltas));
+            std::sort(std::begin(delta_abs), std::end(delta_abs));
+            dev = delta_abs[n / 2];
+        } else {
+            dev = sqrt((deltas*deltas).sum() / n);
+        }
+
+        return {avg, dev};
     }
 
     void normalize(NormVals prms) {
