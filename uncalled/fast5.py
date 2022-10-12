@@ -203,11 +203,11 @@ class Fast5Reader:
         return self
 
     def __next__(self):
-        while not self._iter.empty():
-            try:
+        try:
+            while not self._iter.empty():
                 return self._iter.next_read()
-            except:
-                sys.stderr.write("Failed to load fast5 file\n")
+        except:
+            sys.stderr.write("Failed to load fast5 file\n")
         raise StopIteration
 
 if __name__ == "__main__":

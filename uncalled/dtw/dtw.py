@@ -81,7 +81,7 @@ def run_dtw(conf):
     for read in fast5s:
         aligned = False
         for aln in tracks.input.get_alns(read.id):
-            #sys.stderr.write(f"{read.id}\n")
+            sys.stderr.write(f"{read.id}\n")
 
             dtw = GuidedDTW(tracks, sigproc, read, aln, conf)
 
