@@ -44,7 +44,7 @@ MAPPER_OPTS = (
     Opt(("-t", "--threads"), ""),
     Opt("--num-channels", "read_buffer"),
     Opt(("-c", "--max-chunks"), "read_buffer"),
-    
+    Opt("--chunk-time", "read_buffer"),
     Opt("--rna", fn="set_r94_rna"),
     CONFIG_OPT,
 )
