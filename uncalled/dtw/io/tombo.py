@@ -13,9 +13,8 @@ import _uncalled
 class Tombo(TrackIO):
     FORMAT = "tombo"
 
-    def __init__(self, conf, mode):
-        filename = conf.tracks.io.tombo_in
-        TrackIO.__init__(self, filename, conf, mode)
+    def __init__(self, filename, write, conf):
+        TrackIO.__init__(self, filename, write, conf)
 
         self._header = True
 

@@ -11,9 +11,8 @@ import _uncalled
 class Eventalign(TrackIO):
     FORMAT = "eventalign"
 
-    def __init__(self, conf, mode):
-        filename = conf.tracks.io.eventalign_in if mode == "r" else conf.tracks.io.eventalign_out
-        TrackIO.__init__(self, filename, conf, mode)
+    def __init__(self, filename, mode, conf):
+        TrackIO.__init__(self, filename, write, conf)
 
         if self.filename == "-":
             self.out = sys.stdout
@@ -144,7 +143,7 @@ class Eventalign(TrackIO):
         sample_rate = self.conf.read_buffer.sample_rate
 
         csv_iter = pd.read_csv(
-            self.conf.tracks.io.eventalign_in, sep="\t", chunksize=10000,
+            self.filename, sep="\t", chunksize=10000,
             usecols=["read_name","contig","position", "event_index",
                      "start_idx","event_level_mean","model_mean",
                      "event_length","strand","model_kmer"])

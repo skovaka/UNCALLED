@@ -17,9 +17,9 @@ bam_re = re.compile("bam_runid_([^_]+)_(\d+)_\d+\.bam")
 class Guppy(TrackIO):
     FORMAT = "guppy"
 
-    def __init__(self, conf, mode):
-        self.dir = conf.tracks.io.guppy_in
-        TrackIO.__init__(self, self.dir, conf, mode)
+    def __init__(self, filename, write, conf):
+        self.dir = filename
+        TrackIO.__init__(self, filename, write, conf)
         
         if not os.path.isdir(self.dir):
             raise FileNotFoundError(f"Guppy directory does not exist: {self.dir}")

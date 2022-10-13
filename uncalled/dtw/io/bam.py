@@ -17,9 +17,8 @@ import _uncalled
 class BAM(TrackIO):
     FORMAT = "bam"
 
-    def __init__(self, conf, mode):
-        self.in_fname = conf.tracks.io.bam_out
-        TrackIO.__init__(self, conf.tracks.io.bam_in, conf, mode)
+    def __init__(self, filename, write, conf):
+        TrackIO.__init__(self, filename, write, conf)
 
         self.init_read_mode()
         self.init_write_mode()
@@ -27,8 +26,7 @@ class BAM(TrackIO):
     def init_read_mode(self):
         if self.conf.tracks.io.bam_in is None:
             raise ValueError("BAM output is only available if BAM input provided")
-        filename = self.conf.tracks.io.bam_in
-        self.input = pysam.AlignmentFile(filename, "rb")
+        self.input = pysam.AlignmentFile(self.filename, "rb")
 
         toml = None
         if "CO" in self.input.header:
@@ -41,7 +39,7 @@ class BAM(TrackIO):
         if toml is None:
             toml = self.conf.to_toml()
 
-        name = os.path.basename(filename)
+        name = os.path.basename(self.filename)
         self.init_track(1, name, name, toml)
 
         #TODO really not good, should stream by default
@@ -94,7 +92,7 @@ class BAM(TrackIO):
         if sam is None: 
             return
 
-        refs = track.coords.refs[self.kmer_trim[0]:self.kmer_trim[1]]
+        refs = track.coords.refs[self.kmer_trim[0]:-self.kmer_trim[1]]
 
         dtw = track.layers["dtw"].reset_index(level=1).reindex(refs)
 

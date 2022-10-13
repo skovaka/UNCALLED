@@ -24,7 +24,7 @@ OUT_EXT = {
 }
 
 class TrackIO:
-    def __init__(self, filename, conf, mode):
+    def __init__(self, filename, write, conf):
         self.conf = conf
         self.prms = self.conf.tracks.io
 
@@ -37,26 +37,22 @@ class TrackIO:
 
         if filename is None:
             self.filename = None
-            self.track_names = None
         elif isinstance(filename, str):
-            spl = filename.split(":")
+            self.filename = filename
+            #spl = filename.split(":")
 
-            if len(spl) == 1:
-                self.filename = filename
-                self.track_names = None
+            #if len(spl) == 1:
+            #    self.filename = filename
+            #    self.track_names = None
 
-            elif len(spl) == 2:
-                self.filename = spl[0]
-                self.track_names = spl[1].split(",")
-            else:
-                raise ValueError("Invalid database specifier format: " + filename)
+            #elif len(spl) == 2:
+            #    self.filename = spl[0]
+            #    self.track_names = spl[1].split(",")
+            #else:
+            #    raise ValueError("Invalid database specifier format: " + filename)
 
-        if mode == "w":
-            self.write_mode = True
-        elif mode == "r":
-            self.write_mode = False
-        else:
-            raise ValueError("TrackIO mode must be either \'w\' or \'r\'")
+        self.track_names = None
+        self.write_mode = write
 
     def init_alignment(self, read_id, fast5, read):
         self.read = read
@@ -117,12 +113,26 @@ class TrackIO:
 
 
 
-from .sqlite import TrackSQL
+from .sqlite import TrackSQL as SQL
 from .tsv import TSV
 from .bam import BAM
 from .eventalign import Eventalign
 from .tombo import Tombo
 from .guppy import Guppy
+
+INPUTS = {
+    "sql_in" : SQL, 
+    "bam_in" : BAM,
+    "eventalign_in" : Eventalign, 
+    "tombo_in" : Tombo, 
+}
+
+OUTPUTS = {
+    "sql_out" : SQL,
+    "bam_out" : BAM,
+    "eventalign_out" : Eventalign,
+    "tsv_out" : TSV,
+}
 
 def _db_track_split(db_str):
     spl = db_str.split(":")

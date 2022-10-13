@@ -106,7 +106,7 @@ REALTIME_OPTS = BWA_OPTS + MAPPER_OPTS + (
 DTW_OPTS = (
     Opt(("-t", "--threads"), ""),
     Opt("--guppy-in", "tracks.io"),
-    Opt("--bam-in", "tracks.io", nargs="?", const="-"), #, required=True
+    Opt("--bam-in", "tracks.io", nargs="?", const="-"),
     Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
 
     MutexOpts("output", [
@@ -243,6 +243,19 @@ DUMP_OPTS = (
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
 )
 
+ALL_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95", "KS"}
+REFSTATS_OPTS = (
+    Opt("layers", "tracks", type=comma_split,
+        help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
+    Opt("refstats", type=comma_split,
+        help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
+    Opt("--sql-in", "tracks.io"),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
+    Opt("--min-coverage", "tracks"),
+    Opt(("--ref-chunksize"), "tracks.io"),
+    Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
+)
+
 READSTATS_OPTS = (
     Opt("--sql-in", "tracks.io"),
     Opt("stats", "readstats", type=comma_split),
@@ -321,7 +334,7 @@ BROWSER_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
     MutexOpts("input", [
 		Opt("--sql-in", "tracks.io"),
-		Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+        Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
 	]),
 
     Opt("--ref", "tracks", "index_prefix"), 
@@ -361,7 +374,6 @@ TRACKPLOT_PANEL_OPTS = (
         help="Display a line plot of specifed layer summary statistic"), 
 )
 
-ALL_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95", "KS"}
 
 CMDS = {
     "index" : ("index", 
@@ -389,17 +401,7 @@ CMDS = {
         "merge"  : ("dtw.io.sqlite", "", MERGE_OPTS), 
         "edit"   : ("dtw.io.sqlite", "", EDIT_OPTS), 
     }),
-    "refstats" : ("stats.refstats", "Calculate per-reference-coordinate statistics", (
-        Opt("layers", "tracks", type=comma_split,
-            help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
-        Opt("refstats", type=comma_split,
-            help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
-        Opt("--sql-in", "tracks.io"),
-        Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-        Opt("--min-coverage", "tracks"),
-        Opt(("--ref-chunksize"), "tracks.io"),
-        Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
-    )),
+    "refstats" : ("stats.refstats", "Calculate per-reference-coordinate statistics", REFSTATS_OPTS),
     "readstats" : ("stats.readstats", "", READSTATS_OPTS),
     "layerstats" : (None, 
             """Compute distance between alignments of the same reads\n"""

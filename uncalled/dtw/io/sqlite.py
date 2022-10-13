@@ -12,9 +12,8 @@ from . import TrackIO
 
 class TrackSQL(TrackIO):
     FORMAT = "db"
-    def __init__(self, conf, mode):
-        filename = conf.tracks.io.sql_in if mode == "r" else conf.tracks.io.sql_out
-        TrackIO.__init__(self, filename, conf, mode)
+    def __init__(self, filename, write, conf):
+        TrackIO.__init__(self, filename, write, conf)
 
         new_file = not os.path.exists(self.filename)
         self.con = sqlite3.connect(self.filename)

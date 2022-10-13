@@ -31,7 +31,7 @@ IOParams._def_params(
     #("db_in", None, str, "Input track database"),
     #("db_out", None, str, "Output track database"),
 
-    ("sql_in", None, str, "Input track database"),
+    ("sql_in", None, None, "Input track database"),
     ("sql_out", None, str, "Output track database"),
 
     ("tsv_out", None, str, "TSV output file (or \"-\"/no argument for stdout)"),
@@ -42,11 +42,11 @@ IOParams._def_params(
     ("bam_in", None, None, "BAM input file (or \"-\"/no argument for stdin)"),
     ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
 
-    ("eventalign_in", None, str, "Eventalign (nanopolish) input file (or \"-\"/no argument for stdin)"),
+    ("eventalign_in", None, list, "Eventalign (nanopolish) input file (or \"-\"/no argument for stdin)"),
     ("eventalign_out", None, str, "Eventalign (nanopolish) output file (or \"-\"/no argument for stdout)"),
     ("eventalign_index", None, str, "Nanopolish index file"),
     ("eventalign_flags", [], list, f"Eventalign optional flags (comma-separated list of \"\"{eventalign_flags}\")"),
-    ("tombo_in", None, str, "Fast5 files containing Tombo alignments"),
+    ("tombo_in", None, None, "Fast5 files containing Tombo alignments"),
 
     ("guppy_in", None, str, "Guppy directory containing sequencing summary, BAM files, and FAST5s"),
 

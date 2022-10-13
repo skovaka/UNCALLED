@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 import scipy
 
-from .io import TrackSQL, TSV, Eventalign, Tombo, BAM, INPUT_PARAMS, OUTPUT_PARAMS
+from .io import SQL, TSV, Eventalign, Tombo, BAM, INPUTS, OUTPUTS, INPUT_PARAMS, OUTPUT_PARAMS
 from .aln_track import AlnTrack
 from .layers import LAYER_META, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
@@ -104,7 +104,7 @@ class Tracks:
 
         #TODO use consistent interface with dtw.dtw
         if self.prms.load_fast5s:
-            if isinstance(self.input, TrackSQL):
+            if isinstance(self.input, SQL):
                 fast5_reads = list()
                 fast5_reads.append(self.input.get_fast5_index(self._aln_track_ids))
                 fast5_reads = pd.concat(fast5_reads)
@@ -214,6 +214,24 @@ class Tracks:
         return self._tracks[i]
 
     def _init_io(self):
+
+        print(self.prms.io.bam_in)
+
+        tracks = list()
+        self.input = None
+
+        for name,Cls in INPUTS.items():
+            vals = getattr(self.prms.io, name, None)
+            if isinstance(vals, str):
+                vals = [vals]
+            if isinstance(vals, list):
+                for val in vals:
+                    self.input = Cls(val, False, self.conf)
+
+        if self.input is not None:
+            self.conf.load_config(self.input.conf)
+            tracks.append(self.input.tracks)
+
         in_prms = [getattr(self.prms.io, p) is not None for p in INPUT_PARAMS]
         out_prms = [getattr(self.prms.io, p) is not None for p in OUTPUT_PARAMS]
         if np.sum(in_prms) > 1:
@@ -221,29 +239,28 @@ class Tracks:
         if np.sum(out_prms) > 1:
             raise ValueError("No more than one output can be specified")
 
-        tracks = list()
 
-        if np.any(in_prms):
-            in_format = INPUT_PARAMS[in_prms][0]
-            if in_format == "sql_in":
-                self.input = TrackSQL(self.conf, "r")
-            elif in_format == "bam_in":
-                self.input = BAM(self.conf, "r")
-            elif in_format == "eventalign_in":
-                self.input = Eventalign(self.conf, "r")
-            elif in_format == "tombo_in":
-                self.input = Tombo(self.conf, "r")
+        #if np.any(in_prms):
+        #    in_format = INPUT_PARAMS[in_prms][0]
+        #    if in_format == "sql_in":
+        #        self.input = TrackSQL(self.conf, "r")
+        #    elif in_format == "bam_in":
+        #        self.input = BAM(self.conf, "r")
+        #    elif in_format == "eventalign_in":
+        #        self.input = Eventalign(self.conf, "r")
+        #    elif in_format == "tombo_in":
+        #        self.input = Tombo(self.conf, "r")
 
-            self.conf.load_config(self.input.conf)
+        #    self.conf.load_config(self.input.conf)
 
-            tracks.append(self.input.tracks)
-        else:
-            self.input = None
+        #    tracks.append(self.input.tracks)
+        #else:
+        #    self.input = None
 
         if np.any(out_prms):
             out_format = OUTPUT_PARAMS[out_prms][0]
             if out_format == "sql_out":
-                self.output = TrackSQL(self.conf, "w")
+                self.output = SQL(self.conf, "w")
             elif out_format == "tsv_out":
                 self.output = TSV(self.conf, "w")
             elif out_format == "eventalign_out":

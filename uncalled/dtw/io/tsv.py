@@ -15,9 +15,8 @@ EXTRA_COLS = pd.Index(EXTRA_FNS.keys())
 class TSV(TrackIO):
     FORMAT = "tsv"
 
-    def __init__(self, conf, mode):
-        filename = conf.tracks.io.tsv_out
-        TrackIO.__init__(self, filename, conf, mode)
+    def __init__(self, filename, write, conf):
+        TrackIO.__init__(self, filename, write, conf)
 
         if self.filename == "-":
             self.out = sys.stdout
