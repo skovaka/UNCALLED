@@ -49,6 +49,7 @@ class TSV(TrackIO):
     def write_layers(self, track, groups):
         track.calc_layers(self.columns)
         df = track.layers_desc_index#.reset_index()
+
         
         df = df[self.columns.intersection(df.columns)].dropna(how="all", axis=0)
 
@@ -59,7 +60,8 @@ class TSV(TrackIO):
 
         for col in self.extras:
             df[col] = EXTRA_FNS[col](track,df)
-        df.reset_index(inplace=True, drop=True)
+
+        df.reset_index(inplace=True, drop=self.prms.tsv_noref)
 
         if self._header:
             self.columns = df.columns
