@@ -10,6 +10,8 @@ import pandas as pd
 
 import cProfile
 
+CONFIG_OPT = Opt(("-C", "--config"), type=str, default=None, required=False, help="Configuration file in TOML format", dest = CONFIG_PARAM)
+
 INDEX_OPTS = (
         Opt("fasta_filename", "index"),
         Opt(("-o", "--index-prefix"), "index"),
@@ -23,6 +25,7 @@ INDEX_OPTS = (
         Opt(("-m", "--max-replen"), "index"),
         Opt("--probs", "index"),
         Opt("--speeds", "index"),
+        CONFIG_OPT,
      )
 BWA_OPTS = (
     Opt("bwa_prefix", "mapper"),
@@ -42,14 +45,8 @@ MAPPER_OPTS = (
     Opt("--num-channels", "read_buffer"),
     Opt(("-c", "--max-chunks"), "read_buffer"),
     Opt("--chunk-time", "read_buffer"),
-    Opt("--config",
-        type = str, 
-        default = None, 
-        required = False, 
-        help = "Config file",
-        dest = CONFIG_PARAM
-    ),
-    Opt("--rna", fn="set_r94_rna")
+    Opt("--rna", fn="set_r94_rna"),
+    CONFIG_OPT,
 )
 
 SIM_OPTS = BWA_OPTS + (
@@ -110,14 +107,12 @@ DTW_OPTS = (
     Opt("--bam-in", "tracks.io", nargs="?", const="-", required=True),
     Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
 
-
     MutexOpts("output", [
         Opt("--sql-out", "tracks.io"),
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
         Opt("--bam-out", "tracks.io", nargs="?", const="-"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     ]),
-
 
     Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
     Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
@@ -146,6 +141,7 @@ DTW_OPTS = (
     Opt(("-s", "--band-shift"), "dtw"),
     Opt(("-N", "--norm-mode"), "dtw", choices=["ref_mom", "model_mom"]),
     Opt("--bc-group", "fast5_reader"),
+    CONFIG_OPT,
 )
 
 #CONVERT_OPTS = (
@@ -197,6 +193,7 @@ CONVERT_OPTS = (
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
     Opt(("-a", "--append"), "tracks.io", action="store_true"),
+    CONFIG_OPT,
 )
 
 DB_OPT = Opt("sql_in", "tracks.io", help="Track database file")
@@ -230,6 +227,7 @@ COMPARE_OPTS = (
     Opt(("-s", "--save"), action="store_true", help="Will save in database if included, otherwise will output to TSV. Will be associated with the first track listed."),
     Opt(("-j", "--jaccard"), action="store_true", help="Will compute per-reference raw sample jaccard distances. Output by default if no other statistics are specified."),
     Opt(("-d", "--mean-ref-dist"), action="store_true", help="Will compute mean reference coordinate distances between raw samples of alignments of the same read. Output by default if no other statistics are specified."),
+    CONFIG_OPT,
     #Opt(("-o", "--output"), choices=["db", "tsv"], help="If \"db\" will output into the track database. If \"tsv\" will output a tab-delimited file to stdout."),
 )
 
@@ -247,6 +245,7 @@ READSTATS_OPTS = (
     #Opt(("-p", "--pca-components"), "readstats"),
     #Opt(("-L", "--pca-layer"), "readstats"),
     Opt(("-s", "--summary-stats"), "readstats", type=comma_split),
+    CONFIG_OPT,
 )
 
 REFPLOT_OPTS = (
@@ -255,6 +254,7 @@ REFPLOT_OPTS = (
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
     Opt(("-L", "--layer"), "refplot"),
+    CONFIG_OPT,
     #Opt(("-o", "--outfile"), "vis"),
 )
 
@@ -284,6 +284,7 @@ DOTPLOT_OPTS = (
     Opt(("--show-bands"), "dotplot", action="store_true"),
     Opt(("--no-model"), "sigplot", action="store_true"),
     Opt(("--bcaln-error", "-e"), "dotplot", action="store_true"),
+    CONFIG_OPT,
 )
 
 TRACKPLOT_OPTS = (
@@ -308,6 +309,7 @@ TRACKPLOT_OPTS = (
     Opt(("--share-reads"), "trackplot", action="store_true"),
     Opt(("--hover-read"), "trackplot", action="store_true"),
     Opt(("-o", "--outfile"), "trackplot"),
+    CONFIG_OPT,
 )
 
 BROWSER_OPTS = (
@@ -330,6 +332,7 @@ BROWSER_OPTS = (
     Opt("--pore-model", "pore_model", "name"),
     Opt(("-p", "--browser-port"), help="Browser port", default=8000),
     Opt(("-o", "--outfile"), "trackplot"),
+    CONFIG_OPT,
 )
 
 def panel_opt(name):
@@ -388,7 +391,7 @@ CMDS = {
             help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
         Opt("--sql-in", "tracks.io"),
         Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-        Opt(("-C", "--min-coverage"), "tracks"),
+        Opt("--min-coverage", "tracks"),
         Opt(("--ref-chunksize"), "tracks.io"),
         Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
     )),
