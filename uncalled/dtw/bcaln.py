@@ -19,7 +19,7 @@ class Bcaln:
     CIG_RE = re.compile("(\d+)(["+CIG_OPS_STR+"])")
     CIG_OPS = set(CIG_OPS_STR)
     CIG_INCR_ALL = {'M','=', 'X'}
-    CIG_INCR_RD = CIG_INCR_ALL | {'I','S'}
+    CIG_INCR_RD = CIG_INCR_ALL | {'I','S','H'}
     CIG_INCR_RF = CIG_INCR_ALL | {'D','N'}
 
     SUB = 0
