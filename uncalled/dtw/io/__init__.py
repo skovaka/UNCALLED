@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 import sys
 
+from ..aln_track import AlnTrack
+
 INPUT_PARAMS = np.array(["sql_in", "eventalign_in", "tombo_in", "bam_in"])
 OUTPUT_PARAMS = np.array(["sql_out", "tsv_out", "eventalign_out", "bam_out"])
 
@@ -30,7 +32,7 @@ class TrackIO:
 
         self.read = None
 
-        self.tracks = None #list()
+        self.tracks = list()
 
         if not hasattr(self, "prev_aln_id"):
             self.prev_aln_id = 0
@@ -39,6 +41,12 @@ class TrackIO:
             self.filename = None
         elif isinstance(filename, str):
             self.filename = filename
+
+        if self.prms.in_names is not None:
+            self.in_tracks = self.prms.in_names
+        else:
+            self.in_tracks = None
+
             #spl = filename.split(":")
 
             #if len(spl) == 1:
@@ -51,7 +59,7 @@ class TrackIO:
             #else:
             #    raise ValueError("Invalid database specifier format: " + filename)
 
-        self.track_names = None
+        #self.track_names = None
         self.write_mode = write
 
     def init_alignment(self, read_id, fast5, read):
@@ -70,34 +78,47 @@ class TrackIO:
         return self.prev_aln_id
 
     def init_write_mode(self):
-        if self.track_names is None:
-            name = os.path.splitext(os.path.basename(self.filename))[0]
-            self.track_names = [name]
+        if self.prms.out_name is not None:
+            self.out_track = self.prms.out_name
+        else:
+            self.out_track = os.path.splitext(os.path.basename(self.filename))[0]
 
-        if len(self.track_names) > 1:
-            raise ValueError("Can only write to one track")
-        name = self.track_names[0]
+        #if self.track_names is None:
+        #    name = os.path.splitext(os.path.basename(self.filename))[0]
+        #    self.track_names = [name]
+
+        #if len(self.track_names) > 1:
+        #    raise ValueError("Can only write to one track")
+        #name = self.track_names[0]
 
         self.prev_fast5 = (None, None)
         self.prev_read = None
 
-        return self.init_track(None, name, name, self.conf.to_toml())
+        return self.init_track(None, self.out_track, self.out_track, self.conf)
 
     def init_track(self, id, name, desc, conf):
-        row = pd.DataFrame({
-            "id" : id,
-            "name" : name,
-            "desc" : desc,
-            "config" : conf
-        }, index=[0])
-        self.init_tracks(row)
-        return row
+        #row = pd.DataFrame({
+        #    "id" : id,
+        #    "name" : name,
+        #    "desc" : desc,
+        #    "config" : conf
+        #}, index=[0])
 
-    def init_tracks(self, df):
-        if self.tracks is None:
-            self.tracks = df
-        else:
-            self.tracks = pd.concat([self.tracks, df])
+        self.tracks.append(AlnTrack(id, name, desc, conf))
+        self.conf.load_config(conf)
+
+        #self.init_tracks(row)
+        #return row
+
+    def fill_tracks(self, coords, alignments, layers):
+        layers = layers.droplevel(0)
+
+        for track in self.tracks:
+            track_alns = alignments[alignments["track_id"] == track.id]
+            i = layers.index.get_level_values("aln_id").isin(track_alns.index)
+            track_layers = layers.iloc[i]
+
+            track.set_data(coords, track_alns, track_layers)
             
     def write_alignment(self, alns):
         pass

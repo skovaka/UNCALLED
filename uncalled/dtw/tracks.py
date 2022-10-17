@@ -103,19 +103,23 @@ class Tracks:
             self.load()
 
         #TODO use consistent interface with dtw.dtw
+        self.fast5s = None
         if self.prms.load_fast5s:
-            if isinstance(self.input, SQL):
-                fast5_reads = list()
-                fast5_reads.append(self.input.get_fast5_index(self._aln_track_ids))
-                fast5_reads = pd.concat(fast5_reads)
-                files = fast5_reads["filename"].unique()
-                self.fast5s = Fast5Reader(
-                    index=fast5_reads, 
-                    conf=self.conf)
+            for io in self.inputs:
+                if isinstance(io, SQL):
+                    fast5_reads = list()
+                    fast5_reads.append(io.get_fast5_index(self._aln_track_ids))
+                    fast5_reads = pd.concat(fast5_reads)
+                    files = fast5_reads["filename"].unique()
+                    self.fast5s = Fast5Reader(
+                        index=fast5_reads, 
+                        conf=self.conf)
 
-            elif len(self.conf.fast5_reader.fast5_files) > 0:
-                self.fast5s = Fast5Reader(conf=self.conf)
-            else: return
+            if self.fast5s is None:
+                if len(self.conf.fast5_reader.fast5_files) > 0:
+                    self.fast5s = Fast5Reader(conf=self.conf)
+                else: 
+                    return
 
             for track in self.alns:
                 track.fast5s = self.fast5s
@@ -134,7 +138,7 @@ class Tracks:
         self.new_alignment = parent.new_alignment
         self.new_layers = parent.new_layers
 
-        self.input = parent.input
+        self.inputs = parent.inputs
         self.output = parent.output
         self.output_track = parent.output_track
 
@@ -215,22 +219,45 @@ class Tracks:
 
     def _init_io(self):
 
-        print(self.prms.io.bam_in)
-
         tracks = list()
-        self.input = None
+
+        self.inputs = list()
+
+        #def load_io(opts, write):
+        #    ret = list()
+
+        #    for name,Cls in opts.items():
+        #        fnames = getattr(self.prms.io, name, None)
+        #        if fnames is None: continue
+        #        if isinstance(fnames, str):
+        #            fnames = [fnames]
+        #        assert isinstance(fnames, list)
+        #            
+        #        for filename in fnames:
+        #            io = Cls(filename, write, self.conf)
+        #            tracks.append(io.tracks)
+        #            if not write:
+        #                self.conf.load_config(io.conf)
+        #            ret.append(io)
+
+        #            for track in io.tracks:
+        #                self._add_track(track.name, track)
 
         for name,Cls in INPUTS.items():
-            vals = getattr(self.prms.io, name, None)
-            if isinstance(vals, str):
-                vals = [vals]
-            if isinstance(vals, list):
-                for val in vals:
-                    self.input = Cls(val, False, self.conf)
+            fnames = getattr(self.prms.io, name, None)
+            if fnames is None: continue
+            if isinstance(fnames, str):
+                fnames = [fnames]
+            assert isinstance(fnames, list)
+                
+            for filename in fnames:
+                io = Cls(filename, False, self.conf)
+                tracks.append(io.tracks)
+                self.conf.load_config(io.conf)
+                self.inputs.append(io)
 
-        if self.input is not None:
-            self.conf.load_config(self.input.conf)
-            tracks.append(self.input.tracks)
+                for track in io.tracks:
+                    self._add_track(track.name, track)
 
         in_prms = [getattr(self.prms.io, p) is not None for p in INPUT_PARAMS]
         out_prms = [getattr(self.prms.io, p) is not None for p in OUTPUT_PARAMS]
@@ -239,53 +266,48 @@ class Tracks:
         if np.sum(out_prms) > 1:
             raise ValueError("No more than one output can be specified")
 
-
-        #if np.any(in_prms):
-        #    in_format = INPUT_PARAMS[in_prms][0]
-        #    if in_format == "sql_in":
-        #        self.input = TrackSQL(self.conf, "r")
-        #    elif in_format == "bam_in":
-        #        self.input = BAM(self.conf, "r")
-        #    elif in_format == "eventalign_in":
-        #        self.input = Eventalign(self.conf, "r")
-        #    elif in_format == "tombo_in":
-        #        self.input = Tombo(self.conf, "r")
-
-        #    self.conf.load_config(self.input.conf)
-
-        #    tracks.append(self.input.tracks)
-        #else:
-        #    self.input = None
-
         if np.any(out_prms):
             out_format = OUTPUT_PARAMS[out_prms][0]
+            filename = getattr(self.prms.io, out_format)
+            new_track = True
             if out_format == "sql_out":
-                self.output = SQL(self.conf, "w")
+                self.output = SQL(filename, True, self.conf)
             elif out_format == "tsv_out":
-                self.output = TSV(self.conf, "w")
+                self.output = TSV(filename, True, self.conf)
             elif out_format == "eventalign_out":
-                self.output = Eventalign(self.conf, "w")
+                self.output = Eventalign(filename, True, self.conf)
             elif out_format == "bam_out":
-                self.output = self.input
+                if len(self.inputs) != 1:
+                    raise RuntimeError("Must input exactly one BAM file for BAM output")
+                new_track = False
+                self.output = self.inputs[0]
 
-            if self.output != self.input:
+            if new_track:
+                for track in self.output.tracks:
+                    self._add_track(track.name, track)
+
                 tracks.append(self.output.tracks)
-            self.output_track = self.output.tracks.iloc[0]["name"]
+
+            self.output_track = self.output.tracks[0].name
             #for track in self.output.tracks:
             #    self.output_tracks[track.name] = track
         else:
             self.output = None
-            self.output_track = self.input.tracks.iloc[0]["name"]
+            self.output_track = self.inputs[0].tracks[0].name
 
         self.model = None
 
-        for _,row in pd.concat(tracks).iterrows():
-            conf = config.Config(toml=row["config"])
-            self.conf.load_config(conf)
-            track = AlnTrack(row["id"], row["name"], row["desc"], conf)
-            self._add_track(track.name, track)
+        #for _,row in pd.concat(tracks).iterrows():
+        #    conf = config.Config(toml=row["config"])
+        #    self.conf.load_config(conf)
+        #    track = AlnTrack(row["id"], row["name"], row["desc"], conf)
+        #    self._add_track(track.name, track)
 
+            #TODO each IO should have reference to its AlnTracks?
+            #probably construct here in Tracks? or maybe in IO!
+            #iterate through each input, it will populate its own AlnTracks
 
+        for track in self.alns:
             if self.model is None:
                 self.model = track.model
             elif self.model.K != track.model.K:
@@ -294,8 +316,9 @@ class Tracks:
     def get_read_fast5(self, read_id):
         if self.fast5s is not None and self.fast5s.indexed:
             return self.fast5s.get_read_file(read_id)
-        elif getattr(self.input, "read_id_in", None) == read_id:
-            return self.input.fast5_in
+        for io in self.inputs:
+            if getattr(io, "read_id_in", None) == read_id:
+                return io.fast5_in
         raise RuntimeError("Could not determine fast5 filename, may need to provide fast5 index (-x)")
 
     def aln_layers(self, layer_filter=None):
@@ -365,7 +388,8 @@ class Tracks:
         if self.output is not None:
             out = self.output
         else:
-            out = self.input
+            out = self.inputs[0]
+            #raise RuntimeError("Error writing output")
 
         if self.new_alignment:
             out.write_alignment(track.alignments)
@@ -521,27 +545,26 @@ class Tracks:
         if load_mat is None:
             load_mat = self.prms.load_mat
 
-        #layers = self.input.query_layers(self.db_layers, self._aln_track_ids, self.coords, full_overlap=full_overlap, read_id=read_filter).droplevel(0)
-        #ids = layers.index.get_level_values("aln_id").unique().to_numpy()
-        #alignments = self.input.query_alignments(aln_id=ids)#self._aln_track_ids, coords=self.coords, full_overlap=full_overlap)
+        for io in self.inputs:
+            alignments, layers = io.query(self.db_layers, self._aln_track_ids, self.coords, full_overlap=full_overlap, read_id=read_filter)
 
-        alignments, layers = self.input.query(self.db_layers, self._aln_track_ids, self.coords, full_overlap=full_overlap, read_id=read_filter)
+            layers = layers.droplevel(0)
 
-        layers = layers.droplevel(0)
+            for track in io.tracks:
+                track_alns = alignments[alignments["track_id"] == track.id]
+                i = layers.index.get_level_values("aln_id").isin(track_alns.index)
+                track_layers = layers.iloc[i]
 
-        for track in self.alns:
-            track_alns = alignments[alignments["track_id"] == track.id]
-            i = layers.index.get_level_values("aln_id").isin(track_alns.index)
-            track_layers = layers.iloc[i]
-
-            track.set_data(self.coords, track_alns, track_layers)
-            track.calc_layers(self.fn_layers)
-        
+                track.set_data(self.coords, track_alns, track_layers)
+                track.calc_layers(self.fn_layers)
+            
+        #TODO get this back
         self.load_compare(alignments.index.to_numpy())
         self.calc_refstats()
 
-        if load_mat:
-            for track in self.alns:
+        for track in self.alns:
+            track.calc_layers(self.fn_layers)
+            if load_mat:
                 track.load_mat()
 
         return self.alns
@@ -550,7 +573,10 @@ class Tracks:
         if len(self.cmp_layers) == 0:
             return
 
-        self.cmp = self.input.query_compare(self.cmp_layers, self._aln_track_ids, self.coords, aln_ids)
+        #TODO handle multiple inputs properly
+        io = self.inputs[0]
+
+        self.cmp = io.query_compare(self.cmp_layers, self._aln_track_ids, self.coords, aln_ids)
 
         if self.cmp is None:
             return
@@ -715,15 +741,6 @@ class Tracks:
         else:
             coords = self.coords
 
-        t0 = time.time()
-        layer_iter = self.input.iter_refs(
-            self.db_layers, 
-            self._aln_track_ids, 
-            coords=coords, 
-            chunksize=self.prms.io.ref_chunksize)
-
-        t0 = time.time()
-
         def get_full_coords(idx):
             fwd = idx[0]
             pac = idx[1]
@@ -744,37 +761,74 @@ class Tracks:
 
             return seq_coords, coords
 
-        chunk = next(layer_iter)
-        seq_coords = get_full_coords(chunk.index[0])
+        layer_iters = [
+            io.iter_refs(
+                self.db_layers, 
+                self._aln_track_ids, 
+                coords=coords, 
+                chunksize=self.prms.io.ref_chunksize)
+            for io in self.inputs]
 
-        t0 = time.time()
-                
-        while len(chunk) > 0:
+        #chunks = [next(i) for i in layer_iters]
+        #seq_coords = [get_full_coords(chunk.index[0]) for chunk in chunks]
 
-            if len(chunk.index.get_level_values("pac").unique()) <= 1:
-                chunk = pd.concat([chunk, next(layer_iter, pd.DataFrame())])
+        #while np.any([len(chunk) > 0 for chunk in chunks]):
 
-            coord_idx = chunk.index.droplevel("aln_id").unique()
-            #chunk_mrefs = chunk.index.get_level_values("pac").unique()
+        #    #Refill from each chunk if only one ref coord is contained in it
 
-            seq_coords, coords = next_coords(seq_coords, coord_idx)
+        #    #TODO find the chunk with the highest ref coordinate, refill other chunks to match?
+        #    #or no, keep this the same? only output up until second-to-last ref in least full chunk, then it'll be filled based on the logic below? 
+        #    for i in range(len(chunks)):
+        #        while len(chunks[i].index.get_level_values("pac").unique()) <= 1:
+        #            layers = next(layer_iters[i], None)
+        #            if layers is not None:
+        #                chunks[i] = pd.concat([chunks[i], layers])
+        #            else: break
 
+        #    last_coord = min([chunk.index.droplevel("aln_id")[-1]])
+
+        #    coord_idx = chunks[0].index.droplevel("aln_id").unique()
+        #    for chunk in chunks[1:]:
+        #        coord_idx = coord_idx.union(chunk.index.droplevel("aln_id").unique())
+
+        #    seq_coords, coords = next_coords(seq_coords, coord_idx)
+        #    coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
             
-            coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
 
-            mask = (chunk.index.get_level_values(0) == coords.fwd) & chunk.index.get_level_values(1).isin(coords.pacs)
-            layers = chunk[mask]
-            leftovers = chunk[~mask]
+        for io in self.inputs:
+            layer_iter = io.iter_refs(
+                self.db_layers, 
+                self._aln_track_ids, 
+                coords=coords, 
+                chunksize=self.prms.io.ref_chunksize)
 
-            aln_ids = layers.index.unique("aln_id").to_numpy()
-            alns = self.input.query_alignments(self._aln_track_ids, aln_id=aln_ids)
+            chunk = next(layer_iter)
+            seq_coords = get_full_coords(chunk.index[0])
 
-            ret = self._tables_to_tracks(coords, alns, layers)
+            while len(chunk) > 0:
 
-            chunk = leftovers
+                if len(chunk.index.get_level_values("pac").unique()) <= 1:
+                    chunk = pd.concat([chunk, next(layer_iter, pd.DataFrame())])
 
-            if not ret.all_empty:
-                yield ret
+                coord_idx = chunk.index.droplevel("aln_id").unique()
+                #chunk_mrefs = chunk.index.get_level_values("pac").unique()
+
+                seq_coords, coords = next_coords(seq_coords, coord_idx)
+                coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
+
+                mask = (chunk.index.get_level_values(0) == coords.fwd) & chunk.index.get_level_values(1).isin(coords.pacs)
+                layers = chunk[mask]
+                leftovers = chunk[~mask]
+
+                aln_ids = layers.index.unique("aln_id").to_numpy()
+                alns = io.query_alignments(self._aln_track_ids, aln_id=aln_ids)
+
+                ret = self._tables_to_tracks(coords, alns, layers)
+
+                chunk = leftovers
+
+                if not ret.all_empty:
+                    yield ret
 
     def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
         
@@ -816,20 +870,23 @@ class Tracks:
 
         t = time.time()
 
-        aln_iter = self.input.iter_alns(
-            self.db_layers, 
-            self._aln_track_ids,
-            self.coords,
-            read_id=reads,
-            full_overlap=full_overlap,
-            ref_index=self.index)
+        #TODO handle multiple inputs properly
+        for io in self.inputs:
+            #aln_iter = self.input.iter_alns(
+            aln_iter = io.iter_alns(
+                self.db_layers, 
+                self._aln_track_ids,
+                self.coords,
+                read_id=reads,
+                full_overlap=full_overlap,
+                ref_index=self.index)
 
-        for alignments,layers in aln_iter:
-            for ref_name,ref_alns in alignments.groupby("ref_name"):
-                coords = self._alns_to_coords(ref_alns)
-                cache = self._tables_to_tracks(coords, ref_alns, layers)
-                for ret in cache.iter_reads_slice():
-                    yield ret
+            for alignments,layers in aln_iter:
+                for ref_name,ref_alns in alignments.groupby("ref_name"):
+                    coords = self._alns_to_coords(ref_alns)
+                    cache = self._tables_to_tracks(coords, ref_alns, layers)
+                    for ret in cache.iter_reads_slice():
+                        yield ret
         
     def _tables_to_tracks(self, coords, alignments, layers):
         tracks = dict()
@@ -901,7 +958,7 @@ class Tracks:
 
     
     def close(self):
-        if self.input is not None:
-            self.input.close()
-        if self.output is not None and self.output != self.input:
+        for io in self.inputs:
+            io.close()
+        if self.output is not None and (len(self.inputs) == 0 or self.output != self.inputs[0]):
             self.output.close()

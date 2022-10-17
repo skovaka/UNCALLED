@@ -107,6 +107,7 @@ DTW_OPTS = (
     Opt(("-t", "--threads"), ""),
     Opt("--guppy-in", "tracks.io"),
     Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+    Opt(("--out-name", "-o"), "tracks.io"),
     Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
 
     MutexOpts("output", [
@@ -173,10 +174,10 @@ DTW_OPTS = (
 CONVERT_OPTS = (
     Opt("index_prefix", "tracks"),
     MutexOpts("input", [
-        Opt("--sql-in", "tracks.io"),
-        Opt("--bam-in", "tracks.io"),
-        Opt("--eventalign-in", "tracks.io", nargs="?", const="-"),
-        Opt("--tombo-in", "tracks.io"),
+        Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+        Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
+        Opt("--eventalign-in", "tracks.io", type=comma_split, nargs="?", const="-"),
+        Opt("--tombo-in", "tracks.io", type=comma_split, action="extend"),
     ]),
 
     MutexOpts("output", [
@@ -184,6 +185,7 @@ CONVERT_OPTS = (
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
     ]),
+    Opt(("--out-name", "-o"), "tracks.io"),
 
     Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
 
@@ -220,11 +222,12 @@ EDIT_OPTS = (
 MERGE_OPTS = (
     Opt("dbs", nargs="+", type=str, help="Database files to merge. Will write to the first file if \"-o\" is not specified. "),
     #Opt(("-n", "--track_names"), nargs="+", help="Names of tracks to merge. Will merge all tracks if not specified"),
-    Opt(("-o", "--sql-out"), "tracks.io", type=str, default=None, help="Output database file. Will output to the first input file if not specified"),
+    Opt("--sql-out", "tracks.io", type=str, default=None, help="Output database file. Will output to the first input file if not specified"),
 )
 
 COMPARE_OPTS = (
-    Opt("--sql-in", "tracks.io"),
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
     #Opt(("-l", "--read-filter"), "tracks", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-R", "--ref-bounds"), "tracks"),
@@ -237,7 +240,7 @@ COMPARE_OPTS = (
 )
 
 DUMP_OPTS = (
-    Opt("--sql-in", "tracks.io"),
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
     Opt("layers", nargs="+",  help="Layers to retrieve or compute"),
     Opt(("-R", "--ref-bounds"), "tracks", type=ref_coords),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
@@ -249,7 +252,10 @@ REFSTATS_OPTS = (
         help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
     Opt("refstats", type=comma_split,
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
-    Opt("--sql-in", "tracks.io"),
+    #Opt("--sql-in", "tracks.io"),
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+    Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
+    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt("--min-coverage", "tracks"),
     Opt(("--ref-chunksize"), "tracks.io"),
@@ -257,7 +263,7 @@ REFSTATS_OPTS = (
 )
 
 READSTATS_OPTS = (
-    Opt("--sql-in", "tracks.io"),
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
     Opt("stats", "readstats", type=comma_split),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt(("-p", "--pca-components"), "readstats"),
@@ -267,7 +273,7 @@ READSTATS_OPTS = (
 )
 
 REFPLOT_OPTS = (
-    Opt("--sql-in", "tracks.io"),
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
     Opt("ref_bounds", "tracks", type=str_to_coord),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
@@ -278,9 +284,9 @@ REFPLOT_OPTS = (
 
 DOTPLOT_OPTS = (
     MutexOpts("input", [
-        Opt("--sql-in", "tracks.io"),
-        Opt("--bam-in", "tracks.io", nargs="?", const="-"),
-        Opt("--eventalign-in", "tracks.io", nargs="?", const="-"),
+        Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+        Opt("--bam-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
+        Opt("--eventalign-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
     ]),
 
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
@@ -308,8 +314,8 @@ DOTPLOT_OPTS = (
 TRACKPLOT_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
     MutexOpts("input", [
-		Opt("--sql-in", "tracks.io"),
-		Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+		Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+		Opt("--bam-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
 	]),
 
     Opt("--ref", "tracks", "index_prefix"), 
@@ -333,7 +339,7 @@ TRACKPLOT_OPTS = (
 BROWSER_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
     MutexOpts("input", [
-		Opt("--sql-in", "tracks.io"),
+		Opt("--sql-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"),
         Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
 	]),
 

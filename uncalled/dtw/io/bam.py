@@ -28,19 +28,19 @@ class BAM(TrackIO):
             raise ValueError("BAM output is only available if BAM input provided")
         self.input = pysam.AlignmentFile(self.filename, "rb")
 
-        toml = None
+        conf = None
         if "CO" in self.input.header:
             for line in self.input.header["CO"]:
                 if not line.startswith("UNC:"): continue
                 toml = re.sub(r"(?<!\\);", "\n", line[4:]).replace("\\;",";")
                 conf = Config(toml=toml)
-                self.conf.load_config(conf)
 
-        if toml is None:
-            toml = self.conf.to_toml()
+        if conf is None:
+            conf = self.conf
+            #toml = self.conf.to_toml()
 
         name = os.path.basename(self.filename)
-        self.init_track(1, name, name, toml)
+        self.init_track(1, name, name, conf)
 
         #TODO really not good, should stream by default
         #if self.conf.tracks.io.bam_out is not None:
@@ -211,6 +211,7 @@ class BAM(TrackIO):
             layers.append(l)
 
         return pd.concat(alignments), pd.concat(layers)
+        #self.fill_tracks(coords, pd.concat(alignments), pd.concat(layers))
 
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
         

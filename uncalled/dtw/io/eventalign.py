@@ -11,13 +11,13 @@ import _uncalled
 class Eventalign(TrackIO):
     FORMAT = "eventalign"
 
-    def __init__(self, filename, mode, conf):
+    def __init__(self, filename, write, conf):
         TrackIO.__init__(self, filename, write, conf)
 
         if self.filename == "-":
             self.out = sys.stdout
         else:
-            self.out = open(self.filename, mode)
+            self.out = open(self.filename, "w" if write else "r")
 
         self._header = True
 
@@ -61,9 +61,7 @@ class Eventalign(TrackIO):
         if self.conf.pore_model.name == "r94_dna":
             self.conf.pore_model.name = "r9.4_dna_450bps_6mer_npl"
 
-        self.init_track(1, name, name, self.conf.to_toml())
-        #t = AlnTrack(self, None, name, name, self.conf)
-        #self.tracks.append(t)
+        self.init_track(1, name, name, self.conf)
 
     #def write_dtw_events(self, track, events):
     #def write_layers(self, df, read, index=["pac","aln_id"]):

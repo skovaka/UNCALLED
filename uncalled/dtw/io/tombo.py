@@ -35,9 +35,9 @@ class Tombo(TrackIO):
         if self.conf.pore_model.name == "r94_rna":
             self.conf.pore_model.name = "r94_rna_tombo"
 
-        self.conf.fast5_reader.fast5_files = [self.prms.tombo_in]
+        self.conf.fast5_reader.fast5_files = self.prms.tombo_in
 
-        self.init_track(1, name, name, self.conf.to_toml())
+        self.init_track(1, name, name, self.conf)
 
     #def init_fast5(self, fast5):
     #    self.

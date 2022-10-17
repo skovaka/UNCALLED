@@ -134,18 +134,18 @@ class TrackSQL(TrackIO):
         for table in ["dtw", "bcaln", "cmp", "band"]:
             self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
 
-        track = self.tracks.iloc[0]
+        track = self.tracks[0]
 
         if self.prms.init_track:
             try:
                 tid = self.write_track(track)
             except Exception as err:
-                if len(self.query_track(track["name"])) > 0:
+                if len(self.query_track(track.name)) > 0:
                     if self.prms.append:
                         pass
                     elif self.prms.overwrite:
                         sys.stderr.write("Deleting existing track...\n")
-                        delete(track["name"], self)
+                        delete(track.name, self)
                         tid = self.write_track(track)
                     else:
                         raise ValueError(f"Database already contains track named \"{ track.name}\". Specify a different name, write to a different file")
@@ -155,9 +155,7 @@ class TrackSQL(TrackIO):
             tid = 0
 
 
-        self.tracks.iloc[0]["id"] = tid
-
-        #self.tracks.append(track)
+        self.tracks[0].id = tid
 
     def init_read_mode(self):
         self.table_columns = dict()
@@ -172,7 +170,7 @@ class TrackSQL(TrackIO):
                 sys.stderr.write(f"Warning: \"{table}\" table missing {n} columns (\"{missing}\")\n")
             self.table_columns[table] = layers.intersection(info["name"])
 
-        df = self.query_track(self.track_names).set_index("name").reindex(self.track_names)
+        df = self.query_track(self.prms.in_names).set_index("name").reindex(self.prms.in_names)
 
         missing = df["id"].isnull()
         if missing.any():
@@ -181,19 +179,25 @@ class TrackSQL(TrackIO):
             raise ValueError("Alignment track not found: \"%s\" (tracks in database: \"%s\")" %
                              ("\", \"".join(bad_names), "\", \"".join(all_names)))
 
-        self.init_tracks(df.reset_index())
+        #self.init_tracks(df.reset_index())
 
-        #for name,row in df.iterrows():
-        #    conf = config.Config(toml=row.config)
-        #    t = AlnTrack(self, row["id"], name, row["desc"], conf)
-        #    self.tracks.append(t)
-        #    self.conf.load_config(conf)
+        for i,row in df.reset_index().iterrows():
+            if "config" in row.index:
+                conf = config.Config(toml=row["config"])
+            else:
+                conf = self.conf
+            self.init_track(row["id"], row["name"], row["desc"], conf)
+
+        #if self.tracks is None:
+        #    self.tracks = df
+        #else:
+        #    self.tracks = pd.concat([self.tracks, df])
 
 
     def write_track(self, track):
         self.cur.execute(
             "INSERT INTO track (name,desc,config) VALUES (?,?,?)",
-            (track["name"], track["desc"], track["config"])
+            (track.name, track.desc, track.conf.to_toml())
         )
         track_id = self.cur.lastrowid
         return track_id
@@ -362,6 +366,7 @@ class TrackSQL(TrackIO):
         aln_ids = layers.index.unique("aln_id").to_numpy()
         alignments = self.query_alignments(aln_id=aln_ids)
 
+        #self.fill_tracks(coords, alignments, layers)
         return alignments, layers
 
     def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], chunksize=None, full_overlap=False):
@@ -488,7 +493,7 @@ _LS_QUERY = "SELECT name,desc,COUNT(alignment.id) FROM track " \
             "JOIN alignment ON track.id == track_id GROUP BY name"
 def ls(conf, db=None):
     if db is None:
-        db = TrackSQL(conf, "r")
+        db = TrackSQL(conf.tracks.io.sql_in, False, conf)
     print("\t".join(["Name", "Description", "Alignments"]))
 
     for row in db.cur.execute(_LS_QUERY).fetchall():
@@ -498,7 +503,8 @@ def ls(conf, db=None):
 
 def delete(track_name=None, db=None, conf=None):
     if db is None:
-        db = TrackSQL(conf, "r")
+        #db = TrackSQL(conf, "r")
+        db = TrackSQL(conf.tracks.io.sql_in, False, conf)
 
     if track_name is None:
         track_name = conf.track_name
@@ -512,7 +518,8 @@ def edit(conf, db=None):
     fast5_change = len(conf.fast5_files) > 0
     track_name = conf.track_name
     if db is None:
-        db = TrackSQL(conf, "r")
+        #db = TrackSQL(conf, "r")
+        db = TrackSQL(conf.tracks.io.sql_in, False, conf)
     track_id = db._verify_track(track_name)
 
     updates = []
@@ -582,7 +589,8 @@ def merge(conf):
 
     conf.tracks.io.init_track = False
 
-    db = TrackSQL(conf, "w")
+    #db = TrackSQL(conf, "w")
+    db = TrackSQL(conf.tracks.io.sql_out, True, conf)
     
     def max_id(table, field="id"):
         i = db.cur.execute(f"SELECT max({field}) FROM {table}").fetchone()[0]

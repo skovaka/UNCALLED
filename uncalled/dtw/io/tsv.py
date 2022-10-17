@@ -41,9 +41,6 @@ class TSV(TrackIO):
 
     def init_read_mode(self):
         raise RuntimeError("Reading from TSV not yet supported")
-        #name = self.track_names[0]
-        #t = AlnTrack(self, None, name, name, self.conf, self.model)
-        #self.tracks.append(t)
 
     def write_layers(self, track, groups):
         track.calc_layers(self.columns)

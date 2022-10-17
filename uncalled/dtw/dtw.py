@@ -71,7 +71,12 @@ def run_dtw(conf):
 
     read_filter = fast5s.get_read_filter()
 
-    if not isinstance(tracks.input, BAM):
+    bam_in = None
+    for io in tracks.inputs:
+        if isinstance(io, BAM):
+            bam_in = io
+            break
+    if bam_in is None:
         raise ValueError("Must specify BAM input")
 
     sigproc = SignalProcessor(tracks[tracks.output_track].model, conf)
@@ -80,7 +85,7 @@ def run_dtw(conf):
 
     for read in fast5s:
         aligned = False
-        for aln in tracks.input.get_alns(read.id):
+        for aln in bam_in.get_alns(read.id):
             sys.stderr.write(f"{read.id}\n")
 
             dtw = GuidedDTW(tracks, sigproc, read, aln, conf)

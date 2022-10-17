@@ -84,7 +84,7 @@ class Guppy(TrackIO):
 
         self.conf.fast5_reader.fast5_files = [self.prms.guppy_in]
 
-        self.init_track(1, name, name, self.conf.to_toml())
+        self.init_track(1, name, name, self.conf)
 
     def iter_batches(self):
         self.batches = set()
