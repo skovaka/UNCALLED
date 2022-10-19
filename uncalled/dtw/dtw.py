@@ -35,7 +35,7 @@ def dtw(conf):
         run_dtw(conf)
         return
 
-    guppy_in = Guppy(conf, "r")
+    guppy_in = Guppy(conf.tracks.io.guppy_in, False, conf)
 
     #for config in guppy_in.iter_batches():
     #    print(config.tracks.io.bam_out)
@@ -52,7 +52,6 @@ def dtw(conf):
         for i,_ in enumerate(pool.imap_unordered(run_dtw, guppy_in.iter_batches(), chunksize=1)):
             pbar.update(i)
 
-    tracks.close()
     pbar.finish()
 
 def run_dtw(conf):
@@ -86,7 +85,7 @@ def run_dtw(conf):
     for read in fast5s:
         aligned = False
         for aln in bam_in.get_alns(read.id):
-            sys.stderr.write(f"{read.id}\n")
+            #sys.stderr.write(f"{read.id}\n")
 
             dtw = GuidedDTW(tracks, sigproc, read, aln, conf)
 

@@ -21,7 +21,7 @@ class TSV(TrackIO):
         if self.filename == "-":
             self.out = sys.stdout
         else:
-            self.out = open(self.filename, mode)
+            self.out = open(self.filename, "w" if write else "r")
 
         if self.write_mode:
             self.init_write_mode()
