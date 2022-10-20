@@ -179,6 +179,7 @@ CONVERT_OPTS = (
         Opt("--eventalign-in", "tracks.io", type=comma_split, nargs="?", const="-"),
         Opt("--tombo-in", "tracks.io", type=comma_split, action="extend"),
     ]),
+    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
 
     MutexOpts("output", [
         Opt("--sql-out", "tracks.io"),
