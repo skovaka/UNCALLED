@@ -205,6 +205,10 @@ class PoreModel:
     def to_df(self, kmer_str=True):
         df = pd.DataFrame(self._cols)
 
+        if self.extra is not None:
+            for col,vals in self.extra.items():
+                df[col] = vals
+
         if kmer_str:
             df["kmer"] = self.KMER_STRS 
 
