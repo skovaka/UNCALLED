@@ -5,7 +5,7 @@ import pysam
 import array
 import os
 import re
-from collections import defaultdict
+from collections import defaultdict, deque
 from ..aln_track import AlnTrack
 from ..layers import LAYER_META, parse_layers
 from ...index import RefCoord
@@ -17,8 +17,8 @@ import _uncalled
 class BAM(TrackIO):
     FORMAT = "bam"
 
-    def __init__(self, filename, write, conf):
-        TrackIO.__init__(self, filename, write, conf)
+    def __init__(self, filename, write, tracks):
+        TrackIO.__init__(self, filename, write, tracks)
 
         self.init_read_mode()
         self.init_write_mode()
@@ -138,7 +138,7 @@ class BAM(TrackIO):
             if unmapped or not sam.is_unmapped:
                 yield sam
 
-    def _parse_sam(self, sam, coords):
+    def _parse_sam(self, sam, coords=None):
         samp_bounds = sam.get_tag("ss")
 
         norm_scale, norm_shift = sam.get_tag("sn")
@@ -148,15 +148,20 @@ class BAM(TrackIO):
         
         length = sam.get_tag("sl")
 
+
         fwd = int(not sam.is_reverse)
         ref_start, ref_end = sam.get_tag("sr")
         refs = pd.RangeIndex(ref_start, ref_end)
-        pacs = coords.ref_to_pac(refs)
 
+        if coords is None:
+            seq_refs = RefCoord(sam.reference_name, ref_start, ref_end, fwd)
+            coords = self.tracks.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=True)
+            
+        pacs = coords.ref_to_pac(refs)
         kmers = coords.ref_kmers.loc[fwd].loc[refs].to_numpy()
 
         dtw = pd.DataFrame(
-            {"current" : current, "length" : length, "kmer" : kmers},
+            {"current" : current, "length" : length},
             index=pd.MultiIndex.from_product([[fwd], pacs, [self.aln_id_in]],
                                              names=("fwd","pac","aln_id"))
         )
@@ -213,8 +218,56 @@ class BAM(TrackIO):
         return pd.concat(alignments), pd.concat(layers)
         #self.fill_tracks(coords, pd.concat(alignments), pd.concat(layers))
 
-    def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
+    def iter_refs(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, chunksize=None, full_overlap=False):
+
+        if coords is not None:
+            itr = self.input.fetch(coords.ref_name, coords.refs.min(), coords.refs.max())
+        else:
+            itr = self.input.fetch()
+
+        if fwd is not None:
+            strands = [int(fwd)]
+        else:
+            strands = [1, 0]
         
+        layers = deque()
+        alns = deque()
+
+        prev_ref = None
+        prev_start = 0
+
+        for sam in itr:
+            aln,layer = self._parse_sam(sam)
+
+            a = aln.iloc[0]
+            pac_st = layer.index.get_level_values(1).min()
+
+            if prev_ref is not None and (a["ref_name"] != prev_ref or a["ref_start"] > prev_start):
+                pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
+                ret_layers = pd.concat([l[l.index.get_level_values(1).isin(pd.RangeIndex(prev_start, pac_st))] for l in layers])
+                aln_ids = ret_layers.index.get_level_values(2).unique()
+                ret_alns = pd.concat([a.loc[aln_ids.intersection(a.index)] for a in alns])
+
+                yield (ret_alns, ret_layers)
+
+                while len(alns) > 0 and (alns[0].iloc[0]["ref_name"] != a["ref_name"] or layers[0].index.get_level_values(1).max() < pac_st):
+                    alns.popleft()
+                    layers.popleft()
+
+                prev_ref = a["ref_name"]
+                prev_start = a["ref_start"]
+
+            alns.append(aln)
+            layers.append(layer)
+
+        pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
+        ret_layers = pd.concat([l[l.index.get_level_values(1) >= prev_start] for l in layers])
+        aln_ids = ret_layers.index.get_level_values(2).unique()
+        ret_alns = pd.concat([a.loc[aln_ids.intersection(a.index)] for a in alns])
+
+        yield (ret_alns, ret_layers)
+
+    def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
         aln_id = 0
 
         if read_id is not None and len(read_id) > 0:

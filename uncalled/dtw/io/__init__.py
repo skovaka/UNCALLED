@@ -26,13 +26,14 @@ OUT_EXT = {
 }
 
 class TrackIO:
-    def __init__(self, filename, write, conf):
-        self.conf = conf
+    def __init__(self, filename, write, tracks):
+        self.tracks = tracks
+        self.conf = tracks.conf
         self.prms = self.conf.tracks.io
 
         self.read = None
 
-        self.tracks = list()
+        self.aln_tracks = list()
 
         if not hasattr(self, "prev_aln_id"):
             self.prev_aln_id = 0
@@ -104,7 +105,7 @@ class TrackIO:
         #    "config" : conf
         #}, index=[0])
 
-        self.tracks.append(AlnTrack(id, name, desc, conf))
+        self.aln_tracks.append(AlnTrack(id, name, desc, conf))
         self.conf.load_config(conf)
 
         #self.init_tracks(row)
@@ -113,7 +114,7 @@ class TrackIO:
     def fill_tracks(self, coords, alignments, layers):
         layers = layers.droplevel(0)
 
-        for track in self.tracks:
+        for track in self.aln_tracks:
             track_alns = alignments[alignments["track_id"] == track.id]
             i = layers.index.get_level_values("aln_id").isin(track_alns.index)
             track_layers = layers.iloc[i]

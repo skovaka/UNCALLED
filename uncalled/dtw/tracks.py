@@ -251,12 +251,12 @@ class Tracks:
             assert isinstance(fnames, list)
                 
             for filename in fnames:
-                io = Cls(filename, False, self.conf)
-                tracks.append(io.tracks)
+                io = Cls(filename, False, self)
+                tracks.append(io.aln_tracks)
                 self.conf.load_config(io.conf)
                 self.inputs.append(io)
 
-                for track in io.tracks:
+                for track in io.aln_tracks:
                     self._add_track(track.name, track)
 
         in_prms = [getattr(self.prms.io, p) is not None for p in INPUT_PARAMS]
@@ -271,11 +271,11 @@ class Tracks:
             filename = getattr(self.prms.io, out_format)
             new_track = True
             if out_format == "sql_out":
-                self.output = SQL(filename, True, self.conf)
+                self.output = SQL(filename, True, self)
             elif out_format == "tsv_out":
-                self.output = TSV(filename, True, self.conf)
+                self.output = TSV(filename, True, self)
             elif out_format == "eventalign_out":
-                self.output = Eventalign(filename, True, self.conf)
+                self.output = Eventalign(filename, True, self)
             elif out_format == "bam_out":
                 if len(self.inputs) != 1:
                     raise RuntimeError("Must input exactly one BAM file for BAM output")
@@ -283,17 +283,17 @@ class Tracks:
                 self.output = self.inputs[0]
 
             if new_track:
-                for track in self.output.tracks:
+                for track in self.output.aln_tracks:
                     self._add_track(track.name, track)
 
-                tracks.append(self.output.tracks)
+                tracks.append(self.output.aln_tracks)
 
-            self.output_track = self.output.tracks[0].name
+            self.output_track = self.output.aln_tracks[0].name
             #for track in self.output.tracks:
             #    self.output_tracks[track.name] = track
         else:
             self.output = None
-            self.output_track = self.inputs[0].tracks[0].name
+            self.output_track = self.inputs[0].aln_tracks[0].name
 
         self.model = None
 
@@ -550,7 +550,7 @@ class Tracks:
 
             layers = layers.droplevel(0)
 
-            for track in io.tracks:
+            for track in io.aln_tracks:
                 track_alns = alignments[alignments["track_id"] == track.id]
                 i = layers.index.get_level_values("aln_id").isin(track_alns.index)
                 track_layers = layers.iloc[i]
@@ -761,13 +761,13 @@ class Tracks:
 
             return seq_coords, coords
 
-        layer_iters = [
-            io.iter_refs(
-                self.db_layers, 
-                self._aln_track_ids, 
-                coords=coords, 
-                chunksize=self.prms.io.ref_chunksize)
-            for io in self.inputs]
+        #layer_iters = [
+        #    io.iter_refs(
+        #        self.db_layers, 
+        #        self._aln_track_ids, 
+        #        coords=coords, 
+        #        chunksize=self.prms.io.ref_chunksize)
+        #    for io in self.inputs]
 
         #chunks = [next(i) for i in layer_iters]
         #seq_coords = [get_full_coords(chunk.index[0]) for chunk in chunks]
@@ -802,30 +802,33 @@ class Tracks:
                 coords=coords, 
                 chunksize=self.prms.io.ref_chunksize)
 
-            chunk = next(layer_iter)
-            seq_coords = get_full_coords(chunk.index[0])
+            aln_chunk, layer_chunk = next(layer_iter)
+            seq_coords = get_full_coords(layer_chunk.index[0])
+            while len(layer_chunk) > 0:
 
-            while len(chunk) > 0:
+                if len(layer_chunk.index.get_level_values("pac").unique()) <= 1:
+                    next_alns, next_layers = next(layer_iter, (pd.DataFrame(), pd.DataFrame()))
+                    aln_chunk = pd.concat([aln_chunk, next_alns])
+                    aln_chunk = aln_chunk[~aln_chunk.index.duplicated()]
+                    layer_chunk = pd.concat([layer_chunk, next_layers])
 
-                if len(chunk.index.get_level_values("pac").unique()) <= 1:
-                    chunk = pd.concat([chunk, next(layer_iter, pd.DataFrame())])
 
-                coord_idx = chunk.index.droplevel("aln_id").unique()
+                coord_idx = layer_chunk.index.droplevel("aln_id").unique()
                 #chunk_mrefs = chunk.index.get_level_values("pac").unique()
 
                 seq_coords, coords = next_coords(seq_coords, coord_idx)
                 coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
 
-                mask = (chunk.index.get_level_values(0) == coords.fwd) & chunk.index.get_level_values(1).isin(coords.pacs)
-                layers = chunk[mask]
-                leftovers = chunk[~mask]
+                mask = (layer_chunk.index.get_level_values(0) == coords.fwd) & layer_chunk.index.get_level_values(1).isin(coords.pacs)
+                layers = layer_chunk[mask]
+                leftovers = layer_chunk[~mask]
 
-                aln_ids = layers.index.unique("aln_id").to_numpy()
-                alns = io.query_alignments(self._aln_track_ids, aln_id=aln_ids)
+                #aln_ids = layers.index.unique("aln_id").to_numpy()
+                #alns = io.query_alignments(self._aln_track_ids, aln_id=aln_ids)
 
-                ret = self._tables_to_tracks(coords, alns, layers)
+                ret = self._tables_to_tracks(coords, aln_chunk, layers)
 
-                chunk = leftovers
+                layer_chunk = leftovers
 
                 if not ret.all_empty:
                     yield ret
@@ -896,11 +899,11 @@ class Tracks:
         layer_alns = layers.index.get_level_values("aln_id")
 
         if self.prms.shared_refs_only or self.prms.min_coverage > 1:
-            track_covs = alignments.loc[layer_alns, ["track_id"]] \
-                                   .set_index(layers.index) \
-                                   .reset_index("aln_id", drop=True) \
-                                   .set_index("track_id", append=True) \
-                                   .index.value_counts()
+            track_covs = alignments.loc[layer_alns, ["track_id"]] 
+            track_covs = track_covs.set_index(layers.index)
+            track_covs = track_covs.reset_index("aln_id", drop=True) 
+            track_covs = track_covs.set_index("track_id", append=True) 
+            track_covs = track_covs.index.value_counts()
 
             mask = track_covs >= self.prms.min_coverage
             if not np.any(mask):

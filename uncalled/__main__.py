@@ -260,6 +260,7 @@ REFSTATS_OPTS = (
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt("--min-coverage", "tracks"),
     Opt(("--ref-chunksize"), "tracks.io"),
+    Opt(("--aln-chunksize"), "tracks.io"),
     Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
 )
 
