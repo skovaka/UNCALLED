@@ -49,6 +49,8 @@ class PoreModel:
                 is_preset = model.name in PORE_MODEL_PRESETS
                 if is_preset:
                     prms = PORE_MODEL_PRESETS[model.name].prms
+                    if model.shift > 0:
+                        prms.shift = model.shift
                 else:
                     prms = model
 

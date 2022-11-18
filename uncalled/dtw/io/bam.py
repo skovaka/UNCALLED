@@ -44,12 +44,12 @@ class BAM(TrackIO):
         self.init_track(1, name, name, conf)
 
         #TODO really not good, should stream by default
-        #if self.conf.tracks.io.bam_out is not None:
-        self.in_alns = defaultdict(list)
-        for aln in self.iter_sam():
-            self.in_alns[aln.query_name].append(aln)
-        self.input.reset()
-
+        if self.conf.tracks.io.bam_out is not None:
+            self.in_alns = defaultdict(list)
+            for aln in self.iter_sam():
+                print("PARSING")
+                self.in_alns[aln.query_name].append(aln)
+            self.input.reset()
 
         self.aln_id_in = 1
 
@@ -181,8 +181,12 @@ class BAM(TrackIO):
 
         layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1).sort_index()
 
-        layers["dtw", "length"] = layers["dtw", "length"].replace(0, pd.NA)#.astype("int32")
+        layers.loc[layers["dtw", "length"] == 0, ("dtw", "length")] = pd.NA
         layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("int32")
+
+        #Note should use below, but too buggy: https://github.com/pandas-dev/pandas/issues/45725
+        #layers["dtw", "length"] = layers["dtw", "length"].replace(0, pd.NA)
+        #layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("int32")
 
         aln = pd.DataFrame({
                 "id" : [self.aln_id_in],
@@ -238,6 +242,7 @@ class BAM(TrackIO):
 
         prev_ref = None
         prev_start = 0
+        print("itering")
 
         for sam in itr:
             aln,layer = self._parse_sam(sam)
@@ -250,6 +255,8 @@ class BAM(TrackIO):
                 ret_layers = pd.concat([l[l.index.get_level_values(1).isin(pd.RangeIndex(prev_start, pac_st))] for l in layers])
                 aln_ids = ret_layers.index.get_level_values(2).unique()
                 ret_alns = pd.concat([a.loc[aln_ids.intersection(a.index)] for a in alns])
+
+                #print("must yield", a)
 
                 yield (ret_alns, ret_layers)
 

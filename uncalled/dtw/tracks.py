@@ -95,7 +95,7 @@ class Tracks:
 
         self._aln_track_ids = [t.id for t in self.alns]
 
-        self.index = load_index(self.model.K, self.prms.index_prefix, kmer_shift=self.conf.pore_model.shift)
+        self.index = load_index(self.model.K, self.prms.index_prefix, kmer_shift=self.model.PRMS.shift)
 
         self.coords = self._ref_bounds_to_coords(self.prms.ref_bounds)
 
@@ -935,8 +935,6 @@ class Tracks:
             else:
                 track_alns = alignments.iloc[:0] 
                 track_layers = layers.iloc[:0]   
-
-            print(track_layers)
 
             track = AlnTrack(parent, coords, track_alns, track_layers)
 
