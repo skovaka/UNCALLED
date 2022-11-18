@@ -11,8 +11,8 @@ import _uncalled
 class Eventalign(TrackIO):
     FORMAT = "eventalign"
 
-    def __init__(self, filename, write, conf):
-        TrackIO.__init__(self, filename, write, conf)
+    def __init__(self, filename, write, tracks):
+        TrackIO.__init__(self, filename, write, tracks)
 
         if self.filename == "-":
             self.out = sys.stdout

@@ -13,8 +13,8 @@ from _uncalled import _Fast5Reader
 
 class TrackSQL(TrackIO):
     FORMAT = "db"
-    def __init__(self, filename, write, conf):
-        TrackIO.__init__(self, filename, write, conf)
+    def __init__(self, filename, write, tracks):
+        TrackIO.__init__(self, filename, write, tracks)
 
         new_file = not os.path.exists(self.filename)
         self.con = sqlite3.connect(self.filename)
@@ -135,7 +135,7 @@ class TrackSQL(TrackIO):
         for table in ["dtw", "bcaln", "cmp", "band"]:
             self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
 
-        track = self.tracks[0]
+        track = self.aln_tracks[0]
 
         if self.prms.init_track:
             try:
@@ -156,7 +156,7 @@ class TrackSQL(TrackIO):
             tid = 0
 
 
-        self.tracks[0].id = tid
+        self.aln_tracks[0].id = tid
 
     def init_read_mode(self):
         self.table_columns = dict()
@@ -356,10 +356,22 @@ class TrackSQL(TrackIO):
         else:
             strands = [1, 0]
 
+        alns = pd.DataFrame()
+
         for fwd in strands:
             chunks = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, ["pac"], chunksize, full_overlap)
-            for c in chunks:
-                yield c
+            for l in chunks:
+                if len(alns) == 0:
+                    aln_ids = l.index.get_level_values(2).unique()
+                else:
+                    all_ids = l.index.get_level_values(2).unique()
+                    old_ids = all_ids.intersection(alns.index)
+                    aln_ids = all_ids.difference(alns.index)
+                    alns = alns.loc[old_ids]
+
+                alns = pd.concat([alns, self.query_alignments(track_id, aln_id=list(aln_ids))])
+
+                yield alns, l
 
     def query(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
         layers = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, order, None, full_overlap)
