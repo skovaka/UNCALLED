@@ -105,6 +105,7 @@ class Dotplot:
         coords = None
 
         flipped = True
+        fwd = True
 
         for i,track in enumerate(tracks.alns):
 
@@ -125,6 +126,7 @@ class Dotplot:
                               .droplevel("aln_id")
 
                 
+                fwd = fwd and aln["fwd"]
                 flipped = flipped and aln["fwd"] == self.conf.is_rna
 
                 if self.prms.show_bands and "band" in layers:
@@ -258,9 +260,9 @@ class Dotplot:
             fig.add_hline(y=self.prms.select_ref, line_color="red", row=2, col=1, opacity=0.5)
             i = hover_data.index.get_loc(self.prms.select_ref)
 
-        strand = "+" if aln["fwd"] else "-"
+        strand = "+" if fwd else "-"
         fig.update_yaxes(row=2, col=1,
-            title_text=aln["ref_name"] + f" ({strand})")
+            title_text=tracks.coords.ref_name + f" ({strand})")
 
         for i,(group,layer) in enumerate(self.layers):
             fig.update_xaxes(row=2, col=i+2,
@@ -395,7 +397,7 @@ class Dotplot:
 def dotplot(conf):
     """Plot signal-to-reference alignment dotplots"""
 
-    #conf.fast5_reader.load_bc = True
+    conf.tracks.load_fast5 = True
     dotplots = Dotplot(conf=conf)
     save = conf.out_prefix is not None
     for read_id, fig in dotplots.iter_plots():

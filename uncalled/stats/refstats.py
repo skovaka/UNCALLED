@@ -58,7 +58,8 @@ def refstats(conf):
         chunk.prms.refstats_layers = layers
 
         stats = chunk.calc_refstats(conf.cov)
-        stats["kmer"] = tracks.model.kmer_to_str(chunk.coords.ref_kmers.loc[(int(chunk.coords.fwd), stats.index)])
+        if stats is None: continue
+        stats["kmer"] = tracks.model.kmer_to_str(chunk.coords.ref_kmers.loc[(chunk.coords.strands, stats.index)])
 
         #if conf.verbose_refs:
         stats.index = pd.MultiIndex.from_product([

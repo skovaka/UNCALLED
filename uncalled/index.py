@@ -85,6 +85,10 @@ class CoordSpace:
     def stranded(self):
         return self.fwd is not None
 
+    @property
+    def strands(self):
+        return [int(self.fwd)] if self.stranded else [0,1]
+
     def contains(self, other):
         if isinstance(other, CoordSpace):
             return (self.ref_name == other.ref_name and
@@ -149,10 +153,15 @@ class CoordSpace:
             return None
         bounds = self.pacs.get_indexer(minmax)
 
+        fwds = np.array(coords.get_level_values(0))
+        all_fwd = np.all(fwds)
+        all_rev = np.all(~fwds)
+        fwd = None if not (all_fwd or all_rev) else all_fwd
+
         st,en = sorted(bounds)
         en += 1
 
-        return self._slice(st,en,self.fwd)
+        return self._slice(st,en,fwd)
 
     def _slice(self, st, en, fwd=None):
         refs = self.refs[st:en]
@@ -167,7 +176,8 @@ class CoordSpace:
 
         elif fwd is None:
             mrefs = tuple( (m[st:en] for m in self.mrefs) )
-            kmers = tuple( (k[st:en] for k in self.kmers) )
+            if self.kmers is not None:
+                kmers = tuple( (k[st:en] for k in self.kmers) )
         else:
             mrefs = self.mrefs[fwd][st:en]
             if self.kmers is not None:

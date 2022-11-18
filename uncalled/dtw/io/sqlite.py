@@ -12,8 +12,10 @@ from . import TrackIO
 
 class TrackSQL(TrackIO):
     FORMAT = "db"
-    def __init__(self, filename, write, tracks):
-        TrackIO.__init__(self, filename, write, tracks)
+    def __init__(self, filename, write, tracks, track_count):
+        TrackIO.__init__(self, filename, write, tracks, track_count)
+
+        self.track_shift = track_count#+1
 
         new_file = not os.path.exists(self.filename)
         self.con = sqlite3.connect(self.filename)
@@ -25,14 +27,14 @@ class TrackSQL(TrackIO):
         #if new_file:
         self.init_tables()
 
-        prev_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
-        if prev_id is not None:
-            self.prev_aln_id = prev_id
-
         if self.write_mode:
             self.init_write_mode()
         else:
             self.init_read_mode()
+
+        prev_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
+        if prev_id is not None:
+            self.prev_aln_id = prev_id
 
     def close(self):
         if self.open:
@@ -154,8 +156,9 @@ class TrackSQL(TrackIO):
         else:
             tid = 0
 
+        self.write_id = tid
 
-        self.aln_tracks[0].id = tid
+        #self.aln_tracks[0].id = tid
 
     def init_read_mode(self):
         self.table_columns = dict()
@@ -186,7 +189,7 @@ class TrackSQL(TrackIO):
                 conf = config.Config(toml=row["config"])
             else:
                 conf = self.conf
-            self.init_track(row["id"], row["name"], row["desc"], conf)
+            self.init_track(row["name"], row["desc"], conf, row["id"]+self.track_shift)
 
         #if self.tracks is None:
         #    self.tracks = df
@@ -195,6 +198,10 @@ class TrackSQL(TrackIO):
 
 
     def write_track(self, track):
+        #self.cur.execute(
+        #    "INSERT INTO track (id,name,desc,config) VALUES (?,?,?,?)",
+        #    (track.id, track.name, track.desc, track.conf.to_toml())
+        #)
         self.cur.execute(
             "INSERT INTO track (name,desc,config) VALUES (?,?,?)",
             (track.name, track.desc, track.conf.to_toml())
@@ -210,6 +217,7 @@ class TrackSQL(TrackIO):
 
 
     def write_alignment(self, aln_df):
+        aln_df["track_id"] = self.write_id
         aln_df.to_sql(
             "alignment", self.con, 
             if_exists="append", 
@@ -302,7 +310,9 @@ class TrackSQL(TrackIO):
 
         query = self._join_query(select, wheres, order)
 
-        return pd.read_sql_query(query, self.con, index_col="id", params=params, chunksize=chunksize)
+        df = pd.read_sql_query(query, self.con, params=params, chunksize=chunksize)
+        df["track_id"] += self.track_shift #self.next_id+1
+        return df.set_index(["track_id","id"])
         
     def _join_query(self, select, wheres, order=None):
         query = select
@@ -343,7 +353,6 @@ class TrackSQL(TrackIO):
             params += [str(coords.pacs.min()), str(coords.pacs.max())]
 
         query = self._join_query(select, wheres)
-
         return pd.read_sql_query(
             query, self.con, 
             index_col=["pac", "aln_a", "aln_b", "group_b"], 
@@ -360,19 +369,20 @@ class TrackSQL(TrackIO):
         for fwd in strands:
             chunks = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, ["pac"], chunksize, full_overlap)
             for l in chunks:
-                if len(alns) == 0:
-                    aln_ids = l.index.get_level_values(2).unique()
-                else:
-                    all_ids = l.index.get_level_values(2).unique()
-                    old_ids = all_ids.intersection(alns.index)
-                    aln_ids = all_ids.difference(alns.index)
-                    alns = alns.loc[old_ids]
+                aln_ids = l.index.get_level_values("aln_id").unique()
+                if len(alns) > 0:
+                    aln_ids = aln_ids.difference(alns.index)
 
-                alns = pd.concat([alns, self.query_alignments(track_id, aln_id=list(aln_ids))])
+                #alns = pd.concat([alns, self.query_alignments(track_id, aln_id=list(aln_ids))])
+                alns = self.query_alignments(track_id, aln_id=list(aln_ids))
 
                 yield alns, l
 
     def query(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
+        
+        if track_id is not None:
+            track_id = np.array(track_id)-self.track_shift
+
         layers = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, order, None, full_overlap)
 
         aln_ids = layers.index.unique("aln_id").to_numpy()
@@ -402,6 +412,7 @@ class TrackSQL(TrackIO):
 
         fields += ["%s.%s AS idx_%s" % (tables[0],idx,idx) for idx in ("pac", "aln_id")]
         fields.append("fwd")
+        fields.append("track_id")
 
         select = "SELECT " + ", ".join(fields) + " FROM " + tables[0]
         for table in tables[1:]:
@@ -437,16 +448,18 @@ class TrackSQL(TrackIO):
 
         ret = pd.read_sql_query(
             query, self.con, 
-            index_col=["fwd", "idx_pac", "idx_aln_id"], 
+            #index_col=["track_id", "fwd", "idx_pac", "idx_aln_id"], 
             params=params, chunksize=chunksize)
 
         def make_groups(df):
             grouped = dict()
+            df["track_id"] += self.track_shift #self.next_id+1
+            df.set_index(["track_id", "fwd", "idx_pac", "idx_aln_id"], inplace=True)
+            df.index.names = ("track_id", "fwd", "pac", "aln_id")
             for group, layers in group_layers.items():
                 gdf = df[layers]
                 grouped[group] = df[layers].rename(columns=renames)
             df = pd.concat(grouped, names=("group", "layer"), axis=1)
-            df.index.names = ("fwd", "pac", "aln_id")
             return df
                 
         if chunksize is None:
@@ -463,13 +476,11 @@ class TrackSQL(TrackIO):
         layer_leftovers = pd.DataFrame()
 
         for layers in layer_iter:
-            ids = layers.index \
-                        .get_level_values("aln_id") \
-                        .unique() \
-                        .difference(aln_leftovers.index) \
-                        .to_numpy()
+            ids = layers.index.unique("aln_id") 
+            if len(aln_leftovers) > 0:
+                ids = ids.difference(aln_leftovers.index.get_level_values("id")) 
             if len(ids) > 0:
-                alignments = self.query_alignments(aln_id=ids)
+                alignments = self.query_alignments(aln_id=ids.to_numpy())
             else:
                 alignments = pd.DataFrame()
 
@@ -487,7 +498,7 @@ class TrackSQL(TrackIO):
 
             yield alignments, layers
 
-        if len(aln_leftovers) > 0:
+        if len(aln_leftovers) > 0 and len(layer_leftovers) > 0:
             yield aln_leftovers, layer_leftovers
     
     def _verify_track(self, track_name):
@@ -505,7 +516,7 @@ _LS_QUERY = "SELECT name,desc,COUNT(alignment.id) FROM track " \
             "JOIN alignment ON track.id == track_id GROUP BY name"
 def ls(conf, db=None):
     if db is None:
-        db = TrackSQL(conf.tracks.io.sql_in, False, conf)
+        db = TrackSQL(conf.tracks.io.sql_in, False, conf, 1)
     print("\t".join(["Name", "Description", "Alignments"]))
 
     for row in db.cur.execute(_LS_QUERY).fetchall():

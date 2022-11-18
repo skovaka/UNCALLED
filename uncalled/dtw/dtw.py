@@ -37,9 +37,6 @@ def dtw(conf):
 
     guppy_in = Guppy(conf.tracks.io.guppy_in, False, conf)
 
-    #for config in guppy_in.iter_batches():
-    #    print(config.tracks.io.bam_out)
-
     pbar = progbar.ProgressBar(len(guppy_in.fast5_paths), widgets=[
         progbar.Timer(),
         progbar.Bar(),

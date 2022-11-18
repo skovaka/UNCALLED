@@ -11,8 +11,8 @@ import _uncalled
 class Eventalign(TrackIO):
     FORMAT = "eventalign"
 
-    def __init__(self, filename, write, tracks):
-        TrackIO.__init__(self, filename, write, tracks)
+    def __init__(self, filename, write, tracks, track_count):
+        TrackIO.__init__(self, filename, write, tracks, track_count)
 
         if self.filename == "-":
             self.out = sys.stdout
@@ -61,7 +61,7 @@ class Eventalign(TrackIO):
         if self.conf.pore_model.name == "r94_dna":
             self.conf.pore_model.name = "r9.4_dna_450bps_6mer_npl"
 
-        self.init_track(1, name, name, self.conf)
+        self.in_id = self.init_track(name, name, self.conf)
 
     #def write_dtw_events(self, track, events):
     #def write_layers(self, df, read, index=["pac","aln_id"]):
@@ -185,7 +185,7 @@ class Eventalign(TrackIO):
                         "event_length" : "length",
                         "event_level_mean" : "current",
                      }).set_index(pd.MultiIndex.from_product(
-                        [[fwd], pacs, [aln_id]], names=("fwd","pac","aln_id")))
+                        [[self.in_id], [fwd], pacs, [aln_id]], names=("track_id","fwd","pac","aln_id")))
 
                 samp_start = layers["start"].min()
                 e = layers["start"].argmax()
@@ -195,7 +195,7 @@ class Eventalign(TrackIO):
 
                 alns = pd.DataFrame({
                         "id" : [aln_id],
-                        "track_id" : [1],
+                        "track_id" : [self.in_id],
                         "read_id" : [read_id],
                         "ref_name" : [coords.ref_name],
                         "ref_start" : [coords.refs.start],
@@ -203,7 +203,7 @@ class Eventalign(TrackIO):
                         "fwd" :     [coords.fwd],
                         "samp_start" : [samp_start],
                         "samp_end" : [samp_end],
-                        "tags" : [""]}).set_index("id")
+                        "tags" : [""]}).set_index(["track_id", "id"])
 
                 aln_id += 1
 

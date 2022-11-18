@@ -89,7 +89,7 @@ TracksParams._def_params(
     ("refstats_layers", None, None, "Layers to compute refstats"),
 
     ("index_prefix", None, str, "BWA index prefix"),
-    ("load_fast5s", True, bool, "Load fast5 files"),
+    ("load_fast5s", False, bool, "Load fast5 files"),
 
     ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter"}
 )

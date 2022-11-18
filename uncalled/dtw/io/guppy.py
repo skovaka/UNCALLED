@@ -17,9 +17,9 @@ bam_re = re.compile("bam_runid_([^_]+)_(\d+)_\d+\.bam")
 class Guppy(TrackIO):
     FORMAT = "guppy"
 
-    def __init__(self, filename, write, tracks):
+    def __init__(self, filename, write, tracks, track_count):
         self.dir = filename
-        TrackIO.__init__(self, filename, write, tracks)
+        TrackIO.__init__(self, filename, write, tracks, track_count)
         
         if not os.path.isdir(self.dir):
             raise FileNotFoundError(f"Guppy directory does not exist: {self.dir}")
@@ -84,7 +84,7 @@ class Guppy(TrackIO):
 
         self.conf.fast5_reader.fast5_files = [self.prms.guppy_in]
 
-        self.init_track(1, name, name, self.conf)
+        self.init_track(name, name, self.conf)
 
     def iter_batches(self):
         self.batches = set()

@@ -17,8 +17,8 @@ import _uncalled
 class BAM(TrackIO):
     FORMAT = "bam"
 
-    def __init__(self, filename, write, tracks):
-        TrackIO.__init__(self, filename, write, tracks)
+    def __init__(self, filename, write, tracks, track_count):
+        TrackIO.__init__(self, filename, write, tracks, track_count)
 
         self.init_read_mode()
         self.init_write_mode()
@@ -40,7 +40,7 @@ class BAM(TrackIO):
             #toml = self.conf.to_toml()
 
         name = os.path.basename(self.filename)
-        self.init_track(1, name, name, conf)
+        self.in_id = self.init_track(name, name, conf)
 
         #TODO really not good, should stream by default
         #if self.conf.tracks.io.bam_out is not None:
@@ -162,8 +162,8 @@ class BAM(TrackIO):
 
         dtw = pd.DataFrame(
             {"current" : current, "length" : length},
-            index=pd.MultiIndex.from_product([[fwd], pacs, [self.aln_id_in]],
-                                             names=("fwd","pac","aln_id"))
+            index=pd.MultiIndex.from_product([[self.in_id], [fwd], pacs, [self.aln_id_in]],
+                                             names=("track_id", "fwd","pac","aln_id"))
         )
 
         if samp_bounds[0] < samp_bounds[1]:
@@ -183,7 +183,7 @@ class BAM(TrackIO):
 
         aln = pd.DataFrame({
                 "id" : [self.aln_id_in],
-                "track_id" : [1],
+                "track_id" : [self.in_id],
                 "read_id" : [sam.query_name],
                 "ref_name" : [coords.ref_name],
                 "ref_start" : [ref_start],
@@ -191,7 +191,7 @@ class BAM(TrackIO):
                 "fwd" :     [fwd],
                 "samp_start" : [samp_start],
                 "samp_end" : [samp_end],
-                "tags" : [""]}).set_index("id")
+                "tags" : [""]}).set_index(["track_id", "id"])
 
         self.aln_id_in += 1
 
@@ -235,34 +235,36 @@ class BAM(TrackIO):
 
         prev_ref = None
         prev_start = 0
+        prev_aln = 0
 
         for sam in itr:
             aln,layer = self._parse_sam(sam)
 
             a = aln.iloc[0]
-            pac_st = layer.index.get_level_values(1).min()
+            pac_st = layer.index.get_level_values("pac").min()
 
-            if prev_ref is not None and (a["ref_name"] != prev_ref or a["ref_start"] > prev_start):
+            if prev_ref is not None and (a["ref_name"] != prev_ref or a["ref_start"] > prev_start) and len(alns) > self.prms.aln_chunksize:
                 pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
-                ret_layers = pd.concat([l[l.index.get_level_values(1).isin(pd.RangeIndex(prev_start, pac_st))] for l in layers])
-                aln_ids = ret_layers.index.get_level_values(2).unique()
-                ret_alns = pd.concat([a.loc[aln_ids.intersection(a.index)] for a in alns])
+                ret_layers = pd.concat([l[l.index.get_level_values("pac").isin(pd.RangeIndex(prev_start, pac_st))] for l in layers])
+                ret_alns = pd.concat([alns[prev_aln:]])
 
                 yield (ret_alns, ret_layers)
 
-                while len(alns) > 0 and (alns[0].iloc[0]["ref_name"] != a["ref_name"] or layers[0].index.get_level_values(1).max() < pac_st):
+                while len(alns) > 0 and (alns[0].iloc[0]["ref_name"] != a["ref_name"] or layers[0].index.get_level_values("pac").max() < pac_st):
                     alns.popleft()
                     layers.popleft()
 
                 prev_ref = a["ref_name"]
                 prev_start = a["ref_start"]
+                prev_aln = len(alns)
 
             alns.append(aln)
             layers.append(layer)
 
         pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
-        ret_layers = pd.concat([l[l.index.get_level_values(1) >= prev_start] for l in layers])
-        aln_ids = ret_layers.index.get_level_values(2).unique()
+        ret_layers = pd.concat([l[l.index.get_level_values("pac") >= prev_start] for l in layers])
+        #aln_ids = ret_layers.index.get_level_values("aln_id").unique()
+        aln_ids = ret_layers.index.droplevel(["fwd","pac"]).unique()
         ret_alns = pd.concat([a.loc[aln_ids.intersection(a.index)] for a in alns])
 
         yield (ret_alns, ret_layers)
