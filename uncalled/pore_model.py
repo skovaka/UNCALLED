@@ -91,7 +91,8 @@ class PoreModel:
 
         if vals is not None:
             prms.k = int(np.log2(len(vals)) / 2)
-            prms.shift = PoreModel.get_kmer_shift(prms.k)
+            if prms.shift < 0:
+                prms.shift = PoreModel.get_kmer_shift(prms.k)
             self._init_new(prms, vals, prms.reverse, prms.complement)
         else:
             self._init_new(prms, prms)

@@ -296,8 +296,13 @@ class RefIndex:
         self.Model = getattr(_uncalled, f"PoreModelK{k}", None)
         if self.InstanceClass is None or self.Model is None:
             raise ValueError(f"Invalid k-mer length {k}")
+        
+        if "kmer_shift" in kwargs:
+            shift = kwargs["kmer_shift"]
+            del kwargs["kmer_shift"]
+        else:
+            shift = PoreModel.get_kmer_shift(k)
 
-        shift = PoreModel.get_kmer_shift(k)
         self.trim = (shift, k-shift-1)
 
         self.instance = self.InstanceClass(*args, **kwargs)
@@ -388,10 +393,10 @@ class RefIndex:
 
 _index_cache = dict()
 
-def load_index(k, prefix, load_pacseq=True, load_bwt=False, cache=True):
+def load_index(k, prefix, load_pacseq=True, load_bwt=False, cache=True, kmer_shift=None):
     idx = _index_cache.get(prefix, None)
     if idx is None:
-        idx = RefIndex(k, prefix, load_pacseq, load_bwt)
+        idx = RefIndex(k, prefix, load_pacseq, load_bwt, kmer_shift=kmer_shift)
         if cache: _index_cache[prefix] = idx
     else:
         if load_pacseq and not idx.pacseq_loaded():

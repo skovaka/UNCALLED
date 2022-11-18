@@ -9,6 +9,7 @@ from ..aln_track import AlnTrack
 from ..layers import LAYER_META, LAYER_DB_GROUPS
 from ... import config
 from . import TrackIO
+from _uncalled import _Fast5Reader
 
 class TrackSQL(TrackIO):
     FORMAT = "db"
@@ -514,7 +515,7 @@ def delete(track_name=None, db=None, conf=None):
     print("Deleted track \"%s\"" % track_name)
 
 def edit(conf, db=None):
-    fast5s = _uncalled._Fast5Reader.Params(conf.fast5_reader)
+    fast5s = _Fast5Reader.Params(conf.fast5_reader)
     fast5_change = len(conf.fast5_files) > 0
     track_name = conf.track_name
     if db is None:

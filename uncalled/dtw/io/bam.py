@@ -34,6 +34,7 @@ class BAM(TrackIO):
                 if not line.startswith("UNC:"): continue
                 toml = re.sub(r"(?<!\\);", "\n", line[4:]).replace("\\;",";")
                 conf = Config(toml=toml)
+            
 
         if conf is None:
             conf = self.conf
@@ -49,10 +50,12 @@ class BAM(TrackIO):
             self.in_alns[aln.query_name].append(aln)
         self.input.reset()
 
+
         self.aln_id_in = 1
 
     def init_write_mode(self):
         if self.conf.tracks.io.bam_out is None:
+
             self.output = None
             return
         TrackIO.init_write_mode(self)

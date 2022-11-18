@@ -9,7 +9,7 @@ const PoreModelParams PORE_MODEL_PRMS_DEF {
     reverse    : false,
     complement : false,
     k          : 5,
-    shift      : 2,
+    shift      : -1,
 };
 
 using M = PoreModelPreset;
