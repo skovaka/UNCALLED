@@ -14,6 +14,7 @@ import pandas as pd
 import sys
 
 from ..aln_track import AlnTrack
+from ...config import Config
 
 INPUT_PARAMS = np.array(["sql_in", "eventalign_in", "tombo_in", "bam_in"])
 OUTPUT_PARAMS = np.array(["sql_out", "tsv_out", "eventalign_out", "bam_out"])
@@ -26,17 +27,22 @@ OUT_EXT = {
 }
 
 class TrackIO:
-    def __init__(self, filename, write, tracks):
-        self.tracks = tracks
-        self.conf = tracks.conf
+    def __init__(self, filename, write, tracks, track_count):
+        if isinstance(tracks, Config):
+            self.tracks = None
+            self.conf = tracks
+        else:
+            self.tracks = tracks
+            self.conf = tracks.conf
         self.prms = self.conf.tracks.io
+        self.next_id = track_count+1
 
         self.read = None
 
         self.aln_tracks = list()
 
         if not hasattr(self, "prev_aln_id"):
-            self.prev_aln_id = 0
+            self.prev_aln_id = 1
 
         if filename is None:
             self.filename = None
@@ -76,6 +82,7 @@ class TrackIO:
             self.prev_read = read_id
 
         self.prev_aln_id += 1
+
         return self.prev_aln_id
 
     def init_write_mode(self):
@@ -95,9 +102,9 @@ class TrackIO:
         self.prev_fast5 = (None, None)
         self.prev_read = None
 
-        return self.init_track(None, self.out_track, self.out_track, self.conf)
+        self.out_id = self.init_track(self.out_track, self.out_track, self.conf)
 
-    def init_track(self, id, name, desc, conf):
+    def init_track(self, name, desc, conf, id=None):
         #row = pd.DataFrame({
         #    "id" : id,
         #    "name" : name,
@@ -105,9 +112,14 @@ class TrackIO:
         #    "config" : conf
         #}, index=[0])
 
+        if id is None:
+            id = self.next_id
+        self.next_id = id + 1
+
         self.aln_tracks.append(AlnTrack(id, name, desc, conf))
         self.conf.load_config(conf)
 
+        return id
         #self.init_tracks(row)
         #return row
 
@@ -174,12 +186,14 @@ def convert(conf):
     from .. import Tracks
 
     conf.tracks.layers = ["dtw"]
+    conf.tracks.load_fast5s = True
     tracks = Tracks(conf=conf)
 
     for read_id, read in tracks.iter_reads():
         sys.stderr.write(f"{read_id}\n")
         aln = read.alns[0]
-        read.init_alignment(read_id, read.get_read_fast5(read_id), aln.coords, {"dtw" : aln.layers["dtw"].droplevel(1)})
+        dtw = aln.layers["dtw"].droplevel(1)
+        read.init_alignment(read_id, read.get_read_fast5(read_id), aln.coords, {"dtw" : dtw})
         
         read.write_alignment()
 

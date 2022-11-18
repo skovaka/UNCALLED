@@ -219,29 +219,11 @@ class Tracks:
 
     def _init_io(self):
 
-        tracks = list()
+        #tracks = list()
 
         self.inputs = list()
 
-        #def load_io(opts, write):
-        #    ret = list()
-
-        #    for name,Cls in opts.items():
-        #        fnames = getattr(self.prms.io, name, None)
-        #        if fnames is None: continue
-        #        if isinstance(fnames, str):
-        #            fnames = [fnames]
-        #        assert isinstance(fnames, list)
-        #            
-        #        for filename in fnames:
-        #            io = Cls(filename, write, self.conf)
-        #            tracks.append(io.tracks)
-        #            if not write:
-        #                self.conf.load_config(io.conf)
-        #            ret.append(io)
-
-        #            for track in io.tracks:
-        #                self._add_track(track.name, track)
+        track_count = 0
 
         for name,Cls in INPUTS.items():
             fnames = getattr(self.prms.io, name, None)
@@ -251,18 +233,19 @@ class Tracks:
             assert isinstance(fnames, list)
                 
             for filename in fnames:
-                io = Cls(filename, False, self)
-                tracks.append(io.aln_tracks)
+                io = Cls(filename, False, self, track_count)
+                #tracks.append(io.aln_tracks)
                 self.conf.load_config(io.conf)
                 self.inputs.append(io)
 
+                track_count += len(io.aln_tracks)
                 for track in io.aln_tracks:
                     self._add_track(track.name, track)
 
         in_prms = [getattr(self.prms.io, p) is not None for p in INPUT_PARAMS]
         out_prms = [getattr(self.prms.io, p) is not None for p in OUTPUT_PARAMS]
-        if np.sum(in_prms) > 1:
-            raise ValueError("No more than one input can be specified")
+        #if np.sum(in_prms) > 1:
+        #    raise ValueError("No more than one input can be specified")
         if np.sum(out_prms) > 1:
             raise ValueError("No more than one output can be specified")
 
@@ -271,11 +254,11 @@ class Tracks:
             filename = getattr(self.prms.io, out_format)
             new_track = True
             if out_format == "sql_out":
-                self.output = SQL(filename, True, self)
+                self.output = SQL(filename, True, self, track_count)
             elif out_format == "tsv_out":
-                self.output = TSV(filename, True, self)
+                self.output = TSV(filename, True, self, track_count)
             elif out_format == "eventalign_out":
-                self.output = Eventalign(filename, True, self)
+                self.output = Eventalign(filename, True, self, track_count)
             elif out_format == "bam_out":
                 if len(self.inputs) != 1:
                     raise RuntimeError("Must input exactly one BAM file for BAM output")
@@ -283,10 +266,11 @@ class Tracks:
                 self.output = self.inputs[0]
 
             if new_track:
+                track_count += len(io.aln_tracks)
                 for track in self.output.aln_tracks:
                     self._add_track(track.name, track)
 
-                tracks.append(self.output.aln_tracks)
+                #tracks.append(self.output.aln_tracks)
 
             self.output_track = self.output.aln_tracks[0].name
             #for track in self.output.tracks:
@@ -548,18 +532,15 @@ class Tracks:
         for io in self.inputs:
             alignments, layers = io.query(self.db_layers, self._aln_track_ids, self.coords, full_overlap=full_overlap, read_id=read_filter)
 
-            layers = layers.droplevel(0)
-
             for track in io.aln_tracks:
-                track_alns = alignments[alignments["track_id"] == track.id]
-                i = layers.index.get_level_values("aln_id").isin(track_alns.index)
-                track_layers = layers.iloc[i]
+                track_alns = alignments.loc[track.id]
+                track_layers = layers.loc[track.id].droplevel(0)
 
                 track.set_data(self.coords, track_alns, track_layers)
                 track.calc_layers(self.fn_layers)
             
         #TODO get this back
-        self.load_compare(alignments.index.to_numpy())
+        self.load_compare(alignments.index.droplevel(0).to_numpy())
         self.calc_refstats()
 
         for track in self.alns:
@@ -577,6 +558,7 @@ class Tracks:
         io = self.inputs[0]
 
         self.cmp = io.query_compare(self.cmp_layers, self._aln_track_ids, self.coords, aln_ids)
+
 
         if self.cmp is None:
             return
@@ -741,97 +723,122 @@ class Tracks:
         else:
             coords = self.coords
 
-        def get_full_coords(idx):
-            fwd = idx[0]
-            pac = idx[1]
+        def get_full_coords(pac):
             rid = self.index.pac_to_ref_id(pac)
             ref_len = self.index.get_ref_len(rid)
             ref_name = self.index.get_ref_name(rid)
-            seq_refs = RefCoord(ref_name, 0, ref_len, fwd)
+            seq_refs = RefCoord(ref_name, 0, ref_len)
             return self.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=False)
 
-        def next_coords(seq_coords, idx):
-            if len(idx) > 1:
-                idx = idx[:-1]
+        def next_coords(seq_coords, pac, fwd):
+            if len(pac) > 1:
+                pac = pac[:-1]
+
+            idx = pd.MultiIndex.from_product([[int(fwd)], pac])
 
             coords = seq_coords.pac_intersect(idx)
             if coords is None:
-                seq_coords = get_full_coords(idx[0])
+                seq_coords = get_full_coords(pac[0])
                 coords = seq_coords.pac_intersect(idx)
 
             return seq_coords, coords
 
-        #layer_iters = [
-        #    io.iter_refs(
-        #        self.db_layers, 
-        #        self._aln_track_ids, 
-        #        coords=coords, 
-        #        chunksize=self.prms.io.ref_chunksize)
-        #    for io in self.inputs]
+        #NEW CODE START 
 
-        #chunks = [next(i) for i in layer_iters]
-        #seq_coords = [get_full_coords(chunk.index[0]) for chunk in chunks]
-
-        #while np.any([len(chunk) > 0 for chunk in chunks]):
-
-        #    #Refill from each chunk if only one ref coord is contained in it
-
-        #    #TODO find the chunk with the highest ref coordinate, refill other chunks to match?
-        #    #or no, keep this the same? only output up until second-to-last ref in least full chunk, then it'll be filled based on the logic below? 
-        #    for i in range(len(chunks)):
-        #        while len(chunks[i].index.get_level_values("pac").unique()) <= 1:
-        #            layers = next(layer_iters[i], None)
-        #            if layers is not None:
-        #                chunks[i] = pd.concat([chunks[i], layers])
-        #            else: break
-
-        #    last_coord = min([chunk.index.droplevel("aln_id")[-1]])
-
-        #    coord_idx = chunks[0].index.droplevel("aln_id").unique()
-        #    for chunk in chunks[1:]:
-        #        coord_idx = coord_idx.union(chunk.index.droplevel("aln_id").unique())
-
-        #    seq_coords, coords = next_coords(seq_coords, coord_idx)
-        #    coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
-            
-
-        for io in self.inputs:
-            layer_iter = io.iter_refs(
+        layer_iters = [
+            io.iter_refs(
                 self.db_layers, 
                 self._aln_track_ids, 
                 coords=coords, 
                 chunksize=self.prms.io.ref_chunksize)
+            for io in self.inputs]
 
-            aln_chunk, layer_chunk = next(layer_iter)
-            seq_coords = get_full_coords(layer_chunk.index[0])
-            while len(layer_chunk) > 0:
+        chunks = [next(i) for i in layer_iters]
 
-                if len(layer_chunk.index.get_level_values("pac").unique()) <= 1:
-                    next_alns, next_layers = next(layer_iter, (pd.DataFrame(), pd.DataFrame()))
-                    aln_chunk = pd.concat([aln_chunk, next_alns])
-                    aln_chunk = aln_chunk[~aln_chunk.index.duplicated()]
-                    layer_chunk = pd.concat([layer_chunk, next_layers])
+        #pacs = pd.Index()
+        #for alns,layers in chunks:
+        #    pacs = pacs.union(layers.get_level_values("pac").unique())
+        pac_min = min([l.index.get_level_values("pac")[0] for a,l in chunks])
+        seq_coords = get_full_coords(pac_min)
 
+        #chunk_coords = [get_full_coords(chunk.index[0]) for chunk in chunks]
+        #chunk_starts = np.array([c.pacs[0] for c in chunk_coords])
+        #seq_coords = [get_full_coords(chunk.index[0]) for chunk in chunks]
 
-                coord_idx = layer_chunk.index.droplevel("aln_id").unique()
-                #chunk_mrefs = chunk.index.get_level_values("pac").unique()
+        while np.any([len(chunk[0]) > 0 for chunk in chunks]):
 
-                seq_coords, coords = next_coords(seq_coords, coord_idx)
+            #Refill from each chunk if only one ref coord is contained in it
+
+            # TODO
+            # need to store alignment chunks and layer chunks, and deduplicate alignment chunks
+            # find least full chunk - lowest max pac coordinate
+            # output all chunks up to that coord
+            # refill most empty chunk
+
+            pac_start = np.inf
+            pac_end = np.inf
+
+            all_pacs = pd.Index([])
+
+            strand = -1
+            all_fwd = True
+            all_rev = True
+
+            for i in range(len(chunks)):
+                pacs = chunks[i][1].index.get_level_values("pac").unique()
+                while len(pacs) <= 1:
+                    alns, layers = next(layer_iters[i], (None, None))
+                    if alns is None:
+                        break
+
+                    alns = pd.concat([chunks[i][0], alns])
+                    alns = alns[~alns.index.duplicated()]
+                    layers = pd.concat([chunks[i][1], layers])
+                    chunks[i] = (alns,layers)
+                    pacs = chunks[i][1].index.get_level_values("pac").unique()
+
+                idx = chunks[i][1].index
+                if all_fwd or all_rev:
+                    fwds = idx.get_level_values("fwd").unique()
+                    all_fwd = all_fwd and np.all(fwds == 1)
+                    all_rev = all_rev and np.all(fwds == 0)
+                pacs = idx.get_level_values("pac").unique()
+
+                all_pacs = all_pacs.union(pacs)
+                pac_start = min(pac_start, pacs.min())
+                pac_end = min(pac_end, pacs.max())+1
+
+            chunk_pacs = pd.RangeIndex(pac_start, pac_end)
+            
+            #chunk_pacs = all_pacs[all_pacs <= pac_end].sort_values()
+
+            if not all_fwd or all_rev:
+                strands = [False, True]
+                fwd = None
+            else:
+                strands = [all_fwd]
+                fwd = all_fwd
+
+            for fwd in strands:
+
+                seq_coords, coords = next_coords(seq_coords, chunk_pacs, fwd)
                 coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
 
-                mask = (layer_chunk.index.get_level_values(0) == coords.fwd) & layer_chunk.index.get_level_values(1).isin(coords.pacs)
-                layers = layer_chunk[mask]
-                leftovers = layer_chunk[~mask]
+                masks = [
+                    l.index.get_level_values("pac").isin(coords.pacs) & (l.index.get_level_values("fwd") == fwd)
+                    for a,l in chunks]
 
-                #aln_ids = layers.index.unique("aln_id").to_numpy()
-                #alns = io.query_alignments(self._aln_track_ids, aln_id=aln_ids)
+                layers = pd.concat([l[mask] for (a,l),mask in zip(chunks, masks)])
+                alns = pd.concat([a.loc[l[mask].index.droplevel(["fwd","pac"]).unique()] for (a,l),mask in zip(chunks, masks)])
 
-                ret = self._tables_to_tracks(coords, aln_chunk, layers)
+                ret = self._tables_to_tracks(coords, alns, layers)
 
-                layer_chunk = leftovers
+                for i in range(len(chunks)):
+                    l = chunks[i][1][~masks[i]]
+                    aln_ids = l.index.droplevel(["fwd","pac"]).unique()
+                    chunks[i] = (chunks[i][0].loc[aln_ids], l)
 
-                if not ret.all_empty:
-                    yield ret
+                yield ret
 
     def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
         
@@ -899,18 +906,19 @@ class Tracks:
         layer_alns = layers.index.get_level_values("aln_id")
 
         if self.prms.shared_refs_only or self.prms.min_coverage > 1:
-            track_covs = alignments.loc[layer_alns, ["track_id"]] 
-            track_covs = track_covs.set_index(layers.index)
-            track_covs = track_covs.reset_index("aln_id", drop=True) 
-            track_covs = track_covs.set_index("track_id", append=True) 
-            track_covs = track_covs.index.value_counts()
+            #track_covs = alignments.loc[layer_alns, ["track_id"]] 
+            #track_covs = track_covs.set_index(layers.index)
+            #track_covs = track_covs.reset_index("aln_id", drop=True) 
+            #track_covs = track_covs.set_index("track_id", append=True) 
+            track_covs = layers.index.droplevel("aln_id")
+            track_covs = track_covs.value_counts()
 
             mask = track_covs >= self.prms.min_coverage
             if not np.any(mask):
                 idx = layers.index[:0]
             elif self.prms.shared_refs_only:
                 track_counts = pd.MultiIndex.from_tuples(track_covs[mask].index) \
-                                   .droplevel(2) \
+                                   .droplevel(0) \
                                    .value_counts()
 
                 shared = track_counts.index[track_counts == len(self.alns)]
@@ -921,17 +929,15 @@ class Tracks:
             else:
                 idx = track_covs[mask].index.unique()
 
-            layers = layers.loc[(idx.get_level_values(0),idx.get_level_values(1),slice(None))]
-            layer_alns = layers.index.get_level_values("aln_id")
+            layers = layers.loc[(slice(None),idx.get_level_values(0),idx.get_level_values(1),slice(None))]
+            layer_alns = layers.index.droplevel(["fwd","pac"])
             alignments = alignments.loc[layer_alns.unique()]
 
-        layers = layers.droplevel(0)
-
-        aln_groups = alignments.groupby("track_id").groups
+        aln_groups = alignments.index.unique("track_id")
         for parent in self.alns:
             if parent.id in aln_groups:
-                track_alns = alignments.loc[aln_groups[parent.id]]
-                track_layers = layers.loc[layer_alns.isin(track_alns.index)]
+                track_alns = alignments.loc[parent.id]
+                track_layers = layers.loc[parent.id].droplevel("fwd")
             else:
                 track_alns = alignments.iloc[:0] 
                 track_layers = layers.iloc[:0]   

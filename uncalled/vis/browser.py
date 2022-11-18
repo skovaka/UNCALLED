@@ -22,6 +22,7 @@ from ..fast5 import parse_read_ids
 def browser(conf):
     """Interactive signal alignment genome browser"""
     conf.tracks.load_mat = True
+    conf.tracks.load_fast5s = True
     #conf.tracks.refstats_layers = ["cmp.mean_ref_dist"]
     conf.tracks.layers=["dtw","dtw.dwell","dtw.model_diff","dtw.middle","bcaln.middle","bcaln","cmp","bc_cmp"]
     sys.stderr.write("Loading tracks...\n")
