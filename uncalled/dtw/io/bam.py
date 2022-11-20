@@ -5,6 +5,7 @@ import pysam
 import array
 import os
 import re
+import time
 from collections import defaultdict, deque
 from ..aln_track import AlnTrack
 from ..layers import LAYER_META, parse_layers
@@ -47,7 +48,6 @@ class BAM(TrackIO):
         if self.conf.tracks.io.bam_out is not None:
             self.in_alns = defaultdict(list)
             for aln in self.iter_sam():
-                print("PARSING")
                 self.in_alns[aln.query_name].append(aln)
             self.input.reset()
 
@@ -237,38 +237,66 @@ class BAM(TrackIO):
         else:
             strands = [1, 0]
         
-        layers = deque()
-        alns = deque()
+        new_layers = list()
+        new_alns = list()
+
+        layer_df = pd.DataFrame()
+        aln_df = pd.DataFrame()
 
         prev_ref = None
         prev_start = 0
-        prev_aln = 0
+        #########prev_aln = 0
 
         for sam in itr:
-            aln,layer = self._parse_sam(sam)
+            next_alns,next_layers = self._parse_sam(sam)
 
-            a = aln.iloc[0]
-            pac_st = layer.index.get_level_values("pac").min()
+            next_aln = next_alns.iloc[0]
+            next_ref = next_aln["ref_name"]
+            next_start = next_layers.index.get_level_values("pac").min()
 
-            if prev_ref is not None and (a["ref_name"] != prev_ref or a["ref_start"] > prev_start) and len(alns) > self.prms.aln_chunksize:
-                pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
-                ret_layers = pd.concat([l[l.index.get_level_values("pac").isin(pd.RangeIndex(prev_start, pac_st))] for l in layers])
-                ret_alns = pd.concat([alns[prev_aln:]])
+            #we're losing alignments somewhere. getting out of sync
+            #maybe right below
+            #but also, not sure if I'm syncing inputs in "Tracks"
+            #probably need to always advance the minimum ref pos/ID
 
-                #print("must yield", a)
+            if prev_ref is not None and (next_ref != prev_ref or next_start > prev_start):# and len(alns) > self.prms.aln_chunksize:
+                #pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
+                aln_df = pd.concat([aln_df] + new_alns).sort_index()
+                layer_df = pd.concat([layer_df] + new_layers).sort_index()
+                new_alns = list()
+                new_layers = list()
+                
+                ret_layers = layer_df.loc[slice(None),slice(None),prev_start:next_start]
+                ret_alns = aln_df.loc[ret_layers.index.droplevel(["fwd", "pac"]).unique()]
 
-                yield (ret_alns, ret_layers)
+                layer_df.drop(ret_layers.index, inplace=True)
+                #a = aln_df.index.difference(layer_df.index.droplevel(["fwd", "pac"]).unique())
+                #print("DANGER")
+                #print(aln_df)
+                aln_df = aln_df.loc[layer_df.index.droplevel(["fwd", "pac"]).unique()]
+                #aln_df.drop(a, inplace=True)
+                #print(aln_df)
 
-                while len(alns) > 0 and (alns[0].iloc[0]["ref_name"] != a["ref_name"] or layers[0].index.get_level_values("pac").max() < pac_st):
-                    alns.popleft()
-                    layers.popleft()
+                #ret_layers = pd.concat([l[(l.index.get_level_values("pac") >= prev_start) & (l.index.get_level_values("pac") < pac_st)] for l in layers])
+                ##ret_alns = pd.concat([alns[prev_aln:]])
+                #ret_alns = list()
 
-                prev_ref = a["ref_name"]
-                prev_start = a["ref_start"]
-                prev_aln = len(alns)
+                #this is probably wrong
+                #im probably getting rid alignments too early
+                #while len(alns) > 0 and (alns[0].iloc[0]["ref_name"] != next_aln["ref_name"] or layers[0].index.get_level_values("pac").max() < pac_st):
+                #    #ret_alns.append(alns[0])
+                #    alns.popleft()
+                #    layers.popleft()
 
-            alns.append(aln)
-            layers.append(layer)
+                if len(ret_alns) > 0:
+                    yield (ret_alns, ret_layers)
+
+            prev_ref = next_ref
+            prev_start = next_start
+            #prev_aln = len(alns)
+
+            new_alns.append(next_alns)
+            new_layers.append(next_layers)
 
         pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
         ret_layers = pd.concat([l[l.index.get_level_values("pac") >= prev_start] for l in layers])

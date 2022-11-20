@@ -784,6 +784,7 @@ class Tracks:
             all_fwd = True
             all_rev = True
 
+            #TODO` probably need to always advance the minimum ref pos/ID
             for i in range(len(chunks)):
                 pacs = chunks[i][1].index.get_level_values("pac").unique()
                 while len(pacs) <= 1:
@@ -824,19 +825,45 @@ class Tracks:
                 seq_coords, coords = next_coords(seq_coords, chunk_pacs, fwd)
                 coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
 
+                t = time.time()
+
+                #TODO just use standard "loc" indexing
+                #clean this whole function up, once you get it working
                 masks = [
                     l.index.get_level_values("pac").isin(coords.pacs) & (l.index.get_level_values("fwd") == fwd)
                     for a,l in chunks]
 
+
                 layers = pd.concat([l[mask] for (a,l),mask in zip(chunks, masks)])
+
                 alns = pd.concat([a.loc[l[mask].index.droplevel(["fwd","pac"]).unique()] for (a,l),mask in zip(chunks, masks)])
+                aln_ids = alns.index
 
                 ret = self._tables_to_tracks(coords, alns, layers)
 
+
+                #leftover collection
+                #errors when there are no leftovers
                 for i in range(len(chunks)):
-                    l = chunks[i][1][~masks[i]]
-                    aln_ids = l.index.droplevel(["fwd","pac"]).unique()
-                    chunks[i] = (chunks[i][0].loc[aln_ids], l)
+                    chunk_alns, chunk_layers = chunks[i]
+
+                    chunk_layers = chunk_layers[~masks[i]]
+                    if len(chunk_layers) > 0:
+                        ids = chunk_layers.index.droplevel(["fwd","pac"]).unique()
+                        #TODO alignments present in chunk_layers which aren't in chunk alns
+                        #must be coming from BAM.iter_refs
+                        chunk_alns = chunk_alns.loc[ids]
+                    else:
+                        chunk_alns = chunk_alns.iloc[:0]
+
+
+                    #aln_ids = l.index.droplevel(["fwd","pac"]).unique()
+
+                    #print(chunks[i][1].index.droplevel(["fwd","pac"]).unique())
+                    #print(aln_ids)
+                    #print(chunks[i][0].index)
+
+                    chunks[i] = (chunk_alns,chunk_layers)
 
                 yield ret
 
