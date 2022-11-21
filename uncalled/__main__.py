@@ -341,10 +341,10 @@ TRACKPLOT_OPTS = (
 
 BROWSER_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
-    MutexOpts("input", [
-		Opt("--sql-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"),
-        Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
-	]),
+    #MutexOpts("input", [
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"),
+    Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
+	#]),
 
     Opt("--ref", "tracks", "index_prefix"), 
     Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),

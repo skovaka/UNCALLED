@@ -151,28 +151,50 @@ class BAM(TrackIO):
         
         length = sam.get_tag("sl")
 
-
         fwd = int(not sam.is_reverse)
         ref_start, ref_end = sam.get_tag("sr")
-        refs = pd.RangeIndex(ref_start, ref_end)
 
         if coords is None:
+            refs = pd.RangeIndex(ref_start, ref_end)
             seq_refs = RefCoord(sam.reference_name, ref_start, ref_end, fwd)
             coords = self.tracks.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=True)
-            
+            start_shift = end_shift = 0
+        else:
+            start_clip = coords.refs.min() - ref_start if coords.refs.min() > ref_start else 0
+            end_clip = ref_end - coords.refs.max() if coords.refs.max() < ref_end else 0
+            current = current[start_clip:-end_clip]
+
+            start_shift = np.sum(length[:start_clip])
+            end_shift = np.sum(length[-end_clip:])
+            length = length[start_clip:-end_clip]
+
+            ref_start += start_clip
+            ref_end -= end_clip
+            refs = pd.RangeIndex(ref_start, ref_end)
+
         pacs = coords.ref_to_pac(refs)
+
+        #refs = coords.refs.intersect(
+            
         kmers = coords.ref_kmers.loc[fwd].loc[refs].to_numpy()
 
+
         dtw = pd.DataFrame(
-            {"current" : current, "length" : length},
+            {"current" : current, "length" : length, "kmer" : kmers},
             index=pd.MultiIndex.from_product([[self.in_id], [fwd], pacs, [self.aln_id_in]],
                                              names=("track_id", "fwd","pac","aln_id"))
         )
+        dtw.loc[dtw["current"].isnull(), "kmer"] = np.nan
+
 
         if samp_bounds[0] < samp_bounds[1]:
             samp_start, samp_end = samp_bounds
+            samp_start += start_shift
+            samp_end -= end_shift
         else:
             samp_end, samp_start = samp_bounds
+            samp_start += end_shift
+            samp_end -= start_shift
             dtw = dtw.iloc[::-1]
 
         start = np.full(len(dtw), samp_start, dtype="int32")
@@ -182,6 +204,8 @@ class BAM(TrackIO):
         layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1).sort_index()
 
         layers.loc[layers["dtw", "length"] == 0, ("dtw", "length")] = pd.NA
+        layers = layers[~(layers["dtw","current"].isnull() & layers["dtw","length"].isnull())]
+
         layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("int32")
 
         #Note should use below, but too buggy: https://github.com/pandas-dev/pandas/issues/45725
@@ -270,41 +294,30 @@ class BAM(TrackIO):
                 ret_alns = aln_df.loc[ret_layers.index.droplevel(["fwd", "pac"]).unique()]
 
                 layer_df.drop(ret_layers.index, inplace=True)
-                #a = aln_df.index.difference(layer_df.index.droplevel(["fwd", "pac"]).unique())
-                #print("DANGER")
-                #print(aln_df)
                 aln_df = aln_df.loc[layer_df.index.droplevel(["fwd", "pac"]).unique()]
-                #aln_df.drop(a, inplace=True)
-                #print(aln_df)
-
-                #ret_layers = pd.concat([l[(l.index.get_level_values("pac") >= prev_start) & (l.index.get_level_values("pac") < pac_st)] for l in layers])
-                ##ret_alns = pd.concat([alns[prev_aln:]])
-                #ret_alns = list()
-
-                #this is probably wrong
-                #im probably getting rid alignments too early
-                #while len(alns) > 0 and (alns[0].iloc[0]["ref_name"] != next_aln["ref_name"] or layers[0].index.get_level_values("pac").max() < pac_st):
-                #    #ret_alns.append(alns[0])
-                #    alns.popleft()
-                #    layers.popleft()
 
                 if len(ret_alns) > 0:
                     yield (ret_alns, ret_layers)
 
             prev_ref = next_ref
             prev_start = next_start
-            #prev_aln = len(alns)
 
             new_alns.append(next_alns)
             new_layers.append(next_layers)
 
-        pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
-        ret_layers = pd.concat([l[l.index.get_level_values("pac") >= prev_start] for l in layers])
-        #aln_ids = ret_layers.index.get_level_values("aln_id").unique()
-        aln_ids = ret_layers.index.droplevel(["fwd","pac"]).unique()
-        ret_alns = pd.concat([a.loc[aln_ids.intersection(a.index)] for a in alns])
+        aln_df = pd.concat([aln_df] + new_alns).sort_index()
+        layer_df = pd.concat([layer_df] + new_layers).sort_index()
+        new_alns = list()
+        new_layers = list()
+        
+        ret_layers = layer_df.loc[slice(None),slice(None),prev_start:next_start]
+        ret_alns = aln_df.loc[ret_layers.index.droplevel(["fwd", "pac"]).unique()]
 
-        yield (ret_alns, ret_layers)
+        layer_df.drop(ret_layers.index, inplace=True)
+        aln_df = aln_df.loc[layer_df.index.droplevel(["fwd", "pac"]).unique()]
+
+        if len(ret_alns) > 0:
+            yield (ret_alns, ret_layers)
 
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
         aln_id = 0

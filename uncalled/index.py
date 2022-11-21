@@ -181,7 +181,7 @@ class CoordSpace:
         else:
             mrefs = self.mrefs[fwd][st:en]
             if self.kmers is not None:
-                kmers = self.kmers[fwd][st:en]
+                kmers = self.kmers[fwd].loc[st:en]
 
         #elif not stranded_out:
 
