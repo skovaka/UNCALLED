@@ -44,12 +44,7 @@ class BAM(TrackIO):
         name = os.path.basename(self.filename)
         self.in_id = self.init_track(name, name, conf)
 
-        #TODO really not good, should stream by default
-        if self.conf.tracks.io.bam_out is not None:
-            self.in_alns = defaultdict(list)
-            for aln in self.iter_sam():
-                self.in_alns[aln.query_name].append(aln)
-            self.input.reset()
+        self.in_alns = None
 
         self.aln_id_in = 1
 
@@ -79,15 +74,25 @@ class BAM(TrackIO):
         self.output = pysam.AlignmentFile(self.conf.tracks.io.bam_out, "wb", header=header)#template=self.input)
 
     def get_alns(self, read_id):
+        self._init_alns()
         return self.in_alns[read_id]
 
     def get_aln(self, read_id, ref_name, ref_start):
+        self._init_alns()
+        return self.in_alns[read_id]
         for aln in self.in_alns[read_id]:
             if aln.reference_name == ref_name and aln.reference_start == ref_start:
                 return aln
         return None
 
     INF_U16 = np.iinfo(np.uint16).max
+
+    def _init_alns(self):
+        if self.in_alns is None:
+            self.in_alns = defaultdict(list)
+            for aln in self.iter_sam():
+                self.in_alns[aln.query_name].append(aln)
+            self.input.reset()
 
     def write_layers(self, track, groups):
         aln = track.alignments.iloc[0]
