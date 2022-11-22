@@ -730,9 +730,11 @@ class Tracks:
             seq_refs = RefCoord(ref_name, 0, ref_len)
             return self.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=False)
 
-        def next_coords(seq_coords, pac, fwd):
-            if len(pac) > 1:
+        def next_coords(seq_coords, pac, fwd, chunk_hasnext):
+            if len(pac) > 1 and chunk_hasnext:
                 pac = pac[:-1]
+            else:
+                print("END CHUNK", seq_coords, pac, fwd, chunk_hasnext)
 
             idx = pd.MultiIndex.from_product([[int(fwd)], pac])
 
@@ -754,27 +756,13 @@ class Tracks:
             for io in self.inputs]
 
         chunks = [next(i) for i in layer_iters]
+        chunk_hasnext = np.ones(len(chunks), bool)
 
-        #pacs = pd.Index()
-        #for alns,layers in chunks:
-        #    pacs = pacs.union(layers.get_level_values("pac").unique())
         pac_min = min([l.index.get_level_values("pac")[0] for a,l in chunks])
         seq_coords = get_full_coords(pac_min)
 
-        #chunk_coords = [get_full_coords(chunk.index[0]) for chunk in chunks]
-        #chunk_starts = np.array([c.pacs[0] for c in chunk_coords])
-        #seq_coords = [get_full_coords(chunk.index[0]) for chunk in chunks]
 
         while np.any([len(chunk[0]) > 0 for chunk in chunks]):
-
-            #Refill from each chunk if only one ref coord is contained in it
-
-            # TODO
-            # need to store alignment chunks and layer chunks, and deduplicate alignment chunks
-            # find least full chunk - lowest max pac coordinate
-            # output all chunks up to that coord
-            # refill most empty chunk
-
             pac_start = np.inf
             pac_end = np.inf
 
@@ -786,19 +774,23 @@ class Tracks:
 
             #TODO` probably need to always advance the minimum ref pos/ID
             for i in range(len(chunks)):
-                pacs = chunks[i][1].index.get_level_values("pac").unique()
+                chunk_alignments, chunk_layers = chunks[i]
+                last_chunk = False
+
+                pacs = chunk_layers.index.get_level_values("pac").unique()
                 while len(pacs) <= 1:
                     alns, layers = next(layer_iters[i], (None, None))
                     if alns is None:
+                        chunk_hasnext[i] = False
                         break
 
-                    alns = pd.concat([chunks[i][0], alns])
-                    alns = alns[~alns.index.duplicated()]
-                    layers = pd.concat([chunks[i][1], layers])
-                    chunks[i] = (alns,layers)
-                    pacs = chunks[i][1].index.get_level_values("pac").unique()
+                    chunk_alignments = pd.concat([chunks[i][0], alns])
+                    chunk_alignments = chunk_alignments[~chunk_alignments.index.duplicated()]
+                    chunk_layers = pd.concat([chunk_layers, layers])
+                    chunks[i] = (chunk_alignments,chunk_layers)
+                    pacs = chunk_layers.index.get_level_values("pac").unique()
 
-                idx = chunks[i][1].index
+                idx = chunk_layers.index
                 if all_fwd or all_rev:
                     fwds = idx.get_level_values("fwd").unique()
                     all_fwd = all_fwd and np.all(fwds == 1)
@@ -813,16 +805,19 @@ class Tracks:
             
             #chunk_pacs = all_pacs[all_pacs <= pac_end].sort_values()
 
-            if not all_fwd or all_rev:
+            if not (all_fwd or all_rev):
                 strands = [False, True]
                 fwd = None
             else:
                 strands = [all_fwd]
                 fwd = all_fwd
 
+            #print(chunk_pacs, strands)
+            #print(chunks)
+
             for fwd in strands:
 
-                seq_coords, coords = next_coords(seq_coords, chunk_pacs, fwd)
+                seq_coords, coords = next_coords(seq_coords, chunk_pacs, fwd, chunk_hasnext[i])
                 coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
 
                 t = time.time()
@@ -841,27 +836,20 @@ class Tracks:
 
                 ret = self._tables_to_tracks(coords, alns, layers)
 
-
                 #leftover collection
-                #errors when there are no leftovers
                 for i in range(len(chunks)):
                     chunk_alns, chunk_layers = chunks[i]
 
+                    #if last_chunk:
+                    #    chunk_alns = chunk_alns.iloc[:0]
+                    #    chunk_layers = chunk_layers.iloc[:0]
+                    #else:
                     chunk_layers = chunk_layers[~masks[i]]
                     if len(chunk_layers) > 0:
                         ids = chunk_layers.index.droplevel(["fwd","pac"]).unique()
-                        #TODO alignments present in chunk_layers which aren't in chunk alns
-                        #must be coming from BAM.iter_refs
                         chunk_alns = chunk_alns.loc[ids]
                     else:
                         chunk_alns = chunk_alns.iloc[:0]
-
-
-                    #aln_ids = l.index.droplevel(["fwd","pac"]).unique()
-
-                    #print(chunks[i][1].index.droplevel(["fwd","pac"]).unique())
-                    #print(aln_ids)
-                    #print(chunks[i][0].index)
 
                     chunks[i] = (chunk_alns,chunk_layers)
 

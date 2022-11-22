@@ -173,7 +173,7 @@ DTW_OPTS = (
 #)
 
 CONVERT_OPTS = (
-    Opt("index_prefix", "tracks"),
+    Opt("index_prefix", "tracks", nargs="?"),
     MutexOpts("input", [
         Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
         Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),

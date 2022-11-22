@@ -189,7 +189,9 @@ class BAM(TrackIO):
             "current" : current, "length" : length, "kmer" : kmers
         }).set_index(["track_id", "fwd", "pac","aln_id"])
 
-        dtw.loc[dtw["current"].isnull(), "kmer"] = np.nan
+        dtw.loc[dtw["current"].isnull(), "kmer"] = pd.NA
+        dtw["kmer"] = dtw["kmer"].astype("Int32", copy=False)
+
 
         flip = samp_bounds[0] > samp_bounds[1]
         if flip:
@@ -305,14 +307,13 @@ class BAM(TrackIO):
                 ret_layers = layer_df.loc[slice(None),slice(None),prev_start:next_start-1]
                 ret_alns = aln_df.loc[ret_layers.index.droplevel(["fwd", "pac"]).unique()]
 
-                ret_layer_count += len(ret_layers)
-
+                #ret_layer_count += len(ret_layers)
 
                 #if ret_layer_count > self.prms.ref_chunksize:
                 #print("DUMP", ret_layer_count, self.prms.ref_chunksize)
                 layer_df = layer_df.loc[slice(None),slice(None),next_start:]
                 aln_df = aln_df.loc[layer_df.index.droplevel(["fwd", "pac"]).unique()]
-                ret_layer_count = 0
+                #ret_layer_count = 0
 
                 #print(ret_layers)
                 #sys.stderr.write(f"{prev_start} {next_start} {time.time()-t}\n")

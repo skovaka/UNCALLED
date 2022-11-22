@@ -365,19 +365,44 @@ class TrackSQL(TrackIO):
         else:
             strands = [1, 0]
 
-        alns = pd.DataFrame()
-
         for fwd in strands:
-            chunks = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, ["pac"], chunksize, full_overlap)
-            for l in chunks:
-                aln_ids = l.index.get_level_values("aln_id").unique()
-                if len(alns) > 0:
-                    aln_ids = aln_ids.difference(alns.index)
+            itr = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, ["pac"], chunksize, full_overlap)
 
-                #alns = pd.concat([alns, self.query_alignments(track_id, aln_id=list(aln_ids))])
-                alns = self.query_alignments(track_id, aln_id=list(aln_ids))
+            ret_alns = pd.DataFrame()
+            chunks = list()
+            prev_pac = None
 
-                yield alns, l
+            for layers in itr:
+                next_pac = layers.index.get_level_values("pac")[-1]
+                #if next_pac 
+
+                if prev_pac is None or prev_pac == next_pac:
+                    chunks.append(layers)
+                else:
+                    chunks.append(layers.loc[slice(None),fwd,:next_pac-1])
+                    ret_layers = pd.concat(chunks)
+                    chunks = [layers.loc[slice(None),fwd,next_pac:]]
+
+                    aln_ids = ret_layers.index.get_level_values("aln_id").unique()
+                    if len(ret_alns) > 0:
+                        aln_ids = aln_ids.difference(ret_alns.index)
+
+                    ret_alns = self.query_alignments(track_id, aln_id=list(aln_ids))
+
+                    yield ret_alns, ret_layers
+
+                prev_pac = next_pac
+
+            ret_layers = pd.concat(chunks)
+            chunks = [layers.loc[slice(None),fwd,next_pac]]
+
+            aln_ids = ret_layers.index.get_level_values("aln_id").unique()
+            if len(ret_alns) > 0:
+                aln_ids = aln_ids.difference(ret_alns.index)
+
+            ret_alns = self.query_alignments(track_id, aln_id=list(aln_ids))
+
+            yield ret_alns, ret_layers
 
     def query(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
         
