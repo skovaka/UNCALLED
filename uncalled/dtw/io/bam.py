@@ -184,29 +184,32 @@ class BAM(TrackIO):
         kmers = coords.ref_kmers.loc[fwd].loc[refs].to_numpy()
 
 
-        dtw = pd.DataFrame(
-            {"current" : current, "length" : length, "kmer" : kmers},
-            index=pd.MultiIndex.from_product([[self.in_id], [fwd], pacs, [self.aln_id_in]],
-                                             names=("track_id", "fwd","pac","aln_id"))
-        )
+        dtw = pd.DataFrame({
+            "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
+            "current" : current, "length" : length, "kmer" : kmers
+        }).set_index(["track_id", "fwd", "pac","aln_id"])
+
         dtw.loc[dtw["current"].isnull(), "kmer"] = np.nan
 
-
-        if samp_bounds[0] < samp_bounds[1]:
-            samp_start, samp_end = samp_bounds
-            samp_start += start_shift
-            samp_end -= end_shift
-        else:
+        flip = samp_bounds[0] > samp_bounds[1]
+        if flip:
             samp_end, samp_start = samp_bounds
             samp_start += end_shift
             samp_end -= start_shift
             dtw = dtw.iloc[::-1]
+        else:
+            samp_start, samp_end = samp_bounds
+            samp_start += start_shift
+            samp_end -= end_shift
 
         start = np.full(len(dtw), samp_start, dtype="int32")
         start[1:] += dtw["length"].cumsum().iloc[:-1].to_numpy("int32")
         dtw["start"] = start
 
-        layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1).sort_index()
+        if flip:
+            dtw = dtw[::-1]
+
+        layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1)#.sort_index()
 
         layers.loc[layers["dtw", "length"] == 0, ("dtw", "length")] = pd.NA
         layers = layers[~(layers["dtw","current"].isnull() & layers["dtw","length"].isnull())]
@@ -276,6 +279,7 @@ class BAM(TrackIO):
         prev_start = 0
         #########prev_aln = 0
 
+        t = time.time()
         for sam in itr:
             next_alns,next_layers = self._parse_sam(sam)
 
@@ -288,38 +292,51 @@ class BAM(TrackIO):
             #but also, not sure if I'm syncing inputs in "Tracks"
             #probably need to always advance the minimum ref pos/ID
 
-            if prev_ref is not None and (next_ref != prev_ref or next_start > prev_start):# and len(alns) > self.prms.aln_chunksize:
+            ret_layer_count = 0
+
+            if prev_ref is not None and (next_ref != prev_ref or next_start - prev_start > 0) and len(new_alns) > self.prms.aln_chunksize:
                 #pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
-                aln_df = pd.concat([aln_df] + new_alns).sort_index()
-                layer_df = pd.concat([layer_df] + new_layers).sort_index()
+
+                aln_df = pd.concat([aln_df] + new_alns)#.sort_index()
+                layer_df = pd.concat([layer_df] + new_layers).sort_index(level="pac")
                 new_alns = list()
                 new_layers = list()
                 
-                ret_layers = layer_df.loc[slice(None),slice(None),prev_start:next_start]
+                ret_layers = layer_df.loc[slice(None),slice(None),prev_start:next_start-1]
                 ret_alns = aln_df.loc[ret_layers.index.droplevel(["fwd", "pac"]).unique()]
 
-                layer_df.drop(ret_layers.index, inplace=True)
+                ret_layer_count += len(ret_layers)
+
+
+                #if ret_layer_count > self.prms.ref_chunksize:
+                #print("DUMP", ret_layer_count, self.prms.ref_chunksize)
+                layer_df = layer_df.loc[slice(None),slice(None),next_start:]
                 aln_df = aln_df.loc[layer_df.index.droplevel(["fwd", "pac"]).unique()]
+                ret_layer_count = 0
+
+                #print(ret_layers)
+                #sys.stderr.write(f"{prev_start} {next_start} {time.time()-t}\n")
+                t = time.time()
 
                 if len(ret_alns) > 0:
                     yield (ret_alns, ret_layers)
 
-            prev_ref = next_ref
-            prev_start = next_start
+                prev_ref = next_ref
+                prev_start = next_start
+
+            elif prev_ref is None:
+                prev_ref = next_ref
+                prev_start = next_start
+
 
             new_alns.append(next_alns)
             new_layers.append(next_layers)
 
         aln_df = pd.concat([aln_df] + new_alns).sort_index()
         layer_df = pd.concat([layer_df] + new_layers).sort_index()
-        new_alns = list()
-        new_layers = list()
         
-        ret_layers = layer_df.loc[slice(None),slice(None),prev_start:next_start]
+        ret_layers = layer_df.loc[slice(None),slice(None),prev_start:]
         ret_alns = aln_df.loc[ret_layers.index.droplevel(["fwd", "pac"]).unique()]
-
-        layer_df.drop(ret_layers.index, inplace=True)
-        aln_df = aln_df.loc[layer_df.index.droplevel(["fwd", "pac"]).unique()]
 
         if len(ret_alns) > 0:
             yield (ret_alns, ret_layers)

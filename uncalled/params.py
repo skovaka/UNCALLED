@@ -58,7 +58,7 @@ IOParams._def_params(
     ("output_format", "db", str,  "Output format (db, eventalign)"),
     ("overwrite", False, bool, "Overwrite existing tracks"),
     ("append", False, bool, "Append reads to existing tracks"),
-    ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
+    ("aln_chunksize", 500, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
     ignore_toml={"bam_in", "bam_out", "sql_in", "sql_out", "eventalign_in", "eventalign_out", "tombo_in", "eventalign_index", "overwrite", "append"},
     #ignore_toml={"input", "output", "output_format", "overwrite", "append"},
