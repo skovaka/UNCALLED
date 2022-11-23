@@ -772,7 +772,7 @@ class Tracks:
             all_fwd = True
             all_rev = True
 
-            #TODO` probably need to always advance the minimum ref pos/ID
+            #TODO simplify! assume inputs segment by ref coord
             for i in range(len(chunks)):
                 chunk_alignments, chunk_layers = chunks[i]
                 last_chunk = False
@@ -799,6 +799,8 @@ class Tracks:
 
                 all_pacs = all_pacs.union(pacs)
                 pac_start = min(pac_start, pacs.min())
+
+                #TODO this part is still key. only output up until the end of the least full chunk
                 pac_end = min(pac_end, pacs.max())+1
 
             chunk_pacs = pd.RangeIndex(pac_start, pac_end)
@@ -820,10 +822,7 @@ class Tracks:
                 seq_coords, coords = next_coords(seq_coords, chunk_pacs, fwd, chunk_hasnext[i])
                 coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
 
-                t = time.time()
-
-                #TODO just use standard "loc" indexing
-                #clean this whole function up, once you get it working
+                #TODO probably don't need masks anymore
                 masks = [
                     l.index.get_level_values("pac").isin(coords.pacs) & (l.index.get_level_values("fwd") == fwd)
                     for a,l in chunks]

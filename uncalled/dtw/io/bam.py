@@ -79,7 +79,6 @@ class BAM(TrackIO):
 
     def get_aln(self, read_id, ref_name, ref_start):
         self._init_alns()
-        return self.in_alns[read_id]
         for aln in self.in_alns[read_id]:
             if aln.reference_name == ref_name and aln.reference_start == ref_start:
                 return aln
