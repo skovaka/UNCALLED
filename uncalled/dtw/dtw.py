@@ -55,17 +55,19 @@ def run_dtw(conf):
 
     """Perform DTW alignment guided by basecalled alignments"""
     conf.fast5_reader.load_bc = True
+    conf.tracks.load_fast5s = True
     conf.export_static()
 
     tracks = Tracks(conf=conf)
 
     #tracks.model = tracks.model.get_normalized(*tracks.model.norm_mad_params(tracks.model.means))
 
+    if not tracks.fast5s.indexed:
+        raise RuntimeError("Must provide fast5 index")
+
     clip_coords = tracks.coords
 
-    fast5s = Fast5Reader(conf=conf)
-
-    read_filter = fast5s.get_read_filter()
+    #read_filter = tracks.fast5s.get_read_filter()
 
     bam_in = None
     for io in tracks.inputs:
@@ -79,10 +81,14 @@ def run_dtw(conf):
 
     n_reads = 0
 
-    for read in fast5s:
-        aligned = False
-        for aln in bam_in.get_alns(read.id):
+
+    #for read in tracks.fast5s:
+    #    aligned = False
+    #    for aln in bam_in.get_alns(read.id):
             #sys.stderr.write(f"{read.id}\n")
+
+    for aln in bam_in.iter_sam():
+            read = tracks.fast5s[aln.query_name]
 
             dtw = GuidedDTW(tracks, sigproc, read, aln, conf)
 
@@ -97,9 +103,9 @@ def run_dtw(conf):
 
             aligned = True
 
-        if aligned:
-            #pbar.update(n_reads)
-            n_reads += 1
+    #if aligned:
+        #pbar.update(n_reads)
+    #    n_reads += 1
 
     tracks.close()
 
