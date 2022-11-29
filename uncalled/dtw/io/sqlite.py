@@ -373,6 +373,7 @@ class TrackSQL(TrackIO):
             prev_pac = None
 
             for layers in itr:
+                layers.sort_index(inplace=True)
                 next_pac = layers.index.get_level_values("pac")[-1]
                 #if next_pac 
 
@@ -487,7 +488,7 @@ class TrackSQL(TrackIO):
                 gdf = df[layers]
                 grouped[group] = df[layers].rename(columns=renames)
             df = pd.concat(grouped, names=("group", "layer"), axis=1)
-            return df.sort_index()
+            return df#.sort_index()
                 
         if chunksize is None:
             return make_groups(ret)
