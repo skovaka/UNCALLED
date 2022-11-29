@@ -38,6 +38,7 @@ class TrackIO:
         self.next_id = track_count+1
 
         self.read = None
+        self.bam = None
 
         self.aln_tracks = list()
 
@@ -69,8 +70,10 @@ class TrackIO:
         #self.track_names = None
         self.write_mode = write
 
-    def init_alignment(self, read_id, fast5, read):
+    def init_alignment(self, read_id, fast5, read, bam):
         self.read = read
+        self.bam = bam
+
         if fast5 == self.prev_fast5[0]:
             fast5_id = self.prev_fast5[1]
         else:

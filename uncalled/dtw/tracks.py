@@ -222,6 +222,7 @@ class Tracks:
         #tracks = list()
 
         self.inputs = list()
+        self.bam_in = None
 
         track_count = 0
 
@@ -237,6 +238,9 @@ class Tracks:
                 #tracks.append(io.aln_tracks)
                 self.conf.load_config(io.conf)
                 self.inputs.append(io)
+
+                if isinstance(io, BAM) and self.bam_in is None:
+                    self.bam_in = io
 
                 track_count += len(io.aln_tracks)
                 for track in io.aln_tracks:
@@ -260,10 +264,11 @@ class Tracks:
             elif out_format == "eventalign_out":
                 self.output = Eventalign(filename, True, self, track_count)
             elif out_format == "bam_out":
-                if len(self.inputs) != 1:
-                    raise RuntimeError("Must input exactly one BAM file for BAM output")
-                new_track = False
-                self.output = self.inputs[0]
+                self.output = BAM(filename, True, self, track_count)
+                #if len(self.inputs) != 1:
+                #    raise RuntimeError("Must input exactly one BAM file for BAM output")
+                #new_track = False
+                #self.output = self.inputs[0]
 
             if new_track:
                 track_count += len(io.aln_tracks)
@@ -389,12 +394,12 @@ class Tracks:
     def set_read(self, read):
         self.output.read = read
 
-    def init_alignment(self, read_id, fast5, coords, layers={}, read=None, track_name=None):
+    def init_alignment(self, read_id, fast5, coords, layers={}, read=None, bam=None, track_name=None):
         track = self._track_or_default(track_name)
         self.new_alignment = True
         self.new_layers = set()
 
-        aln_id = self.output.init_alignment(read_id, fast5, read=read)
+        aln_id = self.output.init_alignment(read_id, fast5, read=read, bam=bam)
 
         if len(layers) > 0:
             starts = None

@@ -77,6 +77,12 @@ def run_dtw(conf):
     if bam_in is None:
         raise ValueError("Must specify BAM input")
 
+    if conf.tracks.ref_bounds is None:
+        bam_iter = bam_in.input
+    else:
+        b = conf.tracks.ref_bounds
+        bam_iter = bam_in.input.fetch(b.name, b.start, b.end)
+
     sigproc = SignalProcessor(tracks[tracks.output_track].model, conf)
 
     n_reads = 0
@@ -87,10 +93,11 @@ def run_dtw(conf):
     #    for aln in bam_in.get_alns(read.id):
             #sys.stderr.write(f"{read.id}\n")
 
-    for aln in bam_in.iter_sam():
-            read = tracks.fast5s[aln.query_name]
+    #for aln in bam_in.iter_sam():
+    for bam in bam_iter:
+            read = tracks.fast5s[bam.query_name]
 
-            dtw = GuidedDTW(tracks, sigproc, read, aln, conf)
+            dtw = GuidedDTW(tracks, sigproc, read, bam, conf)
 
             if dtw.df is None:
                 sys.stderr.write(f"Warning: {read.id} failed\n")
@@ -115,11 +122,11 @@ class GuidedDTW:
 
     #TODO do more in constructor using prms, not in main
     #def __init__(self, track, read, paf, conf=None, **kwargs):
-    def __init__(self, tracks, sigproc, read, aln, conf=None, **kwargs):
+    def __init__(self, tracks, sigproc, read, bam, conf=None, **kwargs):
         self.conf = read.conf if conf is None else conf
         self.prms = self.conf.dtw
 
-        bcaln = Bcaln(conf, tracks.index, read, aln, tracks.coords)
+        bcaln = Bcaln(conf, tracks.index, read, bam, tracks.coords)
         if bcaln.empty:
             self.df = None
             return
@@ -129,7 +136,7 @@ class GuidedDTW:
         #if self.conf.normalizer.mode == "ref_mom":
         #    signal.normalize(
 
-        aln_id, self.coords = tracks.init_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, read=signal)
+        aln_id, self.coords = tracks.init_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, read=signal, bam=bam)
 
         self.index = tracks.index
         self.model = sigproc.model
@@ -157,8 +164,13 @@ class GuidedDTW:
         #kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
         new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], conf.is_rna)
 
-        self.block_coords[0][0] += self.index.trim[1]
-        self.block_coords[-1][1] -= self.index.trim[0]
+        if bcaln.flip_ref:
+            self.block_coords[0][0] += self.index.trim[1]
+            self.block_coords[-1][1] -= self.index.trim[0]
+        else:
+            self.block_coords[0][0] += self.index.trim[0]
+            self.block_coords[-1][1] -= self.index.trim[1]
+
         mrefs = np.concatenate([np.arange(s,e) for s,e,_ in self.block_coords])
 
         #self.ref_kmers = pd.concat(kmer_blocks)

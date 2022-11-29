@@ -21,8 +21,13 @@ class BAM(TrackIO):
     def __init__(self, filename, write, tracks, track_count):
         TrackIO.__init__(self, filename, write, tracks, track_count)
 
-        self.init_read_mode()
-        self.init_write_mode()
+        if write:
+            if tracks.bam_in is None:
+                raise ValueError("No BAM template provided")
+            self.header = tracks.bam_in.input.header.to_dict()
+            self.init_write_mode()
+        else:
+            self.init_read_mode()
 
     def init_read_mode(self):
         if self.conf.tracks.io.bam_in is None:
@@ -66,12 +71,12 @@ class BAM(TrackIO):
         conf_line = self.conf.to_toml() \
                         .replace(";", "\\;") \
                         .replace("\n", ";")   
-        header = self.input.header.to_dict()
-        if not "CO" in header:
-            header["CO"] = list()
-        header["CO"].append("UNC:" + conf_line)
+        #header = self.input.header.to_dict()
+        if not "CO" in self.header:
+            self.header["CO"] = list()
+        self.header["CO"].append("UNC:" + conf_line)
 
-        self.output = pysam.AlignmentFile(self.conf.tracks.io.bam_out, "wb", header=header)#template=self.input)
+        self.output = pysam.AlignmentFile(self.conf.tracks.io.bam_out, "wb", header=self.header)#template=self.input)
 
     def get_alns(self, read_id):
         self._init_alns()
@@ -88,6 +93,7 @@ class BAM(TrackIO):
 
     def _init_alns(self):
         if self.in_alns is None:
+            print("BUFFERING ALNS")
             self.in_alns = defaultdict(list)
             for aln in self.iter_sam():
                 self.in_alns[aln.query_name].append(aln)
@@ -95,10 +101,10 @@ class BAM(TrackIO):
 
     def write_layers(self, track, groups):
         aln = track.alignments.iloc[0]
-        sam = self.get_aln(aln["read_id"], aln["ref_name"], aln["ref_start"]-self.kmer_trim[0])
-        if sam is None: 
+        #sam = self.get_aln(aln["read_id"], aln["ref_name"], aln["ref_start"]-self.kmer_trim[0])
+        if self.bam is None: 
             return
-
+        
         refs = track.coords.refs[self.kmer_trim[0]:-self.kmer_trim[1]]
 
         dtw = track.layers["dtw"].reset_index(level=1).reindex(refs)
@@ -116,12 +122,11 @@ class BAM(TrackIO):
         dc = dc.fillna(self.INF_U16).to_numpy(np.uint16)
         lens = dtw["length"].reindex(refs).to_numpy(np.uint16, na_value=0)
 
-        #sam.set_tag("sc", dc.tobytes().hex(), "H") #hex format
-        #sam.set_tag("sl", lens.tobytes().hex(), "H") #hex formt
+        #self.bam.set_tag("sc", dc.tobytes().hex(), "H") #hex format
+        #self.bam.set_tag("sl", lens.tobytes().hex(), "H") #hex formt
         #cur = dtw["current"].to_numpy().astype(float)
-        #sam.set_tag("sc", array.array("f", cur)) #float current
-        #sam.set_tag("sl", ",".join(map(str,lens))) #str lens
-
+        #self.bam.set_tag("sc", array.array("f", cur)) #float current
+        #self.bam.set_tag("sl", ",".join(map(str,lens))) #str lens
 
         if dtw["start"].iloc[0] < dtw["start"].iloc[-1]:
             sample_start = dtw["start"].iloc[0]
@@ -130,13 +135,13 @@ class BAM(TrackIO):
             sample_start = dtw["start"].iloc[0] + dtw["length"].iloc[0]
             sample_end = dtw["start"].iloc[-1] 
 
-        sam.set_tag("sr", array.array("I", (refs[0], refs[-1]+1)))
-        sam.set_tag("ss", array.array("I", (sample_start, sample_end)))
-        sam.set_tag("sn", array.array("f", (scale,shift)))
-        sam.set_tag("sl", array.array("H", lens))
-        sam.set_tag("sc", array.array("H", dc))
+        self.bam.set_tag("sr", array.array("I", (refs[0], refs[-1]+1)))
+        self.bam.set_tag("ss", array.array("I", (sample_start, sample_end)))
+        self.bam.set_tag("sn", array.array("f", (scale,shift)))
+        self.bam.set_tag("sl", array.array("H", lens))
+        self.bam.set_tag("sc", array.array("H", dc))
 
-        self.output.write(sam)
+        self.output.write(self.bam)
 
     #TODO more query options
     def iter_sam(self, unmapped=False):
@@ -306,16 +311,10 @@ class BAM(TrackIO):
                 ret_layers = layer_df.loc[slice(None),slice(None),prev_start:next_start-1]
                 ret_alns = aln_df.loc[ret_layers.index.droplevel(["fwd", "pac"]).unique()]
 
-                #ret_layer_count += len(ret_layers)
-
-                #if ret_layer_count > self.prms.ref_chunksize:
-                #print("DUMP", ret_layer_count, self.prms.ref_chunksize)
                 layer_df = layer_df.loc[slice(None),slice(None),next_start:]
                 aln_df = aln_df.loc[layer_df.index.droplevel(["fwd", "pac"]).unique()]
                 #ret_layer_count = 0
 
-                #print(ret_layers)
-                #sys.stderr.write(f"{prev_start} {next_start} {time.time()-t}\n")
                 t = time.time()
 
                 if len(ret_alns) > 0:
