@@ -393,16 +393,17 @@ class TrackSQL(TrackIO):
 
                 prev_pac = next_pac
 
-            ret_layers = pd.concat(chunks)
-            chunks = [layers.loc[slice(None),fwd,next_pac]]
+            if len(chunks) > 0:
+                ret_layers = pd.concat(chunks)
+                chunks = [layers.loc[slice(None),fwd,next_pac]]
 
-            aln_ids = ret_layers.index.get_level_values("aln_id").unique()
-            if len(ret_alns) > 0:
-                aln_ids = aln_ids.difference(ret_alns.index)
+                aln_ids = ret_layers.index.get_level_values("aln_id").unique()
+                if len(ret_alns) > 0:
+                    aln_ids = aln_ids.difference(ret_alns.index)
 
-            ret_alns = self.query_alignments(track_id, aln_id=list(aln_ids))
+                ret_alns = self.query_alignments(track_id, aln_id=list(aln_ids))
 
-            yield ret_alns, ret_layers
+                yield ret_alns, ret_layers
 
     def query(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
         
@@ -486,7 +487,7 @@ class TrackSQL(TrackIO):
                 gdf = df[layers]
                 grouped[group] = df[layers].rename(columns=renames)
             df = pd.concat(grouped, names=("group", "layer"), axis=1)
-            return df
+            return df.sort_index()
                 
         if chunksize is None:
             return make_groups(ret)

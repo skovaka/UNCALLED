@@ -67,7 +67,7 @@ def run_dtw(conf):
 
     clip_coords = tracks.coords
 
-    #read_filter = tracks.fast5s.get_read_filter()
+    read_filter = tracks.fast5s.get_read_filter()
 
     bam_in = None
     for io in tracks.inputs:
@@ -78,7 +78,7 @@ def run_dtw(conf):
         raise ValueError("Must specify BAM input")
 
     if conf.tracks.ref_bounds is None:
-        bam_iter = bam_in.input
+        bam_iter = bam_in.iter_sam()
     else:
         b = conf.tracks.ref_bounds
         bam_iter = bam_in.input.fetch(b.name, b.start, b.end)
@@ -95,20 +95,21 @@ def run_dtw(conf):
 
     #for aln in bam_in.iter_sam():
     for bam in bam_iter:
-            read = tracks.fast5s[bam.query_name]
+        if not bam.query_name in read_filter: continue
+        read = tracks.fast5s[bam.query_name]
 
-            dtw = GuidedDTW(tracks, sigproc, read, bam, conf)
+        dtw = GuidedDTW(tracks, sigproc, read, bam, conf)
 
-            if dtw.df is None:
-                sys.stderr.write(f"Warning: {read.id} failed\n")
-                continue
+        if dtw.df is None:
+            sys.stderr.write(f"Warning: {read.id} failed\n")
+            continue
 
-            if conf.bc_cmp:
-                tracks.calc_compare("bcaln", True, True)
+        if conf.bc_cmp:
+            tracks.calc_compare("bcaln", True, True)
 
-            tracks.write_alignment()
+        tracks.write_alignment()
 
-            aligned = True
+        aligned = True
 
     #if aligned:
         #pbar.update(n_reads)

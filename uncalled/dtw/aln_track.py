@@ -42,6 +42,7 @@ class AlnTrack:
         self.name = name
         self.desc = desc
         self.conf = conf
+        self.coords = None
 
         self.fast5s = fast5s #TODO get rid of this
 
