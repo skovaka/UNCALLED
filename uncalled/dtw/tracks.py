@@ -99,8 +99,8 @@ class Tracks:
 
         self.coords = self._ref_bounds_to_coords(self.prms.ref_bounds)
 
-        if self.coords is not None and  len(self._aln_track_ids) > 0:
-            self.load()
+        #if self.coords is not None and  len(self._aln_track_ids) > 0:
+        #    self.load()
 
         #TODO use consistent interface with dtw.dtw
         self.fast5s = None
@@ -819,8 +819,6 @@ class Tracks:
                 strands = [all_fwd]
                 fwd = all_fwd
 
-            #print(chunk_pacs, strands)
-            #print(chunks)
 
             for fwd in strands:
 

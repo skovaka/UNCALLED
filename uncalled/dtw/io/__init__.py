@@ -94,27 +94,12 @@ class TrackIO:
         else:
             self.out_track = os.path.splitext(os.path.basename(self.filename))[0]
 
-        #if self.track_names is None:
-        #    name = os.path.splitext(os.path.basename(self.filename))[0]
-        #    self.track_names = [name]
-
-        #if len(self.track_names) > 1:
-        #    raise ValueError("Can only write to one track")
-        #name = self.track_names[0]
-
         self.prev_fast5 = (None, None)
         self.prev_read = None
 
         self.out_id = self.init_track(self.out_track, self.out_track, self.conf)
 
     def init_track(self, name, desc, conf, id=None):
-        #row = pd.DataFrame({
-        #    "id" : id,
-        #    "name" : name,
-        #    "desc" : desc,
-        #    "config" : conf
-        #}, index=[0])
-
         if id is None:
             id = self.next_id
         self.next_id = id + 1
@@ -123,8 +108,6 @@ class TrackIO:
         self.conf.load_config(conf)
 
         return id
-        #self.init_tracks(row)
-        #return row
 
     def fill_tracks(self, coords, alignments, layers):
         layers = layers.droplevel(0)

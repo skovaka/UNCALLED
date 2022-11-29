@@ -25,8 +25,10 @@ class BAM(TrackIO):
             if tracks.bam_in is None:
                 raise ValueError("No BAM template provided")
             self.header = tracks.bam_in.input.header.to_dict()
+            self.input = None
             self.init_write_mode()
         else:
+            self.output = None
             self.init_read_mode()
 
     def init_read_mode(self):
@@ -40,7 +42,6 @@ class BAM(TrackIO):
                 if not line.startswith("UNC:"): continue
                 toml = re.sub(r"(?<!\\);", "\n", line[4:]).replace("\\;",";")
                 conf = Config(toml=toml)
-            
 
         if conf is None:
             conf = self.conf
@@ -105,9 +106,16 @@ class BAM(TrackIO):
         if self.bam is None: 
             return
         
+        #refs = track.layer_refs
+        #if aln["fwd"]:
         refs = track.coords.refs[self.kmer_trim[0]:-self.kmer_trim[1]]
+        #else:
+        #    refs = track.coords.refs[self.kmer_trim[1]:-self.kmer_trim[0]]
 
+        #print(track.layers)
+        #print(refs)
         dtw = track.layers["dtw"].reset_index(level=1).reindex(refs)
+        #print(dtw)
 
         lens = dtw["length"]
         lens[dtw["start"].duplicated()] = 0 #skips
@@ -163,19 +171,30 @@ class BAM(TrackIO):
         fwd = int(not sam.is_reverse)
         ref_start, ref_end = sam.get_tag("sr")
 
+
         if coords is None:
             refs = pd.RangeIndex(ref_start, ref_end)
             seq_refs = RefCoord(sam.reference_name, ref_start, ref_end, fwd)
             coords = self.tracks.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=True)
             start_shift = end_shift = 0
         else:
-            start_clip = coords.refs.min() - ref_start if coords.refs.min() > ref_start else 0
-            end_clip = ref_end - coords.refs.max() if coords.refs.max() < ref_end else 0
-            current = current[start_clip:-end_clip]
+            #start_clip = coords.refs.min() - ref_start if coords.refs.min() > ref_start else 0
+            #end_clip = ref_end - coords.refs.max() if coords.refs.max() < ref_end else 0
+            #current = current[start_clip:-end_clip]
+
+            start_clip = (coords.refs.min() - ref_start) if coords.refs.min() > ref_start else 0
+            end_clip = (ref_end - coords.refs.max()) if coords.refs.max() < ref_end else 0
+
+            new_end = len(current) - end_clip
+            current = current[start_clip:new_end]
+
 
             start_shift = np.sum(length[:start_clip])
-            end_shift = np.sum(length[-end_clip:])
-            length = length[start_clip:-end_clip]
+            end_shift = np.sum(length[new_end:])
+            length = length[start_clip:new_end]
+            #end_shift = np.sum(length[-end_clip:])
+            #length = length[start_clip:-end_clip]
+
 
             ref_start += start_clip
             ref_end -= end_clip
@@ -186,7 +205,6 @@ class BAM(TrackIO):
         #refs = coords.refs.intersect(
             
         kmers = coords.ref_kmers.loc[fwd].loc[refs].to_numpy()
-
 
         dtw = pd.DataFrame({
             "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
@@ -220,7 +238,7 @@ class BAM(TrackIO):
         layers.loc[layers["dtw", "length"] == 0, ("dtw", "length")] = pd.NA
         layers = layers[~(layers["dtw","current"].isnull() & layers["dtw","length"].isnull())]
 
-        layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("int32")
+        layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("Int32")
 
         #Note should use below, but too buggy: https://github.com/pandas-dev/pandas/issues/45725
         #layers["dtw", "length"] = layers["dtw", "length"].replace(0, pd.NA)
@@ -304,7 +322,7 @@ class BAM(TrackIO):
                 #pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
 
                 aln_df = pd.concat([aln_df] + new_alns)#.sort_index()
-                layer_df = pd.concat([layer_df] + new_layers).sort_index(level="pac")
+                layer_df = pd.concat([layer_df] + new_layers).sort_index()
                 new_alns = list()
                 new_layers = list()
                 
@@ -402,7 +420,8 @@ class BAM(TrackIO):
 
 
     def close(self):
-        self.input.close()
+        if self.input is not None:
+            self.input.close()
         if self.output is not None:
             self.output.close()
 

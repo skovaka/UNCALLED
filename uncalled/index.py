@@ -327,7 +327,7 @@ class RefIndex:
         #else:
         #   #ref_coord.start += kmer_shift
 
-        if (mrefs.step > 0) == is_rna:
+        if (mrefs.step > 0) != is_rna:
             i,j = self.trim
         else:
             i,j = reversed(self.trim)
@@ -381,7 +381,7 @@ class RefIndex:
         else:
             mrefs = tuple((
                 self.ref_coord_to_mrefs(RefCoord(ref_coord, fwd), is_rna)
-                for fwd in range(2)
+                for fwd in [False, True]
             ))
 
         if load_kmers:

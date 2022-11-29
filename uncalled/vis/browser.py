@@ -27,6 +27,7 @@ def browser(conf):
     conf.tracks.layers=["dtw","dtw.dwell","dtw.model_diff","dtw.middle","bcaln.middle","bcaln","cmp","bc_cmp"]
     sys.stderr.write("Loading tracks...\n")
     tracks = Tracks(conf=conf)
+    tracks.load()
     sys.stderr.write("Starting server...\n")
     new_browser(tracks, conf)
 

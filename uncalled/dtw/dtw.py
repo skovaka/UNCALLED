@@ -159,7 +159,7 @@ class GuidedDTW:
             self.block_coords.append([block_st, gap_st, shift])
             block_st = gap_en
             shift += gap_en-gap_st
-        self.block_coords.append([block_st,mref_max,shift])
+        self.block_coords.append([block_st,mref_max, shift])
 
         #kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
         new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], conf.is_rna)
