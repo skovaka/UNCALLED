@@ -738,8 +738,6 @@ class Tracks:
         def next_coords(seq_coords, pac, fwd, chunk_hasnext):
             if len(pac) > 1 and chunk_hasnext:
                 pac = pac[:-1]
-            else:
-                print("END CHUNK", seq_coords, pac, fwd, chunk_hasnext)
 
             idx = pd.MultiIndex.from_product([[int(fwd)], pac])
 
