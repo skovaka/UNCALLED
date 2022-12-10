@@ -154,9 +154,16 @@ class BAM(TrackIO):
     #TODO more query options
     def iter_sam(self, unmapped=False):
         #if self.conf.tracks.ref_bounds is not None
-        for sam in self.input:
-            if unmapped or not sam.is_unmapped:
-                yield sam
+        if self.conf.tracks.ref_bounds is None:
+            itr = self.input
+        else:
+            b = self.conf.tracks.ref_bounds
+            itr = self.input.fetch(b.name, b.start, b.end)
+
+        if unmapped:
+            return (a for a in itr if not a.is_unmapped)
+        return itr
+            
 
     def _parse_sam(self, sam, coords=None):
         samp_bounds = sam.get_tag("ss")

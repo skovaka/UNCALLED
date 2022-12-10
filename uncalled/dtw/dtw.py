@@ -31,6 +31,10 @@ METHODS = {
 
 
 def dtw(conf):
+    conf.fast5_reader.load_bc = True
+    conf.tracks.load_fast5s = True
+    conf.export_static()
+
     if conf.tracks.io.guppy_in is None:
         run_dtw(conf)
         return
@@ -51,91 +55,45 @@ def dtw(conf):
 
     pbar.finish()
 
+
+
 def run_dtw(conf):
-
     """Perform DTW alignment guided by basecalled alignments"""
-    conf.fast5_reader.load_bc = True
-    conf.tracks.load_fast5s = True
-    conf.export_static()
-
     tracks = Tracks(conf=conf)
 
-    #tracks.model = tracks.model.get_normalized(*tracks.model.norm_mad_params(tracks.model.means))
-
+    #TODO generalize Fast5Reader for POD5/SLOW5
+    #move read_filter into TrackIO init_read_mode
     if not tracks.fast5s.indexed:
         raise RuntimeError("Must provide fast5 index")
 
-    clip_coords = tracks.coords
-
     read_filter = tracks.fast5s.get_read_filter()
 
-    bam_in = None
-    for io in tracks.inputs:
-        if isinstance(io, BAM):
-            bam_in = io
-            break
-    if bam_in is None:
-        raise ValueError("Must specify BAM input")
-
-    if conf.tracks.ref_bounds is None:
-        bam_iter = bam_in.iter_sam()
-    else:
-        b = conf.tracks.ref_bounds
-        bam_iter = bam_in.input.fetch(b.name, b.start, b.end)
-
-    sigproc = SignalProcessor(tracks[tracks.output_track].model, conf)
-
-    n_reads = 0
-
-
-    #for read in tracks.fast5s:
-    #    aligned = False
-    #    for aln in bam_in.get_alns(read.id):
-            #sys.stderr.write(f"{read.id}\n")
-
-    #for aln in bam_in.iter_sam():
-    for bam in bam_iter:
+    for bam in tracks.bam_in.iter_sam():
         if not bam.query_name in read_filter: continue
-        read = tracks.fast5s[bam.query_name]
-
-        dtw = GuidedDTW(tracks, sigproc, read, bam, conf)
-
-        if dtw.df is None:
-            sys.stderr.write(f"Warning: {read.id} failed\n")
-            continue
-
-        if conf.bc_cmp:
-            tracks.calc_compare("bcaln", True, True)
-
-        tracks.write_alignment()
-
-        aligned = True
-
-    #if aligned:
-        #pbar.update(n_reads)
-    #    n_reads += 1
+        dtw = GuidedDTW(tracks, bam)
 
     tracks.close()
 
-    #pbar.finish()
-
 class GuidedDTW:
 
-    #TODO do more in constructor using prms, not in main
-    #def __init__(self, track, read, paf, conf=None, **kwargs):
-    def __init__(self, tracks, sigproc, read, bam, conf=None, **kwargs):
-        self.conf = read.conf if conf is None else conf
+    def __init__(self, tracks, bam, **kwargs):
+        self.conf = tracks.conf
         self.prms = self.conf.dtw
 
-        bcaln = Bcaln(conf, tracks.index, read, bam, tracks.coords)
+        read = tracks.fast5s[bam.query_name]
+
+        bcaln = Bcaln(self.conf, tracks.index, read, bam, tracks.coords)
         if bcaln.empty:
             self.df = None
             return
         
-        signal = sigproc.process(read, False)
+        #TODO refactor so EventDetector generates ProcessedRead
+        #maybe make ProcessedRead into column-major DataFrame
+        #call normalization function on ProcessedRead, return a normalized version
+        #call DTW on ProcessedRead + BAM, return signal alignment
 
-        #if self.conf.normalizer.mode == "ref_mom":
-        #    signal.normalize(
+        sigproc = SignalProcessor(tracks.model, self.conf)
+        signal = sigproc.process(read, False)
 
         aln_id, self.coords = tracks.init_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, read=signal, bam=bam)
 
@@ -163,7 +121,7 @@ class GuidedDTW:
         self.block_coords.append([block_st,mref_max, shift])
 
         #kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
-        new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], conf.is_rna)
+        new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], self.conf.is_rna)
 
         if bcaln.flip_ref:
             self.block_coords[0][0] += self.index.trim[1]
@@ -236,6 +194,11 @@ class GuidedDTW:
 
         if self.bands is not None:
             tracks.add_layers("band", self.bands, aln_id=aln_id)
+
+        if self.conf.bc_cmp:
+            tracks.calc_compare("bcaln", True, True)
+
+        tracks.write_alignment()
 
         self.empty = False
 

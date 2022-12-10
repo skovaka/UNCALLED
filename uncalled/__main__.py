@@ -106,7 +106,7 @@ REALTIME_OPTS = BWA_OPTS + MAPPER_OPTS + (
 DTW_OPTS = (
     Opt(("-t", "--threads"), ""),
     Opt("--guppy-in", "tracks.io"),
-    Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+    Opt("--bam-in", "tracks.io", nargs="?", const="-", required=True),
     Opt(("--out-name", "-o"), "tracks.io"),
     Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
 
