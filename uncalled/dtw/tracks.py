@@ -265,15 +265,10 @@ class Tracks:
                 self.output = Eventalign(filename, True, self, track_count)
             elif out_format == "bam_out":
                 self.output = BAM(filename, True, self, track_count)
-                #if len(self.inputs) != 1:
-                #    raise RuntimeError("Must input exactly one BAM file for BAM output")
-                #new_track = False
-                #self.output = self.inputs[0]
 
-            if new_track:
-                track_count += len(io.aln_tracks)
-                for track in self.output.aln_tracks:
-                    self._add_track(track.name, track)
+            track_count += len(self.output.aln_tracks)
+            for track in self.output.aln_tracks:
+                self._add_track(track.name, track)
 
                 #tracks.append(self.output.aln_tracks)
 

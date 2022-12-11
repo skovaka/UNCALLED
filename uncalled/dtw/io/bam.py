@@ -22,11 +22,12 @@ class BAM(TrackIO):
         TrackIO.__init__(self, filename, write, tracks, track_count)
 
         if write:
-            if tracks.bam_in is None:
-                raise ValueError("No BAM template provided")
-            self.header = tracks.bam_in.input.header.to_dict()
-            self.input = None
+            if not self.prms.buffered:
+                if tracks.bam_in is None:
+                    raise ValueError("No BAM template provided")
+                self.header = tracks.bam_in.input.header.to_dict()
             self.init_write_mode()
+            self.input = None
         else:
             self.output = None
             self.init_read_mode()
@@ -56,9 +57,9 @@ class BAM(TrackIO):
 
     def init_write_mode(self):
         if self.conf.tracks.io.bam_out is None:
-
             self.output = None
             return
+
         TrackIO.init_write_mode(self)
 
         if len(self.conf.fast5_reader.fast5_index) == 0:
@@ -67,6 +68,11 @@ class BAM(TrackIO):
         #TODO load from AlnTrack instance (initialized by Tracks)
         self.model = PoreModel(self.conf.pore_model)
         self.kmer_trim = self.model.kmer_trim
+
+        if self.prms.buffered:
+            self.out_buffer = list()
+            self.output = None
+            return
 
         #Store config toml in single-line comment with newlines replaced by semicolons
         conf_line = self.conf.to_toml() \
@@ -94,7 +100,6 @@ class BAM(TrackIO):
 
     def _init_alns(self):
         if self.in_alns is None:
-            print("BUFFERING ALNS")
             self.in_alns = defaultdict(list)
             for aln in self.iter_sam():
                 self.in_alns[aln.query_name].append(aln)
@@ -149,7 +154,16 @@ class BAM(TrackIO):
         self.bam.set_tag("sl", array.array("H", lens))
         self.bam.set_tag("sc", array.array("H", dc))
 
-        self.output.write(self.bam)
+        if self.prms.buffered:
+            self.out_buffer.append(self.bam.to_string())
+        else:
+            self.output.write(self.bam)
+
+    def write_bam_strs(self, bams):
+        header = pysam.AlignmentHeader.from_dict(self.header)
+        for b in bams:
+            bam = pysam.AlignedSegment.fromstring(b, header)
+            self.output.write(bam)
 
     #TODO more query options
     def iter_sam(self, unmapped=False):

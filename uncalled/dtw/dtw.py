@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 import progressbar as progbar
+import pysam
 
 from sklearn.linear_model import TheilSenRegressor
 from ..pafstats import parse_paf
@@ -35,36 +36,63 @@ def dtw(conf):
     conf.tracks.load_fast5s = True
     conf.export_static()
 
-    if conf.tracks.io.guppy_in is None:
-        run_dtw(conf)
-        return
+    if conf.threads == 1:
+        dtw_single(conf)
+    else:
+        with mp.Pool(processes=conf.threads) as pool:
+            dtw_pool(conf, pool)
+            return
+        raise ValueError("FAIL")
 
-    guppy_in = Guppy(conf.tracks.io.guppy_in, False, conf, 0)
+def dtw_pool(conf, pool):
+    #pbar = progbar.ProgressBar(len(guppy_in.fast5_paths), widgets=[
+    #        progbar.Timer(),
+    #        progbar.Bar(),
+    #        progbar.ETA(),
+    #])
 
-    pbar = progbar.ProgressBar(len(guppy_in.fast5_paths), widgets=[
-        progbar.Timer(),
-        progbar.Bar(),
-        progbar.ETA(),
-    ])
+    tracks = Tracks(conf=conf)
 
-    with mp.Pool(processes=conf.threads) as pool:
-        sys.stderr.write(f"Using {conf.threads} processes\n")
-        pbar.start()
-        for i,_ in enumerate(pool.imap_unordered(run_dtw, guppy_in.iter_batches(), chunksize=1)):
-            pbar.update(i)
+    chunksize = 50
+    header = tracks.output.header
+    def iter_chunks():
+        bams = list()
+        for bam in tracks.bam_in.iter_sam():
+            bams.append(bam.to_string())
+            if len(bams) == chunksize:
+                yield (conf, bams, header)
+                bams = list()
 
-    pbar.finish()
+    for i,bams in enumerate(pool.imap_unordered(dtw_worker, iter_chunks(), chunksize=1)):
+        tracks.output.write_bam_strs(bams)
+        #pbar.update(i)
+
+def dtw_worker(p):
+    conf,bams,header = p
+    conf.tracks.io.buffered = True
+    conf.tracks.io.bam_in = None
+
+    header = pysam.AlignmentHeader.from_dict(header)
+    tracks = Tracks(conf=conf)
+
+    for bam in bams:
+        bam = pysam.AlignedSegment.fromstring(bam, header)
+        dtw = GuidedDTW(tracks, bam)
+    tracks.close()
+
+    return tracks.output.out_buffer
 
 
-
-def run_dtw(conf):
+def dtw_single(conf):
     """Perform DTW alignment guided by basecalled alignments"""
     tracks = Tracks(conf=conf)
 
     #TODO generalize Fast5Reader for POD5/SLOW5
     #move read_filter into TrackIO init_read_mode
-    if not tracks.fast5s.indexed:
-        raise RuntimeError("Must provide fast5 index")
+
+    #TODO refactor Fast5Reader into ReadIndex + Fast5/Slow5/Pod5 Reader
+    #ReadIndex comes from seqsum, filename_mapping, nanopolish, look into SLOW5/POD5 
+    #also parses read_ids, passed into TrackIO for filtering
 
     read_filter = tracks.fast5s.get_read_filter()
 

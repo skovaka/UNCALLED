@@ -42,6 +42,8 @@ IOParams._def_params(
     ("bam_in", None, None, "BAM input file (or \"-\"/no argument for stdin)"),
     ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
 
+    ("buffered", False, bool, "Will store alignments in buffer rather than directly output"),
+
     ("eventalign_in", None, list, "Eventalign (nanopolish) input file (or \"-\"/no argument for stdin)"),
     ("eventalign_out", None, str, "Eventalign (nanopolish) output file (or \"-\"/no argument for stdout)"),
     ("eventalign_index", None, str, "Nanopolish index file"),
