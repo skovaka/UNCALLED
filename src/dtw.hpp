@@ -15,7 +15,7 @@ struct DtwParams {
     DTWSubSeq subseq;
     float move_cost, stay_cost, skip_cost,
           band_shift;
-    i32 band_width, iterations;
+    i32 del_max, ins_max, band_width, iterations;
     std::string norm_mode, band_mode, cost_fn, mm2_paf;
     bool save_bands;
 };
