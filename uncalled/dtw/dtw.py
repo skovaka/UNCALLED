@@ -53,7 +53,7 @@ def dtw_pool(conf, pool):
 
     tracks = Tracks(conf=conf)
 
-    chunksize = 50
+    chunksize = 500
     header = tracks.output.header
     def iter_chunks():
         bams = list()
@@ -63,7 +63,10 @@ def dtw_pool(conf, pool):
                 yield (conf, bams, header)
                 bams = list()
 
-    for i,bams in enumerate(pool.imap_unordered(dtw_worker, iter_chunks(), chunksize=1)):
+        if len(bams) > 0:
+            yield (conf, bams, header)
+
+    for i,bams in enumerate(pool.imap(dtw_worker, iter_chunks(), chunksize=1)):
         tracks.output.write_bam_strs(bams)
         #pbar.update(i)
 
