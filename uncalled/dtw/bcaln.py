@@ -34,6 +34,8 @@ class Bcaln:
     def __init__(self, conf, ref_index, read, sam, clip_coords=None):
 
         self.is_rna = conf.is_rna
+        self.del_max = conf.dtw.del_max
+        self.ins_max = conf.dtw.ins_max
 
         self.clip_coords = clip_coords
 
@@ -159,7 +161,7 @@ class Bcaln:
                     bp_mref_aln.append((read_i,rf,-l))
                     
                 #TODO do this based on indel field
-                if c == "N":
+                if c == "N" or l > self.del_max:
                     self.ref_gaps.append((mref_i,mref_j))
                 
             if incr_qr: read_i = read_j 

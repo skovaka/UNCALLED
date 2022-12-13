@@ -122,6 +122,7 @@ DTW_OPTS = (
     Opt("--tsv-noref", "tracks.io", action="store_true"),
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
 
+    Opt("--del-max", "dtw"),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
     Opt("--mask-indels", "tracks"),
 
