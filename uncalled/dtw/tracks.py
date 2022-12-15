@@ -4,7 +4,6 @@ import sqlite3
 import numpy as np
 import pandas as pd
 import collections
-import time
 from collections import defaultdict
 import scipy
 
@@ -15,6 +14,8 @@ from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
 from .. import config
+
+from time import time
 
 
 _REFSTAT_AGGS = {
@@ -78,6 +79,7 @@ class Tracks:
             self._init_new(*args, **kwargs)
 
     def _init_new(self, *args, **kwargs):
+
         self.conf, self.prms = config._init_group("tracks", copy_conf=True, *args, **kwargs)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers, add_deps=False))
 
@@ -85,7 +87,7 @@ class Tracks:
         self._tracks = dict()
         self.new_alignment = False
         self.new_layers = set()
-        
+
         self._init_io()
 
         self.set_layers(self.prms.layers)
@@ -116,6 +118,7 @@ class Tracks:
                         conf=self.conf)
 
             if self.fast5s is None:
+
                 if len(self.conf.fast5_reader.fast5_files) > 0:
                     self.fast5s = Fast5Reader(conf=self.conf)
                 else: 
@@ -635,14 +638,6 @@ class Tracks:
 
         elif group_b == "bcaln":
             df = track_a.bc_cmp(track_b, True, True)
-            #if len(alns) > 2:
-            #    raise ValueError("Must input one or two tracks to compare dtw to bcaln")
-            #
-            #t = time.time()
-            #if len(alns) == 2:
-            #    df = track_a.bc_cmp(alns[1], calc_jaccard, calc_mean_ref_dist)
-            #else:
-            #    df = track_a.bc_cmp(None, calc_jaccard, calc_mean_ref_dist)
 
         df = df.dropna(how="all")
         self.add_layers("cmp", df)
@@ -887,8 +882,6 @@ class Tracks:
             reads = self.prms.read_filter
         if max_reads is None:
             max_reads = self.prms.max_reads
-
-        t = time.time()
 
         #TODO handle multiple inputs properly
         for io in self.inputs:

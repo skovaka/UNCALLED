@@ -1,5 +1,5 @@
 import sys
-import time
+from time import time
 import glob
 import numpy as np
 import pandas as pd
@@ -7,6 +7,7 @@ import os
 from _uncalled import _Fast5Dict, _Fast5Iter, _Fast5Reader
 import uncalled as unc
 import re
+from collections import defaultdict
 
 def is_fast5(fname):
     return fname.endswith(".fast5")
@@ -79,6 +80,7 @@ def parse_read_ids(reads):
 class Fast5Reader:
 
     def __init__(self, fast5s=None, index=None, reads=None, recursive=None, conf=None):
+
         self.conf = unc.Config(conf)# if conf is None else conf
 
         conf_prms = self.conf.fast5_reader
@@ -129,7 +131,9 @@ class Fast5Reader:
         index = None
         names = None
 
+
         fast5_paths = {os.path.basename(path) : path for path in self.prms.fast5_files}
+
 
         with open(filename) as infile:
             head = infile.readline().split()
@@ -147,7 +151,7 @@ class Fast5Reader:
             infile.seek(0)
 
             if names is not None:
-                index = pd.read_csv(infile, sep="\t", names=names, header=header)
+                index = pd.read_csv(infile, sep="\t", names=names, header=header, usecols=["filename", "read_id"])
 
         if index is None:
             raise RuntimeError("Unable to read index \"%s\"" % self.prms.fast5_index)
@@ -162,12 +166,16 @@ class Fast5Reader:
 
         self.prms.read_filter = list(index["read_id"])
 
-        groups = index.groupby("filename").groups
-        groups = {
-            fast5_paths[os.path.basename(fast5)] : list(index.loc[rows, "read_id"])
-            for fast5,rows in groups.items()
-            if os.path.basename(fast5) in fast5_paths
-        }
+        idx = index.set_index("filename").sort_index()
+        groups = dict()
+        for fast5 in idx.index.unique():
+            path = fast5_paths[os.path.basename(fast5)]
+            reads = idx.loc[fast5, "read_id"]
+            if isinstance(reads, str):
+                reads = [reads]
+            else:
+                reads = list(reads)
+            groups[path] = reads
 
         self._dict = _Fast5Dict(groups, self.prms)
         self.indexed = True

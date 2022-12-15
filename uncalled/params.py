@@ -93,7 +93,7 @@ TracksParams._def_params(
     ("index_prefix", None, str, "BWA index prefix"),
     ("load_fast5s", False, bool, "Load fast5 files"),
 
-    ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter"}
+    ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter", "load_fast5s"}
 )
 
 class VisParams(config.ParamGroup):
