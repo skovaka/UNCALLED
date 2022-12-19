@@ -232,6 +232,8 @@ class Fast5Dict : public Fast5Reader {
     Fast5Dict(const Params &p);
 
     void add_read(const std::string &read_id, u32 fast5_idx); 
+    bool is_indexed() const;
+    bool load_index(std::vector<std::string> read_ids, std::vector<std::string> file_names);
     bool load_index(const std::string &filename);
 
     Fast5Read operator[](const std::string &read_id);
@@ -254,8 +256,13 @@ class Fast5Dict : public Fast5Reader {
         c.def(pybind11::init<Fast5ReadMap, Params>());
         c.def(pybind11::init<Fast5ReadMap>());
         c.def(pybind11::init<std::vector<std::string>, std::vector<std::string>, std::vector<std::string>, const Params &>());
+
+        c.def("load_index", static_cast<bool (Fast5Dict::*)(const std::string &)> (&Fast5Dict::load_index) );
+        //c.def("load_index", static_cast<bool (Fast5Dict::*)(const std::vector<std::string> &, const std::vector<std::string> &)> (&Fast5Dict::load_index) );
+        c.def("load_index", static_cast<bool (Fast5Dict::*)(std::vector<std::string>, std::vector<std::string>)> (&Fast5Dict::load_index) );
         
-        PY_FAST5_DICT_METH(load_index, "");
+        PY_FAST5_DICT_METH(is_indexed, "");
+        //PY_FAST5_DICT_METH(load_index, "");
         PY_FAST5_DICT_METH(add_read, "");
         PY_FAST5_DICT_METH(get_read_file, "");
         //c.def("add_read", pybind11::vectorize(&Fast5Dict::add_read), "");

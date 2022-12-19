@@ -151,6 +151,9 @@ class BAM(TrackIO):
         self.bam.set_tag("sl", array.array("H", lens))
         self.bam.set_tag("sc", array.array("H", dc))
 
+        if not self.bam.has_tag("f5"):
+            self.bam.set_tag("f5", os.path.basename(self.prev_fast5[0]))
+
         if self.prms.buffered:
             self.out_buffer.append(self.bam.to_string())
         else:

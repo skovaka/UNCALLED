@@ -92,14 +92,15 @@ class Fast5Reader:
         self.prms.load_bc = conf_prms.load_bc
         self.prms.bc_group = conf_prms.bc_group
 
-        self.indexed = read_index.indexed
+        self.indexed = False#read_index.indexed
+        self.read_index = read_index
 
         #TODO rewrite Fast5Dict to take read->filename, filename->path
         #maybe read_array, filename_array, path_array, all sorted by filename?
-        if self.indexed:
+        if read_index.indexed:
             #self._dict = _Fast5Dict(read_index.get_fast5_dict(), self.prms)
-            idx = read_index.read_files
-            self._dict = _Fast5Dict(read_index.file_paths, list(idx["read_id"]), list(idx["filename"]), self.prms)
+            #self._dict = _Fast5Dict(read_index.file_paths, list(idx["read_id"]), list(idx["filename"]), self.prms)
+            self._dict = _Fast5Dict(read_index.file_paths, [], [], self.prms)
         else:
             self._dict = None
 
@@ -190,21 +191,34 @@ class Fast5Reader:
         if len(self.prms.read_filter) > 0:
             return set(self.prms.read_filter)
         return None
+
+    def _init_index(self):
+        if self._dict is None:
+            raise RuntimeError("Must provide fast5 index")
+
+        if self._dict.is_indexed(): return
+        idx = self.read_index.read_files
+        self._dict.load_index(list(idx["read_id"]), list(idx["filename"]))
+        if not self._dict.is_indexed():
+            raise RuntimeError("Must provide fast5 index")
     
     def get_read_file(self, read_id):
-        if not self.indexed:
-            raise RuntimeError("Fast5 index is required to query fast5 filenames")
+        self._init_index()
+        #if not self.indexed:
+        #    raise RuntimeError("Fast5 index is required to query fast5 filenames")
         return self._dict.get_read_file(read_id)
 
     def __contains__(self, read_id):
-        if not self.indexed:
-            raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")
+        self._init_index()
+        #if not self.indexed:
+        #    raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")
         #TODO faster solution?
         return not self._dict[read_id].empty()
 
     def __getitem__(self, read_id):
-        if not self.indexed:
-            raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")
+        self._init_index()
+        #if not self.indexed:
+        #    raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")
 
         read = self._dict[read_id]
         if read.empty():

@@ -310,14 +310,7 @@ Fast5Dict::Fast5Dict(std::vector<std::string> file_paths, std::vector<std::strin
         filename_paths_[basename] = i;
     }   
 
-    if (read_ids.size() != file_names.size()) {
-        throw std::runtime_error("read_ids must be same length as file_names");
-    }
-
-    for (size_t i = 0; i < read_ids.size(); i++) {
-        add_read(read_ids[i], filename_paths_[file_names[i]]);
-    }
-
+    load_index(read_ids, file_names);
 }
 
 Fast5Dict::Fast5Dict(Fast5ReadMap fast5_map, const Params &p) : Fast5Dict(p) {
@@ -327,6 +320,21 @@ Fast5Dict::Fast5Dict(Fast5ReadMap fast5_map, const Params &p) : Fast5Dict(p) {
             add_read(read, i);
         }
     }
+}
+
+//bool Fast5Dict::load_index(const std::vector<std::string> &read_ids, const std::vector<std::string> &file_names) {
+bool Fast5Dict::load_index(std::vector<std::string> read_ids, std::vector<std::string> file_names) {
+    if (read_ids.size() != file_names.size()) {
+        throw std::runtime_error("read_ids must be same length as file_names");
+    }
+
+    for (size_t i = 0; i < read_ids.size(); i++) {
+        add_read(read_ids[i], filename_paths_[file_names[i]]);
+    }
+}
+
+bool Fast5Dict::is_indexed() const {
+    return reads_.size() > 0;
 }
 
 bool Fast5Dict::load_index(const std::string &filename) {
