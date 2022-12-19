@@ -113,6 +113,11 @@ class GuidedDTW:
 
         read = tracks.fast5s[bam.query_name]
 
+        #TODO move to tracks.init_bcaln (maybe rename bcaln)
+        #construct from BAM (with move table, or FAST5)
+        #need to standardize ref_gaps, maybe event_gaps too
+        #ideally in generalized C++ CoordBounds or whatever
+
         bcaln = Bcaln(self.conf, tracks.index, read, bam, tracks.coords)
         if bcaln.empty:
             self.df = None
