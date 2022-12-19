@@ -1,11 +1,11 @@
 import sys
-import time
 import re
 import numpy as np
 import pandas as pd
 from collections import defaultdict
 import progressbar as progbar
 import pysam
+from time import time
 
 from sklearn.linear_model import TheilSenRegressor
 from ..pafstats import parse_paf
@@ -57,11 +57,15 @@ def dtw_pool(conf, pool):
     header = tracks.output.header
     def iter_chunks():
         bams = list()
+        read_ids = set()
         for bam in tracks.bam_in.iter_sam():
             bams.append(bam.to_string())
+            read_ids.add(bam.query_name)
             if len(bams) == chunksize:
-                yield (conf, bams, header)
+                reads = tracks.read_index.subset(read_ids)
+                yield (conf, bams, reads, header)
                 bams = list()
+                read_ids = set()
 
         if len(bams) > 0:
             yield (conf, bams, header)
@@ -71,16 +75,18 @@ def dtw_pool(conf, pool):
         #pbar.update(i)
 
 def dtw_worker(p):
-    conf,bams,header = p
+    conf,bams,reads,header = p
     conf.tracks.io.buffered = True
     conf.tracks.io.bam_in = None
 
     header = pysam.AlignmentHeader.from_dict(header)
-    tracks = Tracks(conf=conf)
+
+    tracks = Tracks(read_index=reads, conf=conf)
 
     for bam in bams:
         bam = pysam.AlignedSegment.fromstring(bam, header)
         dtw = GuidedDTW(tracks, bam)
+
     tracks.close()
 
     return tracks.output.out_buffer
@@ -88,19 +94,10 @@ def dtw_worker(p):
 
 def dtw_single(conf):
     """Perform DTW alignment guided by basecalled alignments"""
+
     tracks = Tracks(conf=conf)
 
-    #TODO generalize Fast5Reader for POD5/SLOW5
-    #move read_filter into TrackIO init_read_mode
-
-    #TODO refactor Fast5Reader into ReadIndex + Fast5/Slow5/Pod5 Reader
-    #ReadIndex comes from seqsum, filename_mapping, nanopolish, look into SLOW5/POD5 
-    #also parses read_ids, passed into TrackIO for filtering
-
-    read_filter = tracks.fast5s.get_read_filter()
-
     for bam in tracks.bam_in.iter_sam():
-        if not bam.query_name in read_filter: continue
         dtw = GuidedDTW(tracks, bam)
 
     tracks.close()

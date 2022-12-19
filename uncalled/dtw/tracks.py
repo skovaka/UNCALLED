@@ -4,7 +4,6 @@ import sqlite3
 import numpy as np
 import pandas as pd
 import collections
-import time
 from collections import defaultdict
 import scipy
 
@@ -14,7 +13,10 @@ from .layers import LAYER_META, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
+from ..read_index import ReadIndex
 from .. import config
+
+from time import time
 
 
 _REFSTAT_AGGS = {
@@ -72,12 +74,17 @@ class RefstatsSplit:
 
 class Tracks:
     def __init__(self, *args, **kwargs):
+        self.read_index = kwargs.get("read_index", None)
+        if self.read_index is not None:
+            del kwargs["read_index"]
+
         if len(args) > 0 and isinstance(args[0], Tracks):
             self._init_slice(*args, **kwargs)
         else:
             self._init_new(*args, **kwargs)
 
     def _init_new(self, *args, **kwargs):
+
         self.conf, self.prms = config._init_group("tracks", copy_conf=True, *args, **kwargs)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers, add_deps=False))
 
@@ -85,7 +92,12 @@ class Tracks:
         self._tracks = dict()
         self.new_alignment = False
         self.new_layers = set()
-        
+
+        if self.read_index is None:
+            self.read_index = ReadIndex(self.conf.fast5_reader.fast5_index, read_filter=self.prms.read_filter)
+
+        #def __init__(self, index_filename=None, file_paths=None, read_filter=None, file_suffix=".fast5"):
+
         self._init_io()
 
         self.set_layers(self.prms.layers)
@@ -103,26 +115,33 @@ class Tracks:
         #    self.load()
 
         #TODO use consistent interface with dtw.dtw
-        self.fast5s = None
-        if self.prms.load_fast5s:
-            for io in self.inputs:
-                if isinstance(io, SQL):
-                    fast5_reads = list()
-                    fast5_reads.append(io.get_fast5_index(self._aln_track_ids))
-                    fast5_reads = pd.concat(fast5_reads)
-                    files = fast5_reads["filename"].unique()
-                    self.fast5s = Fast5Reader(
-                        index=fast5_reads, 
-                        conf=self.conf)
+        self._fast5s = None
 
-            if self.fast5s is None:
-                if len(self.conf.fast5_reader.fast5_files) > 0:
-                    self.fast5s = Fast5Reader(conf=self.conf)
-                else: 
-                    return
+    @property
+    def fast5s(self):
+        if self._fast5s is not None:
+            return self._fast5s
 
-            for track in self.alns:
-                track.fast5s = self.fast5s
+        for io in self.inputs:
+            if isinstance(io, SQL):
+                fast5_reads = list()
+                fast5_reads.append(io.get_fast5_index(self._aln_track_ids))
+                fast5_reads = pd.concat(fast5_reads)
+                files = fast5_reads["filename"].unique()
+                self._fast5s = Fast5Reader(
+                    index=fast5_reads, 
+                    conf=self.conf)
+
+        if self._fast5s is None:
+            if len(self.conf.fast5_reader.fast5_files) > 0:
+                self._fast5s = Fast5Reader(self.read_index, conf=self.conf)
+            else: 
+                return None
+
+        for track in self.alns:
+            track.fast5s = self._fast5s
+
+        return self._fast5s
 
     def _init_slice(self, parent, coords, tracks):
         self.conf = parent.conf 
@@ -235,7 +254,10 @@ class Tracks:
                 
             for filename in fnames:
                 io = Cls(filename, False, self, track_count)
-                #tracks.append(io.aln_tracks)
+
+                p = io.conf.fast5_reader
+                self.read_index.load_paths(p.fast5_files, p.recursive)
+
                 self.conf.load_config(io.conf)
                 self.inputs.append(io)
 
@@ -635,14 +657,6 @@ class Tracks:
 
         elif group_b == "bcaln":
             df = track_a.bc_cmp(track_b, True, True)
-            #if len(alns) > 2:
-            #    raise ValueError("Must input one or two tracks to compare dtw to bcaln")
-            #
-            #t = time.time()
-            #if len(alns) == 2:
-            #    df = track_a.bc_cmp(alns[1], calc_jaccard, calc_mean_ref_dist)
-            #else:
-            #    df = track_a.bc_cmp(None, calc_jaccard, calc_mean_ref_dist)
 
         df = df.dropna(how="all")
         self.add_layers("cmp", df)
@@ -887,8 +901,6 @@ class Tracks:
             reads = self.prms.read_filter
         if max_reads is None:
             max_reads = self.prms.max_reads
-
-        t = time.time()
 
         #TODO handle multiple inputs properly
         for io in self.inputs:

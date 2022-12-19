@@ -108,7 +108,13 @@ DTW_OPTS = (
     Opt("--guppy-in", "tracks.io"),
     Opt("--bam-in", "tracks.io", nargs="?", const="-", required=True),
     Opt(("--out-name", "-o"), "tracks.io"),
-    Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
+    Opt("index_prefix", "tracks"), #+ FAST5_OPTS + (
+
+    Opt(FAST5_PARAM, "fast5_reader", nargs="+", type=str),
+    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+    Opt(("-l", "--read-filter"), "tracks"),
+    Opt(("-x", "--fast5-index"), "fast5_reader"),
+    Opt(("-n", "--max-reads"), "tracks"),
 
     MutexOpts("output", [
         Opt("--sql-out", "tracks.io"),
