@@ -13,6 +13,7 @@ from .layers import LAYER_META, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
 from ..fast5 import Fast5Reader, parse_read_ids
+from ..read_index import ReadIndex
 from .. import config
 
 from time import time
@@ -88,6 +89,10 @@ class Tracks:
         self.new_alignment = False
         self.new_layers = set()
 
+        self.read_index = ReadIndex(self.conf.fast5_reader.fast5_index, self.prms.read_filter)
+
+        #def __init__(self, index_filename=None, file_paths=None, read_filter=None, file_suffix=".fast5"):
+
         self._init_io()
 
         self.set_layers(self.prms.layers)
@@ -120,7 +125,7 @@ class Tracks:
             if self.fast5s is None:
 
                 if len(self.conf.fast5_reader.fast5_files) > 0:
-                    self.fast5s = Fast5Reader(conf=self.conf)
+                    self.fast5s = Fast5Reader(self.read_index, conf=self.conf)
                 else: 
                     return
 
@@ -238,7 +243,10 @@ class Tracks:
                 
             for filename in fnames:
                 io = Cls(filename, False, self, track_count)
-                #tracks.append(io.aln_tracks)
+
+                p = io.conf.fast5_reader
+                self.read_index.load_paths(p.fast5_files, p.recursive)
+
                 self.conf.load_config(io.conf)
                 self.inputs.append(io)
 

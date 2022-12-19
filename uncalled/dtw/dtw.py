@@ -97,10 +97,11 @@ def dtw_single(conf):
     #ReadIndex comes from seqsum, filename_mapping, nanopolish, look into SLOW5/POD5 
     #also parses read_ids, passed into TrackIO for filtering
 
-    read_filter = tracks.fast5s.get_read_filter()
+    read_filter = tracks.read_index.read_filter
 
     for bam in tracks.bam_in.iter_sam():
-        if not bam.query_name in read_filter: continue
+        if not (read_filter is None or bam.query_name in read_filter): 
+            continue
         dtw = GuidedDTW(tracks, bam)
 
     tracks.close()

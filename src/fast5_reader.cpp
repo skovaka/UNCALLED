@@ -303,6 +303,23 @@ Fast5Dict::Fast5Dict(const Params &p) : Fast5Reader(p) {
     }
 }
 
+Fast5Dict::Fast5Dict(std::vector<std::string> file_paths, std::vector<std::string> read_ids, std::vector<std::string> file_names, const Params &p) : Fast5Dict(p) {
+    for (auto &path : file_paths) {
+        auto i = add_fast5(path);
+        auto basename = path.substr(path.rfind('/')+1);
+        filename_paths_[basename] = i;
+    }   
+
+    if (read_ids.size() != file_names.size()) {
+        throw std::runtime_error("read_ids must be same length as file_names");
+    }
+
+    for (size_t i = 0; i < read_ids.size(); i++) {
+        add_read(read_ids[i], filename_paths_[file_names[i]]);
+    }
+
+}
+
 Fast5Dict::Fast5Dict(Fast5ReadMap fast5_map, const Params &p) : Fast5Dict(p) {
     for (auto fast5_reads : fast5_map) {
         auto i = add_fast5(fast5_reads.first);

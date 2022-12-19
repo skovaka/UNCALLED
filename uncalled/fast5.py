@@ -79,44 +79,53 @@ def parse_read_ids(reads):
 
 class Fast5Reader:
 
-    def __init__(self, fast5s=None, index=None, reads=None, recursive=None, conf=None):
+    #def __init__(self, fast5s=None, index=None, reads=None, recursive=None, conf=None):
+    def __init__(self, read_index, conf=None):#fast5s=None, index=None, reads=None, recursive=None, conf=None):
 
         self.conf = unc.Config(conf)# if conf is None else conf
 
+        #TODO probably not ll this
         conf_prms = self.conf.fast5_reader
         self.prms = _Fast5Iter.Params()
-        self.indexed = False
-
-        #TODO all very hacky. should be refactored into C++
-
-        if reads is None: 
-            reads = conf_prms.read_filter
-        self.prms.read_filter = parse_read_ids(reads)
-
-        if recursive is None: 
-            recursive = conf_prms.recursive
-        self.prms.recursive = recursive
-
-        if fast5s is None: 
-            fast5s = conf_prms.fast5_files
-        self.prms.fast5_files = parse_fast5_paths(fast5s, recursive)
-
-        if index is None:
-            index = conf_prms.fast5_index
-        #self.prms.fast5_index = index
-
         self.prms.max_reads = conf_prms.max_reads
         self.prms.max_buffer = conf_prms.max_buffer
         self.prms.load_bc = conf_prms.load_bc
         self.prms.bc_group = conf_prms.bc_group
 
-        if isinstance(index, str): 
-            if len(index) > 0:
-                self._load_index_file(index)
-        elif isinstance(index, pd.DataFrame):
-            self._load_index_df(index)
+        self.indexed = read_index.indexed
+
+        #TODO rewrite Fast5Dict to take read->filename, filename->path
+        #maybe read_array, filename_array, path_array, all sorted by filename?
+        if self.indexed:
+            #self._dict = _Fast5Dict(read_index.get_fast5_dict(), self.prms)
+            idx = read_index.read_files
+            self._dict = _Fast5Dict(read_index.file_paths, list(idx["read_id"]), list(idx["filename"]), self.prms)
         else:
-            raise ValueError("Unknown fast5 index format")
+            self._dict = None
+
+        #if reads is None: 
+        #    reads = conf_prms.read_filter
+        #self.prms.read_filter = parse_read_ids(reads)
+
+        #if recursive is None: 
+        #    recursive = conf_prms.recursive
+        #self.prms.recursive = recursive
+
+        #if fast5s is None: 
+        #    fast5s = conf_prms.fast5_files
+        #self.prms.fast5_files = parse_fast5_paths(fast5s, recursive)
+
+        #if index is None:
+        #    index = conf_prms.fast5_index
+        ##self.prms.fast5_index = index
+
+        #if isinstance(index, str): 
+        #    if len(index) > 0:
+        #        self._load_index_file(index)
+        #elif isinstance(index, pd.DataFrame):
+        #    self._load_index_df(index)
+        #else:
+        #    raise ValueError("Unknown fast5 index format")
 
     def _load_index_df(self, df):
         fast5_paths = {os.path.basename(path) : path for path in self.prms.fast5_files}

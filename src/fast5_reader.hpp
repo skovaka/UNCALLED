@@ -227,6 +227,8 @@ class Fast5Dict : public Fast5Reader {
 
     Fast5Dict();
     Fast5Dict(Fast5ReadMap fast5_map, const Params &p=PRMS_DEF);
+    Fast5Dict(std::vector<std::string> file_paths, std::vector<std::string> read_ids={}, std::vector<std::string> file_names={}, const Params &p=PRMS_DEF);
+
     Fast5Dict(const Params &p);
 
     void add_read(const std::string &read_id, u32 fast5_idx); 
@@ -237,7 +239,7 @@ class Fast5Dict : public Fast5Reader {
     std::string get_read_file(const std::string &read_id);
 
     private:
-    std::unordered_map<std::string, u32> reads_;
+    std::unordered_map<std::string, u32> reads_, filename_paths_;
 
     #ifdef PYBIND
 
@@ -251,6 +253,7 @@ class Fast5Dict : public Fast5Reader {
         c.def(pybind11::init());
         c.def(pybind11::init<Fast5ReadMap, Params>());
         c.def(pybind11::init<Fast5ReadMap>());
+        c.def(pybind11::init<std::vector<std::string>, std::vector<std::string>, std::vector<std::string>, const Params &>());
         
         PY_FAST5_DICT_METH(load_index, "");
         PY_FAST5_DICT_METH(add_read, "");
