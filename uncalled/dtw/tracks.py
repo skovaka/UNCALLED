@@ -74,6 +74,10 @@ class RefstatsSplit:
 
 class Tracks:
     def __init__(self, *args, **kwargs):
+        self.read_index = kwargs.get("read_index", None)
+        if self.read_index is not None:
+            del kwargs["read_index"]
+
         if len(args) > 0 and isinstance(args[0], Tracks):
             self._init_slice(*args, **kwargs)
         else:
@@ -89,7 +93,8 @@ class Tracks:
         self.new_alignment = False
         self.new_layers = set()
 
-        self.read_index = ReadIndex(self.conf.fast5_reader.fast5_index, read_filter=self.prms.read_filter)
+        if self.read_index is None:
+            self.read_index = ReadIndex(self.conf.fast5_reader.fast5_index, read_filter=self.prms.read_filter)
 
         #def __init__(self, index_filename=None, file_paths=None, read_filter=None, file_suffix=".fast5"):
 
@@ -110,27 +115,33 @@ class Tracks:
         #    self.load()
 
         #TODO use consistent interface with dtw.dtw
-        self.fast5s = None
-        if self.prms.load_fast5s:
-            for io in self.inputs:
-                if isinstance(io, SQL):
-                    fast5_reads = list()
-                    fast5_reads.append(io.get_fast5_index(self._aln_track_ids))
-                    fast5_reads = pd.concat(fast5_reads)
-                    files = fast5_reads["filename"].unique()
-                    self.fast5s = Fast5Reader(
-                        index=fast5_reads, 
-                        conf=self.conf)
+        self._fast5s = None
 
-            if self.fast5s is None:
+    @property
+    def fast5s(self):
+        if self._fast5s is not None:
+            return self._fast5s
 
-                if len(self.conf.fast5_reader.fast5_files) > 0:
-                    self.fast5s = Fast5Reader(self.read_index, conf=self.conf)
-                else: 
-                    return
+        for io in self.inputs:
+            if isinstance(io, SQL):
+                fast5_reads = list()
+                fast5_reads.append(io.get_fast5_index(self._aln_track_ids))
+                fast5_reads = pd.concat(fast5_reads)
+                files = fast5_reads["filename"].unique()
+                self._fast5s = Fast5Reader(
+                    index=fast5_reads, 
+                    conf=self.conf)
 
-            for track in self.alns:
-                track.fast5s = self.fast5s
+        if self._fast5s is None:
+            if len(self.conf.fast5_reader.fast5_files) > 0:
+                self._fast5s = Fast5Reader(self.read_index, conf=self.conf)
+            else: 
+                return None
+
+        for track in self.alns:
+            track.fast5s = self._fast5s
+
+        return self._fast5s
 
     def _init_slice(self, parent, coords, tracks):
         self.conf = parent.conf 

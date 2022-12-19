@@ -17,11 +17,17 @@ class ReadIndex:
     @property
     def indexed(self):
         return len(self.file_paths) > 0
+    
+    def subset(self, read_ids):
+        ret = ReadIndex(read_filter=read_ids, file_suffix=self.file_suffix)
+        ret.load_index_df(self.read_files)
+        ret.file_paths = self.file_paths
+        return ret
 
     def load_index_file(self, fname=None):
         if fname is None:
             if self.index_filename is None:
-                raise ValueError("No read index file specified")
+                return
             fname = self.index_filename
 
         read_files = None
