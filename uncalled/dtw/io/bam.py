@@ -117,10 +117,7 @@ class BAM(TrackIO):
         #else:
         #    refs = track.coords.refs[self.kmer_trim[1]:-self.kmer_trim[0]]
 
-        #print(track.layers)
-        #print(refs)
         dtw = track.layers["dtw"].reset_index(level=1).reindex(refs)
-        #print(dtw)
 
         lens = dtw["length"]
         lens[dtw["start"].duplicated()] = 0 #skips
@@ -175,8 +172,29 @@ class BAM(TrackIO):
             itr = self.input.fetch(b.name, b.start, b.end)
 
         if unmapped:
-            return (a for a in itr if not a.is_unmapped)
-        return itr
+            mapped = lambda a: not a.is_unmapped
+        else:
+            mapped = lambda a: True
+
+        read_filter = self.tracks.read_index.read_filter
+        if read_filter is not None:
+            filt = lambda a: a.query_name in read_filter
+        else:
+            filt = lambda a: True
+
+        valid = lambda a: mapped(a) and filt(a)
+            
+        if self.conf.tracks.max_reads is None:
+            for a in itr:
+                if valid(a): yield a
+        else:
+            n = 0
+            for a in itr:
+                if valid(a): 
+                    yield a
+                    n += 1
+                if n == self.conf.tracks.max_reads:
+                    break
             
 
     def _parse_sam(self, sam, coords=None):

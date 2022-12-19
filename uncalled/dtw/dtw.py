@@ -90,18 +90,7 @@ def dtw_single(conf):
     """Perform DTW alignment guided by basecalled alignments"""
     tracks = Tracks(conf=conf)
 
-    #TODO generalize Fast5Reader for POD5/SLOW5
-    #move read_filter into TrackIO init_read_mode
-
-    #TODO refactor Fast5Reader into ReadIndex + Fast5/Slow5/Pod5 Reader
-    #ReadIndex comes from seqsum, filename_mapping, nanopolish, look into SLOW5/POD5 
-    #also parses read_ids, passed into TrackIO for filtering
-
-    read_filter = tracks.read_index.read_filter
-
     for bam in tracks.bam_in.iter_sam():
-        if not (read_filter is None or bam.query_name in read_filter): 
-            continue
         dtw = GuidedDTW(tracks, bam)
 
     tracks.close()

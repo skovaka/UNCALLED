@@ -95,8 +95,6 @@ class ReadIndex:
                     for line in infile:
                         self._add_read_file(line.strip())
 
-            #print(self.file_paths)
-
     def get_fast5_dict(self):
         fast5_reads = dict()
         idx = self.read_files.set_index("filename").sort_index()

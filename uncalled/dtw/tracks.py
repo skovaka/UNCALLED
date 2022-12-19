@@ -89,7 +89,7 @@ class Tracks:
         self.new_alignment = False
         self.new_layers = set()
 
-        self.read_index = ReadIndex(self.conf.fast5_reader.fast5_index, self.prms.read_filter)
+        self.read_index = ReadIndex(self.conf.fast5_reader.fast5_index, read_filter=self.prms.read_filter)
 
         #def __init__(self, index_filename=None, file_paths=None, read_filter=None, file_suffix=".fast5"):
 

@@ -73,7 +73,7 @@ TracksParams._def_params(
     ("io", {}, IOParams, "Track input/output parameters"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),
-    ("max_reads", None, int, "Only load reads which overlap these coordinates"),
+    ("max_reads", None, int, "Maximum number of reads to load"),
 
     ("mask_skips", None, None, "Either \"all\" to mask all skips, or \"keep_best\" to mask all but the closest to the model"),
     ("mask_indels", None, int, "Mask positions which overlap basecalled alignment insertions or deletions of this length or longer"),
