@@ -136,7 +136,7 @@ class Eventalign(TrackIO):
 
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
-        read_filter = set(self.conf.fast5_reader.read_filter)
+        #read_filter = set(self.conf.fast5_reader.read_filter)
 
         sample_rate = self.conf.read_buffer.sample_rate
 
@@ -156,7 +156,8 @@ class Eventalign(TrackIO):
             groups = events.groupby(["contig", "read_name"])
             for (contig,read_id), df in groups:
 
-                if len(read_filter) > 0 and read_id not in read_filter:
+                if self.read_filter is not None and read_id not in self.read_filter:
+
                     continue
 
                 df.drop(df.index[df["model_mean"] == 0], inplace=True)

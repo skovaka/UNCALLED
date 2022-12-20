@@ -3,6 +3,10 @@ from time import time
 import numpy as np
 import pandas as pd
 import os
+import re
+
+def is_read_id(read_id):
+    return re.match("[a-z0-9]+(-[a-z0-9])+", read_id) is not None
 
 class ReadIndex:
     def __init__(self, index_filename=None, file_paths=None, read_filter=None, file_suffix=".fast5"):
@@ -25,8 +29,8 @@ class ReadIndex:
         return ret
 
     def load_index_file(self, fname=None):
-        if fname is None:
-            if self.index_filename is None:
+        if fname is None or len(fname) == 0:
+            if self.index_filename is None or len(self.index_filename) == 0:
                 return
             fname = self.index_filename
 
@@ -61,6 +65,8 @@ class ReadIndex:
 
         if self.read_filter is not None:
             df = df[df["read_id"].isin(self.read_filter)]
+
+        df = df.set_index("read_id").sort_index()
 
         if self.read_files is None:
             self.read_files = df
@@ -101,18 +107,18 @@ class ReadIndex:
                     for line in infile:
                         self._add_read_file(line.strip())
 
-    def get_fast5_dict(self):
-        fast5_reads = dict()
-        idx = self.read_files.set_index("filename").sort_index()
-        for fast5 in idx.index.unique():
-            path = self.file_paths[os.path.basename(fast5)]
-            reads = idx.loc[fast5, "read_id"]
-            if isinstance(reads, str):
-                reads = [reads]
-            else:
-                reads = list(reads)
-            fast5_reads[path] = reads
-        return fast5_reads
+    #def get_fast5_dict(self):
+    #    fast5_reads = dict()
+    #    idx = self.read_files.set_index("filename").sort_index()
+    #    for fast5 in idx.index.unique():
+    #        path = self.file_paths[os.path.basename(fast5)]
+    #        reads = idx.loc[fast5, "read_id"]
+    #        if isinstance(reads, str):
+    #            reads = [reads]
+    #        else:
+    #            reads = list(reads)
+    #        fast5_reads[path] = reads
+    #    return fast5_reads
 
     def _load_filter(self, reads):
         if reads is None:

@@ -70,6 +70,10 @@ class TrackIO:
         #self.track_names = None
         self.write_mode = write
 
+    @property
+    def read_filter(self):
+        return self.tracks.read_index.read_filter
+
     def init_alignment(self, read_id, fast5, read, bam):
         self.read = read
         self.bam = bam

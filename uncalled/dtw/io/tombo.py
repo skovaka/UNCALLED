@@ -19,6 +19,7 @@ class Tombo(TrackIO):
         self._header = True
 
         self.fast5_in = None
+        self.read_index = tracks.read_index
         self.read_id_in = None
 
         if self.write_mode:
@@ -46,9 +47,9 @@ class Tombo(TrackIO):
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
         
-        f5reader = Fast5Reader(conf=self.conf)
-        read_filter = f5reader.get_read_filter()
-        fast5_files = f5reader.prms.fast5_files
+        #f5reader = self.fast5_in #Fast5Reader(conf=self.conf)
+        read_filter = self.read_index.read_filter #f5reader.get_read_filter()
+        fast5_files = self.read_index.file_paths #f5reader.prms.fast5_files
 
         if self.conf.fast5_reader.max_reads > 0 and len(fast5_files) > self.conf.fast5_reader.max_reads:
             fast5_files = fast5_files[:self.conf.fast5_reader.max_reads]

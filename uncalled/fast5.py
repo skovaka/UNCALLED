@@ -193,12 +193,15 @@ class Fast5Reader:
         return None
 
     def _init_index(self):
+        sys.stdout.flush()
         if self._dict is None:
             raise RuntimeError("Must provide fast5 index")
 
+        sys.stdout.flush()
+
         if self._dict.is_indexed(): return
         idx = self.read_index.read_files
-        self._dict.load_index(list(idx["read_id"]), list(idx["filename"]))
+        self._dict.load_index(list(idx.index), list(idx["filename"]))
         if not self._dict.is_indexed():
             raise RuntimeError("Must provide fast5 index")
     
@@ -215,7 +218,13 @@ class Fast5Reader:
         #TODO faster solution?
         return not self._dict[read_id].empty()
 
+    def get_read(self, read_id, filename=None):
+        if filename is None:
+            return self[read_id]
+        return self._dict.get_read(read_id, filename)
+
     def __getitem__(self, read_id):
+        sys.stdout.flush()
         self._init_index()
         #if not self.indexed:
         #    raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")

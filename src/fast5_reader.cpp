@@ -331,6 +331,8 @@ bool Fast5Dict::load_index(std::vector<std::string> read_ids, std::vector<std::s
     for (size_t i = 0; i < read_ids.size(); i++) {
         add_read(read_ids[i], filename_paths_[file_names[i]]);
     }
+
+    return true;
 }
 
 bool Fast5Dict::is_indexed() const {
@@ -368,6 +370,34 @@ bool Fast5Dict::load_index(const std::string &filename) {
 
 void Fast5Dict::add_read(const std::string &read_id, u32 fast5_idx) {
     reads_[read_id] = fast5_idx;
+}
+
+Fast5Read Fast5Dict::get_read(const std::string &read_id, const std::string &filename) {
+    std::cout << fast5_idx_ << " " << filename << "\n";
+    std::cout.flush();
+    if (fast5_idx_ >= fast5_files_.size() || fast5_files_[fast5_idx_] != filename) {
+        fast5_idx_ = filename_paths_[filename];
+    }
+    std::cout << "OPENing " << fast5_idx_ << "\n";
+    std::cout.flush();
+
+    if (!open_fast5(fast5_idx_)) {
+        return Fast5Read();
+    }
+    std::cout << "opend\n";
+    std::cout.flush();
+
+    std::string path;
+    if (fmt_ == Format::MULTI) {
+        path = "/"+MULTI_READ_PREFIX + read_id;
+    } else {
+        path = get_single_raw_path();
+    }
+
+    std::cout << "reting\n";
+    std::cout.flush();
+
+    return Fast5Read(fast5_file_, get_subpaths(path));
 }
 
 Fast5Read Fast5Dict::operator[](const std::string &read_id) {

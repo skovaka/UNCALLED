@@ -93,10 +93,13 @@ class Tracks:
         self.new_alignment = False
         self.new_layers = set()
 
+        
         if self.read_index is None:
             self.read_index = ReadIndex(self.conf.fast5_reader.fast5_index, read_filter=self.prms.read_filter)
 
         #def __init__(self, index_filename=None, file_paths=None, read_filter=None, file_suffix=".fast5"):
+
+        self._fast5s = None
 
         self._init_io()
 
@@ -114,29 +117,27 @@ class Tracks:
         #if self.coords is not None and  len(self._aln_track_ids) > 0:
         #    self.load()
 
-        #TODO use consistent interface with dtw.dtw
-        self._fast5s = None
 
     @property
     def fast5s(self):
         if self._fast5s is not None:
             return self._fast5s
 
-        for io in self.inputs:
-            if isinstance(io, SQL):
-                fast5_reads = list()
-                fast5_reads.append(io.get_fast5_index(self._aln_track_ids))
-                fast5_reads = pd.concat(fast5_reads)
-                files = fast5_reads["filename"].unique()
-                self._fast5s = Fast5Reader(
-                    index=fast5_reads, 
-                    conf=self.conf)
+        #for io in self.inputs:
+        #    if isinstance(io, SQL):
+        #        fast5_reads = list()
+        #        fast5_reads.append(io.get_fast5_index(self._aln_track_ids))
+        #        fast5_reads = pd.concat(fast5_reads)
+        #        files = fast5_reads["filename"].unique()
+        #        self._fast5s = Fast5Reader(
+        #            index=fast5_reads, 
+        #            conf=self.conf)
 
-        if self._fast5s is None:
-            if len(self.conf.fast5_reader.fast5_files) > 0:
-                self._fast5s = Fast5Reader(self.read_index, conf=self.conf)
-            else: 
-                return None
+        #if self._fast5s is None:
+        if len(self.conf.fast5_reader.fast5_files) > 0:
+            self._fast5s = Fast5Reader(self.read_index, conf=self.conf)
+        else: 
+            return None
 
         for track in self.alns:
             track.fast5s = self._fast5s
@@ -151,7 +152,8 @@ class Tracks:
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers, add_deps=False))
 
         self.index = parent.index
-        self.fast5s = parent.fast5s
+        self.read_index = parent.read_index
+        self._fast5s = parent._fast5s
         self._aln_track_ids = parent._aln_track_ids
         self.refstats = None
         self.new_alignment = parent.new_alignment
@@ -320,8 +322,8 @@ class Tracks:
                 raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
 
     def get_read_fast5(self, read_id):
-        if self.fast5s is not None and self.fast5s.indexed:
-            return self.fast5s.get_read_file(read_id)
+        if self.read_index is not None and self.read_index.read_files is not None:
+            return self.read_index.read_files.loc[read_id, "filename"]
         for io in self.inputs:
             if getattr(io, "read_id_in", None) == read_id:
                 return io.fast5_in
@@ -865,6 +867,9 @@ class Tracks:
                 yield ret
 
     def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
+
+        if read_filter is None and self.read_index is not None:
+            read_filter = self.read_index.read_filter
         
         if ref_bounds is not None and not isinstance(ref_bounds, RefCoord):
             ref_bounds = RefCoord(ref_bounds)

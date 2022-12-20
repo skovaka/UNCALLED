@@ -291,11 +291,11 @@ class TrackSQL(TrackIO):
         return pd.read_sql_query(query, self.con, params=params)
 
     def query_alignments(self, track_id=None, read_id=None, aln_id=None, coords=None, full_overlap=False, order=None, chunksize=None):
-        select = "SELECT * FROM alignment"
+        select = "SELECT alignment.id, track_id, read_id, ref_name, ref_start, ref_end, fwd, samp_start, samp_end, tags, filename AS fast5 FROM alignment JOIN read ON read_id == read.id JOIN fast5 ON fast5.id = fast5_id"
         wheres = list()
         params = list()
 
-        self._add_where(wheres, params, "id", aln_id)
+        self._add_where(wheres, params, "alignment.id", aln_id)
         self._add_where(wheres, params, "track_id", track_id)
         self._add_where(wheres, params, "read_id", read_id)
 
