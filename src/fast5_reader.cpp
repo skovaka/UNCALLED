@@ -373,19 +373,13 @@ void Fast5Dict::add_read(const std::string &read_id, u32 fast5_idx) {
 }
 
 Fast5Read Fast5Dict::get_read(const std::string &read_id, const std::string &filename) {
-    std::cout << fast5_idx_ << " " << filename << "\n";
-    std::cout.flush();
     if (fast5_idx_ >= fast5_files_.size() || fast5_files_[fast5_idx_] != filename) {
         fast5_idx_ = filename_paths_[filename];
     }
-    std::cout << "OPENing " << fast5_idx_ << "\n";
-    std::cout.flush();
 
     if (!open_fast5(fast5_idx_)) {
         return Fast5Read();
     }
-    std::cout << "opend\n";
-    std::cout.flush();
 
     std::string path;
     if (fmt_ == Format::MULTI) {
@@ -394,8 +388,6 @@ Fast5Read Fast5Dict::get_read(const std::string &read_id, const std::string &fil
         path = get_single_raw_path();
     }
 
-    std::cout << "reting\n";
-    std::cout.flush();
 
     return Fast5Read(fast5_file_, get_subpaths(path));
 }

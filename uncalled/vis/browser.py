@@ -30,11 +30,7 @@ def browser(conf):
 
     t = time()
     tracks = Tracks(conf=conf)
-    print("made tracks", time()-t)
-    t = time()
     tracks.load()
-    print("load tracks", time()-t)
-    t = time()
     sys.stderr.write("Starting server...\n")
     new_browser(tracks, conf)
 
