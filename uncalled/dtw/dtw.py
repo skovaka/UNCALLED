@@ -68,7 +68,8 @@ def dtw_pool(conf, pool):
                 read_ids = set()
 
         if len(bams) > 0:
-            yield (conf, bams, header)
+            reads = tracks.read_index.subset(read_ids)
+            yield (conf, bams, reads, header)
 
     for i,bams in enumerate(pool.imap(dtw_worker, iter_chunks(), chunksize=1)):
         tracks.output.write_bam_strs(bams)

@@ -24,7 +24,7 @@ class ReadIndex:
     
     def subset(self, read_ids):
         ret = ReadIndex(read_filter=read_ids, file_suffix=self.file_suffix)
-        ret.load_index_df(self.read_files)
+        ret.load_index_df(self.read_files.reset_index())
         ret.file_paths = self.file_paths
         return ret
 

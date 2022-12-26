@@ -95,7 +95,7 @@ class Tracks:
 
         
         if self.read_index is None:
-            self.read_index = ReadIndex(self.conf.fast5_reader.fast5_index, read_filter=self.prms.read_filter)
+            self.read_index = ReadIndex(read_filter=self.prms.read_filter)
 
         #def __init__(self, index_filename=None, file_paths=None, read_filter=None, file_suffix=".fast5"):
 
@@ -259,6 +259,7 @@ class Tracks:
 
                 p = io.conf.fast5_reader
                 self.read_index.load_paths(p.fast5_files, p.recursive)
+                self.read_index.load_index_file(p.fast5_index)
 
                 self.conf.load_config(io.conf)
                 self.inputs.append(io)
