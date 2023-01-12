@@ -111,25 +111,10 @@ class GuidedDTW:
 
         read = tracks.fast5s[bam.query_name]
 
-        #TODO move to tracks.init_bcaln (maybe rename bcaln)
-        #construct from BAM (with move table, or FAST5)
-        #need to standardize ref_gaps, maybe event_gaps too
-        #ideally in generalized C++ CoordBounds or whatever
-
-        bcaln = Bcaln(self.conf, tracks.index, read, bam, tracks.coords)
-        if bcaln.empty:
-            self.df = None
-            return
-        
-        #TODO refactor so EventDetector generates ProcessedRead
-        #maybe make ProcessedRead into column-major DataFrame
-        #call normalization function on ProcessedRead, return a normalized version
-        #call DTW on ProcessedRead + BAM, return signal alignment
+        bcaln, self.coords = tracks.calc_bcaln(bam)
 
         sigproc = SignalProcessor(tracks.model, self.conf)
         signal = sigproc.process(read, False)
-
-        aln_id, self.coords = tracks.init_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, read=signal, bam=bam)
 
         self.index = tracks.index
         self.model = sigproc.model
@@ -224,10 +209,10 @@ class GuidedDTW:
         df["kmer"] = self.ref_kmers.loc[df["mref"]].to_numpy()
         self.df = df.set_index("mref")
 
-        tracks.write_dtw_events(self.df, aln_id=aln_id, read=signal)
+        tracks.write_dtw_events(self.df, read=signal)#, aln_id=aln_id
 
         if self.bands is not None:
-            tracks.add_layers("band", self.bands, aln_id=aln_id)
+            tracks.add_layers("band", self.bands)#, aln_id=aln_id)
 
         if self.conf.bc_cmp:
             tracks.calc_compare("bcaln", True, True)
