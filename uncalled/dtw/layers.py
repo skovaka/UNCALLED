@@ -15,6 +15,7 @@ LAYERS = {
             lambda track: track.layer_strands),
     }, "dtw" : {
         "current" : _Layer(float, "Current (pA)"),
+        "stdv" : _Layer(float, "Current Standard Deviation"),
         "kmer" : _Layer(str, "Reference k-mer"),
         "start" : _Layer("Int32", "Sample Start"),
         "length" : _Layer("Int32", "Sample Length"),

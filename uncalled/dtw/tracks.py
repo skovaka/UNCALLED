@@ -347,7 +347,7 @@ class Tracks:
             return self._tracks[track_name]
         raise ValueError(f"Unknown track: {track_name}")
 
-    def collapse_events(self, dtw):
+    def collapse_events(self, dtw, read=None):
         dtw["cuml_mean"] = dtw["length"] * dtw["current"]
 
         grp = dtw.groupby(level=0)
@@ -363,6 +363,14 @@ class Tracks:
             "events" : grp["start"].count(),
         })
 
+        if read is not None:
+            #dtw["stdv"] = np.std(read.signal[dtw["start"]:dtw["start"]+dtw["length"]], axis=1)
+            dtw["stdv"] = [
+                np.std(
+                    read.get_norm_signal(dtw.loc[i, "start"], dtw.loc[i, "start"]+dtw.loc[i, "length"])
+                ) for i in dtw.index
+            ]
+
         skip_counts = dtw["start"].value_counts().loc[dtw["start"]].to_numpy()
         dtw["events"] /= skip_counts
 
@@ -370,7 +378,7 @@ class Tracks:
 
     def write_dtw_events(self, events=None, track_name=None, aln_id=None, read=None):
         if events is not None:# and self.output.FORMAT != "eventalign":
-            events = self.collapse_events(events)
+            events = self.collapse_events(events, read=read)
             overwrite = False
         else:
             overwrite = True
