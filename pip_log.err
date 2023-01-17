@@ -1,0 +1,190 @@
+2023-01-17T16:16:57,585 Using pip 21.0.1 from /home/skovaka/anaconda3/lib/python3.8/site-packages/pip (python 3.8)
+2023-01-17T16:16:57,586 Non-user install because site-packages writeable
+2023-01-17T16:16:57,667 Created temporary directory: /tmp/pip-ephem-wheel-cache-iwqimn9y
+2023-01-17T16:16:57,667 Created temporary directory: /tmp/pip-req-tracker-3sqxg70z
+2023-01-17T16:16:57,667 Initialized build tracking at /tmp/pip-req-tracker-3sqxg70z
+2023-01-17T16:16:57,667 Created build tracker: /tmp/pip-req-tracker-3sqxg70z
+2023-01-17T16:16:57,667 Entered build tracker: /tmp/pip-req-tracker-3sqxg70z
+2023-01-17T16:16:57,668 Created temporary directory: /tmp/pip-install-t40k5okk
+2023-01-17T16:16:57,672 Obtaining file:///home/skovaka/Dropbox/code/jhu/UNCALLED
+2023-01-17T16:16:57,672   Added file:///home/skovaka/Dropbox/code/jhu/UNCALLED to build tracker '/tmp/pip-req-tracker-3sqxg70z'
+2023-01-17T16:16:57,672     Running setup.py (path:/home/skovaka/Dropbox/code/jhu/UNCALLED/setup.py) egg_info for package from file:///home/skovaka/Dropbox/code/jhu/UNCALLED
+2023-01-17T16:16:57,673     Created temporary directory: /tmp/pip-pip-egg-info-z2xfnk0e
+2023-01-17T16:16:57,673     Running command python setup.py egg_info
+2023-01-17T16:16:58,008     running egg_info
+2023-01-17T16:16:58,008     creating /tmp/pip-pip-egg-info-z2xfnk0e/uncalled.egg-info
+2023-01-17T16:16:58,020     writing /tmp/pip-pip-egg-info-z2xfnk0e/uncalled.egg-info/PKG-INFO
+2023-01-17T16:16:58,020     writing dependency_links to /tmp/pip-pip-egg-info-z2xfnk0e/uncalled.egg-info/dependency_links.txt
+2023-01-17T16:16:58,021     writing entry points to /tmp/pip-pip-egg-info-z2xfnk0e/uncalled.egg-info/entry_points.txt
+2023-01-17T16:16:58,021     writing requirements to /tmp/pip-pip-egg-info-z2xfnk0e/uncalled.egg-info/requires.txt
+2023-01-17T16:16:58,021     writing top-level names to /tmp/pip-pip-egg-info-z2xfnk0e/uncalled.egg-info/top_level.txt
+2023-01-17T16:16:58,021     writing manifest file '/tmp/pip-pip-egg-info-z2xfnk0e/uncalled.egg-info/SOURCES.txt'
+2023-01-17T16:16:58,057     reading manifest file '/tmp/pip-pip-egg-info-z2xfnk0e/uncalled.egg-info/SOURCES.txt'
+2023-01-17T16:16:58,057     reading manifest template 'MANIFEST.in'
+2023-01-17T16:16:58,060     adding license file 'LICENCE'
+2023-01-17T16:16:58,062     writing manifest file '/tmp/pip-pip-egg-info-z2xfnk0e/uncalled.egg-info/SOURCES.txt'
+2023-01-17T16:16:58,099   Source in /home/skovaka/Dropbox/code/jhu/UNCALLED has version 3.3.0, which satisfies requirement uncalled==3.3.0 from file:///home/skovaka/Dropbox/code/jhu/UNCALLED
+2023-01-17T16:16:58,099   Removed uncalled==3.3.0 from file:///home/skovaka/Dropbox/code/jhu/UNCALLED from build tracker '/tmp/pip-req-tracker-3sqxg70z'
+2023-01-17T16:16:58,108 Requirement already satisfied: pybind11>=2.6.0 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from uncalled==3.3.0) (2.8.1)
+2023-01-17T16:16:58,109 Requirement already satisfied: pandas>=1.1.5 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from uncalled==3.3.0) (1.1.5)
+2023-01-17T16:16:58,110 Requirement already satisfied: plotly>=5.0.0 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from uncalled==3.3.0) (5.10.0)
+2023-01-17T16:16:58,111 Requirement already satisfied: dash>=2.0.0 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from uncalled==3.3.0) (2.6.1)
+2023-01-17T16:16:58,112 Requirement already satisfied: scipy>=1.5.4 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from uncalled==3.3.0) (1.5.4)
+2023-01-17T16:16:58,112 Requirement already satisfied: toml>=0.10.2 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from uncalled==3.3.0) (0.10.2)
+2023-01-17T16:16:58,113 Requirement already satisfied: ont_fast5_api in /home/skovaka/anaconda3/lib/python3.8/site-packages (from uncalled==3.3.0) (3.3.0)
+2023-01-17T16:16:58,114 Requirement already satisfied: pysam in /home/skovaka/anaconda3/lib/python3.8/site-packages (from uncalled==3.3.0) (0.18.0)
+2023-01-17T16:16:58,170 Requirement already satisfied: dash-core-components==2.0.0 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from dash>=2.0.0->uncalled==3.3.0) (2.0.0)
+2023-01-17T16:16:58,170 Requirement already satisfied: flask-compress in /home/skovaka/anaconda3/lib/python3.8/site-packages (from dash>=2.0.0->uncalled==3.3.0) (1.10.1)
+2023-01-17T16:16:58,171 Requirement already satisfied: Flask>=1.0.4 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from dash>=2.0.0->uncalled==3.3.0) (1.1.2)
+2023-01-17T16:16:58,172 Requirement already satisfied: dash-html-components==2.0.0 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from dash>=2.0.0->uncalled==3.3.0) (2.0.0)
+2023-01-17T16:16:58,172 Requirement already satisfied: dash-table==5.0.0 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from dash>=2.0.0->uncalled==3.3.0) (5.0.0)
+2023-01-17T16:16:58,184 Requirement already satisfied: click>=5.1 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from Flask>=1.0.4->dash>=2.0.0->uncalled==3.3.0) (7.1.2)
+2023-01-17T16:16:58,185 Requirement already satisfied: Jinja2>=2.10.1 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from Flask>=1.0.4->dash>=2.0.0->uncalled==3.3.0) (2.11.3)
+2023-01-17T16:16:58,185 Requirement already satisfied: itsdangerous>=0.24 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from Flask>=1.0.4->dash>=2.0.0->uncalled==3.3.0) (1.1.0)
+2023-01-17T16:16:58,186 Requirement already satisfied: Werkzeug>=0.15 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from Flask>=1.0.4->dash>=2.0.0->uncalled==3.3.0) (1.0.1)
+2023-01-17T16:16:58,189 Requirement already satisfied: MarkupSafe>=0.23 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from Jinja2>=2.10.1->Flask>=1.0.4->dash>=2.0.0->uncalled==3.3.0) (1.1.1)
+2023-01-17T16:16:58,195 Requirement already satisfied: numpy>=1.15.4 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from pandas>=1.1.5->uncalled==3.3.0) (1.23.2)
+2023-01-17T16:16:58,195 Requirement already satisfied: python-dateutil>=2.7.3 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from pandas>=1.1.5->uncalled==3.3.0) (2.8.2)
+2023-01-17T16:16:58,196 Requirement already satisfied: pytz>=2017.2 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from pandas>=1.1.5->uncalled==3.3.0) (2021.1)
+2023-01-17T16:16:58,199 Requirement already satisfied: tenacity>=6.2.0 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from plotly>=5.0.0->uncalled==3.3.0) (8.0.1)
+2023-01-17T16:16:58,203 Requirement already satisfied: six>=1.5 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from python-dateutil>=2.7.3->pandas>=1.1.5->uncalled==3.3.0) (1.15.0)
+2023-01-17T16:16:58,217 Requirement already satisfied: brotli in /home/skovaka/anaconda3/lib/python3.8/site-packages (from flask-compress->dash>=2.0.0->uncalled==3.3.0) (1.0.9)
+2023-01-17T16:16:58,222 Requirement already satisfied: progressbar33>=2.3.1 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from ont_fast5_api->uncalled==3.3.0) (2.4)
+2023-01-17T16:16:58,222 Requirement already satisfied: packaging in /home/skovaka/anaconda3/lib/python3.8/site-packages (from ont_fast5_api->uncalled==3.3.0) (20.9)
+2023-01-17T16:16:58,223 Requirement already satisfied: h5py>=2.8 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from ont_fast5_api->uncalled==3.3.0) (2.10.0)
+2023-01-17T16:16:58,228 Requirement already satisfied: pyparsing>=2.0.2 in /home/skovaka/anaconda3/lib/python3.8/site-packages (from packaging->ont_fast5_api->uncalled==3.3.0) (2.4.7)
+2023-01-17T16:16:58,231 Created temporary directory: /tmp/pip-unpack-byxycc8l
+2023-01-17T16:16:59,111 Installing collected packages: uncalled
+2023-01-17T16:16:59,112   Attempting uninstall: uncalled
+2023-01-17T16:16:59,113     Found existing installation: uncalled 3.3.0
+2023-01-17T16:16:59,114     Uninstalling uncalled-3.3.0:
+2023-01-17T16:16:59,451       Created temporary directory: /tmp/pip-uninstall-4y8cwzzh
+2023-01-17T16:16:59,451       Removing file or directory /home/skovaka/anaconda3/bin/uncalled
+2023-01-17T16:16:59,451       Created temporary directory: /tmp/pip-uninstall-2rb9m4tu
+2023-01-17T16:16:59,452       Removing file or directory /home/skovaka/anaconda3/lib/python3.8/site-packages/uncalled.egg-link
+2023-01-17T16:16:59,452       Removing pth entries from /home/skovaka/anaconda3/lib/python3.8/site-packages/easy-install.pth:
+2023-01-17T16:16:59,452       Removing entry: /home/skovaka/Dropbox/code/jhu/UNCALLED
+2023-01-17T16:16:59,452       Successfully uninstalled uncalled-3.3.0
+2023-01-17T16:16:59,452   Running setup.py develop for uncalled
+2023-01-17T16:16:59,453     Running command /home/skovaka/anaconda3/bin/python -c 'import sys, setuptools, tokenize; sys.argv[0] = '"'"'/home/skovaka/Dropbox/code/jhu/UNCALLED/setup.py'"'"'; __file__='"'"'/home/skovaka/Dropbox/code/jhu/UNCALLED/setup.py'"'"';f=getattr(tokenize, '"'"'open'"'"', open)(__file__);code=f.read().replace('"'"'\r\n'"'"', '"'"'\n'"'"');f.close();exec(compile(code, __file__, '"'"'exec'"'"'))' develop --no-deps
+2023-01-17T16:16:59,806     running develop
+2023-01-17T16:17:00,000     running egg_info
+2023-01-17T16:17:00,015     writing uncalled.egg-info/PKG-INFO
+2023-01-17T16:17:00,015     writing dependency_links to uncalled.egg-info/dependency_links.txt
+2023-01-17T16:17:00,015     writing entry points to uncalled.egg-info/entry_points.txt
+2023-01-17T16:17:00,016     writing requirements to uncalled.egg-info/requires.txt
+2023-01-17T16:17:00,016     writing top-level names to uncalled.egg-info/top_level.txt
+2023-01-17T16:17:00,042     reading manifest file 'uncalled.egg-info/SOURCES.txt'
+2023-01-17T16:17:00,042     reading manifest template 'MANIFEST.in'
+2023-01-17T16:17:00,045     adding license file 'LICENCE'
+2023-01-17T16:17:00,047     writing manifest file 'uncalled.egg-info/SOURCES.txt'
+2023-01-17T16:17:00,047     running build_ext
+2023-01-17T16:17:00,048     building '_uncalled' extension
+2023-01-17T16:17:00,054     gcc -pthread -B /home/skovaka/anaconda3/compiler_compat -Wl,--sysroot=/ -Wsign-compare -DNDEBUG -g -fwrapv -O3 -Wall -Wstrict-prototypes -fPIC -DPYBIND -I./submods -I./submods/hdf5/include -I./submods/fast5/include -I./submods/pdqsort -I./submods/toml11 -I/home/skovaka/anaconda3/lib/python3.8/site-packages/pybind11/include -I/home/skovaka/anaconda3/lib/python3.8/site-packages/pybind11/include -I/home/skovaka/anaconda3/include/python3.8 -c src/event_detector.cpp -o build/temp.linux-x86_64-cpython-38/src/event_detector.o -fvisibility=hidden -g0 -std=c++11 -O3 -g
+2023-01-17T16:17:00,056     gcc -pthread -B /home/skovaka/anaconda3/compiler_compat -Wl,--sysroot=/ -Wsign-compare -DNDEBUG -g -fwrapv -O3 -Wall -Wstrict-prototypes -fPIC -DPYBIND -I./submods -I./submods/hdf5/include -I./submods/fast5/include -I./submods/pdqsort -I./submods/toml11 -I/home/skovaka/anaconda3/lib/python3.8/site-packages/pybind11/include -I/home/skovaka/anaconda3/lib/python3.8/site-packages/pybind11/include -I/home/skovaka/anaconda3/include/python3.8 -c src/pybinder.cpp -o build/temp.linux-x86_64-cpython-38/src/pybinder.o -fvisibility=hidden -g0 -std=c++11 -O3 -g
+2023-01-17T16:17:00,059     cc1plus: warning: command line option ‘-Wstrict-prototypes’ is valid for C/ObjC but not for C++
+2023-01-17T16:17:00,060     cc1plus: warning: command line option ‘-Wstrict-prototypes’ is valid for C/ObjC but not for C++
+2023-01-17T16:17:01,006     In file included from src/event_detector.cpp:15:
+2023-01-17T16:17:01,006     src/event_detector.hpp:53:21: error: ‘Container’ is not a template
+2023-01-17T16:17:01,006        53 |     void set_signal(Container<float> signal_) {
+2023-01-17T16:17:01,006           |                     ^~~~~~~~~
+2023-01-17T16:17:01,006     src/event_detector.hpp: In member function ‘void ProcessedRead::set_signal(Container)’:
+2023-01-17T16:17:01,007     src/event_detector.hpp:54:63: error: ‘class std::valarray<float>’ has no member named ‘end’
+2023-01-17T16:17:01,007        54 |         signal = std::valarray<float>(signal_.begin(), signal.end());
+2023-01-17T16:17:01,007           |                                                               ^~~
+2023-01-17T16:17:01,012     src/event_detector.hpp: In member function ‘void ProcessedRead::normalize(NormVals)’:
+2023-01-17T16:17:01,012     src/event_detector.hpp:104:39: warning: comparison of integer expressions of different signedness: ‘size_t’ {aka ‘long unsigned int’} and ‘i32’ {aka ‘int’} [-Wsign-compare]
+2023-01-17T16:17:01,012       104 |         for (size_t i = prms.start; i < prms.end; i++) {
+2023-01-17T16:17:01,012           |                                     ~~^~~~~~~~~~
+2023-01-17T16:17:01,012     src/event_detector.hpp: In member function ‘void ProcessedRead::normalize(float, float)’:
+2023-01-17T16:17:01,012     src/event_detector.hpp:111:34: warning: narrowing conversion of ‘((ProcessedRead*)this)->ProcessedRead::events.std::vector<Event>::size()’ from ‘std::vector<Event>::size_type’ {aka ‘long unsigned int’} to ‘i32’ {aka ‘int’} [-Wnarrowing]
+2023-01-17T16:17:01,012       111 |         normalize({0, events.size(), scale, shift});
+2023-01-17T16:17:01,012           |                       ~~~~~~~~~~~^~
+2023-01-17T16:17:01,228     In file included from src/pybinder.cpp:5:
+2023-01-17T16:17:01,228     src/fast5_py_read.hpp: In constructor ‘Fast5PyRead::Fast5PyRead(pybind11::object)’:
+2023-01-17T16:17:01,228     src/fast5_py_read.hpp:97:30: warning: comparison of integer expressions of different signedness: ‘size_t’ {aka ‘long unsigned int’} and ‘__gnu_cxx::__alloc_traits<std::allocator<long int>, long int>::value_type’ {aka ‘long int’} [-Wsign-compare]
+2023-01-17T16:17:01,228        97 |         for (size_t i = 0; i < raw_info.shape[0]; i++) {
+2023-01-17T16:17:01,302     In file included from src/pore_model.hpp:35,
+2023-01-17T16:17:01,302                      from src/dtw.hpp:8,
+2023-01-17T16:17:01,302                      from src/config.hpp:30,
+2023-01-17T16:17:01,302                      from src/map_pool.hpp:31,
+2023-01-17T16:17:01,302                      from src/pybinder.cpp:6:
+2023-01-17T16:17:01,302     src/event_detector.hpp: At global scope:
+2023-01-17T16:17:01,302     src/event_detector.hpp:53:21: error: ‘Container’ is not a template
+2023-01-17T16:17:01,302        53 |     void set_signal(Container<float> signal_) {
+2023-01-17T16:17:01,302           |                     ^~~~~~~~~
+2023-01-17T16:17:01,303     src/event_detector.hpp: In member function ‘void ProcessedRead::set_signal(Container)’:
+2023-01-17T16:17:01,303     src/event_detector.hpp:54:63: error: ‘class std::valarray<float>’ has no member named ‘end’
+2023-01-17T16:17:01,303        54 |         signal = std::valarray<float>(signal_.begin(), signal.end());
+2023-01-17T16:17:01,303           |                                                               ^~~
+2023-01-17T16:17:01,309     src/event_detector.hpp: In member function ‘void ProcessedRead::normalize(NormVals)’:
+2023-01-17T16:17:01,309     src/event_detector.hpp:104:39: warning: comparison of integer expressions of different signedness: ‘size_t’ {aka ‘long unsigned int’} and ‘i32’ {aka ‘int’} [-Wsign-compare]
+2023-01-17T16:17:01,309       104 |         for (size_t i = prms.start; i < prms.end; i++) {
+2023-01-17T16:17:01,309           |                                     ~~^~~~~~~~~~
+2023-01-17T16:17:01,310     src/event_detector.hpp: In member function ‘void ProcessedRead::normalize(float, float)’:
+2023-01-17T16:17:01,310     src/event_detector.hpp:111:34: warning: narrowing conversion of ‘((ProcessedRead*)this)->ProcessedRead::events.std::vector<Event>::size()’ from ‘std::vector<Event>::size_type’ {aka ‘long unsigned int’} to ‘i32’ {aka ‘int’} [-Wnarrowing]
+2023-01-17T16:17:01,310       111 |         normalize({0, events.size(), scale, shift});
+2023-01-17T16:17:01,310           |                       ~~~~~~~~~~~^~
+2023-01-17T16:17:01,973     In file included from src/pybinder.cpp:15:
+2023-01-17T16:17:01,974     src/compare.hpp: In member function ‘Compare::DistIter::Coefs Compare::DistIter::next_dist(int)’:
+2023-01-17T16:17:01,974     src/compare.hpp:93:21: warning: unused variable ‘dist’ [-Wunused-variable]
+2023-01-17T16:17:01,974        93 |             int len,dist;
+2023-01-17T16:17:01,974           |                     ^~~~
+2023-01-17T16:17:01,977     In file included from src/pybinder.cpp:15:
+2023-01-17T16:17:01,977     src/compare.hpp: In lambda function:
+2023-01-17T16:17:01,977     src/compare.hpp:134:47: warning: narrowing conversion of ‘c.Compare::rec.std::vector<Compare::Rec>::size()’ from ‘std::vector<Compare::Rec>::size_type’ {aka ‘long unsigned int’} to ‘pybind11::ssize_t’ {aka ‘long int’} [-Wnarrowing]
+2023-01-17T16:17:01,977       134 |             return py::array_t<Rec>{c.rec.size(), c.rec.data()};
+2023-01-17T16:17:01,977           |                                     ~~~~~~~~~~^~
+2023-01-17T16:17:02,614     src/pybinder.cpp: In instantiation of ‘void pybind_kmers(pybind11::module_&) [with long unsigned int ...Ks = {4, 5, 6, 7, 8, 9, 10, 11, 12}]’:
+2023-01-17T16:17:02,614     src/pybinder.cpp:115:41:   required from here
+2023-01-17T16:17:02,614     src/pybinder.cpp:47:10: warning: unused variable ‘_’ [-Wunused-variable]
+2023-01-17T16:17:02,614        47 |     auto _ = {(pybind_kmer<Ks>(m))...};
+2023-01-17T16:17:02,614           |          ^
+2023-01-17T16:17:02,630     /home/skovaka/anaconda3/lib/python3.8/site-packages/setuptools/command/easy_install.py:144: EasyInstallDeprecationWarning: easy_install command is deprecated. Use build and pip and other standards-based tools.
+2023-01-17T16:17:02,630       warnings.warn(
+2023-01-17T16:17:02,630     /home/skovaka/anaconda3/lib/python3.8/site-packages/setuptools/command/install.py:34: SetuptoolsDeprecationWarning: setup.py install is deprecated. Use build and pip and other standards-based tools.
+2023-01-17T16:17:02,630       warnings.warn(
+2023-01-17T16:17:02,631     All submodules present
+2023-01-17T16:17:02,631     Found libbwa.a
+2023-01-17T16:17:02,631     Found libhdf5.a
+2023-01-17T16:17:02,631     error: command '/usr/bin/gcc' failed with exit code 1
+2023-01-17T16:17:02,645     Exception ignored in: <function Pool.__del__ at 0x7f70c10dde50>
+2023-01-17T16:17:02,646     Traceback (most recent call last):
+2023-01-17T16:17:02,646       File "/home/skovaka/anaconda3/lib/python3.8/multiprocessing/pool.py", line 268, in __del__
+2023-01-17T16:17:02,646         self._change_notifier.put(None)
+2023-01-17T16:17:02,646       File "/home/skovaka/anaconda3/lib/python3.8/multiprocessing/queues.py", line 368, in put
+2023-01-17T16:17:02,646         self._writer.send_bytes(obj)
+2023-01-17T16:17:02,646       File "/home/skovaka/anaconda3/lib/python3.8/multiprocessing/connection.py", line 200, in send_bytes
+2023-01-17T16:17:02,646         self._send_bytes(m[offset:offset + size])
+2023-01-17T16:17:02,646       File "/home/skovaka/anaconda3/lib/python3.8/multiprocessing/connection.py", line 411, in _send_bytes
+2023-01-17T16:17:02,646         self._send(header + buf)
+2023-01-17T16:17:02,646       File "/home/skovaka/anaconda3/lib/python3.8/multiprocessing/connection.py", line 368, in _send
+2023-01-17T16:17:02,646         n = write(self._handle, buf)
+2023-01-17T16:17:02,646     OSError: [Errno 9] Bad file descriptor
+2023-01-17T16:17:21,302   Rolling back uninstall of uncalled
+2023-01-17T16:17:21,302   Moving to /home/skovaka/anaconda3/bin/uncalled
+2023-01-17T16:17:21,302    from /tmp/pip-uninstall-4y8cwzzh/uncalled
+2023-01-17T16:17:21,302   Moving to /home/skovaka/anaconda3/lib/python3.8/site-packages/uncalled.egg-link
+2023-01-17T16:17:21,302    from /tmp/pip-uninstall-2rb9m4tu/uncalled.egg-link
+2023-01-17T16:17:21,302   Replacing /home/skovaka/anaconda3/bin/uncalled from /tmp/pip-uninstall-4y8cwzzh/uncalled
+2023-01-17T16:17:21,302   Replacing /home/skovaka/anaconda3/lib/python3.8/site-packages/uncalled.egg-link from /tmp/pip-uninstall-2rb9m4tu/uncalled.egg-link
+2023-01-17T16:17:21,302   Rolling /home/skovaka/anaconda3/lib/python3.8/site-packages/easy-install.pth back to previous state
+2023-01-17T16:17:21,303 ERROR: Command errored out with exit status 1: /home/skovaka/anaconda3/bin/python -c 'import sys, setuptools, tokenize; sys.argv[0] = '"'"'/home/skovaka/Dropbox/code/jhu/UNCALLED/setup.py'"'"'; __file__='"'"'/home/skovaka/Dropbox/code/jhu/UNCALLED/setup.py'"'"';f=getattr(tokenize, '"'"'open'"'"', open)(__file__);code=f.read().replace('"'"'\r\n'"'"', '"'"'\n'"'"');f.close();exec(compile(code, __file__, '"'"'exec'"'"'))' develop --no-deps Check the logs for full command output.
+2023-01-17T16:17:21,303 Exception information:
+2023-01-17T16:17:21,303 Traceback (most recent call last):
+2023-01-17T16:17:21,303   File "/home/skovaka/anaconda3/lib/python3.8/site-packages/pip/_internal/cli/base_command.py", line 189, in _main
+2023-01-17T16:17:21,303     status = self.run(options, args)
+2023-01-17T16:17:21,303   File "/home/skovaka/anaconda3/lib/python3.8/site-packages/pip/_internal/cli/req_command.py", line 178, in wrapper
+2023-01-17T16:17:21,303     return func(self, options, args)
+2023-01-17T16:17:21,303   File "/home/skovaka/anaconda3/lib/python3.8/site-packages/pip/_internal/commands/install.py", line 391, in run
+2023-01-17T16:17:21,303     installed = install_given_reqs(
+2023-01-17T16:17:21,303   File "/home/skovaka/anaconda3/lib/python3.8/site-packages/pip/_internal/req/__init__.py", line 80, in install_given_reqs
+2023-01-17T16:17:21,303     requirement.install(
+2023-01-17T16:17:21,303   File "/home/skovaka/anaconda3/lib/python3.8/site-packages/pip/_internal/req/req_install.py", line 764, in install
+2023-01-17T16:17:21,303     install_editable_legacy(
+2023-01-17T16:17:21,303   File "/home/skovaka/anaconda3/lib/python3.8/site-packages/pip/_internal/operations/install/editable_legacy.py", line 49, in install_editable
+2023-01-17T16:17:21,303     call_subprocess(
+2023-01-17T16:17:21,303   File "/home/skovaka/anaconda3/lib/python3.8/site-packages/pip/_internal/utils/subprocess.py", line 258, in call_subprocess
+2023-01-17T16:17:21,303     raise InstallationSubprocessError(proc.returncode, command_desc)
+2023-01-17T16:17:21,303 pip._internal.exceptions.InstallationSubprocessError: Command errored out with exit status 1: /home/skovaka/anaconda3/bin/python -c 'import sys, setuptools, tokenize; sys.argv[0] = '"'"'/home/skovaka/Dropbox/code/jhu/UNCALLED/setup.py'"'"'; __file__='"'"'/home/skovaka/Dropbox/code/jhu/UNCALLED/setup.py'"'"';f=getattr(tokenize, '"'"'open'"'"', open)(__file__);code=f.read().replace('"'"'\r\n'"'"', '"'"'\n'"'"');f.close();exec(compile(code, __file__, '"'"'exec'"'"'))' develop --no-deps Check the logs for full command output.
+2023-01-17T16:17:21,369 Removed build tracker: '/tmp/pip-req-tracker-3sqxg70z'
