@@ -51,7 +51,7 @@ struct ProcessedRead {
 
     template <typename Container>
     void set_signal(Container signal_) {
-        signal = std::valarray<float>(std::begin(signal_), std::end(signal_));
+        signal = std::valarray<float>(&signal_[0], signal_.size());
     }
 
     u32 sample_start() const {
@@ -98,12 +98,24 @@ struct ProcessedRead {
         return {avg, dev};
     }
 
+    void update_stdv(Event &e) {
+        auto deltas = static_cast<std::valarray<float>>(signal[std::slice(e.start, e.length, 1)]) - e.mean;
+        e.stdv = sqrt((deltas*deltas).sum() / e.length);
+    }
+
     void normalize(NormVals prms) {
         assert(prms.start >= 0);
         assert(prms.end < events.size());
+
+		signal = (signal * prms.scale) + prms.shift;
+
         for (size_t i = prms.start; i < prms.end; i++) {
-            events[i].mean = events[i].mean * prms.scale + prms.shift;
+            auto &evt = events[i];
+            evt.mean = evt.mean * prms.scale + prms.shift;
+            update_stdv(evt);
         }
+        //auto slc = std::slice(prms.start, prms.end-prms.start, 1);
+		//signal[slc] = (static_cast<std::valarray<float>>(signal[slc]) * prms.scale) + prms.shift;
         norm.push_back(prms);
     }
 
@@ -128,13 +140,43 @@ struct ProcessedRead {
         normalize_mom(tgt_mean, tgt_stdv, 0, events.size());
     }
 
+	#define PY_PROC_ARR(T, A, D) p.def_property_readonly(#A, \
+    [](ProcessedRead &r) -> py::array_t<T> { \
+        return py::array_t<T>(r.A.size(), r.A.data()); \
+    }, D);
+
     #ifdef PYBIND
+	static void pybind(py::module_ &m) {
+		PYBIND11_NUMPY_DTYPE(NormVals, start, end, scale, shift);
+		//TODO move to ProcessedRead
+		py::class_<ProcessedRead> p(m, "_ProcessedRead");
+		p.def(pybind11::init());
+		p.def(pybind11::init<const ProcessedRead &>());
+		p.def("normalize",
+				static_cast<void (ProcessedRead::*)(float, float)> (&ProcessedRead::normalize),
+				py::arg("scale"), py::arg("shift"));
+		p.def("normalize_mom",
+				static_cast< void (ProcessedRead::*)(float, float)> (&ProcessedRead::normalize_mom),
+				py::arg("tgt_mean"), py::arg("tgt_stdv"));
+		p.def("normalize_mom",
+				static_cast< void (ProcessedRead::*)(float, float, size_t, size_t)> (&ProcessedRead::normalize_mom),
+				py::arg("tgt_mean"), py::arg("tgt_stdv"), py::arg("start"), py::arg("end"));
+		p.def_property_readonly("sample_start", &ProcessedRead::sample_start);
+		p.def_property_readonly("sample_end", &ProcessedRead::sample_end);
+		p.def("set_events", &ProcessedRead::set_events);
+		p.def_readonly("signal", &ProcessedRead::signal);
+		PY_PROC_ARR(Event, events, "Un-normalized events");        
+		PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");    
+
+
+	}
+
     void set_events(py::array_t<Event> arr) {
         auto evts = PyArray<Event>(arr);
-        events.clear();
-        events.reserve(evts.size());
+        //events.clear();
+        events.resize(evts.size());
         for (size_t i = 0; i < evts.size(); i++) {
-            events.push_back(evts[i]);
+            events[i] = evts[i];
         }
     }
     #endif

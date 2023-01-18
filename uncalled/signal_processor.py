@@ -11,7 +11,7 @@ from .pore_model import PoreModel
 import _uncalled
 
 class ProcessedRead(_uncalled._ProcessedRead):
-    def __init__(self, read, raw=None):
+    def __init__(self, read):
         if isinstance(read, pd.DataFrame):
             _uncalled._ProcessedRead.__init__(self)
             if not "stdv" in read.columns:
@@ -20,8 +20,6 @@ class ProcessedRead(_uncalled._ProcessedRead):
             self.set_events(read)
         else:
             _uncalled._ProcessedRead.__init__(self, read)
-
-        self.signal = raw.signal if raw is not None else None
 
     def set_events(self, df):
         if isinstance(df, pd.DataFrame):
@@ -48,7 +46,8 @@ class ProcessedRead(_uncalled._ProcessedRead):
         n = self.norm[0]
         if samp_max is None:
             samp_max = len(self.signal)
-        return self.signal[samp_min:samp_max] * n["scale"] + n["shift"]
+        norm = self.signal.to_numpy()[samp_min:samp_max]
+        return norm
 
         #ret = np.zeros(int(samp_max - samp_min))
         #i = self.norm[0]["end"].searchsorted(samp_min)
@@ -90,4 +89,4 @@ class SignalProcessor:
         return self.instance.__getattribute__(name)
 
     def process(self, read, normalize=False):
-        return ProcessedRead(self.instance.process(read, normalize), read)
+        return ProcessedRead(self.instance.process(read, normalize))

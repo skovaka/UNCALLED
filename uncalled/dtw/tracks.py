@@ -363,13 +363,13 @@ class Tracks:
             "events" : grp["start"].count(),
         })
 
-        if read is not None:
-            #dtw["stdv"] = np.std(read.signal[dtw["start"]:dtw["start"]+dtw["length"]], axis=1)
-            dtw["stdv"] = [
-                np.std(
-                    read.get_norm_signal(dtw.loc[i, "start"], dtw.loc[i, "start"]+dtw.loc[i, "length"])
-                ) for i in dtw.index
-            ]
+        #if read is not None:
+        #    #dtw["stdv"] = np.std(read.signal[dtw["start"]:dtw["start"]+dtw["length"]], axis=1)
+        #    dtw["stdv"] = [
+        #        np.std(
+        #            read.get_norm_signal(dtw.loc[i, "start"], dtw.loc[i, "start"]+dtw.loc[i, "length"])
+        #        ) for i in dtw.index
+        #    ]
 
         skip_counts = dtw["start"].value_counts().loc[dtw["start"]].to_numpy()
         dtw["events"] /= skip_counts

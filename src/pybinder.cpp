@@ -117,7 +117,7 @@ PYBIND11_MODULE(_uncalled, m) {
     m.def("self_align", &self_align);
     m.def("unpack_moves", &unpack_moves);
 
-    signal_processor_pybind(m);
+    ProcessedRead::pybind(m);
 
     Compare::pybind(m);
 

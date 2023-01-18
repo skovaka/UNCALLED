@@ -37,9 +37,11 @@ class SignalProcessor {
     }
 
     ProcessedRead process(const ReadBuffer &read, bool normalize=true) {
-        ProcessedRead ret = {norm_prms_};
+        ProcessedRead ret = evdt_.process_read(read);//{norm_prms_};
+		ret.norm_prms = norm_prms_;
 
-        ret.events = evdt_.get_events(read.get_signal());
+        //ret.events = evdt_.get_events(read.get_signal());
+		//ret.set_signal(read.get_signal());
         
         if (normalize) {
             if (norm_prms_.mode == "model_mom" || norm_prms_.mode == "ref_mom") {
@@ -74,36 +76,8 @@ class SignalProcessor {
 
 };
 
-#define PY_PROC_ARR(T, A, D) p.def_property_readonly(#A, \
-    [](ProcessedRead &r) -> py::array_t<T> { \
-        return py::array_t<T>(r.A.size(), r.A.data()); \
-    }, D);
-
 
 #ifdef PYBIND
-void signal_processor_pybind(py::module_ &m) {
-
-    PYBIND11_NUMPY_DTYPE(NormVals, start, end, scale, shift);
-
-    //TODO move to ProcessedRead
-    py::class_<ProcessedRead> p(m, "_ProcessedRead");
-    p.def(pybind11::init());
-    p.def(pybind11::init<const ProcessedRead &>());
-    p.def("normalize", 
-            static_cast<void (ProcessedRead::*)(float, float)> (&ProcessedRead::normalize),
-            py::arg("scale"), py::arg("shift"));
-    p.def("normalize_mom", 
-            static_cast< void (ProcessedRead::*)(float, float)> (&ProcessedRead::normalize_mom),
-            py::arg("tgt_mean"), py::arg("tgt_stdv"));
-    p.def("normalize_mom", 
-            static_cast< void (ProcessedRead::*)(float, float, size_t, size_t)> (&ProcessedRead::normalize_mom),
-            py::arg("tgt_mean"), py::arg("tgt_stdv"), py::arg("start"), py::arg("end"));
-    p.def_property_readonly("sample_start", &ProcessedRead::sample_start);
-    p.def_property_readonly("sample_end", &ProcessedRead::sample_end);
-    p.def("set_events", &ProcessedRead::set_events);
-    PY_PROC_ARR(Event, events, "Un-normalized events");
-    PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");
-}
 #endif
 
 #endif

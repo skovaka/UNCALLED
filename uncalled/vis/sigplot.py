@@ -107,7 +107,7 @@ class Sigplot:
             fast5 = self.tracks.fast5s[read_id]
         else:
             fast5 = self.tracks.fast5s.get_read(read_id, os.path.basename(fast5_file))
-
+        
         read = self.sigproc.process(fast5, True)
         signal = read.get_norm_signal(samp_min, samp_max)
 

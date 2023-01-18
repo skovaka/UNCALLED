@@ -10,6 +10,30 @@
 #include <pybind11/numpy.h>
 namespace py = pybind11;
 
+PYBIND11_MAKE_OPAQUE(std::valarray<float>);
+
+template<typename T>
+void bind_valarray(py::module_ &m, std::string suffix) {
+    auto name = "Valarray"+suffix;
+    py::class_<std::valarray<T>> a(m, name.c_str(), py::buffer_protocol());
+    a.def_buffer([](std::valarray<T> &c) -> py::buffer_info { 
+        return py::buffer_info( 
+            &c[0], 
+            sizeof(T), 
+            py::format_descriptor<T>::format(), 
+            1, 
+            {c.size()}, 
+            {sizeof(T)} 
+        ); 
+    });
+    a.def("__getitem__", static_cast< T& (std::valarray<T>::*)(size_t)> (&std::valarray<T>::operator[]));
+    a.def("__len__", &std::valarray<T>::size);
+
+    a.def("to_numpy", [](std::valarray<T> &a) -> py::array_t<T> { 
+        return py::array_t<T>{static_cast<py::ssize_t>(a.size()), &a[0]}; 
+    });
+}
+
 template<typename T>
 struct PyArray {
 

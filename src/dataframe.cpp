@@ -13,6 +13,8 @@ void pybind_dataframes(py::module_ &m) {
 
     BIND_DF(AlnCoordsDF)
 
+    bind_valarray<float>(m, "F32");
+
     PyArray<float>::pybind(m, "PyArrayF32");
     PyArray<int>::pybind(m, "PyArrayI32");  
     PyArray<i64>::pybind(m, "PyArrayI64");  

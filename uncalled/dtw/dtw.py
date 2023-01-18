@@ -18,7 +18,7 @@ from .io import BAM, Guppy
 
 import _uncalled
 
-from ..signal_processor import SignalProcessor
+from ..signal_processor import ProcessedRead
 
 from . import Bcaln, Tracks
 
@@ -113,11 +113,14 @@ class GuidedDTW:
 
         bcaln, self.coords = tracks.calc_bcaln(bam)
 
-        sigproc = SignalProcessor(tracks.model, self.conf)
-        signal = sigproc.process(read, False)
+        #sigproc = SignalProcessor(tracks.model, self.conf)
+        #signal = sigproc.process(read, False)
+
+        evdt = _uncalled.EventDetector(self.conf.event_detector)
+        signal = ProcessedRead(evdt.process_read(read))
 
         self.index = tracks.index
-        self.model = sigproc.model
+        self.model = tracks.model
 
         self.bcaln = bcaln.df#[bcaln.df["indel"] == 0]
 
@@ -258,6 +261,7 @@ class GuidedDTW:
 
         
         path = np.flip(dtw.path)
+
         #TODO shouldn't need to clip, error in bdtw
         evts = read_block.index[np.clip(path['qry'], 0, len(read_block))]
         mrefs = self.ref_kmers.index[path['ref']]
@@ -266,6 +270,17 @@ class GuidedDTW:
             self.bands = self._ll_to_df(dtw.ll, read_block, mrefs[0], len(self.ref_kmers))
         else:
             self.bands = None
+
+        #TODO write ReadAln (DF?)
+        #constructed via DTW output and ProcessedRead: collapses events to reference coords
+        #scalars: aln_id, read_id, ref_name, ref_start, ref_end, ref_fwd, samp_start, samp_en
+        #base valarrays: length, current, stdv
+        #derived valarrays: refs, starts
+        #for now keep ReadAlns as seperate chunks, convert to pandas and concat
+
+        #After that works, construct AlnTrack in C++ by concating ReadAlns
+        #   contains alignments and layers DFs, probably distinct from ReadAln
+        #   sortable and indexable by aln_id, ref
 
         return pd.DataFrame({'mref': mrefs}, 
                             index = evts,
