@@ -19,6 +19,7 @@ from .io import BAM, Guppy
 import _uncalled
 
 from ..signal_processor import ProcessedRead
+from ..dfs import DtwDF
 
 from . import Bcaln, Tracks
 
@@ -254,16 +255,20 @@ class GuidedDTW:
 
         block_signal = read_block['mean'].to_numpy()
         
-        args = self._get_dtw_args(read_block, self.ref_kmers)
-
-
-        dtw = self.dtw_fn(*args)
+        #args = self._get_dtw_args(read_block, self.ref_kmers)
+        #dtw = self.dtw_fn(*args)
+        prms, means, kmers, inst, bands = self._get_dtw_args(read_block, self.ref_kmers)
+        dtw = self.dtw_fn(prms, signal, self.evt_start, self.evt_end, kmers, inst, bands)
+        #    return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(ref_kmers), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         
         path = np.flip(dtw.path)
 
+        #_ = 
+
         #TODO shouldn't need to clip, error in bdtw
-        evts = read_block.index[np.clip(path['qry'], 0, len(read_block))]
+        #evts = read_block.index[np.clip(path['qry'], 0, len(read_block))]
+        evts = path['qry']
         mrefs = self.ref_kmers.index[path['ref']]
 
         if self.prms.save_bands and hasattr(dtw, "ll"):
@@ -282,12 +287,19 @@ class GuidedDTW:
         #   contains alignments and layers DFs, probably distinct from ReadAln
         #   sortable and indexable by aln_id, ref
 
-        return pd.DataFrame({'mref': mrefs}, 
-                            index = evts,
-                            dtype='Int64') \
-                 .join(signal.to_df()) \
-                 .drop(columns=['mask'], errors='ignore') \
-                 .rename(columns={'mean' : 'current', 'stdv' : 'current_stdv'})
+        df = DtwDF(dtw.get_aln()).to_df()
+        df["mref"] = pd.RangeIndex(mref_st, mref_en+1)
+
+        #df2 = pd.DataFrame({'mref': mrefs}, 
+        #                    index = evts,
+        #                    dtype='Int64') \
+        #         .join(signal.to_df()) \
+        #         .drop(columns=['mask'], errors='ignore') \
+        #         .rename(columns={'mean' : 'current', 'stdv' : 'current_stdv'})
+        #print(df)
+        #print(df2)
+        #print(df.iloc[:20])
+        return df
 
     def _get_dtw_args(self, read_block, ref_kmers):
         qry_len = len(read_block)

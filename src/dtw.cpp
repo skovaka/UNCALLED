@@ -31,9 +31,14 @@ py::array_t<Coord> get_guided_bands(PyArray<i32> &bc_refs, PyArray<i32> &bc_samp
     return ret;
 }
 
+constexpr DtwDF::NameArray DtwDF::names;
+
 #define PY_DTW_PARAM(P, D) p.def_readwrite(#P, &DtwParams::P, D);
 void pybind_dtw(py::module_ &m) {
     PYBIND11_NUMPY_DTYPE(Coord, qry, ref);
+    
+    DtwDF::pybind<DtwDF>(m, "_DtwDF");
+
     py::class_<DtwParams> p(m, "DtwParams");
     PY_DTW_PARAM(band_mode, "DTW band mode (\"guided\", \"static\", or \"\"/\"none\")");
     PY_DTW_PARAM(norm_mode, "Normalization method");

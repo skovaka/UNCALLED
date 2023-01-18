@@ -363,22 +363,25 @@ class Tracks:
             "events" : grp["start"].count(),
         })
 
-        #if read is not None:
-        #    #dtw["stdv"] = np.std(read.signal[dtw["start"]:dtw["start"]+dtw["length"]], axis=1)
-        #    dtw["stdv"] = [
-        #        np.std(
-        #            read.get_norm_signal(dtw.loc[i, "start"], dtw.loc[i, "start"]+dtw.loc[i, "length"])
-        #        ) for i in dtw.index
-        #    ]
+        if read is not None:
+            #dtw["stdv"] = np.std(read.signal[dtw["start"]:dtw["start"]+dtw["length"]], axis=1)
+            dtw["stdv"] = [
+                np.std(
+                    read.get_norm_signal(dtw.loc[i, "start"], dtw.loc[i, "start"]+dtw.loc[i, "length"])
+                ) for i in dtw.index
+            ]
 
         skip_counts = dtw["start"].value_counts().loc[dtw["start"]].to_numpy()
         dtw["events"] /= skip_counts
+
+        #print(dtw.sort_index().iloc[:20])
+        #print("DON")
 
         return dtw.sort_index()
 
     def write_dtw_events(self, events=None, track_name=None, aln_id=None, read=None):
         if events is not None:# and self.output.FORMAT != "eventalign":
-            events = self.collapse_events(events, read=read)
+            events = events #self.collapse_events(events, read=read)
             overwrite = False
         else:
             overwrite = True

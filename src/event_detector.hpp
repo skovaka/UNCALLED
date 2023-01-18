@@ -98,9 +98,26 @@ struct ProcessedRead {
         return {avg, dev};
     }
 
-    void update_stdv(Event &e) {
-        auto deltas = static_cast<std::valarray<float>>(signal[std::slice(e.start, e.length, 1)]) - e.mean;
+    void update_stdv(Event &e) const {
+        auto slc = static_cast<std::valarray<float>>(signal[std::slice(e.start, e.length, 1)]);
+        auto deltas = slc - e.mean;
+        //e.mean = slc.sum() / e.length;
         e.stdv = sqrt((deltas*deltas).sum() / e.length);
+        //e.mean = sqrt((deltas*deltas).sum() / e.length);
+    }
+
+    Event merge_events(size_t i, size_t j) const {
+        if (i+1 >= j) {
+            return events[i];
+        }
+        Event ret{0,0,events[i].start,0};
+        for (auto k=i; k < j; k++) {
+            ret.mean += events[k].mean*events[k].length;
+            ret.length += events[k].length;
+        }
+        ret.mean /= ret.length;
+        update_stdv(ret);
+        return ret;
     }
 
     void normalize(NormVals prms) {

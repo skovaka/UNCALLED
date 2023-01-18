@@ -8,12 +8,21 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
 #include <pybind11/numpy.h>
+#include "util.hpp"
 namespace py = pybind11;
 
 PYBIND11_MAKE_OPAQUE(std::valarray<float>);
+PYBIND11_MAKE_OPAQUE(std::valarray<i8>);
+PYBIND11_MAKE_OPAQUE(std::valarray<i16>);
+PYBIND11_MAKE_OPAQUE(std::valarray<i32>);
+PYBIND11_MAKE_OPAQUE(std::valarray<i64>);
+PYBIND11_MAKE_OPAQUE(std::valarray<u8>);
+PYBIND11_MAKE_OPAQUE(std::valarray<u16>);
+PYBIND11_MAKE_OPAQUE(std::valarray<u32>);
+PYBIND11_MAKE_OPAQUE(std::valarray<u64>);
 
 template<typename T>
-void bind_valarray(py::module_ &m, std::string suffix) {
+void pybind_valarray(py::module_ &m, std::string suffix) {
     auto name = "Valarray"+suffix;
     py::class_<std::valarray<T>> a(m, name.c_str(), py::buffer_protocol());
     a.def_buffer([](std::valarray<T> &c) -> py::buffer_info { 
@@ -138,7 +147,7 @@ class DataFrame {
     public:
     static constexpr size_t width = sizeof...(Types);
 
-    using DataTuple = std::tuple<PyArray<Types>...>;
+    using DataTuple = std::tuple<std::valarray<Types>...>;
     using NameArray = std::array<const char *, width>;
     DataTuple data_;
 
@@ -152,7 +161,12 @@ class DataFrame {
     DataFrame(DataFrame&&) = default;
 
     DataFrame(py::array_t<Types>... arrays) : 
-        data_  { PyArray<Types>(arrays)... },
+        data_  { init_arr(arrays)... },
+        height {init_height()} {
+    }
+
+    DataFrame(size_t length) : 
+        data_  { std::valarray<Types>(length)... },
         height {init_height()} {
     }
 
@@ -183,11 +197,22 @@ class DataFrame {
         return std::get<I>(data_);
     }
 
+    private:
+
+    template <typename T>
+    static std::valarray<T> init_arr(py::array_t<T> a) {
+        auto info = a.request();
+        return std::valarray<T>(static_cast<T*>(info.ptr), static_cast<size_t>(info.shape[0]));
+    }
+
+    public:
+
 
     template<class Subclass>
-    static void pybind(py::module_ &m, const char *name) {
+    static py::class_<Subclass> pybind(py::module_ &m, const char *name) {
         py::class_<Subclass> c(m, name);
         c.def(py::init<py::array_t<Types>...>());
+        c.def(py::init<size_t>());
 
         c.def("__len__", [](Subclass &c) -> size_t {return c.height;});
         c.attr("names") = py::cast(Subclass::names);
@@ -195,6 +220,8 @@ class DataFrame {
         c.def_readonly("height", &Subclass::height);
 
         pybind_col<Subclass>(c);
+        
+        return c;
     }
 
     template<class Subclass, size_t I=0, typename T = typename std::tuple_element<I, DataTuple>::type>

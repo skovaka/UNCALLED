@@ -1,6 +1,6 @@
 import pandas as pd
 
-from _uncalled import _AlnCoords, _AlnCoordsDF
+from _uncalled import _AlnCoords, _AlnCoordsDF, _DtwDF
 
 class RecArrayHelper:
     def _init(self, cls, df):
@@ -14,19 +14,30 @@ class AlnCoords(_AlnCoords, RecArrayHelper):
         self._init(_AlnCoords, *args)
 
 class DataFrameHelper:
-    def _init(self, cls, *args):
-        if isinstance(args[0], pd.DataFrame):
+    #def _init(self, cls, *args):
+    def _init(self, df, Cls=None):
+        if isinstance(df, pd.DataFrame) and Cls is not None:
             df = args[0]
             args = [df[col].to_numpy(copy=True) for col in self.names]
-        cls.__init__(self, *args)
+            self.instance = Cls(*args)
+
+        self.instance = df
+
+    def __getattr__(self, name):
+        return getattr(self.instance, name)
 
     def __getitem__(self, name):
-        return self.__getattribute__(name)
+        return getattr(self.instance, name)
+        #return self.instance.__getattribute__(name)
 
     def to_df(self):
         return pd.DataFrame(
             {name : self[name].to_numpy() for name in self.names},
         )
+
+class DtwDF(DataFrameHelper):
+    def __init__(self, *args):
+        self._init( *args, _DtwDF)
 
 class AlnCoordsDF(_AlnCoordsDF, DataFrameHelper):
     def __init__(self, *args):
