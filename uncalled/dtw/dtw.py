@@ -215,8 +215,8 @@ class GuidedDTW:
 
         tracks.write_dtw_events(self.df, read=signal)#, aln_id=aln_id
 
-        if self.bands is not None:
-            tracks.add_layers("band", self.bands)#, aln_id=aln_id)
+        #if self.bands is not None:
+        #    tracks.add_layers("band", self.bands)#, aln_id=aln_id)
 
         if self.conf.bc_cmp:
             tracks.calc_compare("bcaln", True, True)
@@ -255,50 +255,17 @@ class GuidedDTW:
 
         block_signal = read_block['mean'].to_numpy()
         
-        #args = self._get_dtw_args(read_block, self.ref_kmers)
-        #dtw = self.dtw_fn(*args)
         prms, means, kmers, inst, bands = self._get_dtw_args(read_block, self.ref_kmers)
         dtw = self.dtw_fn(prms, signal, self.evt_start, self.evt_end, kmers, inst, bands)
-        #    return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(ref_kmers), self.model.instance, _uncalled.PyArrayCoord(bands))
-
         
-        path = np.flip(dtw.path)
-
-        #_ = 
-
-        #TODO shouldn't need to clip, error in bdtw
-        #evts = read_block.index[np.clip(path['qry'], 0, len(read_block))]
-        evts = path['qry']
-        mrefs = self.ref_kmers.index[path['ref']]
-
-        if self.prms.save_bands and hasattr(dtw, "ll"):
-            self.bands = self._ll_to_df(dtw.ll, read_block, mrefs[0], len(self.ref_kmers))
-        else:
-            self.bands = None
-
-        #TODO write ReadAln (DF?)
-        #constructed via DTW output and ProcessedRead: collapses events to reference coords
-        #scalars: aln_id, read_id, ref_name, ref_start, ref_end, ref_fwd, samp_start, samp_en
-        #base valarrays: length, current, stdv
-        #derived valarrays: refs, starts
-        #for now keep ReadAlns as seperate chunks, convert to pandas and concat
-
-        #After that works, construct AlnTrack in C++ by concating ReadAlns
-        #   contains alignments and layers DFs, probably distinct from ReadAln
-        #   sortable and indexable by aln_id, ref
+        #if self.prms.save_bands and hasattr(dtw, "ll"):
+        #    self.bands = self._ll_to_df(dtw.ll, read_block, mrefs[0], len(self.ref_kmers))
+        #else:
+        #    self.bands = None
 
         df = DtwDF(dtw.get_aln()).to_df()
-        df["mref"] = pd.RangeIndex(mref_st, mref_en+1)
+        df["mref"] = self.ref_kmers.index#pd.RangeIndex(mref_st, mref_en+1)
 
-        #df2 = pd.DataFrame({'mref': mrefs}, 
-        #                    index = evts,
-        #                    dtype='Int64') \
-        #         .join(signal.to_df()) \
-        #         .drop(columns=['mask'], errors='ignore') \
-        #         .rename(columns={'mean' : 'current', 'stdv' : 'current_stdv'})
-        #print(df)
-        #print(df2)
-        #print(df.iloc[:20])
         return df
 
     def _get_dtw_args(self, read_block, ref_kmers):

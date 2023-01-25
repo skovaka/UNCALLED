@@ -242,6 +242,16 @@ struct Coord {
 //PyArray<Coord> get_guided_bands(PyArray<i32> bc_refs, PyArray<i32> bc_samps, PyArray<i32> event_samps);
 #endif
 
+
+//TODO 
+// redo dataframes so it's
+//create ReadAln, contains DtwDF, BcalnDF, and aln info:
+//store coordinates (list of ref bound pairs), use to index DFs
+//aln_id, read_id, ref_name, ref_start, ref_end, ref_fwd, samp_start, samp_en
+//Eventually construct AlnTrack in C++ by concating ReadAlns
+//   contains alignments and layers DFs, probably distinct from ReadAln
+//   sortable and indexable by aln_id, ref
+
 struct DtwDF : public DataFrame<int, int, float, float> {
     static constexpr NameArray names = {"start", "length", "current", "stdv"}; 
     ColType<0> &start = std::get<0>(data_);  

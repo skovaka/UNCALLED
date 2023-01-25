@@ -374,9 +374,6 @@ class Tracks:
         skip_counts = dtw["start"].value_counts().loc[dtw["start"]].to_numpy()
         dtw["events"] /= skip_counts
 
-        #print(dtw.sort_index().iloc[:20])
-        #print("DON")
-
         return dtw.sort_index()
 
     def write_dtw_events(self, events=None, track_name=None, aln_id=None, read=None):
@@ -414,11 +411,6 @@ class Tracks:
 
         if self.new_alignment:
             out.write_alignment(track.alignments)
-
-        #layers = track.layers_pac_index
-        #layers = layers.drop(columns=[
-        #    layer for layer in layers.columns
-        #    if not (layer[0] in self.new_layers or LAYER_META.loc[layer,"base"])])
 
         if len(self.new_layers) > 0 and len(track.layers) > 0:
             out.write_layers(track, self.new_layers)
