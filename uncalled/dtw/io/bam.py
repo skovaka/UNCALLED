@@ -15,6 +15,13 @@ from ... import Config
 from . import TrackIO
 import _uncalled 
 
+REF_TAG  = "ur"
+SAMP_TAG = "us"
+NORM_TAG = "un"
+LENS_TAG = "ul"
+CURS_TAG = "uc"
+STDS_TAG = "ud"
+
 class BAM(TrackIO):
     FORMAT = "bam"
 
@@ -122,21 +129,17 @@ class BAM(TrackIO):
         lens = dtw["length"]
         lens[dtw["start"].duplicated()] = 0 #skips
 
-        cmin = dtw["current"].min()
+        cmin = 0
         cmax = dtw["current"].max()
         scale = (self.INF_U16 - 1) / (cmax - cmin)
         shift = -cmin
 
         dc = np.round((dtw["current"]+ shift) * scale)#.astype("uint16")
+        ds = np.round((dtw["stdv"]+ shift) * scale)#.astype("uint16")
 
         dc = dc.fillna(self.INF_U16).to_numpy(np.uint16)
+        ds = ds.fillna(self.INF_U16).to_numpy(np.uint16)
         lens = dtw["length"].reindex(refs).to_numpy(np.uint16, na_value=0)
-
-        #self.bam.set_tag("sc", dc.tobytes().hex(), "H") #hex format
-        #self.bam.set_tag("sl", lens.tobytes().hex(), "H") #hex formt
-        #cur = dtw["current"].to_numpy().astype(float)
-        #self.bam.set_tag("sc", array.array("f", cur)) #float current
-        #self.bam.set_tag("sl", ",".join(map(str,lens))) #str lens
 
         if dtw["start"].iloc[0] < dtw["start"].iloc[-1]:
             sample_start = dtw["start"].iloc[0]
@@ -145,11 +148,12 @@ class BAM(TrackIO):
             sample_start = dtw["start"].iloc[0] + dtw["length"].iloc[0]
             sample_end = dtw["start"].iloc[-1] 
 
-        self.bam.set_tag("sr", array.array("I", (refs[0], refs[-1]+1)))
-        self.bam.set_tag("ss", array.array("I", (sample_start, sample_end)))
-        self.bam.set_tag("sn", array.array("f", (scale,shift)))
-        self.bam.set_tag("sl", array.array("H", lens))
-        self.bam.set_tag("sc", array.array("H", dc))
+        self.bam.set_tag(REF_TAG, array.array("I", (refs[0], refs[-1]+1)))
+        self.bam.set_tag(SAMP_TAG, array.array("I", (sample_start, sample_end)))
+        self.bam.set_tag(NORM_TAG, array.array("f", (scale,shift)))
+        self.bam.set_tag(LENS_TAG, array.array("H", lens))
+        self.bam.set_tag(CURS_TAG, array.array("H", dc))
+        self.bam.set_tag(STDS_TAG, array.array("H", ds))
 
         if not self.bam.has_tag("f5"):
             self.bam.set_tag("f5", os.path.basename(self.prev_fast5[0]))
@@ -201,17 +205,23 @@ class BAM(TrackIO):
             
 
     def _parse_sam(self, sam, coords=None):
-        samp_bounds = sam.get_tag("ss")
+        samp_bounds = sam.get_tag(SAMP_TAG)
 
-        norm_scale, norm_shift = sam.get_tag("sn")
-        dac = np.array(sam.get_tag("sc"))
+        norm_scale, norm_shift = sam.get_tag(NORM_TAG)
+
+        dac = np.array(sam.get_tag(CURS_TAG))
         current = (dac/norm_scale)-norm_shift
         current[dac == self.INF_U16] = np.nan
+
+        das = np.array(sam.get_tag(STDS_TAG))
+        stdv = (das/norm_scale)-norm_shift
+        stdv[das == self.INF_U16] = np.nan
+
         
-        length = sam.get_tag("sl")
+        length = sam.get_tag(LENS_TAG)
 
         fwd = int(not sam.is_reverse)
-        ref_start, ref_end = sam.get_tag("sr")
+        ref_start, ref_end = sam.get_tag(REF_TAG)
 
 
         if coords is None:
@@ -220,37 +230,29 @@ class BAM(TrackIO):
             coords = self.tracks.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=True)
             start_shift = end_shift = 0
         else:
-            #start_clip = coords.refs.min() - ref_start if coords.refs.min() > ref_start else 0
-            #end_clip = ref_end - coords.refs.max() if coords.refs.max() < ref_end else 0
-            #current = current[start_clip:-end_clip]
-
             start_clip = (coords.refs.min() - ref_start) if coords.refs.min() > ref_start else 0
             end_clip = (ref_end - coords.refs.max()) if coords.refs.max() < ref_end else 0
 
             new_end = len(current) - end_clip
             current = current[start_clip:new_end]
+            stdv = stdv[start_clip:new_end]
 
 
             start_shift = np.sum(length[:start_clip])
             end_shift = np.sum(length[new_end:])
             length = length[start_clip:new_end]
-            #end_shift = np.sum(length[-end_clip:])
-            #length = length[start_clip:-end_clip]
-
 
             ref_start += start_clip
             ref_end -= end_clip
             refs = pd.RangeIndex(ref_start, ref_end)
 
         pacs = coords.ref_to_pac(refs)
-
-        #refs = coords.refs.intersect(
             
         kmers = coords.ref_kmers.loc[fwd].loc[refs].to_numpy()
 
         dtw = pd.DataFrame({
             "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
-            "current" : current, "length" : length, "kmer" : kmers
+            "current" : current, "stdv" : stdv, "length" : length, "kmer" : kmers
         }).set_index(["track_id", "fwd", "pac","aln_id"])
 
         dtw.loc[dtw["current"].isnull(), "kmer"] = pd.NA
@@ -411,50 +413,9 @@ class BAM(TrackIO):
         for sam in self.iter_sam():
             if read_ids is not None and sam.query_name not in read_ids:
                 continue
-            ref_start, ref_end = sam.get_tag("sr")
+            ref_start, ref_end = sam.get_tag(REF_TAG)
             ref_bounds = RefCoord(sam.reference_name, ref_start, ref_end, not sam.is_reverse)
             coords = ref_index.get_coord_space(ref_bounds, is_rna=self.conf.is_rna, load_kmers=True, kmer_trim=False)
-
-            ##refs = pd.RangeIndex(*sam.get_tag("sr"), name="ref")
-            #samp_bounds = sam.get_tag("ss")
-
-            #norm_scale, norm_shift = sam.get_tag("sn")
-            #dac = np.array(sam.get_tag("sc"))
-            #current = (dac/norm_scale)-norm_shift
-            #current[dac == self.INF_U16] = np.nan
-            #
-            #length = sam.get_tag("sl")
-
-            #dtw = pd.DataFrame(
-            #    {"current" : current, "length" : length, "kmer" : coords.ref_kmers.to_numpy()},
-            #    index=pd.MultiIndex.from_product([[int(coords.fwd)], coords.pacs, [aln_id]], 
-            #                                     names=("fwd","pac","aln_id"))
-            #)
-
-            #
-            #if samp_bounds[0] < samp_bounds[1]:
-            #    samp_start, samp_end = samp_bounds
-            #else:
-            #    samp_end, samp_start = samp_bounds
-            #    dtw = dtw.iloc[::-1]
-
-            #start = np.full(len(dtw), samp_start, dtype="int32")
-            #start[1:] += dtw["length"].cumsum().iloc[:-1].to_numpy("int32")
-            #dtw["start"] = start
-
-            #layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1).sort_index()
-
-            #alns = pd.DataFrame({
-            #        "id" : [aln_id],
-            #        "track_id" : [1],
-            #        "read_id" : [sam.query_name],
-            #        "ref_name" : [coords.ref_name],
-            #        "ref_start" : [coords.refs.start],
-            #        "ref_end" : [coords.refs.stop],
-            #        "fwd" :     [int(coords.fwd)],
-            #        "samp_start" : [samp_start],
-            #        "samp_end" : [samp_end],
-            #        "tags" : [""]}).set_index("id")
 
             yield self._parse_sam(sam, coords)
 
