@@ -377,13 +377,10 @@ class Tracks:
         return dtw.sort_index()
 
     def write_dtw_events(self, events=None, track_name=None, aln_id=None, read=None):
-        if events is not None:# and self.output.FORMAT != "eventalign":
-            events = events #self.collapse_events(events, read=read)
-            overwrite = False
-        else:
-            overwrite = True
+        if np.any(events.index.duplicated()):
+            events = self.collapse_events(events, read=read)
 
-        self.add_layers("dtw", events, track_name, aln_id, overwrite, read)
+        self.add_layers("dtw", events, track_name, aln_id, False, read)
         
     def add_layers(self, group, layers, track_name=None, aln_id=None, overwrite=False, read=None):
         track = self._track_or_default(track_name)
@@ -912,6 +909,7 @@ class Tracks:
             gen = self.iter_reads_slice(read_filter, ref_bounds)
 
         for read_id,chunk in gen:
+            #print(read_id, [len(a.alignments) for a in chunk.alns])
             yield read_id,chunk
             
     def iter_reads_slice(self, reads=None, ref_bounds=None):
@@ -948,6 +946,8 @@ class Tracks:
                 ref_index=self.index)
 
             for alignments,layers in aln_iter:
+                #print("aln", alignments)
+                #print("layer", layers.index.unique("aln_id"))
                 for ref_name,ref_alns in alignments.groupby("ref_name"):
                     coords = self._alns_to_coords(ref_alns)
                     cache = self._tables_to_tracks(coords, ref_alns, layers)

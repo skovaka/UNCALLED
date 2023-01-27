@@ -500,34 +500,34 @@ class TrackSQL(TrackIO):
             layers, track_id, coords, aln_id, read_id, fwd,
             ["read_id", "pac"], self.prms.ref_chunksize, full_overlap) 
 
-        aln_leftovers = pd.DataFrame()
         layer_leftovers = pd.DataFrame()
 
         for layers in layer_iter:
-            ids = layers.index.unique("aln_id") 
-            if len(aln_leftovers) > 0:
-                ids = ids.difference(aln_leftovers.index.get_level_values("id")) 
-            if len(ids) > 0:
-                alignments = self.query_alignments(aln_id=ids.to_numpy())
-            else:
-                alignments = pd.DataFrame()
-
-            alignments = pd.concat([aln_leftovers, alignments])
             layers = pd.concat([layer_leftovers, layers])
 
-            aln_end = alignments["read_id"] == alignments["read_id"].iloc[-1]
-            aln_leftovers = alignments.loc[aln_end]
-            alignments = alignments.loc[~aln_end]
+            ids = layers.index.unique("aln_id").to_numpy()
+            alignments = self.query_alignments(aln_id=ids, order=["read_id"])
 
-            layer_end = layers.index.get_level_values("aln_id").isin(aln_leftovers.index)
-            layer_leftovers = layers.loc[layer_end]
-            layers = layers.loc[~layer_end]
-            layer_alns = layers.index.get_level_values("aln_id")
+            #print("HERE")
+            last_read = alignments.iloc[-1]["read_id"]
+            mask = alignments["read_id"] == last_read
+            last_alns = alignments.index[mask].get_level_values("id")
+            alignments = alignments[~mask]
+
+            #print(last_alns)
+            #print(layers)
+
+            layer_leftovers = layers.loc[layers.index.get_level_values("aln_id").isin(last_alns)]
+            #layer_leftovers = layers.loc[last_layers]
+
+            layers = layers.drop(index=layer_leftovers.index)
 
             yield alignments, layers
 
-        if len(aln_leftovers) > 0 and len(layer_leftovers) > 0:
-            yield aln_leftovers, layer_leftovers
+        if len(layer_leftovers) > 0:
+            ids = layer_leftovers.index.unique("aln_id").to_numpy()
+            alignments = self.query_alignments(aln_id=ids, order=["read_id"])
+            yield alignments, layer_leftovers
     
     def _verify_track(self, track_name):
         ids = self.cur.execute("SELECT id FROM track WHERE name == ?", (track_name,)).fetchall()
