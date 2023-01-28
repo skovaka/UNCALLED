@@ -43,6 +43,7 @@ IOParams._def_params(
     ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
 
     ("buffered", False, bool, "Will store alignments in buffer rather than directly output"),
+    ("bam_header", None, None, "BAM input header dict"),
 
     ("eventalign_in", None, list, "Eventalign (nanopolish) input file (or \"-\"/no argument for stdin)"),
     ("eventalign_out", None, str, "Eventalign (nanopolish) output file (or \"-\"/no argument for stdout)"),

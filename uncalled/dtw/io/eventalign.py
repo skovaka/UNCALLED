@@ -14,11 +14,6 @@ class Eventalign(TrackIO):
     def __init__(self, filename, write, tracks, track_count):
         TrackIO.__init__(self, filename, write, tracks, track_count)
 
-        if self.filename == "-":
-            self.out = sys.stdout
-        else:
-            self.out = open(self.filename, "w" if write else "r")
-
         self._header = True
 
         if self.write_mode:
@@ -34,23 +29,35 @@ class Eventalign(TrackIO):
         self.write_signal_index = "signal-index" in flags
         self.write_samples = "samples" in flags
 
-        header = ["contig", "position", "reference_kmer"]
+        self.header = ["contig", "position", "reference_kmer"]
 
         if self.write_read_name:
-            header.append("read_name")
+            self.header.append("read_name")
         else:
-            header.append("read_index")
+            self.header.append("read_index")
 
-        header += ["strand", "event_index", "event_level_mean", "event_stdv", "event_length", "model_kmer", "model_mean", "model_stdv", "standardized_level"]
+        self.header += ["strand", "event_index", "event_level_mean", "event_stdv", "event_length", "model_kmer", "model_mean", "model_stdv", "standardized_level"]
 
         if self.write_signal_index:
-            header += ["start_idx", "end_idx"]
+            self.header += ["start_idx", "end_idx"]
 
         if self.write_samples:
-            header += ["samples"]
+            self.header += ["samples"]
 
-        self.out.write("\t".join(header) + "\n")
+        if self.prms.buffered:
+            self.out_buffer = list()
+            self.output = None
+        else:
+            if self.filename == "-":
+                self.output = sys.stdout
+            else:
+                self.output = open(self.filename, "w")
 
+            self.output.write("\t".join(self.header) + "\n")
+
+    def write_buffer(self, buf):
+        for out in buf:
+            self.output.write(out)
 
     def init_read_mode(self):
         #if len(self.track_names) != 1:
@@ -117,7 +124,10 @@ class Eventalign(TrackIO):
             event_index, #TODO properly rep skips?
             std_level, signal) #TODO compute internally?
 
-        self.out.write(eventalign)
+        if self.out_buffer is None:
+            self.output.write(eventalign)
+        else:
+            self.out_buffer.append(eventalign)
 
     #def init_fast5(self, filename):
 
@@ -240,4 +250,5 @@ class Eventalign(TrackIO):
         pass
 
     def close(self):
-        self.out.close()
+        if not self.prms.buffered:
+            self.output.close()

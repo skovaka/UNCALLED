@@ -54,8 +54,8 @@ def dtw_pool(conf, pool):
 
     tracks = Tracks(conf=conf)
 
-    chunksize = 500
-    header = tracks.output.header
+    chunksize = 50
+    header = tracks.bam_in.header
     def iter_chunks():
         bams = list()
         read_ids = set()
@@ -72,8 +72,8 @@ def dtw_pool(conf, pool):
             reads = tracks.read_index.subset(read_ids)
             yield (conf, bams, reads, header)
 
-    for i,bams in enumerate(pool.imap(dtw_worker, iter_chunks(), chunksize=1)):
-        tracks.output.write_bam_strs(bams)
+    for i,out in enumerate(pool.imap(dtw_worker, iter_chunks(), chunksize=1)):
+        tracks.output.write_buffer(out)
         #pbar.update(i)
 
 def dtw_worker(p):

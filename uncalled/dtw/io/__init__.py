@@ -103,6 +103,8 @@ class TrackIO:
 
         self.out_id = self.init_track(self.out_track, self.out_track, self.conf)
 
+        self.out_buffer = None
+
     def init_track(self, name, desc, conf, id=None):
         if id is None:
             id = self.next_id

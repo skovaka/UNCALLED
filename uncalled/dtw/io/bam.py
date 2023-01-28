@@ -33,6 +33,8 @@ class BAM(TrackIO):
                 if tracks.bam_in is None:
                     raise ValueError("No BAM template provided")
                 self.header = tracks.bam_in.input.header.to_dict()
+            else:
+                self.header = self.prms.bam_header
             self.init_write_mode()
             self.input = None
         else:
@@ -44,9 +46,11 @@ class BAM(TrackIO):
             raise ValueError("BAM output is only available if BAM input provided")
         self.input = pysam.AlignmentFile(self.filename, "rb")
 
+        self.header = self.input.header.to_dict()
+
         conf = None
-        if "CO" in self.input.header:
-            for line in self.input.header["CO"]:
+        if "CO" in self.header:
+            for line in self.header["CO"]:
                 if not line.startswith("UNC:"): continue
                 toml = re.sub(r"(?<!\\);", "\n", line[4:]).replace("\\;",";")
                 conf = Config(toml=toml)
@@ -163,7 +167,7 @@ class BAM(TrackIO):
         else:
             self.output.write(self.bam)
 
-    def write_bam_strs(self, bams):
+    def write_buffer(self, bams):
         header = pysam.AlignmentHeader.from_dict(self.header)
         for b in bams:
             bam = pysam.AlignedSegment.fromstring(b, header)
@@ -179,9 +183,9 @@ class BAM(TrackIO):
             itr = self.input.fetch(b.name, b.start, b.end)
 
         if unmapped:
-            mapped = lambda a: not a.is_unmapped
-        else:
             mapped = lambda a: True
+        else:
+            mapped = lambda a: not a.is_unmapped
 
         read_filter = self.tracks.read_index.read_filter
         if read_filter is not None:

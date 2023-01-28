@@ -18,11 +18,6 @@ class TSV(TrackIO):
     def __init__(self, filename, write, tracks, track_count):
         TrackIO.__init__(self, filename, write, tracks, track_count)
 
-        if self.filename == "-":
-            self.out = sys.stdout
-        else:
-            self.out = open(self.filename, "w" if write else "r")
-
         if self.write_mode:
             self.init_write_mode()
         else:
@@ -37,7 +32,16 @@ class TSV(TrackIO):
         layers = list(parse_layers(layer_cols, add_deps=False))
         self.columns = pd.MultiIndex.from_tuples(layers)
         self.conf.tracks.layers += layers
+
         self._header = True
+        if self.prms.buffered:
+            self.output = None
+            self.out_buffer = list()
+        else:
+            if self.filename == "-":
+                self.output = sys.stdout
+            else:
+                self.output = open(self.filename, "w")
 
     def init_read_mode(self):
         raise RuntimeError("Reading from TSV not yet supported")
@@ -64,13 +68,24 @@ class TSV(TrackIO):
             labels = [
                 ".".join([c for c in col if len(c) > 0]) 
                 for col in self.columns]
-            self.out.write("\t".join(labels) + "\n")
             self._header = False
+            if not self.prms.buffered:
+                self.output.write("\t".join(labels) + "\n")
 
         df = df.loc[:,self.columns]
 
-        self.out.write(df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False))
+        out = df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False)
+
+        if self.prms.buffered:
+            self.out_buffer.append(out)
+        else:
+            self.output.write(out)
+
+    def write_buffer(self, buf):
+        for out in buf:
+            self.output.write(out)
 
     def close(self):
-        self.out.close()
+        if not self.prms.buffered:
+            self.output.close()
 
