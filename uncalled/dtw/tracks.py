@@ -7,7 +7,7 @@ import collections
 from collections import defaultdict
 import scipy
 
-from .io import SQL, TSV, Eventalign, Tombo, BAM, INPUTS, OUTPUTS, INPUT_PARAMS, OUTPUT_PARAMS
+from .io import SQL, TSV, Eventalign, Tombo, BAM, ModelTrainer, INPUTS, OUTPUTS, INPUT_PARAMS, OUTPUT_PARAMS
 from .aln_track import AlnTrack
 from .layers import LAYER_META, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
@@ -291,6 +291,8 @@ class Tracks:
                 self.output = Eventalign(filename, True, self, track_count)
             elif out_format == "bam_out":
                 self.output = BAM(filename, True, self, track_count)
+            elif out_format == "model_dir":
+                self.output = ModelTrainer(filename, True, self, track_count)
 
             track_count += len(self.output.aln_tracks)
             for track in self.output.aln_tracks:

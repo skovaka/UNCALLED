@@ -66,6 +66,10 @@ class BAM(TrackIO):
 
         self.aln_id_in = 1
 
+    def reset(self):
+        self.input.reset()
+        self.aln_id_in = 1
+
     def init_write_mode(self):
         if self.conf.tracks.io.bam_out is None:
             self.output = None
@@ -172,6 +176,21 @@ class BAM(TrackIO):
         for b in bams:
             bam = pysam.AlignedSegment.fromstring(b, header)
             self.output.write(bam)
+
+    def iter_str_chunks(self):
+        read_ids = set()
+        bams = list()
+        for bam in self.iter_sam():
+            read_ids.add(bam.query_name)
+            bams.append(bam.to_string())
+
+            if len(bams) == self.prms.chunksize:
+                yield(read_ids, bams)
+                read_ids = set()
+                bams = list()
+
+        if len(bams) > 0:
+            yield(read_ids, bams)
 
     #TODO more query options
     def iter_sam(self, unmapped=False):

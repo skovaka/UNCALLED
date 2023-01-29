@@ -408,6 +408,12 @@ class PoreModel {
         return ((kmer << 2) & KMER_MASK) | i; 
     }
 
+    static KmerType set_kmer_base(KmerType kmer, u8 i, u8 b) {
+        auto shift = 2*i;
+        auto mask = ~(0x3 << shift);
+        return (kmer & mask) | (b << shift); 
+    }
+
     static u8 kmer_base(KmerType kmer, u8 i) {
         return (u8) ((kmer >> (2 * ((KmerType)K-i-1))) & 0x3);
     }
@@ -538,6 +544,7 @@ class PoreModel {
         c.def_static("kmer_revcomp",  py::vectorize(&Class::kmer_revcomp), "Reverse complements binary k-mers");
         c.def_static("kmer_head",     py::vectorize(&Class::kmer_head), "Returns the first base index in binary k-mers");
         c.def_static("kmer_base",     py::vectorize(&Class::kmer_base), "Returns the base at the specified index in a binary k-mer");
+        c.def_static("set_kmer_base",     py::vectorize(&Class::set_kmer_base), "Sets a binary k-mer base");
         c.def_static("kmer_base_count",     py::vectorize(&Class::kmer_base_count), "Returns the number of occurances of the specified base index in the binary k-mer");
         c.def_static("kmer_neighbor", py::vectorize(&Class::kmer_neighbor), "Returns the binary k-mer shifted left with the specified base appended");
 

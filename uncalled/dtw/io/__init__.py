@@ -17,7 +17,7 @@ from ..aln_track import AlnTrack
 from ...config import Config
 
 INPUT_PARAMS = np.array(["sql_in", "eventalign_in", "tombo_in", "bam_in"])
-OUTPUT_PARAMS = np.array(["sql_out", "tsv_out", "eventalign_out", "bam_out"])
+OUTPUT_PARAMS = np.array(["sql_out", "tsv_out", "eventalign_out", "bam_out", "model_dir"])
 
 OUT_EXT = {
     "sql_out" : "db", 
@@ -124,6 +124,29 @@ class TrackIO:
             track_layers = layers.iloc[i]
 
             track.set_data(coords, track_alns, track_layers)
+
+    def _init_output(self, buffered, mode="w"):
+        if buffered:
+            self.output = None
+            self.out_buffer = list()
+        else:
+            if self.filename == "-":
+                self.output = sys.stdout
+            else:
+                self.output = open(self.filename, mode)
+
+    def _set_output(self, out):
+        if self.prms.buffered:
+            self.out_buffer.append(out)
+        else:
+            self.output.write(out)
+
+    def write_buffer(self, buf=None):
+        if buf is None:
+            buf = [self.out_buffer]
+
+        for out in buf:
+            self.output.write(out)
             
     def write_alignment(self, alns):
         pass
@@ -145,6 +168,7 @@ from .bam import BAM
 from .eventalign import Eventalign
 from .tombo import Tombo
 from .guppy import Guppy
+from .model_trainer import ModelTrainer
 
 INPUTS = {
     "sql_in" : SQL, 
@@ -158,6 +182,7 @@ OUTPUTS = {
     "bam_out" : BAM,
     "eventalign_out" : Eventalign,
     "tsv_out" : TSV,
+    "model_dir" : ModelTrainer,
 }
 
 def _db_track_split(db_str):

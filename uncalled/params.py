@@ -31,6 +31,9 @@ IOParams._def_params(
     #("db_in", None, str, "Input track database"),
     #("db_out", None, str, "Output track database"),
 
+    ("processes", 1, int, "Number of parallel processes"),
+    ("chunksize", 100, int, "Per-process alignment chunksize"),
+
     ("sql_in", None, None, "Input track database"),
     ("sql_out", None, str, "Output track database"),
 
@@ -41,6 +44,8 @@ IOParams._def_params(
 
     ("bam_in", None, None, "BAM input file (or \"-\"/no argument for stdin)"),
     ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
+
+    ("model_dir", None, str, "Pore model training output directory"),
 
     ("buffered", False, bool, "Will store alignments in buffer rather than directly output"),
     ("bam_header", None, None, "BAM input header dict"),
@@ -95,6 +100,15 @@ TracksParams._def_params(
     ("load_fast5s", False, bool, "Load fast5 files"),
 
     ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter", "load_fast5s"}
+)
+
+class TrainParams(config.ParamGroup):
+    _name = "train"
+TrainParams._def_params(
+    ("kmer_samples", 1000, int, "Maximum number of instances of each k-mer to use per training iteration"),
+    ("iterations", 1, int, "Number of model training iterations"),
+    ("max_bcaln_dist", 1, float, "Maximum mean_refi_dist from basecalled alignment to use for model trainer"),
+    ("use_median", False, bool, ""),
 )
 
 class VisParams(config.ParamGroup):

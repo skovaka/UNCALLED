@@ -44,25 +44,12 @@ class Eventalign(TrackIO):
         if self.write_samples:
             self.header += ["samples"]
 
-        if self.prms.buffered:
-            self.out_buffer = list()
-            self.output = None
-        else:
-            if self.filename == "-":
-                self.output = sys.stdout
-            else:
-                self.output = open(self.filename, "w")
+        TrackIO._init_output(self, self.prms.buffered)
 
+        if not self.prms.buffered:
             self.output.write("\t".join(self.header) + "\n")
 
-    def write_buffer(self, buf):
-        for out in buf:
-            self.output.write(out)
-
     def init_read_mode(self):
-        #if len(self.track_names) != 1:
-        #    raise ValueError("Can only read eventalign TSV into a single track")
-        #name = self.track_names[0]
         name = self.filename
         
         if self.conf.pore_model.name == "r94_dna":
@@ -70,8 +57,6 @@ class Eventalign(TrackIO):
 
         self.in_id = self.init_track(name, name, self.conf)
 
-    #def write_dtw_events(self, track, events):
-    #def write_layers(self, df, read, index=["pac","aln_id"]):
     def write_layers(self, track, groups):
         if "dtw" not in groups: 
             return
@@ -124,25 +109,7 @@ class Eventalign(TrackIO):
             event_index, #TODO properly rep skips?
             std_level, signal) #TODO compute internally?
 
-        if self.out_buffer is None:
-            self.output.write(eventalign)
-        else:
-            self.out_buffer.append(eventalign)
-
-    #def init_fast5(self, filename):
-
-    #    row = self.cur.execute("SELECT id FROM fast5 WHERE filename = ?", (filename,)).fetchone()
-    #    if row is not None:
-    #        return row[0]
-    #        
-    #    self.cur.execute("INSERT INTO fast5 (filename) VALUES (?)", (filename,))
-    #    fast5_id = self.cur.lastrowid
-    #    #self.con.commit()
-
-    #    return fast5_id
-
-    #def init_read(self, read_id, fast5_id):
-    #    self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
+        self._set_output(eventalign)
 
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 

@@ -103,8 +103,10 @@ REALTIME_OPTS = BWA_OPTS + MAPPER_OPTS + (
     Opt("--port", "realtime"),
     Opt("--duration", "realtime"),
 ) 
+
 DTW_OPTS = (
-    Opt(("-t", "--threads"), ""),
+    Opt(("-p", "--processes"), "tracks.io"),
+    Opt("--chunksize", "tracks.io"),
     Opt("--guppy-in", "tracks.io"),
     Opt("--bam-in", "tracks.io", nargs="?", const="-", required=True),
     Opt(("--out-name", "-o"), "tracks.io"),
@@ -115,13 +117,6 @@ DTW_OPTS = (
     Opt(("-l", "--read-filter"), "tracks"),
     Opt(("-x", "--fast5-index"), "fast5_reader"),
     Opt(("-n", "--max-reads"), "tracks"),
-
-    MutexOpts("output", [
-        Opt("--sql-out", "tracks.io"),
-        Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
-        Opt("--bam-out", "tracks.io", nargs="?", const="-"),
-        Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
-    ]),
 
     Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
     Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
@@ -135,8 +130,7 @@ DTW_OPTS = (
     #Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include"),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
     Opt(("-a", "--append"), "tracks.io", action="store_true"),
-    Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
-    Opt(("-p", "--pore-model"), "pore_model", "name", default=None),
+    Opt(("-m", "--pore-model"), "pore_model", "name", default=None),
     Opt(("--kmer-shift"), "pore_model", "shift", default=None),
     Opt("--save-bands", "dtw", action="store_true"),
     Opt("--full-overlap", "tracks", action="store_true"),
@@ -144,10 +138,10 @@ DTW_OPTS = (
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt("--method", "dtw", choices=METHODS.keys()),
-    Opt(("-i", "--iterations"), "dtw"),
-        Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
-        Opt("--skip-cost", "dtw"),
-        Opt("--stay-cost", "dtw"),
+    #Opt(("-i", "--iterations"), "dtw"),
+    Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
+    Opt("--skip-cost", "dtw"),
+    Opt("--stay-cost", "dtw"),
     Opt("--move-cost", "dtw"),
     Opt(("-b", "--band-width"), "dtw"),
     Opt(("-s", "--band-shift"), "dtw"),
@@ -271,6 +265,25 @@ REFSTATS_OPTS = (
     Opt(("--aln-chunksize"), "tracks.io"),
     Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
 )
+
+DTW_CMD_OPTS = DTW_OPTS + (
+    MutexOpts("output", [
+        Opt("--sql-out", "tracks.io"),
+        Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
+        Opt("--bam-out", "tracks.io", nargs="?", const="-"),
+        Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
+    ]),
+    Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
+)
+
+TRAIN_OPTS = (
+    Opt(("-i", "--iterations"), "train"), 
+    Opt("--kmer-samples", "train"), 
+    Opt(("-d", "--max-bcaln-dist"), "train"), 
+    Opt(("--use-median"), "train"), 
+    Opt("--out-dir", "tracks.io", "model_dir"),
+) + DTW_OPTS
+
 
 READSTATS_OPTS = (
     Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
@@ -401,8 +414,10 @@ CMDS = {
     "pafstats" : ("rt.pafstats", 
         "Estimate speed and accuracy from an Uncalled PAF file", PAF_OPTS), 
     "dtw" : ("dtw.dtw", 
-        "Perform DTW alignment guided by basecalled alignments", DTW_OPTS), 
+        "Perform DTW alignment guided by basecalled alignments", DTW_CMD_OPTS), 
     "convert" : ("dtw.io", "Convert between signal alignment file formats", CONVERT_OPTS),
+    "train" : ("dtw.train", 
+        "Iteratively train a new k-mer pore model", TRAIN_OPTS), 
     "db" : (None, 
         """Edit, merge, and ls alignment databases
 

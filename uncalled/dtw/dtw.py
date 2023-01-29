@@ -37,44 +37,27 @@ def dtw(conf):
     conf.tracks.load_fast5s = True
     conf.export_static()
 
-    if conf.threads == 1:
+    if conf.tracks.io.processes == 1:
         dtw_single(conf)
     else:
-        with mp.Pool(processes=conf.threads) as pool:
-            dtw_pool(conf, pool)
-            return
-        raise ValueError("FAIL")
+        dtw_pool(conf)
 
-def dtw_pool(conf, pool):
-    #pbar = progbar.ProgressBar(len(guppy_in.fast5_paths), widgets=[
-    #        progbar.Timer(),
-    #        progbar.Bar(),
-    #        progbar.ETA(),
-    #])
-
-    tracks = Tracks(conf=conf)
-
-    chunksize = 50
-    header = tracks.bam_in.header
-    def iter_chunks():
-        bams = list()
-        read_ids = set()
-        for bam in tracks.bam_in.iter_sam():
-            bams.append(bam.to_string())
-            read_ids.add(bam.query_name)
-            if len(bams) == chunksize:
-                reads = tracks.read_index.subset(read_ids)
-                yield (conf, bams, reads, header)
-                bams = list()
-                read_ids = set()
-
-        if len(bams) > 0:
+def dtw_pool_iter(tracks):
+    def iter_args(): 
+        for read_ids, bams in tracks.bam_in.iter_str_chunks():
             reads = tracks.read_index.subset(read_ids)
-            yield (conf, bams, reads, header)
+            yield (tracks.conf, bams, reads, tracks.bam_in.header)
 
-    for i,out in enumerate(pool.imap(dtw_worker, iter_chunks(), chunksize=1)):
-        tracks.output.write_buffer(out)
-        #pbar.update(i)
+    with mp.Pool(processes=tracks.conf.tracks.io.processes) as pool:
+        for out in pool.imap(dtw_worker, iter_args(), chunksize=1):
+            yield out 
+
+def dtw_pool(conf):
+    tracks = Tracks(conf=conf)
+    #tracks.output.set_model(tracks.model)
+    for chunk in dtw_pool_iter(tracks):
+        tracks.output.write_buffer(chunk)
+    tracks.close()
 
 def dtw_worker(p):
     conf,bams,reads,header = p

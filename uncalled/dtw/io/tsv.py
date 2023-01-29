@@ -32,16 +32,9 @@ class TSV(TrackIO):
         layers = list(parse_layers(layer_cols, add_deps=False))
         self.columns = pd.MultiIndex.from_tuples(layers)
         self.conf.tracks.layers += layers
-
         self._header = True
-        if self.prms.buffered:
-            self.output = None
-            self.out_buffer = list()
-        else:
-            if self.filename == "-":
-                self.output = sys.stdout
-            else:
-                self.output = open(self.filename, "w")
+
+        TrackIO._init_output(self, self.prms.buffered)
 
     def init_read_mode(self):
         raise RuntimeError("Reading from TSV not yet supported")
@@ -49,7 +42,6 @@ class TSV(TrackIO):
     def write_layers(self, track, groups):
         track.calc_layers(self.columns)
         df = track.layers_desc_index#.reset_index()
-
         
         df = df[self.columns.intersection(df.columns)].dropna(how="all", axis=0)
 
@@ -76,14 +68,8 @@ class TSV(TrackIO):
 
         out = df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False)
 
-        if self.prms.buffered:
-            self.out_buffer.append(out)
-        else:
-            self.output.write(out)
+        self._set_output(out)
 
-    def write_buffer(self, buf):
-        for out in buf:
-            self.output.write(out)
 
     def close(self):
         if not self.prms.buffered:
