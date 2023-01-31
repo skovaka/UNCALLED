@@ -132,8 +132,6 @@ class ModelTrainer(TrackIO):
                    .sort_index() \
                    .drop(self.full_kmers, errors="ignore") 
 
-            #print("cat", time()-t)
-            #t = time()
 
             kc = df.index.value_counts()
             self.kmer_counts[kc.index] += kc.to_numpy()
@@ -145,8 +143,6 @@ class ModelTrainer(TrackIO):
 
                 self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
                 self.buff_len += len(df)
-
-        #print("buff", self.buff_len*self.itemsize, len(self.full_kmers)/len(self.kmer_counts))
 
         if self.buff_len == 0 or (self.buff_len * self.itemsize < self.tprms.buffer_size*10**6 and not force):
             return
