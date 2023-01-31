@@ -1,9 +1,10 @@
-import numpy as np
-import pandas as pd
 import sys
 import _uncalled
-import sortednp
 import os
+from glob import glob
+import numpy as np
+import pandas as pd
+from time import time
 
 from ...pore_model import PoreModel
 from ..aln_track import AlnTrack
@@ -18,13 +19,13 @@ class ModelTrainer(TrackIO):
     def __init__(self, filename, write, tracks, track_count):
         TrackIO.__init__(self, filename, write, tracks, track_count)
 
+        self.tprms = self.conf.train
+
         self.row_dtype = [
             (name, np.dtype(dt.lower() if isinstance(dt,str) else dt))
             for (_,name),dt in LAYER_META.loc[LAYERS, "dtype"].items()
         ]
-
         self.itemsize = sum((d.itemsize for _,d in self.row_dtype))
-        self.max_kmers = self.conf.train.kmer_samples
 
         self.output = self.input = None
 
@@ -46,16 +47,37 @@ class ModelTrainer(TrackIO):
 
     def init_write_mode(self):
         TrackIO.init_write_mode(self)
-        os.makedirs(self.filename, exist_ok=True)
 
         self.model = None
-        self.kmer_counts = None
 
-        self.iter = 0
+        if self.tprms.append and not self.prms.buffered:
+            prev_models = glob(f"{self.filename}/it*.model.tsv")
+            if len(prev_models) == 0:
+                raise ValueError("--append can only be used with existing model training directory")
+
+            max_itr = -1
+            fname = None
+            for m in prev_models:
+                itr = int(os.path.basename(m).split(".")[0][2:])
+                if itr > max_itr:
+                    fname = m
+                    max_itr = itr
+
+            self.iter = max_itr+1
+            self.conf.pore_model.name = fname
+            self.set_model(PoreModel(fname))
+            print("Using", fname)
+
+        else:
+            os.makedirs(self.filename, exist_ok=True)
+            self.conf.to_toml(os.path.join(self.filename, "conf.toml"))
+            self.iter = 0
+            #self.model = None
+            self.kmer_counts = None
+
         self.buff_len = 0
 
         self.out_buffer = list()
-        #self.index_out = 
 
     def set_model(self, model):
         self.model = model
@@ -79,22 +101,49 @@ class ModelTrainer(TrackIO):
             self.write_buffer([dtw])
 
     def write_buffer(self, out=[], force=False):
-        for df in out:
-            df = df.drop(self.full_kmers, errors="ignore")
-            kc = df.index.value_counts()
-            self.kmer_counts[kc.index] += kc #TODO do I need kc.index?
+        #t = time()
+        #for df in out:
+        #    df = df.drop(self.full_kmers, errors="ignore")
+        #    kc = df.index.value_counts()
+        #    self.kmer_counts[kc.index] += kc.to_numpy()
 
-            full = self.kmer_counts >= self.max_kmers
-            if np.any(full):
-                self.full_kmers.update(self.kmer_counts.index[full])
-                #self.kmer_counts = self.kmer_counts[~full]
-            
+        #    full = self.kmer_counts >= self.tprms.kmer_samples
+        #    if np.any(full):
+        #        self.full_kmers.update(self.kmer_counts.index[full])
+        #        #self.kmer_counts = self.kmer_counts[~full]
+
+        #    self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
+        #    self.buff_len += len(df)
+
+        print("write")
+        t = time()
+
+        df = pd.concat(out) \
+               .sort_index() \
+               .drop(self.full_kmers, errors="ignore") 
+
+        print("cat", time()-t)
+        t = time()
+
+        kc = df.index.value_counts()
+        print("count", time()-t)
+        t = time()
+        self.kmer_counts[kc.index] += kc.to_numpy()
+        print("add", time()-t)
+        t = time()
+
+        full = self.kmer_counts >= self.tprms.kmer_samples
+        if np.any(full):
+            self.full_kmers.update(self.kmer_counts.index[full])
+            #self.kmer_counts = self.kmer_counts[~full]
+
             self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
             self.buff_len += len(df)
 
-        if self.buff_len == 0 or (self.buff_len * self.itemsize < 10**6 and not force):
-            return
+        print(self.buff_len, self.buff_len*self.itemsize)
 
+        if self.buff_len == 0 or (self.buff_len * self.itemsize < 256*10**6 and not force):
+            return
 
         if self.output is None:
             self.output = open(self._filename("data"), "wb")
@@ -117,7 +166,7 @@ class ModelTrainer(TrackIO):
         self.buff_len = 0
 
     def is_full(self):
-        return len(self.kmer_counts) == 0
+        return self.model is not None and len(self.full_kmers) == self.model.KMER_COUNT
 
     def next_model(self):
         self.close()

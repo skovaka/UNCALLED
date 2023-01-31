@@ -6,6 +6,7 @@ from collections import defaultdict
 import progressbar as progbar
 import pysam
 from time import time
+import os
 
 from sklearn.linear_model import TheilSenRegressor
 from ..pafstats import parse_paf
@@ -24,6 +25,7 @@ from ..dfs import DtwDF
 from . import Bcaln, Tracks
 
 import multiprocessing as mp
+#from concurrent.futures import ProcessPoolExecutor as Pool
 
 METHODS = {
     "guided" : "BandedDTW", 
@@ -42,22 +44,29 @@ def dtw(conf):
     else:
         dtw_pool(conf)
 
-def dtw_pool_iter(tracks):
-    def iter_args(): 
-        for read_ids, bams in tracks.bam_in.iter_str_chunks():
-            reads = tracks.read_index.subset(read_ids)
-            yield (tracks.conf, bams, reads, tracks.bam_in.header)
-
-    with mp.Pool(processes=tracks.conf.tracks.io.processes) as pool:
-        for out in pool.imap(dtw_worker, iter_args(), chunksize=1):
-            yield out 
-
 def dtw_pool(conf):
     tracks = Tracks(conf=conf)
     #tracks.output.set_model(tracks.model)
+    i = 0
     for chunk in dtw_pool_iter(tracks):
+        i += len(chunk)
         tracks.output.write_buffer(chunk)
     tracks.close()
+
+def dtw_pool_iter(tracks):
+    def iter_args(): 
+        i = 0
+        for read_ids, bams in tracks.bam_in.iter_str_chunks():
+            reads = tracks.read_index.subset(read_ids)
+            i += len(bams)
+            yield (tracks.conf, bams, reads, tracks.bam_in.header)
+
+    with mp.Pool(processes=tracks.conf.tracks.io.processes) as pool:
+        i = 0
+        for out in pool.imap_unordered(dtw_worker, iter_args(), chunksize=1):
+        #for out in pool.imap(dtw_worker, iter_args(), chunksize=1):
+            i += len(out)
+            yield out 
 
 def dtw_worker(p):
     conf,bams,reads,header = p
@@ -68,9 +77,11 @@ def dtw_worker(p):
 
     tracks = Tracks(read_index=reads, conf=conf)
 
+    i = 0
     for bam in bams:
         bam = pysam.AlignedSegment.fromstring(bam, header)
         dtw = GuidedDTW(tracks, bam)
+        i += 1
 
     tracks.close()
 
@@ -192,6 +203,10 @@ class GuidedDTW:
             signal.normalize(reg.coef_, reg.intercept_)
             df = self._calc_dtw(signal)
 
+        if df is None:
+            self.empty = True
+            sys.stderr.write(f"Warning: dtw failed for read {read.id}\n")
+            return
 
         df["kmer"] = self.ref_kmers.loc[df["mref"]].to_numpy()
         self.df = df.set_index("mref")
@@ -241,10 +256,8 @@ class GuidedDTW:
         prms, means, kmers, inst, bands = self._get_dtw_args(read_block, self.ref_kmers)
         dtw = self.dtw_fn(prms, signal, self.evt_start, self.evt_end, kmers, inst, bands)
         
-        #if self.prms.save_bands and hasattr(dtw, "ll"):
-        #    self.bands = self._ll_to_df(dtw.ll, read_block, mrefs[0], len(self.ref_kmers))
-        #else:
-        #    self.bands = None
+        if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
+            return None
 
         df = DtwDF(dtw.get_aln()).to_df()
         df["mref"] = self.ref_kmers.index#pd.RangeIndex(mref_st, mref_en+1)
@@ -269,7 +282,7 @@ class GuidedDTW:
                 mrefs[aln.index.isin(pd.RangeIndex(st,en))] -= sh
 
             bands = _uncalled.get_guided_bands(ar(mrefs), ar(aln["start"]), ar(read_block['start']), band_count, shift)
-            
+
             return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(ref_kmers), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         #elif self.method == "static":

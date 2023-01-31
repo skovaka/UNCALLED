@@ -118,18 +118,12 @@ DTW_OPTS = (
     Opt(("-x", "--fast5-index"), "fast5_reader"),
     Opt(("-n", "--max-reads"), "tracks"),
 
-    Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
-    Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
-    Opt("--tsv-noref", "tracks.io", action="store_true"),
-    Opt("--eventalign-flags", "tracks.io", type=comma_split),
-
     Opt("--del-max", "dtw"),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
     Opt("--mask-indels", "tracks"),
 
     #Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include"),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
-    Opt(("-a", "--append"), "tracks.io", action="store_true"),
     Opt(("-m", "--pore-model"), "pore_model", "name", default=None),
     Opt(("--kmer-shift"), "pore_model", "shift", default=None),
     Opt("--save-bands", "dtw", action="store_true"),
@@ -273,6 +267,10 @@ DTW_CMD_OPTS = DTW_OPTS + (
         Opt("--bam-out", "tracks.io", nargs="?", const="-"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     ]),
+    Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
+    Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
+    Opt("--tsv-noref", "tracks.io", action="store_true"),
+    Opt("--eventalign-flags", "tracks.io", type=comma_split),
     Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
 )
 
@@ -282,6 +280,7 @@ TRAIN_OPTS = (
     Opt(("-d", "--max-bcaln-dist"), "train"), 
     Opt(("--use-median"), "train"), 
     Opt("--out-dir", "tracks.io", "model_dir"),
+    Opt(("-a", "--append"), "train", action="store_true"),
 ) + DTW_OPTS
 
 

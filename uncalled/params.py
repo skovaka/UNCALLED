@@ -109,6 +109,7 @@ TrainParams._def_params(
     ("iterations", 1, int, "Number of model training iterations"),
     ("max_bcaln_dist", 1, float, "Maximum mean_refi_dist from basecalled alignment to use for model trainer"),
     ("use_median", False, bool, ""),
+    ("append", False, bool, "If output directory exists and contains a file 'it[N].model.tsv', will use the file with the highest N to initialize training and generate additional training iterations"),
 )
 
 class VisParams(config.ParamGroup):

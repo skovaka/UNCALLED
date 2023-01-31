@@ -9,15 +9,23 @@ def train(conf):
     tracks = Tracks(conf=conf)
     
     trainer = tracks.output
-    trainer.set_model(tracks.model)
+
+    if conf.train.append:
+        conf.pore_model.name = trainer.model.name
+    else:
+        trainer.set_model(tracks.model)
 
     for i in range(conf.train.iterations):
-        print("ITER", i)
+        i = 0
         for chunk in dtw_pool_iter(tracks):
+            i += len(chunk)
+            print(i, "first")
             trainer.write_buffer(chunk)
-
+            print(i, "next")
             if trainer.is_full():
+                print("DONE", i)
                 break
+        print("finish", trainer.is_full())
 
         model_file = trainer.next_model()
         tracks.bam_in.reset()
