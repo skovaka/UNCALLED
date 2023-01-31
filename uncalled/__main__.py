@@ -278,7 +278,7 @@ TRAIN_OPTS = (
     Opt(("-i", "--iterations"), "train"), 
     Opt("--kmer-samples", "train"), 
     Opt(("-d", "--max-bcaln-dist"), "train"), 
-    Opt(("--use-median"), "train"), 
+    Opt(("--use-median"), "train", action="store_true"), 
     Opt("--out-dir", "tracks.io", "model_dir"),
     Opt(("-a", "--append"), "train", action="store_true"),
 ) + DTW_OPTS

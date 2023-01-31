@@ -118,29 +118,30 @@ class ModelTrainer(TrackIO):
         print("write")
         t = time()
 
-        df = pd.concat(out) \
-               .sort_index() \
-               .drop(self.full_kmers, errors="ignore") 
+        if len(out) > 0:
+            df = pd.concat(out) \
+                   .sort_index() \
+                   .drop(self.full_kmers, errors="ignore") 
 
-        print("cat", time()-t)
-        t = time()
+            print("cat", time()-t)
+            t = time()
 
-        kc = df.index.value_counts()
-        print("count", time()-t)
-        t = time()
-        self.kmer_counts[kc.index] += kc.to_numpy()
-        print("add", time()-t)
-        t = time()
+            kc = df.index.value_counts()
+            print("count", time()-t)
+            t = time()
+            self.kmer_counts[kc.index] += kc.to_numpy()
+            print("add", time()-t)
+            t = time()
 
-        full = self.kmer_counts >= self.tprms.kmer_samples
-        if np.any(full):
-            self.full_kmers.update(self.kmer_counts.index[full])
-            #self.kmer_counts = self.kmer_counts[~full]
+            full = self.kmer_counts >= self.tprms.kmer_samples
+            if np.any(full):
+                self.full_kmers.update(self.kmer_counts.index[full])
+                #self.kmer_counts = self.kmer_counts[~full]
 
-            self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
-            self.buff_len += len(df)
+                self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
+                self.buff_len += len(df)
 
-        print(self.buff_len, self.buff_len*self.itemsize)
+            print(self.buff_len, self.buff_len*self.itemsize)
 
         if self.buff_len == 0 or (self.buff_len * self.itemsize < 256*10**6 and not force):
             return
@@ -187,7 +188,12 @@ class ModelTrainer(TrackIO):
                 rows[i:i+length] = np.fromfile(self.input, self.row_dtype, length)
                 i += length
 
-            df.loc[kmer, "mean"] = np.mean(rows["current"])
+            #df.loc[kmer, "mean"] = np.mean(rows["current"])
+            if self.tprms.use_median:                            
+                df.loc[kmer, "mean"] = np.median(rows["current"])
+            else:                                                
+                df.loc[kmer, "mean"] = np.mean(rows["current"])  
+
             df.loc[kmer, "stdv"] = np.std(rows["current"])
             df.loc[kmer, "count"] = len(rows)
 
