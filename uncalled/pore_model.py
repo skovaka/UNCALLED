@@ -77,13 +77,16 @@ class PoreModel:
 
         elif not is_preset:
             if os.path.exists(prms.name):
-                try:
-                    vals = self._vals_from_tsv(prms.name)
-                except:
+                if prms.name.endswith(".npz"):
+                    vals = self._vals_from_npz(prms.name)
+                else:
                     try:
-                        vals = self._vals_from_hdf5(prms.name)
+                        vals = self._vals_from_tsv(prms.name)
                     except:
-                        raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
+                        try:
+                            vals = self._vals_from_hdf5(prms.name)
+                        except:
+                            raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
             else:
                 models = ", ".join(PORE_MODEL_PRESETS.keys())
                 raise ValueError(
@@ -151,10 +154,17 @@ class PoreModel:
         for col in extra:
             self._cols[col] = df[col].to_numpy()
         return np.ravel(df.sort_values("kmer")[["mean","stdv"]])
-               
-
+    
     def _usecol(self, name):
         return self.extra_cols or name in self.COLUMNS or name in self.TSV_RENAME
+
+    def _vals_from_npz(self, filename):
+        arrs = dict(np.load(filename))
+        vals = np.concatenate([arrs["mean"], arrs["stdv"]], axis=0)
+        for name,arr in arrs.items():
+            if name in {"mean","stdv"}: continue
+            self._cols[name] = arr
+        return vals
 
     def _vals_from_tsv(self, filename):
         df = pd.read_csv(filename, sep="\t", comment="#", usecols=self._usecol)
@@ -208,9 +218,9 @@ class PoreModel:
     def to_df(self, kmer_str=True):
         df = pd.DataFrame(self._cols)
 
-        if self.extra is not None:
-            for col,vals in self.extra.items():
-                df[col] = vals
+        #if self.extra is not None:
+        #    for col,vals in self.extra.items():
+        #        df[col] = vals
 
         if kmer_str:
             df["kmer"] = self.KMER_STRS 
@@ -219,6 +229,10 @@ class PoreModel:
 
     def to_tsv(self, out=None):
         return self.to_df().to_csv(out, sep="\t", index=False)
+
+    def to_npz(self, fname):
+        print(self._cols)
+        np.savez(fname, **self._cols)
 
     def norm_mom_params(self, current, tgt_mean=None, tgt_stdv=None):
         tgt_mean = self.model_mean if tgt_mean is None else tgt_mean
@@ -249,14 +263,6 @@ class PoreModel:
     
     def __repr__(self):
         ret = "<PoreModel mean=%.3f stdv=%.3f>\n" % (self.model_mean, self.model_stdv)
-        ret += "kmer    mean    stdv\n"
-        def kmer_str(i):
-            return "%s%8.3f%8.3f\n" % (self.KMER_STRS[i], self.means[i], self.stdvs[i])
-
-        for i in self.KMERS[:3]:
-            ret += kmer_str(i)
-        ret += "...\n"
-        for i in self.KMERS[-3:]:
-            ret += kmer_str(i)
+        ret += str(self.to_df())
         return ret[:-1]
 

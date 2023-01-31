@@ -282,6 +282,7 @@ TRAIN_OPTS = (
     Opt(("--use-median"), "train", action="store_true"), 
     Opt("--out-dir", "tracks.io", "model_dir"),
     Opt(("-a", "--append"), "train", action="store_true"),
+    Opt("--skip-dtw", "train", action="store_true"),
 ) + DTW_OPTS
 
 

@@ -110,6 +110,7 @@ TrainParams._def_params(
     ("buffer_size", 256, int, "Size of sorted chunk buffer (MB)"),
     ("max_bcaln_dist", 1, float, "Maximum mean_refi_dist from basecalled alignment to use for model trainer"),
     ("use_median", False, bool, ""),
+    ("skip_dtw", None, bool, "Will use previous training data to re-compute the model. '--out-dir' must be a previous model training directory with at least the specified number of iterations"),
     ("append", False, bool, "If output directory exists and contains a file 'it[N].model.tsv', will use the file with the highest N to initialize training and generate additional training iterations"),
 )
 

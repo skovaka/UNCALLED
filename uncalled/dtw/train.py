@@ -7,15 +7,23 @@ def train(conf):
     conf.fast5_reader.load_bc = True
     conf.tracks.load_fast5s = True
     conf.bc_cmp = True
+    print("Loading tracks")
 
     tracks = Tracks(conf=conf)
     
     trainer = tracks.output
 
+    print("setting")
     if conf.train.append:
         conf.pore_model.name = trainer.model.name
     else:
         trainer.set_model(tracks.model)
+
+    if conf.train.skip_dtw:
+        print("skipping")
+        model_file = trainer.next_model(True)
+        return
+        #itr = range(conf.train.iterations, conf.train.iterations+1)
 
     t = time()
     for i in range(conf.train.iterations):

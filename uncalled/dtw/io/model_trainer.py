@@ -35,10 +35,13 @@ class ModelTrainer(TrackIO):
             self.init_read_mode()
 
     def init_read_mode(self, load_index=True):
+        print("loading", self._filename("data"))
         self.input = open(self._filename("data"), "rb")
 
         if load_index:
+            print("loading", self._filename("index"))
             self.kmer_index = pd.read_csv(self._filename("index"), index_col="kmer", sep="\t")
+            print(self.kmer_index)
 
     def _filename(self, name, itr=None):
         if itr is None:
@@ -50,7 +53,7 @@ class ModelTrainer(TrackIO):
 
         self.model = None
 
-        if self.tprms.append and not self.prms.buffered:
+        if (self.tprms.append) and not self.prms.buffered:
             prev_models = glob(f"{self.filename}/it*.model.tsv")
             if len(prev_models) == 0:
                 raise ValueError("--append can only be used with existing model training directory")
@@ -63,17 +66,21 @@ class ModelTrainer(TrackIO):
                     fname = m
                     max_itr = itr
 
-            self.iter = max_itr+1
+            self.iter = max_itr + int(not self.tprms.skip_dtw)
             self.conf.pore_model.name = fname
             self.set_model(PoreModel(fname))
             print("Using", fname)
+
+        elif self.tprms.skip_dtw:
+            self.iter = self.tprms.iterations
+            self.kmer_counts = None
 
         else:
             os.makedirs(self.filename, exist_ok=True)
             self.conf.to_toml(os.path.join(self.filename, "conf.toml"))
             self.iter = 1
-            #self.model = None
             self.kmer_counts = None
+
 
         #self.index_file = open(self._filename("index"), "w")
 
@@ -172,31 +179,50 @@ class ModelTrainer(TrackIO):
     def is_full(self):
         return self.model is not None and len(self.full_kmers) == self.model.KMER_COUNT
 
-    def next_model(self):
+    def next_model(self, load_index=False):
+        print("nexting")
         self.close()
-        self.init_read_mode(load_index=False)
+        self.init_read_mode(load_index=load_index)
 
+        print("initted")
         self.kmer_index.sort_index(inplace=True)
+        print("sorted")
 
         df = pd.DataFrame(index=self.model.KMERS, columns=["mean", "stdv"])
         df["kmer"] = self.model.KMER_STRS
 
+        print("deeffed")
+        t = time()
         for kmer in self.kmer_index.index.unique():
             chunks = self.kmer_index.loc[[kmer]]
+            #print(len(chunks))
             rows = np.zeros(chunks["length"].sum(), dtype=self.row_dtype)
 
             i = 0
+            print(kmer)
             for _,(start,length) in chunks.iterrows():
                 self.input.seek(start*self.itemsize)
                 rows[i:i+length] = np.fromfile(self.input, self.row_dtype, length)
                 i += length
 
             if self.tprms.use_median:
-                df.loc[kmer, "mean"] = np.median(rows["current"])
+                avg = np.median
             else:
-                df.loc[kmer, "mean"] = np.mean(rows["current"])
+                avg = np.mean
+
+            df.loc[kmer, "mean"]      = avg(rows["current"])
+            df.loc[kmer, "stdv_mean"] = avg(rows["stdv"])
+            df.loc[kmer, "dwell_mean"] = avg(rows["dwell"])
+
             df.loc[kmer, "stdv"] = np.std(rows["current"])
+            df.loc[kmer, "stdv_stdv"] = np.std(rows["stdv"])
+            df.loc[kmer, "dwell_stdv"] = np.std(rows["dwell"])
+
             df.loc[kmer, "count"] = len(rows)
+
+            if kmer % 100 == 0:
+                print(kmer, len(rows), time()-t)
+            #print("done", kmer)
 
         subs_locs = np.array([0,self.model.K-1])
 
