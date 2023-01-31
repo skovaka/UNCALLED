@@ -32,7 +32,7 @@ IOParams._def_params(
     #("db_out", None, str, "Output track database"),
 
     ("processes", 1, int, "Number of parallel processes"),
-    ("chunksize", 100, int, "Per-process alignment chunksize"),
+    ("bam_chunksize", 100, int, "Per-process alignment bam_chunksize"),
 
     ("sql_in", None, None, "Input track database"),
     ("sql_out", None, str, "Output track database"),
@@ -107,6 +107,7 @@ class TrainParams(config.ParamGroup):
 TrainParams._def_params(
     ("kmer_samples", 1000, int, "Maximum number of instances of each k-mer to use per training iteration"),
     ("iterations", 1, int, "Number of model training iterations"),
+    ("buffer_size", 256, int, "Size of sorted chunk buffer (MB)"),
     ("max_bcaln_dist", 1, float, "Maximum mean_refi_dist from basecalled alignment to use for model trainer"),
     ("use_median", False, bool, ""),
     ("append", False, bool, "If output directory exists and contains a file 'it[N].model.tsv', will use the file with the highest N to initialize training and generate additional training iterations"),

@@ -59,6 +59,7 @@ def dtw_pool_iter(tracks):
         for read_ids, bams in tracks.bam_in.iter_str_chunks():
             reads = tracks.read_index.subset(read_ids)
             i += len(bams)
+            print(min(read_ids))
             yield (tracks.conf, bams, reads, tracks.bam_in.header)
 
     with mp.Pool(processes=tracks.conf.tracks.io.processes) as pool:

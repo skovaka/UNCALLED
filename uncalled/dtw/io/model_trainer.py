@@ -71,9 +71,11 @@ class ModelTrainer(TrackIO):
         else:
             os.makedirs(self.filename, exist_ok=True)
             self.conf.to_toml(os.path.join(self.filename, "conf.toml"))
-            self.iter = 0
+            self.iter = 1
             #self.model = None
             self.kmer_counts = None
+
+        #self.index_file = open(self._filename("index"), "w")
 
         self.buff_len = 0
 
@@ -92,8 +94,8 @@ class ModelTrainer(TrackIO):
         track.calc_layers(LAYERS)
         dtw = track.layers.loc[
             track.layers[("cmp", "mean_ref_dist")] <= 1, LAYERS
-        ]["dtw"].set_index("kmer", drop=True) \
-         .sort_index() 
+        ]["dtw"].set_index("kmer", drop=True) #\
+         #.sort_index() 
 
         if self.prms.buffered:
             self.out_buffer.append(dtw)
@@ -115,34 +117,31 @@ class ModelTrainer(TrackIO):
         #    self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
         #    self.buff_len += len(df)
 
-        print("write")
-        t = time()
+        #print("write")
+        #t = time()
 
-        df = pd.concat(out) \
-               .sort_index() \
-               .drop(self.full_kmers, errors="ignore") 
+        if len(out) > 0:
+            df = pd.concat(out) \
+                   .sort_index() \
+                   .drop(self.full_kmers, errors="ignore") 
 
-        print("cat", time()-t)
-        t = time()
+            #print("cat", time()-t)
+            #t = time()
 
-        kc = df.index.value_counts()
-        print("count", time()-t)
-        t = time()
-        self.kmer_counts[kc.index] += kc.to_numpy()
-        print("add", time()-t)
-        t = time()
+            kc = df.index.value_counts()
+            self.kmer_counts[kc.index] += kc.to_numpy()
 
-        full = self.kmer_counts >= self.tprms.kmer_samples
-        if np.any(full):
-            self.full_kmers.update(self.kmer_counts.index[full])
-            #self.kmer_counts = self.kmer_counts[~full]
+            full = self.kmer_counts >= self.tprms.kmer_samples
+            if np.any(full):
+                self.full_kmers.update(self.kmer_counts.index[full])
+                #self.kmer_counts = self.kmer_counts[~full]
 
-            self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
-            self.buff_len += len(df)
+                self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
+                self.buff_len += len(df)
 
-        print(self.buff_len, self.buff_len*self.itemsize)
+        #print("buff", self.buff_len*self.itemsize, len(self.full_kmers)/len(self.kmer_counts))
 
-        if self.buff_len == 0 or (self.buff_len * self.itemsize < 256*10**6 and not force):
+        if self.buff_len == 0 or (self.buff_len * self.itemsize < self.tprms.buffer_size*10**6 and not force):
             return
 
         if self.output is None:
@@ -154,10 +153,15 @@ class ModelTrainer(TrackIO):
         kmers, counts = np.unique(out["kmer"], return_counts=True)
         df = pd.DataFrame({"start" : 0, "length" : counts}, index=kmers)
         df["start"].iloc[1:] = counts.cumsum()[:-1]
+        print("WRITE")
         if self.kmer_index is None:
             self.kmer_index = df
+            df.to_csv(self._filename("index"), sep="\t", index_label="kmer", mode="w")
+            #self.index_file.flush()
         else:
             df["start"] += self.kmer_index.iloc[-1].sum()
+            df.to_csv(self._filename("index"), sep="\t", index_label="kmer", header=False, mode="a")
+            #self.index_file.flush()
             self.kmer_index = pd.concat([self.kmer_index, df])
 
         self.output.write(out.tobytes())
@@ -187,7 +191,10 @@ class ModelTrainer(TrackIO):
                 rows[i:i+length] = np.fromfile(self.input, self.row_dtype, length)
                 i += length
 
-            df.loc[kmer, "mean"] = np.mean(rows["current"])
+            if self.tprms.use_median:
+                df.loc[kmer, "mean"] = np.median(rows["current"])
+            else:
+                df.loc[kmer, "mean"] = np.mean(rows["current"])
             df.loc[kmer, "stdv"] = np.std(rows["current"])
             df.loc[kmer, "count"] = len(rows)
 
@@ -230,7 +237,7 @@ class ModelTrainer(TrackIO):
             self.output.close()
             self.output = None
 
-            self.kmer_index.to_csv(self._filename("index"), sep="\t", index_label="kmer")
+            #self.kmer_index.to_csv(, sep="\t", index_label="kmer")
 
         if self.input is not None:
             self.input.close()

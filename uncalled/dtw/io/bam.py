@@ -184,7 +184,7 @@ class BAM(TrackIO):
             read_ids.add(bam.query_name)
             bams.append(bam.to_string())
 
-            if len(bams) == self.prms.chunksize:
+            if len(bams) == self.prms.bam_chunksize:
                 yield(read_ids, bams)
                 read_ids = set()
                 bams = list()

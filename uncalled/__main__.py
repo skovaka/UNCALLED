@@ -106,7 +106,7 @@ REALTIME_OPTS = BWA_OPTS + MAPPER_OPTS + (
 
 DTW_OPTS = (
     Opt(("-p", "--processes"), "tracks.io"),
-    Opt("--chunksize", "tracks.io"),
+    Opt("--bam-chunksize", "tracks.io"),
     Opt("--guppy-in", "tracks.io"),
     Opt("--bam-in", "tracks.io", nargs="?", const="-", required=True),
     Opt(("--out-name", "-o"), "tracks.io"),
@@ -277,8 +277,9 @@ DTW_CMD_OPTS = DTW_OPTS + (
 TRAIN_OPTS = (
     Opt(("-i", "--iterations"), "train"), 
     Opt("--kmer-samples", "train"), 
+    Opt("--buffer-size", "train"), 
     Opt(("-d", "--max-bcaln-dist"), "train"), 
-    Opt(("--use-median"), "train"), 
+    Opt(("--use-median"), "train", action="store_true"), 
     Opt("--out-dir", "tracks.io", "model_dir"),
     Opt(("-a", "--append"), "train", action="store_true"),
 ) + DTW_OPTS
