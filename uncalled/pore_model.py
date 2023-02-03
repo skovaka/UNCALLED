@@ -30,7 +30,7 @@ class PoreModel:
         if model is not None: 
             if isinstance(getattr(model, "PRMS", None), PoreModelParams):
                 if isinstance(model, PoreModel):
-                    self._init(model.prms, model.instance)
+                    self._init(model.PRMS, model.instance)
                 else:
                     self._init(model.PRMS, model)
                 return 

@@ -104,7 +104,11 @@ class Bcaln:
         else:
             self.coords = self.sam_coords
 
-        df = df.set_index(df.index - self.kmer_shift[0])# + 1)
+        #TODO don't do this
+        if self.kmer_shift[0] <= 2:
+            df = df.set_index(df.index - self.kmer_shift[0])
+        else:
+            df = df.set_index(df.index - self.kmer_shift[0] + 1)
 
         self.df = df.iloc[self.kmer_shift[0]:]#:-self.kmer_shift[1]]
         self.coords = self.coords.mref_intersect(mrefs=self.df.index)

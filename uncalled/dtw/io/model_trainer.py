@@ -53,7 +53,7 @@ class ModelTrainer(TrackIO):
 
         self.model = None
 
-        if (self.tprms.append) and not self.prms.buffered:
+        if self.tprms.append and not self.prms.buffered:
             prev_models = glob(f"{self.filename}/it*.model.tsv")
             if len(prev_models) == 0:
                 raise ValueError("--append can only be used with existing model training directory")
@@ -179,23 +179,19 @@ class ModelTrainer(TrackIO):
         print("nexting")
         self.close()
         self.init_read_mode(load_index=load_index)
-
         print("initted")
+
         self.kmer_index.sort_index(inplace=True)
         print("sorted")
 
-        df = pd.DataFrame(index=self.model.KMERS, columns=["mean", "stdv"])
-        df["kmer"] = self.model.KMER_STRS
-
-        print("deeffed")
-        t = time()
+        model_rows = list()
         for kmer in self.kmer_index.index.unique():
             chunks = self.kmer_index.loc[[kmer]]
             #print(len(chunks))
             rows = np.zeros(chunks["length"].sum(), dtype=self.row_dtype)
 
             i = 0
-            print(kmer)
+            #print(kmer)
             for _,(start,length) in chunks.iterrows():
                 self.input.seek(start*self.itemsize)
                 rows[i:i+length] = np.fromfile(self.input, self.row_dtype, length)
@@ -206,19 +202,25 @@ class ModelTrainer(TrackIO):
             else:
                 avg = np.mean
 
-            df.loc[kmer, "mean"]      = avg(rows["current"])
-            df.loc[kmer, "stdv_mean"] = avg(rows["stdv"])
-            df.loc[kmer, "dwell_mean"] = avg(rows["dwell"])
+            k = self.model.kmer_to_str(kmer)
 
-            df.loc[kmer, "stdv"] = np.std(rows["current"])
-            df.loc[kmer, "stdv_stdv"] = np.std(rows["stdv"])
-            df.loc[kmer, "dwell_stdv"] = np.std(rows["dwell"])
-
-            df.loc[kmer, "count"] = len(rows)
+            model_rows.append((
+                kmer,
+                avg(rows["current"]),
+                avg(rows["stdv"]),
+                avg(rows["dwell"]),
+                np.std(rows["current"]),
+                np.std(rows["stdv"]),
+                np.std(rows["dwell"]),
+                len(rows)
+            ))
 
             if kmer % 100 == 0:
                 print(kmer, len(rows), time()-t)
             #print("done", kmer)
+
+        df = pd.DataFrame(model_rows, columns=["kmer", "mean", "stdv_mean", "dwell_mean", "stdv", "stdv_stdv", "dwell_stdv", "count"]).set_index("kmer").reindex(self.model.KMERS)
+        print(df)
 
         subs_locs = np.array([0,self.model.K-1])
 
@@ -243,10 +245,11 @@ class ModelTrainer(TrackIO):
         self.set_model(PoreModel(df=df, extra_cols=True))
 
         outfile = self._filename("model.tsv")
-        self.model.to_tsv(outfile)
+        self.model.to_tsv(self._filename("model.tsv"))
+        #outfile.close()
 
         self.iter += 1
-        return outfile
+        return outfile#self._filename("model.tsv")
         #df.to_csv(self._filename(""))
         #print(kmer, "\t".join(map(str,df.loc[kmer])))
         

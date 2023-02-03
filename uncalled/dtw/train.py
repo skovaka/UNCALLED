@@ -37,6 +37,8 @@ def train(conf):
             sys.stdout.flush()
         print("finish", trainer.is_full())
 
+        conf.train.append = False
+
         model_file = trainer.next_model()
         tracks.bam_in.reset()
         conf.pore_model.name = model_file
