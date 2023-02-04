@@ -35,13 +35,10 @@ class ModelTrainer(TrackIO):
             self.init_read_mode()
 
     def init_read_mode(self, load_index=True):
-        print("loading", self._filename("data"))
         self.input = open(self._filename("data"), "rb")
 
         if load_index:
-            print("loading", self._filename("index"))
             self.kmer_index = pd.read_csv(self._filename("index"), index_col="kmer", sep="\t")
-            print(self.kmer_index)
 
     def _filename(self, name, itr=None):
         if itr is None:
@@ -68,8 +65,7 @@ class ModelTrainer(TrackIO):
 
             self.iter = max_itr + int(not self.tprms.skip_dtw)
             self.conf.pore_model.name = fname
-            self.set_model(PoreModel(fname))
-            print("Using", fname)
+            self.set_model(PoreModel(self.conf.pore_model))
 
         elif self.tprms.skip_dtw:
             self.iter = self.tprms.iterations
@@ -124,9 +120,6 @@ class ModelTrainer(TrackIO):
         #    self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
         #    self.buff_len += len(df)
 
-        #print("write")
-        #t = time()
-
         if len(out) > 0:
             df = pd.concat(out) \
                    .sort_index() \
@@ -141,8 +134,8 @@ class ModelTrainer(TrackIO):
                 self.full_kmers.update(self.kmer_counts.index[full])
                 #self.kmer_counts = self.kmer_counts[~full]
 
-                self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
-                self.buff_len += len(df)
+            self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
+            self.buff_len += len(df)
 
         if self.buff_len == 0 or (self.buff_len * self.itemsize < self.tprms.buffer_size*10**6 and not force):
             return
@@ -156,7 +149,6 @@ class ModelTrainer(TrackIO):
         kmers, counts = np.unique(out["kmer"], return_counts=True)
         df = pd.DataFrame({"start" : 0, "length" : counts}, index=kmers)
         df["start"].iloc[1:] = counts.cumsum()[:-1]
-        print("WRITE")
         if self.kmer_index is None:
             self.kmer_index = df
             df.to_csv(self._filename("index"), sep="\t", index_label="kmer", mode="w")
@@ -176,22 +168,18 @@ class ModelTrainer(TrackIO):
         return self.model is not None and len(self.full_kmers) == self.model.KMER_COUNT
 
     def next_model(self, load_index=False):
-        print("nexting")
         self.close()
         self.init_read_mode(load_index=load_index)
-        print("initted")
 
         self.kmer_index.sort_index(inplace=True)
-        print("sorted")
 
+        t = time()
         model_rows = list()
         for kmer in self.kmer_index.index.unique():
             chunks = self.kmer_index.loc[[kmer]]
-            #print(len(chunks))
             rows = np.zeros(chunks["length"].sum(), dtype=self.row_dtype)
 
             i = 0
-            #print(kmer)
             for _,(start,length) in chunks.iterrows():
                 self.input.seek(start*self.itemsize)
                 rows[i:i+length] = np.fromfile(self.input, self.row_dtype, length)
@@ -215,12 +203,7 @@ class ModelTrainer(TrackIO):
                 len(rows)
             ))
 
-            if kmer % 100 == 0:
-                print(kmer, len(rows), time()-t)
-            #print("done", kmer)
-
         df = pd.DataFrame(model_rows, columns=["kmer", "mean", "stdv_mean", "dwell_mean", "stdv", "stdv_stdv", "dwell_stdv", "count"]).set_index("kmer").reindex(self.model.KMERS)
-        print(df)
 
         subs_locs = np.array([0,self.model.K-1])
 
@@ -242,16 +225,28 @@ class ModelTrainer(TrackIO):
 
         df["count"] = df["count"].astype(int)
             
-        self.set_model(PoreModel(df=df, extra_cols=True))
 
+        #if self.model.PRMS.reverse:
+        #    #df.reset_index(inplace=True)
+        #    print(df)
+        #    print(self.model.KMERS)
+        #    print(self.model.kmer_rev(self.model.KMERS))
+        #    df["kmer"] = self.model.kmer_rev(self.model.KMERS)
+        #    df.set_index("kmer", inplace=True)
+        #    df.sort_index(inplace=True)
+        #    print(df)
+
+
+        model_out = PoreModel(df=df, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True)
         outfile = self._filename("model.tsv")
-        self.model.to_tsv(self._filename("model.tsv"))
-        #outfile.close()
+        model_out.to_tsv(outfile)
+
+        self.set_model(PoreModel(outfile, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True))
+
+        #self.model.to_tsv(self._filename("model.tsv"))
 
         self.iter += 1
         return outfile#self._filename("model.tsv")
-        #df.to_csv(self._filename(""))
-        #print(kmer, "\t".join(map(str,df.loc[kmer])))
         
 
     def close(self):

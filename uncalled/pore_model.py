@@ -120,6 +120,7 @@ class PoreModel:
         self.PRMS.k = prms.k
         self.PRMS.shift = prms.shift
 
+
         if self.K > 8:
             self.kmer_dtype = "uint32"
             self.array_type = ArrayU32
@@ -231,7 +232,6 @@ class PoreModel:
         return self.to_df().to_csv(out, sep="\t", index=False)
 
     def to_npz(self, fname):
-        print(self._cols)
         np.savez(fname, **self._cols)
 
     def norm_mom_params(self, current, tgt_mean=None, tgt_stdv=None):
