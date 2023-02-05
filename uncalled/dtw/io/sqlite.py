@@ -570,7 +570,7 @@ def edit(conf, db=None):
     track_name = conf.track_name
     if db is None:
         #db = TrackSQL(conf, "r")
-        db = TrackSQL(conf.tracks.io.sql_in, False, conf)
+        db = TrackSQL(conf.tracks.io.sql_in, False, conf, 1)
     track_id = db._verify_track(track_name)
 
     updates = []

@@ -49,7 +49,7 @@ class Sigplot:
         for base, color in enumerate(self.conf.vis.base_colors):
             base_dtw = dtw[bases == base]
             starts = base_dtw['start']
-            ends = starts + base_dtw['length'] - 1
+            ends = starts + base_dtw['length'] - (1.0 / self.conf.read_buffer.sample_rate)
             nones = [None]*len(base_dtw)
 
             ys = [ymax,ymax,ymin,ymin,None]*len(base_dtw)
@@ -91,6 +91,8 @@ class Sigplot:
 
                 dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln_id")
                 dtw["model_current"] = track.model[dtw["kmer"]]
+
+
                 dtws.append(dtw)
 
                 max_i = dtw["start"].argmax()
@@ -99,6 +101,9 @@ class Sigplot:
 
                 current_min = min(current_min, dtw["model_current"].min())
                 current_max = max(current_max, dtw["model_current"].max())
+
+                dtw["start"] /=  self.conf.read_buffer.sample_rate
+                dtw["length"] /=  self.conf.read_buffer.sample_rate
 
             if len(dtws) > 0:
                 track_dtws.append(pd.concat(dtws).sort_index())
@@ -119,6 +124,7 @@ class Sigplot:
                 (signal <= sig_med + sig_win))
         
         samples = np.arange(samp_min, samp_max)[mask]
+        samp_time = samples / self.conf.read_buffer.sample_rate
         signal = signal[mask]
 
         current_min = min(current_min, signal.min())
@@ -140,7 +146,7 @@ class Sigplot:
             dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks.alns]
 
         fig.add_trace(go.Scattergl(
-            x=samples, y=signal,
+            x=samp_time, y=signal,
             hoverinfo="skip",
             name="Raw Signal",
             mode="markers",

@@ -125,6 +125,13 @@ class Dotplot:
                               .loc[(slice(None),aln_id), slice(None)] \
                               .droplevel("aln_id")
 
+                layers["dtw","start"] /=    float(self.conf.read_buffer.sample_rate)
+                layers["dtw","length"] /=   float(self.conf.read_buffer.sample_rate)
+                layers["bcaln","start"] /=  float(self.conf.read_buffer.sample_rate)
+                layers["bcaln","length"] /= float(self.conf.read_buffer.sample_rate)
+                layers["bcaln","middle"] /= float(self.conf.read_buffer.sample_rate)
+                layers["dtw","middle"] /=   float(self.conf.read_buffer.sample_rate)
+
                 
                 fwd = fwd and aln["fwd"]
                 flipped = flipped and aln["fwd"] == self.conf.is_rna
@@ -162,7 +169,7 @@ class Dotplot:
                         legendgroup=track.name,
                         line={
                             "color":self.conf.vis.track_colors[i], 
-                            "width":2, "shape" : "vh" if flipped else "hv" },
+                            "width":2, "shape" : "vh"  },
                         hoverinfo="skip",
                         showlegend=first_aln
                     ), row=2, col=1)
@@ -276,18 +283,20 @@ class Dotplot:
 
         fig.update_xaxes(**axis_kw)
         fig.update_yaxes(**axis_kw)
-        fig.update_yaxes(showticklabels=False)
+        fig.update_yaxes(
+            tickformat=",d", tickangle=-90, nticks=3
+        )#showticklabels=False)
         #fig.update_yaxes(showspikes=True)
 
         fig.update_xaxes(
-            title_text="Raw Sample", 
-            tickformat="d", 
+            title_text="Time (s)", 
+            #tickformat=".3f", 
             #showspikes=True,
             row=2, col=1)
 
         fig.update_layout(
             #hovermode="x unified",
-            margin={"l":50,"r":50},#, "b":50},
+            margin={"l":100,"r":50},#, "b":50},
             barmode="overlay",
             hoverdistance=20,
             dragmode="pan", 

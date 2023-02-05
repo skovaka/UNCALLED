@@ -15,7 +15,7 @@ LAYERS = {
             lambda track: track.layer_strands),
     }, "dtw" : {
         "current" : _Layer(np.float32, "Current (pA)"),
-        "stdv" : _Layer(np.float32, "Current Standard Deviation"),
+        "stdv" : _Layer(np.float32, "Stdv (pA)"),
         "kmer" : _Layer("UInt32", "Reference k-mer"),
         "start" : _Layer("Int32", "Sample Start"),
         "length" : _Layer("Int32", "Sample Length"),
@@ -31,7 +31,7 @@ LAYERS = {
         "middle" : _Layer(np.float32, "Sample Middle",  
             lambda track: track.layers["dtw","start"] + (track.layers["dtw","length"] / 2),
             [("dtw", "start"), ("dtw", "length")]),
-        "dwell" : _Layer(np.float32, "Dwell (ms/nt)",
+        "dwell" : _Layer(np.float32, "Dwell (ms)",
             lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate,
             [("dtw", "length")]),
         "model" : _Layer(np.float32, "Model Current",
