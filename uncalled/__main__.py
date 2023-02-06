@@ -459,6 +459,7 @@ _help_lines = [
     "\tpafstats   Estimate speed and accuracy from an Uncalled PAF file", "",
     "Dynamic Time Warping (DTW) Alignment:",
     "\tdtw        Perform DTW alignment guided by basecalled alignments",
+    "\ttrain      Train new k-mer pore models",
     "\tconvert    Convert between signal alignment file formats",
     "\tdb         Edit, merge, and ls alignment databases", "",
     "DTW Analysis:",

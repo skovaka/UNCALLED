@@ -18,6 +18,7 @@ For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0
 - [`index`: Reference Indexing](#index)
 - [DTW Alignment and Storage](#dtw-alignment-and-storage)
   - [`dtw`: Perform DTW alignment guided by basecalled alignments](#dtw)
+  - [`train`: Train new k-mer pore models](#train)
   - [`convert`: Import DTW alignments produced by Nanopolish or Tombo](#convert)
   - [`db`: Edit, merge, and ls alignment databases](#db)
 - [DTW Visualization](#dtw-visualization)
@@ -109,6 +110,24 @@ usage: uncalled dtw [-h] --bam-in [BAM_IN] [-r] [-l READ_FILTER] [-x FAST5_INDEX
                     index_prefix fast5_files [fast5_files ...]                  
 ```
 
+### `dtw`
+
+Iteratively train a new k-mer pore model
+
+Accepts most of the same paramters as `uncalled dtw`, in addition to number of iterations. First iteration must use some starting pore model, while subsequent iterations use  the pore model from the previous iteration.
+
+```
+usage: uncalled train [-h] [-i ITERATIONS] [--kmer-samples KMER_SAMPLES] [--buffer-size BUFFER_SIZE]          
+                      [-d MAX_BCALN_DIST] [--use-median] [--out-dir OUT_DIR] [-a] [--skip-dtw] [-p PROCESSES] 
+                      [--bam-chunksize BAM_CHUNKSIZE] [--guppy-in GUPPY_IN] --bam-in [BAM_IN]                 
+                      [--out-name OUT_NAME] [-r] [-l READ_FILTER] [-x FAST5_INDEX] [-n MAX_READS]             
+                      [--del-max DEL_MAX] [--mask-skips [MASK_SKIPS]] [--mask-indels MASK_INDELS] [-f]        
+                      [-m PORE_MODEL] [--kmer-shift KMER_SHIFT] [--save-bands] [--full-overlap] [--rna]       
+                      [-R REF_BOUNDS] [-c {abs_diff,z_score,norm_pdf}] [--skip-cost SKIP_COST]                
+                      [--stay-cost STAY_COST] [--move-cost MOVE_COST] [-b BAND_WIDTH] [-s BAND_SHIFT]         
+                      [-N {ref_mom,model_mom}] [--norm-median] [--norm-seg] [--bc-group BC_GROUP] [-C CONFIG] 
+                      index_prefix fast5_files [fast5_files ...]                                              
+```
 
 ### convert
 
