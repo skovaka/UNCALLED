@@ -153,13 +153,6 @@ class PoreModel {
 
     }
 
-    #ifdef PYBIND
-    PoreModel(py::array_t<float> means, py::array_t<float> stdvs, bool reverse, bool complement) 
-        : PoreModel("", reverse, complement) {
-    
-    #endif
-    
-
     void init_vals(const std::vector<float> &vals) {
         model_mean_ = 0;
 

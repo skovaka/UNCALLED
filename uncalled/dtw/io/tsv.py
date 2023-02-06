@@ -47,7 +47,7 @@ class TSV(TrackIO):
 
         for col in df.columns[df.columns.get_level_values(-1).str.endswith("kmer")]:
             kmers = df[col].dropna()
-            df.loc[kmers.index, col] = track.model.kmer_to_str(kmers)
+            df[col] = track.model.kmer_to_str(kmers)
 
 
         for col in self.extras:

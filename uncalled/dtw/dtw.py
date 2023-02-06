@@ -39,6 +39,9 @@ def dtw(conf):
     conf.tracks.load_fast5s = True
     conf.export_static()
 
+    if len(conf.fast5_reader.fast5_index) == 0:
+        raise ValueError("Must specify fast5 index (-x/--fast5-index)")
+
     if conf.tracks.io.processes == 1:
         dtw_single(conf)
     else:

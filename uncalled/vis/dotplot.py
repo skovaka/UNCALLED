@@ -127,9 +127,10 @@ class Dotplot:
 
                 layers["dtw","start"] /=    float(self.conf.read_buffer.sample_rate)
                 layers["dtw","length"] /=   float(self.conf.read_buffer.sample_rate)
-                layers["bcaln","start"] /=  float(self.conf.read_buffer.sample_rate)
-                layers["bcaln","length"] /= float(self.conf.read_buffer.sample_rate)
-                layers["bcaln","middle"] /= float(self.conf.read_buffer.sample_rate)
+                #layers["bcaln","start"] /=  float(self.conf.read_buffer.sample_rate)
+                #layers["bcaln","length"] /= float(self.conf.read_buffer.sample_rate)
+                if has_bcaln:
+                    layers["bcaln","middle"] /= float(self.conf.read_buffer.sample_rate)
                 layers["dtw","middle"] /=   float(self.conf.read_buffer.sample_rate)
 
                 

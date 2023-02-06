@@ -17,8 +17,10 @@ class Eventalign(TrackIO):
         self._header = True
 
         if self.write_mode:
+            print("WRITE MODE")
             self.init_write_mode()
         else:
+            print("READ MODE")
             self.init_read_mode()
 
     def init_write_mode(self):
@@ -44,6 +46,7 @@ class Eventalign(TrackIO):
         if self.write_samples:
             self.header += ["samples"]
 
+        print("init_out")
         TrackIO._init_output(self, self.prms.buffered)
 
         if not self.prms.buffered:
@@ -51,6 +54,8 @@ class Eventalign(TrackIO):
 
     def init_read_mode(self):
         name = self.filename
+
+        self.output = None
         
         if self.conf.pore_model.name == "r94_dna":
             self.conf.pore_model.name = "r9.4_dna_450bps_6mer_npl"
@@ -217,5 +222,5 @@ class Eventalign(TrackIO):
         pass
 
     def close(self):
-        if not self.prms.buffered:
+        if not self.prms.buffered and self.output is not None:
             self.output.close()
