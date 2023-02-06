@@ -34,6 +34,8 @@ class Bcaln:
     def __init__(self, conf, ref_index, read, sam, clip_coords=None):
 
         self.is_rna = conf.is_rna
+        self.del_max = conf.dtw.del_max
+        self.ins_max = conf.dtw.ins_max
 
         self.clip_coords = clip_coords
 
@@ -44,14 +46,16 @@ class Bcaln:
         ref_coord = RefCoord(sam.reference_name, sam.reference_start, sam.reference_end, self.is_fwd)
         self.sam_coords = ref_index.get_coord_space(ref_coord, self.is_rna, load_kmers=False)
 
+        self.flip_ref = self.is_fwd == self.is_rna
+
         self.kmer_shift = ref_index.trim#[not sam.is_fwd]
+        if not self.flip_ref:
+            self.kmer_shift = self.kmer_shift[::-1]
         #if sam.is_fwd == self.is_rna:
         #self.kmer_shift = self.kmer_shift[::-1]
 
         self.ref_gaps = list()
         self.errors = None
-
-        self.flip_ref = self.is_fwd == self.is_rna
 
         if read.bc_loaded:
             moves = read.moves
@@ -84,6 +88,8 @@ class Bcaln:
             "length" : grp["length"].sum().astype("uint32"),
             "indel" : grp["indel"].first()
         }).set_index("mref")
+        #pd.set_option('display.max_rows', 50000) 
+        #print(df)
 
         #print((df["indel"] < 0).mean(), (df["indel"] > 0).mean())
 
@@ -98,8 +104,11 @@ class Bcaln:
         else:
             self.coords = self.sam_coords
 
-
-        df = df.set_index(df.index - self.kmer_shift[0])
+        #TODO don't do this
+        if self.kmer_shift[0] <= 2:
+            df = df.set_index(df.index - self.kmer_shift[0])
+        else:
+            df = df.set_index(df.index - self.kmer_shift[0] + 1)
 
         self.df = df.iloc[self.kmer_shift[0]:]#:-self.kmer_shift[1]]
         self.coords = self.coords.mref_intersect(mrefs=self.df.index)
@@ -156,7 +165,7 @@ class Bcaln:
                     bp_mref_aln.append((read_i,rf,-l))
                     
                 #TODO do this based on indel field
-                if c == "N":
+                if c == "N" or l > self.del_max:
                     self.ref_gaps.append((mref_i,mref_j))
                 
             if incr_qr: read_i = read_j 

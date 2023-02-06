@@ -1,5 +1,5 @@
 import sys
-import time
+from time import time
 import glob
 import numpy as np
 import pandas as pd
@@ -7,6 +7,7 @@ import os
 from _uncalled import _Fast5Dict, _Fast5Iter, _Fast5Reader
 import uncalled as unc
 import re
+from collections import defaultdict
 
 def is_fast5(fname):
     return fname.endswith(".fast5")
@@ -78,58 +79,78 @@ def parse_read_ids(reads):
 
 class Fast5Reader:
 
-    def __init__(self, fast5s=None, index=None, reads=None, recursive=None, conf=None):
+    #def __init__(self, fast5s=None, index=None, reads=None, recursive=None, conf=None):
+    def __init__(self, read_index, conf=None):#fast5s=None, index=None, reads=None, recursive=None, conf=None):
+
         self.conf = unc.Config(conf)# if conf is None else conf
 
+        #TODO probably not ll this
         conf_prms = self.conf.fast5_reader
         self.prms = _Fast5Iter.Params()
-        self.indexed = False
-
-        #TODO all very hacky. should be refactored into C++
-
-        if reads is None: 
-            reads = conf_prms.read_filter
-        self.prms.read_filter = parse_read_ids(reads)
-
-        if recursive is None: 
-            recursive = conf_prms.recursive
-        self.prms.recursive = recursive
-
-        if fast5s is None: 
-            fast5s = conf_prms.fast5_files
-        self.prms.fast5_files = parse_fast5_paths(fast5s, recursive)
-
-        if index is None:
-            index = conf_prms.fast5_index
-        #self.prms.fast5_index = index
-
         self.prms.max_reads = conf_prms.max_reads
         self.prms.max_buffer = conf_prms.max_buffer
         self.prms.load_bc = conf_prms.load_bc
         self.prms.bc_group = conf_prms.bc_group
 
-        if isinstance(index, str): 
-            if len(index) > 0:
-                self._load_index_file(index)
-        elif isinstance(index, pd.DataFrame):
-            self._load_index_df(index)
+        self.indexed = False#read_index.indexed
+        self.read_index = read_index
+
+        #TODO rewrite Fast5Dict to take read->filename, filename->path
+        #maybe read_array, filename_array, path_array, all sorted by filename?
+        if read_index.indexed:
+            #self._dict = _Fast5Dict(read_index.get_fast5_dict(), self.prms)
+            #self._dict = _Fast5Dict(read_index.file_paths, list(idx["read_id"]), list(idx["filename"]), self.prms)
+            self._dict = _Fast5Dict(read_index.file_paths, [], [], self.prms)
         else:
-            raise ValueError("Unknown fast5 index format")
+            self._dict = None
+
+        #if reads is None: 
+        #    reads = conf_prms.read_filter
+        #self.prms.read_filter = parse_read_ids(reads)
+
+        #if recursive is None: 
+        #    recursive = conf_prms.recursive
+        #self.prms.recursive = recursive
+
+        #if fast5s is None: 
+        #    fast5s = conf_prms.fast5_files
+        #self.prms.fast5_files = parse_fast5_paths(fast5s, recursive)
+
+        #if index is None:
+        #    index = conf_prms.fast5_index
+        ##self.prms.fast5_index = index
+
+        #if isinstance(index, str): 
+        #    if len(index) > 0:
+        #        self._load_index_file(index)
+        #elif isinstance(index, pd.DataFrame):
+        #    self._load_index_df(index)
+        #else:
+        #    raise ValueError("Unknown fast5 index format")
 
     def _load_index_df(self, df):
-        groups = df.groupby("filename").groups
-        groups = {
-            fast5 : list(df.loc[rows, "read_id"])
-            for fast5,rows in groups.items()
-        }
-        self._dict = _Fast5Dict(groups, self.prms)
+        fast5_paths = {os.path.basename(path) : path for path in self.prms.fast5_files}
+
+        idx = df.set_index("filename").sort_index()
+        fast5_reads = dict()
+        for fast5 in idx.index.unique():
+            path = fast5_paths[os.path.basename(fast5)]
+            reads = idx.loc[fast5, "read_id"]
+            if isinstance(reads, str):
+                reads = [reads]
+            else:
+                reads = list(reads)
+            fast5_reads[path] = reads
+
+        self._dict = _Fast5Dict(fast5_reads, self.prms)
+
         self.indexed = True
             
     def _load_index_file(self, filename):
         index = None
         names = None
 
-        fast5_paths = {os.path.basename(path) : path for path in self.prms.fast5_files}
+
 
         with open(filename) as infile:
             head = infile.readline().split()
@@ -147,7 +168,7 @@ class Fast5Reader:
             infile.seek(0)
 
             if names is not None:
-                index = pd.read_csv(infile, sep="\t", names=names, header=header)
+                index = pd.read_csv(infile, sep="\t", names=names, header=header, usecols=["filename", "read_id"])
 
         if index is None:
             raise RuntimeError("Unable to read index \"%s\"" % self.prms.fast5_index)
@@ -162,34 +183,51 @@ class Fast5Reader:
 
         self.prms.read_filter = list(index["read_id"])
 
-        groups = index.groupby("filename").groups
-        groups = {
-            fast5_paths[os.path.basename(fast5)] : list(index.loc[rows, "read_id"])
-            for fast5,rows in groups.items()
-        }
+        self._load_index_df(index)
 
-        self._dict = _Fast5Dict(groups, self.prms)
         self.indexed = True
 
     def get_read_filter(self):
         if len(self.prms.read_filter) > 0:
             return set(self.prms.read_filter)
         return None
+
+    def _init_index(self):
+        sys.stdout.flush()
+        if self._dict is None:
+            raise RuntimeError("Must provide fast5 index")
+
+        sys.stdout.flush()
+
+        if self._dict.is_indexed(): return
+        idx = self.read_index.read_files
+        self._dict.load_index(list(idx.index), list(idx["filename"]))
+        if not self._dict.is_indexed():
+            raise RuntimeError("Must provide fast5 index")
     
     def get_read_file(self, read_id):
-        if not self.indexed:
-            raise RuntimeError("Fast5 index is required to query fast5 filenames")
+        self._init_index()
+        #if not self.indexed:
+        #    raise RuntimeError("Fast5 index is required to query fast5 filenames")
         return self._dict.get_read_file(read_id)
 
     def __contains__(self, read_id):
-        if not self.indexed:
-            raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")
+        self._init_index()
+        #if not self.indexed:
+        #    raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")
         #TODO faster solution?
         return not self._dict[read_id].empty()
 
+    def get_read(self, read_id, filename=None):
+        if filename is None:
+            return self[read_id]
+        return self._dict.get_read(read_id, filename)
+
     def __getitem__(self, read_id):
-        if not self.indexed:
-            raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")
+        sys.stdout.flush()
+        self._init_index()
+        #if not self.indexed:
+        #    raise RuntimeError("Fast5 index is required for dict-like fast5 access (iteration still supported)")
 
         read = self._dict[read_id]
         if read.empty():
@@ -202,11 +240,11 @@ class Fast5Reader:
         return self
 
     def __next__(self):
-        while not self._iter.empty():
-            try:
+        try:
+            while not self._iter.empty():
                 return self._iter.next_read()
-            except:
-                sys.stderr.write("Failed to load fast5 file\n")
+        except:
+            sys.stderr.write("Failed to load fast5 file\n")
         raise StopIteration
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
+import os
 
 from .. import config
 from ..index import str_to_coord
@@ -48,7 +49,7 @@ class Sigplot:
         for base, color in enumerate(self.conf.vis.base_colors):
             base_dtw = dtw[bases == base]
             starts = base_dtw['start']
-            ends = starts + base_dtw['length'] - 1
+            ends = starts + base_dtw['length'] - (1.0 / self.conf.read_buffer.sample_rate)
             nones = [None]*len(base_dtw)
 
             ys = [ymax,ymax,ymin,ymin,None]*len(base_dtw)
@@ -73,6 +74,7 @@ class Sigplot:
         
         current_min = samp_min = np.inf
         current_max = samp_max = 0
+        fast5_file = None
         for i,track in enumerate(self.tracks.alns):
             #track_color = self.prms.track_colors[i]
             colors = self.conf.vis.track_colors[i]
@@ -80,11 +82,17 @@ class Sigplot:
             alns = track.alignments.query("@read_id == read_id")
             aln_ids = alns.index
 
+
             dtws = list()
             
             for aln_id,aln in alns.iterrows():
+                if "fast5" in aln.index:
+                    fast5_file = aln.loc["fast5"]
+
                 dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln_id")
                 dtw["model_current"] = track.model[dtw["kmer"]]
+
+
                 dtws.append(dtw)
 
                 max_i = dtw["start"].argmax()
@@ -94,10 +102,18 @@ class Sigplot:
                 current_min = min(current_min, dtw["model_current"].min())
                 current_max = max(current_max, dtw["model_current"].max())
 
+                dtw["start"] /=  self.conf.read_buffer.sample_rate
+                dtw["length"] /=  self.conf.read_buffer.sample_rate
+
             if len(dtws) > 0:
                 track_dtws.append(pd.concat(dtws).sort_index())
 
-        read = self.sigproc.process(track.fast5s[read_id])
+        if fast5_file is None:
+            fast5 = self.tracks.fast5s[read_id]
+        else:
+            fast5 = self.tracks.fast5s.get_read(read_id, os.path.basename(fast5_file))
+        
+        read = self.sigproc.process(fast5, True)
         signal = read.get_norm_signal(samp_min, samp_max)
 
         sig_med = np.median(signal)
@@ -108,6 +124,7 @@ class Sigplot:
                 (signal <= sig_med + sig_win))
         
         samples = np.arange(samp_min, samp_max)[mask]
+        samp_time = samples / self.conf.read_buffer.sample_rate
         signal = signal[mask]
 
         current_min = min(current_min, signal.min())
@@ -129,7 +146,7 @@ class Sigplot:
             dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks.alns]
 
         fig.add_trace(go.Scattergl(
-            x=samples, y=signal,
+            x=samp_time, y=signal,
             hoverinfo="skip",
             name="Raw Signal",
             mode="markers",

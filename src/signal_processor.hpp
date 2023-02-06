@@ -2,6 +2,7 @@
 #define _INCL_SIGNAL_PROCESSOR
 
 #include <deque>
+#include <valarray>
 #include "read_buffer.hpp"
 #include "event_detector.hpp"
 #include "normalizer.hpp"
@@ -14,56 +15,7 @@
 namespace py = pybind11;
 #endif
 
-struct NormVals {
-    u32 start, end;
-    float scale, shift;
-};
 
-struct ProcessedRead {
-    //std::vector<i32> event_starts, event_lengths;
-    //std::vector<float> event_means, event_stdvs;
-    std::vector<Event> events;
-    std::vector<NormVals> norm;
-    //std::vector<bool> mask;
-
-    u32 sample_start() const {
-        return events[0].start;
-    }
-
-    u32 sample_end() const {
-        auto e = events.back();
-        return e.start + e.length;
-    }
-
-    void rescale(float scale, float shift) {
-        normalize({0, sample_end(), scale, shift});
-    }
-
-    void normalize(NormVals prms) {
-        //auto cmp = [](Event &e, u32 loc) -> bool {
-        //    return e.start < loc;
-        //};
-        //auto st = std::lower_bound(events.begin(), events.end(), prms.start, cmp);
-        //auto en = std::lower_bound(events.begin(), events.end(), prms.end, cmp);
-        //for (auto e = st; e < en; e++) {
-        norm = {prms};
-
-        for (auto &e : events) {
-            e.mean = e.mean * prms.scale + prms.shift;
-        }
-    }
-
-    #ifdef PYBIND
-    void set_events(py::array_t<Event> arr) {
-        auto evts = PyArray<Event>(arr);
-        events.clear();
-        events.reserve(evts.size());
-        for (size_t i = 0; i < evts.size(); i++) {
-            events.push_back(evts[i]);
-        }
-    }
-    #endif
-};
 
 template <typename ModelType>
 class SignalProcessor {
@@ -72,23 +24,32 @@ class SignalProcessor {
     const ModelType &model_;
     EventDetector evdt_;
     Normalizer norm_;
+    NormalizerParams norm_prms_;
 
     public: 
 
-    SignalProcessor(const ModelType &model, EventDetector::Params event_prms=EventDetector::PRMS_DEF) : 
+    SignalProcessor(const ModelType &model, EventDetector::Params event_prms=EventDetector::PRMS_DEF, NormalizerParams norm_prms=NORMALIZER_PRMS_DEF) : 
         model_(model),
-        evdt_(event_prms) {
-        set_norm_tgt(model.model_mean(), model.model_stdv());
+        evdt_(event_prms),
+        norm_prms_(norm_prms) {
+
+        //set_norm_tgt(model.model_mean(), model.model_stdv());
     }
 
-    ProcessedRead process(const ReadBuffer &read) {
-        ProcessedRead ret = {};
+    ProcessedRead process(const ReadBuffer &read, bool normalize=true) {
+        ProcessedRead ret = evdt_.process_read(read);//{norm_prms_};
+		ret.norm_prms = norm_prms_;
 
-        ret.events = evdt_.get_events(read.get_signal());
-
-
-        auto norm = norm_mom_params(ret.events);
-        ret.normalize(norm);
+        //ret.events = evdt_.get_events(read.get_signal());
+		//ret.set_signal(read.get_signal());
+        
+        if (normalize) {
+            if (norm_prms_.mode == "model_mom" || norm_prms_.mode == "ref_mom") {
+                ret.normalize_mom(norm_prms_.tgt_mean, norm_prms_.tgt_stdv);
+            } else {
+                throw std::runtime_error("Normalization mode not supported: " + norm_prms_.mode); 
+            }
+        }
         //for (auto &e : ret.events) {
         //    e.mean = e.mean * norm.scale + norm.shift;
         //}
@@ -97,35 +58,16 @@ class SignalProcessor {
     }
 
     void set_norm_tgt(float mean, float stdv) {
-        norm_.set_target(mean, stdv);
+        norm_prms_.tgt_mean = mean;
+        norm_prms_.tgt_stdv = stdv;
     }
 
-    NormVals norm_mom_params(const std::vector<Event> &events) {
-        float mean = 0, stdv = 0;
-        for (auto &e : events) {
-            mean += e.mean;
-        }
-        mean /= events.size();
-        
-        for (auto &e : events) {
-            float delta = e.mean - mean;
-            stdv += delta*delta;
-        }
-        stdv = sqrt(stdv / events.size());
-
-        NormVals ret;
-        ret.start = 0;
-        ret.end = events.size();
-        ret.scale = norm_.PRMS.tgt_stdv / stdv;
-        ret.shift = norm_.PRMS.tgt_mean - ret.scale * mean;
-        return ret;
-    }
 
     #ifdef PYBIND
 
     static void pybind(py::module_ &m, const std::string &suffix) {
         py::class_<SignalProcessor> s(m, ("SignalProcessor" + suffix).c_str());
-        s.def(pybind11::init<const ModelType &, EventDetector::Params>());
+        s.def(pybind11::init<const ModelType &, EventDetector::Params, NormalizerParams>());
         s.def("process", &SignalProcessor::process);
         s.def("set_norm_tgt", &SignalProcessor::set_norm_tgt);
 
@@ -134,28 +76,8 @@ class SignalProcessor {
 
 };
 
-#define PY_PROC_ARR(T, A, D) p.def_property_readonly(#A, \
-    [](ProcessedRead &r) -> py::array_t<T> { \
-        return py::array_t<T>(r.A.size(), r.A.data()); \
-    }, D);
-
 
 #ifdef PYBIND
-void signal_processor_pybind(py::module_ &m) {
-
-    PYBIND11_NUMPY_DTYPE(NormVals, start, end, scale, shift);
-
-    //TODO move to ProcessedRead
-    py::class_<ProcessedRead> p(m, "_ProcessedRead");
-    p.def(pybind11::init());
-    p.def(pybind11::init<const ProcessedRead &>());
-    p.def("rescale", &ProcessedRead::rescale);
-    p.def_property_readonly("sample_start", &ProcessedRead::sample_start);
-    p.def_property_readonly("sample_end", &ProcessedRead::sample_end);
-    p.def("set_events", &ProcessedRead::set_events);
-    PY_PROC_ARR(Event, events, "Un-normalized events");
-    PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");
-}
 #endif
 
 #endif

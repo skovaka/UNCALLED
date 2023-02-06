@@ -15,14 +15,8 @@ EXTRA_COLS = pd.Index(EXTRA_FNS.keys())
 class TSV(TrackIO):
     FORMAT = "tsv"
 
-    def __init__(self, conf, mode):
-        filename = conf.tracks.io.tsv_out
-        TrackIO.__init__(self, filename, conf, mode)
-
-        if self.filename == "-":
-            self.out = sys.stdout
-        else:
-            self.out = open(self.filename, mode)
+    def __init__(self, filename, write, tracks, track_count):
+        TrackIO.__init__(self, filename, write, tracks, track_count)
 
         if self.write_mode:
             self.init_write_mode()
@@ -40,11 +34,10 @@ class TSV(TrackIO):
         self.conf.tracks.layers += layers
         self._header = True
 
+        TrackIO._init_output(self, self.prms.buffered)
+
     def init_read_mode(self):
         raise RuntimeError("Reading from TSV not yet supported")
-        #name = self.track_names[0]
-        #t = AlnTrack(self, None, name, name, self.conf, self.model)
-        #self.tracks.append(t)
 
     def write_layers(self, track, groups):
         track.calc_layers(self.columns)
@@ -54,25 +47,31 @@ class TSV(TrackIO):
 
         for col in df.columns[df.columns.get_level_values(-1).str.endswith("kmer")]:
             kmers = df[col].dropna()
-            df.loc[kmers.index, col] = track.model.kmer_to_str(kmers)
+            df[col] = track.model.kmer_to_str(kmers)
 
 
         for col in self.extras:
             df[col] = EXTRA_FNS[col](track,df)
-        df.reset_index(inplace=True)
+
+        df.reset_index(inplace=True, drop=self.prms.tsv_noref)
 
         if self._header:
             self.columns = df.columns
             labels = [
                 ".".join([c for c in col if len(c) > 0]) 
                 for col in self.columns]
-            self.out.write("\t".join(labels) + "\n")
             self._header = False
+            if not self.prms.buffered:
+                self.output.write("\t".join(labels) + "\n")
 
         df = df.loc[:,self.columns]
 
-        self.out.write(df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False))
+        out = df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False)
+
+        self._set_output(out)
+
 
     def close(self):
-        self.out.close()
+        if not self.prms.buffered:
+            self.output.close()
 

@@ -147,7 +147,7 @@ requires=[
     'scipy>=1.5.4',
     'toml>=0.10.2',
     'ont_fast5_api',
-    'pysam'
+    'pysam',
 ],
 
 setup(
@@ -164,7 +164,7 @@ setup(
 
     python_requires=">=3.8",
 
-    setup_requires=['pybind11>=2.6.0'],
+    setup_requires=['setuptools', 'pybind11>=2.6.0'],
     install_requires=requires,
 
     packages=find_packages(),

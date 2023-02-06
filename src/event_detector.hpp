@@ -9,6 +9,10 @@
 
 #include <vector>
 #include <unordered_map>
+//#include "signal_processor.hpp"
+#include "dataframe.hpp"
+#include "read_buffer.hpp"
+#include "normalizer.hpp"
 #include "util.hpp"
 
 #ifdef PYBIND
@@ -19,17 +23,181 @@
 namespace py = pybind11;
 #endif
 
-
 typedef struct {
-    float mean;
-    float stdv;
-    u32 start;
-    u32 length;
-} Event;
+    float mean; 
+    float stdv; 
+    u32 start;  
+    u32 length; 
+} Event;        
+
 //
 //#ifdef PYBIND
 //PYBIND11_MAKE_OPAQUE(std::vector<Event>);
 //#endif
+
+struct NormVals {
+    i32 start, end;
+    float scale, shift;
+};
+
+struct ProcessedRead {
+    //std::vector<i32> event_starts, event_lengths;
+    //std::vector<float> event_means, event_stdvs;
+    NormalizerParams norm_prms;
+    std::vector<Event> events;
+    std::vector<NormVals> norm;
+    std::valarray<float> signal;
+    //std::vector<bool> mask;
+
+    template <typename Container>
+    void set_signal(Container signal_) {
+        signal = std::valarray<float>(&signal_[0], signal_.size());
+    }
+
+    u32 sample_start() const {
+        return events[0].start;
+    }
+
+    u32 sample_end() const {
+        auto e = events.back();
+        return e.start + e.length;
+    }
+
+
+    std::pair<float,float> get_moments(size_t event_start, size_t event_end) {
+        size_t n = event_end - event_start;
+        std::valarray<float> event_means(n);
+
+        size_t i = 0;
+        for (size_t j = event_start; j < event_end; j++) {
+            event_means[i++] = events[j].mean;
+        }
+
+        //const std::valarray<float>  filt_means = std::valarray<float>(event_means[std::abs(deltas) < 3.5*stdv]);
+
+        float avg, dev;
+
+        if (norm_prms.median) {
+            std::sort(std::begin(event_means), std::end(event_means));
+            avg = event_means[n / 2];
+            //mean = event_means.sum() / n;
+        } else {
+            avg = event_means.sum() / n;
+        }
+
+        auto deltas = event_means - avg;
+
+        if (norm_prms.median) {
+            auto delta_abs = std::valarray<float>(std::abs(deltas));
+            std::sort(std::begin(delta_abs), std::end(delta_abs));
+            dev = delta_abs[n / 2];
+        } else {
+            dev = sqrt((deltas*deltas).sum() / n);
+        }
+
+        return {avg, dev};
+    }
+
+    void update_stdv(Event &e) const {
+        auto slc = static_cast<std::valarray<float>>(signal[std::slice(e.start, e.length, 1)]);
+        auto deltas = slc - e.mean;
+        //e.mean = slc.sum() / e.length;
+        e.stdv = sqrt((deltas*deltas).sum() / e.length);
+        //e.mean = sqrt((deltas*deltas).sum() / e.length);
+    }
+
+    Event merge_events(size_t i, size_t j) const {
+        if (i+1 >= j) {
+            return events[i];
+        }
+        Event ret{0,0,events[i].start,0};
+        for (auto k=i; k < j; k++) {
+            ret.mean += events[k].mean*events[k].length;
+            ret.length += events[k].length;
+        }
+        ret.mean /= ret.length;
+        update_stdv(ret);
+        return ret;
+    }
+
+    void normalize(NormVals prms) {
+        assert(prms.start >= 0);
+        assert(prms.end < events.size());
+
+		signal = (signal * prms.scale) + prms.shift;
+
+        for (size_t i = prms.start; i < prms.end; i++) {
+            auto &evt = events[i];
+            evt.mean = evt.mean * prms.scale + prms.shift;
+            update_stdv(evt);
+        }
+        //auto slc = std::slice(prms.start, prms.end-prms.start, 1);
+		//signal[slc] = (static_cast<std::valarray<float>>(signal[slc]) * prms.scale) + prms.shift;
+        norm.push_back(prms);
+    }
+
+    void normalize(float scale, float shift) {
+        normalize({0, events.size(), scale, shift});
+    }
+
+    void normalize_mom(float tgt_mean, float tgt_stdv, size_t event_start, size_t event_end) {
+        auto mom = get_moments(event_start, event_end);
+        auto mean = mom.first, stdv = mom.second;
+
+        NormVals norm;
+        norm.start = event_start;
+        norm.end = event_end;
+        norm.scale = tgt_stdv / stdv;
+        norm.shift = tgt_mean - norm.scale * mean;
+
+        normalize(norm);
+    }
+
+    void normalize_mom(float tgt_mean, float tgt_stdv) {
+        normalize_mom(tgt_mean, tgt_stdv, 0, events.size());
+    }
+
+	#define PY_PROC_ARR(T, A, D) p.def_property_readonly(#A, \
+    [](ProcessedRead &r) -> py::array_t<T> { \
+        return py::array_t<T>(r.A.size(), r.A.data()); \
+    }, D);
+
+    #ifdef PYBIND
+	static void pybind(py::module_ &m) {
+		PYBIND11_NUMPY_DTYPE(NormVals, start, end, scale, shift);
+		//TODO move to ProcessedRead
+		py::class_<ProcessedRead> p(m, "_ProcessedRead");
+		p.def(pybind11::init());
+		p.def(pybind11::init<const ProcessedRead &>());
+		p.def("normalize",
+				static_cast<void (ProcessedRead::*)(float, float)> (&ProcessedRead::normalize),
+				py::arg("scale"), py::arg("shift"));
+		p.def("normalize_mom",
+				static_cast< void (ProcessedRead::*)(float, float)> (&ProcessedRead::normalize_mom),
+				py::arg("tgt_mean"), py::arg("tgt_stdv"));
+		p.def("normalize_mom",
+				static_cast< void (ProcessedRead::*)(float, float, size_t, size_t)> (&ProcessedRead::normalize_mom),
+				py::arg("tgt_mean"), py::arg("tgt_stdv"), py::arg("start"), py::arg("end"));
+		p.def_property_readonly("sample_start", &ProcessedRead::sample_start);
+		p.def_property_readonly("sample_end", &ProcessedRead::sample_end);
+		p.def("set_events", &ProcessedRead::set_events);
+		p.def_readonly("signal", &ProcessedRead::signal);
+		PY_PROC_ARR(Event, events, "Un-normalized events");        
+		PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");    
+
+
+	}
+
+    void set_events(py::array_t<Event> arr) {
+        auto evts = PyArray<Event>(arr);
+        //events.clear();
+        events.resize(evts.size());
+        for (size_t i = 0; i < evts.size(); i++) {
+            events[i] = evts[i];
+        }
+    }
+    #endif
+};
 
 class EventDetector {
 
@@ -57,6 +225,8 @@ class EventDetector {
     bool add_sample(float s);
     Event get_event() const;
     std::vector<Event> get_events(const std::vector<float> &raw);
+
+    ProcessedRead process_read(const ReadBuffer &read);
 
     float kmer_current() const;
     std::vector<float> get_means(const std::vector<float> &raw);
@@ -107,6 +277,7 @@ class EventDetector {
         PY_EVTD_METH(add_sample, "");
         //:PY_EVTD_METH(get_event, "");
         PY_EVTD_METH(get_events, "");
+        PY_EVTD_METH(process_read, "");
         PY_EVTD_METH(kmer_current, "");
         PY_EVTD_METH(get_means, "");
         PY_EVTD_METH(mean_event_len, "");

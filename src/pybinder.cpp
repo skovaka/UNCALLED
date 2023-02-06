@@ -112,12 +112,13 @@ PYBIND11_MODULE(_uncalled, m) {
     py::bind_vector<std::vector<u8>>(m, "ArrayU8", py::buffer_protocol());
     py::bind_vector<std::vector<u16>>(m, "ArrayU16", py::buffer_protocol());
     py::bind_vector<std::vector<u32>>(m, "ArrayU32", py::buffer_protocol());
-    pybind_kmers<4,5,6,7,8,9,10,11,12>(m);
+    //pybind_kmers<4,5,6,7,8,9,10,11,12>(m);
+    pybind_kmers<5,6,10,11,12>(m);
 
     m.def("self_align", &self_align);
     m.def("unpack_moves", &unpack_moves);
 
-    signal_processor_pybind(m);
+    ProcessedRead::pybind(m);
 
     Compare::pybind(m);
 

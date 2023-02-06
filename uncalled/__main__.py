@@ -103,43 +103,45 @@ REALTIME_OPTS = BWA_OPTS + MAPPER_OPTS + (
     Opt("--port", "realtime"),
     Opt("--duration", "realtime"),
 ) 
+
 DTW_OPTS = (
+    Opt(("-p", "--processes"), "tracks.io"),
+    Opt("--bam-chunksize", "tracks.io"),
+    Opt("--guppy-in", "tracks.io"),
     Opt("--bam-in", "tracks.io", nargs="?", const="-", required=True),
-    Opt("index_prefix", "tracks"),) + FAST5_OPTS + (
+    Opt(("--out-name", "-o"), "tracks.io"),
+    Opt("index_prefix", "tracks"), #+ FAST5_OPTS + (
 
-    MutexOpts("output", [
-        Opt("--sql-out", "tracks.io"),
-        Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
-        Opt("--bam-out", "tracks.io", nargs="?", const="-"),
-        Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
-    ]),
+    Opt(FAST5_PARAM, "fast5_reader", nargs="+", type=str),
+    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+    Opt(("-l", "--read-filter"), "tracks"),
+    Opt(("-x", "--fast5-index"), "fast5_reader"),
+    Opt(("-n", "--max-reads"), "tracks"),
 
-    Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
-    Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
-    Opt("--eventalign-flags", "tracks.io", type=comma_split),
-
+    Opt("--del-max", "dtw"),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
     Opt("--mask-indels", "tracks"),
 
     #Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include"),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
-    Opt(("-a", "--append"), "tracks.io", action="store_true"),
-    Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
-    Opt(("-p", "--pore-model"), "pore_model", "name", default=None),
+    Opt(("-m", "--pore-model"), "pore_model", "name", default=None),
+    Opt(("--kmer-shift"), "pore_model", "shift", default=None),
     Opt("--save-bands", "dtw", action="store_true"),
     Opt("--full-overlap", "tracks", action="store_true"),
     #Opt(("-S", "--mask-skips"), "dtw", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt("--method", "dtw", choices=METHODS.keys()),
-    Opt(("-i", "--iterations"), "dtw"),
-        Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
-        Opt("--skip-cost", "dtw"),
-        Opt("--stay-cost", "dtw"),
+    #Opt(("-i", "--iterations"), "dtw"),
+    Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
+    Opt("--skip-cost", "dtw"),
+    Opt("--stay-cost", "dtw"),
     Opt("--move-cost", "dtw"),
     Opt(("-b", "--band-width"), "dtw"),
     Opt(("-s", "--band-shift"), "dtw"),
-    Opt(("-N", "--norm-mode"), "dtw", choices=["ref_mom", "model_mom"]),
+    Opt(("-N", "--norm-mode"), "normalizer", "mode", choices=["ref_mom", "model_mom"]),
+    Opt("--norm-median", "normalizer", "median", action="store_true"),
+    Opt("--norm-seg", "normalizer", "full_read", action="store_false"),
     Opt("--bc-group", "fast5_reader"),
     CONFIG_OPT,
 )
@@ -166,19 +168,21 @@ DTW_OPTS = (
 #)
 
 CONVERT_OPTS = (
-    Opt("index_prefix", "tracks"),
+    Opt("index_prefix", "tracks", nargs="?"),
     MutexOpts("input", [
-        Opt("--sql-in", "tracks.io"),
-        Opt("--bam-in", "tracks.io"),
-        Opt("--eventalign-in", "tracks.io", nargs="?", const="-"),
-        Opt("--tombo-in", "tracks.io"),
+        Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+        Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
+        Opt("--eventalign-in", "tracks.io", type=comma_split, nargs="?", const="-"),
+        Opt("--tombo-in", "tracks.io", type=comma_split, action="extend"),
     ]),
+    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
 
     MutexOpts("output", [
         Opt("--sql-out", "tracks.io"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
     ]),
+    Opt(("--out-name", "-o"), "tracks.io"),
 
     Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
 
@@ -186,7 +190,7 @@ CONVERT_OPTS = (
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
 
     Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
-    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
+    Opt(("-l", "--read-filter"), "tracks"),
     Opt(("-x", "--fast5-index"), "fast5_reader"),
     Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
@@ -215,11 +219,12 @@ EDIT_OPTS = (
 MERGE_OPTS = (
     Opt("dbs", nargs="+", type=str, help="Database files to merge. Will write to the first file if \"-o\" is not specified. "),
     #Opt(("-n", "--track_names"), nargs="+", help="Names of tracks to merge. Will merge all tracks if not specified"),
-    Opt(("-o", "--sql-out"), "tracks.io", type=str, default=None, help="Output database file. Will output to the first input file if not specified"),
+    Opt("--sql-out", "tracks.io", type=str, default=None, help="Output database file. Will output to the first input file if not specified"),
 )
 
 COMPARE_OPTS = (
-    Opt("--sql-in", "tracks.io"),
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
     #Opt(("-l", "--read-filter"), "tracks", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-R", "--ref-bounds"), "tracks"),
@@ -232,14 +237,57 @@ COMPARE_OPTS = (
 )
 
 DUMP_OPTS = (
-    Opt("--sql-in", "tracks.io"),
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
     Opt("layers", nargs="+",  help="Layers to retrieve or compute"),
     Opt(("-R", "--ref-bounds"), "tracks", type=ref_coords),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
 )
 
+ALL_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95", "KS"}
+REFSTATS_OPTS = (
+    Opt("layers", "tracks", type=comma_split,
+        help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
+    Opt("refstats", type=comma_split,
+        help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
+    #Opt("--sql-in", "tracks.io"),
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+    Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
+    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
+    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
+    Opt("--min-coverage", "tracks"),
+    Opt(("--ref-chunksize"), "tracks.io"),
+    Opt(("--aln-chunksize"), "tracks.io"),
+    Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
+)
+
+DTW_CMD_OPTS = DTW_OPTS + (
+    MutexOpts("output", [
+        Opt("--sql-out", "tracks.io"),
+        Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
+        Opt("--bam-out", "tracks.io", nargs="?", const="-"),
+        Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
+    ]),
+    Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
+    Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
+    Opt("--tsv-noref", "tracks.io", action="store_true"),
+    Opt("--eventalign-flags", "tracks.io", type=comma_split),
+    Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
+)
+
+TRAIN_OPTS = (
+    Opt(("-i", "--iterations"), "train"), 
+    Opt("--kmer-samples", "train"), 
+    Opt("--buffer-size", "train"), 
+    Opt(("-d", "--max-bcaln-dist"), "train"), 
+    Opt(("--use-median"), "train", action="store_true"), 
+    Opt("--out-dir", "tracks.io", "model_dir"),
+    Opt(("-a", "--append"), "train", action="store_true"),
+    Opt("--skip-dtw", "train", action="store_true"),
+) + DTW_OPTS
+
+
 READSTATS_OPTS = (
-    Opt("--sql-in", "tracks.io"),
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
     Opt("stats", "readstats", type=comma_split),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt(("-p", "--pca-components"), "readstats"),
@@ -249,7 +297,7 @@ READSTATS_OPTS = (
 )
 
 REFPLOT_OPTS = (
-    Opt("--sql-in", "tracks.io"),
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
     Opt("ref_bounds", "tracks", type=str_to_coord),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
@@ -260,9 +308,9 @@ REFPLOT_OPTS = (
 
 DOTPLOT_OPTS = (
     MutexOpts("input", [
-        Opt("--sql-in", "tracks.io"),
-        Opt("--bam-in", "tracks.io", nargs="?", const="-"),
-        Opt("--eventalign-in", "tracks.io", nargs="?", const="-"),
+        Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+        Opt("--bam-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
+        Opt("--eventalign-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
     ]),
 
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
@@ -290,8 +338,8 @@ DOTPLOT_OPTS = (
 TRACKPLOT_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
     MutexOpts("input", [
-		Opt("--sql-in", "tracks.io"),
-		Opt("--bam-in", "tracks.io", nargs="?", const="-"),
+		Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+		Opt("--bam-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
 	]),
 
     Opt("--ref", "tracks", "index_prefix"), 
@@ -314,10 +362,10 @@ TRACKPLOT_OPTS = (
 
 BROWSER_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
-    MutexOpts("input", [
-		Opt("--sql-in", "tracks.io"),
-		Opt("--bam-in", "tracks.io", nargs="?", const="-"),
-	]),
+    #MutexOpts("input", [
+    Opt("--sql-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"),
+    Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
+	#]),
 
     Opt("--ref", "tracks", "index_prefix"), 
     Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
@@ -356,7 +404,6 @@ TRACKPLOT_PANEL_OPTS = (
         help="Display a line plot of specifed layer summary statistic"), 
 )
 
-ALL_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95", "KS"}
 
 CMDS = {
     "index" : ("index", 
@@ -368,8 +415,10 @@ CMDS = {
     "pafstats" : ("rt.pafstats", 
         "Estimate speed and accuracy from an Uncalled PAF file", PAF_OPTS), 
     "dtw" : ("dtw.dtw", 
-        "Perform DTW alignment guided by basecalled alignments", DTW_OPTS), 
+        "Perform DTW alignment guided by basecalled alignments", DTW_CMD_OPTS), 
     "convert" : ("dtw.io", "Convert between signal alignment file formats", CONVERT_OPTS),
+    "train" : ("dtw.train", 
+        "Iteratively train a new k-mer pore model", TRAIN_OPTS), 
     "db" : (None, 
         """Edit, merge, and ls alignment databases
 
@@ -384,17 +433,7 @@ CMDS = {
         "merge"  : ("dtw.io.sqlite", "", MERGE_OPTS), 
         "edit"   : ("dtw.io.sqlite", "", EDIT_OPTS), 
     }),
-    "refstats" : ("stats.refstats", "Calculate per-reference-coordinate statistics", (
-        Opt("layers", "tracks", type=comma_split,
-            help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
-        Opt("refstats", type=comma_split,
-            help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
-        Opt("--sql-in", "tracks.io"),
-        Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-        Opt("--min-coverage", "tracks"),
-        Opt(("--ref-chunksize"), "tracks.io"),
-        Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
-    )),
+    "refstats" : ("stats.refstats", "Calculate per-reference-coordinate statistics", REFSTATS_OPTS),
     "readstats" : ("stats.readstats", "", READSTATS_OPTS),
     "layerstats" : (None, 
             """Compute distance between alignments of the same reads\n"""
@@ -420,6 +459,7 @@ _help_lines = [
     "\tpafstats   Estimate speed and accuracy from an Uncalled PAF file", "",
     "Dynamic Time Warping (DTW) Alignment:",
     "\tdtw        Perform DTW alignment guided by basecalled alignments",
+    "\ttrain      Train new k-mer pore models",
     "\tconvert    Convert between signal alignment file formats",
     "\tdb         Edit, merge, and ls alignment databases", "",
     "DTW Analysis:",

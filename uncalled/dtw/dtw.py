@@ -1,10 +1,12 @@
 import sys
-import time
 import re
 import numpy as np
 import pandas as pd
 from collections import defaultdict
 import progressbar as progbar
+import pysam
+from time import time
+import os
 
 from sklearn.linear_model import TheilSenRegressor
 from ..pafstats import parse_paf
@@ -13,89 +15,110 @@ from ..argparse import ArgParser
 from ..index import str_to_coord
 from ..fast5 import Fast5Reader
 
-from .io import BAM
+from .io import BAM, Guppy
 
 import _uncalled
 
-from ..signal_processor import SignalProcessor
+from ..signal_processor import ProcessedRead
+from ..dfs import DtwDF
 
 from . import Bcaln, Tracks
 
+import multiprocessing as mp
+#from concurrent.futures import ProcessPoolExecutor as Pool
+
 METHODS = {
-        "guided" : "BandedDTW", 
-        "static" : "StaticBDTW",
-        "global" : "GlobalDTW", 
+    "guided" : "BandedDTW", 
+    "static" : "StaticBDTW",
+    "global" : "GlobalDTW", 
 }
 
 
 def dtw(conf):
-    """Perform DTW alignment guided by basecalled alignments"""
     conf.fast5_reader.load_bc = True
+    conf.tracks.load_fast5s = True
     conf.export_static()
 
+    if len(conf.fast5_reader.fast5_index) == 0:
+        raise ValueError("Must specify fast5 index (-x/--fast5-index)")
+
+    if conf.tracks.io.processes == 1:
+        dtw_single(conf)
+    else:
+        dtw_pool(conf)
+
+def dtw_pool(conf):
     tracks = Tracks(conf=conf)
+    #tracks.output.set_model(tracks.model)
+    i = 0
+    for chunk in dtw_pool_iter(tracks):
+        i += len(chunk)
+        tracks.output.write_buffer(chunk)
+    tracks.close()
 
-    #tracks.model = tracks.model.get_normalized(*tracks.model.norm_mad_params(tracks.model.means))
+def dtw_pool_iter(tracks):
+    def iter_args(): 
+        i = 0
+        for read_ids, bams in tracks.bam_in.iter_str_chunks():
+            reads = tracks.read_index.subset(read_ids)
+            i += len(bams)
+            yield (tracks.conf, bams, reads, tracks.bam_in.header)
 
-    clip_coords = tracks.coords
+    with mp.Pool(processes=tracks.conf.tracks.io.processes) as pool:
+        i = 0
+        for out in pool.imap_unordered(dtw_worker, iter_args(), chunksize=1):
+        #for out in pool.imap(dtw_worker, iter_args(), chunksize=1):
+            i += len(out)
+            yield out 
 
-    fast5s = Fast5Reader(conf=conf)
+def dtw_worker(p):
+    conf,bams,reads,header = p
+    conf.tracks.io.buffered = True
+    conf.tracks.io.bam_in = None
 
-    read_filter = fast5s.get_read_filter()
+    header = pysam.AlignmentHeader.from_dict(header)
 
-    if not isinstance(tracks.input, BAM):
-        raise ValueError("Must specify BAM input")
+    tracks = Tracks(read_index=reads, conf=conf)
 
-    sigproc = SignalProcessor(tracks[tracks.output_track].model, conf)
-
-    n_reads = 0
-
-    for read in fast5s:
-        aligned = False
-        for aln in tracks.input.get_alns(read.id):
-            sys.stderr.write(f"{read.id}\n")
-
-            dtw = GuidedDTW(tracks, sigproc, read, aln, conf)
-
-            if dtw.df is None:
-                sys.stderr.write(f"Warning: {read.id} failed\n")
-                continue
-
-            if conf.bc_cmp:
-                tracks.calc_compare("bcaln", True, True)
-
-            tracks.write_alignment()
-
-            aligned = True
-
-        if aligned:
-            #pbar.update(n_reads)
-            n_reads += 1
+    i = 0
+    for bam in bams:
+        bam = pysam.AlignedSegment.fromstring(bam, header)
+        dtw = GuidedDTW(tracks, bam)
+        i += 1
 
     tracks.close()
 
-    #pbar.finish()
+    return tracks.output.out_buffer
+
+
+def dtw_single(conf):
+    """Perform DTW alignment guided by basecalled alignments"""
+
+    tracks = Tracks(conf=conf)
+
+    for bam in tracks.bam_in.iter_sam():
+        dtw = GuidedDTW(tracks, bam)
+
+    tracks.close()
 
 class GuidedDTW:
 
-    #TODO do more in constructor using prms, not in main
-    #def __init__(self, track, read, paf, conf=None, **kwargs):
-    def __init__(self, tracks, sigproc, read, aln, conf=None, **kwargs):
-        self.conf = read.conf if conf is None else conf
+    def __init__(self, tracks, bam, **kwargs):
+        self.conf = tracks.conf
         self.prms = self.conf.dtw
 
-        bcaln = Bcaln(conf, tracks.index, read, aln, tracks.coords)
-        if bcaln.empty:
-            print(bcaln.df)
-            self.df = None
-            return
+        read = tracks.fast5s[bam.query_name]
 
-        signal = sigproc.process(read)
+        bcaln, self.coords = tracks.calc_bcaln(bam)
 
-        aln_id, self.coords = tracks.init_alignment(read.id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, read=signal)
+        #sigproc = SignalProcessor(tracks.model, self.conf)
+        #signal = sigproc.process(read, False)
+
+        evdt = _uncalled.EventDetector(self.conf.event_detector)
+        signal = ProcessedRead(evdt.process_read(read))
 
         self.index = tracks.index
-        self.model = sigproc.model
+        self.model = tracks.model
 
         self.bcaln = bcaln.df#[bcaln.df["indel"] == 0]
 
@@ -115,13 +138,18 @@ class GuidedDTW:
             self.block_coords.append([block_st, gap_st, shift])
             block_st = gap_en
             shift += gap_en-gap_st
-        self.block_coords.append([block_st,mref_max,shift])
+        self.block_coords.append([block_st,mref_max, shift])
 
         #kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
-        new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], conf.is_rna)
+        new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], self.conf.is_rna)
 
-        self.block_coords[0][0] += self.index.trim[1]
-        self.block_coords[-1][1] -= self.index.trim[0]
+        if bcaln.flip_ref:
+            self.block_coords[0][0] += self.index.trim[1]
+            self.block_coords[-1][1] -= self.index.trim[0]
+        else:
+            self.block_coords[0][0] += self.index.trim[0]
+            self.block_coords[-1][1] -= self.index.trim[1]
+
         mrefs = np.concatenate([np.arange(s,e) for s,e,_ in self.block_coords])
 
         #self.ref_kmers = pd.concat(kmer_blocks)
@@ -142,28 +170,59 @@ class GuidedDTW:
 
         self.samp_min = self.bcaln["start"].min()
         self.samp_max = self.bcaln["start"].max()
+        self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
-        if self.prms.norm_mode == "ref_mom":
-            sigproc.set_norm_tgt(ref_means.mean(), ref_means.std())
-            signal = sigproc.process(read)
-            tracks.set_read(signal)
+        if self.conf.normalizer.mode == "ref_mom":
+            
+            if self.conf.normalizer.median:
+                med = np.median(ref_means)
+                #tgt = (med, np.median(np.abs(med-ref_means)))
+                tgt = (med, np.median(np.abs(med-ref_means)))
+            else:
+                tgt = (ref_means.mean(), ref_means.std())
 
+
+            signal.normalize_mom(ref_means.mean(), ref_means.std())#, self.evt_start, self.evt_end)
+        elif self.conf.normalizer.mode == "model_mom":
+            if self.conf.normalizer.median:
+                med = self.model.means.median()
+                tgt = (med, np.median(np.abs(med-self.model.means)))
+            else:
+                tgt = (self.model.model_mean, self.model.model_stdv)
+        else:
+            raise ValueError(f"Unknown normalization mode: {self.prms.norm_mode}")
+
+        if self.conf.normalizer.full_read:
+            signal.normalize_mom(*tgt)
+        else:
+            signal.normalize_mom(*tgt, self.evt_start, self.evt_end)
+
+        tracks.set_read(signal)
 
         df = self._calc_dtw(signal)
 
         for i in range(self.prms.iterations-1):
             reg = self.renormalize(signal, df)
-            signal.rescale(reg.coef_, reg.intercept_)
+            signal.normalize(reg.coef_, reg.intercept_)
             df = self._calc_dtw(signal)
 
+        if df is None:
+            self.empty = True
+            sys.stderr.write(f"Warning: dtw failed for read {read.id}\n")
+            return
 
         df["kmer"] = self.ref_kmers.loc[df["mref"]].to_numpy()
         self.df = df.set_index("mref")
 
-        tracks.write_dtw_events(self.df, aln_id=aln_id, read=signal)
+        tracks.write_dtw_events(self.df, read=signal)#, aln_id=aln_id
 
-        if self.bands is not None:
-            tracks.add_layers("band", self.bands, aln_id=aln_id)
+        #if self.bands is not None:
+        #    tracks.add_layers("band", self.bands)#, aln_id=aln_id)
+
+        if self.conf.bc_cmp:
+            tracks.calc_compare("bcaln", True, True)
+
+        tracks.write_alignment()
 
         self.empty = False
 
@@ -193,32 +252,20 @@ class GuidedDTW:
         #samp_st = self.bcaln.iloc[0]["start"]
         #samp_en = self.bcaln.iloc[-1]["start"] + self.bcaln.iloc[-1]["length"]
 
-        read_block = signal.sample_range(samp_st, samp_en)
+        read_block = signal.to_df()[self.evt_start:self.evt_end]#.sample_range(samp_st, samp_en)
 
         block_signal = read_block['mean'].to_numpy()
         
-        args = self._get_dtw_args(read_block, self.ref_kmers)
-
-
-        dtw = self.dtw_fn(*args)
-
+        prms, means, kmers, inst, bands = self._get_dtw_args(read_block, self.ref_kmers)
+        dtw = self.dtw_fn(prms, signal, self.evt_start, self.evt_end, kmers, inst, bands)
         
-        path = np.flip(dtw.path)
-        #TODO shouldn't need to clip, error in bdtw
-        evts = read_block.index[np.clip(path['qry'], 0, len(read_block))]
-        mrefs = self.ref_kmers.index[path['ref']]
+        if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
+            return None
 
-        if self.prms.save_bands and hasattr(dtw, "ll"):
-            self.bands = self._ll_to_df(dtw.ll, read_block, mrefs[0], len(self.ref_kmers))
-        else:
-            self.bands = None
+        df = DtwDF(dtw.get_aln()).to_df()
+        df["mref"] = self.ref_kmers.index#pd.RangeIndex(mref_st, mref_en+1)
 
-        return pd.DataFrame({'mref': mrefs}, 
-                            index = evts,
-                            dtype='Int64') \
-                 .join(signal.to_df()) \
-                 .drop(columns=['mask'], errors='ignore') \
-                 .rename(columns={'mean' : 'current', 'stdv' : 'current_stdv'})
+        return df
 
     def _get_dtw_args(self, read_block, ref_kmers):
         qry_len = len(read_block)
@@ -238,7 +285,7 @@ class GuidedDTW:
                 mrefs[aln.index.isin(pd.RangeIndex(st,en))] -= sh
 
             bands = _uncalled.get_guided_bands(ar(mrefs), ar(aln["start"]), ar(read_block['start']), band_count, shift)
-            
+
             return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(ref_kmers), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         #elif self.method == "static":

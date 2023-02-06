@@ -105,6 +105,7 @@ class Dotplot:
         coords = None
 
         flipped = True
+        fwd = True
 
         for i,track in enumerate(tracks.alns):
 
@@ -124,7 +125,16 @@ class Dotplot:
                               .loc[(slice(None),aln_id), slice(None)] \
                               .droplevel("aln_id")
 
+                layers["dtw","start"] /=    float(self.conf.read_buffer.sample_rate)
+                layers["dtw","length"] /=   float(self.conf.read_buffer.sample_rate)
+                #layers["bcaln","start"] /=  float(self.conf.read_buffer.sample_rate)
+                #layers["bcaln","length"] /= float(self.conf.read_buffer.sample_rate)
+                if has_bcaln:
+                    layers["bcaln","middle"] /= float(self.conf.read_buffer.sample_rate)
+                layers["dtw","middle"] /=   float(self.conf.read_buffer.sample_rate)
+
                 
+                fwd = fwd and aln["fwd"]
                 flipped = flipped and aln["fwd"] == self.conf.is_rna
 
                 if self.prms.show_bands and "band" in layers:
@@ -160,7 +170,7 @@ class Dotplot:
                         legendgroup=track.name,
                         line={
                             "color":self.conf.vis.track_colors[i], 
-                            "width":2, "shape" : "vh" if flipped else "hv" },
+                            "width":2, "shape" : "vh"  },
                         hoverinfo="skip",
                         showlegend=first_aln
                     ), row=2, col=1)
@@ -258,9 +268,9 @@ class Dotplot:
             fig.add_hline(y=self.prms.select_ref, line_color="red", row=2, col=1, opacity=0.5)
             i = hover_data.index.get_loc(self.prms.select_ref)
 
-        strand = "+" if aln["fwd"] else "-"
+        strand = "+" if fwd else "-"
         fig.update_yaxes(row=2, col=1,
-            title_text=aln["ref_name"] + f" ({strand})")
+            title_text=tracks.coords.ref_name + f" ({strand})")
 
         for i,(group,layer) in enumerate(self.layers):
             fig.update_xaxes(row=2, col=i+2,
@@ -274,18 +284,20 @@ class Dotplot:
 
         fig.update_xaxes(**axis_kw)
         fig.update_yaxes(**axis_kw)
-        fig.update_yaxes(showticklabels=False)
+        fig.update_yaxes(
+            tickformat=",d", tickangle=-90, nticks=3
+        )#showticklabels=False)
         #fig.update_yaxes(showspikes=True)
 
         fig.update_xaxes(
-            title_text="Raw Sample", 
-            tickformat="d", 
+            title_text="Time (s)", 
+            #tickformat=".3f", 
             #showspikes=True,
             row=2, col=1)
 
         fig.update_layout(
             #hovermode="x unified",
-            margin={"l":50,"r":50},#, "b":50},
+            margin={"l":100,"r":50},#, "b":50},
             barmode="overlay",
             hoverdistance=20,
             dragmode="pan", 
@@ -395,7 +407,7 @@ class Dotplot:
 def dotplot(conf):
     """Plot signal-to-reference alignment dotplots"""
 
-    #conf.fast5_reader.load_bc = True
+    conf.tracks.load_fast5 = True
     dotplots = Dotplot(conf=conf)
     save = conf.out_prefix is not None
     for read_id, fig in dotplots.iter_plots():

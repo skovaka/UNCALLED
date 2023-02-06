@@ -13,13 +13,13 @@ import _uncalled
 class Tombo(TrackIO):
     FORMAT = "tombo"
 
-    def __init__(self, conf, mode):
-        filename = conf.tracks.io.tombo_in
-        TrackIO.__init__(self, filename, conf, mode)
+    def __init__(self, filename, write, tracks, track_count):
+        TrackIO.__init__(self, filename, write, tracks, track_count)
 
         self._header = True
 
         self.fast5_in = None
+        self.read_index = tracks.read_index
         self.read_id_in = None
 
         if self.write_mode:
@@ -36,9 +36,9 @@ class Tombo(TrackIO):
         if self.conf.pore_model.name == "r94_rna":
             self.conf.pore_model.name = "r94_rna_tombo"
 
-        self.conf.fast5_reader.fast5_files = [self.prms.tombo_in]
+        self.conf.fast5_reader.fast5_files = self.prms.tombo_in
 
-        self.init_track(1, name, name, self.conf.to_toml())
+        self.in_id = self.init_track(name, name, self.conf)
 
     #def init_fast5(self, fast5):
     #    self.
@@ -47,9 +47,9 @@ class Tombo(TrackIO):
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
         
-        f5reader = Fast5Reader(conf=self.conf)
-        read_filter = f5reader.get_read_filter()
-        fast5_files = f5reader.prms.fast5_files
+        #f5reader = self.fast5_in #Fast5Reader(conf=self.conf)
+        read_filter = self.read_index.read_filter #f5reader.get_read_filter()
+        fast5_files = self.read_index.file_paths #f5reader.prms.fast5_files
 
         if self.conf.fast5_reader.max_reads > 0 and len(fast5_files) > self.conf.fast5_reader.max_reads:
             fast5_files = fast5_files[:self.conf.fast5_reader.max_reads]
@@ -135,7 +135,7 @@ class Tombo(TrackIO):
             kmers = coords.ref_kmers.droplevel(0).loc[refs]
 
             idx = pd.MultiIndex.from_product(
-                    [[fwd], pacs, [aln_id]], names=("fwd","pac","aln_id"))
+                    [[self.in_id], [fwd], pacs, [aln_id]], names=("track_id","fwd","pac","aln_id"))
 
             layers = pd.DataFrame({
                     "start"  : starts,
@@ -152,7 +152,7 @@ class Tombo(TrackIO):
 
             alns = pd.DataFrame({
                     "id" : [aln_id],
-                    "track_id" : [1],
+                    "track_id" : [self.in_id],
                     "read_id" : [read.read_id],
                     "ref_name" : [coords.ref_name],
                     "ref_start" : [coords.refs.start],
@@ -160,7 +160,7 @@ class Tombo(TrackIO):
                     "fwd" :     [coords.fwd],
                     "samp_start" : [samp_start],
                     "samp_end" : [samp_end],
-                    "tags" : [""]}).set_index("id")
+                    "tags" : [""]}).set_index(["track_id", "id"])
 
             aln_id += 1
 

@@ -9,12 +9,14 @@ from ..aln_track import AlnTrack
 from ..layers import LAYER_META, LAYER_DB_GROUPS
 from ... import config
 from . import TrackIO
+from _uncalled import _Fast5Reader
 
 class TrackSQL(TrackIO):
     FORMAT = "db"
-    def __init__(self, conf, mode):
-        filename = conf.tracks.io.sql_in if mode == "r" else conf.tracks.io.sql_out
-        TrackIO.__init__(self, filename, conf, mode)
+    def __init__(self, filename, write, tracks, track_count):
+        TrackIO.__init__(self, filename, write, tracks, track_count)
+
+        self.track_shift = track_count#+1
 
         new_file = not os.path.exists(self.filename)
         self.con = sqlite3.connect(self.filename)
@@ -26,14 +28,14 @@ class TrackSQL(TrackIO):
         #if new_file:
         self.init_tables()
 
-        prev_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
-        if prev_id is not None:
-            self.prev_aln_id = prev_id
-
         if self.write_mode:
             self.init_write_mode()
         else:
             self.init_read_mode()
+
+        prev_id = self.cur.execute("SELECT MAX(id) FROM alignment").fetchone()[0]
+        if prev_id is not None:
+            self.prev_aln_id = prev_id
 
     def close(self):
         if self.open:
@@ -135,18 +137,18 @@ class TrackSQL(TrackIO):
         for table in ["dtw", "bcaln", "cmp", "band"]:
             self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
 
-        track = self.tracks.iloc[0]
+        track = self.aln_tracks[0]
 
         if self.prms.init_track:
             try:
                 tid = self.write_track(track)
             except Exception as err:
-                if len(self.query_track(track["name"])) > 0:
+                if len(self.query_track(track.name)) > 0:
                     if self.prms.append:
                         pass
                     elif self.prms.overwrite:
                         sys.stderr.write("Deleting existing track...\n")
-                        delete(track["name"], self)
+                        delete(track.name, self)
                         tid = self.write_track(track)
                     else:
                         raise ValueError(f"Database already contains track named \"{ track.name}\". Specify a different name, write to a different file")
@@ -155,10 +157,9 @@ class TrackSQL(TrackIO):
         else:
             tid = 0
 
+        self.write_id = tid
 
-        self.tracks.iloc[0]["id"] = tid
-
-        #self.tracks.append(track)
+        #self.aln_tracks[0].id = tid
 
     def init_read_mode(self):
         self.table_columns = dict()
@@ -173,7 +174,7 @@ class TrackSQL(TrackIO):
                 sys.stderr.write(f"Warning: \"{table}\" table missing {n} columns (\"{missing}\")\n")
             self.table_columns[table] = layers.intersection(info["name"])
 
-        df = self.query_track(self.track_names).set_index("name").reindex(self.track_names)
+        df = self.query_track(self.prms.in_names).set_index("name").reindex(self.prms.in_names)
 
         missing = df["id"].isnull()
         if missing.any():
@@ -182,19 +183,29 @@ class TrackSQL(TrackIO):
             raise ValueError("Alignment track not found: \"%s\" (tracks in database: \"%s\")" %
                              ("\", \"".join(bad_names), "\", \"".join(all_names)))
 
-        self.init_tracks(df.reset_index())
+        #self.init_tracks(df.reset_index())
 
-        #for name,row in df.iterrows():
-        #    conf = config.Config(toml=row.config)
-        #    t = AlnTrack(self, row["id"], name, row["desc"], conf)
-        #    self.tracks.append(t)
-        #    self.conf.load_config(conf)
+        for i,row in df.reset_index().iterrows():
+            if "config" in row.index:
+                conf = config.Config(toml=row["config"])
+            else:
+                conf = self.conf
+            self.init_track(row["name"], row["desc"], conf, row["id"]+self.track_shift)
+
+        #if self.tracks is None:
+        #    self.tracks = df
+        #else:
+        #    self.tracks = pd.concat([self.tracks, df])
 
 
     def write_track(self, track):
+        #self.cur.execute(
+        #    "INSERT INTO track (id,name,desc,config) VALUES (?,?,?,?)",
+        #    (track.id, track.name, track.desc, track.conf.to_toml())
+        #)
         self.cur.execute(
             "INSERT INTO track (name,desc,config) VALUES (?,?,?)",
-            (track["name"], track["desc"], track["config"])
+            (track.name, track.desc, track.conf.to_toml())
         )
         track_id = self.cur.lastrowid
         return track_id
@@ -207,6 +218,7 @@ class TrackSQL(TrackIO):
 
 
     def write_alignment(self, aln_df):
+        aln_df["track_id"] = self.write_id
         aln_df.to_sql(
             "alignment", self.con, 
             if_exists="append", 
@@ -279,11 +291,11 @@ class TrackSQL(TrackIO):
         return pd.read_sql_query(query, self.con, params=params)
 
     def query_alignments(self, track_id=None, read_id=None, aln_id=None, coords=None, full_overlap=False, order=None, chunksize=None):
-        select = "SELECT * FROM alignment"
+        select = "SELECT alignment.id, track_id, read_id, ref_name, ref_start, ref_end, fwd, samp_start, samp_end, tags, filename AS fast5 FROM alignment JOIN read ON read_id == read.id JOIN fast5 ON fast5.id = fast5_id"
         wheres = list()
         params = list()
 
-        self._add_where(wheres, params, "id", aln_id)
+        self._add_where(wheres, params, "alignment.id", aln_id)
         self._add_where(wheres, params, "track_id", track_id)
         self._add_where(wheres, params, "read_id", read_id)
 
@@ -299,7 +311,9 @@ class TrackSQL(TrackIO):
 
         query = self._join_query(select, wheres, order)
 
-        return pd.read_sql_query(query, self.con, index_col="id", params=params, chunksize=chunksize)
+        df = pd.read_sql_query(query, self.con, params=params, chunksize=chunksize)
+        df["track_id"] += self.track_shift #self.next_id+1
+        return df.set_index(["track_id","id"])
         
     def _join_query(self, select, wheres, order=None):
         query = select
@@ -340,7 +354,6 @@ class TrackSQL(TrackIO):
             params += [str(coords.pacs.min()), str(coords.pacs.max())]
 
         query = self._join_query(select, wheres)
-
         return pd.read_sql_query(
             query, self.con, 
             index_col=["pac", "aln_a", "aln_b", "group_b"], 
@@ -353,16 +366,57 @@ class TrackSQL(TrackIO):
             strands = [1, 0]
 
         for fwd in strands:
-            chunks = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, ["pac"], chunksize, full_overlap)
-            for c in chunks:
-                yield c
+            itr = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, ["pac"], chunksize, full_overlap)
+
+            ret_alns = pd.DataFrame()
+            chunks = list()
+            prev_pac = None
+
+            for layers in itr:
+                layers.sort_index(inplace=True)
+                next_pac = layers.index.get_level_values("pac")[-1]
+                #if next_pac 
+
+                if prev_pac is None or prev_pac == next_pac:
+                    chunks.append(layers)
+                else:
+                    chunks.append(layers.loc[slice(None),fwd,:next_pac-1])
+                    ret_layers = pd.concat(chunks)
+                    chunks = [layers.loc[slice(None),fwd,next_pac:]]
+
+                    aln_ids = ret_layers.index.get_level_values("aln_id").unique()
+                    if len(ret_alns) > 0:
+                        aln_ids = aln_ids.difference(ret_alns.index)
+
+                    ret_alns = self.query_alignments(track_id, aln_id=list(aln_ids))
+
+                    yield ret_alns, ret_layers
+
+                prev_pac = next_pac
+
+            if len(chunks) > 0:
+                ret_layers = pd.concat(chunks)
+                chunks = [layers.loc[slice(None),fwd,next_pac]]
+
+                aln_ids = ret_layers.index.get_level_values("aln_id").unique()
+                if len(ret_alns) > 0:
+                    aln_ids = aln_ids.difference(ret_alns.index)
+
+                ret_alns = self.query_alignments(track_id, aln_id=list(aln_ids))
+
+                yield ret_alns, ret_layers
 
     def query(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
+        
+        if track_id is not None:
+            track_id = np.array(track_id)-self.track_shift
+
         layers = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, order, None, full_overlap)
 
         aln_ids = layers.index.unique("aln_id").to_numpy()
         alignments = self.query_alignments(aln_id=aln_ids)
 
+        #self.fill_tracks(coords, alignments, layers)
         return alignments, layers
 
     def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], chunksize=None, full_overlap=False):
@@ -386,6 +440,7 @@ class TrackSQL(TrackIO):
 
         fields += ["%s.%s AS idx_%s" % (tables[0],idx,idx) for idx in ("pac", "aln_id")]
         fields.append("fwd")
+        fields.append("track_id")
 
         select = "SELECT " + ", ".join(fields) + " FROM " + tables[0]
         for table in tables[1:]:
@@ -421,17 +476,19 @@ class TrackSQL(TrackIO):
 
         ret = pd.read_sql_query(
             query, self.con, 
-            index_col=["fwd", "idx_pac", "idx_aln_id"], 
+            #index_col=["track_id", "fwd", "idx_pac", "idx_aln_id"], 
             params=params, chunksize=chunksize)
 
         def make_groups(df):
             grouped = dict()
+            df["track_id"] += self.track_shift #self.next_id+1
+            df.set_index(["track_id", "fwd", "idx_pac", "idx_aln_id"], inplace=True)
+            df.index.names = ("track_id", "fwd", "pac", "aln_id")
             for group, layers in group_layers.items():
                 gdf = df[layers]
                 grouped[group] = df[layers].rename(columns=renames)
             df = pd.concat(grouped, names=("group", "layer"), axis=1)
-            df.index.names = ("fwd", "pac", "aln_id")
-            return df
+            return df#.sort_index()
                 
         if chunksize is None:
             return make_groups(ret)
@@ -443,36 +500,34 @@ class TrackSQL(TrackIO):
             layers, track_id, coords, aln_id, read_id, fwd,
             ["read_id", "pac"], self.prms.ref_chunksize, full_overlap) 
 
-        aln_leftovers = pd.DataFrame()
         layer_leftovers = pd.DataFrame()
 
         for layers in layer_iter:
-            ids = layers.index \
-                        .get_level_values("aln_id") \
-                        .unique() \
-                        .difference(aln_leftovers.index) \
-                        .to_numpy()
-            if len(ids) > 0:
-                alignments = self.query_alignments(aln_id=ids)
-            else:
-                alignments = pd.DataFrame()
-
-            alignments = pd.concat([aln_leftovers, alignments])
             layers = pd.concat([layer_leftovers, layers])
 
-            aln_end = alignments["read_id"] == alignments["read_id"].iloc[-1]
-            aln_leftovers = alignments.loc[aln_end]
-            alignments = alignments.loc[~aln_end]
+            ids = layers.index.unique("aln_id").to_numpy()
+            alignments = self.query_alignments(aln_id=ids, order=["read_id"])
 
-            layer_end = layers.index.get_level_values("aln_id").isin(aln_leftovers.index)
-            layer_leftovers = layers.loc[layer_end]
-            layers = layers.loc[~layer_end]
-            layer_alns = layers.index.get_level_values("aln_id")
+            #print("HERE")
+            last_read = alignments.iloc[-1]["read_id"]
+            mask = alignments["read_id"] == last_read
+            last_alns = alignments.index[mask].get_level_values("id")
+            alignments = alignments[~mask]
+
+            #print(last_alns)
+            #print(layers)
+
+            layer_leftovers = layers.loc[layers.index.get_level_values("aln_id").isin(last_alns)]
+            #layer_leftovers = layers.loc[last_layers]
+
+            layers = layers.drop(index=layer_leftovers.index)
 
             yield alignments, layers
 
-        if len(aln_leftovers) > 0:
-            yield aln_leftovers, layer_leftovers
+        if len(layer_leftovers) > 0:
+            ids = layer_leftovers.index.unique("aln_id").to_numpy()
+            alignments = self.query_alignments(aln_id=ids, order=["read_id"])
+            yield alignments, layer_leftovers
     
     def _verify_track(self, track_name):
         ids = self.cur.execute("SELECT id FROM track WHERE name == ?", (track_name,)).fetchall()
@@ -489,7 +544,7 @@ _LS_QUERY = "SELECT name,desc,COUNT(alignment.id) FROM track " \
             "JOIN alignment ON track.id == track_id GROUP BY name"
 def ls(conf, db=None):
     if db is None:
-        db = TrackSQL(conf, "r")
+        db = TrackSQL(conf.tracks.io.sql_in, False, conf, 1)
     print("\t".join(["Name", "Description", "Alignments"]))
 
     for row in db.cur.execute(_LS_QUERY).fetchall():
@@ -499,7 +554,8 @@ def ls(conf, db=None):
 
 def delete(track_name=None, db=None, conf=None):
     if db is None:
-        db = TrackSQL(conf, "r")
+        #db = TrackSQL(conf, "r")
+        db = TrackSQL(conf.tracks.io.sql_in, False, conf)
 
     if track_name is None:
         track_name = conf.track_name
@@ -509,11 +565,12 @@ def delete(track_name=None, db=None, conf=None):
     print("Deleted track \"%s\"" % track_name)
 
 def edit(conf, db=None):
-    fast5s = _uncalled._Fast5Reader.Params(conf.fast5_reader)
+    fast5s = _Fast5Reader.Params(conf.fast5_reader)
     fast5_change = len(conf.fast5_files) > 0
     track_name = conf.track_name
     if db is None:
-        db = TrackSQL(conf, "r")
+        #db = TrackSQL(conf, "r")
+        db = TrackSQL(conf.tracks.io.sql_in, False, conf, 1)
     track_id = db._verify_track(track_name)
 
     updates = []
@@ -583,7 +640,8 @@ def merge(conf):
 
     conf.tracks.io.init_track = False
 
-    db = TrackSQL(conf, "w")
+    #db = TrackSQL(conf, "w")
+    db = TrackSQL(conf.tracks.io.sql_out, True, conf)
     
     def max_id(table, field="id"):
         i = db.cur.execute(f"SELECT max({field}) FROM {table}").fetchone()[0]

@@ -85,6 +85,10 @@ class CoordSpace:
     def stranded(self):
         return self.fwd is not None
 
+    @property
+    def strands(self):
+        return [int(self.fwd)] if self.stranded else [0,1]
+
     def contains(self, other):
         if isinstance(other, CoordSpace):
             return (self.ref_name == other.ref_name and
@@ -149,10 +153,15 @@ class CoordSpace:
             return None
         bounds = self.pacs.get_indexer(minmax)
 
+        fwds = np.array(coords.get_level_values(0))
+        all_fwd = np.all(fwds)
+        all_rev = np.all(~fwds)
+        fwd = None if not (all_fwd or all_rev) else all_fwd
+
         st,en = sorted(bounds)
         en += 1
 
-        return self._slice(st,en,self.fwd)
+        return self._slice(st,en,fwd)
 
     def _slice(self, st, en, fwd=None):
         refs = self.refs[st:en]
@@ -167,11 +176,12 @@ class CoordSpace:
 
         elif fwd is None:
             mrefs = tuple( (m[st:en] for m in self.mrefs) )
-            kmers = tuple( (k[st:en] for k in self.kmers) )
+            if self.kmers is not None:
+                kmers = tuple( (k[st:en] for k in self.kmers) )
         else:
             mrefs = self.mrefs[fwd][st:en]
             if self.kmers is not None:
-                kmers = self.kmers[fwd][st:en]
+                kmers = self.kmers[fwd].loc[st:en]
 
         #elif not stranded_out:
 
@@ -296,8 +306,13 @@ class RefIndex:
         self.Model = getattr(_uncalled, f"PoreModelK{k}", None)
         if self.InstanceClass is None or self.Model is None:
             raise ValueError(f"Invalid k-mer length {k}")
+        
+        if "kmer_shift" in kwargs:
+            shift = kwargs["kmer_shift"]
+            del kwargs["kmer_shift"]
+        else:
+            shift = PoreModel.get_kmer_shift(k)
 
-        shift = PoreModel.get_kmer_shift(k)
         self.trim = (shift, k-shift-1)
 
         self.instance = self.InstanceClass(*args, **kwargs)
@@ -312,7 +327,7 @@ class RefIndex:
         #else:
         #   #ref_coord.start += kmer_shift
 
-        if (mrefs.step > 0) == is_rna:
+        if (mrefs.step > 0) != is_rna:
             i,j = self.trim
         else:
             i,j = reversed(self.trim)
@@ -366,7 +381,7 @@ class RefIndex:
         else:
             mrefs = tuple((
                 self.ref_coord_to_mrefs(RefCoord(ref_coord, fwd), is_rna)
-                for fwd in range(2)
+                for fwd in [False, True]
             ))
 
         if load_kmers:
@@ -388,10 +403,10 @@ class RefIndex:
 
 _index_cache = dict()
 
-def load_index(k, prefix, load_pacseq=True, load_bwt=False, cache=True):
+def load_index(k, prefix, load_pacseq=True, load_bwt=False, cache=True, kmer_shift=None):
     idx = _index_cache.get(prefix, None)
     if idx is None:
-        idx = RefIndex(k, prefix, load_pacseq, load_bwt)
+        idx = RefIndex(k, prefix, load_pacseq, load_bwt, kmer_shift=kmer_shift)
         if cache: _index_cache[prefix] = idx
     else:
         if load_pacseq and not idx.pacseq_loaded():

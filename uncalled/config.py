@@ -116,9 +116,9 @@ class Config(_Conf):
             self.load_toml(text=toml)
 
 
-    def _param_writable(self, name, val, group=None):
+    def _param_writable(self, name, val, group=None, ignore=True):
         if group is not None: 
-            if (name in getattr(getattr(self, group), "_ignore_toml", {}) 
+            if ignore and (name in getattr(self.get_group(group), "_ignore_toml", {}) 
                 or name == "read_filter"): #TODO not great - should wrap Fast5Params in ParamGroup
                 return False
         return (not self.is_default(name, group) and
@@ -158,7 +158,8 @@ class Config(_Conf):
             #    if not (param.startswith("_") or (ignore_defaults and other.is_default(param, group_name))):
             #        setattr(sgroup, param, getattr(ogroup, param))
 
-    def to_toml(self, filename=None):
+
+    def to_toml(self, filename=None, force_all=False):
 
         def fmt(val):
             if isinstance(val, str) and os.path.exists(val):
@@ -169,24 +170,32 @@ class Config(_Conf):
 
         for param in self._GLOBAL_PARAMS:
             val = getattr(self,param)
-            if self._param_writable(param, val):
+            if self._param_writable(param, val, ignore=not force_all):
                 out[param] = fmt(val)
 
         for param, val in vars(self).items():
-            if self._param_writable(param, val):
+            if self._param_writable(param, val, ignore=not force_all):
                 out[param] = fmt(val)
 
         groups = self._PARAM_GROUPS + list(self._EXTRA_GROUPS.keys())
 
-        for group_name in groups:
-            group = getattr(self, group_name)
+        def write_group(group_name, out):
+            group = self.get_group(group_name)
+
             vals = dict()
             for param in dir(group):
                 val = getattr(group,param)
-                if self._param_writable(param, val, group_name):
+                if self._param_writable(param, val, group_name, ignore=not force_all):
                     vals[param] = fmt(val)
+                elif isinstance(val, ParamGroup):
+                    #out[param] = dict()
+                    write_group(f"{group_name}.{param}", vals)
+
             if len(vals) > 0:
-                out[group_name] = fmt(vals)
+                out[group_name.split(".")[-1]] = fmt(vals)
+
+        for group_name in groups:
+            write_group(group_name, out)
 
         if filename is None:
             return toml.dumps(out)
@@ -200,27 +209,45 @@ class Config(_Conf):
         elif text is not None:
             toml_dict = toml.loads(text)
 
+
+        def load_group(name, vals):
+            group = self.get_group(name)
+            if group is None:
+                if self.is_default(name):
+                    setattr(self, name, vals)
+            else:
+                basename = name.split(".")[0]
+                for param, value in vals.items():
+                    if not hasattr(group, param):
+                        sys.stderr.write(f"Unrecognized config parameter: \"{name}.{param}\". Skipping.\n")
+                    if isinstance(value, dict):
+                        load_group(f"{basename}.{param}", value)
+                    elif self.is_default(param, name):
+                        setattr(group, param, value)
+
         for name, val in toml_dict.items():
             if isinstance(val, dict):
-                group = getattr(self, name, None)
-                if group is None:
-                    if self.is_default(name):
-                        setattr(self, name, val)
-                else:
-                    for param, value in val.items():
-                        if not hasattr(group, param):
-                            sys.stderr.write(f"Unrecognized config parameter: \"{name}.{param}\". Skipping.\n")
-                        if self.is_default(param, name):
-                            setattr(group, param, value)
+                load_group(name, val)
             else:
                 if self.is_default(name):
                     setattr(self, name, val)
+
+    #support pickling via toml
+    def __setstate__(self, toml):
+        self.__init__(toml=toml)
+        #self.load_toml(text=toml)
+
+    def __getstate__(self):
+        return self.to_toml(force_all=True)
 
     def get_group(self, group_name):
         """Returns the group based on the group name"""
 
         if group_name is None or len(group_name) == 0:
             return self
+        
+        if not isinstance(group_name, str):
+            return group_name
 
         group = self
         for name in group_name.split("."):

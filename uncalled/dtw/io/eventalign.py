@@ -11,20 +11,16 @@ import _uncalled
 class Eventalign(TrackIO):
     FORMAT = "eventalign"
 
-    def __init__(self, conf, mode):
-        filename = conf.tracks.io.eventalign_in if mode == "r" else conf.tracks.io.eventalign_out
-        TrackIO.__init__(self, filename, conf, mode)
-
-        if self.filename == "-":
-            self.out = sys.stdout
-        else:
-            self.out = open(self.filename, mode)
+    def __init__(self, filename, write, tracks, track_count):
+        TrackIO.__init__(self, filename, write, tracks, track_count)
 
         self._header = True
 
         if self.write_mode:
+            print("WRITE MODE")
             self.init_write_mode()
         else:
+            print("READ MODE")
             self.init_read_mode()
 
     def init_write_mode(self):
@@ -35,39 +31,37 @@ class Eventalign(TrackIO):
         self.write_signal_index = "signal-index" in flags
         self.write_samples = "samples" in flags
 
-        header = ["contig", "position", "reference_kmer"]
+        self.header = ["contig", "position", "reference_kmer"]
 
         if self.write_read_name:
-            header.append("read_name")
+            self.header.append("read_name")
         else:
-            header.append("read_index")
+            self.header.append("read_index")
 
-        header += ["strand", "event_index", "event_level_mean", "event_stdv", "event_length", "model_kmer", "model_mean", "model_stdv", "standardized_level"]
+        self.header += ["strand", "event_index", "event_level_mean", "event_stdv", "event_length", "model_kmer", "model_mean", "model_stdv", "standardized_level"]
 
         if self.write_signal_index:
-            header += ["start_idx", "end_idx"]
+            self.header += ["start_idx", "end_idx"]
 
         if self.write_samples:
-            header += ["samples"]
+            self.header += ["samples"]
 
-        self.out.write("\t".join(header) + "\n")
+        print("init_out")
+        TrackIO._init_output(self, self.prms.buffered)
 
+        if not self.prms.buffered:
+            self.output.write("\t".join(self.header) + "\n")
 
     def init_read_mode(self):
-        #if len(self.track_names) != 1:
-        #    raise ValueError("Can only read eventalign TSV into a single track")
-        #name = self.track_names[0]
         name = self.filename
+
+        self.output = None
         
         if self.conf.pore_model.name == "r94_dna":
             self.conf.pore_model.name = "r9.4_dna_450bps_6mer_npl"
 
-        self.init_track(1, name, name, self.conf.to_toml())
-        #t = AlnTrack(self, None, name, name, self.conf)
-        #self.tracks.append(t)
+        self.in_id = self.init_track(name, name, self.conf)
 
-    #def write_dtw_events(self, track, events):
-    #def write_layers(self, df, read, index=["pac","aln_id"]):
     def write_layers(self, track, groups):
         if "dtw" not in groups: 
             return
@@ -120,31 +114,16 @@ class Eventalign(TrackIO):
             event_index, #TODO properly rep skips?
             std_level, signal) #TODO compute internally?
 
-        self.out.write(eventalign)
-
-    #def init_fast5(self, filename):
-
-    #    row = self.cur.execute("SELECT id FROM fast5 WHERE filename = ?", (filename,)).fetchone()
-    #    if row is not None:
-    #        return row[0]
-    #        
-    #    self.cur.execute("INSERT INTO fast5 (filename) VALUES (?)", (filename,))
-    #    fast5_id = self.cur.lastrowid
-    #    #self.con.commit()
-
-    #    return fast5_id
-
-    #def init_read(self, read_id, fast5_id):
-    #    self.cur.execute("INSERT OR IGNORE INTO read VALUES (?,?)", (read_id, fast5_id))
+        self._set_output(eventalign)
 
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
-        read_filter = set(self.conf.fast5_reader.read_filter)
+        #read_filter = set(self.conf.fast5_reader.read_filter)
 
         sample_rate = self.conf.read_buffer.sample_rate
 
         csv_iter = pd.read_csv(
-            self.conf.tracks.io.eventalign_in, sep="\t", chunksize=10000,
+            self.filename, sep="\t", chunksize=10000,
             usecols=["read_name","contig","position", "event_index",
                      "start_idx","event_level_mean","model_mean",
                      "event_length","strand","model_kmer"])
@@ -159,7 +138,8 @@ class Eventalign(TrackIO):
             groups = events.groupby(["contig", "read_name"])
             for (contig,read_id), df in groups:
 
-                if len(read_filter) > 0 and read_id not in read_filter:
+                if self.read_filter is not None and read_id not in self.read_filter:
+
                     continue
 
                 df.drop(df.index[df["model_mean"] == 0], inplace=True)
@@ -188,7 +168,7 @@ class Eventalign(TrackIO):
                         "event_length" : "length",
                         "event_level_mean" : "current",
                      }).set_index(pd.MultiIndex.from_product(
-                        [[fwd], pacs, [aln_id]], names=("fwd","pac","aln_id")))
+                        [[self.in_id], [fwd], pacs, [aln_id]], names=("track_id","fwd","pac","aln_id")))
 
                 samp_start = layers["start"].min()
                 e = layers["start"].argmax()
@@ -198,7 +178,7 @@ class Eventalign(TrackIO):
 
                 alns = pd.DataFrame({
                         "id" : [aln_id],
-                        "track_id" : [1],
+                        "track_id" : [self.in_id],
                         "read_id" : [read_id],
                         "ref_name" : [coords.ref_name],
                         "ref_start" : [coords.refs.start],
@@ -206,7 +186,7 @@ class Eventalign(TrackIO):
                         "fwd" :     [coords.fwd],
                         "samp_start" : [samp_start],
                         "samp_end" : [samp_end],
-                        "tags" : [""]}).set_index("id")
+                        "tags" : [""]}).set_index(["track_id", "id"])
 
                 aln_id += 1
 
@@ -242,4 +222,5 @@ class Eventalign(TrackIO):
         pass
 
     def close(self):
-        self.out.close()
+        if not self.prms.buffered and self.output is not None:
+            self.output.close()

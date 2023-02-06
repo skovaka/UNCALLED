@@ -1,13 +1,14 @@
 #include <cmath>
 #include "normalizer.hpp"
 
-const Normalizer::Params Normalizer::PRMS_DEF = {
-    len : 6000,
-    tgt_mean : 90.20827,
-    tgt_stdv : 12.83266
-};
+//const NormalizerParams NORMALIZER_PRMS_DEF = {
+//    mode : "model_mom",
+//    len : 6000,
+//    tgt_mean : 90.20827,
+//    tgt_stdv : 12.83266
+//};
 
-Normalizer::Normalizer(Params p) 
+Normalizer::Normalizer(NormalizerParams p) 
     : PRMS(p),
       signal_(p.len), //TODO need to set
       mean_(0),
@@ -19,7 +20,7 @@ Normalizer::Normalizer(Params p)
       is_empty_(true) {
 }
 
-Normalizer::Normalizer(float tgt_mean, float tgt_stdv) : Normalizer(PRMS_DEF) {
+Normalizer::Normalizer(float tgt_mean, float tgt_stdv) : Normalizer(NORMALIZER_PRMS_DEF) {
     set_target(tgt_mean, tgt_stdv);
 }
 

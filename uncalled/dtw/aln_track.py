@@ -42,6 +42,7 @@ class AlnTrack:
         self.name = name
         self.desc = desc
         self.conf = conf
+        self.coords = None
 
         self.fast5s = fast5s #TODO get rid of this
 
@@ -199,7 +200,8 @@ class AlnTrack:
 
                     fn = meta["fn"]
                     if fn is None:
-                        raise ValueError("Layer not found: {group}.{layer}")
+                        continue
+                        #raise ValueError(f"Layer not found: {group}.{layer}")
                     vals = fn(self)
                     self.layers[group,layer] = vals
 

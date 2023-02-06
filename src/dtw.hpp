@@ -15,7 +15,7 @@ struct DtwParams {
     DTWSubSeq subseq;
     float move_cost, stay_cost, skip_cost,
           band_shift;
-    i32 band_width, iterations;
+    i32 del_max, ins_max, band_width, iterations;
     std::string norm_mode, band_mode, cost_fn, mm2_paf;
     bool save_bands;
 };
@@ -59,6 +59,7 @@ class GlobalDTW {
         float cost, ds, hs, vs;
         for (u64 r = 0; r < ref_vals_.size(); r++) {
             for (u64 q = 0; q < qry_vals_.size(); q++) {
+            //for (u64 q = event_start_; q < event_end_; q++) {
 
                 cost = costfn(qry_vals_[q], ref_vals_[r]);
                 ds = dscore(r,q) + (PRMS.move_cost * cost);
@@ -81,20 +82,28 @@ class GlobalDTW {
         }
     }
 
+    size_t ref_size() const {
+        return (ref_vals_.size());
+    }
+
+    size_t qry_size() const {
+        return (qry_vals_.size());
+    }
+
     void traceback() {
-        u64 r = ref_vals_.size()-1, q = qry_vals_.size()-1;
+        u64 r = ref_vals_.size()-1, q = qry_size()-1;//qry_vals_.size()-1;
 
         switch (PRMS.subseq) {
             case DTWSubSeq::ROW:
                 for (u64 k = 0; k < ref_vals_.size(); k++) {
-                    if (mat_[k*qry_vals_.size() + q] < mat_[r*qry_vals_.size() + q]) { 
+                    if (mat_[k*qry_size() + q] < mat_[r*qry_size() + q]) { 
                         r = k;
                     }
                 }
                 break;
             case DTWSubSeq::COL:
-                for (u64 k = 0; k < qry_vals_.size(); k++) {
-                    if (mat_[r*qry_vals_.size() + k] < mat_[r*qry_vals_.size() + q]) {
+                for (u64 k = 0; k < qry_size(); k++) {
+                    if (mat_[r*qry_size() + k] < mat_[r*qry_size() + q]) {
                         q = k;
                     }
                 }
@@ -103,11 +112,11 @@ class GlobalDTW {
                 break;
         }
 
-        score_sum_ = mat_[r*qry_vals_.size() + q];
+        score_sum_ = mat_[r*qry_size() + q];
 
         path_.push_back({q, r});
 
-        u64 k = r*qry_vals_.size() + q;
+        u64 k = r*qry_size() + q;
         while(!(r == 0 || PRMS.subseq == DTWSubSeq::ROW) ||
               !(q == 0 || PRMS.subseq == DTWSubSeq::COL)) {
 
@@ -115,10 +124,10 @@ class GlobalDTW {
                 k--;
                 q--;
             } else if (q == 0 || bcrumbs_[k] == Move::V) {
-                k -= qry_vals_.size();
+                k -= qry_size();
                 r--;
             } else {
-                k -= qry_vals_.size() + 1;
+                k -= qry_size() + 1;
                 r--;
                 q--;
             }
@@ -161,19 +170,19 @@ class GlobalDTW {
     }
 
     inline float hscore(u64 r, u64 q) {
-        if (q > 0) return mat_[qry_vals_.size()*r + q-1];
+        if (q > 0) return mat_[qry_size()*r + q-1];
         else if (PRMS.subseq == DTWSubSeq::ROW) return 0;
         return MAX_COST;
     }
 
     inline float vscore(u64 r, u64 q) {
-        if (r > 0) return mat_[qry_vals_.size()*(r-1) + q];
+        if (r > 0) return mat_[qry_size()*(r-1) + q];
         else if (PRMS.subseq == DTWSubSeq::COL) return 0;
         else return MAX_COST;
     }
 
     inline float dscore(u64 r, u64 q) {
-        if (q > 0 && r > 0) return mat_[qry_vals_.size()*(r-1) + q-1];
+        if (q > 0 && r > 0) return mat_[qry_size()*(r-1) + q-1];
         else if ((q == r) || 
                  (r == 0 && PRMS.subseq == DTWSubSeq::COL) || 
                  (q == 0 && PRMS.subseq == DTWSubSeq::ROW)) return 0;
@@ -196,7 +205,7 @@ class GlobalDTW {
 
         c.def_property_readonly("mat", [](GlobalDTW<ModelType> &d) -> pybind11::array_t<float> {
              return pybind11::array_t<float>(
-                     {d.ref_vals_.size(), d.qry_vals_.size()},
+                     {d.ref_vals_.size(), d.qry_size()},
                      d.mat_.data()
                      );
         });
@@ -225,9 +234,86 @@ struct Coord {
 //    }
 //};
 
+//ReadAln coords_to_aln(const std::vector<Coords> &coords, const ProcessedRead &read) {
+//
+//}
+
 #ifdef PYBIND
 //PyArray<Coord> get_guided_bands(PyArray<i32> bc_refs, PyArray<i32> bc_samps, PyArray<i32> event_samps);
 #endif
+
+
+//TODO 
+// redo dataframes so it's
+//create ReadAln, contains DtwDF, BcalnDF, and aln info:
+//store coordinates (list of ref bound pairs), use to index DFs
+//aln_id, read_id, ref_name, ref_start, ref_end, ref_fwd, samp_start, samp_en
+//Eventually construct AlnTrack in C++ by concating ReadAlns
+//   contains alignments and layers DFs, probably distinct from ReadAln
+//   sortable and indexable by aln_id, ref
+
+struct DtwDF : public DataFrame<int, int, float, float> {
+    static constexpr NameArray names = {"start", "length", "current", "stdv"}; 
+    ColType<0> &start = std::get<0>(data_);  
+    ColType<1> &length = std::get<1>(data_);  
+    ColType<2> &current = std::get<2>(data_);  
+    ColType<3> &stdv = std::get<3>(data_);  
+    using DataFrame::DataFrame;                              
+
+    DtwDF(const std::vector<Coord> &path, const ProcessedRead &read, size_t ref_len) : DtwDF(ref_len) {
+        i32 i = 0, prev_ref = -1, qry_st = -1;
+
+        //Event evt{-1,-1,-1,-1};
+        for (auto itr = path.rbegin(); itr != path.rend(); itr++) {
+            if (itr->ref > prev_ref) {
+                if (prev_ref >= 0) {
+                    auto evt = read.merge_events(qry_st, itr->qry);
+                    start[i] = evt.start;
+                    length[i] = evt.length;
+                    current[i] = evt.mean;
+                    stdv[i] = evt.stdv;
+                    //std::cout << "DONE " << length[i] << " " << current[i] << " " << stdv[i] << "\n";
+                    //std::cout.flush();
+                    i++;
+                }
+                prev_ref = itr->ref;
+                qry_st = itr->qry;
+            }
+        }
+        auto evt = read.merge_events(qry_st, path.front().qry);
+        start[i] = evt.start;
+        length[i] = evt.length;
+        current[i] = evt.mean;
+        stdv[i] = evt.stdv;
+    }
+
+    //using DataFrame::data_;
+
+    //int aln_id;
+    //std::string read_id, ref_name;
+    //int ref_start, ref_end;
+    //bool ref_fwd;
+    //int samp_start, samp_end;
+
+    //ReadAln(int aln_id_, std::string read_id_, std::string ref_name_, int ref_start_, int ref_end_, bool ref_fwd_, int samp_start_, int samp_end_) : ReadAln(ref_end_-ref_start_) {
+    //    aln_id = aln_id_;
+    //    read_id = read_id_;
+    //    ref_name = ref_name_;
+    //    ref_start = ref_start_;
+    //    ref_end = ref_end_;
+    //    ref_fwd = ref_fwd_;
+    //    samp_start = samp_start_;
+    //    samp_end = samp_end_;
+    //}
+
+    //#define ALN_ATTR(A) c.def_readwrite(#A, &ReadAln::A);
+    //static py::class_<ReadAln> pybind(py::module_ &m) {
+    //    auto c = DataFrame::pybind<ReadAln>(m, "_ReadAln");
+    //    c.def(py::init<const std::vector<Coords> &, const ProcessedRead &, size_t>());
+    //    
+    //    return c;
+    //}
+};
 
 template <typename ModelType>
 class BandedDTW {
@@ -242,7 +328,9 @@ class BandedDTW {
     const DtwParams PRMS;
     const DTWCostFn cost_fn_;
 
-    const PyArray<float> &qry_vals_;
+    //const PyArray<float> &qry_vals_;
+    const ProcessedRead &qry_vals_;
+    size_t event_start_, event_end_;
     const std::vector<KmerType> &ref_vals_;
     const PyArray<Coord> &ll_;
 
@@ -267,62 +355,23 @@ class BandedDTW {
 
     public:
     BandedDTW(const DtwParams &prms,
-              const PyArray<float> &qry_vals,   
+              //const PyArray<float> &qry_vals,   
+              const ProcessedRead &read,
+              size_t event_start, size_t event_end,
               const std::vector<KmerType> &ref_vals,
               const ModelType &model,
               const PyArray<Coord> &ll) :
             PRMS(prms),
             cost_fn_(get_cost_fn(PRMS.cost_fn)),
-            qry_vals_(qry_vals),
+            qry_vals_(read), //(qry_vals),
+            event_start_(event_start), event_end_(event_end),
             ref_vals_(ref_vals),
             ll_(ll),
             model_(model) {
-        //std::cout << "DTW\n";
-        //std::cout.flush();
         init_mat();
-        //std::cout << "init\n";
-        //std::cout.flush();
         fill_mat();          
-        //std::cout << "mat\n";
-        //std::cout.flush();
         traceback();
-        //std::cout << "trace\n";
-        //std::cout.flush();
     }
-
-    //BandedDTW(const DtwParams &prms,
-    //          const PyArray<float> &qry_vals,   
-    //          const PyArray<KmerType> &ref_vals,
-    //          const ModelType &model,
-    //          const PyArray<Coord> &ll) :
-    //            BandedDTW(prms, qry_vals, ref_vals, model) {
-
-    //    //ll_.resize(ll.size());
-    //    ////for (size_t i = 0; i < lower.size(); i++) {
-    //    //for (size_t i = 0; i < ll.size(); i++) {
-    //    //    ll_[i] = ll[i];
-    //    //}
-
-    //}
-
-    //BandedDTW(const DtwParams &prms,
-    //          const PyArray<float> &qry_vals,   
-    //          const PyArray<KmerType> &ref_vals,
-    //          const ModelType &model,
-    //          const std::vector<std::pair<i32,i32>> &ll) :
-    //            BandedDTW<ModelType>(prms, qry_vals, ref_vals, model) {
-    //    //assert(lower.size() == left.size());
-
-    //    ll_.resize(ll.size());
-    //    //for (size_t i = 0; i < lower.size(); i++) {
-    //    for (size_t i = 0; i < ll.size(); i++) {
-    //        ll_[i] = {ll[i].first, ll[i].second};
-    //    }
-
-    //    init_mat();
-    //    fill_mat();          
-    //    traceback();
-    //}
 
     u32 band_count() const {
         return ref_size() + qry_size() - 1;
@@ -338,12 +387,12 @@ class BandedDTW {
         return static_cast<u32>(i) >= 0 && static_cast<u32>(i) < v.size();
     }
 
-    i32 ref_size() const {
-        return static_cast<i32>(ref_vals_.size());
+    size_t ref_size() const {
+        return (ref_vals_.size());
     }
 
-    i32 qry_size() const {
-        return static_cast<i32>(qry_vals_.size());
+    size_t qry_size() const {
+        return (event_end_-event_start_);
     }
 
     //void init_mat(const std::vector<bool> &rmoves) {
@@ -412,8 +461,8 @@ class BandedDTW {
             for (size_t k = band_start; k < band_end; k++) {
 
                 //TODO can I compute starting locaiton from ll_?
-                if (in_range(q, qry_vals_) && in_range(r, ref_vals_)) {
-                    float cost = costfn(qry_vals_[q], ref_vals_[r]);
+                if (q >= 0 & q < qry_size() && in_range(r, ref_vals_)) {
+                    float cost = costfn(qry_vals_.events[event_start_+q].mean, ref_vals_[r]);
                     float ds,hs,vs;
 
                     if (ak >= astart && ak <= aend) { 
@@ -475,7 +524,7 @@ class BandedDTW {
 
             auto offs = path_k - band_start(path_band);
             //std::cout << path_band << " " << path_k << " " << offs << "\n";
-            path_.push_back({path_ll.qry-offs, path_ll.ref+offs});
+            path_.push_back({path_ll.qry-offs+event_start_, path_ll.ref+offs});
 
             i32 shift = 0;
 
@@ -507,11 +556,15 @@ class BandedDTW {
         }
 
         //std::cout << "\n";
-        path_.push_back({0,0});
+        path_.push_back({event_start_,0});
     }
 
     std::vector<Coord> get_path() {
         return path_;
+    }
+
+    DtwDF get_aln() {
+        return DtwDF(path_, qry_vals_, ref_size());
     }
 
     float score() {
@@ -607,7 +660,9 @@ class BandedDTW {
         pybind11::class_<BandedDTW<ModelType>> c(m, ("BandedDTW" + suffix).c_str());
 
         c.def(pybind11::init<const DtwParams &,
-                             const PyArray<float>&, 
+                             //const PyArray<float>&, 
+                             const ProcessedRead&, 
+                             size_t, size_t,
                              const std::vector<KmerType>&,
                              const ModelType&,
                              const PyArray<Coord>&>());
@@ -619,6 +674,7 @@ class BandedDTW {
         //                     const std::vector<std::pair<i32,i32>>& >());
 
         PY_BANDED_DTW_METH(get_path)
+        PY_BANDED_DTW_METH(get_aln)
         PY_BANDED_DTW_METH(score)
         PY_BANDED_DTW_METH(mean_score)
         //c.def_readonly("ll", BandedDTW<ModelType>::ll_);

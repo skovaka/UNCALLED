@@ -31,28 +31,42 @@ IOParams._def_params(
     #("db_in", None, str, "Input track database"),
     #("db_out", None, str, "Output track database"),
 
-    ("sql_in", None, str, "Input track database"),
+    ("processes", 1, int, "Number of parallel processes"),
+    ("bam_chunksize", 100, int, "Per-process alignment bam_chunksize"),
+
+    ("sql_in", None, None, "Input track database"),
     ("sql_out", None, str, "Output track database"),
 
     ("tsv_out", None, str, "TSV output file (or \"-\"/no argument for stdout)"),
     ("tsv_cols", None, list, "TSV file output alignment layers (comma-separated, can also include \"read_id\""),
     ("tsv_na", "*", str, "Missing value representation for TSV output"),
+    ("tsv_noref", False, bool, "Will NOT output reference coordinates to TSV if True"),
 
-    ("bam_in", None, str, "BAM input file (or \"-\"/no argument for stdin)"),
+    ("bam_in", None, None, "BAM input file (or \"-\"/no argument for stdin)"),
     ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
 
-    ("eventalign_in", None, str, "Eventalign (nanopolish) input file (or \"-\"/no argument for stdin)"),
+    ("model_dir", None, str, "Pore model training output directory"),
+
+    ("buffered", False, bool, "Will store alignments in buffer rather than directly output"),
+    ("bam_header", None, None, "BAM input header dict"),
+
+    ("eventalign_in", None, list, "Eventalign (nanopolish) input file (or \"-\"/no argument for stdin)"),
     ("eventalign_out", None, str, "Eventalign (nanopolish) output file (or \"-\"/no argument for stdout)"),
     ("eventalign_index", None, str, "Nanopolish index file"),
     ("eventalign_flags", [], list, f"Eventalign optional flags (comma-separated list of \"\"{eventalign_flags}\")"),
-    ("tombo_in", None, str, "Fast5 files containing Tombo alignments"),
+    ("tombo_in", None, None, "Fast5 files containing Tombo alignments"),
+
+    ("guppy_in", None, str, "Guppy directory containing sequencing summary, BAM files, and FAST5s"),
+
+    ("out_name", None, str, "Output track name (defaults to file basename)"),
+    ("in_names", None, list, "Names of tracks to read from input(s)"),
 
     ("init_track", True, bool, "If true will initialze track"),
 
     ("output_format", "db", str,  "Output format (db, eventalign)"),
     ("overwrite", False, bool, "Overwrite existing tracks"),
     ("append", False, bool, "Append reads to existing tracks"),
-    ("aln_chunksize", 4000, int, "Number of alignments to query for iteration"),
+    ("aln_chunksize", 500, int, "Number of alignments to query for iteration"),
     ("ref_chunksize", 10000, int, "Number of reference coordinates to query for iteration"),
     ignore_toml={"bam_in", "bam_out", "sql_in", "sql_out", "eventalign_in", "eventalign_out", "tombo_in", "eventalign_index", "overwrite", "append"},
     #ignore_toml={"input", "output", "output_format", "overwrite", "append"},
@@ -65,7 +79,7 @@ TracksParams._def_params(
     ("io", {}, IOParams, "Track input/output parameters"),
     ("ref_bounds", None, RefCoord, "Only load reads which overlap these coordinates"),
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),
-    ("max_reads", None, int, "Only load reads which overlap these coordinates"),
+    ("max_reads", None, int, "Maximum number of reads to load"),
 
     ("mask_skips", None, None, "Either \"all\" to mask all skips, or \"keep_best\" to mask all but the closest to the model"),
     ("mask_indels", None, int, "Mask positions which overlap basecalled alignment insertions or deletions of this length or longer"),
@@ -83,9 +97,21 @@ TracksParams._def_params(
     ("refstats_layers", None, None, "Layers to compute refstats"),
 
     ("index_prefix", None, str, "BWA index prefix"),
-    ("load_fast5s", True, bool, "Load fast5 files"),
+    ("load_fast5s", False, bool, "Load fast5 files"),
 
-    ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter"}
+    ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter", "load_fast5s"}
+)
+
+class TrainParams(config.ParamGroup):
+    _name = "train"
+TrainParams._def_params(
+    ("kmer_samples", 1000, int, "Maximum number of instances of each k-mer to use per training iteration"),
+    ("iterations", 1, int, "Number of model training iterations"),
+    ("buffer_size", 256, int, "Size of sorted chunk buffer (MB)"),
+    ("max_bcaln_dist", 1, float, "Maximum mean_refi_dist from basecalled alignment to use for model trainer"),
+    ("use_median", False, bool, ""),
+    ("skip_dtw", None, bool, "Will use previous training data to re-compute the model. '--out-dir' must be a previous model training directory with at least the specified number of iterations"),
+    ("append", False, bool, "If output directory exists and contains a file 'it[N].model.tsv', will use the file with the highest N to initialize training and generate additional training iterations"),
 )
 
 class VisParams(config.ParamGroup):

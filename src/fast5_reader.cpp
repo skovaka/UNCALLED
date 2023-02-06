@@ -303,6 +303,16 @@ Fast5Dict::Fast5Dict(const Params &p) : Fast5Reader(p) {
     }
 }
 
+Fast5Dict::Fast5Dict(std::vector<std::string> file_paths, std::vector<std::string> read_ids, std::vector<std::string> file_names, const Params &p) : Fast5Dict(p) {
+    for (auto &path : file_paths) {
+        auto i = add_fast5(path);
+        auto basename = path.substr(path.rfind('/')+1);
+        filename_paths_[basename] = i;
+    }   
+
+    load_index(read_ids, file_names);
+}
+
 Fast5Dict::Fast5Dict(Fast5ReadMap fast5_map, const Params &p) : Fast5Dict(p) {
     for (auto fast5_reads : fast5_map) {
         auto i = add_fast5(fast5_reads.first);
@@ -310,6 +320,23 @@ Fast5Dict::Fast5Dict(Fast5ReadMap fast5_map, const Params &p) : Fast5Dict(p) {
             add_read(read, i);
         }
     }
+}
+
+//bool Fast5Dict::load_index(const std::vector<std::string> &read_ids, const std::vector<std::string> &file_names) {
+bool Fast5Dict::load_index(std::vector<std::string> read_ids, std::vector<std::string> file_names) {
+    if (read_ids.size() != file_names.size()) {
+        throw std::runtime_error("read_ids must be same length as file_names");
+    }
+
+    for (size_t i = 0; i < read_ids.size(); i++) {
+        add_read(read_ids[i], filename_paths_[file_names[i]]);
+    }
+
+    return true;
+}
+
+bool Fast5Dict::is_indexed() const {
+    return reads_.size() > 0;
 }
 
 bool Fast5Dict::load_index(const std::string &filename) {
@@ -343,6 +370,26 @@ bool Fast5Dict::load_index(const std::string &filename) {
 
 void Fast5Dict::add_read(const std::string &read_id, u32 fast5_idx) {
     reads_[read_id] = fast5_idx;
+}
+
+Fast5Read Fast5Dict::get_read(const std::string &read_id, const std::string &filename) {
+    if (fast5_idx_ >= fast5_files_.size() || fast5_files_[fast5_idx_] != filename) {
+        fast5_idx_ = filename_paths_[filename];
+    }
+
+    if (!open_fast5(fast5_idx_)) {
+        return Fast5Read();
+    }
+
+    std::string path;
+    if (fmt_ == Format::MULTI) {
+        path = "/"+MULTI_READ_PREFIX + read_id;
+    } else {
+        path = get_single_raw_path();
+    }
+
+
+    return Fast5Read(fast5_file_, get_subpaths(path));
 }
 
 Fast5Read Fast5Dict::operator[](const std::string &read_id) {

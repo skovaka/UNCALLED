@@ -42,7 +42,7 @@ Mapper::Params Mapper::PRMS {
     idx_preset      : "default",
     pore_model      : "r94_dna",//_compl",
     seed_tracker    : SeedTracker::PRMS_DEF,
-    normalizer      : Normalizer::PRMS_DEF,
+    normalizer      : NORMALIZER_PRMS_DEF,
     event_detector  : EventDetector::PRMS_DEF,
     event_profiler  : EventProfiler::PRMS_DEF
 

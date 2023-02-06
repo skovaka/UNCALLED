@@ -145,6 +145,13 @@ std::vector<Event> EventDetector::get_events(const std::vector<float> &raw) {
     return events;
 }
 
+ProcessedRead EventDetector::process_read(const ReadBuffer &read) {
+    ProcessedRead ret;
+    ret.events = get_events(read.signal_);
+    ret.set_signal(read.signal_);
+    return ret;
+}
+
 Event EventDetector::get_event() const {
     return event_;
 }

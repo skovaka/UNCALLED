@@ -225,6 +225,9 @@ class Opt:
         else:
             param_name = flag_to_var(self.args[-1])
 
+        if not hasattr(group, param_name):
+            raise ValueError(f"Parameter {self.group_name}.{param_name} does not exist")
+
         default = getattr(group, param_name)
 
         if hasattr(group, "_types"):

@@ -78,6 +78,9 @@ class Trackplot:
             self.tracks.conf.load_config(self.conf)
             self.conf = self.tracks.conf
 
+        if self.tracks.all_empty:       
+            self.tracks.load()
+
         if self.tracks.refstats is None:
             self.tracks.calc_refstats()
 
