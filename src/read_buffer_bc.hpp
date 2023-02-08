@@ -31,7 +31,8 @@
 class ReadBufferBC : public ReadBuffer {
     public:
 
-    ReadBufferBC() : ReadBuffer() {}
+    using ReadBuffer::ReadBuffer;
+    //ReadBufferBC() : ReadBuffer() {}
 
     u32 get_template_start() const {
         return template_start_;

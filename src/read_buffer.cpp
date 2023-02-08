@@ -23,6 +23,7 @@
 
 #include <iostream>
 #include "read_buffer.hpp"
+#include "dataframe.hpp"
 
 ReadBuffer::Params ReadBuffer::PRMS = {
     num_channels : 512,
@@ -88,6 +89,22 @@ ReadBuffer::ReadBuffer(const std::string &id, u16 channel, u32 number, u64 start
     for (u32 i = 0; i < raw_len; i++) signal_[i] = raw_data[raw_st+i];
 }
 
+#ifdef PYBIND
+ReadBuffer::ReadBuffer(const std::string &id, u16 channel, u32 number, u64 start_time, const py::array_t<float> &raw_data) 
+    : id_(id),
+      channel_idx_(channel-1),
+      number_(number),
+      start_sample_(start_time) {
+
+    PyArray<float> arr(raw_data);
+    full_duration_ = arr.size();
+    signal_.assign(arr.begin(), arr.end());
+    //signal_.reserve(arr.size());
+    //for (auto s : arr) {
+    //    signal_.push_back(s);
+    //}
+}
+#endif
 
 //Returns read ID (name)
 std::string ReadBuffer::get_id() const {

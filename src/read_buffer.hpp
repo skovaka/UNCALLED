@@ -40,6 +40,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
+namespace py = pybind11;
 #endif
 
 class ReadBuffer {
@@ -73,6 +74,10 @@ class ReadBuffer {
           const std::string &dtype, const std::string &raw_str);
     ReadBuffer(const std::string &id, u16 channel, u32 number, u64 start_time, 
           const std::vector<float> &raw_data, u32 raw_st, u32 raw_len);
+    
+    #ifdef PYBIND
+    ReadBuffer(const std::string &id, u16 channel, u32 number, u64 start_time, const py::array_t<float> &raw_data);
+    #endif
 
     //Returns read ID (name)
     std::string get_id() const;
@@ -141,6 +146,8 @@ class ReadBuffer {
 
     static void pybind_defs(pybind11::class_<ReadBuffer> &c) {
         c.def(pybind11::init<ReadBuffer>());
+        c.def(pybind11::init<const std::string &, u16, u32, u64, const py::array_t<float> &>());
+    
         PY_READ_METH(empty, "Returns true if read has no data");
         PY_READ_RPROP(id, "Read ID (name)");
         PY_READ_RPROP(start, "Read start sample relative to start of the run");
