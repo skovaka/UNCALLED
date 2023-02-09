@@ -58,24 +58,32 @@ class Bcaln:
         self.errors = None
 
         if read.bc_loaded:
-            moves = read.moves
+            mv_stride = read.bce_stride
+            moves = np.array(read.moves)
+            template_start = read.template_start
         elif sam.has_tag("mv"):
-            moves = np.array(sam.get_tag("mv"))[1:]
+            mv = np.array(sam.get_tag("mv"))
+            mv_stride = mv[0]
+            template_start = sam.get_tag("ts")
+            moves = mv[1:]
         else:
-            raise RuntimeError(f"Basecaller \"moves\" not found for read {read.id}")
+            #raise RuntimeError(f"Basecaller \"moves\" not found for read {read.id}")
+            sys.stderr.write(f"Basecaller moves not found for read {read.id}, skipping\n")
+            self.df = pd.DataFrame()
+            return
             
         if not self.parse_cigar(sam):
             raise RuntimeError(f"Cigar string not found for read {read.id}")
 
         #TODO make c++ build this 
-        moves = np.array(read.moves, bool)
-        bce_qrs = np.cumsum(read.moves)
-        bce_samps = read.template_start + np.arange(len(bce_qrs)) * read.bce_stride
+        #moves = np.array(read.moves, bool)
+        bce_qrs = np.cumsum(moves)
+        bce_samps = template_start + np.arange(len(bce_qrs)) * mv_stride
 
         samp_bps = pd.DataFrame({
             "start" : bce_samps,
-            "length" : read.bce_stride,
-            "bp"     : np.cumsum(read.moves),
+            "length" : mv_stride,
+            "bp"     : bce_qrs,
         })
 
         df = samp_bps.join(self.bp_mref_aln, on="bp").dropna()
@@ -107,6 +115,7 @@ class Bcaln:
             df = df.set_index(df.index - self.kmer_shift[0])
         else:
             df = df.set_index(df.index - self.kmer_shift[0] + 1)
+
 
         self.df = df.iloc[self.kmer_shift[0]:]#:-self.kmer_shift[1]]
         self.coords = self.coords.mref_intersect(mrefs=self.df.index)

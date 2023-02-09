@@ -110,6 +110,9 @@ class GuidedDTW:
 
         bcaln, self.coords = tracks.calc_bcaln(bam, read)
 
+        if bcaln is None:
+            return
+
         #sigproc = SignalProcessor(tracks.model, self.conf)
         #signal = sigproc.process(read, False)
 

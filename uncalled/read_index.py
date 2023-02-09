@@ -148,12 +148,6 @@ class ReadIndex:
         if not self._is_read_file(path):
             return False
 
-        #TODO make sure fast5 reader doesn't crash on failure
-        #if not os.path.isfile(path):
-        #    sys.stderr.write("Warning: fast5 file \"%s\" does not exist\n" % fname)
-        #    return False
-        #TODO is abspath nesissary?
-
         fname = os.path.basename(path)
         self.file_paths_d[fname] = path
 
@@ -182,6 +176,7 @@ class Fast5Reader(ReadIndex):
             self.infile.close()
         self.infile_name = filename
         self.infile = get_fast5_file(self.infile_name, mode="r")
+
 
     def _get(self, read_id, filename):
         self._open(filename)

@@ -12,8 +12,8 @@ from .aln_track import AlnTrack
 from .layers import LAYER_META, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
-from ..read_index import ReadIndex#, Fast5Reader
-from ..fast5 import Fast5Reader
+from ..read_index import ReadIndex, Fast5Reader
+#from ..fast5 import Fast5Reader
 from .. import config
 from . import Bcaln
 
