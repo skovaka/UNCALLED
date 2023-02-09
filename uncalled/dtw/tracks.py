@@ -12,8 +12,8 @@ from .aln_track import AlnTrack
 from .layers import LAYER_META, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
-from ..fast5 import Fast5Reader, parse_read_ids
-from ..read_index import ReadIndex
+from ..read_index import ReadIndex#, Fast5Reader
+from ..fast5 import Fast5Reader
 from .. import config
 from . import Bcaln
 
@@ -619,12 +619,10 @@ class Tracks:
             #    sys.stderr.write("Failed to write compare group\n")
             #    sys.stderr.write(str(track.alignments))
 
-    def calc_bcaln(self, bam, track_name=None):
+    def calc_bcaln(self, bam, read, track_name=None):
         track = self._track_or_default(track_name)
 
         read_id = bam.query_name
-
-        read = self.fast5s[read_id]
 
         #TODO move to tracks.init_bcaln (maybe rename bcaln)
         #construct from BAM (with move table, or FAST5)

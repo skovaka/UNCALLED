@@ -13,7 +13,6 @@ from ..pafstats import parse_paf
 from ..config import Config
 from ..argparse import ArgParser
 from ..index import str_to_coord
-from ..fast5 import Fast5Reader
 
 from .io import BAM, Guppy
 
@@ -109,7 +108,7 @@ class GuidedDTW:
 
         read = tracks.fast5s[bam.query_name]
 
-        bcaln, self.coords = tracks.calc_bcaln(bam)
+        bcaln, self.coords = tracks.calc_bcaln(bam, read)
 
         #sigproc = SignalProcessor(tracks.model, self.conf)
         #signal = sigproc.process(read, False)

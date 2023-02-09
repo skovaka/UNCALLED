@@ -128,7 +128,7 @@ class Fast5Read : public ReadBufferBC {
     }
 
     protected:
-    std::string filename_;
+    //std::string filename;
 
     #ifdef PYBIND
 
@@ -138,7 +138,6 @@ class Fast5Read : public ReadBufferBC {
 
     static void pybind_defs(pybind11::class_<Fast5Read, ReadBufferBC> &c) {
 
-        c.def_readonly("filename", &Fast5Read::filename_);
         c.def("__repr__", [](Fast5Read &r) -> std::string {
             return "<Fast5Read id=" + r.get_id() + ">"; //TODO add channel, number, length
         });

@@ -89,9 +89,7 @@ class Bcaln:
             "indel" : grp["indel"].first()
         }).set_index("mref")
         #pd.set_option('display.max_rows', 50000) 
-        #print(df)
 
-        #print((df["indel"] < 0).mean(), (df["indel"] > 0).mean())
 
         #df = pd.concat([df, self.errors], axis=1)
 
@@ -125,7 +123,6 @@ class Bcaln:
 
         bp_mref_aln = list()#defaultdict(list)
 
-        #print(sam.query_alignment_start, sam.query_alignment_end)
         #if not self.is_rna:
         #    read_i = sam.query_alignment_start
         #else:

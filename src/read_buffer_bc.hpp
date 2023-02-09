@@ -27,6 +27,12 @@
 #include <algorithm>
 #include "hdf5_tools.hpp"
 #include "read_buffer.hpp"
+#ifdef PYBIND
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/numpy.h>
+namespace py = pybind11;
+#endif
 
 class ReadBufferBC : public ReadBuffer {
     public:
@@ -50,9 +56,16 @@ class ReadBufferBC : public ReadBuffer {
         return bce_stride_;
     }
 
+    void set_moves(const std::vector<u8> &moves, u32 template_start, u32 stride) {
+        moves_.assign(moves.begin(), moves.end());
+        template_start_ = template_start;
+        bce_stride_ = stride;
+        bc_loaded_ = true;
+    }
+
     protected:
 
-    bool bc_loaded_;
+    bool bc_loaded_ = false;
     u32 template_start_, bce_stride_;
     std::vector<u8> moves_;
 
@@ -65,7 +78,10 @@ class ReadBufferBC : public ReadBuffer {
 
     static void pybind_defs(pybind11::class_<ReadBufferBC, ReadBuffer> &c) {
 
-        //c.def(pybind11::init<ReadBuffer>());
+        c.def(pybind11::init<ReadBufferBC>());
+        c.def(pybind11::init<const std::string &, u16, u32, u64, const py::array_t<float> &>());
+        c.def("set_moves", &ReadBufferBC::set_moves);
+        PY_READ_BUFFER_BC_METH(set_moves, "Set move data");
         PY_READ_BUFFER_BC_RPROP(bc_loaded, "True if basecalling data loaded");
         PY_READ_BUFFER_BC_RPROP(moves, "Guppy BC event moves");
         PY_READ_BUFFER_BC_RPROP(bce_stride, "Guppy BC event length");

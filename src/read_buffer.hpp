@@ -148,6 +148,7 @@ class ReadBuffer {
         c.def(pybind11::init<ReadBuffer>());
         c.def(pybind11::init<const std::string &, u16, u32, u64, const py::array_t<float> &>());
     
+        c.def_readwrite("filename", &ReadBuffer::filename_);
         PY_READ_METH(empty, "Returns true if read has no data");
         PY_READ_RPROP(id, "Read ID (name)");
         PY_READ_RPROP(start, "Read start sample relative to start of the run");
@@ -176,7 +177,7 @@ class ReadBuffer {
     #endif
 
     //Source source_;
-    std::string id_;
+    std::string id_, filename_;
     u16 channel_idx_;
     u32 number_;
     u64 start_sample_, full_duration_; //TODO no raw len
