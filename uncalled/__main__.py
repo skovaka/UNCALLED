@@ -191,7 +191,7 @@ CONVERT_OPTS = (
 
     Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks"),
-    Opt(("-x", "--fast5-index"), "fast5_reader"),
+    Opt(("-x", "--fast5-index"), "fast5_reader", required=False),
     Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),

@@ -12,7 +12,7 @@ from .aln_track import AlnTrack
 from .layers import LAYER_META, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel
-from ..read_index import ReadIndex, Fast5Reader
+from ..read_index import ReadIndex, Fast5Reader, Slow5Reader
 #from ..fast5 import Fast5Reader
 from .. import config
 from . import Bcaln
@@ -96,7 +96,7 @@ class Tracks:
 
         
         if self.read_index is None:
-            self.read_index = Fast5Reader(read_filter=self.prms.read_filter)
+            self.read_index = Slow5Reader(read_filter=self.prms.read_filter)
 
         self._init_io()
 
@@ -227,6 +227,7 @@ class Tracks:
                 io = Cls(filename, False, self, track_count)
 
                 p = io.conf.fast5_reader
+                print("LOAD", p.fast5_files)
                 self.read_index.load_paths(p.fast5_files, p.recursive)
                 self.read_index.load_index_file(p.fast5_index)
 
