@@ -11,11 +11,10 @@ def is_read_id(read_id):
     return re.match("[a-z0-9]+(-[a-z0-9])+", read_id) is not None
 
 class ReadIndex:
-    def __init__(self, index_filename=None, file_paths=None, read_filter=None, file_suffix=".fast5"):
+    def __init__(self, file_paths=None, index_filename=None, read_filter=None, file_suffix=".fast5"):
         self.file_suffix = file_suffix
         self.index_filename = index_filename
-        self.file_paths = list()
-        self.file_paths_d = dict()
+        self.file_paths = dict()
         self.read_files = None
 
         self._load_filter(read_filter)
@@ -29,7 +28,6 @@ class ReadIndex:
         ret = ReadIndex(read_filter=read_ids, file_suffix=self.file_suffix)
         ret.load_index_df(self.read_files.reset_index())
         ret.file_paths = self.file_paths
-        ret.file_paths_d = self.file_paths_d
         return ret
 
     def load_index_file(self, fname=None):
@@ -70,12 +68,12 @@ class ReadIndex:
         if self.read_filter is not None:
             df = df[df["read_id"].isin(self.read_filter)]
 
-        df = df.set_index("read_id").sort_index()
+        filenames = df.set_index("read_id")["filename"].str.rsplit("/", n=2, expand=True).iloc[:,-1]
 
         if self.read_files is None:
-            self.read_files = df
+            self.read_files = filenames.sort_index()
         else:
-            self.read_files = pd.concat([self.read_files, df])
+            self.read_files = pd.concat([self.read_files, filenames]).sort_index()
 
 
     def load_paths(self, paths, recursive):
@@ -111,19 +109,6 @@ class ReadIndex:
                     for line in infile:
                         self._add_read_file(line.strip())
 
-    #def get_fast5_dict(self):
-    #    fast5_reads = dict()
-    #    idx = self.read_files.set_index("filename").sort_index()
-    #    for fast5 in idx.index.unique():
-    #        path = self.file_paths[os.path.basename(fast5)]
-    #        reads = idx.loc[fast5, "read_id"]
-    #        if isinstance(reads, str):
-    #            reads = [reads]
-    #        else:
-    #            reads = list(reads)
-    #        fast5_reads[path] = reads
-    #    return fast5_reads
-
     def _load_filter(self, reads):
         if reads is None:
             self.read_filter = None
@@ -141,31 +126,22 @@ class ReadIndex:
         return fname.endswith(self.file_suffix) and not fname.startswith("#")
 
     def get_read_file(self, read_id):
-        filename = self.read_files.loc[read_id, "filename"]
-        return self.file_paths_d[filename]
+        filename = self.read_files.loc[read_id]
+        return self.file_paths[filename]
 
     def _add_read_file(self, path):
         if not self._is_read_file(path):
             return False
 
         fname = os.path.basename(path)
-        self.file_paths_d[fname] = path
-
-        self.file_paths.append(path)
+        self.file_paths[fname] = path
 
         return True
 
 class Fast5Reader(ReadIndex):
-    #def __init__(self, index_filename=None, file_paths=None, read_filter=None):
-    def __init__(self, ri, conf):
-        self.read_files = ri.read_files
-        self.file_suffix = ".fast5" 
-        self.index_filename = ri.index_filename
-        self.file_paths = ri.file_paths
-        self.file_paths_d = ri.file_paths_d
-        self.conf = conf
+    def __init__(self, index_filename=None, file_paths=None, read_filter=None):
+        ReadIndex.__init__(self, index_filename, file_paths, read_filter, ".fast5")
 
-        #ReadIndex.__init__(self, index_filename, file_paths, read_filter, ".fast5")
         self.infile = None
         self.infile_name = None
 
@@ -176,7 +152,6 @@ class Fast5Reader(ReadIndex):
             self.infile.close()
         self.infile_name = filename
         self.infile = get_fast5_file(self.infile_name, mode="r")
-
 
     def _get(self, read_id, filename):
         self._open(filename)
@@ -201,14 +176,13 @@ class Fast5Reader(ReadIndex):
 
     def __iter__(self):
         prev = prev = None
-        for read_id, filename in self.read_files["filename"].items():
+        for read_id, filename in self.read_files.items():
             if prev != filename:
                 path = self.get_read_file(filename)
             yield self._get(read_id, path)
 
     def __getitem__(self, read_id):
         return self._get(read_id, self.get_read_file(read_id))
-
 
     def close(self):
         if self.infile is not None:

@@ -96,11 +96,7 @@ class Tracks:
 
         
         if self.read_index is None:
-            self.read_index = ReadIndex(read_filter=self.prms.read_filter)
-
-        #def __init__(self, index_filename=None, file_paths=None, read_filter=None, file_suffix=".fast5"):
-
-        self._fast5s = None
+            self.read_index = Fast5Reader(read_filter=self.prms.read_filter)
 
         self._init_io()
 
@@ -118,33 +114,6 @@ class Tracks:
         #if self.coords is not None and  len(self._aln_track_ids) > 0:
         #    self.load()
 
-
-    @property
-    def fast5s(self):
-        if self._fast5s is not None:
-            return self._fast5s
-
-        #for io in self.inputs:
-        #    if isinstance(io, SQL):
-        #        fast5_reads = list()
-        #        fast5_reads.append(io.get_fast5_index(self._aln_track_ids))
-        #        fast5_reads = pd.concat(fast5_reads)
-        #        files = fast5_reads["filename"].unique()
-        #        self._fast5s = Fast5Reader(
-        #            index=fast5_reads, 
-        #            conf=self.conf)
-
-        #if self._fast5s is None:
-        if len(self.conf.fast5_reader.fast5_files) > 0:
-            self._fast5s = Fast5Reader(self.read_index, conf=self.conf)
-        else: 
-            return None
-
-        for track in self.alns:
-            track.fast5s = self._fast5s
-
-        return self._fast5s
-
     def _init_slice(self, parent, coords, tracks):
         self.conf = parent.conf 
         self.prms = parent.prms
@@ -154,7 +123,6 @@ class Tracks:
 
         self.index = parent.index
         self.read_index = parent.read_index
-        self._fast5s = parent._fast5s
         self._aln_track_ids = parent._aln_track_ids
         self.refstats = None
         self.new_alignment = parent.new_alignment
@@ -327,7 +295,7 @@ class Tracks:
 
     def get_read_fast5(self, read_id):
         if self.read_index is not None and self.read_index.read_files is not None:
-            return self.read_index.read_files.loc[read_id, "filename"]
+            return self.read_index.read_files.loc[read_id]
         for io in self.inputs:
             if getattr(io, "read_id_in", None) == read_id:
                 return io.fast5_in
@@ -909,7 +877,6 @@ class Tracks:
             gen = self.iter_reads_slice(read_filter, ref_bounds)
 
         for read_id,chunk in gen:
-            #print(read_id, [len(a.alignments) for a in chunk.alns])
             yield read_id,chunk
             
     def iter_reads_slice(self, reads=None, ref_bounds=None):
@@ -946,8 +913,6 @@ class Tracks:
                 ref_index=self.index)
 
             for alignments,layers in aln_iter:
-                #print("aln", alignments)
-                #print("layer", layers.index.unique("aln_id"))
                 for ref_name,ref_alns in alignments.groupby("ref_name"):
                     coords = self._alns_to_coords(ref_alns)
                     cache = self._tables_to_tracks(coords, ref_alns, layers)

@@ -74,7 +74,6 @@ class Sigplot:
         
         current_min = samp_min = np.inf
         current_max = samp_max = 0
-        fast5_file = None
         for i,track in enumerate(self.tracks.alns):
             #track_color = self.prms.track_colors[i]
             colors = self.conf.vis.track_colors[i]
@@ -86,9 +85,6 @@ class Sigplot:
             dtws = list()
             
             for aln_id,aln in alns.iterrows():
-                if "fast5" in aln.index:
-                    fast5_file = aln.loc["fast5"]
-
                 dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln_id")
                 dtw["model_current"] = track.model[dtw["kmer"]]
 
@@ -108,12 +104,7 @@ class Sigplot:
             if len(dtws) > 0:
                 track_dtws.append(pd.concat(dtws).sort_index())
 
-        if fast5_file is None:
-            fast5 = self.tracks.fast5s[read_id]
-        else:
-            fast5 = self.tracks.fast5s.get_read(read_id, os.path.basename(fast5_file))
-        
-        read = self.sigproc.process(fast5, True)
+        read = self.sigproc.process(self.tracks.read_index[read_id], True)
         signal = read.get_norm_signal(samp_min, samp_max)
 
         sig_med = np.median(signal)

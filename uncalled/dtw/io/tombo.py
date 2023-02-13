@@ -49,7 +49,7 @@ class Tombo(TrackIO):
         
         #f5reader = self.fast5_in #Fast5Reader(conf=self.conf)
         read_filter = self.read_index.read_filter #f5reader.get_read_filter()
-        fast5_files = self.read_index.file_paths #f5reader.prms.fast5_files
+        fast5_files = self.read_index.file_paths.values() #f5reader.prms.fast5_files
 
         if self.conf.fast5_reader.max_reads > 0 and len(fast5_files) > self.conf.fast5_reader.max_reads:
             fast5_files = fast5_files[:self.conf.fast5_reader.max_reads]

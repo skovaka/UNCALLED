@@ -106,7 +106,7 @@ class GuidedDTW:
         self.conf = tracks.conf
         self.prms = self.conf.dtw
 
-        read = tracks.fast5s[bam.query_name]
+        read = tracks.read_index[bam.query_name]
 
         bcaln, self.coords = tracks.calc_bcaln(bam, read)
 
