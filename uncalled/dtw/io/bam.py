@@ -77,9 +77,6 @@ class BAM(TrackIO):
 
         TrackIO.init_write_mode(self)
 
-        if len(self.conf.fast5_reader.fast5_index) == 0:
-            sys.stderr.write("Warning: no fast5 index specified\n")
-
         #TODO load from AlnTrack instance (initialized by Tracks)
         self.model = PoreModel(self.conf.pore_model)
         self.kmer_trim = self.model.kmer_trim
