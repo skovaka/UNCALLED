@@ -5,17 +5,17 @@ import pandas as pd
 import os
 import re
 from _uncalled import ReadBufferBC
+from uuid import UUID
 
 from ont_fast5_api.fast5_interface import get_fast5_file
 import pyslow5
+import pod5
 
 def is_read_id(read_id):
     return re.match("[a-z0-9]+(-[a-z0-9])+", read_id) is not None
 
 #class ReaderBase:
 #    def __init__(self, filename):
-
-SUFFIXES = {"fast5", "slow5", "blow5"}
 
 class ReadIndex:
     def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False):
@@ -81,7 +81,8 @@ class ReadIndex:
         if self.read_filter is not None:
             df = df[df["read_id"].isin(self.read_filter)]
 
-        filenames = df.set_index("read_id")["filename"].str.rsplit("/", n=2, expand=True).iloc[:,-1]
+        #filenames = df.set_index("read_id")["filename"].str.rsplit("/", n=2, expand=True).iloc[:,-1]
+        filenames = df.set_index("read_id")["filename"].apply(os.path.basename)
 
         if self.read_files is None:
             self.read_files = filenames.sort_index()
@@ -149,7 +150,7 @@ class ReadIndex:
         Reader = FILE_READERS[fname.split(".")[-1]]
         self.file_info[fname] = (Reader, path)
 
-        if Reader == Slow5Reader:
+        if Reader != Fast5Reader:
             self._open(fname)
             self.load_index_df(pd.DataFrame({
                 "read_id"  : self.infile.read_ids,
@@ -213,10 +214,38 @@ class Fast5Reader:
     def close(self):
         self.infile.close()
 
+class Pod5Reader:
+    def __init__(self, filename):
+        self.infile = pod5.Reader(filename)
+        self._read_ids = None
+
+    @property
+    def read_ids(self):
+        if self._read_ids is None:
+            read_ids = self.infile.read_table.read_pandas()["read_id"]
+            self._read_ids = read_ids.apply(lambda r: str(UUID(bytes=r)))
+        return self._read_ids
+
+    def __getitem__(self, read_id):
+        r = next(self.infile.reads(selection=[read_id]))
+        c = r.calibration
+        signal = (r.signal + c.offset) * c.scale
+        return ReadBufferBC(read_id, 0, 0, 0, signal)
+
+    def __iter__(self):
+        for r in self.infile.seq_read():
+            yield self._dict_to_read(r)
+
+    def close(self):
+        self.infile.close()
+
 class Slow5Reader:
     def __init__(self, filename):
         self.infile = pyslow5.Open(filename, mode="r")
-        self.read_ids,_ = self.infile.get_read_ids()
+
+    @property
+    def read_ids(self):
+        return self.infile.get_read_ids()[0]
 
     def _dict_to_read(self, d):
         return ReadBufferBC(d["read_id"], 0, 0, 0, d["signal"])
@@ -235,5 +264,8 @@ class Slow5Reader:
 FILE_READERS = {
     "fast5" : Fast5Reader,
     "slow5" : Slow5Reader,
-    "blow5" : Slow5Reader
+    "blow5" : Slow5Reader,
+    "pod5"  : Pod5Reader
 }
+
+SUFFIXES = set(FILE_READERS.keys())
