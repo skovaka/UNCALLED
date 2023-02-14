@@ -110,7 +110,7 @@ usage: uncalled dtw [-h] --bam-in [BAM_IN] [-r] [-l READ_FILTER] [-x FAST5_INDEX
                     index_prefix fast5_files [fast5_files ...]                  
 ```
 
-### `dtw`
+### `train`
 
 Iteratively train a new k-mer pore model
 
