@@ -15,13 +15,18 @@ class AlnCoords(_AlnCoords, RecArrayHelper):
 
 class DataFrameHelper:
     #def _init(self, cls, *args):
-    def _init(self, df, Cls=None):
-        if isinstance(df, pd.DataFrame) and Cls is not None:
+    def _init(self, Cls, *args):
+        if len(args) == 1 and isinstance(args[0], pd.DataFrame) and Cls is not None:
             df = args[0]
             args = [df[col].to_numpy(copy=True) for col in self.names]
             self.instance = Cls(*args)
+        elif len(args) > 1:
+            self.instance = Cls(*args)
+        elif len(args) == 1:
+            self.instance = args[0]
 
-        self.instance = df
+        else:
+            raise ValueError(f"Invalid {Cls} dataframe")
 
     def __getattr__(self, name):
         return getattr(self.instance, name)
@@ -32,12 +37,12 @@ class DataFrameHelper:
 
     def to_df(self):
         return pd.DataFrame(
-            {name : self[name].to_numpy() for name in self.names},
+            {name : self[name].to_numpy() for name in self.names if len(self[name]) > 0},
         )
 
 class DtwDF(DataFrameHelper):
     def __init__(self, *args):
-        self._init( *args, _DtwDF)
+        self._init(_DtwDF, *args)
 
 class AlnCoordsDF(_AlnCoordsDF, DataFrameHelper):
     def __init__(self, *args):

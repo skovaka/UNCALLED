@@ -132,7 +132,7 @@ DTW_OPTS = (
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt("--method", "dtw", choices=METHODS.keys()),
-    #Opt(("-i", "--iterations"), "dtw"),
+    Opt(("--iterations"), "dtw"),
     Opt(("-c", "--cost-fn"), "dtw", choices=["abs_diff","z_score","norm_pdf"]),
     Opt("--skip-cost", "dtw"),
     Opt("--stay-cost", "dtw"),
@@ -275,7 +275,7 @@ DTW_CMD_OPTS = DTW_OPTS + (
 )
 
 TRAIN_OPTS = (
-    Opt(("-i", "--iterations"), "train"), 
+    Opt(("-i", "--train-iterations"), "train", "iterations"), 
     Opt("--kmer-samples", "train"), 
     Opt("--buffer-size", "train"), 
     Opt(("-d", "--max-bcaln-dist"), "train"), 

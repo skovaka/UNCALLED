@@ -142,8 +142,6 @@ struct AlnCoords : public RecArray<AlnCoord> {
 
 template <typename... Types>
 class DataFrame {
-
-    
     public:
     static constexpr size_t width = sizeof...(Types);
 
@@ -178,8 +176,13 @@ class DataFrame {
     template <size_t I>
     typename std::enable_if<I < width, size_t>::type
     init_height(size_t size) {
-        if (std::get<I>(data_).size() != size) {
-            throw std::runtime_error("All DataFrame columns must be same size");
+        auto arr_size = std::get<I>(data_).size();
+        if (arr_size > 0) {
+            if (size == 0) {
+                size = arr_size;
+            } else if (arr_size != size) {
+                throw std::runtime_error("All DataFrame columns must be same size or empty");
+            }
         }
         return init_height<I+1>(size);
     }

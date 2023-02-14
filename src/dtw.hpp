@@ -16,7 +16,7 @@ struct DtwParams {
     float move_cost, stay_cost, skip_cost,
           band_shift;
     i32 del_max, ins_max, band_width, iterations;
-    std::string norm_mode, band_mode, cost_fn, mm2_paf;
+    std::string norm_mode, band_mode, cost_fn;
     bool save_bands;
 };
 
@@ -287,6 +287,20 @@ struct DtwDF : public DataFrame<int, int, float, float> {
         stdv[i] = evt.stdv;
     }
 
+    void set_signal(const ProcessedRead &read) {
+        if (current.size() == 0) {
+            current = std::valarray<float>(height);
+            stdv = std::valarray<float>(height);
+        }
+
+        for (size_t i = 0; i < height; i++) {
+            auto seg = static_cast<std::valarray<float>>(read.signal[std::slice(start[i], length[i], 1)]);
+            current[i] = seg.sum() / seg.size();
+            auto deltas = seg - current[i];
+            stdv[i] = sqrt((deltas*deltas).sum() / seg.size());
+        }
+    }
+
     //using DataFrame::data_;
 
     //int aln_id;
@@ -307,12 +321,11 @@ struct DtwDF : public DataFrame<int, int, float, float> {
     //}
 
     //#define ALN_ATTR(A) c.def_readwrite(#A, &ReadAln::A);
-    //static py::class_<ReadAln> pybind(py::module_ &m) {
-    //    auto c = DataFrame::pybind<ReadAln>(m, "_ReadAln");
-    //    c.def(py::init<const std::vector<Coords> &, const ProcessedRead &, size_t>());
-    //    
-    //    return c;
-    //}
+    static py::class_<DtwDF> pybind(py::module_ &m) {
+        auto c = DataFrame::pybind<DtwDF>(m, "_DtwDF");
+        c.def("set_signal", &DtwDF::set_signal);
+        return c;
+    }
 };
 
 template <typename ModelType>

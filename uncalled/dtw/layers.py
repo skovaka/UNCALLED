@@ -14,11 +14,11 @@ LAYERS = {
         "strand" : _Layer(str, "Strand",
             lambda track: track.layer_strands),
     }, "dtw" : {
+        "start" : _Layer("Int32", "Sample Start"),
+        "length" : _Layer("Int32", "Sample Length"),
         "current" : _Layer(np.float32, "Current (pA)"),
         "stdv" : _Layer(np.float32, "Stdv (pA)"),
         "kmer" : _Layer("UInt32", "Reference k-mer"),
-        "start" : _Layer("Int32", "Sample Start"),
-        "length" : _Layer("Int32", "Sample Length"),
         "events" : _Layer(np.float32, "Event Count"),
         #"kmer_id" : _Layer(np.uint32, "Binary k-mer ID", 
         #                   lambda track: track.

@@ -61,11 +61,13 @@ class Bcaln:
             mv_stride = read.bce_stride
             moves = np.array(read.moves)
             template_start = read.template_start
+
         elif sam.has_tag("mv"):
             mv = np.array(sam.get_tag("mv"))
             mv_stride = mv[0]
             template_start = sam.get_tag("ts")
             moves = mv[1:]
+
         else:
             #raise RuntimeError(f"Basecaller \"moves\" not found for read {read.id}")
             sys.stderr.write(f"Basecaller moves not found for read {read.id}, skipping\n")
@@ -96,10 +98,6 @@ class Bcaln:
             "length" : grp["length"].sum().astype("uint32"),
             "indel" : grp["indel"].first()
         }).set_index("mref")
-        #pd.set_option('display.max_rows', 50000) 
-
-
-        #df = pd.concat([df, self.errors], axis=1)
 
         if self.clip_coords is not None:
             mrefs = df.index.intersection(self.clip_coords.mrefs[self.is_fwd])

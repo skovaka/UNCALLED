@@ -163,21 +163,30 @@ class AlnTrack:
         
     def add_layer_group(self, group, layers, aln_id, overwrite):
         aln_id = self._aln_id_or_default(aln_id)
-        df = pd.concat({aln_id : 
-            pd.concat({group : layers}, names=["group", "layer"], axis=1)
-        }, names=["aln_id", "ref"]).reorder_levels(["ref","aln_id"])
+        #print("a")
+        #print(layers)
+        #df = pd.concat({aln_id : 
+        #    pd.concat({group : layers}, names=["group", "layer"], axis=1)
+        #}, names=["aln_id", "ref"]).reorder_levels(["ref","aln_id"])
 
-        df = df[LAYER_META.index.intersection(df.columns)]
+        layers["aln_id"] = aln_id
+        df = layers.set_index("aln_id", append=True).reorder_levels(["ref","aln_id"])
+        #print(df)
 
-        df = df.astype(LAYER_META.loc[df.columns, "dtype"], copy=False)
+        meta = LAYER_META.loc[group]
+        df = df[meta.index.intersection(df.columns)]
+        df = df.astype(meta.loc[df.columns, "dtype"], copy=False)
+
+        df = self._parse_layers(pd.concat({group : df}, names=["group", "layer"], axis=1))
 
         if self.layers is None or overwrite:
-            self.layers = self._parse_layers(df) #pd.DataFrame({
+            self.layers = df #pd.DataFrame({
             #    layer : df[layer].astype(LAYER_META.loc[layer,"dtype"]) 
             #    for layer in df}, columns=df.columns)
         else:
             #TODO don't always parse every layer twice
-            self.layers = self._parse_layers(pd.concat([self.layers, df], axis=1))
+            #self.layers = pd.concat([self.layers, self._parse_layers(df)], axis=1)
+            self.layers = pd.concat([self.layers, df], axis=1)
             #for layer in df:
             #    self.layers[layer] = df[layer]#.astype(LAYER_META.loc[layer,"dtype"])
 

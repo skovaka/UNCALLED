@@ -201,20 +201,29 @@ class GuidedDTW:
 
         tracks.set_read(signal)
 
-        df = self._calc_dtw(signal)
-
-        for i in range(self.prms.iterations-1):
-            reg = self.renormalize(signal, df)
-            signal.normalize(reg.coef_, reg.intercept_)
+        if self.prms.iterations > 0:
             df = self._calc_dtw(signal)
 
+            for i in range(self.prms.iterations-1):
+                reg = self.renormalize(signal, df)
+                signal.normalize(reg.coef_, reg.intercept_)
+                df = self._calc_dtw(signal)
+        else:
+            starts = self.bcaln["start"].to_numpy()
+            lengths = self.bcaln["length"].to_numpy()
+            cur = std = np.array([])
+            df = DtwDF(starts, lengths, cur, std)
+            df.set_signal(signal)
+            df = df.to_df()
+            df["mref"] = self.bcaln.index#pd.RangeIndex(mref_st, mref_en+1)
         if df is None:
             self.empty = True
             sys.stderr.write(f"Warning: dtw failed for read {read.id}\n")
             return
 
-        df["kmer"] = self.ref_kmers.loc[df["mref"]].to_numpy()
         self.df = df.set_index("mref")
+        self.df["kmer"] = self.ref_kmers#.loc[df.loc["mref"]]#.to_numpy()
+        self.df.dropna(subset=["kmer"], inplace=True)
 
         tracks.write_dtw_events(self.df, read=signal)#, aln_id=aln_id
 
