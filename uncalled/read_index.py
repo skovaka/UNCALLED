@@ -12,11 +12,16 @@ import pyslow5
 def is_read_id(read_id):
     return re.match("[a-z0-9]+(-[a-z0-9])+", read_id) is not None
 
+#class ReaderBase:
+#    def __init__(self, filename):
+
+SUFFIXES = {"fast5", "slow5", "blow5"}
+
 class ReadIndex:
-    def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False, suffix_regex="\.fast5"):
-        self.suffix_re = re.compile(suffix_regex)
+    def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False):
+        #self.suffix_re = re.compile(suffix_regex)
         self.index_filename = index_filename
-        self.file_paths = dict()
+        self.file_info = dict()
         self.read_files = None
 
         if file_paths is not None:
@@ -30,13 +35,12 @@ class ReadIndex:
         
     @property
     def indexed(self):
-        return len(self.file_paths) > 0
+        return len(self.file_info) > 0
     
     def subset(self, read_ids):
         ret = ReadIndex(read_filter=read_ids)
-        ret.suffix_re = self.suffix_re
         ret.load_index_df(self.read_files.reset_index())
-        ret.file_paths = self.file_paths
+        ret.file_paths = self.file_info
         return ret
 
     def load_index_file(self, fname=None):
@@ -82,6 +86,7 @@ class ReadIndex:
         if self.read_files is None:
             self.read_files = filenames.sort_index()
         else:
+            filenames = filenames[~filenames.index.isin(self.read_files.index)]
             self.read_files = pd.concat([self.read_files, filenames]).sort_index()
 
     def load_paths(self, paths, recursive):
@@ -90,7 +95,6 @@ class ReadIndex:
 
         for path in paths:
             path = path.strip()
-
             if not os.path.exists(path):
                 raise ValueError("Error: \"%s\" does not exist\n" % path)
 
@@ -108,7 +112,7 @@ class ReadIndex:
                     self._add_read_file(os.path.join(path, fname))
 
             #Read fast5 name directly
-            elif self.suffix_re.search(fname):
+            elif self._is_read_file(path):
                 self._add_read_file(path)
 
             #Read fast5 filenames from text file
@@ -131,58 +135,63 @@ class ReadIndex:
             self.read_filter = set(reads)
 
     def _is_read_file(self, fname):
-        return self.suffix_re.search(fname) and not fname.startswith("#")
+        return not fname.startswith("#") and fname.split(".")[-1] in SUFFIXES
 
     def get_read_file(self, read_id):
         filename = self.read_files.loc[read_id]
-        return self.file_paths[filename]
+        return filename
 
     def _add_read_file(self, path):
         if not self._is_read_file(path):
             return False
 
         fname = os.path.basename(path)
-        self.file_paths[fname] = path
+        Reader = FILE_READERS[fname.split(".")[-1]]
+        self.file_info[fname] = (Reader, path)
+
+        if Reader == Slow5Reader:
+            self._open(fname)
+            self.load_index_df(pd.DataFrame({
+                "read_id"  : self.infile.read_ids,
+                "filename" : fname
+            }))
 
         return True
 
     def _open(self, filename):
         if filename == self.infile_name:
-            return False
-        elif self.infile is not None:
+            return self.infile
+        if self.infile is not None:
             self.infile.close()
         self.infile_name = filename
-        return True
 
-    def __iter__(self):
-        prev = prev = None
-        for read_id, filename in self.read_files.items():
-            if prev != filename:
-                path = self.file_paths[filename]
-            yield self._get(read_id, path)
+        Reader,path = self.file_info[filename]
+        self.infile = Reader(path)
+        return self.infile
 
     def __getitem__(self, read_id):
-        return self._get(read_id, self.get_read_file(read_id))
+        self._open(self.get_read_file(read_id))
+        return self.infile[read_id]
+        #return self._get(read_id, self.get_read_file(read_id))
 
     def close(self):
         if self.infile is not None:
             self.infile.close()
 
-class Fast5Reader(ReadIndex):
-    def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False):
-        ReadIndex.__init__(self, file_paths, read_filter, index_filename, recursive, "\.fast5")
+class Fast5Reader:
+    #def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False):
+    def __init__(self, filename):
+        self.infile = get_fast5_file(filename, mode="r")
 
-    def _open(self, filename):
-        if ReadIndex._open(self, filename):
-            self.infile = get_fast5_file(self.infile_name, mode="r")
-
-    def _get(self, read_id, filename):
-        self._open(filename)
+    def __getitem__(self, read_id):
         f5 = self.infile.get_read(read_id)
+        return self._dict_to_read(f5)
+    
+    def _dict_to_read(self, f5):
         channel = f5.get_channel_info()
         attrs = f5.handle[f5.raw_dataset_group_name].attrs#["start_time"])
         read = ReadBufferBC(f5.read_id, channel["channel_number"], attrs["read_number"], attrs["start_time"], f5.get_raw_data(scale=True))
-        read.filename = filename
+        #read.filename = filename
 
         bc_group = f5.get_latest_analysis("Basecall_1D")
         seg_group = f5.get_latest_analysis("Segmentation")
@@ -197,33 +206,34 @@ class Fast5Reader(ReadIndex):
 
         return read
 
-class Slow5Reader(ReadIndex):
-    def __init__(self, file_paths=None, read_filter=None, recursive=False):
-        ReadIndex.__init__(self, file_paths, read_filter, None, recursive, "\.[bs]low5$")
+    def __iter__(self):
+        for r in self.infile:
+            yield self._dict_to_read(r)
 
-        for fname,path in self.file_paths.items():
-            self._open(path)
-            read_ids,n = self.infile.get_read_ids()
-            self.load_index_df(pd.DataFrame({"read_id" : read_ids, "filename" : fname}))
+    def close(self):
+        self.infile.close()
 
-    def _add_read_file(self, path):
-        if ReadIndex._add_read_file(self, path):
-            self._open(path)
-            read_ids,n = self.infile.get_read_ids()
-            self.load_index_df(pd.DataFrame({"read_id" : read_ids, "filename" : path}))
-            return True
-        return False
+class Slow5Reader:
+    def __init__(self, filename):
+        self.infile = pyslow5.Open(filename, mode="r")
+        self.read_ids,_ = self.infile.get_read_ids()
 
-    def _open(self, filename):
-        if ReadIndex._open(self, filename):
-            self.infile = pyslow5.Open(self.infile_name, mode="r")
+    def _dict_to_read(self, d):
+        return ReadBufferBC(d["read_id"], 0, 0, 0, d["signal"])
 
-    def _get(self, read_id, filename):
-        self._open(filename)
-        
-        s5 = self.infile.get_read(read_id, pA=True)
+    def __getitem__(self, read_id):
+        r = self.infile.get_read(read_id, pA=True)
+        return self._dict_to_read(r)
 
-        read = ReadBufferBC(s5["read_id"], 0, 0, 0, s5["signal"])
-        
-        return read
+    def __iter__(self):
+        for r in self.infile.seq_read():
+            yield self._dict_to_read(r)
 
+    def close(self):
+        self.infile.close()
+
+FILE_READERS = {
+    "fast5" : Fast5Reader,
+    "slow5" : Slow5Reader,
+    "blow5" : Slow5Reader
+}
