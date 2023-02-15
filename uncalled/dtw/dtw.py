@@ -134,26 +134,39 @@ class GuidedDTW:
         mref_min = self.coords.mrefs.min()#-self.index.trim[0]
         mref_max = self.coords.mrefs.max()+1#+self.index.trim[1]
 
+        tup_coords = list()
         self.block_coords = list()
         block_st = mref_min
         shift = block_st#+5
         for gap_st, gap_en in self.ref_gaps:
+            tup_coords.append((block_st, gap_st))
             self.block_coords.append([block_st, gap_st, shift])
             block_st = gap_en
             shift += gap_en-gap_st
         self.block_coords.append([block_st,mref_max, shift])
+        tup_coords.append((block_st,mref_max))
 
         #kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
         new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], self.conf.is_rna)
 
         if bcaln.flip_ref:
+            tup_coords[0] = (tup_coords[0][0] + self.index.trim[1], tup_coords[0][1])
+            tup_coords[-1] = (tup_coords[0][0], tup_coords[0][1] - self.index.trim[0])
             self.block_coords[0][0] += self.index.trim[1]
             self.block_coords[-1][1] -= self.index.trim[0]
         else:
+            tup_coords[0] = (tup_coords[0][0] + self.index.trim[0], tup_coords[0][1])
+            tup_coords[-1] = (tup_coords[0][0], tup_coords[0][1] - self.index.trim[1])
             self.block_coords[0][0] += self.index.trim[0]
             self.block_coords[-1][1] -= self.index.trim[1]
 
+        self.intv_coords = _uncalled.IntervalIndexI64(tup_coords)
+
+        #print(self.block_coords)
+        #print(self.intv_coords)
+
         mrefs = np.concatenate([np.arange(s,e) for s,e,_ in self.block_coords])
+        print("a", np.all(mrefs == self.intv_coords.expand()))
 
         #self.ref_kmers = pd.concat(kmer_blocks)
         self.ref_kmers = pd.Series(new_kmers, index=mrefs)
@@ -210,7 +223,6 @@ class GuidedDTW:
                 signal.normalize(reg.coef_, reg.intercept_)
                 df = self._calc_dtw(signal)
         else:
-            print("SKIPPING DTW")
             starts = self.bcaln["start"].to_numpy()
             lengths = self.bcaln["length"].to_numpy()
             cur = std = np.array([])
@@ -294,8 +306,11 @@ class GuidedDTW:
             #mrefs = np.array(ref_kmers.index) #np.array(self.bcaln.index)
             aln = self.bcaln[self.bcaln.index.isin(ref_kmers.index)]
             mrefs = np.array(aln.index)
+            imrefs = self.intv_coords.get_index(mrefs) + 2
             for st,en,sh in self.block_coords:
                 mrefs[aln.index.isin(pd.RangeIndex(st,en))] -= sh
+
+            print("m", np.all(mrefs == imrefs))
 
             bands = _uncalled.get_guided_bands(ar(mrefs), ar(aln["start"]), ar(read_block['start']), band_count, shift)
 

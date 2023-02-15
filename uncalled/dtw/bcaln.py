@@ -39,8 +39,6 @@ class Bcaln:
 
         self.clip_coords = clip_coords
 
-        #ref_coord = RefCoord(sam.rf_name, sam.rf_st-1, sam.rf_en+2, sam.is_fwd)
-        #ref_coord = RefCoord(sam.rf_name, sam.rf_st, sam.rf_en, sam.is_fwd)
         self.is_fwd = not sam.is_reverse
 
         ref_coord = RefCoord(sam.reference_name, sam.reference_start, sam.reference_end, self.is_fwd)
@@ -51,8 +49,6 @@ class Bcaln:
         self.kmer_shift = ref_index.trim#[not sam.is_fwd]
         if not self.flip_ref:
             self.kmer_shift = self.kmer_shift[::-1]
-        #if sam.is_fwd == self.is_rna:
-        #self.kmer_shift = self.kmer_shift[::-1]
 
         self.ref_gaps = list()
         self.errors = None
@@ -69,7 +65,6 @@ class Bcaln:
             moves = mv[1:]
 
         else:
-            #raise RuntimeError(f"Basecaller \"moves\" not found for read {read.id}")
             sys.stderr.write(f"Basecaller moves not found for read {read.id}, skipping\n")
             self.df = pd.DataFrame()
             return

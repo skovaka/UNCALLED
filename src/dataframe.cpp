@@ -23,6 +23,8 @@ void pybind_dataframes(py::module_ &m) {
     pybind_valarray<u32>(m, "U32");
     pybind_valarray<u64>(m, "U64");
 
+    IntervalIndex<i64>::pybind(m, "I64");
+
     PyArray<float>::pybind(m, "PyArrayF32");
     PyArray<int>::pybind(m, "PyArrayI32");  
     PyArray<i64>::pybind(m, "PyArrayI64");  

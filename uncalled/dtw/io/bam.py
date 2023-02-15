@@ -59,6 +59,8 @@ class BAM(TrackIO):
             conf = self.conf
             #toml = self.conf.to_toml()
 
+        self._init_tags(conf.tracks.io.bam_tags)
+
         name = os.path.basename(self.filename)
         self.in_id = self.init_track(name, name, conf)
 
@@ -70,10 +72,18 @@ class BAM(TrackIO):
         self.input.reset()
         self.aln_id_in = 1
 
+    def _init_tags(self, tags):
+        self.tags = dict()
+        for t in tags:
+            label, tag = t.split(":")
+            self.tags[label] = tag
+
     def init_write_mode(self):
         if self.conf.tracks.io.bam_out is None:
             self.output = None
             return
+
+        self._init_tags(self.prms.bam_tags)
 
         TrackIO.init_write_mode(self)
 

@@ -44,6 +44,10 @@ IOParams._def_params(
 
     ("bam_in", None, None, "BAM input file (or \"-\"/no argument for stdin)"),
     ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
+    ("bam_tags", [
+        "ref_bounds:ur", "samp_bounds:us" , "norm_params:un",
+        "length:ul", "current:uc", "stdv:ud"
+        ], list, "BAM output file (or \"-\"/no argument for stdout)"),
 
     ("model_dir", None, str, "Pore model training output directory"),
 

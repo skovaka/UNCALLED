@@ -35,8 +35,34 @@ void pybind_valarray(py::module_ &m, std::string suffix) {
             {sizeof(T)} 
         ); 
     });
+    a.def("__repr__", [](std::valarray<T> &a) -> std::string { 
+        std::stringstream ss;
+        ss << "[";
+        if (a.size() > 6) {
+            for (size_t i = 0; i < 3; i++) {
+                ss << a[i] << " ";
+            }
+            ss << "...";
+            for (size_t i = a.size()-4; i < a.size(); i++) {
+                ss << " " << a[i];
+            }
+        } else {
+            for (size_t i = 0; i < a.size()-1; i++) {
+                ss << a[i] << " ";
+            }
+            ss << a[a.size()-1];
+        }
+        ss << "]";
+        return ss.str();
+    });
+
     a.def("__getitem__", static_cast< T& (std::valarray<T>::*)(size_t)> (&std::valarray<T>::operator[]));
     a.def("__len__", &std::valarray<T>::size);
+    a.def("__iter__", [](const std::valarray<T> &v) { 
+            return py::make_iterator(std::begin(v), std::end(v)); 
+        }, py::keep_alive<0, 1>())
+    ;
+
 
     a.def("to_numpy", [](std::valarray<T> &a) -> py::array_t<T> { 
         return py::array_t<T>{static_cast<py::ssize_t>(a.size()), &a[0]}; 
@@ -45,22 +71,9 @@ void pybind_valarray(py::module_ &m, std::string suffix) {
 
 template<typename T>
 struct PyArray {
-
-    std::vector<T> data_vec;
     py::buffer_info info;
     T *data;
     size_t size_;
-
-    PyArray(size_t length, T fill) :
-        data_vec { length, fill },
-        info { data_vec.data(), length },
-        data { data_vec.data() },
-        size_ { length } {}
-
-    PyArray(T *ptr, size_t length) :
-        info { ptr, length },
-        data { ptr },
-        size_ { length } {}
 
     PyArray(py::array_t<T> arr) :
         info { arr.request() },
@@ -254,6 +267,146 @@ struct AlnCoordsDF : public DataFrame<int, int, int> {
 };                
 
 void pybind_dataframes(py::module_ &m);
+
+template <typename T>
+struct Interval {
+    T start, end;
+
+    Interval(T s, T e) : start(s), end(e) {}
+    Interval(const std::pair<T,T>& p) : Interval(p.first, p.second) {}
+
+    static const T NA = std::numeric_limits<T>::max();
+
+    bool contains(T val) const {
+        return val >= start && val < end;
+    }
+
+    size_t length() const {
+        return static_cast<size_t>(end-start);
+    }
+
+    T &operator[](size_t i) {
+        switch (i) {
+            case 0: return start;
+            case 1: return end;
+        }
+        throw std::out_of_range("Interval index out of bounds");
+    }
+
+    std::string to_string() const {
+        std::stringstream ss;
+        ss << "[" << start << ", " << end << ")";
+        return ss.str();
+    }
+};
+
+template <typename T>
+bool operator <(const Interval<T> &a, const Interval<T> &b) { 
+    return a.start < b.start || (a.start == b.start && a.end < b.end);
+}
+
+template <typename T>
+class IntervalIndex {
+    public:
+
+    std::vector<Interval<T>> coords;
+    std::vector<size_t> starts;
+    size_t length;
+
+    static constexpr size_t MAX_IDX = -1;//std::numeric_limits<size_t>::max();
+
+    IntervalIndex(std::vector<std::pair<T,T>> coords_, bool sorted=false) 
+            : coords(coords_.begin(), coords_.end()) {
+
+        if (!sorted) {
+            std::sort(coords.begin(), coords.end());
+        }
+
+        starts.reserve(coords.size());
+        length = 0;
+        for (auto c : coords) {
+            starts.push_back(length);
+            length += c.length();
+        }
+    }
+
+    T operator[] (size_t i) {
+        if (i > length) throw std::out_of_range("Interval index of range");
+        size_t j = std::upper_bound(starts.begin(), starts.end(), i) - starts.begin() - 1;
+        return coords[j].start + (i - starts[j]);
+    }
+
+    std::string to_string() const {
+        std::stringstream ss;
+        for (auto c : coords) {
+            ss << c.to_string() << " ";
+        }
+        return ss.str();
+    }
+
+    Interval<T> get_interval(size_t i) const {
+        return coords[i];
+    }
+
+    std::valarray<T> get_lengths() const {
+        std::valarray<T> ret(size());
+        for (size_t i = 0; i < size(); i++) {
+            ret[i] = coords[i].end - coords[i].start;
+        }
+        return ret;
+    }
+
+    std::valarray<T> expand() const {
+        std::valarray<T> ret(length);
+        size_t i = 0;
+        for (auto &intv : coords) {
+            for (T v = intv.start; v < intv.end; v++) {
+                ret[i++] = v;
+            }
+        }
+        return ret;
+    }
+
+    size_t get_index(T val) const {
+        Interval<T> q = {val, Interval<T>::NA};
+        auto itr = std::lower_bound(coords.begin(), coords.end(), q);
+
+        if (itr > coords.begin()) {
+            size_t i = static_cast<size_t>(itr - coords.begin()) - 1;
+            if (coords[i].contains(val)) {
+                return starts[i] + (val - coords[i].start);
+            }
+        }
+        return MAX_IDX;
+    }
+
+    size_t size() const {
+        return coords.size();
+    }
+
+    #ifdef PYBIND
+    static void pybind(py::module_ &m, const std::string &suffix) {
+        PYBIND11_NUMPY_DTYPE(Interval<T>, start, end);
+
+        py::class_<IntervalIndex>(m, ("IntervalIndex"+suffix).c_str())
+            .def(py::init<std::vector<std::pair<T,T>>>())
+            .def("__getitem__", py::vectorize(&IntervalIndex::operator[]))
+            .def("__len__", &IntervalIndex::size)
+            .def("__repr__", &IntervalIndex<T>::to_string)
+            .def("expand", &IntervalIndex::expand)
+            .def("get_interval", py::vectorize(&IntervalIndex::get_interval))
+            .def("get_index", py::vectorize(&IntervalIndex::get_index))
+            .def_property_readonly("lengths", &IntervalIndex::get_lengths)
+            ;
+            
+        py::class_<Interval<T>>(m, ("Interval"+suffix).c_str())
+            .def("__repr__", &Interval<T>::to_string)
+            .def("__getitem__", &Interval<T>::operator[])
+            .def_readwrite("start", &Interval<T>::start)
+            .def_readwrite("end", &Interval<T>::end);
+    }
+    #endif
+};
 
 #endif
 #endif
