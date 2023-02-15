@@ -294,6 +294,12 @@ class Tracks:
             elif self.model.K != track.model.K:
                 raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
 
+    def set_model(self, model):
+        self.conf.pore_model = model.PRMS
+        self.model = model
+        for track in self.alns:
+            track.model = model
+
     def get_read_fast5(self, read_id):
         if self.read_index is not None and self.read_index.read_files is not None:
             return self.read_index.read_files.loc[read_id]

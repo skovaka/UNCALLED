@@ -87,7 +87,7 @@ class PoreModel:
                             vals = self._vals_from_hdf5(prms.name)
                         except:
                             raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
-            else:
+            elif len(prms.name) > 0:
                 models = ", ".join(PORE_MODEL_PRESETS.keys())
                 raise ValueError(
                     f"Unknown PoreModel: {prms.name}. Must be a filename, or one of {models}" \

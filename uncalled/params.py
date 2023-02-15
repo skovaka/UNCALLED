@@ -106,6 +106,8 @@ class TrainParams(config.ParamGroup):
     _name = "train"
 TrainParams._def_params(
     ("kmer_samples", 1000, int, "Maximum number of instances of each k-mer to use per training iteration"),
+    ("init_model", None, str, "Initial pore model. If not specified, iteration will be based on basecaller move alignments"),
+    ("kmer_len", None, int, "Output model k-mer length. Required if init_model is not specified"),
     ("iterations", 1, int, "Number of model training iterations"),
     ("buffer_size", 256, int, "Size of sorted chunk buffer (MB)"),
     ("max_bcaln_dist", 1, float, "Maximum mean_refi_dist from basecalled alignment to use for model trainer"),

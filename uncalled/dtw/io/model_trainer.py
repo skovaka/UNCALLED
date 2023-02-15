@@ -95,9 +95,10 @@ class ModelTrainer(TrackIO):
             self.set_model(track.model)
 
         track.calc_layers(LAYERS)
-        dtw = track.layers.loc[
-            track.layers[("cmp", "mean_ref_dist")] <= 1, LAYERS
-        ]["dtw"].set_index("kmer", drop=True) #\
+        mask = track.layers[("cmp", "mean_ref_dist")] <= 1
+        if self.conf.dtw.iterations == 0:
+            mask &= track.layers[("dtw", "length")] >= 30
+        dtw = track.layers.loc[mask, LAYERS]["dtw"].set_index("kmer", drop=True) #\
          #.sort_index() 
 
         if self.prms.buffered:
@@ -225,28 +226,16 @@ class ModelTrainer(TrackIO):
 
         df["count"] = df["count"].astype(int)
             
-
-        #if self.model.PRMS.reverse:
-        #    #df.reset_index(inplace=True)
-        #    print(df)
-        #    print(self.model.KMERS)
-        #    print(self.model.kmer_rev(self.model.KMERS))
-        #    df["kmer"] = self.model.kmer_rev(self.model.KMERS)
-        #    df.set_index("kmer", inplace=True)
-        #    df.sort_index(inplace=True)
-        #    print(df)
-
-
         model_out = PoreModel(df=df, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True)
         outfile = self._filename("model.tsv")
         model_out.to_tsv(outfile)
 
         self.set_model(PoreModel(outfile, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True))
 
-        #self.model.to_tsv(self._filename("model.tsv"))
-
         self.iter += 1
-        return outfile#self._filename("model.tsv")
+        print("write", self.model.PRMS.reverse, self.model.PRMS.complement)
+        return self.model #outfile#self._filename("model.tsv")
+        #return outfile
         
 
     def close(self):

@@ -72,6 +72,7 @@ def dtw_pool_iter(tracks):
 
 def dtw_worker(p):
     conf,bams,reads,header = p
+
     conf.tracks.io.buffered = True
     conf.tracks.io.bam_in = None
 
@@ -209,6 +210,7 @@ class GuidedDTW:
                 signal.normalize(reg.coef_, reg.intercept_)
                 df = self._calc_dtw(signal)
         else:
+            print("SKIPPING DTW")
             starts = self.bcaln["start"].to_numpy()
             lengths = self.bcaln["length"].to_numpy()
             cur = std = np.array([])

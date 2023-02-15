@@ -124,7 +124,6 @@ DTW_OPTS = (
 
     #Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include"),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
-    Opt(("-m", "--pore-model"), "pore_model", "name", default=None),
     Opt(("--kmer-shift"), "pore_model", "shift", default=None),
     Opt("--save-bands", "dtw", action="store_true"),
     Opt("--full-overlap", "tracks", action="store_true"),
@@ -267,6 +266,7 @@ DTW_CMD_OPTS = DTW_OPTS + (
         Opt("--bam-out", "tracks.io", nargs="?", const="-"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     ]),
+    Opt(("-m", "--pore-model"), "pore_model", "name", default=None),
     Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
     Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
     Opt("--tsv-noref", "tracks.io", action="store_true"),
@@ -276,6 +276,8 @@ DTW_CMD_OPTS = DTW_OPTS + (
 
 TRAIN_OPTS = (
     Opt(("-i", "--train-iterations"), "train", "iterations"), 
+    Opt(("-m", "--init-model"), "train"),
+    Opt(("-k", "--kmer-len"), "train"),
     Opt("--kmer-samples", "train"), 
     Opt("--buffer-size", "train"), 
     Opt(("-d", "--max-bcaln-dist"), "train"), 
