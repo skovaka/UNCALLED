@@ -147,26 +147,28 @@ class GuidedDTW:
         tup_coords.append((block_st,mref_max))
 
         #kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
-        new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], self.conf.is_rna)
+        #new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], self.conf.is_rna)
+        new_kmers = self.index.get_kmers(tup_coords, self.conf.is_rna)
 
         if bcaln.flip_ref:
             tup_coords[0] = (tup_coords[0][0] + self.index.trim[1], tup_coords[0][1])
             tup_coords[-1] = (tup_coords[-1][0], tup_coords[-1][1] - self.index.trim[0])
-            self.block_coords[0][0] += self.index.trim[1]
-            self.block_coords[-1][1] -= self.index.trim[0]
+            #self.block_coords[0][0] += self.index.trim[1]
+            #self.block_coords[-1][1] -= self.index.trim[0]
         else:
             tup_coords[0] = (tup_coords[0][0] + self.index.trim[0], tup_coords[0][1])
             tup_coords[-1] = (tup_coords[-1][0], tup_coords[-1][1] - self.index.trim[1])
-            self.block_coords[0][0] += self.index.trim[0]
-            self.block_coords[-1][1] -= self.index.trim[1]
+            #self.block_coords[0][0] += self.index.trim[0]
+            #self.block_coords[-1][1] -= self.index.trim[1]
 
         self.intv_coords = _uncalled.IntervalIndexI64(tup_coords)
 
         #print(self.block_coords)
         #print(self.intv_coords)
 
-        mrefs = np.concatenate([np.arange(s,e) for s,e,_ in self.block_coords])
-        print("a", np.all(mrefs == self.intv_coords.expand()))
+        #mrefs = np.concatenate([np.arange(s,e) for s,e,_ in self.block_coords])
+        mrefs = np.array(self.intv_coords.expand())
+        #print("a", np.all(mrefs ==self.intv_coords.expand()))
 
         #self.ref_kmers = pd.concat(kmer_blocks)
         self.ref_kmers = pd.Series(new_kmers, index=mrefs)
@@ -303,18 +305,18 @@ class GuidedDTW:
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
 
             ar = _uncalled.PyArrayI32
-            #mrefs = np.array(ref_kmers.index) #np.array(self.bcaln.index)
-            aln = self.bcaln[self.bcaln.index.isin(ref_kmers.index)]
-            mrefs = np.array(aln.index)
-            imrefs = self.intv_coords.get_index(mrefs) #+ 2
-            for st,en,sh in self.block_coords:
-                mrefs[aln.index.isin(pd.RangeIndex(st,en))] -= sh
+            #aln = self.bcaln[self.bcaln.index.isin(ref_kmers.index)]
+            #mrefs = np.array(aln.index)
+            #for st,en,sh in self.block_coords:
+            #    mrefs[aln.index.isin(pd.RangeIndex(st,en))] -= sh
 
-            print("good", mrefs)
-            print("bad ", imrefs)
-            print("m", np.all(mrefs == imrefs))
+            mrefs = self.intv_coords.get_index(ref_kmers.index) + self.intv_coords[0]-self.coords.mrefs.min()
 
-            bands = _uncalled.get_guided_bands(ar(mrefs), ar(aln["start"]), ar(read_block['start']), band_count, shift)
+            #print("m", np.all(mrefs == imrefs))
+            samp_start = self.bcaln.loc[ref_kmers.index[0]]
+
+            #bands = _uncalled.get_guided_bands(ar(mrefs), ar(aln["start"]), ar(read_block['start']), band_count, shift)
+            bands = _uncalled.get_guided_bands(ar(mrefs), ar(samp_start), ar(read_block['start']), band_count, shift)
 
             return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(ref_kmers), self.model.instance, _uncalled.PyArrayCoord(bands))
 
