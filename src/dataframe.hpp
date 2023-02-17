@@ -55,14 +55,11 @@ void pybind_valarray(py::module_ &m, std::string suffix) {
         ss << "]";
         return ss.str();
     });
-
     a.def("__getitem__", static_cast< T& (std::valarray<T>::*)(size_t)> (&std::valarray<T>::operator[]));
     a.def("__len__", &std::valarray<T>::size);
     a.def("__iter__", [](const std::valarray<T> &v) { 
             return py::make_iterator(std::begin(v), std::end(v)); 
-        }, py::keep_alive<0, 1>())
-    ;
-
+        }, py::keep_alive<0, 1>());
 
     a.def("to_numpy", [](std::valarray<T> &a) -> py::array_t<T> { 
         return py::array_t<T>{static_cast<py::ssize_t>(a.size()), &a[0]}; 
@@ -71,9 +68,29 @@ void pybind_valarray(py::module_ &m, std::string suffix) {
 
 template<typename T>
 struct PyArray {
+
+    std::vector<T> data_vec;
     py::buffer_info info;
     T *data;
     size_t size_;
+
+    //PyArray(size_t length, T fill) :
+    //    data_vec { length, fill },
+    //    info { data_vec.data(), length },
+    //    data { data_vec.data() },
+    //    size_ { length } {
+    //    std::cout << "called " << length << " " << fill << "\n";
+    //    std::cout.flush();
+    //}
+
+    PyArray(T *ptr, size_t length) :
+        info { ptr, length },
+        data { ptr },
+        size_ { length } {
+        //std::cout << "length " << length << "\n";
+        //std::cout.flush();
+
+    }
 
     PyArray(py::array_t<T> arr) :
         info { arr.request() },
@@ -152,6 +169,7 @@ struct AlnCoords : public RecArray<AlnCoord> {
         PYBIND11_NUMPY_DTYPE(AlnCoord, ref, start, end);
     }
 };
+
 
 template <typename... Types>
 class DataFrame {
@@ -407,6 +425,8 @@ class IntervalIndex {
     }
     #endif
 };
+
+
 
 #endif
 #endif
