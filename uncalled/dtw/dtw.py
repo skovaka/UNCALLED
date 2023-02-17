@@ -303,12 +303,13 @@ class GuidedDTW:
 
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
 
+            aln = self.bcaln[self.bcaln.index.isin(ref_kmers.index)]
+
             idxs = self.intv_coords.get_index(ref_kmers.index) + self.intv_coords[0]-self.coords.mrefs.min()
 
-            mv_starts = self.bcaln.iloc[idxs]["start"]
+            mv_starts = self.bcaln.loc[ref_kmers.index, "start"]
 
-            aln = self.bcaln[self.bcaln.index.isin(ref_kmers.index)]
-            print(np.all(aln["start"]==mv_starts))
+            print("a", np.all(aln["start"]== mv_starts))
 
             bands = _uncalled.get_guided_bands(idxs, mv_starts, read_block['start'], band_count, shift)
 
