@@ -48,6 +48,7 @@ def dtw(conf):
 
 def dtw_pool(conf):
     tracks = Tracks(conf=conf)
+    assert(tracks.output is not None)
     #tracks.output.set_model(tracks.model)
     i = 0
     for chunk in dtw_pool_iter(tracks):
@@ -95,6 +96,7 @@ def dtw_single(conf):
     """Perform DTW alignment guided by basecalled alignments"""
 
     tracks = Tracks(conf=conf)
+    assert(tracks.output is not None)
 
     for bam in tracks.bam_in.iter_sam():
         dtw = GuidedDTW(tracks, bam)
@@ -309,7 +311,7 @@ class GuidedDTW:
 
             mv_starts = self.bcaln.loc[ref_kmers.index, "start"]
 
-            print("a", np.all(aln["start"]== mv_starts))
+            #print("a", np.all(aln["start"]== mv_starts))
 
             bands = _uncalled.get_guided_bands(idxs, mv_starts, read_block['start'], band_count, shift)
 

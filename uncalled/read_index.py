@@ -139,7 +139,13 @@ class ReadIndex:
         return not fname.startswith("#") and fname.split(".")[-1] in SUFFIXES
 
     def get_read_file(self, read_id):
-        filename = self.read_files.loc[read_id]
+        if self.read_files is not None:
+            filename = self.read_files.loc[read_id]
+        elif len(self.file_info) == 1:
+            filename, = self.file_info.keys()
+        else:
+            raise IndexError("Must provide read index TSV file for random access over multiple files")
+
         return filename
 
     def _add_read_file(self, path):
