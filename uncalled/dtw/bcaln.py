@@ -14,6 +14,21 @@ from ..config import Config
 from ..argparse import Opt
 from ..index import RefCoord
 
+MOVE_KMER_LENS = {
+   "dna_r10.3_450bps" : 10,
+   "dna_r10.3_450bpsm" : 10,
+   "dna_r10.4.1_e8.2_260bps" : 10,
+   "dna_r10.4.1_e8.2_400bps" : 10,
+   "dna_r10_450bps" : 10,
+   "dna_r10.4_e8.1" : 10,
+   "dna_r10.4_e8.1m" : 10,
+   "dna_r9.4.1_450bps" : 6,
+   "dna_r9.4.1_e8.1" : 6,
+   "dna_r9.4.1_e8.1m" : 6,
+   "dna_r9.5_450bps" : 6,
+   "rna_r9.4.1_70bps" : 5,
+}
+
 class Bcaln:
     CIG_OPS_STR = "MIDNSHP=X"
     CIG_RE = re.compile("(\d+)(["+CIG_OPS_STR+"])")
@@ -31,13 +46,18 @@ class Bcaln:
     ERR_WIDTHS = [0,0,5]
 
 
-    def __init__(self, conf, ref_index, read, sam, clip_coords=None):
+    def __init__(self, conf, ref_index, read, sam, clip_coords=None, model_name=None):
 
         self.is_rna = conf.is_rna
         self.del_max = conf.dtw.del_max
         self.ins_max = conf.dtw.ins_max
 
         self.clip_coords = clip_coords
+
+        if model_name is not None:
+            mkl = MOVE_KMER_LENS[model_name]
+        else:
+            mkl = conf.pore_model.k
 
         self.is_fwd = not sam.is_reverse
 
@@ -47,7 +67,7 @@ class Bcaln:
         self.flip_ref = self.is_fwd == self.is_rna
 
         self.kmer_shift = ref_index.trim#[not sam.is_fwd]
-        if not self.flip_ref:
+        if self.flip_ref:
             self.kmer_shift = self.kmer_shift[::-1]
 
         self.ref_gaps = list()
@@ -104,13 +124,18 @@ class Bcaln:
             self.coords = self.sam_coords
 
         #TODO don't do this
-        if self.kmer_shift[0] <= 2:
-            df = df.set_index(df.index - self.kmer_shift[0])
-        else:
-            df = df.set_index(df.index - self.kmer_shift[0] + 1)
+        #if self.kmer_shift[0] <= 2:
+        #if self.kmer_shift[0] <= 2:
+        #    df = df.set_index(df.index - self.kmer_shift[0])
+        #else:
+        #    df = df.set_index(df.index - self.kmer_shift[0] + 1)
 
-
-        self.df = df.iloc[self.kmer_shift[0]:]#:-self.kmer_shift[1]]
+        sh = conf.pore_model.k - mkl
+        self.df = df.set_index(df.index - (self.kmer_shift[0] - sh))\
+                    .reindex(self.coords.mrefs[self.kmer_shift[0]:-self.kmer_shift[1]].sort_values() + sh)
+        self.df.index.name = "mref"
+        #df = df.set_index(df.index - (self.kmer_shift[0] - sh))
+        #self.df = df.iloc[np.sum(self.kmer_shift) - sh:len(df)-sh]#-self.kmer_shift[1]+sh]
         self.coords = self.coords.mref_intersect(mrefs=self.df.index)
 
 

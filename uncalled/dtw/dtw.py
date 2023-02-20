@@ -136,40 +136,44 @@ class GuidedDTW:
         mref_min = self.coords.mrefs.min()#-self.index.trim[0]
         mref_max = self.coords.mrefs.max()+1#+self.index.trim[1]
 
+        t0,t1 = self.index.trim if not bcaln.flip_ref else reversed(self.index.trim)
+
         tup_coords = list()
-        self.block_coords = list()
+        kmer_coords = list()
+        #self.block_coords = list()
         block_st = mref_min
-        shift = block_st#+5
+        kmer_st = block_st-t0
         for gap_st, gap_en in self.ref_gaps:
             tup_coords.append((block_st, gap_st))
-            self.block_coords.append([block_st, gap_st, shift])
-            block_st = gap_en
-            shift += gap_en-gap_st
-        self.block_coords.append([block_st,mref_max, shift])
+            kmer_coords.append((kmer_st, gap_st))
+            block_st = kmer_st = gap_en
+            #self.block_coords.append([block_st, gap_st, shift])
+            #shift += gap_en-gap_st
+        #self.block_coords.append([block_st,mref_max, shift])
+        kmer_coords.append((kmer_st,mref_max+t1))
         tup_coords.append((block_st,mref_max))
 
-        #kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
-        new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], self.conf.is_rna)
 
-        if bcaln.flip_ref:
-            tup_coords[0] = (tup_coords[0][0] + self.index.trim[1], tup_coords[0][1])
-            tup_coords[-1] = (tup_coords[-1][0], tup_coords[-1][1] - self.index.trim[0])
-            self.block_coords[0][0] += self.index.trim[1]
-            self.block_coords[-1][1] -= self.index.trim[0]
-        else:
-            tup_coords[0] = (tup_coords[0][0] + self.index.trim[0], tup_coords[0][1])
-            tup_coords[-1] = (tup_coords[-1][0], tup_coords[-1][1] - self.index.trim[1])
-            self.block_coords[0][0] += self.index.trim[0]
-            self.block_coords[-1][1] -= self.index.trim[1]
+        #kmer_blocks = [kmers.loc[st:en] for st,en,_ in self.block_coords]
+        new_kmers = self.index.get_kmers(kmer_coords, self.conf.is_rna)
+        #new_kmers = self.index.get_kmers([(s,e) for s,e,_ in self.block_coords], self.conf.is_rna)
+
+        #if bcaln.flip_ref:
+        #    tup_coords[0] = (tup_coords[0][0] + self.index.trim[1], tup_coords[0][1])
+        #    tup_coords[-1] = (tup_coords[-1][0], tup_coords[-1][1] - self.index.trim[0])
+        #    #self.block_coords[0][0] += self.index.trim[1]
+        #    #self.block_coords[-1][1] -= self.index.trim[0]
+        #else:
+        #    tup_coords[0] = (tup_coords[0][0] + self.index.trim[0], tup_coords[0][1])
+        #    tup_coords[-1] = (tup_coords[-1][0], tup_coords[-1][1] - self.index.trim[1])
+            #self.block_coords[0][0] += self.index.trim[0]
+            #self.block_coords[-1][1] -= self.index.trim[1]
 
         self.intv_coords = _uncalled.IntervalIndexI64(tup_coords)
 
-        #print(self.block_coords)
-        #print(self.intv_coords)
 
         #mrefs = np.concatenate([np.arange(s,e) for s,e,_ in self.block_coords])
         mrefs = np.array(self.intv_coords.expand())
-        #print("a", np.all(mrefs == self.intv_coords.expand()))
 
         #self.ref_kmers = pd.concat(kmer_blocks)
         self.ref_kmers = pd.Series(new_kmers, index=mrefs)
@@ -267,10 +271,10 @@ class GuidedDTW:
         path_qrys = list()
         path_refs = list()
 
-        #mref_st = self.ref_kmers.index[0]
-        mref_st = self.bcaln.index[self.bcaln.index.searchsorted(self.ref_kmers.index[0])]
-        mref_en = self.bcaln.index[self.bcaln.index.searchsorted(self.ref_kmers.index[-1])]
-        #mref_en = self.bcaln.index[-1]+1
+        mref_st = self.bcaln.index[0]
+        #mref_st = self.bcaln.index[self.bcaln.index.searchsorted(self.ref_kmers.index[0])]
+        #mref_en = self.bcaln.index[self.bcaln.index.searchsorted(self.ref_kmers.index[-1])]
+        mref_en = self.bcaln.index[-1]
 
         #kmers = self.ref_kmers.loc[mref_st:mref_en]
         #kmers = self.ref_kmers
@@ -310,8 +314,6 @@ class GuidedDTW:
             idxs = self.intv_coords.get_index(ref_kmers.index) + self.intv_coords[0]-self.coords.mrefs.min()
 
             mv_starts = self.bcaln.loc[ref_kmers.index, "start"]
-
-            #print("a", np.all(aln["start"]== mv_starts))
 
             bands = _uncalled.get_guided_bands(idxs, mv_starts, read_block['start'], band_count, shift)
 

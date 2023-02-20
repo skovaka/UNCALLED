@@ -266,7 +266,7 @@ DTW_CMD_OPTS = DTW_OPTS + (
         Opt("--bam-out", "tracks.io", nargs="?", const="-"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
     ]),
-    Opt(("-m", "--pore-model"), "pore_model", "name", default=None),
+    Opt(("-m", "--pore-model"), "pore_model", "name", default=""),
     Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
     Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
     Opt("--tsv-noref", "tracks.io", action="store_true"),

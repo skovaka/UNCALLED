@@ -11,7 +11,7 @@ from .io import SQL, TSV, Eventalign, Tombo, BAM, ModelTrainer, INPUTS, OUTPUTS,
 from .aln_track import AlnTrack
 from .layers import LAYER_META, parse_layers
 from ..index import load_index, RefCoord, str_to_coord
-from ..pore_model import PoreModel
+from ..pore_model import PoreModel, WORKFLOW_PRESETS
 from ..read_index import ReadIndex, Fast5Reader, Slow5Reader
 #from ..fast5 import Fast5Reader
 from .. import config
@@ -293,6 +293,12 @@ class Tracks:
                 self.model = track.model
             elif self.model.K != track.model.K:
                 raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
+
+        if self.model is None:
+            self.conf.pore_model.name = WORKFLOW_PRESETS[self.read_index.default_model]
+            self.model = PoreModel(self.conf.pore_model.name)
+            for track in self.alns:
+                track.model = self.model
 
     def set_model(self, model):
         self.conf.pore_model = model.PRMS
@@ -604,7 +610,7 @@ class Tracks:
         #need to standardize ref_gaps, maybe event_gaps too
         #ideally in generalized C++ CoordBounds or whatever
 
-        bcaln = Bcaln(self.conf, self.index, read, bam, self.coords)
+        bcaln = Bcaln(self.conf, self.index, read, bam, self.coords, self.read_index.default_model)
 
         if bcaln.empty:
             return None, None

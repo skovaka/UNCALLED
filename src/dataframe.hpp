@@ -291,7 +291,8 @@ struct Interval {
     T start, end;
 
     Interval(T s, T e) : start(s), end(e) {}
-    Interval(const std::pair<T,T>& p) : Interval(p.first, p.second) {}
+    Interval(const std::pair<T,T>& p) : Interval(p.first, p.second) {
+    }
 
     static const T NA = std::numeric_limits<T>::max();
 

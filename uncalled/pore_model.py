@@ -10,6 +10,21 @@ from _uncalled import PoreModelParams, ArrayU32, ArrayU16, PORE_MODEL_PRESETS
 import _uncalled
 from . import config
 
+WORKFLOW_PRESETS = {
+   "dna_r10.3_450bps" : "",
+   "dna_r10.3_450bpsm" : "",
+   "dna_r10.4.1_e8.2_260bps" : "",
+   "dna_r10.4.1_e8.2_400bps" : "",
+   "dna_r10_450bps" : "",
+   "dna_r10.4_e8.1" : "",
+   "dna_r10.4_e8.1m" : "",
+   "dna_r9.4.1_450bps" : "r94_dna",
+   "dna_r9.4.1_e8.1" : "r94_dna",
+   "dna_r9.4.1_e8.1m" : "r94_dna",
+   "dna_r9.5_450bps" : "r94_dna",
+   "rna_r9.4.1_70bps" : "r94_rna"
+}
+
 CACHE = dict()
 
 class PoreModel:

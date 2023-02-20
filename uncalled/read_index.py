@@ -6,16 +6,16 @@ import os
 import re
 from _uncalled import ReadBufferBC
 from uuid import UUID
+from types import SimpleNamespace
 
 from ont_fast5_api.fast5_interface import get_fast5_file
 import pyslow5
 import pod5
 
+ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+
 def is_read_id(read_id):
     return re.match("[a-z0-9]+(-[a-z0-9])+", read_id) is not None
-
-#class ReaderBase:
-#    def __init__(self, filename):
 
 class ReadIndex:
     def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False):
@@ -30,8 +30,20 @@ class ReadIndex:
         self._load_filter(read_filter)
         self.load_index_file(index_filename)
 
+        self._default_model = None
         self.infile = None
         self.infile_name = None
+
+    @property
+    def default_model(self):
+        if self._default_model is None:
+            self._open(next(iter(self.file_info.keys())))   
+            flowcell,kit = self.infile.get_run_info()
+            models = pd.read_csv(os.path.join(ROOT_DIR, "config", "workflows.tsv"), sep="\t")\
+                       .set_index(["flowcell","kit"]).sort_index()
+            self._default_model = models.loc[(flowcell,kit), "config_name"].iloc[0]
+
+        return self._default_model
         
     @property
     def indexed(self):
@@ -176,6 +188,8 @@ class ReadIndex:
         self.infile = Reader(path)
         return self.infile
 
+        
+
     def __getitem__(self, read_id):
         self._open(self.get_read_file(read_id))
         return self.infile[read_id]
@@ -216,6 +230,18 @@ class Fast5Reader:
     def __iter__(self):
         for r in self.infile:
             yield self._dict_to_read(r)
+
+    def get_run_info(self):
+        rid = self.infile.get_read_ids()[0]
+        r = self.infile.get_read(rid)
+        tags = r.get_context_tags()
+        kit = tags.get("sequencing_kit", None)
+        flowcell = tags.get("flowcell_type", None)
+        if flowcell is None:
+            tags = r.get_tracking_id()
+            flowcell = tags.get("flow_cell_product_code", None)
+        upper = lambda s: s.upper() if s is not None else None
+        return upper(flowcell), upper(kit)
 
     def close(self):
         self.infile.close()

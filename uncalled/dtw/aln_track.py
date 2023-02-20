@@ -48,8 +48,10 @@ class AlnTrack:
 
         if model is not None:
             self.model = model 
-        else:
+        elif len(conf.pore_model.name) > 0:
             self.model = PoreModel(conf.pore_model)
+        else:
+            self.model = None
 
     def _init_slice(self, p, coords=None, alignments=None, layers=None, order=["fwd", "ref_start"]):
         self._init_new(p.id, p.name, p.desc, p.conf, p.model, p.fast5s)
@@ -163,15 +165,9 @@ class AlnTrack:
         
     def add_layer_group(self, group, layers, aln_id, overwrite):
         aln_id = self._aln_id_or_default(aln_id)
-        #print("a")
-        #print(layers)
-        #df = pd.concat({aln_id : 
-        #    pd.concat({group : layers}, names=["group", "layer"], axis=1)
-        #}, names=["aln_id", "ref"]).reorder_levels(["ref","aln_id"])
 
         layers["aln_id"] = aln_id
         df = layers.set_index("aln_id", append=True).reorder_levels(["ref","aln_id"])
-        #print(df)
 
         meta = LAYER_META.loc[group]
         df = df[meta.index.intersection(df.columns)]
@@ -290,6 +286,7 @@ class AlnTrack:
                    .loc[(slice(None),id_b),group][["start","end"]] \
                    .reset_index(level="aln_id") \
                    .rename(columns={"aln_id" : "aln_b"})
+                
 
         alns_a = aln_a.index.unique(1)
         if len(alns_a) != 1:

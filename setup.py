@@ -7,7 +7,7 @@ import sys
 
 try:
     from pybind11.setup_helpers import Pybind11Extension, ParallelCompile, naive_recompile
-    ParallelCompile("NPY_NUM_BUILD_JOBS", needs_recompile=naive_recompile).install()
+    ParallelCompile("NPY_NUM_BUILD_JOBS", default=4, needs_recompile=naive_recompile).install()
 except:
     from setuptools import Extension as Pybind11Extension
 
