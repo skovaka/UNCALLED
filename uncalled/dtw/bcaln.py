@@ -29,6 +29,7 @@ MOVE_KMER_LENS = {
    "dna_r9.5_450bps" : 6,
    "rna_r9.4.1_70bps" : 5,
 }
+INT32_NA = np.iinfo(np.int32).max
 
 class Bcaln:
     CIG_OPS_STR = "MIDNSHP=X"
@@ -90,38 +91,7 @@ class Bcaln:
             self.df = pd.DataFrame()
             return
             
-        if not self.parse_cigar(sam):
-            raise RuntimeError(f"Cigar string not found for read {read.id}")
-
-        #df = pd.DataFrame(
-        #    sam.get_aligned_pairs(), 
-        #    columns=["read","ref"], dtype="Int64"
-        #).dropna(subset=["ref"])
-
-        #df["mref"] = self.sam_coords.ref_to_mref(df["ref"].to_numpy())
-
-        #if self.flip_ref:
-        #    df["read"] = sam.query_length-df["read"]-1
-        #    df = df.iloc[::-1]
-
-
-        #self.bp_mref_aln = df.set_index("read")["mref"]
-        # .set_index("ref")\
-        # .reindex(self.sam_coords.refs)\
-        # .reset_index()\
-        # .set
-
-        #df = df.set_index(self.sam_coords.ref_to_mref(df.index))
-        #print(self.bp_mref_aln)
-
-        #TODO make c++ build this 
-        #moves = np.array(read.moves, bool)
-        bce_qrs = np.cumsum(moves)
-        bce_samps = template_start + np.arange(len(bce_qrs)) * mv_stride
-
         read_moves = moves_to_aln(moves, template_start, mv_stride)
-
-        QRY_NA = np.iinfo(np.int32).max
 
         ar = np.array(sam.get_aligned_pairs())
         ar = ar[ar[:,1] != None]
@@ -129,76 +99,35 @@ class Bcaln:
             ar = ar[::-1]
             qrys = ar[:,0]
             #silly trick to make null reverse into REF_NA
-            qrys[qrys == None] = sam.query_length - QRY_NA - 1
+            qrys[qrys == None] = sam.query_length - INT32_NA - 1
             qrys = sam.query_length - qrys - 1
 
         else:
             qrys = ar[:,0]
-            qrys[qrys == None] = QRY_NA
+            qrys[qrys == None] = INT32_NA
         refs = np.array(self.sam_coords.ref_to_mref(ar[:,1]), np.int64)
         qrys = qrys.astype(np.int64)
 
         ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max)
-        df= pd.DataFrame({
-            "mref"   : np.array(ref_moves.index.expand()),
-            "start"  : np.array(ref_moves.samples.starts),
-            "length" : np.array(ref_moves.samples.lengths)
+
+        shift = conf.pore_model.k - mkl - self.kmer_shift[0]
+        ref_moves.index.shift(shift)
+        ref_moves = ref_moves.slice(-shift, len(ref_moves.samples))
+        self.aln = ref_moves
+
+        df = pd.DataFrame({
+            "mref"   : (ref_moves.index.expand()),
+            "start"  : (ref_moves.samples.starts),
+            "length" : (ref_moves.samples.lengths)
         }).set_index("mref")
-
-        isna = df["start"] == QRY_NA
+        isna = df["start"] == INT32_NA
         df[isna] = pd.NA
-        df.fillna(method="backfill", inplace=True)
+        self.df = df.fillna(method="backfill")
 
-        #ref_moves = RefMoves(read_moves, refs, qrys)
-
-        #samp_bps = pd.DataFrame({
-        #    "start" : bce_samps,
-        #    "length" : mv_stride,
-        #    "bp"     : bce_qrs,
-        #})
-
-        #samp_bps = samp_bps.join(self.bp_mref_aln, on="bp").dropna()
-        #grp = samp_bps.groupby("mref")
-
-        #df = pd.DataFrame({
-        #    "mref"    : grp["mref"].first().astype("int64"),
-        #    "start"  : grp["start"].min().astype("uint32"),
-        #    "length" : grp["length"].sum().astype("uint32"),
-        #    #"indel" : grp["indel"].first()
-        #}).set_index("mref")
-
-        #print("sorted")
-        #print(df.sort_values("length"))
-
-        #print("diff")
-        #print(df[diff])
-        #print()
-
-        if self.clip_coords is not None:
-            mrefs = df.index.intersection(self.clip_coords.mrefs[self.is_fwd])
-            mrefs.name = "mref"
-
-            df = df.reindex(index=mrefs, copy=False)
-            self.coords = self.clip_coords#.mref_intersect(mrefs=self.df.index)
-        else:
-            self.coords = self.sam_coords
-
-        #TODO don't do this
-        #if self.kmer_shift[0] <= 2:
-        #if self.kmer_shift[0] <= 2:
-        #    df = df.set_index(df.index - self.kmer_shift[0])
-        #else:
-        #    df = df.set_index(df.index - self.kmer_shift[0] + 1)
-
-        sh = conf.pore_model.k - mkl
-        self.df = df.set_index(df.index - (self.kmer_shift[0] - sh))\
-                    .reindex(self.coords.mrefs[self.kmer_shift[0]:-self.kmer_shift[1]].sort_values() + sh)
         self.df.index.name = "mref"
-        #df = df.set_index(df.index - (self.kmer_shift[0] - sh))
-        #self.df = df.iloc[np.sum(self.kmer_shift) - sh:len(df)-sh]#-self.kmer_shift[1]+sh]
-        self.coords = self.coords.mref_intersect(mrefs=self.df.index)
+        self.coords = self.sam_coords.mref_intersect(mrefs=self.df.index)
 
-
+        
     @property
     def empty(self):
         return not hasattr(self, "df") or len(self.df) <= sum(self.kmer_shift)

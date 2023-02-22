@@ -257,16 +257,26 @@ struct AlnDF {
     IntervalIndex<i32> samples;
     std::valarray<float> current, current_sd; 
 
-    AlnDF(IntervalIndex<i64> &index_) : 
+    AlnDF(IntervalIndex<i64> index_) : 
         index(index_),
         current(index.length),
         current_sd(index.length) {}
 
-    AlnDF(IntervalIndex<i64> &index_, IntervalIndex<i32> &samples_, py::array_t<float> current_, py::array_t<float> current_sd_) : 
+    AlnDF(IntervalIndex<i64> index_, IntervalIndex<i32> &samples_, py::array_t<float> current_, py::array_t<float> current_sd_) : 
         index(index_),
         samples(samples_),
         current(init_arr(current_)),
         current_sd(init_arr(current_sd_)) {}
+
+    AlnDF slice(size_t i, size_t j) {
+        AlnDF ret(index.islice(i, j));
+        for (size_t k = i; k < j; k++) {
+            ret.samples.append(samples.coords[k]);
+            ret.current[k-i] = current[k];
+            ret.current_sd[k-i] = current_sd[k];
+        }
+        return ret;
+    }
 
     template <typename T>
     static std::valarray<T> init_arr(py::array_t<T> &a) {
@@ -280,6 +290,7 @@ struct AlnDF {
         c.def(py::init<IntervalIndex<i64>&, IntervalIndex<i32>&, py::array_t<float>, py::array_t<float>>());
         c.def_readwrite("index", &AlnDF::index);
         c.def_readwrite("samples", &AlnDF::samples);
+        c.def("slice", &AlnDF::slice);
         //c.def_readwrite("current", &AlnDF::current);
         //c.def_readwrite("current_sd", &AlnDF::current_sd);
         return c;

@@ -126,6 +126,7 @@ class GuidedDTW:
         self.model = tracks.model
 
         self.bcaln = bcaln.df#[bcaln.df["indel"] == 0]
+        self.bcaln_new = bcaln.aln#[bcaln.df["indel"] == 0]
 
         self.ref_gaps = list(sorted(bcaln.ref_gaps))
 
@@ -136,22 +137,18 @@ class GuidedDTW:
         mref_min = self.coords.mrefs.min()#-self.index.trim[0]
         mref_max = self.coords.mrefs.max()+1#+self.index.trim[1]
 
-        t0,t1 = self.index.trim if not bcaln.flip_ref else reversed(self.index.trim)
-
-        tup_coords = list()
+        coords = list()
         kmer_coords = list()
         block_st = mref_min
-        kmer_st = block_st-t0
         for gap_st, gap_en in self.ref_gaps:
-            tup_coords.append((block_st, gap_st))
-            kmer_coords.append((kmer_st, gap_st))
+            coords.append((block_st, gap_st))
             block_st = kmer_st = gap_en
-        kmer_coords.append((kmer_st,mref_max+t1))
-        tup_coords.append((block_st,mref_max))
+        coords.append((block_st,mref_max))
 
-        new_kmers = self.index.get_kmers(kmer_coords, self.conf.is_rna)
+        new_kmers = self.index.get_kmers(coords, self.conf.is_rna)
 
-        self.intv_coords = _uncalled.IntervalIndexI64(tup_coords)
+        t0,t1 = self.index.trim if not bcaln.flip_ref else reversed(self.index.trim)
+        self.intv_coords = self.bcaln_new.index.islice(t0, len(self.bcaln_new.samples)-t1)
 
         mrefs = np.array(self.intv_coords.expand())
 

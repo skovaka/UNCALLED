@@ -360,6 +360,44 @@ class IntervalIndex {
         }
     }
 
+    void shift(i64 delta) {
+        for (auto &c : coords) {
+            if (c.is_valid()) {
+                c.start += delta;
+                c.end += delta;
+            }
+        }
+    }
+
+    IntervalIndex<T> slice(T i, T j) const {
+        auto st = get_index(i), en = get_index(j-1);
+        return islice(st, en+1);
+    }
+
+    IntervalIndex<T> islice(size_t i, size_t j) const {
+        IntervalIndex<T> ret;
+        auto st = idx_to_interval(i), en = idx_to_interval(j-1);
+
+        ret.reserve(en-st+1);
+
+        auto intv = coords[st];
+        intv.start += i - starts[st];
+
+        if (st == en) {
+            intv.end = intv.start + (j-i);
+        } else {
+            ret.append(intv);
+            for (size_t i = st+1; i < en; i++) {
+                ret.append(coords[i]);
+            }
+            intv = coords[en];
+            intv.end = (j-i) - ret.length;
+        }
+        ret.append(intv);
+
+        return ret;
+    }
+
     void reserve(size_t size) {
         coords.reserve(size);
         starts.reserve(size);
@@ -375,9 +413,13 @@ class IntervalIndex {
         append({start,end});
     }
 
-    T operator[] (size_t i) {
+    size_t idx_to_interval(size_t i) const {
         if (i > length) throw std::out_of_range("Interval index of range");
-        size_t j = std::upper_bound(starts.begin(), starts.end(), i) - starts.begin() - 1;
+        return std::upper_bound(starts.begin(), starts.end(), i) - starts.begin() - 1;
+    }
+
+    T operator[] (size_t i) {
+        auto j = idx_to_interval(i);
         return coords[j].start + (i - starts[j]);
     }
 
@@ -425,7 +467,7 @@ class IntervalIndex {
     }
 
     //Interval<T> get_interval(size_t i) const {
-    size_t get_interval_index(T val) const {
+    size_t get_interval_idx(T val) const {
         Interval<T> q = {val, Interval<T>::NA};
         auto itr = std::lower_bound(coords.begin(), coords.end(), q);
 
@@ -439,7 +481,7 @@ class IntervalIndex {
     }
 
     Interval<T> get_interval(T val) const {
-        auto i = get_interval_index(val);
+        auto i = get_interval_idx(val);
         if (i < coords.size()) {
             return coords[i];
         } else {
@@ -448,7 +490,7 @@ class IntervalIndex {
     }
 
     size_t get_index(T val) const {
-        auto i = get_interval_index(val);
+        auto i = get_interval_idx(val);
         if (i < coords.size()) {
             return starts[i] + (val - coords[i].start);
         } else {
@@ -470,6 +512,9 @@ class IntervalIndex {
             .def("__len__", &IntervalIndex::size)
             .def("__repr__", &IntervalIndex<T>::to_string)
             .def("expand", &IntervalIndex::expand)
+            .def("shift", &IntervalIndex::shift)
+            .def("slice", &IntervalIndex::slice)
+            .def("islice", &IntervalIndex::islice)
             .def("get_interval", py::vectorize(&IntervalIndex::get_interval))
             .def("get_index", py::vectorize(&IntervalIndex::get_index))
             .def_property_readonly("lengths", &IntervalIndex::get_lengths)
