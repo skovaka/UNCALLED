@@ -94,7 +94,8 @@ class Bcaln:
         read_moves = moves_to_aln(moves, template_start, mv_stride)
 
         ar = np.array(sam.get_aligned_pairs())
-        ar = ar[ar[:,1] != None]
+        ar = ar[ar[:,1] != None] #TODO keep track of insertion counts
+
         if self.flip_ref:
             ar = ar[::-1]
             qrys = ar[:,0]
@@ -108,10 +109,13 @@ class Bcaln:
         refs = np.array(self.sam_coords.ref_to_mref(ar[:,1]), np.int64)
         qrys = qrys.astype(np.int64)
 
+
         ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max)
+
 
         shift = conf.pore_model.k - mkl - self.kmer_shift[0]
         ref_moves.index.shift(shift)
+        #TODO errors below if any refgaps :(
         ref_moves = ref_moves.slice(-shift, len(ref_moves.samples))
         self.aln = ref_moves
 

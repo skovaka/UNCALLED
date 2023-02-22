@@ -79,37 +79,50 @@ AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::a
 
     for (size_t i = 0; i < qrys.size(); i++) {
         auto ref = refs[i];
-        if (ref > prev_ref) {
-            samples.append(samps);
-            samps.clear();
-            prev_ref++;
+        //if (ref > prev_ref) {
+        //    samples.append(samps);
+        //    samps.clear();
+        //    prev_ref++;
 
-            if (ref - prev_ref < del_max) {
-                for (; prev_ref < ref; prev_ref++) {
-                    //std::cout << "skip " << samps.to_string() << "\n";
-                    samples.append(samps);
-                }
-            } else {
-                ref_seg.end = prev_ref;
-                ref_index.append(ref_seg);
-                ref_seg.start = prev_ref = ref;
-                ref_seg.end = ref_seg.NA;
+        //    if (ref - prev_ref < del_max) {
+        //    } else {
+        //        ref_seg.end = prev_ref;
+        //        ref_index.append(ref_seg);
+        //        ref_seg.start = prev_ref = ref;
+        //        ref_seg.end = ref_seg.NA;
+        //    }
+        //}
+        
+        //TODO handle del_max properly
+        //only append and update prev_ref on valid samps query
+        //the decide if its a gap or pad it up 
+        
+        auto j = read_moves.index.get_index(qrys[i]);
+        if (j >= read_moves.samples.size()) {
+            continue;
+        }
+        auto gap = ref - prev_ref;
+        if (gap > del_max) {
+            ref_seg.end = prev_ref;
+            ref_index.append(ref_seg);
+            ref_seg.start = prev_ref = ref;
+            ref_seg.end = ref_seg.NA;
+        } else if (gap > 1) {
+            for (auto k = prev_ref+1; k < ref; k++) {
+                samples.append(Interval<i32>());
             }
         }
-
-        auto j = read_moves.index.get_index(qrys[i]);
-        if (j < read_moves.samples.size()) {
-            samps = read_moves.samples.coords[j];
-            //std::cout << "jump " << j << " " << samps.to_string() << "\n";
-        } else {
-            samps.clear();
-            //std::cout << "hop " << samps.to_string() << "\n";
-        }
+        prev_ref = ref;
+        samples.append(read_moves.samples.coords[j]);
     }
+
+    //for (; prev_ref < ref; prev_ref++) {
+    //    samples.append(Interval<i32>());
+    //}
 
     ref_seg.end = refs[refs.size()-1]+1;
     ref_index.append(ref_seg);
-    samples.append(samps);
+    //samples.append(samps);
 
     return AlnDF(ref_index, samples, {}, {});
 }

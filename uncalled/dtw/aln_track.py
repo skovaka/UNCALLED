@@ -174,6 +174,8 @@ class AlnTrack:
         df = df.astype(meta.loc[df.columns, "dtype"], copy=False)
 
         df = self._parse_layers(pd.concat({group : df}, names=["group", "layer"], axis=1))
+        pd.set_option('display.max_rows', 50)
+
 
         if self.layers is None or overwrite:
             self.layers = df #pd.DataFrame({

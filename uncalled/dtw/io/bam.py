@@ -89,7 +89,7 @@ class BAM(TrackIO):
 
         #TODO load from AlnTrack instance (initialized by Tracks)
         self.model = PoreModel(self.conf.pore_model)
-        self.kmer_trim = self.model.kmer_trim
+        #self.kmer_trim = self.model.kmer_trim
 
         if self.prms.buffered:
             self.out_buffer = list()
@@ -135,11 +135,19 @@ class BAM(TrackIO):
         
         #refs = track.layer_refs
         #if aln["fwd"]:
+        self.kmer_trim = self.tracks.index.trim #if not bcaln.flip_ref else reversed(self.index.trim)
         refs = track.coords.refs[self.kmer_trim[0]:-self.kmer_trim[1]]
         #else:
         #    refs = track.coords.refs[self.kmer_trim[1]:-self.kmer_trim[0]]
+        #print("START")
+        #print(track.layers)
+        #print(self.kmer_trim)
+        #print(track.coords.refs)
+        #print(refs)
+        #print(track.layers.reset_index(level=1))
 
         dtw = track.layers["dtw"].reset_index(level=1).reindex(refs)
+        #print(dtw)
 
         lens = dtw["length"]
         lens[dtw["start"].duplicated()] = 0 #skips
@@ -156,6 +164,7 @@ class BAM(TrackIO):
         ds = ds.fillna(self.INF_U16).to_numpy(np.uint16)
         lens = dtw["length"].reindex(refs).to_numpy(np.uint16, na_value=0)
 
+        #print(dtw)
         if dtw["start"].iloc[0] < dtw["start"].iloc[-1]:
             sample_start = dtw["start"].iloc[0]
             sample_end = dtw["start"].iloc[-1] + dtw["length"].iloc[-1]

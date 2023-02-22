@@ -145,6 +145,8 @@ class GuidedDTW:
             block_st = kmer_st = gap_en
         coords.append((block_st,mref_max))
 
+        #print(coords)
+
         new_kmers = self.index.get_kmers(coords, self.conf.is_rna)
 
         t0,t1 = self.index.trim if not bcaln.flip_ref else reversed(self.index.trim)
