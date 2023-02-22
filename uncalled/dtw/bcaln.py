@@ -109,15 +109,11 @@ class Bcaln:
         refs = np.array(self.sam_coords.ref_to_mref(ar[:,1]), np.int64)
         qrys = qrys.astype(np.int64)
 
-
         ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max)
-
 
         shift = conf.pore_model.k - mkl - self.kmer_shift[0]
         ref_moves.index.shift(shift)
-        #TODO errors below if any refgaps :(
-        ref_moves = ref_moves.slice(-shift, len(ref_moves.samples))
-        self.aln = ref_moves
+        self.aln = ref_moves.slice(-shift, len(ref_moves))
 
         df = pd.DataFrame({
             "mref"   : (ref_moves.index.expand()),

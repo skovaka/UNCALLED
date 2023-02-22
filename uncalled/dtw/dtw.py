@@ -112,6 +112,7 @@ class GuidedDTW:
         read = tracks.read_index[bam.query_name]
 
         bcaln, self.coords = tracks.calc_bcaln(bam, read)
+        #print(read.id)
 
         if bcaln is None:
             return
@@ -128,33 +129,15 @@ class GuidedDTW:
         self.bcaln = bcaln.df#[bcaln.df["indel"] == 0]
         self.bcaln_new = bcaln.aln#[bcaln.df["indel"] == 0]
 
-        self.ref_gaps = list(sorted(bcaln.ref_gaps))
+        bcaln_index = self.bcaln_new.index
 
-        kmer_blocks = list()
-        gap_lens = list()
-        ref_shift = 0
-
-        mref_min = self.coords.mrefs.min()#-self.index.trim[0]
-        mref_max = self.coords.mrefs.max()+1#+self.index.trim[1]
-
-        coords = list()
-        kmer_coords = list()
-        block_st = mref_min
-        for gap_st, gap_en in self.ref_gaps:
-            coords.append((block_st, gap_st))
-            block_st = kmer_st = gap_en
-        coords.append((block_st,mref_max))
-
-        #print(coords)
-
-        new_kmers = self.index.get_kmers(coords, self.conf.is_rna)
+        coords = [bcaln_index.get_interval(i).to_tuple() for i in range(bcaln_index.interval_count())]
+        kmers = self.index.get_kmers(coords, self.conf.is_rna)
 
         t0,t1 = self.index.trim if not bcaln.flip_ref else reversed(self.index.trim)
-        self.intv_coords = self.bcaln_new.index.islice(t0, len(self.bcaln_new.samples)-t1)
+        self.intv_coords = self.bcaln_new.index.islice(t0, len(self.bcaln_new)-t1)
 
-        mrefs = np.array(self.intv_coords.expand())
-
-        self.ref_kmers = pd.Series(new_kmers, index=mrefs)
+        self.ref_kmers = pd.Series(kmers, index=self.intv_coords.expand())
 
         ref_means = self.model[self.ref_kmers]
 

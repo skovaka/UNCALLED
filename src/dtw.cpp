@@ -72,13 +72,14 @@ AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::a
     Interval<i64> ref_seg;
     Interval<i32> samps;
 
-    auto prev_ref = refs[0];
+    auto ref = refs[0], 
+         prev_ref = ref-1;
 
-    ref_seg.start = prev_ref;
+    ref_seg.start = ref;
     //indel = 0;
 
     for (size_t i = 0; i < qrys.size(); i++) {
-        auto ref = refs[i];
+        ref = refs[i];
         //if (ref > prev_ref) {
         //    samples.append(samps);
         //    samps.clear();
@@ -98,12 +99,12 @@ AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::a
         //the decide if its a gap or pad it up 
         
         auto j = read_moves.index.get_index(qrys[i]);
-        if (j >= read_moves.samples.size()) {
+        if (j >= read_moves.samples.interval_count()) {
             continue;
         }
         auto gap = ref - prev_ref;
         if (gap > del_max) {
-            ref_seg.end = prev_ref;
+            ref_seg.end = prev_ref+1;
             ref_index.append(ref_seg);
             ref_seg.start = prev_ref = ref;
             ref_seg.end = ref_seg.NA;
@@ -116,9 +117,9 @@ AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::a
         samples.append(read_moves.samples.coords[j]);
     }
 
-    //for (; prev_ref < ref; prev_ref++) {
-    //    samples.append(Interval<i32>());
-    //}
+    for (auto k = prev_ref; k < ref; k++) {
+        samples.append(Interval<i32>());
+    }
 
     ref_seg.end = refs[refs.size()-1]+1;
     ref_index.append(ref_seg);

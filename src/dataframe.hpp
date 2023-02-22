@@ -79,16 +79,12 @@ struct PyArray {
     //    info { data_vec.data(), length },
     //    data { data_vec.data() },
     //    size_ { length } {
-    //    std::cout << "called " << length << " " << fill << "\n";
-    //    std::cout.flush();
     //}
 
     PyArray(T *ptr, size_t length) :
         info { ptr, length },
         data { ptr },
         size_ { length } {
-        //std::cout << "length " << length << "\n";
-        //std::cout.flush();
 
     }
 
@@ -305,6 +301,10 @@ struct Interval {
         return !(start == NA || end == NA) && start < end;
     }
 
+    std::pair<T,T> to_pair() const {
+        return {start, end};
+    }
+
     bool contains(T val) const {
         return val >= start && val < end;
     }
@@ -345,7 +345,7 @@ class IntervalIndex {
 
     IntervalIndex() {}
 
-    IntervalIndex(std::vector<std::pair<T,T>> coords_, bool sorted=false) 
+    IntervalIndex(std::vector<std::pair<T,T>> coords_, bool sorted=false)
             : coords(coords_.begin(), coords_.end()) {
 
         if (!sorted) {
@@ -355,8 +355,10 @@ class IntervalIndex {
         starts.reserve(coords.size());
         length = 0;
         for (auto c : coords) {
-            starts.push_back(length);
-            length += c.length();
+            if (c.is_valid()) {
+                starts.push_back(length);
+                length += c.length();
+            }
         }
     }
 
@@ -376,12 +378,14 @@ class IntervalIndex {
 
     IntervalIndex<T> islice(size_t i, size_t j) const {
         IntervalIndex<T> ret;
-        auto st = idx_to_interval(i), en = idx_to_interval(j-1);
+        auto st = idx_to_interval(i); 
+        auto en = idx_to_interval(j-1);
 
         ret.reserve(en-st+1);
 
         auto intv = coords[st];
         intv.start += i - starts[st];
+
 
         if (st == en) {
             intv.end = intv.start + (j-i);
@@ -391,7 +395,7 @@ class IntervalIndex {
                 ret.append(coords[i]);
             }
             intv = coords[en];
-            intv.end = (j-i) - ret.length;
+            intv.end = intv.start + (j-i) - ret.length;
         }
         ret.append(intv);
 
@@ -406,7 +410,9 @@ class IntervalIndex {
     void append(Interval<T> intv) {
         coords.push_back(intv);
         starts.push_back(length);
-        length += intv.length();
+        if (intv.is_valid()) {
+            length += intv.length();
+        }
     }
 
     void append(T start, T end) {
@@ -431,25 +437,33 @@ class IntervalIndex {
         return ss.str();
     }
 
+    std::valarray<T> get_gaps() const {
+        std::valarray<T> ret(coords.size()-1);
+        for (size_t i = 0; i < ret.size(); i++) {
+            ret[i] = coords[i+1].start - coords[i].end;
+        }
+        return ret;
+    }
+
     std::valarray<T> get_lengths() const {
-        std::valarray<T> ret(size());
-        for (size_t i = 0; i < size(); i++) {
+        std::valarray<T> ret(coords.size());
+        for (size_t i = 0; i < coords.size(); i++) {
             ret[i] = coords[i].end - coords[i].start;
         }
         return ret;
     }
 
     std::valarray<T> get_starts() const {
-        std::valarray<T> ret(size());
-        for (size_t i = 0; i < size(); i++) {
+        std::valarray<T> ret(coords.size());
+        for (size_t i = 0; i < coords.size(); i++) {
             ret[i] = coords[i].start;
         }
         return ret;
     }
 
     std::valarray<T> get_ends() const {
-        std::valarray<T> ret(size());
-        for (size_t i = 0; i < size(); i++) {
+        std::valarray<T> ret(coords.size());
+        for (size_t i = 0; i < coords.size(); i++) {
             ret[i] = coords[i].end;
         }
         return ret;
@@ -466,7 +480,6 @@ class IntervalIndex {
         return ret;
     }
 
-    //Interval<T> get_interval(size_t i) const {
     size_t get_interval_idx(T val) const {
         Interval<T> q = {val, Interval<T>::NA};
         auto itr = std::lower_bound(coords.begin(), coords.end(), q);
@@ -480,13 +493,8 @@ class IntervalIndex {
         return -1;
     }
 
-    Interval<T> get_interval(T val) const {
-        auto i = get_interval_idx(val);
-        if (i < coords.size()) {
-            return coords[i];
-        } else {
-            return Interval<T>();
-        }
+    Interval<T> get_interval(size_t i) const {
+        return coords[i];
     }
 
     size_t get_index(T val) const {
@@ -498,7 +506,7 @@ class IntervalIndex {
         }
     }
 
-    size_t size() const {
+    size_t interval_count() const {
         return coords.size();
     }
 
@@ -509,7 +517,9 @@ class IntervalIndex {
         py::class_<IntervalIndex>(m, ("IntervalIndex"+suffix).c_str())
             .def(py::init<std::vector<std::pair<T,T>>>())
             .def("__getitem__", py::vectorize(&IntervalIndex::operator[]))
-            .def("__len__", &IntervalIndex::size)
+            //.def("__len__", &IntervalIndex::size)
+            .def("interval_count", &IntervalIndex::interval_count)
+            .def_readonly("length", &IntervalIndex::length)//TODO bind to __len__
             .def("__repr__", &IntervalIndex<T>::to_string)
             .def("expand", &IntervalIndex::expand)
             .def("shift", &IntervalIndex::shift)
@@ -518,6 +528,7 @@ class IntervalIndex {
             .def("get_interval", py::vectorize(&IntervalIndex::get_interval))
             .def("get_index", py::vectorize(&IntervalIndex::get_index))
             .def_property_readonly("lengths", &IntervalIndex::get_lengths)
+            .def_property_readonly("gaps", &IntervalIndex::get_gaps)
             .def_property_readonly("starts", &IntervalIndex::get_starts)
             .def_property_readonly("ends", &IntervalIndex::get_ends)
             ;
@@ -526,7 +537,8 @@ class IntervalIndex {
             .def("__repr__", &Interval<T>::to_string)
             .def("__getitem__", &Interval<T>::operator[])
             .def_readwrite("start", &Interval<T>::start)
-            .def_readwrite("end", &Interval<T>::end);
+            .def_readwrite("end", &Interval<T>::end)
+            .def("to_tuple", &Interval<T>::to_pair);
     }
     #endif
 };
