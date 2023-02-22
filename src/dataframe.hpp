@@ -289,12 +289,21 @@ void pybind_dataframes(py::module_ &m);
 template <typename T>
 struct Interval {
     T start, end;
+    static const T NA = std::numeric_limits<T>::max();
 
+    Interval() : start(NA), end(NA) {}
     Interval(T s, T e) : start(s), end(e) {}
     Interval(const std::pair<T,T>& p) : Interval(p.first, p.second) {
     }
 
-    static const T NA = std::numeric_limits<T>::max();
+    void clear() {
+        start = NA;
+        end = NA;
+    }
+
+    bool is_valid() const {
+        return !(start == NA || end == NA) && start < end;
+    }
 
     bool contains(T val) const {
         return val >= start && val < end;
@@ -330,9 +339,11 @@ class IntervalIndex {
 
     std::vector<Interval<T>> coords;
     std::vector<size_t> starts;
-    size_t length;
+    size_t length = 0;
 
     static constexpr size_t MAX_IDX = -1;//std::numeric_limits<size_t>::max();
+
+    IntervalIndex() {}
 
     IntervalIndex(std::vector<std::pair<T,T>> coords_, bool sorted=false) 
             : coords(coords_.begin(), coords_.end()) {
@@ -349,6 +360,21 @@ class IntervalIndex {
         }
     }
 
+    void reserve(size_t size) {
+        coords.reserve(size);
+        starts.reserve(size);
+    }
+
+    void append(Interval<T> intv) {
+        coords.push_back(intv);
+        starts.push_back(length);
+        length += intv.length();
+    }
+
+    void append(T start, T end) {
+        append({start,end});
+    }
+
     T operator[] (size_t i) {
         if (i > length) throw std::out_of_range("Interval index of range");
         size_t j = std::upper_bound(starts.begin(), starts.end(), i) - starts.begin() - 1;
@@ -363,14 +389,26 @@ class IntervalIndex {
         return ss.str();
     }
 
-    Interval<T> get_interval(size_t i) const {
-        return coords[i];
-    }
-
     std::valarray<T> get_lengths() const {
         std::valarray<T> ret(size());
         for (size_t i = 0; i < size(); i++) {
             ret[i] = coords[i].end - coords[i].start;
+        }
+        return ret;
+    }
+
+    std::valarray<T> get_starts() const {
+        std::valarray<T> ret(size());
+        for (size_t i = 0; i < size(); i++) {
+            ret[i] = coords[i].start;
+        }
+        return ret;
+    }
+
+    std::valarray<T> get_ends() const {
+        std::valarray<T> ret(size());
+        for (size_t i = 0; i < size(); i++) {
+            ret[i] = coords[i].end;
         }
         return ret;
     }
@@ -386,17 +424,36 @@ class IntervalIndex {
         return ret;
     }
 
-    size_t get_index(T val) const {
+    //Interval<T> get_interval(size_t i) const {
+    size_t get_interval_index(T val) const {
         Interval<T> q = {val, Interval<T>::NA};
         auto itr = std::lower_bound(coords.begin(), coords.end(), q);
 
         if (itr > coords.begin()) {
             size_t i = static_cast<size_t>(itr - coords.begin()) - 1;
             if (coords[i].contains(val)) {
-                return starts[i] + (val - coords[i].start);
+                return i;
             }
         }
-        return MAX_IDX;
+        return -1;
+    }
+
+    Interval<T> get_interval(T val) const {
+        auto i = get_interval_index(val);
+        if (i < coords.size()) {
+            return coords[i];
+        } else {
+            return Interval<T>();
+        }
+    }
+
+    size_t get_index(T val) const {
+        auto i = get_interval_index(val);
+        if (i < coords.size()) {
+            return starts[i] + (val - coords[i].start);
+        } else {
+            return MAX_IDX;
+        }
     }
 
     size_t size() const {
@@ -416,6 +473,8 @@ class IntervalIndex {
             .def("get_interval", py::vectorize(&IntervalIndex::get_interval))
             .def("get_index", py::vectorize(&IntervalIndex::get_index))
             .def_property_readonly("lengths", &IntervalIndex::get_lengths)
+            .def_property_readonly("starts", &IntervalIndex::get_starts)
+            .def_property_readonly("ends", &IntervalIndex::get_ends)
             ;
             
         py::class_<Interval<T>>(m, ("Interval"+suffix).c_str())

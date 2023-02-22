@@ -252,6 +252,40 @@ struct Coord {
 //   contains alignments and layers DFs, probably distinct from ReadAln
 //   sortable and indexable by aln_id, ref
 
+struct AlnDF {
+    IntervalIndex<i64> index;
+    IntervalIndex<i32> samples;
+    std::valarray<float> current, current_sd; 
+
+    AlnDF(IntervalIndex<i64> &index_) : 
+        index(index_),
+        current(index.length),
+        current_sd(index.length) {}
+
+    AlnDF(IntervalIndex<i64> &index_, IntervalIndex<i32> &samples_, py::array_t<float> current_, py::array_t<float> current_sd_) : 
+        index(index_),
+        samples(samples_),
+        current(init_arr(current_)),
+        current_sd(init_arr(current_sd_)) {}
+
+    template <typename T>
+    static std::valarray<T> init_arr(py::array_t<T> &a) {
+        auto info = a.request();
+        return std::valarray<T>(static_cast<T*>(info.ptr), static_cast<size_t>(info.shape[0]));
+    }
+
+    static py::class_<AlnDF> pybind(py::module_ &m) {
+        py::class_<AlnDF> c(m, "_AlnDF");
+        c.def(py::init<IntervalIndex<i64> &>());
+        c.def(py::init<IntervalIndex<i64>&, IntervalIndex<i32>&, py::array_t<float>, py::array_t<float>>());
+        c.def_readwrite("index", &AlnDF::index);
+        c.def_readwrite("samples", &AlnDF::samples);
+        //c.def_readwrite("current", &AlnDF::current);
+        //c.def_readwrite("current_sd", &AlnDF::current_sd);
+        return c;
+    }
+};
+
 struct DtwDF : public DataFrame<int, int, float, float> {
     static constexpr NameArray names = {"start", "length", "current", "stdv"}; 
     ColType<0> &start = std::get<0>(data_);  

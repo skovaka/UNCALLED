@@ -1,6 +1,6 @@
 import pandas as pd
 
-from _uncalled import _AlnCoords, _AlnCoordsDF, _DtwDF
+from _uncalled import _AlnCoords, _AlnCoordsDF, _DtwDF, _AlnDF
 
 class RecArrayHelper:
     def _init(self, cls, df):

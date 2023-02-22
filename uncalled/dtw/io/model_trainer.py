@@ -96,8 +96,6 @@ class ModelTrainer(TrackIO):
 
         track.calc_layers(LAYERS)
         mask = track.layers[("cmp", "mean_ref_dist")] <= 1
-        if self.conf.dtw.iterations == 0:
-            mask &= track.layers[("dtw", "length")] >= 30
         dtw = track.layers.loc[mask, LAYERS]["dtw"].set_index("kmer", drop=True) #\
          #.sort_index() 
 

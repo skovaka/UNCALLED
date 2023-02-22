@@ -37,11 +37,89 @@ py::array_t<Coord> get_guided_bands(py::array_t<i32> &bc_refs_, py::array_t<i32>
 
 constexpr DtwDF::NameArray DtwDF::names;
 
+
+AlnDF moves_to_aln(py::array_t<bool> moves_py, i32 start, i32 stride) {
+    PyArray<bool> moves(moves_py);
+    IntervalIndex<i64> index; //({{0, moves.size()}});
+    IntervalIndex<i32> samples;
+
+    size_t idx_start = 1, idx_end=1;
+
+    auto end = start + stride;
+    for (size_t i = 1; i < moves.size(); i++) {
+        if (moves[i]) {
+            samples.append(start, end);
+            idx_end++;
+            start = end;
+        }
+        end += stride;
+    }
+    samples.append(start, end);
+    index.append(idx_start, idx_end+1);
+
+    return AlnDF(index, samples, {}, {});
+}
+
+AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::array_t<i64> qrys_py, i32 del_max) {
+    PyArray<i64> refs(refs_py), qrys(qrys_py);
+    if (refs.size() != qrys.size() || refs.size() == 0) {
+        throw std::length_error("reference and query coordinates must be the same non-zero length");
+    } 
+
+    IntervalIndex<i64> ref_index; //({{0, moves.size()}});
+    IntervalIndex<i32> samples;
+
+    Interval<i64> ref_seg;
+    Interval<i32> samps;
+
+    auto prev_ref = refs[0];
+
+    ref_seg.start = prev_ref;
+    //indel = 0;
+
+    for (size_t i = 0; i < qrys.size(); i++) {
+        auto ref = refs[i];
+        if (ref > prev_ref) {
+            samples.append(samps);
+            samps.clear();
+            prev_ref++;
+
+            if (ref - prev_ref < del_max) {
+                for (; prev_ref < ref; prev_ref++) {
+                    //std::cout << "skip " << samps.to_string() << "\n";
+                    samples.append(samps);
+                }
+            } else {
+                ref_seg.end = prev_ref;
+                ref_index.append(ref_seg);
+                ref_seg.start = prev_ref = ref;
+                ref_seg.end = ref_seg.NA;
+            }
+        }
+
+        auto j = read_moves.index.get_index(qrys[i]);
+        if (j < read_moves.samples.size()) {
+            samps = read_moves.samples.coords[j];
+            //std::cout << "jump " << j << " " << samps.to_string() << "\n";
+        } else {
+            samps.clear();
+            //std::cout << "hop " << samps.to_string() << "\n";
+        }
+    }
+
+    ref_seg.end = refs[refs.size()-1]+1;
+    ref_index.append(ref_seg);
+    samples.append(samps);
+
+    return AlnDF(ref_index, samples, {}, {});
+}
+
 #define PY_DTW_PARAM(P, D) p.def_readwrite(#P, &DtwParams::P, D);
 void pybind_dtw(py::module_ &m) {
     PYBIND11_NUMPY_DTYPE(Coord, qry, ref);
     
     DtwDF::pybind(m);//<DtwDF>, "_DtwDF");
+    AlnDF::pybind(m);//<AlnDF>, "_AlnDF");
 
     py::class_<DtwParams> p(m, "DtwParams");
     PY_DTW_PARAM(band_mode, "DTW band mode (\"guided\", \"static\", or \"\"/\"none\")");
@@ -58,6 +136,8 @@ void pybind_dtw(py::module_ &m) {
     PY_DTW_PARAM(save_bands, "Save DTW band coordinates to database");
 
     m.def("get_guided_bands", &get_guided_bands);
+    m.def("moves_to_aln", &moves_to_aln);
+    m.def("read_to_ref_moves", &read_to_ref_moves);
     PyArray<Coord>::pybind(m, "PyArrayCoord");  
 
     m.attr("DTW_PRMS_DEF") = py::cast(DTW_PRMS_DEF);

@@ -10,6 +10,7 @@ import pandas as pd
 import scipy.stats
 import copy
 
+from _uncalled import _AlnDF, IntervalIndexI64, IntervalIndexI32, moves_to_aln, read_to_ref_moves
 from ..config import Config
 from ..argparse import Opt
 from ..index import RefCoord
@@ -92,27 +93,86 @@ class Bcaln:
         if not self.parse_cigar(sam):
             raise RuntimeError(f"Cigar string not found for read {read.id}")
 
+        #df = pd.DataFrame(
+        #    sam.get_aligned_pairs(), 
+        #    columns=["read","ref"], dtype="Int64"
+        #).dropna(subset=["ref"])
+
+        #df["mref"] = self.sam_coords.ref_to_mref(df["ref"].to_numpy())
+
+        #if self.flip_ref:
+        #    df["read"] = sam.query_length-df["read"]-1
+        #    df = df.iloc[::-1]
+
+
+        #self.bp_mref_aln = df.set_index("read")["mref"]
+        # .set_index("ref")\
+        # .reindex(self.sam_coords.refs)\
+        # .reset_index()\
+        # .set
+
+        #df = df.set_index(self.sam_coords.ref_to_mref(df.index))
+        #print(self.bp_mref_aln)
+
         #TODO make c++ build this 
         #moves = np.array(read.moves, bool)
         bce_qrs = np.cumsum(moves)
         bce_samps = template_start + np.arange(len(bce_qrs)) * mv_stride
 
-        samp_bps = pd.DataFrame({
-            "start" : bce_samps,
-            "length" : mv_stride,
-            "bp"     : bce_qrs,
-        })
+        read_moves = moves_to_aln(moves, template_start, mv_stride)
 
-        df = samp_bps.join(self.bp_mref_aln, on="bp").dropna()
+        QRY_NA = np.iinfo(np.int32).max
 
-        grp = df.groupby("mref")
+        ar = np.array(sam.get_aligned_pairs())
+        ar = ar[ar[:,1] != None]
+        if self.flip_ref:
+            ar = ar[::-1]
+            qrys = ar[:,0]
+            #silly trick to make null reverse into REF_NA
+            qrys[qrys == None] = sam.query_length - QRY_NA - 1
+            qrys = sam.query_length - qrys - 1
 
-        df = pd.DataFrame({
-            "mref"    : grp["mref"].first().astype("int64"),
-            "start"  : grp["start"].min().astype("uint32"),
-            "length" : grp["length"].sum().astype("uint32"),
-            "indel" : grp["indel"].first()
+        else:
+            qrys = ar[:,0]
+            qrys[qrys == None] = QRY_NA
+        refs = np.array(self.sam_coords.ref_to_mref(ar[:,1]), np.int64)
+        qrys = qrys.astype(np.int64)
+
+        ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max)
+        df= pd.DataFrame({
+            "mref"   : np.array(ref_moves.index.expand()),
+            "start"  : np.array(ref_moves.samples.starts),
+            "length" : np.array(ref_moves.samples.lengths)
         }).set_index("mref")
+
+        isna = df["start"] == QRY_NA
+        df[isna] = pd.NA
+        df.fillna(method="backfill", inplace=True)
+
+        #ref_moves = RefMoves(read_moves, refs, qrys)
+
+        #samp_bps = pd.DataFrame({
+        #    "start" : bce_samps,
+        #    "length" : mv_stride,
+        #    "bp"     : bce_qrs,
+        #})
+
+        #samp_bps = samp_bps.join(self.bp_mref_aln, on="bp").dropna()
+        #grp = samp_bps.groupby("mref")
+
+        #df = pd.DataFrame({
+        #    "mref"    : grp["mref"].first().astype("int64"),
+        #    "start"  : grp["start"].min().astype("uint32"),
+        #    "length" : grp["length"].sum().astype("uint32"),
+        #    #"indel" : grp["indel"].first()
+        #}).set_index("mref")
+
+        #print("sorted")
+        #print(df.sort_values("length"))
+
+        #print("diff")
+        #print(df[diff])
+        #print()
 
         if self.clip_coords is not None:
             mrefs = df.index.intersection(self.clip_coords.mrefs[self.is_fwd])
