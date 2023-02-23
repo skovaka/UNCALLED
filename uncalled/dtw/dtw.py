@@ -109,7 +109,11 @@ class GuidedDTW:
         self.conf = tracks.conf
         self.prms = self.conf.dtw
 
-        read = tracks.read_index[bam.query_name]
+        try:
+            read = tracks.read_index[bam.query_name]
+        except:
+            sys.stderr.write(f"Warning: failed to load signal from read {bam.query_name}\n")
+            return
 
         bcaln, self.coords = tracks.calc_bcaln(bam, read)
         #print(read.id)
