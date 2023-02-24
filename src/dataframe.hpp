@@ -589,6 +589,16 @@ struct AlnDF {
     }
 };
 
+//template <typename ModelType>
+//struct ReadAln {
+//    std::string read_id;
+//    Sequence<ModelType> seq;
+//    AlnDF dtw, bcaln;
+//
+//    ReadAln(const std::string &read_id_, Sequence<ModelType> seq_) {
+//
+//    }
+//};
 
 template<typename T>
 struct RecArray : public PyArray<T> {

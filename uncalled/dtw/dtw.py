@@ -130,14 +130,11 @@ class GuidedDTW:
         self.index = tracks.index
         self.model = tracks.model
 
-        self.bcaln_new = bcaln.aln
+        self.bcaln = bcaln.aln
 
-        t0,t1 = self.index.trim 
-        self.intv_coords = self.bcaln_new.index#.islice(t0, len(self.bcaln_new)-t1)
+        self.intv_coords = self.bcaln.index
 
-        self.seq = self.index.instance.get_kmers(self.model.instance, self.bcaln_new.index, self.conf.is_rna)
-
-        #self.bcaln_new = self.bcaln_new.slice(t0, len(self.bcaln_new)-t1)
+        self.seq = self.index.instance.get_kmers(self.model.instance, self.bcaln.index, self.conf.is_rna)
 
         ref_means = self.seq.current.to_numpy()  #self.model[self.ref_kmers]
 
@@ -152,14 +149,14 @@ class GuidedDTW:
         if self.dtw_fn is None:
             raise ValueError(f"Invalid DTW k-mer length {self.model.K}")
 
-        self.samp_min = self.bcaln_new.samples.starts[0]
-        self.samp_max = self.bcaln_new.samples.ends[len(self.bcaln_new)-1]
+        self.samp_min = self.bcaln.samples.starts[0]
+        self.samp_max = self.bcaln.samples.ends[len(self.bcaln)-1]
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
         #print(self.samp_min, self.samp_max)
-        #print(self.bcaln_new.samples.starts[0], self.bcaln_new.samples.ends[len(self.bcaln_new)-1])
-        #print(self.bcaln_new.index)
-        #print(self.bcaln_new.samples)
+        #print(self.bcaln.samples.starts[0], self.bcaln.samples.ends[len(self.bcaln)-1])
+        #print(self.bcaln.index)
+        #print(self.bcaln.samples)
 
         if self.conf.normalizer.mode == "ref_mom":
             
@@ -196,13 +193,13 @@ class GuidedDTW:
                 signal.normalize(reg.coef_, reg.intercept_)
                 df = self._calc_dtw(signal)
         else:
-            starts = self.bcaln_new.samples.starts.to_numpy()
-            lengths = self.bcaln_new.samples.lengths.to_numpy()
+            starts = self.bcaln.samples.starts.to_numpy()
+            lengths = self.bcaln.samples.lengths.to_numpy()
             cur = std = np.array([])
             df = DtwDF(starts, lengths, cur, std)
             df.set_signal(signal)
             df = df.to_df()
-            df["mref"] = self.bcaln_new.index.expand()
+            df["mref"] = self.bcaln.index.expand()
         if df is None:
             self.empty = True
             sys.stderr.write(f"Warning: dtw failed for read {read.id}\n")
@@ -261,17 +258,9 @@ class GuidedDTW:
             band_count = qry_len + ref_len
 
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
+            mv_starts = self.bcaln.samples.starts.to_numpy()
+            bands = _uncalled.get_guided_bands(np.arange(len(self.seq)), mv_starts, read_block['start'], band_count, shift)
 
-            mrefs = self.seq.coords.expand()
-
-            idxs = self.intv_coords.get_index(mrefs)# + self.index.trim[0]
-
-            mv_starts = self.bcaln_new.samples.starts.to_numpy()
-
-
-            bands = _uncalled.get_guided_bands(idxs, mv_starts, read_block['start'], band_count, shift)
-
-            #return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(ref_kmers), self.model.instance, _uncalled.PyArrayCoord(bands))
             return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         #elif self.method == "static":

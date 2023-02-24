@@ -136,7 +136,7 @@ class BAM(TrackIO):
         #refs = track.layer_refs
         #if aln["fwd"]:
         self.kmer_trim = self.tracks.index.trim #if not bcaln.flip_ref else reversed(self.index.trim)
-        refs = track.coords.refs[self.kmer_trim[0]:-self.kmer_trim[1]]
+        refs = track.coords.refs#[self.kmer_trim[0]:-self.kmer_trim[1]]
         #else:
         #    refs = track.coords.refs[self.kmer_trim[1]:-self.kmer_trim[0]]
         #print("START")
