@@ -69,8 +69,8 @@ class Bcaln:
         self.flip_ref = self.is_fwd == self.is_rna
 
         self.kmer_shift = ref_index.trim#[not sam.is_fwd]
-        if self.flip_ref:
-            self.kmer_shift = self.kmer_shift[::-1]
+        #if not self.flip_ref:
+        #    self.kmer_shift = self.kmer_shift[::-1]
 
         self.ref_gaps = list()
         self.errors = None
@@ -109,7 +109,7 @@ class Bcaln:
         refs = np.array(self.sam_coords.ref_to_mref(ar[:,1]), np.int64)
         qrys = qrys.astype(np.int64)
 
-        ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max)
+        ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, True)
 
         shift = conf.pore_model.k - mkl - self.kmer_shift[0]
         ref_moves.index.shift(shift)

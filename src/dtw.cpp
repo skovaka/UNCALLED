@@ -60,7 +60,7 @@ AlnDF moves_to_aln(py::array_t<bool> moves_py, i32 start, i32 stride) {
     return AlnDF(index, samples, {}, {});
 }
 
-AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::array_t<i64> qrys_py, i32 del_max) {
+AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::array_t<i64> qrys_py, i32 del_max, bool backfill_na=true) {
     PyArray<i64> refs(refs_py), qrys(qrys_py);
     if (refs.size() != qrys.size() || refs.size() == 0) {
         throw std::length_error("reference and query coordinates must be the same non-zero length");
@@ -80,23 +80,6 @@ AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::a
 
     for (size_t i = 0; i < qrys.size(); i++) {
         ref = refs[i];
-        //if (ref > prev_ref) {
-        //    samples.append(samps);
-        //    samps.clear();
-        //    prev_ref++;
-
-        //    if (ref - prev_ref < del_max) {
-        //    } else {
-        //        ref_seg.end = prev_ref;
-        //        ref_index.append(ref_seg);
-        //        ref_seg.start = prev_ref = ref;
-        //        ref_seg.end = ref_seg.NA;
-        //    }
-        //}
-        
-        //TODO handle del_max properly
-        //only append and update prev_ref on valid samps query
-        //the decide if its a gap or pad it up 
         
         auto j = read_moves.index.get_index(qrys[i]);
         if (j >= read_moves.samples.interval_count()) {
@@ -109,12 +92,14 @@ AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::a
             ref_seg.start = prev_ref = ref;
             ref_seg.end = ref_seg.NA;
         } else if (gap > 1) {
+            auto fill = backfill_na ? samps : Interval<i32>();
             for (auto k = prev_ref+1; k < ref; k++) {
-                samples.append(Interval<i32>());
+                samples.append(samps);
             }
         }
         prev_ref = ref;
-        samples.append(read_moves.samples.coords[j]);
+        samps = read_moves.samples.coords[j];
+        samples.append(samps);
     }
 
     for (auto k = prev_ref; k < ref; k++) {

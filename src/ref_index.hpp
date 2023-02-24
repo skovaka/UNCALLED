@@ -511,9 +511,6 @@ class RefIndex {
     Sequence<ModelType> get_kmers(ModelType &model, IntervalIndex<i64> &mref_blocks, bool is_rna) {
         bool rev = is_mref_flipped(mref_blocks[0]-1);
         auto trim_st = (K - 1) / 2, trim_en = K - trim_st - 1;
-        if (rev) {
-            std::swap(trim_st, trim_en);
-        }
         auto seq_idx = mref_blocks.islice(trim_st, mref_blocks.length-trim_en);
         
         Sequence<ModelType> seq(model, seq_idx);
