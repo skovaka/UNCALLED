@@ -130,20 +130,14 @@ class GuidedDTW:
         self.index = tracks.index
         self.model = tracks.model
 
-        self.bcaln = bcaln.df#[bcaln.df["indel"] == 0]
-        self.bcaln_new = bcaln.aln#[bcaln.df["indel"] == 0]
-        #print(self.bcaln_new.samples.starts[0], self.bcaln_new.samples.ends[len(self.bcaln_new)-1])
+        self.bcaln_new = bcaln.aln
 
-        t0,t1 = self.index.trim #if not bcaln.flip_ref else reversed(self.index.trim)
-        self.intv_coords = self.bcaln_new.index.islice(t0, len(self.bcaln_new)-t1)
-
-        #self.ref_kmers = pd.Series(kmers, index=self.intv_coords.expand())
+        t0,t1 = self.index.trim 
+        self.intv_coords = self.bcaln_new.index#.islice(t0, len(self.bcaln_new)-t1)
 
         self.seq = self.index.instance.get_kmers(self.model.instance, self.bcaln_new.index, self.conf.is_rna)
-        #print(self.bcaln_new.index)
-        #print(self.seq.coords)
 
-        self.bcaln_new = self.bcaln_new.slice(t0, len(self.bcaln_new)-t1)
+        #self.bcaln_new = self.bcaln_new.slice(t0, len(self.bcaln_new)-t1)
 
         ref_means = self.seq.current.to_numpy()  #self.model[self.ref_kmers]
 
@@ -158,8 +152,6 @@ class GuidedDTW:
         if self.dtw_fn is None:
             raise ValueError(f"Invalid DTW k-mer length {self.model.K}")
 
-        #self.samp_min = self.bcaln["start"].min()
-        #self.samp_max = self.bcaln["start"].max()
         self.samp_min = self.bcaln_new.samples.starts[0]
         self.samp_max = self.bcaln_new.samples.ends[len(self.bcaln_new)-1]
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
@@ -168,7 +160,6 @@ class GuidedDTW:
         #print(self.bcaln_new.samples.starts[0], self.bcaln_new.samples.ends[len(self.bcaln_new)-1])
         #print(self.bcaln_new.index)
         #print(self.bcaln_new.samples)
-        #print(self.bcaln)
 
         if self.conf.normalizer.mode == "ref_mom":
             
@@ -205,15 +196,12 @@ class GuidedDTW:
                 signal.normalize(reg.coef_, reg.intercept_)
                 df = self._calc_dtw(signal)
         else:
-            #starts = self.bcaln["start"].to_numpy()
-            #lengths = self.bcaln["length"].to_numpy()
             starts = self.bcaln_new.samples.starts.to_numpy()
             lengths = self.bcaln_new.samples.lengths.to_numpy()
             cur = std = np.array([])
             df = DtwDF(starts, lengths, cur, std)
             df.set_signal(signal)
             df = df.to_df()
-            #df["mref"] = self.bcaln.index #pd.RangeIndex(mref_st, mref_en+1)
             df["mref"] = self.bcaln_new.index.expand()
         if df is None:
             self.empty = True

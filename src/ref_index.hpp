@@ -510,16 +510,19 @@ class RefIndex {
 
     Sequence<ModelType> get_kmers(ModelType &model, IntervalIndex<i64> &mref_blocks, bool is_rna) {
         bool rev = is_mref_flipped(mref_blocks[0]-1);
-        auto trim_st = (K - 1) / 2, trim_en = K - trim_st - 1;
-        auto seq_idx = mref_blocks.islice(trim_st, mref_blocks.length-trim_en);
+        auto seq_idx = mref_blocks;//.islice(trim_st, mref_blocks.length-trim_en);
         
         Sequence<ModelType> seq(model, seq_idx);
-        //std::vector<KmerType> kmers;
-        //ValArray<KmerType> kmers(mref_blocks.length - K + 1);
-        size_t i = 0;
-        for (auto &b : mref_blocks.coords) {
-            i = get_kmers(b.start, b.end, is_rna, seq.kmer, i);
+        auto lpad = (K - 1) / 2, rpad = K - lpad - 1;
+        size_t k = 0;
+        for (size_t i = 0; i < mref_blocks.interval_count()-1; i++) {
+            auto &c = mref_blocks.coords[i];
+            k = get_kmers(c.start-lpad, c.end, is_rna, seq.kmer, k);
+            lpad = 0;
         }
+        auto &c = mref_blocks.coords.back();
+        get_kmers(c.start-lpad, c.end+rpad, is_rna, seq.kmer, k);
+
         seq.init_current();
         return seq;
     }

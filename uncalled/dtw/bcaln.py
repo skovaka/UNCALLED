@@ -113,12 +113,12 @@ class Bcaln:
 
         shift = conf.pore_model.k - mkl - self.kmer_shift[0]
         ref_moves.index.shift(shift)
-        self.aln = ref_moves.slice(-shift, len(ref_moves))
+        self.aln = ref_moves.slice(-shift+self.kmer_shift[0], len(ref_moves)-self.kmer_shift[1])
 
         df = pd.DataFrame({
-            "mref"   : (ref_moves.index.expand()),
-            "start"  : (ref_moves.samples.starts),
-            "length" : (ref_moves.samples.lengths)
+            "mref"   : (self.aln.index.expand()),
+            "start"  : (self.aln.samples.starts),
+            "length" : (self.aln.samples.lengths)
         }).set_index("mref")
         isna = df["start"] == INT32_NA
         df[isna] = pd.NA
