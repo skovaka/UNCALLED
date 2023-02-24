@@ -46,12 +46,12 @@ struct ProcessedRead {
     NormalizerParams norm_prms;
     std::vector<Event> events;
     std::vector<NormVals> norm;
-    std::valarray<float> signal;
+    ValArray<float> signal;
     //std::vector<bool> mask;
 
     template <typename Container>
     void set_signal(Container signal_) {
-        signal = std::valarray<float>(&signal_[0], signal_.size());
+        signal = ValArray<float>(&signal_[0], signal_.size());
     }
 
     u32 sample_start() const {
@@ -66,7 +66,7 @@ struct ProcessedRead {
 
     std::pair<float,float> get_moments(size_t event_start, size_t event_end) {
         size_t n = event_end - event_start;
-        std::valarray<float> event_means(n);
+        ValArray<float> event_means(n);
 
         size_t i = 0;
         for (size_t j = event_start; j < event_end; j++) {

@@ -440,7 +440,12 @@ class RefIndex {
     }
 
     std::vector<KmerType> get_kmers(std::vector<std::pair<i64, i64>> pac_blocks, bool rev, bool comp) {
-        std::vector<KmerType> kmers;
+        size_t len = 0;
+        for (auto &b : pac_blocks) {
+            len += b.second - b.first;
+        }
+        len -= K - 1;
+        std::vector<KmerType> kmers(len);
         for (auto &b : pac_blocks) {
             get_kmers(b.first, b.second, rev, comp, kmers);
         }
@@ -448,32 +453,39 @@ class RefIndex {
     }
 
     std::vector<KmerType> get_kmers(i64 pac_start, i64 pac_end, bool rev, bool comp) {
-        std::vector<KmerType> kmers;
+        std::vector<KmerType> kmers(pac_end-pac_start-K+1);
         get_kmers(pac_start, pac_end, rev, comp, kmers);
         return kmers;
     }
 
-    void get_kmers(i64 pac_start, i64 pac_end, bool rev, bool comp, std::vector<KmerType> &kmers) {
+    template <typename Container>
+    size_t get_kmers(i64 pac_start, i64 pac_end, bool rev, bool comp, Container &kmers, size_t k=0) {
         if (!rev) {
             auto i = pac_start;
-            if (kmers.size() == 0) {
-                kmers.push_back(get_kmer(i, comp));
+            if (k == 0) {
+                kmers[k++] = get_kmer(i, comp);
+                //kmers.push_back(get_kmer(i, comp));
                 i += K;
             }
             for (; i < pac_end; i++) {
-                next_kmer(kmers, i, comp);
+                kmers[k++] = next_kmer(kmers[k-1], i, comp);
+                //next_kmer(kmers, i, comp);
             }
         } else {
             auto i = pac_end-1;
-            if (kmers.size() == 0) {
-                kmers.push_back(ModelType::kmer_rev(get_kmer(pac_end-K, comp)));
+            if (k == 0) {
+                //kmers[k++] = ModelType::kmer_rev(get_kmer(pac_end-K, comp));
+                kmers[k++] = ModelType::kmer_rev(get_kmer(pac_end-K, comp));
+                //kmers.push_back(ModelType::kmer_rev(get_kmer(pac_end-K, comp)));
                 i -= K;
             }
             //for (auto i = pac_end-K-1; i >= pac_start; i--) {
             for (; i >= pac_start; i--) {
-                next_kmer(kmers, i, comp);
+                kmers[k++] = next_kmer(kmers[k-1], i, comp);
+                //next_kmer(kmers, i, comp);
             }
         }
+        return k;
     }
 
     std::vector<KmerType> get_kmers(const std::string &name, i64 start, i64 end, bool rev=false, bool comp=false) {
@@ -483,26 +495,52 @@ class RefIndex {
     }
 
     std::vector<KmerType> get_kmers(std::vector<std::pair<i64, i64>> mref_blocks, bool is_rna) {
-        std::vector<KmerType> kmers;
+        size_t len = 0;
         for (auto &b : mref_blocks) {
-            get_kmers(b.first, b.second, is_rna, kmers);
+            len += b.second - b.first;
+        }
+        len -= K - 1;
+        std::vector<KmerType> kmers(len);
+        size_t i = 0;
+        for (auto &b : mref_blocks) {
+            i = get_kmers(b.first, b.second, is_rna, kmers, i);
         }
         return kmers;
     }
+
+    Sequence<ModelType> get_kmers(ModelType &model, IntervalIndex<i64> &mref_blocks, bool is_rna) {
+        bool rev = is_mref_flipped(mref_blocks[0]-1);
+        auto trim_st = (K - 1) / 2, trim_en = K - trim_st - 1;
+        if (rev) {
+            std::swap(trim_st, trim_en);
+        }
+        auto seq_idx = mref_blocks.islice(trim_st, mref_blocks.length-trim_en);
+        
+        Sequence<ModelType> seq(model, seq_idx);
+        //std::vector<KmerType> kmers;
+        //ValArray<KmerType> kmers(mref_blocks.length - K + 1);
+        size_t i = 0;
+        for (auto &b : mref_blocks.coords) {
+            i = get_kmers(b.start, b.end, is_rna, seq.kmer, i);
+        }
+        seq.init_current();
+        return seq;
+    }
     
     std::vector<KmerType> get_kmers(i64 mref_start, i64 mref_end, bool is_rna) {
-        std::vector<KmerType> kmers;
-        get_kmers(mref_start, mref_end, is_rna, kmers);
+        std::vector<KmerType> kmers(mref_end-mref_start - K + 1);
+        get_kmers(mref_start, mref_end, is_rna, kmers, 0);
         return kmers;
     }
 
-    void get_kmers(i64 mref_start, i64 mref_end, bool is_rna, std::vector<KmerType> &kmers) {
+    template <typename Container>
+    size_t get_kmers(i64 mref_start, i64 mref_end, bool is_rna, Container &kmers, size_t k) {
         bool rev = is_mref_flipped(mref_end-1);
         bool comp = rev != is_rna;
         if (rev) {
-            get_kmers(size()-mref_end, size()-mref_start, true, comp, kmers);
+            return get_kmers(size()-mref_end, size()-mref_start, true, comp, kmers, k);
         } else {
-            get_kmers(mref_start, mref_end, false, comp, kmers);
+            return get_kmers(mref_start, mref_end, false, comp, kmers, k);
         }
     }
 
@@ -679,6 +717,10 @@ class RefIndex {
         c.def("get_kmers", 
             static_cast< std::vector<KmerType> (RefIndex::*)(std::vector<std::pair<i64, i64>>, bool)> (&RefIndex::get_kmers),
             py::arg("mref_blocks"), py::arg("is_rna"));
+
+        c.def("get_kmers", 
+            static_cast< Sequence<ModelType> (RefIndex::*)(ModelType&, IntervalIndex<i64>&, bool)> (&RefIndex::get_kmers),
+            py::arg("model"), py::arg("mref_blocks"), py::arg("is_rna"));
 
         c.def("get_kmers", 
             static_cast< std::vector<KmerType> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::get_kmers),

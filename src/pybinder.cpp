@@ -26,6 +26,13 @@ std::vector<bool> unpack_moves(u64 moves, u8 length) {
 }
 
 
+//template <typename M>
+//constexpr typename Sequence<M>::NameArray Sequence<M>::names;
+//constexpr Sequence<PoreModel<6>>::NameArray Sequence<PoreModel<6>>::names;
+//constexpr Sequence<PoreModel<10>>::NameArray Sequence<PoreModel<10>>::names;
+//constexpr Sequence<PoreModel<11>>::NameArray Sequence<PoreModel<11>>::names;
+//constexpr Sequence<PoreModel<12>>::NameArray Sequence<PoreModel<12>>::template names;
+
 template<size_t K>
 size_t pybind_kmer(py::module_ &m) {
     std::string suffix = "K"+std::to_string(K);
@@ -36,6 +43,9 @@ size_t pybind_kmer(py::module_ &m) {
     //StaticBDTW<Model>::pybind_defs(m, suffix);
     GlobalDTW<Model>::pybind_defs(m, suffix);
     SignalProcessor<Model>::pybind(m, suffix);
+
+    Sequence<Model>::pybind(m, suffix);
+
     //m.def(("write_eventalign_"+suffix).c_str(), write_eventalign<PoreModel<K>>);
     auto fn = write_eventalign<Model>;
     m.def(("write_eventalign_"+suffix).c_str(), fn);

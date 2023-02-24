@@ -243,67 +243,6 @@ struct Coord {
 #endif
 
 
-//TODO 
-// redo dataframes so it's
-//create ReadAln, contains DtwDF, BcalnDF, and aln info:
-//store coordinates (list of ref bound pairs), use to index DFs
-//aln_id, read_id, ref_name, ref_start, ref_end, ref_fwd, samp_start, samp_en
-//Eventually construct AlnTrack in C++ by concating ReadAlns
-//   contains alignments and layers DFs, probably distinct from ReadAln
-//   sortable and indexable by aln_id, ref
-
-struct AlnDF {
-    IntervalIndex<i64> index;
-    IntervalIndex<i32> samples;
-    std::valarray<float> current, current_sd; 
-
-    AlnDF(IntervalIndex<i64> index_) : index(index_) {
-        //current(index.length),
-        //current_sd(index.length)
-        current = std::valarray<float>(index_.length);
-        current_sd = std::valarray<float>(index_.length);
-    }
-
-    AlnDF(IntervalIndex<i64> index_, IntervalIndex<i32> &samples_, py::array_t<float> current_, py::array_t<float> current_sd_) : 
-        index(index_),
-        samples(samples_),
-        current(init_arr(current_)),
-        current_sd(init_arr(current_sd_)) {}
-
-    AlnDF slice(size_t i, size_t j) {
-        AlnDF ret(index.islice(i, j));
-        for (size_t k = i; k < j; k++) {
-            ret.samples.append(samples.coords[k]);
-            ret.current[k-i] = current[k];
-            ret.current_sd[k-i] = current_sd[k];
-        }
-        return ret;
-    }
-
-    size_t size() const {
-        return index.length;
-    }
-
-    template <typename T>
-    static std::valarray<T> init_arr(py::array_t<T> &a) {
-        auto info = a.request();
-        return std::valarray<T>(static_cast<T*>(info.ptr), static_cast<size_t>(info.shape[0]));
-    }
-
-    static py::class_<AlnDF> pybind(py::module_ &m) {
-        py::class_<AlnDF> c(m, "_AlnDF");
-        c.def(py::init<IntervalIndex<i64> &>());
-        c.def(py::init<IntervalIndex<i64>&, IntervalIndex<i32>&, py::array_t<float>, py::array_t<float>>());
-        c.def_readwrite("index", &AlnDF::index);
-        c.def_readwrite("samples", &AlnDF::samples);
-        c.def("slice", &AlnDF::slice);
-        c.def("__len__", &AlnDF::size);
-        //c.def_readwrite("current", &AlnDF::current);
-        //c.def_readwrite("current_sd", &AlnDF::current_sd);
-        return c;
-    }
-};
-
 struct DtwDF : public DataFrame<int, int, float, float> {
     static constexpr NameArray names = {"start", "length", "current", "stdv"}; 
     ColType<0> &start = std::get<0>(data_);  
@@ -341,8 +280,8 @@ struct DtwDF : public DataFrame<int, int, float, float> {
 
     void set_signal(const ProcessedRead &read) {
         if (current.size() == 0) {
-            current = std::valarray<float>(height);
-            stdv = std::valarray<float>(height);
+            current = ValArray<float>(height);
+            stdv = ValArray<float>(height);
         }
 
         for (size_t i = 0; i < height; i++) {

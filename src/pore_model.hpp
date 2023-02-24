@@ -432,8 +432,8 @@ class PoreModel {
         return s;
     }
 
-    static std::vector<KmerType> pacseq_to_kmers(u8 *seq, u64 st, u64 en) {
-        std::vector<KmerType> ret;
+    static ValArray<KmerType> pacseq_to_kmers(u8 *seq, u64 st, u64 en) {
+        ValArray<KmerType> ret(en - st - K + 1);
 
         u64 pst = st >> 2,
             pen = ((en) >> 2)+1;
@@ -442,11 +442,15 @@ class PoreModel {
         KmerType kmer = 0;
         u8 bst = (st&3), ben;
 
+        //TODO could optimize by splitting into init and extend loops
         for (u64 j = pst; j < pen; j++) {
             ben = j == pen-1 ? (en&3) : 4;
             for (u8 k = bst; k < ben; k++) {
                 kmer = kmer_neighbor(kmer, (seq[j] >> ((K^3) << 1) ) & 3);
-                if (++i >= K) ret.push_back(kmer);
+                if (i >= K-1) {
+                    ret[i] = kmer;
+                }
+                i++;
             }
             bst = 0;
         }
@@ -552,10 +556,98 @@ class PoreModel {
     #endif
 };
 
-//template <KmerLen K, typename T>
-//bool PoreModel<K,T>::PRESETS_LOADED = false;
+template <typename ModelType>
+struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
+    using KmerType = typename ModelType::kmer_t;
+    //using super = DataFrame<KmerType, u8, float>;
 
-//using PoreModelK5 = PoreModel<5,u16>;
-//using PoreModelK10 = PoreModel<10,u32>;
+    const ModelType &model;
+    //std::string name;
+    //bool fwd;
+    IntervalIndex<i64> coords;
+
+    //static constexpr typename super::NameArray names = {"ref", "start", "end"}; 
+    //typename super::template ColType<0> &kmer = std::get<0>(super::data_);   
+    //typename super::template ColType<1> &current = std::get<1>(super::data_);   
+    //typename super::template ColType<2> &base = std::get<2>(super::data_);   
+    //ValArray<u8> base;
+
+    ValArray<KmerType> kmer; 
+    ValArray<float> current;   
+
+    Sequence(const ModelType &model_, size_t length) : 
+        model(model_), 
+        coords({{0,static_cast<i64>(length)}}), 
+        kmer(length), current(length) {}
+
+    Sequence(const ModelType &model_, IntervalIndex<i64> coords_) : 
+        model(model_), 
+        //name(name_), 
+        //fwd(fwd_), 
+        coords(coords_),
+        kmer(coords.length), current(coords.length) {}
+
+    Sequence(const ModelType &model_, const std::string &seq) :
+            Sequence(model_, seq.size()-ModelType::KMER_LEN+1) {
+
+        kmer[0] = model.str_to_kmer(seq);
+
+        for (size_t i = 0; i < size()-1; i++) {
+            auto b = BASE_BYTES[seq[i+ModelType::KMER_LEN]];
+            kmer[i+1] = model.kmer_neighbor(kmer[i], b);
+        }
+        init_current();
+    }
+
+    //TODO input pacseq and interval index, set from each segment
+    //then RefIndex can just feed right in
+    //need to figure out mrefs, k-mer trim
+    
+    //eventually need to write new FastaIndex based on FAI
+    //then also pass file pointer and interval index, read chunks
+
+    Sequence(const ModelType &model_, u8 *seq, size_t start, size_t end) :
+            Sequence(model_, end-start-ModelType::KMER_LEN+1) {
+        kmer = model.pacseq_to_kmers(seq, start, end);
+    }
+
+    typename ModelType::KmerTypePy kmer_to_str(size_t i) const {
+        return model.kmer_to_arr(i);
+    }
+
+    KmerType get_kmer(i64 r) const {
+        auto i = coords.get_index(r);
+        return kmer[i];
+    }
+
+    KmerType get_current(i64 r) const {
+        auto i = coords.get_index(r);
+        return current[i];
+    }
+
+    void init_current() {
+        for (size_t i = 0; i < size(); i++) {
+            current[i] = model.kmer_current(kmer[i]);
+        }
+    }
+
+    size_t size() const {
+        return kmer.size();
+    }
+
+    static void pybind(py::module &m, std::string suffix) {
+        py::class_<Sequence> c(m, ("Sequence"+suffix).c_str());
+        //auto c = super::template pybind<Sequence>(m, ("Sequence"+suffix).c_str(), false);
+
+        c.def(py::init<const ModelType &, const std::string &>());
+        c.def("__len__", &Sequence::size);
+        c.def_readonly("coords", &Sequence::coords);
+        c.def_readonly("kmer", &Sequence::kmer);
+        c.def_readonly("current", &Sequence::current);
+        c.def("kmer_to_str", py::vectorize(&Sequence::kmer_to_str));
+        c.def("get_kmer", py::vectorize(&Sequence::get_kmer));
+        c.def("get_current", py::vectorize(&Sequence::get_current));
+    }
+};
 
 #endif

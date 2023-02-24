@@ -11,82 +11,80 @@
 #include "util.hpp"
 namespace py = pybind11;
 
-PYBIND11_MAKE_OPAQUE(std::valarray<float>);
-PYBIND11_MAKE_OPAQUE(std::valarray<i8>);
-PYBIND11_MAKE_OPAQUE(std::valarray<i16>);
-PYBIND11_MAKE_OPAQUE(std::valarray<i32>);
-PYBIND11_MAKE_OPAQUE(std::valarray<i64>);
-PYBIND11_MAKE_OPAQUE(std::valarray<u8>);
-PYBIND11_MAKE_OPAQUE(std::valarray<u16>);
-PYBIND11_MAKE_OPAQUE(std::valarray<u32>);
-PYBIND11_MAKE_OPAQUE(std::valarray<u64>);
-
 template<typename T>
-void pybind_valarray(py::module_ &m, std::string suffix) {
-    auto name = "Valarray"+suffix;
-    py::class_<std::valarray<T>> a(m, name.c_str(), py::buffer_protocol());
-    a.def_buffer([](std::valarray<T> &c) -> py::buffer_info { 
-        return py::buffer_info( 
-            &c[0], 
-            sizeof(T), 
-            py::format_descriptor<T>::format(), 
-            1, 
-            {c.size()}, 
-            {sizeof(T)} 
-        ); 
-    });
-    a.def("__repr__", [](std::valarray<T> &a) -> std::string { 
+class ValArray: public std::valarray<T> {
+    public:
+    using std::valarray<T>::valarray;
+    using super = std::valarray<T>;
+
+
+    T &at(size_t i) {
+        return super::operator[](i);
+    }
+
+    std::string to_string() {
         std::stringstream ss;
         ss << "[";
-        if (a.size() > 6) {
+        if (super::size() > 6) {
             for (size_t i = 0; i < 3; i++) {
-                ss << a[i] << " ";
+                ss << at(i) << " ";
             }
             ss << "...";
-            for (size_t i = a.size()-4; i < a.size(); i++) {
-                ss << " " << a[i];
+            for (size_t i = super::size()-4; i < super::size(); i++) {
+                ss << " " << at(i);
             }
         } else {
-            for (size_t i = 0; i < a.size()-1; i++) {
-                ss << a[i] << " ";
+            for (size_t i = 0; i < super::size()-1; i++) {
+                ss << at(i) << " ";
             }
-            ss << a[a.size()-1];
+            ss << at(super::size()-1);
         }
         ss << "]";
         return ss.str();
-    });
-    a.def("__getitem__", static_cast< T& (std::valarray<T>::*)(size_t)> (&std::valarray<T>::operator[]));
-    a.def("__len__", &std::valarray<T>::size);
-    a.def("__iter__", [](const std::valarray<T> &v) { 
-            return py::make_iterator(std::begin(v), std::end(v)); 
-        }, py::keep_alive<0, 1>());
+    }
 
-    a.def("to_numpy", [](std::valarray<T> &a) -> py::array_t<T> { 
-        return py::array_t<T>{static_cast<py::ssize_t>(a.size()), &a[0]}; 
-    });
-}
+    py::array_t<T> to_numpy() {
+        return py::array_t<T>(static_cast<py::ssize_t>(super::size()), &((*this)[0])); 
+    }
+
+    static void pybind(py::module_ &m, std::string suffix) {
+        auto name = "ValArray"+suffix;
+        py::class_<ValArray> a(m, name.c_str(), py::buffer_protocol());
+        a.def_buffer([](ValArray &c) -> py::buffer_info { 
+            return py::buffer_info( 
+                &c[0], 
+                sizeof(T), 
+                py::format_descriptor<T>::format(), 
+                1, 
+                {c.size()}, 
+                {sizeof(T)} 
+            ); 
+        });
+        //a.def("__getitem__", static_cast<T& (super::*)(size_t)> (&super::operator[]));
+        a.def("__getitem__", &ValArray::at);
+        a.def("__repr__", &ValArray::to_string);
+        a.def("to_numpy", &ValArray::to_numpy);
+        a.def("__len__", &super::size);
+        a.def("__iter__", [](const ValArray &v) { 
+                return py::make_iterator(std::begin(v), std::end(v)); 
+            }, py::keep_alive<0, 1>());
+
+    }
+};
 
 template<typename T>
 struct PyArray {
 
-    std::vector<T> data_vec;
     py::buffer_info info;
     T *data;
     size_t size_;
 
-    //PyArray(size_t length, T fill) :
-    //    data_vec { length, fill },
-    //    info { data_vec.data(), length },
-    //    data { data_vec.data() },
+    //TODO turn into ArrayRef, could reference slices
+    //PyArray(T *ptr, size_t length) :
+    //    info { ptr, length },
+    //    data { ptr },
     //    size_ { length } {
     //}
-
-    PyArray(T *ptr, size_t length) :
-        info { ptr, length },
-        data { ptr },
-        size_ { length } {
-
-    }
 
     PyArray(py::array_t<T> arr) :
         info { arr.request() },
@@ -140,147 +138,6 @@ struct PyArray {
     }
 };
 
-
-template<typename T>
-struct RecArray : public PyArray<T> {
-    using PyArray<T>::PyArray;
-    template <typename Subclass>
-    static void pybind_rec(py::module_ &m) {
-        auto c = RecArray<T>::template pybind<Subclass>(m, Subclass::name);
-        c.attr("columns") = py::cast(Subclass::columns);
-        Subclass::bind_rec();
-    }
-};
-
-struct AlnCoord {
-    int ref, start, end;
-};
-struct AlnCoords : public RecArray<AlnCoord> {
-    using RecArray<AlnCoord>::RecArray;
-
-    static constexpr const char *name = "_AlnCoords";
-    static constexpr std::array<const char *, 3> columns = {"ref", "start", "end"};
-
-    static void bind_rec() {
-        PYBIND11_NUMPY_DTYPE(AlnCoord, ref, start, end);
-    }
-};
-
-
-template <typename... Types>
-class DataFrame {
-    public:
-    static constexpr size_t width = sizeof...(Types);
-
-    using DataTuple = std::tuple<std::valarray<Types>...>;
-    using NameArray = std::array<const char *, width>;
-    DataTuple data_;
-
-    template <size_t I>
-    using ColType = typename std::tuple_element<I, DataTuple>::type;
-
-    const size_t height;
-
-    DataFrame(const DataFrame &) = delete;
-    DataFrame &operator=(const DataFrame &) = delete;
-    DataFrame(DataFrame&&) = default;
-
-    DataFrame(py::array_t<Types>... arrays) : 
-        data_  { init_arr(arrays)... },
-        height {init_height()} {
-    }
-
-    DataFrame(size_t length) : 
-        data_  { std::valarray<Types>(length)... },
-        height {init_height()} {
-    }
-
-    size_t init_height() {
-        auto size = std::get<0>(data_).size();
-        return init_height<1>(size);
-    }
-
-    template <size_t I>
-    typename std::enable_if<I < width, size_t>::type
-    init_height(size_t size) {
-        auto arr_size = std::get<I>(data_).size();
-        if (arr_size > 0) {
-            if (size == 0) {
-                size = arr_size;
-            } else if (arr_size != size) {
-                throw std::runtime_error("All DataFrame columns must be same size or empty");
-            }
-        }
-        return init_height<I+1>(size);
-    }
-
-    template <size_t I>
-    typename std::enable_if<I == width, size_t>::type
-    init_height(size_t size) {
-        return size;
-    }
-
-    //using 
-
-    template<size_t I, typename T = ColType<I>>
-    T &get() {
-        return std::get<I>(data_);
-    }
-
-    private:
-
-    template <typename T>
-    static std::valarray<T> init_arr(py::array_t<T> a) {
-        auto info = a.request();
-        return std::valarray<T>(static_cast<T*>(info.ptr), static_cast<size_t>(info.shape[0]));
-    }
-
-    public:
-
-
-    template<class Subclass>
-    static py::class_<Subclass> pybind(py::module_ &m, const char *name) {
-        py::class_<Subclass> c(m, name);
-        c.def(py::init<py::array_t<Types>...>());
-        c.def(py::init<size_t>());
-
-        c.def("__len__", [](Subclass &c) -> size_t {return c.height;});
-        c.attr("names") = py::cast(Subclass::names);
-        c.attr("width") = py::cast(Subclass::width);
-        c.def_readonly("height", &Subclass::height);
-
-        pybind_col<Subclass>(c);
-        
-        return c;
-    }
-
-    template<class Subclass, size_t I=0, typename T = typename std::tuple_element<I, DataTuple>::type>
-    static typename std::enable_if<I < width, void>::type
-    pybind_col(py::class_<Subclass> &c) {
-        c.def_property_readonly(
-            Subclass::names[I], 
-            [](Subclass &c) -> T& {
-                return std::get<I>(c.data_);
-        });
-        pybind_col<Subclass, I + 1>(c);
-    }
-
-    template<class Subclass, size_t I>
-    static typename std::enable_if<I == width, void>::type
-    pybind_col(py::class_<Subclass> &c) {
-        return;
-    }
-};
-
-struct AlnCoordsDF : public DataFrame<int, int, int> {
-    static constexpr NameArray names = {"ref", "start", "end"}; 
-    ColType<0> &ref = std::get<0>(data_);                      
-    ColType<1> &start = std::get<1>(data_);                      
-    ColType<2> &end = std::get<2>(data_);                      
-    using DataFrame::DataFrame;                              
-};                
-
-void pybind_dataframes(py::module_ &m);
 
 template <typename T>
 struct Interval {
@@ -437,40 +294,40 @@ class IntervalIndex {
         return ss.str();
     }
 
-    std::valarray<T> get_gaps() const {
-        std::valarray<T> ret(coords.size()-1);
+    ValArray<T> get_gaps() const {
+        ValArray<T> ret(coords.size()-1);
         for (size_t i = 0; i < ret.size(); i++) {
             ret[i] = coords[i+1].start - coords[i].end;
         }
         return ret;
     }
 
-    std::valarray<T> get_lengths() const {
-        std::valarray<T> ret(coords.size());
+    ValArray<T> get_lengths() const {
+        ValArray<T> ret(coords.size());
         for (size_t i = 0; i < coords.size(); i++) {
             ret[i] = coords[i].end - coords[i].start;
         }
         return ret;
     }
 
-    std::valarray<T> get_starts() const {
-        std::valarray<T> ret(coords.size());
+    ValArray<T> get_starts() const {
+        ValArray<T> ret(coords.size());
         for (size_t i = 0; i < coords.size(); i++) {
             ret[i] = coords[i].start;
         }
         return ret;
     }
 
-    std::valarray<T> get_ends() const {
-        std::valarray<T> ret(coords.size());
+    ValArray<T> get_ends() const {
+        ValArray<T> ret(coords.size());
         for (size_t i = 0; i < coords.size(); i++) {
             ret[i] = coords[i].end;
         }
         return ret;
     }
 
-    std::valarray<T> expand() const {
-        std::valarray<T> ret(length);
+    ValArray<T> expand() const {
+        ValArray<T> ret(length);
         size_t i = 0;
         for (auto &intv : coords) {
             for (T v = intv.start; v < intv.end; v++) {
@@ -543,6 +400,220 @@ class IntervalIndex {
     #endif
 };
 
+template <typename... Types>
+class DataFrame {
+    public:
+    static constexpr size_t width = sizeof...(Types);
+
+    using DataTuple = std::tuple<ValArray<Types>...>;
+    using NameArray = std::array<const char *, width>;
+    DataTuple data_;
+
+    template <size_t I>
+    using ColType = typename std::tuple_element<I, DataTuple>::type;
+
+    const size_t height;
+
+    DataFrame(const DataFrame &) = default;
+    DataFrame &operator=(const DataFrame &) = default;
+    DataFrame(DataFrame&&) = default;
+
+    DataFrame(py::array_t<Types>... arrays) : 
+        data_  { init_arr(arrays)... },
+        height {init_height()} {
+    }
+
+    DataFrame(size_t length) : 
+        data_  { ValArray<Types>(length)... },
+        height { length } {
+    }
+
+    DataFrame(size_t length, bool full...) : 
+        data_  { init_arr<Types>(length, full)... },
+        height { length } {
+    }
+
+    size_t init_height() {
+        auto size = std::get<0>(data_).size();
+        return init_height<1>(size);
+    }
+
+    template <size_t I>
+    typename std::enable_if<I < width, size_t>::type
+    init_height(size_t size) {
+        auto arr_size = std::get<I>(data_).size();
+        if (arr_size > 0) {
+            if (size == 0) {
+                size = arr_size;
+            } else if (arr_size != size) {
+                throw std::runtime_error("All DataFrame columns must be same size or empty");
+            }
+        }
+        return init_height<I+1>(size);
+    }
+
+    template <size_t I>
+    typename std::enable_if<I == width, size_t>::type
+    init_height(size_t size) {
+        return size;
+    }
+
+    //using 
+
+    template<size_t I, typename T = ColType<I>>
+    T &get() {
+        return std::get<I>(data_);
+    }
+
+    private:
+
+    template <typename T>
+    static ValArray<T> init_arr(py::array_t<T> a) {
+        auto info = a.request();
+        return ValArray<T>(static_cast<T*>(info.ptr), static_cast<size_t>(info.shape[0]));
+    }
+
+    template <typename T>
+    static ValArray<T> init_arr(size_t n, bool full=true) {
+        return full ? ValArray<T>(n) : ValArray<T>();
+    }
+
+    public:
+
+
+    template<class Subclass>
+    static py::class_<Subclass> pybind(py::module_ &m, const char *name, bool constructors=true) {
+        py::class_<Subclass> c(m, name);
+
+        if (constructors) {
+            c.def(py::init<py::array_t<Types>...>());
+            c.def(py::init<size_t>());
+        }
+
+        c.def("__len__", [](Subclass &c) -> size_t {return c.height;});
+        c.attr("names") = py::cast(Subclass::names);
+        c.attr("width") = py::cast(Subclass::width);
+        c.def_readonly("height", &Subclass::height);
+
+        pybind_col<Subclass>(c);
+        
+        return c;
+    }
+
+    template<class Subclass, size_t I=0, typename T = typename std::tuple_element<I, DataTuple>::type>
+    static typename std::enable_if<I < width, void>::type
+    pybind_col(py::class_<Subclass> &c) {
+        c.def_property_readonly(
+            Subclass::names[I], 
+            [](Subclass &c) -> T& {
+                return std::get<I>(c.data_);
+        });
+        pybind_col<Subclass, I + 1>(c);
+    }
+
+    template<class Subclass, size_t I>
+    static typename std::enable_if<I == width, void>::type
+    pybind_col(py::class_<Subclass> &c) {
+        return;
+    }
+};
+
+struct AlnCoordsDF : public DataFrame<int, int, int> {
+    static constexpr NameArray names = {"ref", "start", "end"}; 
+    ColType<0> &ref = std::get<0>(data_);                      
+    ColType<1> &start = std::get<1>(data_);                      
+    ColType<2> &end = std::get<2>(data_);                      
+    using DataFrame::DataFrame;                              
+};                
+
+void pybind_dataframes(py::module_ &m);
+
+//TODO 
+// redo dataframes so it's
+//create ReadAln, contains DtwDF, BcalnDF, and aln info:
+//store coordinates (list of ref bound pairs), use to index DFs
+//aln_id, read_id, ref_name, ref_start, ref_end, ref_fwd, samp_start, samp_en
+//Eventually construct AlnTrack in C++ by concating ReadAlns
+//   contains alignments and layers DFs, probably distinct from ReadAln
+//   sortable and indexable by aln_id, ref
+
+struct AlnDF {
+    IntervalIndex<i64> index;
+    IntervalIndex<i32> samples;
+    ValArray<float> current, current_sd; 
+
+    AlnDF(IntervalIndex<i64> index_) : index(index_) {
+        //current(index.length),
+        //current_sd(index.length)
+        current = ValArray<float>(index_.length);
+        current_sd = ValArray<float>(index_.length);
+    }
+
+    AlnDF(IntervalIndex<i64> index_, IntervalIndex<i32> &samples_, py::array_t<float> current_, py::array_t<float> current_sd_) : 
+        index(index_),
+        samples(samples_),
+        current(init_arr(current_)),
+        current_sd(init_arr(current_sd_)) {}
+
+    AlnDF slice(size_t i, size_t j) {
+        AlnDF ret(index.islice(i, j));
+        for (size_t k = i; k < j; k++) {
+            ret.samples.append(samples.coords[k]);
+            ret.current[k-i] = current[k];
+            ret.current_sd[k-i] = current_sd[k];
+        }
+        return ret;
+    }
+
+    size_t size() const {
+        return index.length;
+    }
+
+    template <typename T>
+    static ValArray<T> init_arr(py::array_t<T> &a) {
+        auto info = a.request();
+        return ValArray<T>(static_cast<T*>(info.ptr), static_cast<size_t>(info.shape[0]));
+    }
+
+    static py::class_<AlnDF> pybind(py::module_ &m) {
+        py::class_<AlnDF> c(m, "_AlnDF");
+        c.def(py::init<IntervalIndex<i64> &>());
+        c.def(py::init<IntervalIndex<i64>&, IntervalIndex<i32>&, py::array_t<float>, py::array_t<float>>());
+        c.def_readwrite("index", &AlnDF::index);
+        c.def_readwrite("samples", &AlnDF::samples);
+        c.def("slice", &AlnDF::slice);
+        c.def("__len__", &AlnDF::size);
+        //c.def_readwrite("current", &AlnDF::current);
+        //c.def_readwrite("current_sd", &AlnDF::current_sd);
+        return c;
+    }
+};
+
+
+template<typename T>
+struct RecArray : public PyArray<T> {
+    using PyArray<T>::PyArray;
+    template <typename Subclass>
+    static void pybind_rec(py::module_ &m) {
+        auto c = RecArray<T>::template pybind<Subclass>(m, Subclass::name);
+        c.attr("columns") = py::cast(Subclass::columns);
+        Subclass::bind_rec();
+    }
+};
+
+struct AlnCoord {
+    int ref, start, end;
+};
+struct AlnCoords : public RecArray<AlnCoord> {
+    using RecArray<AlnCoord>::RecArray;
+
+    static constexpr const char *name = "_AlnCoords";
+    static constexpr std::array<const char *, 3> columns = {"ref", "start", "end"};
+
+    static void bind_rec() {
+        PYBIND11_NUMPY_DTYPE(AlnCoord, ref, start, end);
+    }
+};
 
 
 #endif

@@ -20,6 +20,7 @@ const std::unordered_map<std::string, PoreModelPreset> PORE_MODEL_PRESETS {{
     M{ {"r9.4_dna_450bps_6mer_npl", false, false, 6, 2}, model_r9_4_dna_450bps_6mer_npl }.map()
 }};
 
+
 #ifdef PYBIND
 
 void pybind_pore_model_params(py::module_ &m) {

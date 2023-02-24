@@ -133,7 +133,6 @@ void pybind_dtw(py::module_ &m) {
     PYBIND11_NUMPY_DTYPE(Coord, qry, ref);
     
     DtwDF::pybind(m);//<DtwDF>, "_DtwDF");
-    AlnDF::pybind(m);//<AlnDF>, "_AlnDF");
 
     py::class_<DtwParams> p(m, "DtwParams");
     PY_DTW_PARAM(band_mode, "DTW band mode (\"guided\", \"static\", or \"\"/\"none\")");

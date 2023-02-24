@@ -135,15 +135,19 @@ class GuidedDTW:
 
         bcaln_index = self.bcaln_new.index
 
-        coords = [bcaln_index.get_interval(i).to_tuple() for i in range(bcaln_index.interval_count())]
-        kmers = self.index.get_kmers(coords, self.conf.is_rna)
+        #coords = [bcaln_index.get_interval(i).to_tuple() for i in range(bcaln_index.interval_count())]
+        #kmers = self.index.get_kmers(coords, self.conf.is_rna)
 
         t0,t1 = self.index.trim if not bcaln.flip_ref else reversed(self.index.trim)
         self.intv_coords = self.bcaln_new.index.islice(t0, len(self.bcaln_new)-t1)
 
-        self.ref_kmers = pd.Series(kmers, index=self.intv_coords.expand())
+        #self.ref_kmers = pd.Series(kmers, index=self.intv_coords.expand())
 
-        ref_means = self.model[self.ref_kmers]
+        self.seq = self.index.instance.get_kmers(self.model.instance, self.bcaln_new.index, self.conf.is_rna)
+        #print(seq.coords)
+        #print(np.all(seq.kmer.to_numpy() == self.ref_kmers.to_numpy()))
+
+        ref_means = self.seq.current.to_numpy()  #self.model[self.ref_kmers]
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
@@ -208,7 +212,7 @@ class GuidedDTW:
             return
 
         self.df = df.set_index("mref")
-        self.df["kmer"] = self.ref_kmers#.loc[df.loc["mref"]]#.to_numpy()
+        self.df["kmer"] = self.seq.kmer #self.ref_kmers#.loc[df.loc["mref"]]#.to_numpy()
         self.df.dropna(subset=["kmer"], inplace=True)
 
         tracks.write_dtw_events(self.df, read=signal)#, aln_id=aln_id
@@ -224,7 +228,7 @@ class GuidedDTW:
         self.empty = False
 
     def renormalize(self, signal, aln):
-        kmers = self.ref_kmers[aln["mref"]]
+        kmers = self.seq.get_kmer(aln["mref"]) #self.ref_kmers[aln["mref"]]
         model_current = self.model[kmers]
         reg = TheilSenRegressor(random_state=0)
         return reg.fit(aln[["current"]], model_current)
@@ -253,20 +257,20 @@ class GuidedDTW:
 
         block_signal = read_block['mean'].to_numpy()
         
-        prms, means, kmers, inst, bands = self._get_dtw_args(read_block, self.ref_kmers)
+        prms, means, kmers, inst, bands = self._get_dtw_args(read_block)#, self.ref_kmers)
         dtw = self.dtw_fn(prms, signal, self.evt_start, self.evt_end, kmers, inst, bands)
         
         if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
             return None
 
         df = DtwDF(dtw.get_aln()).to_df()
-        df["mref"] = self.ref_kmers.index#pd.RangeIndex(mref_st, mref_en+1)
+        df["mref"] = self.seq.coords.expand() #self.ref_kmers.index #pd.RangeIndex(mref_st, mref_en+1)
 
         return df
 
-    def _get_dtw_args(self, read_block, ref_kmers):
+    def _get_dtw_args(self, read_block):#, ref_kmers):
         qry_len = len(read_block)
-        ref_len = len(ref_kmers)
+        ref_len = len(self.seq)
 
         #should maybe move to C++
         if self.method == "guided":
@@ -274,15 +278,18 @@ class GuidedDTW:
 
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
 
-            aln = self.bcaln[self.bcaln.index.isin(ref_kmers.index)]
+            mrefs = self.seq.coords.expand()
 
-            idxs = self.intv_coords.get_index(ref_kmers.index) + self.intv_coords[0]-self.coords.mrefs.min()
+            aln = self.bcaln[self.bcaln.index.isin(mrefs)]
 
-            mv_starts = self.bcaln.loc[ref_kmers.index, "start"]
+            idxs = self.intv_coords.get_index(mrefs) + self.intv_coords[0]-self.coords.mrefs.min()
+
+            mv_starts = self.bcaln.loc[mrefs, "start"]
 
             bands = _uncalled.get_guided_bands(idxs, mv_starts, read_block['start'], band_count, shift)
 
-            return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(ref_kmers), self.model.instance, _uncalled.PyArrayCoord(bands))
+            #return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(ref_kmers), self.model.instance, _uncalled.PyArrayCoord(bands))
+            return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         #elif self.method == "static":
         #    return common

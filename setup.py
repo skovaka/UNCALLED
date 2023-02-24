@@ -94,6 +94,7 @@ uncalled = Pybind11Extension(
 
     sources = [ #glob("src/**/*.cpp", recursive=True),
        "src/pore_model.cpp",
+       #"src/sequence.cpp", 
        "src/dtw.cpp",
        "src/pybinder.cpp",
        "src/config.cpp",
