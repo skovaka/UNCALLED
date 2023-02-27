@@ -259,14 +259,14 @@ struct DtwDF : public DataFrame<int, int, float, float> {
             if (itr->ref > prev_ref) {
                 if (prev_ref >= 0) {
                     auto evt = read.merge_events(qry_st, itr->qry);
+                    //std::cout << i << " " << evt.start << " " << evt.mean << " ";
                     start[i] = evt.start;
                     length[i] = evt.length;
                     current[i] = evt.mean;
                     stdv[i] = evt.stdv;
-                    //std::cout << "DONE " << length[i] << " " << current[i] << " " << stdv[i] << "\n";
-                    //std::cout.flush();
                     i++;
                 }
+                //std::cout << ((itr->ref)-prev_ref) << "\n"; 
                 prev_ref = itr->ref;
                 qry_st = itr->qry;
             }
@@ -276,6 +276,8 @@ struct DtwDF : public DataFrame<int, int, float, float> {
         length[i] = evt.length;
         current[i] = evt.mean;
         stdv[i] = evt.stdv;
+
+        //std::cout.flush();
     }
 
     void set_signal(const ProcessedRead &read) {
@@ -559,8 +561,15 @@ class BandedDTW {
             path_k -= shift;
         }
 
+        auto c = path_.back();
+        c.qry = event_start_;
+        while (c.ref > 0) {
+            c.ref -= 1;
+            path_.push_back(c);
+        }
+
         //std::cout << "\n";
-        path_.push_back({event_start_,0});
+        //path_.push_back({event_start_,0});
     }
 
     std::vector<Coord> get_path() {

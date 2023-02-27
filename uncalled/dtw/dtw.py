@@ -132,6 +132,8 @@ class GuidedDTW:
 
         self.bcaln = bcaln.aln
 
+        #print(bcaln.aln.samples)
+
         self.intv_coords = self.bcaln.index
 
         self.seq = self.index.instance.get_kmers(self.model.instance, self.bcaln.index, self.conf.is_rna)
@@ -152,11 +154,6 @@ class GuidedDTW:
         self.samp_min = self.bcaln.samples.starts[0]
         self.samp_max = self.bcaln.samples.ends[len(self.bcaln)-1]
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
-
-        #print(self.samp_min, self.samp_max)
-        #print(self.bcaln.samples.starts[0], self.bcaln.samples.ends[len(self.bcaln)-1])
-        #print(self.bcaln.index)
-        #print(self.bcaln.samples)
 
         if self.conf.normalizer.mode == "ref_mom":
             
@@ -204,6 +201,7 @@ class GuidedDTW:
             self.empty = True
             sys.stderr.write(f"Warning: dtw failed for read {read.id}\n")
             return
+        
 
         self.df = df.set_index("mref")
         self.df["kmer"] = self.seq.kmer #self.ref_kmers#.loc[df.loc["mref"]]#.to_numpy()
@@ -240,7 +238,7 @@ class GuidedDTW:
         
         prms, means, kmers, inst, bands = self._get_dtw_args(read_block)#, self.ref_kmers)
         dtw = self.dtw_fn(prms, signal, self.evt_start, self.evt_end, kmers, inst, bands)
-        
+
         if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
             return None
 
