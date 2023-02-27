@@ -509,10 +509,13 @@ class RefIndex {
     }
 
     Sequence<ModelType> get_kmers(ModelType &model, IntervalIndex<i64> &mref_blocks, bool is_rna) {
-        bool rev = is_mref_flipped(mref_blocks[0]-1);
+        auto mref_end = mref_blocks.coords.back().end-1;  
+        bool rev = is_mref_flipped(mref_end);
         auto seq_idx = mref_blocks;//.islice(trim_st, mref_blocks.length-trim_en);
         
-        Sequence<ModelType> seq(model, seq_idx);
+        auto rid = mref_to_ref_id(mref_end);
+        auto name = get_ref_name(rid);
+        Sequence<ModelType> seq(model, name, seq_idx, rev != is_rna);
         auto lpad = (K - 1) / 2, rpad = K - lpad - 1;
         size_t k = 0;
         for (size_t i = 0; i < mref_blocks.interval_count()-1; i++) {

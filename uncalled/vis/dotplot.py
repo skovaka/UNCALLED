@@ -170,7 +170,7 @@ class Dotplot:
                         legendgroup=track.name,
                         line={
                             "color":self.conf.vis.track_colors[i], 
-                            "width":2, "shape" : "vh"  },
+                            "width":2, "shape" : "vh" if flipped else "hv" },
                         hoverinfo="skip",
                         showlegend=first_aln
                     ), row=2, col=1)

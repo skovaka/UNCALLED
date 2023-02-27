@@ -105,7 +105,7 @@ class Sigplot:
                 track_dtws.append(pd.concat(dtws).sort_index())
 
         read = self.sigproc.process(self.tracks.read_index[read_id], True)
-        signal = read.get_norm_signal(samp_min, samp_max)
+        signal = read.get_norm_signal(int(samp_min), int(samp_max))
 
         sig_med = np.median(signal)
         sig_win = signal.std()*3 #, signal.min(), signal.max())

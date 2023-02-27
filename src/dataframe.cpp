@@ -12,7 +12,6 @@ void pybind_dataframes(py::module_ &m) {
     AlnCoords::pybind_rec<AlnCoords>(m);
 
     BIND_DF(AlnCoordsDF)
-    AlnDF::pybind(m);
 
 
     ValArray<float>::pybind(m, "F32");

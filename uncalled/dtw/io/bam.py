@@ -7,6 +7,7 @@ import os
 import re
 import time
 from collections import defaultdict, deque
+from ..bcaln import sam_to_ref_moves, INT32_NA
 from ..aln_track import AlnTrack
 from ..layers import LAYER_META, parse_layers
 from ...index import RefCoord
@@ -241,7 +242,6 @@ class BAM(TrackIO):
                     n += 1
                 if n == self.conf.tracks.max_reads:
                     break
-            
 
     def _parse_sam(self, sam, coords=None):
         samp_bounds = sam.get_tag(SAMP_TAG)
@@ -338,6 +338,25 @@ class BAM(TrackIO):
                 "samp_start" : [samp_start],
                 "samp_end" : [samp_end],
                 "tags" : [""]}).set_index(["track_id", "id"])
+
+
+        if sam.query_name in self.tracks.read_index:
+            read = self.tracks.read_index[sam.query_name]
+        moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
+        if moves is not None:
+            pacs = self.tracks.index.mref_to_pac(moves.index.expand())
+            df = pd.DataFrame({
+                #"mref"   : (moves.index.expand()),
+                "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
+                "start"  : (moves.samples.starts),
+                "length" : (moves.samples.lengths)
+            }).set_index(["track_id", "fwd", "pac","aln_id"])
+            #}).set_index("mref")
+            isna = df["start"] == INT32_NA
+            df[isna] = pd.NA
+            df = pd.concat({"bcaln" : df.fillna(method="backfill")}, names=("group","layer"),  axis=1)
+
+            layers = pd.concat([layers, df.reindex(dtw.index)], axis=1)
 
         self.aln_id_in += 1
 
@@ -441,7 +460,10 @@ class BAM(TrackIO):
         if len(ret_alns) > 0:
             yield (ret_alns, ret_layers)
 
-    def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
+    def iter_alns(self, layers=None, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
+
+
+            
         aln_id = 0
 
         if read_id is not None and len(read_id) > 0:

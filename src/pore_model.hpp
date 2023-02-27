@@ -562,9 +562,9 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
     //using super = DataFrame<KmerType, u8, float>;
 
     const ModelType &model;
-    //std::string name;
-    //bool fwd;
+    std::string name;
     IntervalIndex<i64> coords;
+    bool is_fwd; //TODO infer from mref coords
 
     //static constexpr typename super::NameArray names = {"ref", "start", "end"}; 
     //typename super::template ColType<0> &kmer = std::get<0>(super::data_);   
@@ -580,12 +580,13 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         coords({{0,static_cast<i64>(length)}}), 
         kmer(length), current(length) {}
 
-    Sequence(const ModelType &model_, IntervalIndex<i64> coords_) : 
+    Sequence(const ModelType &model_, const std::string &name_, IntervalIndex<i64> coords_, bool is_fwd_) : 
         model(model_), 
-        //name(name_), 
-        //fwd(fwd_), 
+        name(name_), 
         coords(coords_),
-        kmer(coords.length), current(coords.length) {}
+        is_fwd(is_fwd_), 
+        kmer(coords.length), 
+        current(coords.length) {}
 
     Sequence(const ModelType &model_, const std::string &seq) :
             Sequence(model_, seq.size()-ModelType::KMER_LEN+1) {

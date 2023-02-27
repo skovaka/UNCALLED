@@ -188,7 +188,13 @@ class ReadIndex:
         self.infile = Reader(path)
         return self.infile
 
-        
+    def __contains__(self, read_id):
+        if self.read_files is not None:
+            return read_id in self.read_files.index
+        elif len(self.file_info) == 1:
+            filename, = self.file_info.keys()
+            self._open(filename)
+            return read_id in self.infile
 
     def __getitem__(self, read_id):
         self._open(self.get_read_file(read_id))
@@ -207,6 +213,13 @@ class Fast5Reader:
     def __getitem__(self, read_id):
         f5 = self.infile.get_read(read_id)
         return self._dict_to_read(f5)
+
+    @property
+    def read_ids(self):
+        return self.infile.get_read_ids()
+
+    def __contains__(self, read_id):
+        return read_id in self.read_ids
     
     def _dict_to_read(self, f5):
         channel = f5.get_channel_info()
@@ -251,6 +264,9 @@ class Pod5Reader:
         self.infile = pod5.Reader(filename)
         self._read_ids = None
 
+    def __contains__(self, read_id):
+        return read_id in self.read_ids
+
     @property
     def read_ids(self):
         if self._read_ids is None:
@@ -274,6 +290,9 @@ class Pod5Reader:
 class Slow5Reader:
     def __init__(self, filename):
         self.infile = pyslow5.Open(filename, mode="r")
+
+    def __contains__(self, read_id):
+        return read_id in self.read_ids
 
     @property
     def read_ids(self):

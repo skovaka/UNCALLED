@@ -13,6 +13,7 @@
 #include "dataframe.hpp"
 #include "eventalign.hpp"
 #include "compare.hpp"
+#include "aln.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -45,6 +46,7 @@ size_t pybind_kmer(py::module_ &m) {
     SignalProcessor<Model>::pybind(m, suffix);
 
     Sequence<Model>::pybind(m, suffix);
+    ReadAln<Model>::pybind(m, suffix);
 
     //m.def(("write_eventalign_"+suffix).c_str(), write_eventalign<PoreModel<K>>);
     auto fn = write_eventalign<Model>;
@@ -134,5 +136,7 @@ PYBIND11_MODULE(_uncalled, m) {
 
     pybind_dtw(m);
     pybind_dataframes(m);
+
+    AlnDF::pybind(m);
 }
 
