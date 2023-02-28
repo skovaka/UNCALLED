@@ -295,6 +295,7 @@ class Tracks:
                 raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
 
         if self.model is None:
+            print("doitthehardway")
             self.conf.pore_model.name = WORKFLOW_PRESETS[self.read_index.default_model]
             self.model = PoreModel(self.conf.pore_model.name)
             for track in self.alns:

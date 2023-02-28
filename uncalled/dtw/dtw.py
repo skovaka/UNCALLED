@@ -66,7 +66,7 @@ def dtw_pool_iter(tracks):
 
     with mp.Pool(processes=tracks.conf.tracks.io.processes) as pool:
         i = 0
-        for out in pool.imap_unordered(dtw_worker, iter_args(), chunksize=1):
+        for out in pool.imap(dtw_worker, iter_args(), chunksize=1):
         #for out in pool.imap(dtw_worker, iter_args(), chunksize=1):
             i += len(out)
             yield out 
@@ -96,6 +96,7 @@ def dtw_single(conf):
     """Perform DTW alignment guided by basecalled alignments"""
 
     tracks = Tracks(conf=conf)
+
     assert(tracks.output is not None)
 
     for bam in tracks.bam_in.iter_sam():

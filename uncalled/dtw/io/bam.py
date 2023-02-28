@@ -140,15 +140,8 @@ class BAM(TrackIO):
         refs = track.coords.refs#[self.kmer_trim[0]:-self.kmer_trim[1]]
         #else:
         #    refs = track.coords.refs[self.kmer_trim[1]:-self.kmer_trim[0]]
-        #print("START")
-        #print(track.layers)
-        #print(self.kmer_trim)
-        #print(track.coords.refs)
-        #print(refs)
-        #print(track.layers.reset_index(level=1))
 
         dtw = track.layers["dtw"].reset_index(level=1).reindex(refs)
-        #print(dtw)
 
         lens = dtw["length"]
         lens[dtw["start"].duplicated()] = 0 #skips
@@ -165,7 +158,6 @@ class BAM(TrackIO):
         ds = ds.fillna(self.INF_U16).to_numpy(np.uint16)
         lens = dtw["length"].reindex(refs).to_numpy(np.uint16, na_value=0)
 
-        #print(dtw)
         if dtw["start"].iloc[0] < dtw["start"].iloc[-1]:
             sample_start = dtw["start"].iloc[0]
             sample_end = dtw["start"].iloc[-1] + dtw["length"].iloc[-1]
@@ -252,9 +244,12 @@ class BAM(TrackIO):
         current = (dac/norm_scale)-norm_shift
         current[dac == self.INF_U16] = np.nan
 
-        das = np.array(sam.get_tag(STDS_TAG))
-        stdv = (das/norm_scale)-norm_shift
-        stdv[das == self.INF_U16] = np.nan
+        if sam.has_tag(STDS_TAG):
+            das = np.array(sam.get_tag(STDS_TAG))
+            stdv = (das/norm_scale)-norm_shift
+            stdv[das == self.INF_U16] = np.nan
+        else:
+            stdv = np.full(len(current), np.nan)
 
         
         length = sam.get_tag(LENS_TAG)

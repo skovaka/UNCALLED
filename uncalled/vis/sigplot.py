@@ -86,7 +86,7 @@ class Sigplot:
             
             for aln_id,aln in alns.iterrows():
                 dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln_id")
-                dtw["model_current"] = track.model[dtw["kmer"]]
+                dtw["model_current"] = track.model[dtw["kmer"].dropna()]
 
 
                 dtws.append(dtw)
