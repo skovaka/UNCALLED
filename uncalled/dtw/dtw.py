@@ -99,28 +99,38 @@ def dtw_single(conf):
 
     assert(tracks.output is not None)
 
-    for bam in tracks.bam_in.iter_sam():
-        dtw = GuidedDTW(tracks, bam)
+    #for bam in tracks.bam_in.iter_sam():
+    #    dtw = GuidedDTW(tracks, bam)
+
+    for sam, aln in tracks.bam_in.iter_moves():
+        #print(aln.read_id)
+        #print(aln.seq.kmer)
+        dtw = GuidedDTW(tracks, aln, sam)
 
     tracks.close()
 
 class GuidedDTW:
 
-    def __init__(self, tracks, bam, **kwargs):
+    #def __init__(self, tracks, bam, **kwargs):
+    def __init__(self, tracks, aln, sam):
         self.conf = tracks.conf
         self.prms = self.conf.dtw
 
+        self.aln = aln
+
         try:
-            read = tracks.read_index[bam.query_name]
+            #read = tracks.read_index[bam.query_name]
+            read = tracks.read_index[self.aln.read_id] #TODO don't load twice (reuse from BAM IO)
         except:
             sys.stderr.write(f"Warning: failed to load signal from read {bam.query_name}\n")
             return
 
-        bcaln, self.coords = tracks.calc_bcaln(bam, read)
+        #bcaln, self.coords = tracks.calc_bcaln(bam, read)
         #print(read.id)
+        #aln_id, aln_coords = self.init_alignment(aln.read_id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, bam=bam) #, read=signal
 
-        if bcaln is None:
-            return
+        #if bcaln is None:
+        #    return
 
         #sigproc = SignalProcessor(tracks.model, self.conf)
         #signal = sigproc.process(read, False)
@@ -131,13 +141,14 @@ class GuidedDTW:
         self.index = tracks.index
         self.model = tracks.model
 
-        self.bcaln = bcaln.aln
+        self.bcaln = self.aln.move #bcaln.aln
 
         #print(bcaln.aln.samples)
 
         self.intv_coords = self.bcaln.index
 
-        self.seq = self.index.instance.get_kmers(self.model.instance, self.bcaln.index, self.conf.is_rna)
+        self.seq = tracks.get_seq(self.bcaln.index)
+        #self.index.instance.get_kmers(self.model.instance, self.bcaln.index, self.conf.is_rna)
 
         ref_means = self.seq.current.to_numpy()  #self.model[self.ref_kmers]
 
@@ -198,6 +209,7 @@ class GuidedDTW:
             df.set_signal(signal)
             df = df.to_df()
             df["mref"] = self.bcaln.index.expand()
+
         if df is None:
             self.empty = True
             sys.stderr.write(f"Warning: dtw failed for read {read.id}\n")
@@ -208,7 +220,7 @@ class GuidedDTW:
         self.df["kmer"] = self.seq.kmer #self.ref_kmers#.loc[df.loc["mref"]]#.to_numpy()
         self.df.dropna(subset=["kmer"], inplace=True)
 
-        tracks.write_dtw_events(self.df, read=signal)#, aln_id=aln_id
+        #tracks.write_dtw_events(self.df, read=signal)#, aln_id=aln_id
 
         #if self.bands is not None:
         #    tracks.add_layers("band", self.bands)#, aln_id=aln_id)
@@ -216,7 +228,8 @@ class GuidedDTW:
         if self.conf.bc_cmp:
             tracks.calc_compare("bcaln", True, True)
 
-        tracks.write_alignment()
+        tracks.write_alignment(self.aln, sam, read.filename)
+        #aln_id, aln_coords = self.init_alignment(aln.read_id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, bam=bam) #, read=signal
 
         self.empty = False
 
@@ -228,14 +241,7 @@ class GuidedDTW:
 
     #TODO refactor inner loop to call function per-block
     def _calc_dtw(self, signal):
-        self.mats = list()
-
-        path_qrys = list()
-        path_refs = list()
-
         read_block = signal.to_df()[self.evt_start:self.evt_end]
-
-        block_signal = read_block['mean'].to_numpy()
         
         prms, means, kmers, inst, bands = self._get_dtw_args(read_block)#, self.ref_kmers)
         dtw = self.dtw_fn(prms, signal, self.evt_start, self.evt_end, kmers, inst, bands)
@@ -243,8 +249,12 @@ class GuidedDTW:
         if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
             return None
 
+        dtw.fill_aln(self.aln);
+
         df = DtwDF(dtw.get_aln()).to_df()
         df["mref"] = self.seq.coords.expand() #self.ref_kmers.index #pd.RangeIndex(mref_st, mref_en+1)
+
+        #print((df["current"] == self.aln.dtw.current).all())
 
         return df
 

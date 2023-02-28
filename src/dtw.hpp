@@ -6,7 +6,7 @@
 #include <cfloat>
 #include "util.hpp"
 #include "pore_model.hpp"
-#include "dataframe.hpp"
+#include "aln.hpp"
 
 enum class DTWSubSeq {NONE, ROW, COL};
 enum class DTWCostFn {ABS_DIFF, NORM_PDF, Z_SCORE};
@@ -294,32 +294,14 @@ struct DtwDF : public DataFrame<int, int, float, float> {
         }
     }
 
-    //using DataFrame::data_;
-
-    //int aln_id;
-    //std::string read_id, ref_name;
-    //int ref_start, ref_end;
-    //bool ref_fwd;
-    //int samp_start, samp_end;
-
-    //ReadAln(int aln_id_, std::string read_id_, std::string ref_name_, int ref_start_, int ref_end_, bool ref_fwd_, int samp_start_, int samp_end_) : ReadAln(ref_end_-ref_start_) {
-    //    aln_id = aln_id_;
-    //    read_id = read_id_;
-    //    ref_name = ref_name_;
-    //    ref_start = ref_start_;
-    //    ref_end = ref_end_;
-    //    ref_fwd = ref_fwd_;
-    //    samp_start = samp_start_;
-    //    samp_end = samp_end_;
-    //}
-
-    //#define ALN_ATTR(A) c.def_readwrite(#A, &ReadAln::A);
     static py::class_<DtwDF> pybind(py::module_ &m) {
         auto c = DataFrame::pybind<DtwDF>(m, "_DtwDF");
         c.def("set_signal", &DtwDF::set_signal);
         return c;
     }
 };
+
+
 
 template <typename ModelType>
 class BandedDTW {
@@ -580,6 +562,33 @@ class BandedDTW {
         return DtwDF(path_, qry_vals_, ref_size());
     }
 
+    void fill_aln(Alignment<ModelType> &aln) {
+        aln.dtw = AlnDF(aln.seq.coords);
+        auto &dtw = aln.dtw;
+
+        i32 i = 0, prev_ref = -1, qry_st = -1;
+        //Event evt{-1,-1,-1,-1};
+        for (auto itr = path_.rbegin(); itr != path_.rend(); itr++) {
+            if (itr->ref > prev_ref) {
+                if (prev_ref >= 0) {
+                    auto evt = qry_vals_.merge_events(qry_st, itr->qry);
+                    dtw.samples.append(evt.start, evt.start+evt.length);
+                    dtw.current[i] = evt.mean;
+                    dtw.current_sd[i] = evt.stdv;
+                    i++;
+                }
+                //std::cout << ((itr->ref)-prev_ref) << "\n"; 
+                prev_ref = itr->ref;
+                qry_st = itr->qry;
+            }
+        }
+        auto evt = qry_vals_.merge_events(qry_st, path_.front().qry);
+        dtw.samples.append(evt.start, evt.start+evt.length);
+        dtw.current[i] = evt.mean;
+        dtw.current_sd[i] = evt.stdv;
+
+    }
+
     float score() {
         return score_sum_;
     }
@@ -693,6 +702,7 @@ class BandedDTW {
         //c.def_readonly("ll", BandedDTW<ModelType>::ll_);
         PY_BANDED_DTW_METH(mean_score)
         PY_BANDED_DTW_METH(get_flat_mat)
+        PY_BANDED_DTW_METH(fill_aln)
 
         c.def_property_readonly("ll", [](BandedDTW<ModelType> &d) -> pybind11::array_t<Coord> {
              return pybind11::array_t<Coord>(d.ll_.size(), d.ll_.data);

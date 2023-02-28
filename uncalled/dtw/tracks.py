@@ -184,6 +184,9 @@ class Tracks:
             return self.index.get_coord_space(ref_bounds, self.conf.is_rna)
         return None
 
+    def get_seq(self, coords):
+        return self.index.instance.get_kmers(self.model.instance, coords, self.conf.is_rna)
+
     def set_layers(self, layers):
         self.prms.layers = layers
 
@@ -381,8 +384,9 @@ class Tracks:
         self.new_layers.add(group)
 
 
-    def write_alignment(self, track_name=None):
-        track = self._track_or_default(track_name)
+    #def write_alignment(self, track_name=None):
+    def write_alignment(self, aln, sam, fast5):
+        #track = self._track_or_default(track_name)
 
         if self.output is not None:
             out = self.output
@@ -390,11 +394,13 @@ class Tracks:
             out = self.inputs[0]
             #raise RuntimeError("Error writing output")
 
-        if self.new_alignment:
-            out.write_alignment(track.alignments)
+        #if self.new_alignment:
+        #    out.write_alignment(track.alignments)
+        aln_id = self.output.init_alignment(aln.read_id, fast5, None, bam=sam)
+        out.write_alignment(aln)
 
-        if len(self.new_layers) > 0 and len(track.layers) > 0:
-            out.write_layers(track, self.new_layers)
+        #if len(self.new_layers) > 0 and len(track.layers) > 0:
+        #    out.write_layers(track, self.new_layers)
 
     def set_read(self, read):
         self.output.read = read

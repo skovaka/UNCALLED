@@ -46,7 +46,7 @@ size_t pybind_kmer(py::module_ &m) {
     SignalProcessor<Model>::pybind(m, suffix);
 
     Sequence<Model>::pybind(m, suffix);
-    ReadAln<Model>::pybind(m, suffix);
+    Alignment<Model>::pybind(m, suffix);
 
     //m.def(("write_eventalign_"+suffix).c_str(), write_eventalign<PoreModel<K>>);
     auto fn = write_eventalign<Model>;

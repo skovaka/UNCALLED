@@ -58,23 +58,23 @@ struct AlnDF {
         py::class_<AlnDF> c(m, "_AlnDF");
         c.def(py::init<IntervalIndex<i64> &>());
         c.def(py::init<IntervalIndex<i64>&, IntervalIndex<i32>&, py::array_t<float>, py::array_t<float>>());
-        c.def_readwrite("index", &AlnDF::index);
-        c.def_readwrite("samples", &AlnDF::samples);
         c.def("slice", &AlnDF::slice);
         c.def("__len__", &AlnDF::size);
-        //c.def_readwrite("current", &AlnDF::current);
-        //c.def_readwrite("current_sd", &AlnDF::current_sd);
+        c.def_readwrite("index", &AlnDF::index);
+        c.def_readwrite("samples", &AlnDF::samples);
+        c.def_readwrite("current", &AlnDF::current);
+        c.def_readwrite("current_sd", &AlnDF::current_sd);
         return c;
     }
 };
 
 template <typename ModelType>
-struct ReadAln {
+struct Alignment {
     std::string read_id;
     Sequence<ModelType> seq;
     AlnDF dtw, move;
 
-    ReadAln(const std::string &read_id_, Sequence<ModelType> seq_) :
+    Alignment(const std::string &read_id_, Sequence<ModelType> seq_) :
         read_id(read_id_), seq(seq_) {
     }
 
@@ -87,14 +87,14 @@ struct ReadAln {
     }
 
     static void pybind(py::module_ &m, std::string suffix) {
-        py::class_<ReadAln> c(m, ("ReadAln"+suffix).c_str());
+        py::class_<Alignment> c(m, ("Alignment"+suffix).c_str());
         c.def(py::init<const std::string &, Sequence<ModelType>>());
-        c.def("set_dtw", &ReadAln::set_dtw);
-        c.def("set_move", &ReadAln::set_move);
-        c.def_readonly("read_id", &ReadAln::read_id);
-        c.def_readonly("seq", &ReadAln::seq);
-        c.def_readonly("dtw", &ReadAln::dtw);
-        c.def_readonly("move", &ReadAln::move);
+        c.def("set_dtw", &Alignment::set_dtw);
+        c.def("set_move", &Alignment::set_move);
+        c.def_readonly("read_id", &Alignment::read_id);
+        c.def_readonly("seq", &Alignment::seq);
+        c.def_readonly("dtw", &Alignment::dtw);
+        c.def_readonly("move", &Alignment::move);
     }
 };
 
