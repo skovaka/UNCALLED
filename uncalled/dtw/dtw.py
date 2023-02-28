@@ -111,6 +111,10 @@ def dtw_single(conf):
 
 class GuidedDTW:
 
+    def process(self, read):
+        evdt = _uncalled.EventDetector(self.conf.event_detector)
+        return ProcessedRead(evdt.process_read(read))
+
     #def __init__(self, tracks, bam, **kwargs):
     def __init__(self, tracks, aln, sam):
         self.conf = tracks.conf
@@ -125,8 +129,7 @@ class GuidedDTW:
             sys.stderr.write(f"Warning: failed to load signal from read {bam.query_name}\n")
             return
 
-        evdt = _uncalled.EventDetector(self.conf.event_detector)
-        signal = ProcessedRead(evdt.process_read(read))
+        signal = self.process(read)
 
         self.index = tracks.index
         self.model = tracks.model

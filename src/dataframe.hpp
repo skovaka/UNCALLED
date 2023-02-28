@@ -166,6 +166,10 @@ struct Interval {
         return val >= start && val < end;
     }
 
+    Interval intersect(const Interval &b) const {
+        return {std::max(start, b.start), std::min(end, b.end)};
+    }
+
     size_t length() const {
         return static_cast<size_t>(end-start);
     }
@@ -188,6 +192,16 @@ struct Interval {
 template <typename T>
 bool operator <(const Interval<T> &a, const Interval<T> &b) { 
     return a.start < b.start || (a.start == b.start && a.end < b.end);
+}
+
+template <typename T>
+bool operator ==(const Interval<T> &a, const Interval<T> &b) { 
+    return a.start == b.start && a.end == b.end;
+}
+
+template <typename T>
+bool operator !=(const Interval<T> &a, const Interval<T> &b) { 
+    return a.start != b.start || a.end != b.end;
 }
 
 template <typename T>
@@ -219,6 +233,20 @@ class IntervalIndex {
         }
     }
 
+    IntervalIndex(py::array_t<i32> starts_py, py::array_t<i32> lengths_py) {
+        PyArray<i32> starts_(starts_py), lengths_(lengths_py);
+        if (starts_.size() != lengths_.size()) {
+            throw std::runtime_error("Interval arrays must be same length");
+        }
+
+        coords.reserve(starts_.size());
+        starts.reserve(starts_.size());
+        length = 0;
+        for (size_t i = 0; i < starts_.size(); i++) {
+            append(starts_[i], starts_[i]+lengths_[i]);
+        }
+    }
+
     void shift(i64 delta) {
         for (auto &c : coords) {
             if (c.is_valid()) {
@@ -226,6 +254,36 @@ class IntervalIndex {
                 c.end += delta;
             }
         }
+    }
+
+    IntervalIndex<T> intersect(IntervalIndex<T> other) const {
+        IntervalIndex<T> ret;
+        auto a = coords.begin(),
+             b = other.coords.begin();
+        
+        while (a != coords.end() && b != other.coords.end()) {
+             //std::cout << (a-coords.begin()) << " "
+             //         << (b - other.coords.begin()) << "\n";
+             if      (b == other.coords.end() || a->end <= b->start) a++;
+             else if (a == coords.end() || b->end <= a->start) b++;
+             else {
+                auto c = a->intersect(*b);
+                if (c.is_valid()) {
+                    //std::cout << "gotit  " << (a->to_string()) << " " 
+                    //          << (b->to_string()) << " "
+                    //          << c.to_string() << "\n";
+                    ret.append(c);
+                } else {
+                    std::cout << "failed " << (a->to_string()) << " " 
+                              << (b->to_string()) << " "
+                              << c.to_string() << "\n";
+                }
+
+                if (a->start < b->start) a++;
+                else b++;
+             }
+        }
+        return ret;
     }
 
     IntervalIndex<T> slice(T i, T j) const {
@@ -310,12 +368,35 @@ class IntervalIndex {
         return ret;
     }
 
+    ValArray<T> get_lengths_dedup() const { 
+        ValArray<T> ret(coords.size());
+        auto prev = coords[0];
+        ret[0] = prev.length();
+        for (size_t i = 1; i < coords.size(); i++) {
+            if (coords[i] != prev) {
+                ret[i] = coords[i].length();
+                prev = coords[i];
+            } else {
+                ret[i] = 0;
+            }
+        }
+        return ret;
+    }
+
     ValArray<T> get_starts() const {
         ValArray<T> ret(coords.size());
         for (size_t i = 0; i < coords.size(); i++) {
             ret[i] = coords[i].start;
         }
         return ret;
+    }
+
+    T get_start() const {
+        return coords.front().start;
+    }
+
+    T get_end() const {
+        return coords.back().end;
     }
 
     ValArray<T> get_ends() const {
@@ -382,17 +463,22 @@ class IntervalIndex {
             .def("shift", &IntervalIndex::shift)
             .def("slice", &IntervalIndex::slice)
             .def("islice", &IntervalIndex::islice)
+            .def("intersect", &IntervalIndex::intersect)
             .def("get_interval", py::vectorize(&IntervalIndex::get_interval))
             .def("get_index", py::vectorize(&IntervalIndex::get_index))
             .def_property_readonly("lengths", &IntervalIndex::get_lengths)
+            .def_property_readonly("lengths_dedup", &IntervalIndex::get_lengths_dedup)
             .def_property_readonly("gaps", &IntervalIndex::get_gaps)
             .def_property_readonly("starts", &IntervalIndex::get_starts)
             .def_property_readonly("ends", &IntervalIndex::get_ends)
+            .def_property_readonly("start", &IntervalIndex::get_start)
+            .def_property_readonly("end", &IntervalIndex::get_end)
             ;
             
         py::class_<Interval<T>>(m, ("Interval"+suffix).c_str())
             .def("__repr__", &Interval<T>::to_string)
             .def("__getitem__", &Interval<T>::operator[])
+            .def("intersect", &Interval<T>::intersect)
             .def_readwrite("start", &Interval<T>::start)
             .def_readwrite("end", &Interval<T>::end)
             .def("to_tuple", &Interval<T>::to_pair);

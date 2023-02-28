@@ -24,6 +24,12 @@ struct AlnDF {
         current_sd = ValArray<float>(index_.length);
     }
 
+    AlnDF(IntervalIndex<i64> index_, py::array_t<i32> start_, py::array_t<i32> length_, py::array_t<float> current_, py::array_t<float> current_sd_) : 
+        index(index_),
+        samples(start_, length_),
+        current(init_arr(current_)),
+        current_sd(init_arr(current_sd_)) {}
+
     AlnDF(IntervalIndex<i64> index_, IntervalIndex<i32> &samples_, py::array_t<float> current_, py::array_t<float> current_sd_) : 
         index(index_),
         samples(samples_),
@@ -58,6 +64,7 @@ struct AlnDF {
         py::class_<AlnDF> c(m, "_AlnDF");
         c.def(py::init<IntervalIndex<i64> &>());
         c.def(py::init<IntervalIndex<i64>&, IntervalIndex<i32>&, py::array_t<float>, py::array_t<float>>());
+        c.def(py::init<IntervalIndex<i64>&, py::array_t<i32>, py::array_t<i32>, py::array_t<float>, py::array_t<float>>());
         c.def("slice", &AlnDF::slice);
         c.def("__len__", &AlnDF::size);
         c.def_readwrite("index", &AlnDF::index);

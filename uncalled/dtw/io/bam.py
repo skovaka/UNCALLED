@@ -14,7 +14,7 @@ from ...index import RefCoord
 from ... import PoreModel
 from ... import Config
 from . import TrackIO
-from _uncalled import AlignmentK5
+from _uncalled import AlignmentK5, IntervalIndexI64, _AlnDF
 
 REF_TAG  = "ur"
 SAMP_TAG = "us"
@@ -131,46 +131,24 @@ class BAM(TrackIO):
     def write_alignment(self, aln):
         if self.bam is None: 
             return
-        mref_st, mref_en = aln.seq.coords[0], aln.seq.coords[aln.seq.coords.length-1]
-        mrefs = np.arange(mref_st, mref_en)
-        ref_st, ref_en = sorted(self.tracks.index.mref_to_ref([mref_st, mref_en]))
-        refs = np.arange(ref_st, ref_en+1)
 
-        dtw = pd.DataFrame({
-            "ref" : self.tracks.index.mref_to_ref(aln.seq.coords.expand()),
-            "start" : aln.dtw.samples.starts,
-            "length" : aln.dtw.samples.lengths,
-            "current" : aln.dtw.current,
-            "stdv" : aln.dtw.current_sd,
-        }).set_index("ref").reindex(refs)
-        dtw["start"] = dtw["start"].astype("Int64")
-        dtw["length"] = dtw["length"].astype("Int64")
-
-        lens = dtw.loc[:,"length"]
-        dtw.loc[dtw["start"].duplicated(), "length"] = 0
-        #lens[dtw["start"].duplicated()] = 0 #skips
+        refs = list()
+        for i in range(aln.seq.coords.interval_count()):
+            c = aln.seq.coords.get_interval(i)
+            refs += [c.start, c.end]
 
         cmin = 0
-        cmax = dtw["current"].max()
+        cmax = np.max(aln.dtw.current)
         scale = (self.INF_U16 - 1) / (cmax - cmin)
         shift = -cmin
 
-        dc = np.round((dtw["current"]+ shift) * scale)#.astype("uint16")
-        ds = np.round((dtw["stdv"]+ shift) * scale)#.astype("uint16")
+        dc = np.round((aln.dtw.current.to_numpy() + shift) * scale).astype(np.uint16)
+        ds = np.round((aln.dtw.current_sd.to_numpy() + shift) * scale).astype(np.uint16)
 
-        dc = dc.fillna(self.INF_U16).to_numpy(np.uint16)
-        ds = ds.fillna(self.INF_U16).to_numpy(np.uint16)
-        lens = dtw["length"].reindex(refs).to_numpy(np.uint16, na_value=0)
+        lens = aln.dtw.samples.lengths_dedup.to_numpy()
 
-        if dtw["start"].iloc[0] < dtw["start"].iloc[-1]:
-            sample_start = dtw["start"].iloc[0]
-            sample_end = dtw["start"].iloc[-1] + dtw["length"].iloc[-1]
-        else:
-            sample_start = dtw["start"].iloc[0] + dtw["length"].iloc[0]
-            sample_end = dtw["start"].iloc[-1] 
-
-        self.bam.set_tag(REF_TAG, array.array("I", (refs[0], refs[-1]+1)))
-        self.bam.set_tag(SAMP_TAG, array.array("I", (sample_start, sample_end)))
+        self.bam.set_tag(REF_TAG, array.array("I", refs))
+        self.bam.set_tag(SAMP_TAG, array.array("I", (aln.dtw.samples.start, aln.dtw.samples.end)))
         self.bam.set_tag(NORM_TAG, array.array("f", (scale,shift)))
         self.bam.set_tag(LENS_TAG, array.array("H", lens))
         self.bam.set_tag(CURS_TAG, array.array("H", dc))
@@ -322,61 +300,56 @@ class BAM(TrackIO):
         length = sam.get_tag(LENS_TAG)
 
         fwd = int(not sam.is_reverse)
-        ref_start, ref_end = sam.get_tag(REF_TAG)
+        #ref_start, ref_end = sam.get_tag(REF_TAG)
+        refs = sam.get_tag(REF_TAG)
 
+        icoords = IntervalIndexI64([(refs[i], refs[i+1]) for i in range(0, len(refs), 2)])
 
-        if coords is None:
-            refs = pd.RangeIndex(ref_start, ref_end)
-            seq_refs = RefCoord(sam.reference_name, ref_start, ref_end, fwd)
-            coords = self.tracks.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=True)
-            start_shift = end_shift = 0
-        else:
-            start_clip = (coords.refs.min() - ref_start) if coords.refs.min() > ref_start else 0
-            end_clip = (ref_end - coords.refs.max()) if coords.refs.max() < ref_end else 0
+        samp_start, samp_end = samp_bounds
 
-            new_end = len(current) - end_clip
-            current = current[start_clip:new_end]
-            stdv = stdv[start_clip:new_end]
+        #TODO build whole alignment, slice after
+        if coords is not None:
+            clip = IntervalIndexI64([(coords.mrefs[fwd].min(), coords.mrefs[fwd].max()+1)])
 
+            st = icoords.get_index(clip.start) if icoords.start < clip.start else 0
+            en = icoords.get_index(clip.end-1)+1  if icoords.end > clip.end else icoords.length
 
-            start_shift = np.sum(length[:start_clip])
-            end_shift = np.sum(length[new_end:])
-            length = length[start_clip:new_end]
+            icoords = icoords.islice(st,en)
 
-            ref_start += start_clip
-            ref_end -= end_clip
-            refs = pd.RangeIndex(ref_start, ref_end)
+            current = current[st:en]
+            stdv = stdv[st:en]
 
-        pacs = coords.ref_to_pac(refs)
+            samp_start += np.sum(length[:st])
+            samp_end -= np.sum(length[en:])
+            length = length[st:en]
+
+        pacs = self.tracks.index.mref_to_pac(icoords.expand())
+
+        seq = self.tracks.get_seq(icoords)
+        aln = AlignmentK5(sam.query_name, seq)
             
-        kmers = coords.ref_kmers.loc[fwd].loc[refs].to_numpy()
+        kmers = seq.kmer #coords.ref_kmers.loc[fwd].loc[refs].to_numpy()
+
+        start = np.full(icoords.length, samp_start, dtype="int32")
+        start[1:] += np.cumsum(length)[:-1].astype("int32")
+        #.to_numpy("int32")
+
+        dtw = _AlnDF(icoords, start, length, current, stdv)
+        aln.set_dtw(dtw)
+
+        if sam.query_name in self.tracks.read_index:
+            read = self.tracks.read_index[sam.query_name]
+        moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
+        if moves is not None:
+            aln.set_move(moves)
 
         dtw = pd.DataFrame({
             "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
-            "current" : current, "stdv" : stdv, "length" : length, "kmer" : kmers
+            "current" : current, "stdv" : stdv, "start" : start, "length" : length, "kmer" : seq.kmer
         }).set_index(["track_id", "fwd", "pac","aln_id"])
 
         dtw.loc[dtw["current"].isnull(), "kmer"] = pd.NA
         dtw["kmer"] = dtw["kmer"].astype("Int32", copy=False)
-
-
-        flip = samp_bounds[0] > samp_bounds[1]
-        if flip:
-            samp_end, samp_start = samp_bounds
-            samp_start += end_shift
-            samp_end -= start_shift
-            dtw = dtw.iloc[::-1]
-        else:
-            samp_start, samp_end = samp_bounds
-            samp_start += start_shift
-            samp_end -= end_shift
-
-        start = np.full(len(dtw), samp_start, dtype="int32")
-        start[1:] += dtw["length"].cumsum().iloc[:-1].to_numpy("int32")
-        dtw["start"] = start
-
-        if flip:
-            dtw = dtw[::-1]
 
         layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1)#.sort_index()
 
@@ -385,27 +358,18 @@ class BAM(TrackIO):
 
         layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("Int32")
 
-        #Note should use below, but too buggy: https://github.com/pandas-dev/pandas/issues/45725
-        #layers["dtw", "length"] = layers["dtw", "length"].replace(0, pd.NA)
-        #layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("int32")
-
         aln = pd.DataFrame({
                 "id" : [self.aln_id_in],
                 "track_id" : [self.in_id],
                 "read_id" : [sam.query_name],
-                "ref_name" : [coords.ref_name],
-                "ref_start" : [ref_start],
-                "ref_end" : [ref_end],
+                "ref_name" : [sam.reference_name],
+                "ref_start" : [sam.reference_start],
+                "ref_end" : [sam.reference_end],
                 "fwd" :     [fwd],
                 "samp_start" : [samp_start],
                 "samp_end" : [samp_end],
                 "tags" : [""]}).set_index(["track_id", "id"])
 
-
-        if sam.query_name in self.tracks.read_index:
-            read = self.tracks.read_index[sam.query_name]
-
-        moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
         if moves is not None:
             pacs = self.tracks.index.mref_to_pac(moves.index.expand())
             df = pd.DataFrame({
