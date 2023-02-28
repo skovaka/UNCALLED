@@ -186,14 +186,10 @@ class BAM(TrackIO):
 
     def write_layers(self, track, groups):
         aln = track.alignments.iloc[0]
-        #sam = self.get_aln(aln["read_id"], aln["ref_name"], aln["ref_start"]-self.kmer_trim[0])
         if self.bam is None: 
             return
         
-        #refs = track.layer_refs
-        #if aln["fwd"]:
         refs = track.coords.refs
-
         dtw = track.layers["dtw"].reset_index(level=1).reindex(refs)
 
         lens = dtw["length"]

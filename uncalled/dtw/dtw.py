@@ -125,16 +125,6 @@ class GuidedDTW:
             sys.stderr.write(f"Warning: failed to load signal from read {bam.query_name}\n")
             return
 
-        #bcaln, self.coords = tracks.calc_bcaln(bam, read)
-        #print(read.id)
-        #aln_id, aln_coords = self.init_alignment(aln.read_id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, bam=bam) #, read=signal
-
-        #if bcaln is None:
-        #    return
-
-        #sigproc = SignalProcessor(tracks.model, self.conf)
-        #signal = sigproc.process(read, False)
-
         evdt = _uncalled.EventDetector(self.conf.event_detector)
         signal = ProcessedRead(evdt.process_read(read))
 
@@ -143,14 +133,7 @@ class GuidedDTW:
 
         self.bcaln = self.aln.move #bcaln.aln
 
-        #print(bcaln.aln.samples)
-
-        self.intv_coords = self.bcaln.index
-
         self.seq = tracks.get_seq(self.bcaln.index)
-        #self.index.instance.get_kmers(self.model.instance, self.bcaln.index, self.conf.is_rna)
-
-        ref_means = self.seq.current.to_numpy()  #self.model[self.ref_kmers]
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
@@ -168,6 +151,8 @@ class GuidedDTW:
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
         if self.conf.normalizer.mode == "ref_mom":
+
+            ref_means = self.seq.current.to_numpy()  #self.model[self.ref_kmers]
             
             if self.conf.normalizer.median:
                 med = np.median(ref_means)
@@ -195,12 +180,12 @@ class GuidedDTW:
         tracks.set_read(signal)
 
         if self.prms.iterations > 0:
-            df = self._calc_dtw(signal)
+            self._calc_dtw(signal)
 
             for i in range(self.prms.iterations-1):
                 reg = self.renormalize(signal, df)
                 signal.normalize(reg.coef_, reg.intercept_)
-                df = self._calc_dtw(signal)
+                self._calc_dtw(signal)
         else:
             starts = self.bcaln.samples.starts.to_numpy()
             lengths = self.bcaln.samples.lengths.to_numpy()
@@ -210,16 +195,10 @@ class GuidedDTW:
             df = df.to_df()
             df["mref"] = self.bcaln.index.expand()
 
-        if df is None:
-            self.empty = True
-            sys.stderr.write(f"Warning: dtw failed for read {read.id}\n")
-            return
-        
-
-        self.df = df.set_index("mref")
-        self.df["kmer"] = self.seq.kmer #self.ref_kmers#.loc[df.loc["mref"]]#.to_numpy()
-        self.df.dropna(subset=["kmer"], inplace=True)
-
+        #if df is None:
+        #    self.empty = True
+        #    sys.stderr.write(f"Warning: dtw failed for read {read.id}\n")
+        #    return
         #tracks.write_dtw_events(self.df, read=signal)#, aln_id=aln_id
 
         #if self.bands is not None:
@@ -241,22 +220,35 @@ class GuidedDTW:
 
     #TODO refactor inner loop to call function per-block
     def _calc_dtw(self, signal):
-        read_block = signal.to_df()[self.evt_start:self.evt_end]
+        read_block = signal.events[self.evt_start:self.evt_end] #.to_df()[self.evt_start:self.evt_end]
         
-        prms, means, kmers, inst, bands = self._get_dtw_args(read_block)#, self.ref_kmers)
-        dtw = self.dtw_fn(prms, signal, self.evt_start, self.evt_end, kmers, inst, bands)
+        #prms, means, kmers, inst, bands = self._get_dtw_args(read_block)#, self.ref_kmers)
+
+        qry_len = self.evt_end - self.evt_start
+        ref_len = len(self.seq)
+
+        band_count = qry_len + ref_len
+        shift = int(np.round(self.prms.band_shift*self.prms.band_width))
+        mv_starts = self.bcaln.samples.starts.to_numpy()
+
+        bands = _uncalled.get_guided_bands(np.arange(len(self.seq)), mv_starts, read_block['start'], band_count, shift)
+
+        #return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
+
+
+        dtw = self.dtw_fn(self.prms, signal, self.evt_start, self.evt_end, self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
             return None
 
-        dtw.fill_aln(self.aln);
+        dtw.fill_aln(self.aln)
 
-        df = DtwDF(dtw.get_aln()).to_df()
-        df["mref"] = self.seq.coords.expand() #self.ref_kmers.index #pd.RangeIndex(mref_st, mref_en+1)
+        #df = DtwDF(dtw.get_aln()).to_df()
+        #df["mref"] = self.seq.coords.expand() #self.ref_kmers.index #pd.RangeIndex(mref_st, mref_en+1)
 
         #print((df["current"] == self.aln.dtw.current).all())
 
-        return df
+        #return df
 
     def _get_dtw_args(self, read_block):#, ref_kmers):
         qry_len = len(read_block)

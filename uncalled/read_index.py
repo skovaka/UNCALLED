@@ -33,6 +33,7 @@ class ReadIndex:
         self._default_model = None
         self.infile = None
         self.infile_name = None
+        self.prev_read = None
 
     @property
     def default_model(self):
@@ -197,8 +198,12 @@ class ReadIndex:
             return read_id in self.infile
 
     def __getitem__(self, read_id):
+        if self.prev_read is not None and self.prev_read.id == read_id: 
+            return self.prev_read
         self._open(self.get_read_file(read_id))
-        return self.infile[read_id]
+        read = self.infile[read_id]
+        self.prev_read = read
+        return read
         #return self._get(read_id, self.get_read_file(read_id))
 
     def close(self):
