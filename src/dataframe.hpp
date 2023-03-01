@@ -17,6 +17,11 @@ class ValArray: public std::valarray<T> {
     using std::valarray<T>::valarray;
     using super = std::valarray<T>;
 
+    static constexpr T init_na() {
+        return  std::numeric_limits<T>::has_infinity ? std::numeric_limits<T>::infinity() : std::numeric_limits<T>::max();
+    }
+
+    static constexpr T NA = init_na();//std::numeric_limits<T>::max();
 
     T &at(size_t i) {
         return super::operator[](i);

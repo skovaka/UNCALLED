@@ -138,5 +138,6 @@ PYBIND11_MODULE(_uncalled, m) {
     pybind_dataframes(m);
 
     AlnDF::pybind(m);
+    CmpDF::pybind(m);
 }
 

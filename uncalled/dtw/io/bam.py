@@ -384,6 +384,17 @@ class BAM(TrackIO):
 
             layers = pd.concat([layers, df.reindex(dtw.index)], axis=1)
 
+        aln.calc_mvcmp()
+        pacs = self.tracks.index.mref_to_pac(aln._mvcmp.index.expand())
+        cmp_df = pd.DataFrame({
+                "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
+                "aln_b" : self.aln_id_in, "mean_ref_dist" : aln._mvcmp.dist, "jaccard" : aln._mvcmp.jaccard,
+        }).set_index(["track_id", "fwd", "pac","aln_id"])
+        #print(cmp_df)
+        #print(layers)
+
+        layers = pd.concat([layers, pd.concat({"bc_cmp" :cmp_df}, axis=1)], axis=1)
+
         self.aln_id_in += 1
 
         #print("dtw")

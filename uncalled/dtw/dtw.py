@@ -211,7 +211,8 @@ class GuidedDTW:
         #    tracks.add_layers("band", self.bands)#, aln_id=aln_id)
 
         if self.conf.bc_cmp:
-            tracks.calc_compare("bcaln", True, True)
+            self.aln.calc_mvcmp()
+            #tracks.calc_compare("bcaln", True, True)
 
         tracks.write_alignment(self.aln)
         #aln_id, aln_coords = self.init_alignment(aln.read_id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, bam=bam) #, read=signal
