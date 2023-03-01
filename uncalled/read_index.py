@@ -204,7 +204,11 @@ class ReadIndex:
         read = self.infile[read_id]
         self.prev_read = read
         return read
-        #return self._get(read_id, self.get_read_file(read_id))
+
+    def get(self, read_id, default=None):
+        if read_id in self:
+            return self[read_id]
+        return default
 
     def close(self):
         if self.infile is not None:

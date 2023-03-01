@@ -13,8 +13,10 @@ from ..layers import LAYER_META, parse_layers
 from ...index import RefCoord
 from ... import PoreModel
 from ... import Config
+from ...dfs import Alignment, AlnDF
 from . import TrackIO
-from _uncalled import AlignmentK5, IntervalIndexI64, _AlnDF
+from _uncalled import IntervalIndexI64
+
 
 REF_TAG  = "ur"
 SAMP_TAG = "us"
@@ -273,12 +275,10 @@ class BAM(TrackIO):
             self.bam = sam
 
             seq = self.tracks.get_seq(moves.index)
-            aln = AlignmentK5(sam.query_name, seq)
-            aln.set_move(moves)
+            aln = Alignment(read, seq, sam)
+            aln.set_moves(moves)
             
             yield sam, aln
-            
-
 
     def _parse_sam(self, sam, coords=None):
         samp_bounds = sam.get_tag(SAMP_TAG)
@@ -326,7 +326,8 @@ class BAM(TrackIO):
         pacs = self.tracks.index.mref_to_pac(icoords.expand())
 
         seq = self.tracks.get_seq(icoords)
-        aln = AlignmentK5(sam.query_name, seq)
+        read = self.tracks.read_index.get(sam.query_name, None)
+        aln = Alignment(sam.query_name if read is None else read, seq, sam)
             
         kmers = seq.kmer #coords.ref_kmers.loc[fwd].loc[refs].to_numpy()
 
@@ -334,14 +335,12 @@ class BAM(TrackIO):
         start[1:] += np.cumsum(length)[:-1].astype("int32")
         #.to_numpy("int32")
 
-        dtw = _AlnDF(icoords, start, length, current, stdv)
+        dtw = AlnDF(icoords, start, length, current, stdv)
         aln.set_dtw(dtw)
 
-        if sam.query_name in self.tracks.read_index:
-            read = self.tracks.read_index[sam.query_name]
         moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
         if moves is not None:
-            aln.set_move(moves)
+            aln.set_moves(moves)
 
         dtw = pd.DataFrame({
             "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
@@ -358,7 +357,7 @@ class BAM(TrackIO):
 
         layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("Int32")
 
-        aln = pd.DataFrame({
+        aln_df = pd.DataFrame({
                 "id" : [self.aln_id_in],
                 "track_id" : [self.in_id],
                 "read_id" : [sam.query_name],
@@ -387,7 +386,11 @@ class BAM(TrackIO):
 
         self.aln_id_in += 1
 
-        return aln, layers
+        #print("dtw")
+        #print(aln.to_pandas())
+        #print(layers)
+
+        return aln_df, layers
 
     def query(self, layers, track_id, coords, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
         itr = self.input.fetch(coords.ref_name, coords.refs.min(), coords.refs.max())

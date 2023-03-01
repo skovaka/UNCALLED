@@ -10,6 +10,7 @@ import scipy
 from .io import SQL, TSV, Eventalign, Tombo, BAM, ModelTrainer, INPUTS, OUTPUTS, INPUT_PARAMS, OUTPUT_PARAMS
 from .aln_track import AlnTrack
 from .layers import LAYER_META, parse_layers
+from ..dfs import Alignment
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel, WORKFLOW_PRESETS
 from ..read_index import ReadIndex, Fast5Reader, Slow5Reader
@@ -183,9 +184,6 @@ class Tracks:
                 ref_bounds = RefCoord(*ref_bounds)
             return self.index.get_coord_space(ref_bounds, self.conf.is_rna)
         return None
-
-    def get_seq(self, coords):
-        return self.index.instance.get_kmers(self.model.instance, coords, self.conf.is_rna)
 
     def set_layers(self, layers):
         self.prms.layers = layers
@@ -385,27 +383,26 @@ class Tracks:
 
 
     #def write_alignment(self, track_name=None):
-    def write_alignment(self, aln, sam, fast5):
-        #track = self._track_or_default(track_name)
-
+    def write_alignment(self, aln):#, sam, fast5):
         if self.output is not None:
             out = self.output
         else:
             out = self.inputs[0]
-            #raise RuntimeError("Error writing output")
 
-        #if self.new_alignment:
-        #    out.write_alignment(track.alignments)
-        aln_id = self.output.init_alignment(aln.read_id, fast5, None, bam=sam)
+        aln_id = self.output.init_alignment(aln.read_id, aln.read.filename, None, bam=aln.sam)
         out.write_alignment(aln)
-
-        #if len(self.new_layers) > 0 and len(track.layers) > 0:
-        #    out.write_layers(track, self.new_layers)
 
     def set_read(self, read):
         self.output.read = read
 
-    def init_alignment(self, read_id, fast5, coords, layers={}, read=None, bam=None, track_name=None):
+    def get_seq(self, coords):
+        return self.index.instance.get_kmers(self.model.instance, coords, self.conf.is_rna)
+
+    def init_alignment(self, read, coords, sam=None):
+        seq = self.index.instance.get_kmers(self.model.instance, coords, self.conf.is_rna)
+        return Alignment(read, seq, sam)
+
+    def init_alignment_old(self, read_id, fast5, coords, layers={}, read=None, bam=None, track_name=None):
         track = self._track_or_default(track_name)
         self.new_alignment = True
         self.new_layers = set()

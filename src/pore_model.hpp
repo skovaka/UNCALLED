@@ -561,6 +561,8 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
     using KmerType = typename ModelType::kmer_t;
     //using super = DataFrame<KmerType, u8, float>;
 
+    static const KmerType K = ModelType::KMER_LEN;
+
     const ModelType &model;
     std::string name;
     IntervalIndex<i64> coords;
@@ -589,7 +591,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         current(coords.length) {}
 
     Sequence(const ModelType &model_, const std::string &seq) :
-            Sequence(model_, seq.size()-ModelType::KMER_LEN+1) {
+            Sequence(model_, seq.size()-K+1) {
 
         kmer[0] = model.str_to_kmer(seq);
 
@@ -648,6 +650,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         c.def("kmer_to_str", py::vectorize(&Sequence::kmer_to_str));
         c.def("get_kmer", py::vectorize(&Sequence::get_kmer));
         c.def("get_current", py::vectorize(&Sequence::get_current));
+        c.attr("K") = pybind11::cast(Sequence::K);
     }
 };
 

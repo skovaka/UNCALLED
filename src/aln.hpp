@@ -79,7 +79,7 @@ template <typename ModelType>
 struct Alignment {
     std::string read_id;
     Sequence<ModelType> seq;
-    AlnDF dtw, move;
+    AlnDF dtw, moves;
 
     Alignment(const std::string &read_id_, Sequence<ModelType> seq_) :
         read_id(read_id_), seq(seq_) {
@@ -89,19 +89,19 @@ struct Alignment {
         dtw = df;
     }
 
-    void set_move(AlnDF df) {
-        move = df;
+    void set_moves(AlnDF df) {
+        moves = df;
     }
 
     static void pybind(py::module_ &m, std::string suffix) {
-        py::class_<Alignment> c(m, ("Alignment"+suffix).c_str());
+        py::class_<Alignment> c(m, ("_Alignment"+suffix).c_str());
         c.def(py::init<const std::string &, Sequence<ModelType>>());
         c.def("set_dtw", &Alignment::set_dtw);
-        c.def("set_move", &Alignment::set_move);
+        c.def("set_moves", &Alignment::set_moves);
         c.def_readonly("read_id", &Alignment::read_id);
         c.def_readonly("seq", &Alignment::seq);
-        c.def_readonly("dtw", &Alignment::dtw);
-        c.def_readonly("move", &Alignment::move);
+        c.def_readonly("_dtw", &Alignment::dtw);
+        c.def_readonly("_moves", &Alignment::moves);
     }
 };
 

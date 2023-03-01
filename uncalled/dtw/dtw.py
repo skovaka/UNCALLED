@@ -19,7 +19,6 @@ from .io import BAM, Guppy
 import _uncalled
 
 from ..signal_processor import ProcessedRead
-from ..dfs import DtwDF
 
 from . import Bcaln, Tracks
 
@@ -134,7 +133,11 @@ class GuidedDTW:
         self.index = tracks.index
         self.model = tracks.model
 
-        self.bcaln = self.aln.move #bcaln.aln
+        self.bcaln = self.aln.moves #bcaln.aln
+
+        #TODO change to tracks.init_alignment(read_id, ref_id, coords)
+        #returns python Alignment object (wrapper for AlignmentK*)
+        #also store alignment in tracks output buffer
 
         self.seq = tracks.get_seq(self.bcaln.index)
 
@@ -210,7 +213,7 @@ class GuidedDTW:
         if self.conf.bc_cmp:
             tracks.calc_compare("bcaln", True, True)
 
-        tracks.write_alignment(self.aln, sam, read.filename)
+        tracks.write_alignment(self.aln)
         #aln_id, aln_coords = self.init_alignment(aln.read_id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, bam=bam) #, read=signal
 
         self.empty = False
@@ -244,14 +247,7 @@ class GuidedDTW:
         if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
             return None
 
-        dtw.fill_aln(self.aln)
-
-        #df = DtwDF(dtw.get_aln()).to_df()
-        #df["mref"] = self.seq.coords.expand() #self.ref_kmers.index #pd.RangeIndex(mref_st, mref_en+1)
-
-        #print((df["current"] == self.aln.dtw.current).all())
-
-        #return df
+        dtw.fill_aln(self.aln.instance)
 
     def _get_dtw_args(self, read_block):#, ref_kmers):
         qry_len = len(read_block)
