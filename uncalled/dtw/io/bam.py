@@ -333,7 +333,7 @@ class BAM(TrackIO):
         start[1:] += np.cumsum(length)[:-1].astype("int32")
         #.to_numpy("int32")
 
-        dtw = AlnDF(icoords, start, length, current, stdv)
+        dtw = AlnDF(seq, start, length, current, stdv)
         aln.set_dtw(dtw)
 
         moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
@@ -376,7 +376,7 @@ class BAM(TrackIO):
 
         #layers = pd.concat([layers, pd.concat({"bc_cmp" :cmp_df}, axis=1)], axis=1)
 
-        layers = aln.to_pandas()
+        layers = aln.to_pandas("mref")
         idx = pd.MultiIndex.from_product(
                 [[self.in_id], [fwd], self.tracks.index.mref_to_pac(sam.reference_id, layers.index), [self.aln_id_in]],
                 names=["track_id", "fwd", "pac", "aln_id"])

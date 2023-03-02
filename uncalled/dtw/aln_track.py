@@ -9,7 +9,6 @@ from typing import NamedTuple
 import pandas as pd
 import copy
 
-from ..dfs import AlnCoords
 from _uncalled import Compare
 
 from ..pore_model import PoreModel

@@ -338,7 +338,6 @@ class RefIndex:
                 kmers = kmers[::-1]
             ret = pd.Series(index=mrefs[i:-j], data=kmers, name="kmer")
         else:
-            print(mrefs.min(), mrefs.max())
             kmers = self.get_kmers(ref_id, mrefs.min()-i, mrefs.max()+j+1, is_rna)
             if mrefs.step < 0:
                 kmers = kmers[::-1]

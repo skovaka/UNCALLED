@@ -66,6 +66,7 @@ struct AlnDF {
         c.def(py::init<IntervalIndex<i64>&, IntervalIndex<i32>&, py::array_t<float>, py::array_t<float>>());
         c.def(py::init<IntervalIndex<i64>&, py::array_t<i32>, py::array_t<i32>, py::array_t<float>, py::array_t<float>>());
         c.def("slice", &AlnDF::slice);
+        c.def("empty", &AlnDF::empty);
         c.def("__len__", &AlnDF::size);
         c.def_readwrite("index", &AlnDF::index);
         c.def_readwrite("samples", &AlnDF::samples);
