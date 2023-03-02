@@ -42,8 +42,8 @@ class TrackIO:
 
         self.aln_tracks = list()
 
-        if not hasattr(self, "prev_aln_id"):
-            self.prev_aln_id = 1
+        if not hasattr(self, "aln_id"):
+            self.aln_id = 1
 
         if filename is None:
             self.filename = None
@@ -74,23 +74,21 @@ class TrackIO:
     def read_filter(self):
         return self.tracks.read_index.read_filter
 
-    def init_alignment(self, read_id, fast5, read, bam):
-        self.read = read
-        self.bam = bam
+    #def init_alignment(self, read_id, fast5, read, bam):
+    #    self.read = read
+    #    self.bam = bam
 
-        if fast5 == self.prev_fast5[0]:
-            fast5_id = self.prev_fast5[1]
-        else:
-            fast5_id = self.init_fast5(fast5)
-            self.prev_fast5 = (fast5, fast5_id)
+    #    if fast5 == self.prev_fast5[0]:
+    #        fast5_id = self.prev_fast5[1]
+    #    else:
+    #        fast5_id = self.init_fast5(fast5)
+    #        self.prev_fast5 = (fast5, fast5_id)
 
-        if self.prev_read != read_id:
-            self.init_read(read_id, fast5_id)
-            self.prev_read = read_id
+    #    if self.prev_read != read_id:
+    #        self.init_read(read_id, fast5_id)
+    #        self.prev_read = read_id
 
-        self.prev_aln_id += 1
-
-        return self.prev_aln_id
+    #    return self.prev_aln_id
 
     def init_write_mode(self):
         if self.prms.out_name is not None:
@@ -148,8 +146,9 @@ class TrackIO:
         for out in buf:
             self.output.write(out)
             
-    def write_alignment(self, alns):
-        pass
+    def next_aln(self, aln):
+        self.aln_id += 1
+        return self.aln_id
 
     def init_fast5(self, fast5):
         pass

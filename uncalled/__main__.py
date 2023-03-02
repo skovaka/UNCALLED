@@ -180,6 +180,7 @@ CONVERT_OPTS = (
         Opt("--sql-out", "tracks.io"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
+        Opt("--bam-out", "tracks.io", nargs="?", const="-"),
     ]),
     Opt(("--out-name", "-o"), "tracks.io"),
 

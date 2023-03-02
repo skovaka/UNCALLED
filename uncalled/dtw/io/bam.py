@@ -131,8 +131,9 @@ class BAM(TrackIO):
             self.input.reset()
 
     def write_alignment(self, aln):
-        if self.bam is None: 
-            return
+        self.bam = aln.sam
+        #if self.bam is None: 
+        #    return
 
         refs = list()
         for i in range(aln.seq.coords.interval_count()):
@@ -149,8 +150,8 @@ class BAM(TrackIO):
 
         lens = aln.dtw.samples.lengths_dedup.to_numpy()
 
-        self.bam.set_tag(REF_TAG, array.array("I", refs))
-        self.bam.set_tag(SAMP_TAG, array.array("I", (aln.dtw.samples.start, aln.dtw.samples.end)))
+        self.bam.set_tag(REF_TAG, array.array("i", refs))
+        self.bam.set_tag(SAMP_TAG, array.array("i", (aln.dtw.samples.start, aln.dtw.samples.end)))
         self.bam.set_tag(NORM_TAG, array.array("f", (scale,shift)))
         self.bam.set_tag(LENS_TAG, array.array("H", lens))
         self.bam.set_tag(CURS_TAG, array.array("H", dc))

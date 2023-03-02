@@ -389,7 +389,7 @@ class Tracks:
         else:
             out = self.inputs[0]
 
-        aln_id = self.output.init_alignment(aln.read_id, aln.read.filename, None, bam=aln.sam)
+        #aln_id = self.output.init_alignment(aln.read_id, aln.read.filename, None, bam=aln.sam)
         out.write_alignment(aln)
 
     def set_read(self, read):
@@ -603,28 +603,6 @@ class Tracks:
             #except:
             #    sys.stderr.write("Failed to write compare group\n")
             #    sys.stderr.write(str(track.alignments))
-
-    def calc_bcaln(self, bam, read, track_name=None):
-        track = self._track_or_default(track_name)
-
-        read_id = bam.query_name
-
-        #TODO move to tracks.init_bcaln (maybe rename bcaln)
-        #construct from BAM (with move table, or FAST5)
-        #need to standardize ref_gaps, maybe event_gaps too
-        #ideally in generalized C++ CoordBounds or whatever
-
-        bcaln = Bcaln(self.conf, self.index, read, bam, self.coords, self.read_index.default_model)
-
-        if bcaln.empty:
-            return None, None
-
-        if track.empty or not read_id in track.alignments["read_id"]:
-            aln_id, aln_coords = self.init_alignment(read_id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, bam=bam) #, read=signal
-        else:
-            self.add_layers("bcaln", bcaln.df, track.name, aln_id)
-        
-        return bcaln, aln_coords
 
     def calc_compare(self, group_b, single_track, save):
         if len(self.alns) > 0:

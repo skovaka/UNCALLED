@@ -258,7 +258,8 @@ class RefIndex {
     }
 
     i64 fm_to_mref(i64 fm) {
-        return size() - fm_to_pac(fm);
+        //return size() - fm_to_pac(fm);
+        return -fm_to_pac(fm)-1;
     }
 
     i64 fm_to_pac(i64 fm) const {
@@ -288,16 +289,17 @@ class RefIndex {
     }
 
     bool is_mref_flipped(i64 i) const {
-        return i >= static_cast<i64>(size() / 2);
+        return i < 0;
+        //return i >= static_cast<i64>(size() / 2);
     }
 
     bool is_mref_fwd(i64 i, bool is_rna) const {
         return is_mref_flipped(i) == is_rna;
     }
 
-    i64 mref_to_pac(i64 mref) {
+    i64 mref_to_pac(i64 mref) const {
         if (is_mref_flipped(mref)) {
-            return size() - mref - 1;
+            return -mref-1;
         }
         return mref;
     }
@@ -326,8 +328,11 @@ class RefIndex {
         bool flip = mref_start >= static_cast<i32>(size() / 2);
 
         i64 pac_st; //TODO rename
-        if (flip) pac_st = size() - mref_end + 1;
-        else pac_st = mref_start;
+        if (is_mref_flipped(mref_start)) { 
+            pac_st = mref_to_pac(mref_end);
+        } else {
+            pac_st = mref_start;
+        }
 
         i32 rid = bns_pos2rid(bns_, pac_st);
         if (rid < 0) return RefCoord();
@@ -384,7 +389,7 @@ class RefIndex {
         auto flip = is_fwd == is_rna;
 
         if (!flip) return {pac_st, pac_en};
-        return {size() - pac_en, size() - pac_st};
+        return {-pac_en-1, -pac_st-1};
     }
 
     i64 ref_to_mref(i32 rid, i64 ref_coord, bool is_fwd, bool is_rna) {
@@ -393,13 +398,13 @@ class RefIndex {
         auto flip = is_fwd == is_rna;
 
         if (!flip) return pac_coord;
-        return size() - pac_coord - 1;
+        return -pac_coord - 1;
     }
 
     i64 mref_to_ref(i64 mref) {
         i64 pac;
         if (is_mref_flipped(mref)) {
-            pac = size() - mref - 1;
+            pac = -mref-1;
         } else {
             pac = mref;
         }
@@ -541,7 +546,7 @@ class RefIndex {
         bool rev = is_mref_flipped(mref_end-1);
         bool comp = rev != is_rna;
         if (rev) {
-            return get_kmers(size()-mref_end, size()-mref_start, true, comp, kmers, k);
+            return get_kmers(-mref_end-1, -mref_start-1, true, comp, kmers, k);
         } else {
             return get_kmers(mref_start, mref_end, false, comp, kmers, k);
         }

@@ -109,7 +109,7 @@ class Alignment:
             df = df.instance
         self.instance.set_moves(df)
 
-    def to_pandas(self):
+    def to_pandas(self, index="ref"):
         vals = {
             "dtw" : self.dtw.to_pandas(), 
             "bcaln" : self.moves.to_pandas(),

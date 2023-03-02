@@ -39,7 +39,7 @@ class TSV(TrackIO):
     def init_read_mode(self):
         raise RuntimeError("Reading from TSV not yet supported")
 
-    def write_layers(self, track, groups):
+    def write_alignment(self, aln):
         track.calc_layers(self.columns)
         df = track.layers_desc_index#.reset_index()
         

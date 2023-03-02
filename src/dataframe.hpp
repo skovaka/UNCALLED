@@ -252,6 +252,10 @@ class IntervalIndex {
         }
     }
 
+    void init_coords(std::vector<std::pair<T,T>> coords_) {
+        //TODO
+    }
+
     void shift(i64 delta) {
         for (auto &c : coords) {
             if (c.is_valid()) {
