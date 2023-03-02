@@ -102,8 +102,6 @@ def dtw_single(conf):
     #    dtw = GuidedDTW(tracks, bam)
 
     for sam, aln in tracks.bam_in.iter_moves():
-        #print(aln.read_id)
-        #print(aln.seq.kmer)
         dtw = GuidedDTW(tracks, aln, sam)
 
     tracks.close()
@@ -167,8 +165,7 @@ class GuidedDTW:
             else:
                 tgt = (ref_means.mean(), ref_means.std())
 
-
-            signal.normalize_mom(ref_means.mean(), ref_means.std())#, self.evt_start, self.evt_end)
+            #signal.normalize_mom(ref_means.mean(), ref_means.std())#, self.evt_start, self.evt_end)
         elif self.conf.normalizer.mode == "model_mom":
             if self.conf.normalizer.median:
                 med = self.model.means.median()
@@ -182,7 +179,7 @@ class GuidedDTW:
             signal.normalize_mom(*tgt)
         else:
             signal.normalize_mom(*tgt, self.evt_start, self.evt_end)
-
+        
         tracks.set_read(signal)
 
         if self.prms.iterations > 0:
@@ -228,6 +225,8 @@ class GuidedDTW:
     #TODO refactor inner loop to call function per-block
     def _calc_dtw(self, signal):
         read_block = signal.events[self.evt_start:self.evt_end] #.to_df()[self.evt_start:self.evt_end]
+
+        #print(read_block)
         
         #prms, means, kmers, inst, bands = self._get_dtw_args(read_block)#, self.ref_kmers)
 
@@ -248,7 +247,11 @@ class GuidedDTW:
         if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
             return None
 
+        #print(list(dtw.path))
+
         dtw.fill_aln(self.aln.instance)
+
+        #print(self.aln.dtw.to_pandas().to_string())
 
     def _get_dtw_args(self, read_block):#, ref_kmers):
         qry_len = len(read_block)

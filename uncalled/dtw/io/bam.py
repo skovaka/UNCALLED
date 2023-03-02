@@ -308,28 +308,26 @@ class BAM(TrackIO):
         samp_start, samp_end = samp_bounds
 
         #TODO build whole alignment, slice after
-        if coords is not None:
-            clip = IntervalIndexI64([(coords.mrefs[fwd].min(), coords.mrefs[fwd].max()+1)])
+        #if coords is not None:
+        #    clip = IntervalIndexI64([(coords.mrefs[fwd].min(), coords.mrefs[fwd].max()+1)])
 
-            st = icoords.get_index(clip.start) if icoords.start < clip.start else 0
-            en = icoords.get_index(clip.end-1)+1  if icoords.end > clip.end else icoords.length
+        #    st = icoords.get_index(clip.start) if icoords.start < clip.start else 0
+        #    en = icoords.get_index(clip.end-1)+1  if icoords.end > clip.end else icoords.length
 
-            icoords = icoords.islice(st,en)
+        #    icoords = icoords.islice(st,en)
 
-            current = current[st:en]
-            stdv = stdv[st:en]
+        #    current = current[st:en]
+        #    stdv = stdv[st:en]
 
-            samp_start += np.sum(length[:st])
-            samp_end -= np.sum(length[en:])
-            length = length[st:en]
+        #    samp_start += np.sum(length[:st])
+        #    samp_end -= np.sum(length[en:])
+        #    length = length[st:en]
 
         pacs = self.tracks.index.mref_to_pac(icoords.expand())
 
         seq = self.tracks.get_seq(icoords)
         read = self.tracks.read_index.get(sam.query_name, None)
         aln = Alignment(sam.query_name if read is None else read, seq, sam)
-            
-        kmers = seq.kmer #coords.ref_kmers.loc[fwd].loc[refs].to_numpy()
 
         start = np.full(icoords.length, samp_start, dtype="int32")
         start[1:] += np.cumsum(length)[:-1].astype("int32")
@@ -341,21 +339,6 @@ class BAM(TrackIO):
         moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
         if moves is not None:
             aln.set_moves(moves)
-
-        dtw = pd.DataFrame({
-            "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
-            "current" : current, "stdv" : stdv, "start" : start, "length" : length, "kmer" : seq.kmer
-        }).set_index(["track_id", "fwd", "pac","aln_id"])
-
-        dtw.loc[dtw["current"].isnull(), "kmer"] = pd.NA
-        dtw["kmer"] = dtw["kmer"].astype("Int32", copy=False)
-
-        layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1)#.sort_index()
-
-        layers.loc[layers["dtw", "length"] == 0, ("dtw", "length")] = pd.NA
-        layers = layers[~(layers["dtw","current"].isnull() & layers["dtw","length"].isnull())]
-
-        layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("Int32")
 
         aln_df = pd.DataFrame({
                 "id" : [self.aln_id_in],
@@ -369,37 +352,37 @@ class BAM(TrackIO):
                 "samp_end" : [samp_end],
                 "tags" : [""]}).set_index(["track_id", "id"])
 
-        if moves is not None:
-            pacs = self.tracks.index.mref_to_pac(moves.index.expand())
-            df = pd.DataFrame({
-                #"mref"   : (moves.index.expand()),
-                "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
-                "start"  : (moves.samples.starts),
-                "length" : (moves.samples.lengths)
-            }).set_index(["track_id", "fwd", "pac","aln_id"])
-            #}).set_index("mref")
-            isna = df["start"] == INT32_NA
-            df[isna] = pd.NA
-            df = pd.concat({"bcaln" : df.fillna(method="backfill")}, names=("group","layer"),  axis=1)
+        #if moves is not None:
+        #    pacs = self.tracks.index.mref_to_pac(moves.index.expand())
+        #    df = pd.DataFrame({
+        #        #"mref"   : (moves.index.expand()),
+        #        "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
+        #        "start"  : (moves.samples.starts),
+        #        "length" : (moves.samples.lengths)
+        #    }).set_index(["track_id", "fwd", "pac","aln_id"])
+        #    #}).set_index("mref")
+        #    isna = df["start"] == INT32_NA
+        #    df[isna] = pd.NA
+        #    df = pd.concat({"bcaln" : df.fillna(method="backfill")}, names=("group","layer"),  axis=1)
 
-            layers = pd.concat([layers, df.reindex(dtw.index)], axis=1)
+        #    layers = pd.concat([layers, df.reindex(dtw.index)], axis=1)
 
         aln.calc_mvcmp()
-        pacs = self.tracks.index.mref_to_pac(aln._mvcmp.index.expand())
-        cmp_df = pd.DataFrame({
-                "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
-                "aln_b" : self.aln_id_in, "mean_ref_dist" : aln._mvcmp.dist, "jaccard" : aln._mvcmp.jaccard,
-        }).set_index(["track_id", "fwd", "pac","aln_id"])
-        #print(cmp_df)
-        #print(layers)
+        #pacs = self.tracks.index.mref_to_pac(aln._mvcmp.index.expand())
+        #cmp_df = pd.DataFrame({
+        #        "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
+        #        "aln_b" : self.aln_id_in, "mean_ref_dist" : aln._mvcmp.dist, "jaccard" : aln._mvcmp.jaccard,
+        #}).set_index(["track_id", "fwd", "pac","aln_id"])
 
-        layers = pd.concat([layers, pd.concat({"bc_cmp" :cmp_df}, axis=1)], axis=1)
+        #layers = pd.concat([layers, pd.concat({"bc_cmp" :cmp_df}, axis=1)], axis=1)
+
+        layers = aln.to_pandas()
+        idx = pd.MultiIndex.from_product(
+                [[self.in_id], [fwd], self.tracks.index.mref_to_pac(layers.index), [self.aln_id_in]],
+                names=["track_id", "fwd", "pac", "aln_id"])
+        layers = layers.set_index(idx).sort_index()
 
         self.aln_id_in += 1
-
-        #print("dtw")
-        #print(aln.to_pandas())
-        #print(layers)
 
         return aln_df, layers
 

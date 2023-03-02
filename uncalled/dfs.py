@@ -110,9 +110,18 @@ class Alignment:
         self.instance.set_moves(df)
 
     def to_pandas(self):
-        df = pd.concat({
-                "dtw" : self.dtw.to_pandas(), 
-                "bcaln" : self.moves.to_pandas()
-            }, axis=1)
-        #df["dtw", "kmer"] = self.seq.kmer
+        vals = {
+            "dtw" : self.dtw.to_pandas(), 
+            "bcaln" : self.moves.to_pandas(),
+        }
+
+        if not self._mvcmp.empty():
+            vals["bc_cmp"] = pd.DataFrame({
+                    "mref" : self._mvcmp.index.expand(),
+                    "mean_ref_dist" : self._mvcmp.dist, "jaccard" : self._mvcmp.jaccard,
+            }).set_index(["mref"])
+
+        df = pd.concat(vals, axis=1, names=["group", "layer"])
+
+        df["dtw", "kmer"] = self.seq.kmer
         return df

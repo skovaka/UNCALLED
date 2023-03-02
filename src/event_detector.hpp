@@ -77,23 +77,23 @@ struct ProcessedRead {
 
         float avg, dev;
 
-        if (norm_prms.median) {
-            std::sort(std::begin(event_means), std::end(event_means));
-            avg = event_means[n / 2];
-            //mean = event_means.sum() / n;
-        } else {
+        //if (norm_prms.median) {
+        //    std::sort(std::begin(event_means), std::end(event_means));
+        //    avg = event_means[n / 2];
+        //    //mean = event_means.sum() / n;
+        //} else {
             avg = event_means.sum() / n;
-        }
+        //}
 
         auto deltas = event_means - avg;
 
-        if (norm_prms.median) {
-            auto delta_abs = std::valarray<float>(std::abs(deltas));
-            std::sort(std::begin(delta_abs), std::end(delta_abs));
-            dev = delta_abs[n / 2];
-        } else {
+        //if (norm_prms.median) {
+        //    auto delta_abs = std::valarray<float>(std::abs(deltas));
+        //    std::sort(std::begin(delta_abs), std::end(delta_abs));
+        //    dev = delta_abs[n / 2];
+        //} else {
             dev = sqrt((deltas*deltas).sum() / n);
-        }
+        //}
 
         return {avg, dev};
     }
