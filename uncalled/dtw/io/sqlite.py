@@ -43,8 +43,8 @@ class TrackSQL(TrackIO):
             self.cur.execute("CREATE INDEX IF NOT EXISTS aln_fwd_idx ON alignment (fwd);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (pac, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_aln_idx ON dtw (aln_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (pac, aln_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_aln_idx ON bcaln (aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS moves_idx ON moves (pac, aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS moves_aln_idx ON moves (aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS band_idx ON band (pac, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS band_aln_idx ON band (aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (pac, aln_a, aln_b, group_b);")
@@ -100,7 +100,7 @@ class TrackSQL(TrackIO):
                 FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE
             );""")
         self.cur.execute("""
-            CREATE TABLE IF NOT EXISTS bcaln (
+            CREATE TABLE IF NOT EXISTS moves (
                 pac INTEGER,
                 aln_id INTEGER,
                 start INTEGER,
@@ -115,7 +115,7 @@ class TrackSQL(TrackIO):
                 aln_a INTEGER,
                 aln_b INTEGER,
                 group_b TEXT DEFAULT "dtw",
-                mean_ref_dist REAL, 
+                dist REAL, 
                 jaccard REAL, 
                 FOREIGN KEY (aln_a) REFERENCES alignment (id) ON DELETE CASCADE,
                 FOREIGN KEY (aln_b) REFERENCES alignment (id) ON DELETE CASCADE
@@ -134,7 +134,7 @@ class TrackSQL(TrackIO):
     def init_write_mode(self):
         TrackIO.init_write_mode(self)
 
-        for table in ["dtw", "bcaln", "cmp", "band"]:
+        for table in ["dtw", "moves", "cmp", "band"]:
             self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
 
         track = self.aln_tracks[0]
@@ -248,7 +248,7 @@ class TrackSQL(TrackIO):
             self.write_layer_group(group, df[base_layers])
 
     def write_layer_group(self, group, df):
-        if group == "bc_cmp": group = "cmp"
+        if group == "mvcmp": group = "cmp"
         if group == "cmp":
             df = df.droplevel("aln_id")
         df.to_sql(
@@ -325,11 +325,11 @@ class TrackSQL(TrackIO):
 
     def query_compare(self, layers, track_id=None, coords=None, aln_id=None):
         dtw = False
-        bcaln = False
+        moves = False
         fields = {"pac", "aln_a", "aln_b", "group_b"}
         for group,layer in layers:
             if group == "cmp": dtw = True
-            if group == "bc_cmp": bcaln = True
+            if group == "mvcmp": moves = True
             fields.add(layer)
 
         fields = ", ".join(fields)
@@ -342,10 +342,10 @@ class TrackSQL(TrackIO):
             select += " JOIN alignment ON id = cmp.aln_a"
             self._add_where(wheres, params, "track_id", track_id)
 
-        if dtw and not bcaln:
+        if dtw and not moves:
             self._add_where(wheres, params, "group_b", "dtw")
-        elif bcaln and not dtw:
-            self._add_where(wheres, params, "group_b", "bcaln")
+        elif moves and not dtw:
+            self._add_where(wheres, params, "group_b", "moves")
 
         self._add_where(wheres, params, "aln_a", aln_id)
 
@@ -428,7 +428,7 @@ class TrackSQL(TrackIO):
         for group,layer in layers:
             if not layer in self.table_columns[group]: 
                 continue
-            if group == "bc_cmp":
+            if group == "mvcmp":
                 group = "cmp"
             field = group + "." + layer
             name = group + "_" + layer
@@ -459,7 +459,7 @@ class TrackSQL(TrackIO):
             self._add_where(wheres, params, "fwd", fwd)
 
         if "cmp" in group_layers:
-            self._add_where(wheres, params, "group_b", "bcaln")
+            self._add_where(wheres, params, "group_b", "moves")
 
         if coords is not None:
             wheres.append("(idx_pac >= ? AND idx_pac <= ?)")
@@ -685,9 +685,9 @@ def merge(conf):
                 "FROM input.dtw"
         db.cur.execute(query)
 
-        query = "INSERT INTO bcaln "\
+        query = "INSERT INTO moves "\
                f"SELECT pac,aln_id+{aln_shift},start,length,indel "\
-                "FROM input.bcaln"
+                "FROM input.moves"
         db.cur.execute(query)
 
         query = "INSERT INTO band "\
@@ -696,7 +696,7 @@ def merge(conf):
         db.cur.execute(query)
 
         query = "INSERT INTO cmp "\
-               f"SELECT pac,aln_a+{aln_shift},aln_b+{aln_shift},group_b,mean_ref_dist,jaccard "\
+               f"SELECT pac,aln_a+{aln_shift},aln_b+{aln_shift},group_b,dist,jaccard "\
                 "FROM input.cmp"
         db.cur.execute(query)
 

@@ -34,18 +34,23 @@ class AlnDF:
 
     @property
     def model_diff(self):
-        return self.current - self.seq.current
+        return np.array(self.current) - self.seq.current
 
-    def to_pandas(self, index="ref"):
-        df = pd.DataFrame({
-            #"mref" : self.index.expand(),
-            "start" : self.samples.starts,
-            "length" : self.samples.lengths,
-            "current" : self.current,
-            "current_sd" : self.current_sd
-        })#.set_index("mref")
+    def to_pandas(self, index="ref", layers=None):
+        if layers is None:
+            df = pd.DataFrame({
+                #"mref" : self.index.expand(),
+                "start" : self.samples.starts,
+                "length" : self.samples.lengths,
+                "current" : self.current,
+                "current_sd" : self.current_sd
+            })#.set_index("mref")
+        else:
+            df = pd.DataFrame({
+                l : getattr(self, l) for l in layers if hasattr(self,l)
+            })
         
-        idx = self.index.expand()
+        idx = self.index.expand().to_numpy()
         if index == "ref" and idx[0] < 0:
             idx = -idx-1
         elif index != "mref":
@@ -67,13 +72,18 @@ class CmpDF:
         self.seq = seq
         self.instance = instance
 
-    def to_pandas(self, index="ref"):
-        df = pd.DataFrame({
-            "mean_ref_dist" : self.instance.dist, 
-            "jaccard" : self.instance.jaccard,
-        })
+    def to_pandas(self, index="ref", layers=None):
+        if layers is None:
+            df = pd.DataFrame({
+                "dist" : self.instance.dist, 
+                "jaccard" : self.instance.jaccard,
+            })
+        else:
+            df = pd.DataFrame({
+                l : getattr(self, l) for l in layers if hasattr(self,l)
+            })
         
-        idx = self.index.expand()
+        idx = self.index.expand().to_numpy()
         if index == "ref" and idx[0] < 0:
             idx = -idx-1
         elif index != "mref":
@@ -110,6 +120,10 @@ class Alignment:
         self.moves = AlnDF(seq, self.instance._moves)
         self.mvcmp = CmpDF(seq, self.instance._mvcmp)
 
+    @property
+    def is_fwd(self):
+        return self.seq.coords.start >= 0
+
     def __getattr__(self, name):
         if not hasattr(self.instance, name):
             raise AttributeError(f"Alignment has no attribute '{name}'")
@@ -129,19 +143,26 @@ class Alignment:
         vals = dict()
 
         if layers is None:
-            for tgt,group in [("dtw","dtw"), ("bcaln","moves"), ("bc_cmp","mvcmp")]:
-                g = getattr(self, group, [])
-                if len(g) > 0:
-                    vals[tgt] = g.to_pandas(index)
+            for name in ["dtw", "moves", "mvcmp"]:
+                group = getattr(self, name, [])
+                if len(group) > 0:
+                    vals[name] = group.to_pandas(index)
+        else:
+            for name in layers.unique(0):
+                _,group_layers = layers.get_loc_level(name)
+                group = getattr(self, name, [])
+                if len(group) > 0:
+                    vals[name] = group.to_pandas(index, group_layers)
+                
 
         #if len(self.dtw) > 0:
         #    vals["dtw"] = self.dtw.to_pandas(index)
 
         #if len(self.moves) > 0:
-        #    vals["bcaln"] = self.moves.to_pandas(index)
+        #    vals["moves"] = self.moves.to_pandas(index)
 
         #if len(self.mvcmp) > 0:
-        #    vals["bc_cmp"] = self.mvcmp.to_pandas(index)
+        #    vals["mvcmp"] = self.mvcmp.to_pandas(index)
 
         df = pd.concat(vals, axis=1, names=["group", "layer"])
 

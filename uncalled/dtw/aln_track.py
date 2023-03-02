@@ -16,7 +16,7 @@ from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
 from .. import config, index 
 from ..index import load_index, RefCoord
-from .bcaln import Bcaln
+from .moves import Bcaln
 
 from .layers import LAYER_META
 
@@ -65,8 +65,8 @@ class AlnTrack:
             if len(df) > 1 and refs[0] > refs[1]:
                 df = df.iloc[::-1]
 
-        if self.conf.tracks.mask_indels is not None and ("bcaln","indel") in df.columns:
-            df = df[df["bcaln","indel"].abs() < self.conf.tracks.mask_indels]
+        if self.conf.tracks.mask_indels is not None and ("moves","indel") in df.columns:
+            df = df[df["moves","indel"].abs() < self.conf.tracks.mask_indels]
 
 
         if self.conf.tracks.mask_skips is not None and ("dtw","events") in df.columns:
@@ -234,11 +234,11 @@ class AlnTrack:
         self.mat = self.mat.iloc[order]
         self.alignments = self.alignments.iloc[order]
 
-    def cmp(self, other, calc_jaccard, calc_mean_ref_dist):
+    def cmp(self, other, calc_jaccard, calc_dist):
         groups_b = other.alignments.groupby("read_id")
 
         df = pd.DataFrame(
-            columns=["aln_b", "group_b", "mean_ref_dist", "jaccard"],
+            columns=["aln_b", "group_b", "dist", "jaccard"],
             index = self.layers.index
         )
 
@@ -248,17 +248,17 @@ class AlnTrack:
             dtw_a = self.layers.loc[(slice(None),id_a),"dtw"][["start","end"]]
 
             for id_b, aln_b in groups_b.get_group(read_id).iterrows():
-                self._compare_alns(dtw_a, other, id_b, "dtw", df, calc_jaccard, calc_mean_ref_dist)
+                self._compare_alns(dtw_a, other, id_b, "dtw", df, calc_jaccard, calc_dist)
 
         df["group_b"] = "dtw"
         return df#.set_index(["aln_b", "group_b"], append=True)
 
-    def bc_cmp(self, other, calc_jaccard, calc_mean_ref_dist):
+    def mvcmp(self, other, calc_jaccard, calc_dist):
         if other != self:
             groups_b = other.alignments.groupby("read_id")
 
         df = pd.DataFrame(
-            columns=["aln_a", "aln_b", "group_b", "mean_ref_dist", "jaccard"],
+            columns=["aln_a", "aln_b", "group_b", "dist", "jaccard"],
             index = self.layer_refs
         )
 
@@ -270,16 +270,16 @@ class AlnTrack:
                 continue
 
             if other == self:
-                self._compare_alns(dtw, self, id_a, "bcaln", df, calc_jaccard, calc_mean_ref_dist)
+                self._compare_alns(dtw, self, id_a, "moves", df, calc_jaccard, calc_dist)
             else:
                 read_id = aln_a["read_id"]
                 for id_b, aln_b in groups_b.get_group(read_id).iterrows():
-                    self._compare_alns(dtw, other, id_b, "bcaln", df)
+                    self._compare_alns(dtw, other, id_b, "moves", df)
 
-        df["group_b"] = "bcaln"
+        df["group_b"] = "moves"
         return df#.set_index(["aln_b", "group_b"], append=True)
 
-    def _compare_alns(self, aln_a, other, id_b, group, df, calc_jaccard=True, calc_mean_ref_dist=True):
+    def _compare_alns(self, aln_a, other, id_b, group, df, calc_jaccard=True, calc_dist=True):
 
         other.calc_layers([(group,"end")])
 
@@ -314,7 +314,7 @@ class AlnTrack:
         #cmp_df = compare.to_numpy()
         #idx = (cmp_df["ref"],slice(None))
         #df.loc[idx,"jaccard"] = cmp_df["jaccard"]
-        #df.loc[idx,"mean_ref_dist"] = cmp_df["mean_ref_dist"]
+        #df.loc[idx,"dist"] = cmp_df["dist"]
 
         cmp_df = pd.DataFrame(compare.to_numpy()).dropna(how="all")
 
@@ -325,7 +325,7 @@ class AlnTrack:
         else:
             cmp_df = cmp_df.set_index("ref")
         df["jaccard"] = cmp_df["jaccard"]
-        df["mean_ref_dist"] = cmp_df["mean_ref_dist"]
+        df["dist"] = cmp_df["dist"]
         df["aln_a"] = alns_a[0]
         df["aln_b"] = id_b
 

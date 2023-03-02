@@ -131,13 +131,13 @@ class GuidedDTW:
         self.index = tracks.index
         self.model = tracks.model
 
-        self.bcaln = self.aln.moves #bcaln.aln
+        self.moves = self.aln.moves #moves.aln
 
         #TODO change to tracks.init_alignment(read_id, ref_id, coords)
         #returns python Alignment object (wrapper for AlignmentK*)
         #also store alignment in tracks output buffer
 
-        self.seq = tracks.get_seq(sam.reference_id, self.bcaln.index)
+        self.seq = tracks.get_seq(sam.reference_id, self.moves.index)
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
@@ -150,8 +150,8 @@ class GuidedDTW:
         if self.dtw_fn is None:
             raise ValueError(f"Invalid DTW k-mer length {self.model.K}")
 
-        self.samp_min = self.bcaln.samples.starts[0]
-        self.samp_max = self.bcaln.samples.ends[len(self.bcaln)-1]
+        self.samp_min = self.moves.samples.starts[0]
+        self.samp_max = self.moves.samples.ends[len(self.moves)-1]
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
         if self.conf.normalizer.mode == "ref_mom":
@@ -190,13 +190,13 @@ class GuidedDTW:
                 signal.normalize(reg.coef_, reg.intercept_)
                 self._calc_dtw(signal)
         else:
-            starts = self.bcaln.samples.starts.to_numpy()
-            lengths = self.bcaln.samples.lengths.to_numpy()
+            starts = self.moves.samples.starts.to_numpy()
+            lengths = self.moves.samples.lengths.to_numpy()
             cur = std = np.array([])
             df = DtwDF(starts, lengths, cur, std)
             df.set_signal(signal)
             df = df.to_df()
-            df["mref"] = self.bcaln.index.expand()
+            df["mref"] = self.moves.index.expand()
 
         #if df is None:
         #    self.empty = True
@@ -207,12 +207,12 @@ class GuidedDTW:
         #if self.bands is not None:
         #    tracks.add_layers("band", self.bands)#, aln_id=aln_id)
 
-        if self.conf.bc_cmp:
-            self.aln.calc_mvcmp()
-            #tracks.calc_compare("bcaln", True, True)
+        #if self.conf.mvcmp:
+        #    self.aln.calc_mvcmp()
+            #tracks.calc_compare("moves", True, True)
 
         tracks.write_alignment(self.aln)
-        #aln_id, aln_coords = self.init_alignment(aln.read_id, read.filename, bcaln.coords, {"bcaln" : bcaln.df}, bam=bam) #, read=signal
+        #aln_id, aln_coords = self.init_alignment(aln.read_id, read.filename, moves.coords, {"moves" : moves.df}, bam=bam) #, read=signal
 
         self.empty = False
 
@@ -235,7 +235,7 @@ class GuidedDTW:
 
         band_count = qry_len + ref_len
         shift = int(np.round(self.prms.band_shift*self.prms.band_width))
-        mv_starts = self.bcaln.samples.starts.to_numpy()
+        mv_starts = self.moves.samples.starts.to_numpy()
 
         bands = _uncalled.get_guided_bands(np.arange(len(self.seq)), mv_starts, read_block['start'], band_count, shift)
 
@@ -262,7 +262,7 @@ class GuidedDTW:
             band_count = qry_len + ref_len
 
             shift = int(np.round(self.prms.band_shift*self.prms.band_width))
-            mv_starts = self.bcaln.samples.starts.to_numpy()
+            mv_starts = self.moves.samples.starts.to_numpy()
             bands = _uncalled.get_guided_bands(np.arange(len(self.seq)), mv_starts, read_block['start'], band_count, shift)
 
             return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))

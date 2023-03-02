@@ -17,12 +17,12 @@ _CMP_COLOR = {"colorscale" : "RdYlGn", "cmin" : 0, "cmid" :5, "cmax" : 10, "reve
 
 LAYER_COLORS = {
     ("dtw", "model_diff") : {"colorscale" : "RdBu", "cmid" : 0, "cmax" : 20, "cmin" : -20, "reversescale":True},
-    ("bcaln", "indel") : {"colorscale" : "Picnic", "cmid" : 0, "cmax" : 1, "cmin" : -1, "reversescale":False},
+    ("moves", "indel") : {"colorscale" : "Picnic", "cmid" : 0, "cmax" : 1, "cmin" : -1, "reversescale":False},
     ("dtw", "events_log2") : {"colorscale" : "Picnic", "cmid" : 0, "cmax" : 2, "cmin" : -2, "reversescale":True},
     ("dtw", "current") : {"colorscale" : "viridis"},
     ("dtw", "dwell") : {"colorscale" : "viridis", "cmin" : 0, "cmax" : 25},
-    ("cmp", "mean_ref_dist") : _CMP_COLOR,
-    ("bc_cmp", "mean_ref_dist") : _CMP_COLOR,
+    ("cmp", "dist") : _CMP_COLOR,
+    ("mvcmp", "dist") : _CMP_COLOR,
 }
 
 LAYER_PANELS = {"mat", "box"}
@@ -38,9 +38,9 @@ DEFAULT_HEIGHTS = {
 
 PLOT_LAYERS = {
     ("dtw", "current"), ("dtw", "dwell"), ("dtw", "model_diff"), ("dtw", "events_log2"),
-    ("bcaln", "indel"),
-    ("cmp", "mean_ref_dist"), ("bc_cmp", "mean_ref_dist"),
-    ("cmp", "jaccard"), ("bc_cmp", "jaccard"), #("bcaln", "error"), 
+    ("moves", "indel"),
+    ("cmp", "dist"), ("mvcmp", "dist"),
+    ("cmp", "jaccard"), ("mvcmp", "jaccard"), #("moves", "error"), 
 }
 
 class Trackplot:

@@ -62,7 +62,8 @@ class Eventalign(TrackIO):
 
         self.in_id = self.init_track(name, name, self.conf)
 
-    def write_layers(self, track, groups):
+    #def write_layers(self, track, groups):
+    def write_alignment(self, aln):
         if "dtw" not in groups: 
             return
 

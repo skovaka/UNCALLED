@@ -8,7 +8,7 @@ from ..pore_model import PoreModel, PoreModelParams
 def train(conf):
     conf.fast5_reader.load_bc = True
     conf.tracks.load_fast5s = True
-    conf.bc_cmp = True
+    conf.mvcmp = True
 
     prms = conf.train
 

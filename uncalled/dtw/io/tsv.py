@@ -7,7 +7,7 @@ from . import TrackIO
 import _uncalled
 
 EXTRA_FNS = {
-    "read_id" : lambda track,df: track.alignments.loc[df.index.get_level_values("aln_id"), "read_id"].to_numpy()
+    "read_id" : lambda aln: aln.read_id
 }
 
 EXTRA_COLS = pd.Index(EXTRA_FNS.keys())
@@ -40,18 +40,26 @@ class TSV(TrackIO):
         raise RuntimeError("Reading from TSV not yet supported")
 
     def write_alignment(self, aln):
-        track.calc_layers(self.columns)
-        df = track.layers_desc_index#.reset_index()
+
+        ref_name = self.tracks.index.get_ref_name(aln.seq.ref_id)
+
+        df = aln.to_pandas("ref", self.columns)
+        idx = pd.MultiIndex.from_product(
+                [[ref_name], df.index, ["+" if aln.is_fwd else "-"], [self.aln_id]],
+                names=[("ref","name"),("ref","coord"),("ref","strand"),"aln_id"])
+        df = df.set_index(idx).sort_index()
+
+        #track.calc_layers(self.columns)
+        #df = track.layers_desc_index#.reset_index()
         
         df = df[self.columns.intersection(df.columns)].dropna(how="all", axis=0)
 
         for col in df.columns[df.columns.get_level_values(-1).str.endswith("kmer")]:
             kmers = df[col].dropna()
-            df[col] = track.model.kmer_to_str(kmers)
-
+            df[col] = self.tracks.model.kmer_to_str(kmers)
 
         for col in self.extras:
-            df[col] = EXTRA_FNS[col](track,df)
+            df[col] = EXTRA_FNS[col](aln)
 
         df.reset_index(inplace=True, drop=self.prms.tsv_noref)
 

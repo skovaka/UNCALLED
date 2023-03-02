@@ -23,16 +23,16 @@ def compare(conf):
     """Compute distance between alignments of the same reads"""
     t = time.time()
 
-    group_b = "bcaln" if conf.bcaln else "dtw"
+    group_b = "moves" if conf.moves else "dtw"
 
-    if conf.bcaln:
-        conf.tracks.layers += [("bc_cmp", "mean_ref_dist")] 
+    if conf.moves:
+        conf.tracks.layers += [("mvcmp", "dist")] 
     else:
-        conf.tracks.layers += [("cmp", "mean_ref_dist")] 
+        conf.tracks.layers += [("cmp", "dist")] 
 
-    all_layers = not (conf.jaccard or conf.mean_ref_dist)
+    all_layers = not (conf.jaccard or conf.dist)
     calc_jaccard = all_layers or conf.jaccard
-    calc_mean_ref_dist = all_layers or conf.mean_ref_dist
+    calc_dist = all_layers or conf.dist
 
     tracks = Tracks(conf=conf)
 
@@ -59,13 +59,13 @@ def dump(conf):
 
     tracks = Tracks(conf=conf)
     #TODO add layer dependencies (compare requires start/length)
-    #tracks.set_layers(["start", "length", "bcaln.start", "bcaln.length"] + conf.layers)
+    #tracks.set_layers(["start", "length", "moves.start", "moves.length"] + conf.layers)
     tracks.set_layers(conf.layers)
 
     layer_groups = {group for group,_ in parse_layers(conf.layers)}
 
     need_cmp = "cmp" in layer_groups
-    need_bc_cmp = "bc_cmp" in layer_groups
+    need_mvcmp = "mvcmp" in layer_groups
 
     header = True
 

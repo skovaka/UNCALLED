@@ -58,7 +58,7 @@ REFSTAT_LABELS = {
 
 BUILTIN_TRACKS = {"_refstats", "_layerstats", "_readstats"}
 
-CMP_GROUPS = {"cmp", "bc_cmp"}
+CMP_GROUPS = {"cmp", "mvcmp"}
 
 class RefstatsSplit:
     def __init__(self, stats, track_count):
@@ -350,7 +350,7 @@ class Tracks:
 
         if read is not None:
             #dtw["stdv"] = np.std(read.signal[dtw["start"]:dtw["start"]+dtw["length"]], axis=1)
-            dtw["stdv"] = [
+            dtw["current_sd"] = [
                 np.std(
                     read.get_norm_signal(dtw.loc[i, "start"], dtw.loc[i, "start"]+dtw.loc[i, "length"])
                 ) for i in dtw.index
@@ -577,10 +577,10 @@ class Tracks:
             return
 
         groups = self.cmp.index.get_level_values("group_b").unique()
-        if "bcaln" in groups:
-            bcalns = self.cmp.loc[(slice(None), slice(None), slice(None), "bcaln"),:]
+        if "moves" in groups:
+            movess = self.cmp.loc[(slice(None), slice(None), slice(None), "moves"),:]
         else:
-            bcalns = None
+            movess = None
         if "dtw" in groups:
             dtws = self.cmp.loc[(slice(None), slice(None), slice(None), "dtw"),:]
         else:
@@ -596,8 +596,8 @@ class Tracks:
                 track.layers = pd.concat([track.layers, df], axis=1).dropna(axis=1,how="all")
 
             #try:
-            if bcalns is not None:
-                _add_group("bc_cmp", bcalns)
+            if movess is not None:
+                _add_group("mvcmp", movess)
             if dtws is not None:
                 _add_group("cmp", dtws)
             #except:
@@ -636,7 +636,7 @@ class Tracks:
                 if track_b != track_a: break
 
         cols = track_a.layers.columns.get_level_values("group").unique()
-        if (group_b == "dtw" and "cmp" in cols) or (group_b == "bcaln" and "bc_cmp" in cols):
+        if (group_b == "dtw" and "cmp" in cols) or (group_b == "moves" and "mvcmp" in cols):
             sys.stderr.write(f"Read already has compare group. Skipping\n")
             return None
 
@@ -646,8 +646,8 @@ class Tracks:
 
             df = track_a.cmp(track_b, True, True)
 
-        elif group_b == "bcaln":
-            df = track_a.bc_cmp(track_b, True, True)
+        elif group_b == "moves":
+            df = track_a.mvcmp(track_b, True, True)
 
         df = df.dropna(how="all")
         self.add_layers("cmp", df)

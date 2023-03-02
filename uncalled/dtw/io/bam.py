@@ -7,7 +7,7 @@ import os
 import re
 import time
 from collections import defaultdict, deque
-from ..bcaln import sam_to_ref_moves, INT32_NA
+from ..moves import sam_to_ref_moves, INT32_NA
 from ..aln_track import AlnTrack
 from ..layers import LAYER_META, parse_layers
 from ...index import RefCoord
@@ -363,7 +363,7 @@ class BAM(TrackIO):
         #    #}).set_index("mref")
         #    isna = df["start"] == INT32_NA
         #    df[isna] = pd.NA
-        #    df = pd.concat({"bcaln" : df.fillna(method="backfill")}, names=("group","layer"),  axis=1)
+        #    df = pd.concat({"moves" : df.fillna(method="backfill")}, names=("group","layer"),  axis=1)
 
         #    layers = pd.concat([layers, df.reindex(dtw.index)], axis=1)
 
@@ -371,10 +371,10 @@ class BAM(TrackIO):
         #pacs = self.tracks.index.mref_to_pac(aln._mvcmp.index.expand())
         #cmp_df = pd.DataFrame({
         #        "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
-        #        "aln_b" : self.aln_id_in, "mean_ref_dist" : aln._mvcmp.dist, "jaccard" : aln._mvcmp.jaccard,
+        #        "aln_b" : self.aln_id_in, "dist" : aln._mvcmp.dist, "jaccard" : aln._mvcmp.jaccard,
         #}).set_index(["track_id", "fwd", "pac","aln_id"])
 
-        #layers = pd.concat([layers, pd.concat({"bc_cmp" :cmp_df}, axis=1)], axis=1)
+        #layers = pd.concat([layers, pd.concat({"mvcmp" :cmp_df}, axis=1)], axis=1)
 
         layers = aln.to_pandas("mref")
         idx = pd.MultiIndex.from_product(

@@ -17,7 +17,7 @@ LAYERS = {
         "start" : _Layer("Int32", "Sample Start"),
         "length" : _Layer("Int32", "Sample Length"),
         "current" : _Layer(np.float32, "Current (pA)"),
-        "stdv" : _Layer(np.float32, "Stdv (pA)"),
+        "current_sd" : _Layer(np.float32, "Stdv (pA)"),
         "kmer" : _Layer("UInt32", "Reference k-mer"),
         "events" : _Layer(np.float32, "Event Count"),
         #"kmer_id" : _Layer(np.uint32, "Binary k-mer ID", 
@@ -45,15 +45,15 @@ LAYERS = {
             [("dtw", "current"),("dtw","kmer")]),
         "base" : _Layer(str, "Reference base",
             lambda track: track.model.kmer_base(track.layers["dtw","kmer"], 2)),
-    }, "bcaln" : {
+    }, "moves" : {
         "start" : _Layer("Int32", "BC Sample Start"),
         "length" : _Layer("Int32", "BC Sample Length"),
         "end" : _Layer("Int32", "Sample End",  
-            lambda track: track.layers["bcaln","start"] + track.layers["bcaln","length"],
-            [("bcaln", "start"), ("bcaln", "length")]),
+            lambda track: track.layers["moves","start"] + track.layers["moves","length"],
+            [("moves", "start"), ("moves", "length")]),
         "middle" : _Layer(np.float32, "Sample Middle",  
-            lambda track: track.layers["bcaln","start"] + (track.layers["bcaln","length"] / 2),
-            [("bcaln", "start"), ("bcaln", "length")]),
+            lambda track: track.layers["moves","start"] + (track.layers["moves","length"] / 2),
+            [("moves", "start"), ("moves", "length")]),
         #"bp" : _Layer("Int32", "Basecaller Base Index"),
         #"error" : _Layer(str, "Basecalled Alignment Error"),
         "indel" : _Layer("Int32", "Basecalled Alignment Indel"),
@@ -70,16 +70,16 @@ LAYERS = {
         "group_b" : _Layer(str, "Compare type"),
         "jaccard" : _Layer(np.float32, "Jaccard Distance", None, 
             [("dtw", "start"), ("dtw", "end"), ("dtw", "length")]),
-        "mean_ref_dist" : _Layer(np.float32, "Mean Ref. Distance", None,
+        "dist" : _Layer(np.float32, "Mean Ref. Distance", None,
             [("dtw", "start"), ("dtw", "end"), ("dtw", "length")]),
-    }, "bc_cmp" : {
+    }, "mvcmp" : {
         "aln_a" : _Layer("Int32", "Compare alignment V"),
         "aln_b" : _Layer("Int32", "Compare alignment A"),
         "group_b" : _Layer(str, "Compare type"),
         "jaccard" : _Layer(np.float32, "Jaccard Distance", None, 
-            [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end"), ("bcaln", "length")]),
-        "mean_ref_dist" : _Layer(np.float32, "Mean Ref. Distance", None,                   
-            [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end"), ("bcaln", "length")]),
+            [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("moves", "start"), ("moves", "end"), ("moves", "length")]),
+        "dist" : _Layer(np.float32, "Mean Ref. Distance", None,                   
+            [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("moves", "start"), ("moves", "end"), ("moves", "length")]),
     }
 }
 
@@ -92,7 +92,7 @@ LAYER_META = pd.concat([
 
 LAYER_META["base"] = LAYER_META["fn"].isna()
 
-LAYER_DB_GROUPS = ["dtw", "bcaln", "cmp", "band"]
+LAYER_DB_GROUPS = ["dtw", "moves", "cmp", "band"]
 
 def parse_layer(layer):
     

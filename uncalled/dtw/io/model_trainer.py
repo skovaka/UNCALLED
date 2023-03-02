@@ -95,7 +95,7 @@ class ModelTrainer(TrackIO):
             self.set_model(track.model)
 
         track.calc_layers(LAYERS)
-        mask = track.layers[("cmp", "mean_ref_dist")] <= 1
+        mask = track.layers[("cmp", "dist")] <= 1
         dtw = track.layers.loc[mask, LAYERS]["dtw"].set_index("kmer", drop=True) #\
          #.sort_index() 
 

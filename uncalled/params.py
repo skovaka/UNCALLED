@@ -114,7 +114,7 @@ TrainParams._def_params(
     ("kmer_len", None, int, "Output model k-mer length. Required if init_model is not specified"),
     ("iterations", 1, int, "Number of model training iterations"),
     ("buffer_size", 256, int, "Size of sorted chunk buffer (MB)"),
-    ("max_bcaln_dist", 1, float, "Maximum mean_refi_dist from basecalled alignment to use for model trainer"),
+    ("max_moves_dist", 1, float, "Maximum mean_refi_dist from basecalled alignment to use for model trainer"),
     ("use_median", False, bool, ""),
     ("skip_dtw", None, bool, "Will use previous training data to re-compute the model. '--out-dir' must be a previous model training directory with at least the specified number of iterations"),
     ("append", False, bool, "If output directory exists and contains a file 'it[N].model.tsv', will use the file with the highest N to initialize training and generate additional training iterations"),
@@ -131,8 +131,8 @@ class DotplotParams(config.ParamGroup):
     _name = "dotplot"
 DotplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
-    ("bcaln_track", None, str, "Only display basecalled alignments from this track"),
-    ("bcaln_error", False, bool, "Display basecalled alignment errors"),
+    ("moves_track", None, str, "Only display basecalled alignments from this track"),
+    ("moves_error", False, bool, "Display basecalled alignment errors"),
     ("show_legend", True, bool, "Display legend"),
     ("show_bands", True, bool, "Display DTW bands (if present in DB)"),
     ("select_ref", None, int, "Display a horizontal line at specified reference coordinate"),
