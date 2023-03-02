@@ -10,10 +10,6 @@
 #include "pore_model.hpp"
 namespace py = pybind11;
 
-//struct RefCoords : public IntervalIndex<i64> {
-//    RefCoords
-//}
-
 struct AlnDF {
     IntervalIndex<i64> index;
     IntervalIndex<i32> samples;

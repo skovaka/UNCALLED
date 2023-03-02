@@ -137,7 +137,7 @@ class GuidedDTW:
         #returns python Alignment object (wrapper for AlignmentK*)
         #also store alignment in tracks output buffer
 
-        self.seq = tracks.get_seq(self.bcaln.index)
+        self.seq = tracks.get_seq(sam.reference_id, self.bcaln.index)
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:

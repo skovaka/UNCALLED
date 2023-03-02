@@ -320,7 +320,7 @@ class RefIndex:
     def __getattr__(self, name):
         return self.instance.__getattribute__(name)
 
-    def mrefs_to_kmers(self, mrefs, is_rna, kmer_trim):
+    def mrefs_to_kmers(self, ref_id, mrefs, is_rna, kmer_trim):
         #if (mrefs.step < 0) == is_rna:
         #    #ref_coord.end -= kmer_shift
         #    kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
@@ -333,12 +333,13 @@ class RefIndex:
             i,j = reversed(self.trim)
 
         if kmer_trim:
-            kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
+            kmers = self.get_kmers(ref_id, mrefs.min(), mrefs.max()+1, is_rna)
             if mrefs.step < 0:
                 kmers = kmers[::-1]
             ret = pd.Series(index=mrefs[i:-j], data=kmers, name="kmer")
         else:
-            kmers = self.get_kmers(mrefs.min()-i, mrefs.max()+j+1, is_rna)
+            print(mrefs.min(), mrefs.max())
+            kmers = self.get_kmers(ref_id, mrefs.min()-i, mrefs.max()+j+1, is_rna)
             if mrefs.step < 0:
                 kmers = kmers[::-1]
             ret = pd.Series(index=mrefs, data=kmers, name="kmer")
@@ -386,10 +387,10 @@ class RefIndex:
 
         if load_kmers:
             if ref_coord.stranded:
-                kmers = self.mrefs_to_kmers(mrefs, is_rna, kmer_trim)
+                kmers = self.mrefs_to_kmers(rid, mrefs, is_rna, kmer_trim)
             else:
                 kmers = tuple(( 
-                    self.mrefs_to_kmers(m, is_rna, kmer_trim) for m in mrefs
+                    self.mrefs_to_kmers(rid, m, is_rna, kmer_trim) for m in mrefs
                 ))
         else:
             kmers = None
@@ -397,7 +398,7 @@ class RefIndex:
 
         fwd = ref_coord.fwd if ref_coord.stranded else None 
 
-        pac_shift = self.get_pac_shift(ref_coord.name)
+        pac_shift = self.get_pac_offset(ref_coord.name)
 
         return CoordSpace(ref_coord.name, refs, mrefs, fwd, kmers, pac_shift)
 

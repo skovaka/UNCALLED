@@ -564,7 +564,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
     static const KmerType K = ModelType::KMER_LEN;
 
     const ModelType &model;
-    std::string name;
+    i32 ref_id;
     IntervalIndex<i64> coords;
     bool is_fwd; //TODO infer from mref coords
 
@@ -579,12 +579,13 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
 
     Sequence(const ModelType &model_, size_t length) : 
         model(model_), 
+        ref_id(-1),
         coords({{0,static_cast<i64>(length)}}), 
         kmer(length), current(length) {}
 
-    Sequence(const ModelType &model_, const std::string &name_, IntervalIndex<i64> coords_, bool is_fwd_) : 
+    Sequence(const ModelType &model_, i32 ref_id_, IntervalIndex<i64> coords_, bool is_fwd_) : 
         model(model_), 
-        name(name_), 
+        ref_id(ref_id_), 
         coords(coords_),
         is_fwd(is_fwd_), 
         kmer(coords.length), 
@@ -645,6 +646,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         c.def(py::init<const ModelType &, const std::string &>());
         c.def("__len__", &Sequence::size);
         c.def_readonly("coords", &Sequence::coords);
+        c.def_readonly("ref_id", &Sequence::ref_id);
         c.def_readonly("kmer", &Sequence::kmer);
         c.def_readonly("current", &Sequence::current);
         c.def("kmer_to_str", py::vectorize(&Sequence::kmer_to_str));

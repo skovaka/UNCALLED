@@ -157,8 +157,8 @@ class BAM(TrackIO):
         self.bam.set_tag(CURS_TAG, array.array("H", dc))
         self.bam.set_tag(STDS_TAG, array.array("H", ds))
 
-        if not self.bam.has_tag("f5"):
-            self.bam.set_tag("f5", os.path.basename(self.prev_fast5[0]))
+        #if not self.bam.has_tag("f5"):
+        #    self.bam.set_tag("f5", os.path.basename(self.prev_fast5[0]))
 
         if self.prms.buffered:
             self.out_buffer.append(self.bam.to_string())
@@ -275,7 +275,7 @@ class BAM(TrackIO):
                 continue
             self.bam = sam
 
-            seq = self.tracks.get_seq(moves.index)
+            seq = self.tracks.get_seq(sam.reference_id, moves.index)
             aln = Alignment(read, seq, sam)
             aln.set_moves(moves)
             
@@ -324,9 +324,8 @@ class BAM(TrackIO):
         #    samp_end -= np.sum(length[en:])
         #    length = length[st:en]
 
-        pacs = self.tracks.index.mref_to_pac(icoords.expand())
 
-        seq = self.tracks.get_seq(icoords)
+        seq = self.tracks.get_seq(sam.reference_id, icoords)
         read = self.tracks.read_index.get(sam.query_name, None)
         aln = Alignment(sam.query_name if read is None else read, seq, sam)
 
@@ -379,7 +378,7 @@ class BAM(TrackIO):
 
         layers = aln.to_pandas()
         idx = pd.MultiIndex.from_product(
-                [[self.in_id], [fwd], self.tracks.index.mref_to_pac(layers.index), [self.aln_id_in]],
+                [[self.in_id], [fwd], self.tracks.index.mref_to_pac(sam.reference_id, layers.index), [self.aln_id_in]],
                 names=["track_id", "fwd", "pac", "aln_id"])
         layers = layers.set_index(idx).sort_index()
 

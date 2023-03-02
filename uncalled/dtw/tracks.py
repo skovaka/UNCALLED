@@ -395,11 +395,11 @@ class Tracks:
     def set_read(self, read):
         self.output.read = read
 
-    def get_seq(self, coords):
-        return self.index.instance.get_kmers(self.model.instance, coords, self.conf.is_rna)
+    def get_seq(self, ref_id, coords):
+        return self.index.instance.get_kmers(self.model.instance, ref_id, coords, self.conf.is_rna)
 
-    def init_alignment(self, read, coords, sam=None):
-        seq = self.index.instance.get_kmers(self.model.instance, coords, self.conf.is_rna)
+    def init_alignment(self, read, ref_id, coords, sam=None):
+        seq = self.index.instance.get_kmers(self.model.instance, ref_id, coords, self.conf.is_rna)
         return Alignment(read, seq, sam)
 
     def init_alignment_old(self, read_id, fast5, coords, layers={}, read=None, bam=None, track_name=None):

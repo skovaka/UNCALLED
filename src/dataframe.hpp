@@ -221,24 +221,15 @@ class IntervalIndex {
 
     IntervalIndex() {}
 
-    IntervalIndex(std::vector<std::pair<T,T>> coords_, bool sorted=false)
-            : coords(coords_.begin(), coords_.end()) {
-
-        if (!sorted) {
-            std::sort(coords.begin(), coords.end());
-        }
-
-        starts.reserve(coords.size());
-        length = 0;
-        for (auto c : coords) {
-            if (c.is_valid()) {
-                starts.push_back(length);
-                length += c.length();
-            }
-        }
+    IntervalIndex(std::vector<std::pair<T,T>> coords_) {
+        init_coords(coords_);
     }
 
     IntervalIndex(py::array_t<i32> starts_py, py::array_t<i32> lengths_py) {
+        init_coords(starts_py, lengths_py);
+    }
+
+    void init_coords(py::array_t<i32> starts_py, py::array_t<i32> lengths_py) {
         PyArray<i32> starts_(starts_py), lengths_(lengths_py);
         if (starts_.size() != lengths_.size()) {
             throw std::runtime_error("Interval arrays must be same length");
@@ -253,7 +244,12 @@ class IntervalIndex {
     }
 
     void init_coords(std::vector<std::pair<T,T>> coords_) {
-        //TODO
+        coords.reserve(coords_.size());
+        starts.reserve(coords_.size());
+        length = 0;
+        for (auto &c : coords_) {
+            append(c.first, c.second);
+        }
     }
 
     void shift(i64 delta) {

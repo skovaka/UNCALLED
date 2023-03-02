@@ -280,9 +280,6 @@ class RefIndex {
         return -1;
     }
 
-    i32 mref_to_ref_id(i64 mref) {
-        return pac_to_ref_id(mref_to_pac(mref));
-    }
 
     i32 pac_to_ref_id(i64 pac) {
         return bns_pos2rid(bns_, pac);
@@ -290,18 +287,17 @@ class RefIndex {
 
     bool is_mref_flipped(i64 i) const {
         return i < 0;
-        //return i >= static_cast<i64>(size() / 2);
     }
 
     bool is_mref_fwd(i64 i, bool is_rna) const {
         return is_mref_flipped(i) == is_rna;
     }
 
-    i64 mref_to_pac(i64 mref) const {
+    i64 mref_to_pac(i32 ref_id, i64 mref) const {
         if (is_mref_flipped(mref)) {
-            return -mref-1;
+            mref = -mref-1;
         }
-        return mref;
+        return get_ref_offset(ref_id) + mref;
     }
 
     std::string get_ref_name(u32 rid) {
@@ -324,12 +320,11 @@ class RefIndex {
 
 
     RefCoord mrefs_to_ref_coord(i64 mref_start, i64 mref_end, bool read_fwd) const {
-
-        bool flip = mref_start >= static_cast<i32>(size() / 2);
+        bool flip = mref_start < 0;// static_cast<i32>(size() / 2);
 
         i64 pac_st; //TODO rename
         if (is_mref_flipped(mref_start)) { 
-            pac_st = mref_to_pac(mref_end);
+            pac_st = mref_to_pac(0, mref_end)+1;
         } else {
             pac_st = mref_start;
         }
@@ -368,11 +363,11 @@ class RefIndex {
     } 
 
     //TODO overload same function below
-    i64 get_pac_shift(const std::string &ref_name) {
-        return get_ref_shift(get_ref_id(ref_name));
+    i64 get_pac_offset(const std::string &ref_name) {
+        return get_ref_offset(get_ref_id(ref_name));
     }
 
-    i64 get_ref_shift(i32 ref_id) {
+    i64 get_ref_offset(i32 ref_id) const {
         return bns_->anns[ref_id].offset;
     }
 
@@ -381,7 +376,7 @@ class RefIndex {
     }
 
     std::pair<i64, i64> ref_to_mref(const std::string &ref_name, i64 st, i64 en, bool is_fwd, bool is_rna) {
-        auto shift = get_pac_shift(ref_name);
+        auto shift = get_pac_offset(ref_name);
 
         i64 pac_st = shift+st, 
             pac_en = shift+en;
@@ -392,24 +387,14 @@ class RefIndex {
         return {-pac_en-1, -pac_st-1};
     }
 
-    i64 ref_to_mref(i32 rid, i64 ref_coord, bool is_fwd, bool is_rna) {
-        auto shift = bns_->anns[rid].offset;
-        auto pac_coord = shift+ref_coord;
-        auto flip = is_fwd == is_rna;
-
-        if (!flip) return pac_coord;
-        return -pac_coord - 1;
+    i64 ref_to_mref(i32 rid, i64 ref, bool is_fwd, bool is_rna) {
+        if (is_fwd == is_rna) return -ref-1;
+        return ref;
     }
 
     i64 mref_to_ref(i64 mref) {
-        i64 pac;
-        if (is_mref_flipped(mref)) {
-            pac = -mref-1;
-        } else {
-            pac = mref;
-        }
-        i32 rid = bns_pos2rid(bns_, pac);
-        return pac - bns_->anns[rid].offset;
+        if (mref < 0) return -mref-1;
+        return mref;
     }
 
     i64 pac_to_ref(i64 pac) {
@@ -444,18 +429,18 @@ class RefIndex {
         return kmer;
     }
 
-    std::vector<KmerType> get_kmers(std::vector<std::pair<i64, i64>> pac_blocks, bool rev, bool comp) {
-        size_t len = 0;
-        for (auto &b : pac_blocks) {
-            len += b.second - b.first;
-        }
-        len -= K - 1;
-        std::vector<KmerType> kmers(len);
-        for (auto &b : pac_blocks) {
-            get_kmers(b.first, b.second, rev, comp, kmers);
-        }
-        return kmers;
-    }
+    //std::vector<KmerType> get_kmers(std::vector<std::pair<i64, i64>> pac_blocks, bool rev, bool comp) {
+    //    size_t len = 0;
+    //    for (auto &b : pac_blocks) {
+    //        len += b.second - b.first;
+    //    }
+    //    len -= K - 1;
+    //    std::vector<KmerType> kmers(len);
+    //    for (auto &b : pac_blocks) {
+    //        get_kmers(b.first, b.second, rev, comp, kmers);
+    //    }
+    //    return kmers;
+    //}
 
     std::vector<KmerType> get_kmers(i64 pac_start, i64 pac_end, bool rev, bool comp) {
         std::vector<KmerType> kmers(pac_end-pac_start-K+1);
@@ -499,172 +484,62 @@ class RefIndex {
         return get_kmers(pac_start, pac_end, rev, comp);
     }
 
-    std::vector<KmerType> get_kmers(std::vector<std::pair<i64, i64>> mref_blocks, bool is_rna) {
-        size_t len = 0;
-        for (auto &b : mref_blocks) {
-            len += b.second - b.first;
-        }
-        len -= K - 1;
-        std::vector<KmerType> kmers(len);
-        size_t i = 0;
-        for (auto &b : mref_blocks) {
-            i = get_kmers(b.first, b.second, is_rna, kmers, i);
-        }
-        return kmers;
-    }
+    //std::vector<KmerType> get_kmers(i32 ref_id, std::vector<std::pair<i64, i64>> mref_blocks, bool is_rna) {
+    //    size_t len = 0;
+    //    for (auto &b : mref_blocks) {
+    //        len += b.second - b.first;
+    //    }
+    //    len -= K - 1;
+    //    std::vector<KmerType> kmers(len);
+    //    size_t i = 0;
+    //    for (auto &b : mref_blocks) {
+    //        i = get_kmers(ref_id, b.first, b.second, is_rna, kmers, i);
+    //    }
+    //    return kmers;
+    //}
 
-    Sequence<ModelType> get_kmers(ModelType &model, IntervalIndex<i64> &mref_blocks, bool is_rna) {
+    Sequence<ModelType> get_kmers(ModelType &model, i32 ref_id, IntervalIndex<i64> &mref_blocks, bool is_rna) {
         auto mref_end = mref_blocks.coords.back().end-1;  
         bool rev = is_mref_flipped(mref_end);
         auto seq_idx = mref_blocks;//.islice(trim_st, mref_blocks.length-trim_en);
         
-        auto rid = mref_to_ref_id(mref_end);
-        auto name = get_ref_name(rid);
-        Sequence<ModelType> seq(model, name, seq_idx, rev != is_rna);
+        Sequence<ModelType> seq(model, ref_id, seq_idx, rev != is_rna);
         auto lpad = (K - 1) / 2, rpad = K - lpad - 1;
         size_t k = 0;
         for (size_t i = 0; i < mref_blocks.interval_count()-1; i++) {
             auto &c = mref_blocks.coords[i];
-            k = get_kmers(c.start-lpad, c.end, is_rna, seq.kmer, k);
+            k = get_kmers(ref_id, c.start-lpad, c.end, is_rna, seq.kmer, k);
             lpad = 0;
         }
         auto &c = mref_blocks.coords.back();
-        get_kmers(c.start-lpad, c.end+rpad, is_rna, seq.kmer, k);
+        get_kmers(ref_id, c.start-lpad, c.end+rpad, is_rna, seq.kmer, k);
 
         seq.init_current();
         return seq;
     }
     
-    std::vector<KmerType> get_kmers(i64 mref_start, i64 mref_end, bool is_rna) {
+    std::vector<KmerType> get_kmers(i32 ref_id, i64 mref_start, i64 mref_end, bool is_rna) {
         std::vector<KmerType> kmers(mref_end-mref_start - K + 1);
-        get_kmers(mref_start, mref_end, is_rna, kmers, 0);
+        get_kmers(ref_id, mref_start, mref_end, is_rna, kmers, 0);
         return kmers;
     }
 
     template <typename Container>
-    size_t get_kmers(i64 mref_start, i64 mref_end, bool is_rna, Container &kmers, size_t k) {
+    size_t get_kmers(i32 ref_id, i64 mref_start, i64 mref_end, bool is_rna, Container &kmers, size_t k) {
         bool rev = is_mref_flipped(mref_end-1);
         bool comp = rev != is_rna;
+        i64 pac_start = mref_to_pac(ref_id, mref_start),
+            pac_end = mref_to_pac(ref_id, mref_end);
+
         if (rev) {
-            return get_kmers(-mref_end-1, -mref_start-1, true, comp, kmers, k);
+            return get_kmers(pac_end+1, pac_start+1, true, comp, kmers, k);
         } else {
-            return get_kmers(mref_start, mref_end, false, comp, kmers, k);
+            return get_kmers(pac_start, pac_end, false, comp, kmers, k);
         }
     }
 
     using FwdRevCoords = std::pair< std::vector<i64>, std::vector<i64> >;
 
-    //Returns all FM index coordinates which translate into reference 
-    //coordinates that overlap the specified range
-    FwdRevCoords range_to_fms(std::string ref_name, i64 start, i64 end) {
-
-        std::vector<i64> fwd_fms, rev_fms;
-
-        auto ref_len = static_cast<i64>(size() / 2);
-
-        auto slop = static_cast<int>( ceil(log(ref_len) / log(4)) );
-
-        auto pac_min = ref_to_pac(ref_name, start),
-             pac_max = pac_min + (end - start) - 1;
-
-        i64 fwd_st;
-        if (ref_len - pac_max > slop) {
-            fwd_st = pac_max + slop;
-        } else {
-            fwd_st = ref_len - 1;
-        }
-
-        Range r = get_base_range(get_base(fwd_st));
-        for (auto i = fwd_st-1; i >= pac_max && i <= fwd_st; i--) {
-            r = get_neighbor(r, get_base(i));
-        }
-
-        for (auto f = r.start_; f <= r.end_; f++) {
-            auto loc = fm_to_pac(f);
-            if (loc == pac_max) {
-                r = Range(f,f);
-                break;
-            }
-        }
-
-        fwd_fms.push_back(r.start_);
-        for (auto i = pac_max-1; i >= pac_min && i < pac_max; i--) {
-            r = get_neighbor(r, get_base(i));
-            fwd_fms.push_back(r.start_);
-        }
-
-        i64 rev_st;
-        if (pac_min > slop) {
-            rev_st = pac_min - slop;
-        } else {
-            rev_st = 0;
-        }
-
-        r = get_base_range(BASE_COMP_B[get_base(rev_st)]);
-        for (i64 i = rev_st+1; i <= pac_min; i++) {
-            r = get_neighbor(r, BASE_COMP_B[get_base(i)]);
-        }
-
-        for (auto f = r.start_; f <= r.end_; f++) {
-            auto loc = fm_to_mref(f);
-            if (loc == pac_min) {
-                r = Range(f,f);
-                break;
-            }
-        }
-
-        rev_fms.push_back(r.start_);
-        for (auto i = pac_min+1; i <= pac_max; i++) {
-            r = get_neighbor(r, BASE_COMP_B[get_base(i)]);
-            rev_fms.push_back(r.start_);
-        }
-
-        return FwdRevCoords(rev_fms, fwd_fms);
-    }
-
-    class KmerSlice {
-        public:
-        KmerSlice(const u8 *pacseq, i64 st, i64 en) :
-            pacseq_(pacseq),
-            st_(st),
-            en_(en),
-            size_(en_-st_-K) {}
-
-        KmerType operator[](i64 i) {
-            i += st_;
-            auto pst = i >> 2;
-            u32 comb = *((u32 *) &pacseq_[pst]);
-            auto shift = (i & 3) >> 1;
-            return (KmerType) ( (comb >> shift) & ModelType::KMER_MASK );
-        }
-
-        i64 size() {
-            return size_;
-        }
-
-        std::string to_str() {
-            std::string str(size_, 'N');
-            auto pst = st_ >> 2,
-                pen = ((en_) >> 2)+1;
-            u8 bst = (st_&3), ben;
-            auto i = 0;
-            for (auto j = pst; j < pen; j++) {
-                ben = j == pen-1 ? (en_&3) : 4;
-                for (u8 k = bst; k < ben; k++) {
-                    str[i++] = BASE_CHARS[(pacseq_[j] >> ((k^3) << 1) ) & 3];
-                }
-                bst = 0;
-            }
-            return str;
-        }
-
-        private:
-        const u8 *pacseq_;
-        i32 st_, en_, pst_, pen_, bst_, ben_,
-            size_;
-    };
-
-    //KmerSlice get_kmers
 
     #ifdef PYBIND
 
@@ -700,13 +575,11 @@ class RefIndex {
         PY_BWA_INDEX_METH(get_sa_loc);
         PY_BWA_INDEX_METH(get_ref_name);
         PY_BWA_INDEX_METH(get_ref_len);
-        PY_BWA_INDEX_METH(get_pac_shift);
-        PY_BWA_INDEX_METH(range_to_fms);
+        PY_BWA_INDEX_METH(get_pac_offset);
         PY_BWA_INDEX_METH(is_mref_fwd);
         PY_BWA_INDEX_METH(is_mref_flipped);
         PY_BWA_INDEX_VEC(get_base);
         c.def("pac_to_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::pac_to_ref_id) );
-        c.def("mref_to_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::mref_to_ref_id) );
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(const std::string &)> (&RefIndex::get_ref_id));
         //c.def("get_kmers_new", &RefIndex::get_kmers_new);
         c.def("ref_to_mref", static_cast<std::pair<i64, i64> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::ref_to_mref));
@@ -718,25 +591,25 @@ class RefIndex {
             static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64, bool, bool)> (&RefIndex::get_kmers),
             py::arg("pac_start"), py::arg("pac_end"), py::arg("rev"), py::arg("comp"));
 
-        c.def("get_kmers", 
-            static_cast< std::vector<KmerType> (RefIndex::*)(std::vector<std::pair<i64, i64>>, bool, bool)> (&RefIndex::get_kmers),
-            py::arg("pac_blocks"), py::arg("rev"), py::arg("comp"));
+        //c.def("get_kmers", 
+        //    static_cast< std::vector<KmerType> (RefIndex::*)(std::vector<std::pair<i64, i64>>, bool, bool)> (&RefIndex::get_kmers),
+        //    py::arg("pac_blocks"), py::arg("rev"), py::arg("comp"));
+
+        //c.def("get_kmers", 
+        //    static_cast< std::vector<KmerType> (RefIndex::*)(i32, std::vector<std::pair<i64, i64>>, bool)> (&RefIndex::get_kmers),
+        //    py::arg("ref_id"), py::arg("mref_blocks"), py::arg("is_rna"));
 
         c.def("get_kmers", 
-            static_cast< std::vector<KmerType> (RefIndex::*)(std::vector<std::pair<i64, i64>>, bool)> (&RefIndex::get_kmers),
-            py::arg("mref_blocks"), py::arg("is_rna"));
-
-        c.def("get_kmers", 
-            static_cast< Sequence<ModelType> (RefIndex::*)(ModelType&, IntervalIndex<i64>&, bool)> (&RefIndex::get_kmers),
-            py::arg("model"), py::arg("mref_blocks"), py::arg("is_rna"));
+            static_cast< Sequence<ModelType> (RefIndex::*)(ModelType&, i32, IntervalIndex<i64>&, bool)> (&RefIndex::get_kmers),
+            py::arg("model"), py::arg("ref_id"), py::arg("mref_blocks"), py::arg("is_rna"));
 
         c.def("get_kmers", 
             static_cast< std::vector<KmerType> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::get_kmers),
 
             py::arg("name"), py::arg("start"), py::arg("end"), py::arg("rev")=false, py::arg("comp")=false);
         c.def("get_kmers", 
-            static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64, bool)> (&RefIndex::get_kmers),
-            py::arg("miref_start"), py::arg("miref_end"), py::arg("is_rna"));
+            static_cast< std::vector<KmerType> (RefIndex::*)(i32, i64, i64, bool)> (&RefIndex::get_kmers),
+            py::arg("ref_id"), py::arg("miref_start"), py::arg("miref_end"), py::arg("is_rna"));
 
     }
 
