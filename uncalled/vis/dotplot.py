@@ -27,8 +27,9 @@ class Dotplot:
 
     REQ_LAYERS = [
         "start", "length", "middle", 
-        "current", "dwell", "kmer", "base", 
-        "moves.middle"
+        "current", "dwell", "seq.kmer", "base", 
+        "moves.middle", "seq.current",
+        "start_sec", "dwell_sec"
     ]
 
     def __init__(self, *args, **kwargs):
@@ -96,9 +97,13 @@ class Dotplot:
         tracks_filter,colors_filter = zip(*[(t,c) for t,c in zip(tracks.alns,self.conf.vis.track_colors) if t.name != self.prms.moves_track])
         #colors_filter = [t for t in tracks if t.name != self.prms.moves_track]
 
+        print("sigplot")
+
         Sigplot(tracks, conf=self.conf).plot(fig)
 
-        hover_layers = [("dtw", "middle"),("dtw","kmer"),("dtw","current"),("dtw","dwell")] + self.layers
+        print("plotted")
+
+        hover_layers = [("dtw", "middle"),("seq","kmer"),("dtw","current"),("dtw","dwell")] + self.layers
         #hover_layers += (l for l in self.prms.layers if l not in {"current","dwell"})
         hover_data = dict()
 
@@ -108,6 +113,8 @@ class Dotplot:
         fwd = True
 
         for i,track in enumerate(tracks.alns):
+
+            print(track.layers)
 
             track_hover = list()
 
@@ -224,6 +231,8 @@ class Dotplot:
         if len(hover_data) > 0:
             hover_data = pd.concat(hover_data, axis=1)
             hover_coords = hover_data.xs("middle", axis=1, level=2).mean(axis=1)
+
+            print(hover_data)
 
             hover_kmers = model.kmer_to_str(
                 hover_data.xs("kmer", 1, 2)

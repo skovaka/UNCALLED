@@ -45,11 +45,11 @@ class Sigplot:
 
             
     def _plot_bases(self, fig, dtw, model, ymin, ymax, row, col):
-        bases = model.kmer_base(dtw["kmer"], 2)
+        bases = model.kmer_base(dtw["seq","kmer"], 2)
         for base, color in enumerate(self.conf.vis.base_colors):
             base_dtw = dtw[bases == base]
-            starts = base_dtw['start']
-            ends = starts + base_dtw['length'] - (1.0 / self.conf.read_buffer.sample_rate)
+            starts = base_dtw["dtw", "start_sec"]
+            ends = starts + base_dtw["dtw", "dwell_sec"] - (1.0 / self.conf.read_buffer.sample_rate)
             nones = [None]*len(base_dtw)
 
             ys = [ymax,ymax,ymin,ymin,None]*len(base_dtw)
@@ -83,26 +83,28 @@ class Sigplot:
 
 
             dtws = list()
+            seqs = list()
             
             for aln_id,aln in alns.iterrows():
                 dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln_id")
-                dtw["model_current"] = track.model[dtw["kmer"].dropna()]
+                seq = track.layers.loc[(slice(None),aln_id),"seq"].droplevel("aln_id")
+                #seq["model_current"] = track.model[seq["kmer"].dropna()]
 
-
-                dtws.append(dtw)
+                #dtws.append(dtw)
+                seqs.append(track.layers.loc[(slice(None),aln_id),:].droplevel("aln_id"))
 
                 max_i = dtw["start"].argmax()
                 samp_min = min(samp_min, dtw["start"].min())
                 samp_max = max(samp_max, dtw["start"].iloc[max_i] + dtw["length"].iloc[max_i])
 
-                current_min = min(current_min, dtw["model_current"].min())
-                current_max = max(current_max, dtw["model_current"].max())
+                current_min = min(current_min, seq["current"].min())
+                current_max = max(current_max, seq["current"].max())
 
-                dtw["start"] /=  self.conf.read_buffer.sample_rate
-                dtw["length"] /=  self.conf.read_buffer.sample_rate
+                #dtw["start"] /=  self.conf.read_buffer.sample_rate
+                #dtw["length"] /=  self.conf.read_buffer.sample_rate
 
-            if len(dtws) > 0:
-                track_dtws.append(pd.concat(dtws).sort_index())
+            if len(seqs) > 0:
+                track_dtws.append(pd.concat(seqs).sort_index())
 
         read = self.sigproc.process(self.tracks.read_index[read_id], True)
         signal = read.get_norm_signal(int(samp_min), int(samp_max))
@@ -149,17 +151,17 @@ class Sigplot:
             fig.add_trace(go.Scattergl(
                 name = "Event Means",
                 mode = "lines",
-                x=read.df["start"], y=read.df["norm_sig"],
+                x=read.df["start_sec"], y=read.df["norm_sig"],
                 line={"color":"black", "width":2, "shape" : "hv"},
             ), row=row, col=col)
 
         if not self.prms.no_model:
             for dtw,color,kw in zip(track_dtws, colors, dtw_kws):
-                dtw = dtw.sort_values("start")
+                dtw = dtw.sort_values(("dtw","start_sec"))
                 fig.add_trace(go.Scattergl(
                     name = "Model Current",
                     mode = "lines",
-                    x=dtw["start"], y=dtw["model_current"],
+                    x=dtw["dtw", "start_sec"], y=dtw["seq", "current"],
                     line={"color":color, "width":2.5, "shape" : "hv"},
                     **kw
                 ), row=row, col=col)

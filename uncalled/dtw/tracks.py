@@ -10,7 +10,7 @@ import scipy
 from .io import SQL, TSV, Eventalign, Tombo, BAM, ModelTrainer, INPUTS, OUTPUTS, INPUT_PARAMS, OUTPUT_PARAMS
 from .aln_track import AlnTrack
 from .layers import LAYER_META, parse_layers
-from ..dfs import Alignment
+from ..aln import Alignment, Sequence, AlnDF
 from ..index import load_index, RefCoord, str_to_coord
 from ..pore_model import PoreModel, WORKFLOW_PRESETS
 from ..read_index import ReadIndex, Fast5Reader, Slow5Reader
@@ -112,6 +112,8 @@ class Tracks:
         self.index = load_index(self.model.K, self.prms.index_prefix, kmer_shift=self.model.PRMS.shift)
 
         self.coords = self._ref_bounds_to_coords(self.prms.ref_bounds)
+
+        AlnDF.sample_rate = self.conf.read_buffer.sample_rate
 
         #if self.coords is not None and  len(self._aln_track_ids) > 0:
         #    self.load()
@@ -382,72 +384,21 @@ class Tracks:
         self.new_layers.add(group)
 
 
-    #def write_alignment(self, track_name=None):
-    def write_alignment(self, aln):#, sam, fast5):
+    def init_alignment(self, read, ref_id, coords, sam=None):
+        seq = self.index.instance.get_kmers(self.model.instance, ref_id, coords, self.conf.is_rna)
+        seq = Sequence(seq, self.index.get_ref_name(ref_id), self.index.get_pac_offset(ref_id))
+        return Alignment(read, seq, sam)
+
+    def write_alignment(self, aln):
         if self.output is not None:
             out = self.output
         else:
             out = self.inputs[0]
 
-        #aln_id = self.output.init_alignment(aln.read_id, aln.read.filename, None, bam=aln.sam)
         out.write_alignment(aln)
 
     def set_read(self, read):
         self.output.read = read
-
-    def get_seq(self, ref_id, coords):
-        return self.index.instance.get_kmers(self.model.instance, ref_id, coords, self.conf.is_rna)
-
-    def init_alignment(self, read, ref_id, coords, sam=None):
-        seq = self.index.instance.get_kmers(self.model.instance, ref_id, coords, self.conf.is_rna)
-        return Alignment(read, seq, sam)
-
-    def init_alignment_old(self, read_id, fast5, coords, layers={}, read=None, bam=None, track_name=None):
-        track = self._track_or_default(track_name)
-        self.new_alignment = True
-        self.new_layers = set()
-
-        aln_id = self.output.init_alignment(read_id, fast5, read=read, bam=bam)
-
-        if len(layers) > 0:
-            starts = None
-            for group,vals in layers.items():
-                if "start" in vals.columns:
-                    starts = vals["start"]
-                    break
-
-            if starts is None:
-                raise ValueError("Must initialize alignment from DataFrame with start column")
-
-            samp_start = starts.min()
-            samp_end = starts.max()
-        else:
-            samp_start = samp_end = None
-
-        track.alignments = pd.DataFrame({
-                "id" : [aln_id],
-                "track_id" : [track.id],
-                "read_id" : [read_id],
-                "ref_name" : [coords.ref_name],
-                "ref_start" : [coords.refs.start],
-                "ref_end" : [coords.refs.stop],
-                "fwd" :     [coords.fwd],
-                "samp_start" : [samp_start],
-                "samp_end" : [samp_end],
-                "tags" : [""]}).set_index("id")
-        
-
-        track.layers = None
-
-        track.coords = coords
-
-        for group,vals in layers.items():
-            if group == "dtw":
-                self.write_dtw_events(vals, track.name, aln_id)
-            else:
-                self.add_layers(group, vals, track.name)
-
-        return aln_id, coords
 
     @property
     def input_count(self):

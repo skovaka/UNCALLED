@@ -11,6 +11,7 @@ EXTRA_FNS = {
 }
 
 EXTRA_COLS = pd.Index(EXTRA_FNS.keys())
+INDEX_COLS = [("seq","name"),("seq","ref"),("seq","strand")]
 
 class TSV(TrackIO):
     FORMAT = "tsv"
@@ -26,7 +27,7 @@ class TSV(TrackIO):
     def init_write_mode(self):
         TrackIO.init_write_mode(self)
 
-        layer_cols = pd.Index(self.prms.tsv_cols).difference(EXTRA_COLS)
+        layer_cols = pd.Index(INDEX_COLS+self.prms.tsv_cols).difference(EXTRA_COLS)
         self.extras = EXTRA_COLS.intersection(self.prms.tsv_cols)
 
         layers = list(parse_layers(layer_cols, add_deps=False))
@@ -40,14 +41,11 @@ class TSV(TrackIO):
         raise RuntimeError("Reading from TSV not yet supported")
 
     def write_alignment(self, aln):
-
         ref_name = self.tracks.index.get_ref_name(aln.seq.ref_id)
 
-        df = aln.to_pandas("ref", self.columns)
-        idx = pd.MultiIndex.from_product(
-                [[ref_name], df.index, ["+" if aln.is_fwd else "-"], [self.aln_id]],
-                names=[("ref","name"),("ref","coord"),("ref","strand"),"aln_id"])
-        df = df.set_index(idx).sort_index()
+        #TODO use this in browser, eventalign
+        df = aln.to_pandas(INDEX_COLS+self.prms.tsv_cols).set_index(INDEX_COLS) 
+        df = df.sort_index()
 
         #track.calc_layers(self.columns)
         #df = track.layers_desc_index#.reset_index()

@@ -581,6 +581,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         model(model_), 
         ref_id(-1),
         coords({{0,static_cast<i64>(length)}}), 
+        is_fwd(true),
         kmer(length), current(length) {}
 
     Sequence(const ModelType &model_, i32 ref_id_, IntervalIndex<i64> coords_, bool is_fwd_) : 
@@ -649,6 +650,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         c.def_readonly("ref_id", &Sequence::ref_id);
         c.def_readonly("kmer", &Sequence::kmer);
         c.def_readonly("current", &Sequence::current);
+        c.def_readonly("is_fwd", &Sequence::is_fwd);
         c.def("kmer_to_str", py::vectorize(&Sequence::kmer_to_str));
         c.def("get_kmer", py::vectorize(&Sequence::get_kmer));
         c.def("get_current", py::vectorize(&Sequence::get_current));

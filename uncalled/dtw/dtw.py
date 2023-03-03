@@ -132,12 +132,7 @@ class GuidedDTW:
         self.model = tracks.model
 
         self.moves = self.aln.moves #moves.aln
-
-        #TODO change to tracks.init_alignment(read_id, ref_id, coords)
-        #returns python Alignment object (wrapper for AlignmentK*)
-        #also store alignment in tracks output buffer
-
-        self.seq = tracks.get_seq(sam.reference_id, self.moves.index)
+        self.seq = self.aln.seq
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:

@@ -6,16 +6,22 @@ _Layer = namedtuple("_Layer", ["dtype", "label", "fn", "deps"], defaults=[None,N
 
 #TODO probably move this to AlnTrack
 LAYERS = {
-    "ref" : {
+    "seq" : {
         "name" : _Layer(str, "Reference Name",
             lambda track: [track.coords.ref_name]*len(track.layers)),
-        "coord" : _Layer("Int64", "Reference Coordinate", 
+        "ref" : _Layer("Int64", "Reference Coordinate", 
             lambda track: track.coords.pac_to_ref(track.layer_pacs)),
         "strand" : _Layer(str, "Strand",
+            lambda track: track.layer_strands),
+        "kmer" : _Layer(str, "Kmer",
+            lambda track: track.layer_strands),
+        "current" : _Layer(np.float32, "Model Current",
             lambda track: track.layer_strands),
     }, "dtw" : {
         "start" : _Layer("Int32", "Sample Start"),
         "length" : _Layer("Int32", "Sample Length"),
+        "start_sec" : _Layer(np.float32, "Time (s)"),
+        "dwell_sec" : _Layer(np.float32, "Dwell (s)"),
         "current" : _Layer(np.float32, "Current (pA)"),
         "current_sd" : _Layer(np.float32, "Stdv (pA)"),
         "kmer" : _Layer("UInt32", "Reference k-mer"),
@@ -48,6 +54,8 @@ LAYERS = {
     }, "moves" : {
         "start" : _Layer("Int32", "BC Sample Start"),
         "length" : _Layer("Int32", "BC Sample Length"),
+        "start_sec" : _Layer(np.float32, "Time (s)"),
+        "dwell_sec" : _Layer(np.float32, "Dwell (s)"),
         "end" : _Layer("Int32", "Sample End",  
             lambda track: track.layers["moves","start"] + track.layers["moves","length"],
             [("moves", "start"), ("moves", "length")]),

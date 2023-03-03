@@ -293,11 +293,11 @@ class RefIndex {
         return is_mref_flipped(i) == is_rna;
     }
 
-    i64 mref_to_pac(i32 ref_id, i64 mref) const {
+    i64 mref_to_pac(i32 ref_id, i64 mref) {
         if (is_mref_flipped(mref)) {
             mref = -mref-1;
         }
-        return get_ref_offset(ref_id) + mref;
+        return get_pac_offset(ref_id) + mref;
     }
 
     std::string get_ref_name(u32 rid) {
@@ -319,7 +319,7 @@ class RefIndex {
     }
 
 
-    RefCoord mrefs_to_ref_coord(i64 mref_start, i64 mref_end, bool read_fwd) const {
+    RefCoord mrefs_to_ref_coord(i64 mref_start, i64 mref_end, bool read_fwd) {
         bool flip = mref_start < 0;// static_cast<i32>(size() / 2);
 
         i64 pac_st; //TODO rename
@@ -364,10 +364,10 @@ class RefIndex {
 
     //TODO overload same function below
     i64 get_pac_offset(const std::string &ref_name) {
-        return get_ref_offset(get_ref_id(ref_name));
+        return get_pac_offset(get_ref_id(ref_name));
     }
 
-    i64 get_ref_offset(i32 ref_id) const {
+    i64 get_pac_offset(i32 ref_id) {
         return bns_->anns[ref_id].offset;
     }
 
@@ -503,7 +503,7 @@ class RefIndex {
         bool rev = is_mref_flipped(mref_end);
         auto seq_idx = mref_blocks;//.islice(trim_st, mref_blocks.length-trim_en);
         
-        Sequence<ModelType> seq(model, ref_id, seq_idx, rev != is_rna);
+        Sequence<ModelType> seq(model, ref_id, seq_idx, rev == is_rna);
         auto lpad = (K - 1) / 2, rpad = K - lpad - 1;
         size_t k = 0;
         for (size_t i = 0; i < mref_blocks.interval_count()-1; i++) {
@@ -575,7 +575,8 @@ class RefIndex {
         PY_BWA_INDEX_METH(get_sa_loc);
         PY_BWA_INDEX_METH(get_ref_name);
         PY_BWA_INDEX_METH(get_ref_len);
-        PY_BWA_INDEX_METH(get_pac_offset);
+        c.def("get_pac_offset", static_cast<i64 (RefIndex::*)(i32)> (&RefIndex::get_pac_offset) );
+        c.def("get_pac_offset", static_cast<i64 (RefIndex::*)(const std::string &)> (&RefIndex::get_pac_offset) );
         PY_BWA_INDEX_METH(is_mref_fwd);
         PY_BWA_INDEX_METH(is_mref_flipped);
         PY_BWA_INDEX_VEC(get_base);
