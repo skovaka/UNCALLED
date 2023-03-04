@@ -309,7 +309,7 @@ class BAM(TrackIO):
 
         #TODO build whole alignment, slice after
         #if coords is not None:
-        #    clip = IntervalIndexI64([(coords.mrefs[fwd].min(), coords.mrefs[fwd].max()+1)])
+        #    clip = IntervalIndexI64([(coords.mposs[fwd].min(), coords.mposs[fwd].max()+1)])
 
         #    st = icoords.get_index(clip.start) if icoords.start < clip.start else 0
         #    en = icoords.get_index(clip.end-1)+1  if icoords.end > clip.end else icoords.length
@@ -421,7 +421,7 @@ class BAM(TrackIO):
             ret_layer_count = 0
 
             if prev_ref is not None and (next_ref != prev_ref or next_start - prev_start > 0) and len(new_alns) > self.prms.aln_chunksize:
-                #pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
+                #pac = self.tracks.index.pos_to_pac(a["ref_name"], prev_start)
 
                 aln_df = pd.concat([aln_df] + new_alns)#.sort_index()
                 layer_df = pd.concat([layer_df] + new_layers).sort_index()

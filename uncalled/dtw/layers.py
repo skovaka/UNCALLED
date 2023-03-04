@@ -9,8 +9,8 @@ LAYERS = {
     "seq" : {
         "name" : _Layer(str, "Reference Name",
             lambda track: [track.coords.ref_name]*len(track.layers)),
-        "ref" : _Layer("Int64", "Reference Coordinate", 
-            lambda track: track.coords.pac_to_ref(track.layer_pacs)),
+        "pos" : _Layer("Int64", "Reference Coordinate", 
+            lambda track: track.coords.pac_to_pos(track.layer_pacs)),
         "strand" : _Layer(str, "Strand",
             lambda track: track.layer_strands),
         "kmer" : _Layer(str, "Kmer",
@@ -37,7 +37,7 @@ LAYERS = {
         "middle" : _Layer(np.float32, "Sample Middle",  
             lambda track: track.layers["dtw","start"] + (track.layers["dtw","length"] / 2),
             [("dtw", "start"), ("dtw", "length")]),
-        "dwell" : _Layer(np.float32, "Dwell (ms)",
+        "length_ms" : _Layer(np.float32, "Dwell (ms)",
             lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate,
             [("dtw", "length")]),
         "model" : _Layer(np.float32, "Model Current",
@@ -68,7 +68,7 @@ LAYERS = {
     }, "band" : {
         "pac_end" : _Layer("Int32", "Mirror Ref. End"),
         "ref_end" : _Layer("Int32", "Mirror Ref. End",
-            lambda track: track.coords.pac_to_ref(track.layers["band","pac_end"]),
+            lambda track: track.coords.pac_to_pos(track.layers["band","pac_end"]),
             [("band", "pac_end")]),
         "sample_start" : _Layer("Int32", "Raw Sample Start"),
         "sample_end" : _Layer("Int32", "Raw Sample End"),

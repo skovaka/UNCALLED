@@ -14,7 +14,7 @@ ALN_LAYERS = {
     "current_sd" : _Layer(np.float32, "Stdv (pA)", True),
     "start_sec" : _Layer(np.float32, "Time (s)", True),
     "dwell_sec" : _Layer(np.float32, "Dwell (s)", True),
-    "dwell" : _Layer(np.float32, "Dwell (ms)", True),
+    "length_ms" : _Layer(np.float32, "Dwell (ms)", True),
     "end" : _Layer("Int32", "Sample End", False),
     "middle" : _Layer(np.float32, "Sample Middle", False),
     "model_diff" : _Layer(np.float32, "Model pA Diff.", True),
@@ -23,12 +23,12 @@ ALN_LAYERS = {
 
 LAYERS = {
     "seq" : {
-        "mref" : _Layer("Int64", "Mirror Ref.", True),
+        "mpos" : _Layer("Int64", "Mirror Ref.", True),
+        "pos" : _Layer("Int64", "Reference Coord.", False),
+        "pac" : _Layer("Int64", "Packed Ref. Coord.", False),
         "kmer" : _Layer(str, "Kmer", True),
         "current" : _Layer(str, "Model Mean (pA)", False),
         "name" : _Layer(str, "Reference Name", False),
-        "ref" : _Layer("Int64", "Reference Coord.", False),
-        "pac" : _Layer("Int64", "Packed Ref. Coord.", False),
         "fwd" : _Layer(bool, "Forward", False),
         "strand" : _Layer(str, "Strand", False),
         "base" : _Layer(str, "Base", False),
@@ -102,9 +102,9 @@ def parse_layers(layers):
     return pd.Index(ret).unique()
 
 class Sequence:
-    LAYERS = {"ref", "mref", "pac", "name", "fwd", "strand", "kmer", "current"}
+    LAYERS = {"pos", "mpos", "pac", "name", "fwd", "strand", "kmer", "current"}
     CONST_LAYERS = {"name", "fwd", "strand"}
-    DEFAULT_LAYERS = ["ref", "kmer"]
+    DEFAULT_LAYERS = ["pos", "kmer"]
 
     def __init__(self, seq, name, offset):
         self.instance = seq
@@ -116,18 +116,18 @@ class Sequence:
         return self.coords.start < 0
 
     @property
-    def mref(self):
+    def mpos(self):
         return self.coords.expand().to_numpy()
 
     @property
-    def ref(self):
+    def pos(self):
         if self.is_flipped:
-            return -self.mref-1
-        return self.mref
+            return -self.mpos-1
+        return self.mpos
 
     @property
     def pac(self):
-        return self.offset + self.ref
+        return self.offset + self.pos
 
     @property
     def strand(self):
@@ -145,7 +145,7 @@ class Sequence:
 
     def to_pandas(self, layers=None):
         if layers is None:
-            layers = ["ref", "kmer"]
+            layers = ["pos", "kmer"]
 
         cols = dict()
         for name in layers:
@@ -207,18 +207,18 @@ class AlnDF:
         return np.array(self.current) - self.seq.current
 
     @property
-    def dwell(self):
+    def length_ms(self):
         return 1000* self.length / AlnDF.sample_rate
 
     def to_pandas(self, layers=None):
         if layers is None:
             df = pd.DataFrame({
-                #"mref" : self.index.expand(),
+                #"mpos" : self.index.expand(),
                 "start" : self.samples.starts,
                 "length" : self.samples.lengths,
                 "current" : self.current,
                 "current_sd" : self.current_sd
-            })#.set_index("mref")
+            })#.set_index("mpos")
         else:
             df = pd.DataFrame({
                 l : getattr(self, l) for l in layers if hasattr(self,l)
@@ -227,7 +227,7 @@ class AlnDF:
         #idx = self.index.expand().to_numpy()
         #if index == "ref" and idx[0] < 0:
         #    idx = -idx-1
-        #elif index != "mref":
+        #elif index != "mpos":
         #    raise ValueError(f"Unknown index column: {index}")
         #df[index] = idx
 
@@ -260,7 +260,7 @@ class CmpDF:
         #idx = self.index.expand().to_numpy()
         #if index == "ref" and idx[0] < 0:
         #    idx = -idx-1
-        #elif index != "mref":
+        #elif index != "mpos":
         #    raise ValueError(f"Unknown index column: {index}")
         #df[index] = idx
 

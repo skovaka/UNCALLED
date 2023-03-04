@@ -47,13 +47,6 @@ namespace py = pybind11;
 //From submods/bwa/bwtindex.c
 #define BWA_BLOCK_SIZE 10000000
 
-struct RefLoc {
-    i32 ref_id;
-    std::string ref_name;
-    i64 ref_len, start, end;
-    bool fwd;
-};
-
 enum class Strand {fwd='+', rev='-', na='*'};
 
 class RefCoord {
@@ -257,7 +250,7 @@ class RefIndex {
         return Range(index_->L2[base], index_->L2[base+1]);
     }
 
-    i64 fm_to_mref(i64 fm) {
+    i64 fm_to_mpos(i64 fm) {
         //return size() - fm_to_pac(fm);
         return -fm_to_pac(fm)-1;
     }
@@ -285,19 +278,19 @@ class RefIndex {
         return bns_pos2rid(bns_, pac);
     }
 
-    bool is_mref_flipped(i64 i) const {
+    bool is_mpos_flipped(i64 i) const {
         return i < 0;
     }
 
-    bool is_mref_fwd(i64 i, bool is_rna) const {
-        return is_mref_flipped(i) == is_rna;
+    bool is_mpos_fwd(i64 i, bool is_rna) const {
+        return is_mpos_flipped(i) == is_rna;
     }
 
-    i64 mref_to_pac(i32 ref_id, i64 mref) {
-        if (is_mref_flipped(mref)) {
-            mref = -mref-1;
+    i64 mpos_to_pac(i32 ref_id, i64 mpos) {
+        if (is_mpos_flipped(mpos)) {
+            mpos = -mpos-1;
         }
-        return get_pac_offset(ref_id) + mref;
+        return get_pac_offset(ref_id) + mpos;
     }
 
     std::string get_ref_name(u32 rid) {
@@ -319,14 +312,14 @@ class RefIndex {
     }
 
 
-    RefCoord mrefs_to_ref_coord(i64 mref_start, i64 mref_end, bool read_fwd) {
-        bool flip = mref_start < 0;// static_cast<i32>(size() / 2);
+    RefCoord mpos_to_pos_coord(i64 mpos_start, i64 mpos_end, bool read_fwd) {
+        bool flip = mpos_start < 0;// static_cast<i32>(size() / 2);
 
         i64 pac_st; //TODO rename
-        if (is_mref_flipped(mref_start)) { 
-            pac_st = mref_to_pac(0, mref_end)+1;
+        if (is_mpos_flipped(mpos_start)) { 
+            pac_st = mpos_to_pac(0, mpos_end)+1;
         } else {
-            pac_st = mref_start;
+            pac_st = mpos_start;
         }
 
         i32 rid = bns_pos2rid(bns_, pac_st);
@@ -335,7 +328,7 @@ class RefIndex {
 
         auto name = std::string(bns_->anns[rid].name);
         auto start = pac_st - bns_->anns[rid].offset;
-        auto end = start + (mref_end-mref_start);
+        auto end = start + (mpos_end-mpos_start);
         auto strand = flip != read_fwd ? Strand::fwd : Strand::rev;
 
         return RefCoord(name,start,end,strand,rid,bns_->anns[rid].len);
@@ -353,7 +346,7 @@ class RefIndex {
         return seqs;
     }
 
-    i64 ref_to_pac(std::string name, i64 coord) {
+    i64 pos_to_pac(std::string name, i64 coord) {
         i32 i;
         for (i = 0; i < bns_->n_seqs; i++) {
             if (strcmp(name.c_str(), bns_->anns[i].name) == 0)
@@ -375,7 +368,7 @@ class RefIndex {
         return pacseq_ != NULL;
     }
 
-    std::pair<i64, i64> ref_to_mref(const std::string &ref_name, i64 st, i64 en, bool is_fwd, bool is_rna) {
+    std::pair<i64, i64> pos_to_mpos(const std::string &ref_name, i64 st, i64 en, bool is_fwd, bool is_rna) {
         auto shift = get_pac_offset(ref_name);
 
         i64 pac_st = shift+st, 
@@ -387,17 +380,17 @@ class RefIndex {
         return {-pac_en-1, -pac_st-1};
     }
 
-    i64 ref_to_mref(i32 rid, i64 ref, bool is_fwd, bool is_rna) {
+    i64 pos_to_mpos(i32 rid, i64 ref, bool is_fwd, bool is_rna) {
         if (is_fwd == is_rna) return -ref-1;
         return ref;
     }
 
-    i64 mref_to_ref(i64 mref) {
-        if (mref < 0) return -mref-1;
-        return mref;
+    i64 mpos_to_pos(i64 mpos) {
+        if (mpos < 0) return -mpos-1;
+        return mpos;
     }
 
-    i64 pac_to_ref(i64 pac) {
+    i64 pac_to_pos(i64 pac) {
         i32 rid = bns_pos2rid(bns_, pac);
         return pac - bns_->anns[rid].offset;
     }
@@ -479,57 +472,57 @@ class RefIndex {
     }
 
     std::vector<KmerType> get_kmers(const std::string &name, i64 start, i64 end, bool rev=false, bool comp=false) {
-        i64 pac_start = ref_to_pac(name, start),
-            pac_end = ref_to_pac(name, end);
+        i64 pac_start = pos_to_pac(name, start),
+            pac_end = pos_to_pac(name, end);
         return get_kmers(pac_start, pac_end, rev, comp);
     }
 
-    //std::vector<KmerType> get_kmers(i32 ref_id, std::vector<std::pair<i64, i64>> mref_blocks, bool is_rna) {
+    //std::vector<KmerType> get_kmers(i32 ref_id, std::vector<std::pair<i64, i64>> mpos_blocks, bool is_rna) {
     //    size_t len = 0;
-    //    for (auto &b : mref_blocks) {
+    //    for (auto &b : mpos_blocks) {
     //        len += b.second - b.first;
     //    }
     //    len -= K - 1;
     //    std::vector<KmerType> kmers(len);
     //    size_t i = 0;
-    //    for (auto &b : mref_blocks) {
+    //    for (auto &b : mpos_blocks) {
     //        i = get_kmers(ref_id, b.first, b.second, is_rna, kmers, i);
     //    }
     //    return kmers;
     //}
 
-    Sequence<ModelType> get_kmers(ModelType &model, i32 ref_id, IntervalIndex<i64> &mref_blocks, bool is_rna) {
-        auto mref_end = mref_blocks.coords.back().end-1;  
-        bool rev = is_mref_flipped(mref_end);
-        auto seq_idx = mref_blocks;//.islice(trim_st, mref_blocks.length-trim_en);
+    Sequence<ModelType> get_kmers(ModelType &model, i32 ref_id, IntervalIndex<i64> &mpos_blocks, bool is_rna) {
+        auto mpos_end = mpos_blocks.coords.back().end-1;  
+        bool rev = is_mpos_flipped(mpos_end);
+        auto seq_idx = mpos_blocks;//.islice(trim_st, mpos_blocks.length-trim_en);
         
         Sequence<ModelType> seq(model, ref_id, seq_idx, rev == is_rna);
         auto lpad = (K - 1) / 2, rpad = K - lpad - 1;
         size_t k = 0;
-        for (size_t i = 0; i < mref_blocks.interval_count()-1; i++) {
-            auto &c = mref_blocks.coords[i];
+        for (size_t i = 0; i < mpos_blocks.interval_count()-1; i++) {
+            auto &c = mpos_blocks.coords[i];
             k = get_kmers(ref_id, c.start-lpad, c.end, is_rna, seq.kmer, k);
             lpad = 0;
         }
-        auto &c = mref_blocks.coords.back();
+        auto &c = mpos_blocks.coords.back();
         get_kmers(ref_id, c.start-lpad, c.end+rpad, is_rna, seq.kmer, k);
 
         seq.init_current();
         return seq;
     }
     
-    std::vector<KmerType> get_kmers(i32 ref_id, i64 mref_start, i64 mref_end, bool is_rna) {
-        std::vector<KmerType> kmers(mref_end-mref_start - K + 1);
-        get_kmers(ref_id, mref_start, mref_end, is_rna, kmers, 0);
+    std::vector<KmerType> get_kmers(i32 ref_id, i64 mpos_start, i64 mpos_end, bool is_rna) {
+        std::vector<KmerType> kmers(mpos_end-mpos_start - K + 1);
+        get_kmers(ref_id, mpos_start, mpos_end, is_rna, kmers, 0);
         return kmers;
     }
 
     template <typename Container>
-    size_t get_kmers(i32 ref_id, i64 mref_start, i64 mref_end, bool is_rna, Container &kmers, size_t k) {
-        bool rev = is_mref_flipped(mref_end-1);
+    size_t get_kmers(i32 ref_id, i64 mpos_start, i64 mpos_end, bool is_rna, Container &kmers, size_t k) {
+        bool rev = is_mpos_flipped(mpos_end-1);
         bool comp = rev != is_rna;
-        i64 pac_start = mref_to_pac(ref_id, mref_start),
-            pac_end = mref_to_pac(ref_id, mref_end);
+        i64 pac_start = mpos_to_pac(ref_id, mpos_start),
+            pac_end = mpos_to_pac(ref_id, mpos_end);
 
         if (rev) {
             return get_kmers(pac_end+1, pac_start+1, true, comp, kmers, k);
@@ -564,12 +557,12 @@ class RefIndex {
         c.def("get_kmer_count", py::vectorize(&RefIndex<ModelType>::get_kmer_count));
         PY_BWA_INDEX_METH(get_base_range);
         PY_BWA_INDEX_METH(fm_to_pac);
-        PY_BWA_INDEX_METH(fm_to_mref);
-        PY_BWA_INDEX_VEC(mref_to_pac);
-        PY_BWA_INDEX_VEC(pac_to_ref);
-        PY_BWA_INDEX_METH(ref_to_pac);
+        PY_BWA_INDEX_METH(fm_to_mpos);
+        PY_BWA_INDEX_VEC(mpos_to_pac);
+        PY_BWA_INDEX_VEC(pac_to_pos);
+        PY_BWA_INDEX_METH(pos_to_pac);
         PY_BWA_INDEX_METH(size);
-        PY_BWA_INDEX_METH(mrefs_to_ref_coord);
+        PY_BWA_INDEX_METH(mpos_to_pos_coord);
         PY_BWA_INDEX_METH(get_seqs);
         PY_BWA_INDEX_METH(pacseq_loaded);
         PY_BWA_INDEX_METH(get_sa_loc);
@@ -577,15 +570,15 @@ class RefIndex {
         PY_BWA_INDEX_METH(get_ref_len);
         c.def("get_pac_offset", static_cast<i64 (RefIndex::*)(i32)> (&RefIndex::get_pac_offset) );
         c.def("get_pac_offset", static_cast<i64 (RefIndex::*)(const std::string &)> (&RefIndex::get_pac_offset) );
-        PY_BWA_INDEX_METH(is_mref_fwd);
-        PY_BWA_INDEX_METH(is_mref_flipped);
+        PY_BWA_INDEX_METH(is_mpos_fwd);
+        PY_BWA_INDEX_METH(is_mpos_flipped);
         PY_BWA_INDEX_VEC(get_base);
         c.def("pac_to_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::pac_to_ref_id) );
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(const std::string &)> (&RefIndex::get_ref_id));
         //c.def("get_kmers_new", &RefIndex::get_kmers_new);
-        c.def("ref_to_mref", static_cast<std::pair<i64, i64> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::ref_to_mref));
-        c.def("ref_to_mref", pybind11::vectorize(static_cast<i64 (RefIndex::*)(i32, i64, bool, bool)> (&RefIndex::ref_to_mref)));
-        c.def("mref_to_ref", pybind11::vectorize(&RefIndex::mref_to_ref));
+        c.def("pos_to_mpos", static_cast<std::pair<i64, i64> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::pos_to_mpos));
+        c.def("pos_to_mpos", pybind11::vectorize(static_cast<i64 (RefIndex::*)(i32, i64, bool, bool)> (&RefIndex::pos_to_mpos)));
+        c.def("mpos_to_pos", pybind11::vectorize(&RefIndex::mpos_to_pos));
         //c.def("get_kmers", static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64)> (&RefIndex::get_kmers) );
         
         c.def("get_kmers", 
@@ -598,11 +591,11 @@ class RefIndex {
 
         //c.def("get_kmers", 
         //    static_cast< std::vector<KmerType> (RefIndex::*)(i32, std::vector<std::pair<i64, i64>>, bool)> (&RefIndex::get_kmers),
-        //    py::arg("ref_id"), py::arg("mref_blocks"), py::arg("is_rna"));
+        //    py::arg("ref_id"), py::arg("mpos_blocks"), py::arg("is_rna"));
 
         c.def("get_kmers", 
             static_cast< Sequence<ModelType> (RefIndex::*)(ModelType&, i32, IntervalIndex<i64>&, bool)> (&RefIndex::get_kmers),
-            py::arg("model"), py::arg("ref_id"), py::arg("mref_blocks"), py::arg("is_rna"));
+            py::arg("model"), py::arg("ref_id"), py::arg("mpos_blocks"), py::arg("is_rna"));
 
         c.def("get_kmers", 
             static_cast< std::vector<KmerType> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::get_kmers),

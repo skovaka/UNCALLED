@@ -372,12 +372,12 @@ class Tracks:
     def add_layers(self, group, layers, track_name=None, aln_id=None, overwrite=False, read=None):
         track = self._track_or_default(track_name)
 
-        if layers.index.names[0] == "mref":
-            layers = layers.set_index(self.index.mref_to_ref(layers.index))
+        if layers.index.names[0] == "mpos":
+            layers = layers.set_index(self.index.mpos_to_pos(layers.index))
         elif layers.index.names[0] == "pac":
-            layers = layers.set_index(self.index.pac_to_ref(layers.index))
+            layers = layers.set_index(self.index.pac_to_pos(layers.index))
 
-        layers.index.names = ("ref",)
+        layers.index.names = ("pos",)
 
         track.add_layer_group(group, layers, aln_id, overwrite)
 
@@ -541,8 +541,8 @@ class Tracks:
             def _add_group(group, df):
                 df = df.reset_index(["aln_b", "group_b"])
                 df = df[df.index.get_level_values("pac").isin(track.layer_pacs)]
-                df.rename(index=track.coords.pac_to_ref, level=0, inplace=True)
-                df.index.names = ["ref", "aln_id"]
+                df.rename(index=track.coords.pac_to_pos, level=0, inplace=True)
+                df.index.names = ["pos", "aln_id"]
                 df = pd.concat({group : df.reindex(track.layers.index)}, axis=1)
                 track.layers = pd.concat([track.layers, df], axis=1).dropna(axis=1,how="all")
 
@@ -636,13 +636,13 @@ class Tracks:
             
             else:
                 groups_a, groups_b = grouped
-                refs_a = self.alns[0].layers.index.unique("ref")
-                refs_b = self.alns[1].layers.index.unique("ref")
+                refs_a = self.alns[0].layers.index.unique("pos")
+                refs_b = self.alns[1].layers.index.unique("pos")
                 refs = refs_a.intersection(refs_b)
                 cmps = {l : defaultdict(list) for l in self.prms.refstats_layers}
-                for ref in refs:
-                    track_a = groups_a.get_group(ref)
-                    track_b = groups_b.get_group(ref)
+                for pos in refs:
+                    track_a = groups_a.get_group(pos)
+                    track_b = groups_b.get_group(pos)
                     for layer in self.prms.refstats_layers:
                         a = track_a[layer]
                         b = track_b[layer]
@@ -665,7 +665,7 @@ class Tracks:
         refstats = pd.concat(refstats, axis=1, names=["track", "group", "layer", "stat"])
 
         #TODO make verbose ref indexing
-        #refstats.index = self.alns[0].coords.mref_to_ref_index(refstats.index, multi=verbose_refs)
+        #refstats.index = self.alns[0].coords.mpos_to_pos_index(refstats.index, multi=verbose_refs)
 
         self.refstats = refstats.dropna()
 
@@ -680,7 +680,7 @@ class Tracks:
             coords = self.coords
 
         def get_full_coords(pac):
-            rid = self.index.pac_to_ref_id(pac)
+            rid = self.index.pac_to_pos_id(pac)
             ref_len = self.index.get_ref_len(rid)
             ref_name = self.index.get_ref_name(rid)
             seq_refs = RefCoord(ref_name, 0, ref_len)
@@ -772,7 +772,7 @@ class Tracks:
             for fwd in strands:
 
                 seq_coords, coords = next_coords(seq_coords, chunk_pacs, fwd, chunk_hasnext[i])
-                coords.set_kmers(self.index.mrefs_to_kmers(coords.mrefs, self.conf.is_rna, False))
+                coords.set_kmers(self.index.mposs_to_kmers(coords.mposs, self.conf.is_rna, False))
 
                 #TODO probably don't need masks anymore
                 masks = [

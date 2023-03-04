@@ -130,7 +130,7 @@ class Tombo(TrackIO):
 
             #if is_rna == ref_bounds.fwd:
             refs = coords.refs[2:-2]
-            pacs = coords.pacs[2:-2] #ref_to_pac(df["position"].to_numpy()+kmer_trim[0])
+            pacs = coords.pacs[2:-2] #pos_to_pac(df["position"].to_numpy()+kmer_trim[0])
 
             kmers = coords.ref_kmers.droplevel(0).loc[refs]
 

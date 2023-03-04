@@ -94,7 +94,7 @@ struct CmpDF {
 
         size_t i = 0, j = 0, k = 0;
 
-        int ref;
+        i64 ref;
         //std::cout << "loop\n";
         //std::cout.flush();
 

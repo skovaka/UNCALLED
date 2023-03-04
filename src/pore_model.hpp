@@ -566,7 +566,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
     const ModelType &model;
     i32 ref_id;
     IntervalIndex<i64> coords;
-    bool is_fwd; //TODO infer from mref coords
+    bool is_fwd; //TODO infer from mpos coords
 
     //static constexpr typename super::NameArray names = {"ref", "start", "end"}; 
     //typename super::template ColType<0> &kmer = std::get<0>(super::data_);   
@@ -606,7 +606,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
 
     //TODO input pacseq and interval index, set from each segment
     //then RefIndex can just feed right in
-    //need to figure out mrefs, k-mer trim
+    //need to figure out mposs, k-mer trim
     
     //eventually need to write new FastaIndex based on FAI
     //then also pass file pointer and interval index, read chunks

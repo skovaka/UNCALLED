@@ -70,7 +70,7 @@ def sam_to_ref_moves(conf, ref_index, read, sam, model_name=None):
         qrys = ar[:,0]
         qrys[qrys == None] = INT32_NA
 
-    refs = ref_index.ref_to_mref(sam.reference_id, ar[:,1], is_fwd, conf.is_rna)
+    refs = ref_index.pos_to_mpos(sam.reference_id, ar[:,1], is_fwd, conf.is_rna)
     qrys = qrys.astype(np.int64)
 
     ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, True)
@@ -96,19 +96,19 @@ class Bcaln:
             return
 
         df = pd.DataFrame({
-            "mref"   : (self.aln.index.expand()),
+            "mpos"   : (self.aln.index.expand()),
             "start"  : (self.aln.samples.starts),
             "length" : (self.aln.samples.lengths)
-        }).set_index("mref")
+        }).set_index("mpos")
         isna = df["start"] == INT32_NA
         df[isna] = pd.NA
         self.df = df.fillna(method="backfill")
 
-        self.df.index.name = "mref"
+        self.df.index.name = "mpos"
 
         ref_coord = RefCoord(sam.reference_name, sam.reference_start, sam.reference_end, not sam.is_reverse)
         sam_coords = ref_index.get_coord_space(ref_coord, conf.is_rna, load_kmers=False)
-        self.coords = sam_coords.mref_intersect(mrefs=self.df.index)
+        self.coords = sam_coords.mpos_intersect(mposs=self.df.index)
         self.K  = conf.pore_model.k
 
     @property

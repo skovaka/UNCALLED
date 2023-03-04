@@ -11,7 +11,7 @@ from ..aln_track import AlnTrack
 from ..layers import LAYER_META, parse_layers
 from . import TrackIO
 
-LAYERS = [("dtw",l) for l in ("kmer", "current", "stdv", "dwell")]
+LAYERS = [("dtw",l) for l in ("kmer", "current", "stdv", "length_ms")]
 
 class ModelTrainer(TrackIO):
     FORMAT = "model"
@@ -195,10 +195,10 @@ class ModelTrainer(TrackIO):
                 kmer,
                 avg(rows["current"]),
                 avg(rows["stdv"]),
-                avg(rows["dwell"]),
+                avg(rows["length_ms"]),
                 np.std(rows["current"]),
                 np.std(rows["stdv"]),
-                np.std(rows["dwell"]),
+                np.std(rows["length_ms"]),
                 len(rows)
             ))
 

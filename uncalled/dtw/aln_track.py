@@ -58,8 +58,8 @@ class AlnTrack:
 
     def _parse_layers(self, df):
         if df.index.names[0] == "pac":
-            df = df.rename(index=self.coords.pac_to_ref, level=0)
-            df.index.names = ("ref", "aln_id")
+            df = df.rename(index=self.coords.pac_to_pos, level=0)
+            df.index.names = ("pos", "aln_id")
 
             refs = df.index.get_level_values(0)
             if len(df) > 1 and refs[0] > refs[1]:
@@ -76,7 +76,6 @@ class AlnTrack:
 
             elif self.conf.tracks.mask_skips == "keep_best":
                 sdf = df[skips].set_index(("dtw","start"), append=True)
-                #sdf.index.names = ("ref", "aln_id", "start")
                 sdf["diff"] = (sdf["dtw","current"] - self.model[sdf["dtw","kmer"]]).abs()
                 grp = sdf.groupby(level=2, group_keys=False)
                 keep_idx = grp["diff"].idxmin()
@@ -124,7 +123,7 @@ class AlnTrack:
         #coords = self.coords.ref_slice(ref_start, ref_end)
         if self.empty:
             return AlnTrack(self, coords, self.alignments, self.layers)
-        layer_refs = self.layers.index.get_level_values("ref")
+        layer_refs = self.layers.index.get_level_values("pos")
 
 
         #layers = self.layers.loc[layer_refs.isin(coords.refs)]
@@ -166,7 +165,7 @@ class AlnTrack:
         aln_id = self._aln_id_or_default(aln_id)
 
         layers["aln_id"] = aln_id
-        df = layers.set_index("aln_id", append=True).reorder_levels(["ref","aln_id"])
+        df = layers.set_index("aln_id", append=True).reorder_levels(["pos","aln_id"])
 
         meta = LAYER_META.loc[group]
         df = df[meta.index.intersection(df.columns)]
@@ -216,8 +215,8 @@ class AlnTrack:
         #df["aln_id"] = df.index.get_level_values("aln_id")
         df = df.reset_index()
 
-        self.mat = df.pivot(index="aln_id", columns=["ref"]) \
-                     .rename_axis(("group","layer","ref"), axis=1) \
+        self.mat = df.pivot(index="aln_id", columns=["pos"]) \
+                     .rename_axis(("group","layer","pos"), axis=1) \
                      .reindex(self.coords.refs, axis=1, level=2) \
                      .sort_index(axis=1)
 
@@ -226,8 +225,8 @@ class AlnTrack:
         self.width = len(self.coords.refs)
         self.height = len(self.alignments)
 
-    def sort_coord(self, layer, ref):
-        order = (-self.mat[layer,ref].fillna(0)).argsort()
+    def sort_coord(self, layer, pos):
+        order = (-self.mat[layer,pos].fillna(0)).argsort()
         self.sort(order)
 
     def sort(self, order):
@@ -299,8 +298,6 @@ class AlnTrack:
         def coords(df, track):
             df = df.dropna().sort_index().reset_index()
             if flip:
-                #df = df[::-1]
-                #df["ref"] = -df["ref"]
                 end = -df["start"]
                 df["start"] = -df["end"]
                 df["end"] = end
@@ -311,19 +308,15 @@ class AlnTrack:
         coords_b = coords(aln_b, other)
 
         compare = Compare(coords_a, coords_b)
-        #cmp_df = compare.to_numpy()
-        #idx = (cmp_df["ref"],slice(None))
-        #df.loc[idx,"jaccard"] = cmp_df["jaccard"]
-        #df.loc[idx,"dist"] = cmp_df["dist"]
 
         cmp_df = pd.DataFrame(compare.to_numpy()).dropna(how="all")
 
         #cmp_df["aln_b"] = alns_b[0]
         if has_pac:
-            cmp_df["pac"] = self.coords.ref_to_pac(pd.Index(cmp_df["ref"]))
+            cmp_df["pac"] = self.coords.pos_to_pac(pd.Index(cmp_df["pos"]))
             cmp_df = cmp_df.set_index("pac")
         else:
-            cmp_df = cmp_df.set_index("ref")
+            cmp_df = cmp_df.set_index("pos")
         df["jaccard"] = cmp_df["jaccard"]
         df["dist"] = cmp_df["dist"]
         df["aln_a"] = alns_a[0]
@@ -341,7 +334,7 @@ class AlnTrack:
 
     @property
     def layer_pacs(self):
-        return self.coords.ref_to_pac(self.layer_refs)
+        return self.coords.pos_to_pac(self.layer_refs)
 
     @property
     def layer_fwds(self):
@@ -353,14 +346,14 @@ class AlnTrack:
 
     @property
     def layers_pac_index(self):
-        index = pd.MultiIndex.from_arrays([self.coords.ref_to_pac(self.layer_refs), self.layers.index.get_level_values("aln_id")], names=["pac","aln_id"])
+        index = pd.MultiIndex.from_arrays([self.coords.pos_to_pac(self.layer_refs), self.layers.index.get_level_values("aln_id")], names=["pac","aln_id"])
         return self.layers.set_index(index, drop=True)
 
     @property
     def layers_desc_index(self):
         index = pd.MultiIndex.from_arrays(
             [self.layer_refs, self.layer_strands, self.layer_aln_ids])
-        return pd.concat({self.coords.ref_name : self.layers.set_index(index, drop=True)}, names=[("ref","name"),("ref","coord"),("ref","strand"),"aln_id"])
+        return pd.concat({self.coords.ref_name : self.layers.set_index(index, drop=True)}, names=[("pos","name"),("pos","coord"),("pos","strand"),"aln_id"])
 
         stats.index = pd.MultiIndex.from_product([
             [chunk.coords.ref_name], stats.index, ["+" if chunk.coords.fwd else "-"]
@@ -368,4 +361,4 @@ class AlnTrack:
 
     @property
     def layer_refs(self):
-        return self.layers.index.get_level_values("ref")
+        return self.layers.index.get_level_values("pos")

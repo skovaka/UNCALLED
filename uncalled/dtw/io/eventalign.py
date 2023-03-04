@@ -70,7 +70,7 @@ class Eventalign(TrackIO):
         df = track.layers["dtw"].dropna(how="all").sort_index()
 
         pacs = df.index.get_level_values(0)
-        events = df.droplevel(1)#.set_index(track.coords.pac_to_ref(pacs))
+        events = df.droplevel(1)#.set_index(track.coords.pac_to_pos(pacs))
 
         model = track.model
         kmers = events["kmer"]
@@ -162,7 +162,7 @@ class Eventalign(TrackIO):
 
                 df["kmer"] = kmers
 
-                pacs = coords.ref_to_pac(df["position"].to_numpy()+kmer_trim[0])
+                pacs = coords.pos_to_pac(df["position"].to_numpy()+kmer_trim[0])
 
                 layers = df.rename(columns={
                         "start_idx" : "start",

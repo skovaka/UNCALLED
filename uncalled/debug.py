@@ -199,7 +199,7 @@ class DebugParser:
 
             #print(fms)
 
-            self.fm_to_ref = {fms[i] : i for i in range(len(fms))}
+            self.fm_to_pos = {fms[i] : i for i in range(len(fms))}
 
             fm_ord = np.argsort(fms)
             if self.bc_loaded:
@@ -511,7 +511,7 @@ class DebugParser:
                 while i < len(self.range_fms) and self.range_fms[i] < fm_start+fm_len: 
                     if True:#not self.bc_loaded or evt in self.range_fm_evts[i]:
                     #if not self.bc_loaded or evt in self.range_fm_evts[i]:
-                        ref_en = self.fm_to_ref[self.range_fms[i]] - 3
+                        ref_en = self.fm_to_pos[self.range_fms[i]] - 3
 
                         #print("%d:%d\t%d\t%d" % (evt,pb,ref_en,fm_len))
                         print("%d:%d" % (evt,pb))
@@ -575,7 +575,7 @@ class DebugParser:
     def parse_bc_aln(self, bce_moves):
 
         #List of ref coords for each query (read) cord
-        qr_to_rfs = self._cig_query_to_refs(self.mm2_paf)
+        qr_to_rfs = self._cig_query_to_poss(self.mm2_paf)
 
         #basecalled event start, end, and stride
         bce_samp_st, bce_moves_pac = bce_moves
@@ -614,7 +614,7 @@ class DebugParser:
         self.bc_loaded = True
 
 
-    def _cig_query_to_refs(self, paf):
+    def _cig_query_to_poss(self, paf):
         cig = paf.tags.get('cg', (None,)*2)[0]
         if cig is None: return None
 

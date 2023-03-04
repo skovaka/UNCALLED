@@ -27,7 +27,7 @@ class Dotplot:
 
     REQ_LAYERS = [
         "start", "length", "middle", 
-        "current", "dwell", "seq.kmer", "base", 
+        "current", "length_ms", "seq.kmer", "base", 
         "moves.middle", "seq.current",
         "start_sec", "dwell_sec"
     ]
@@ -103,8 +103,8 @@ class Dotplot:
 
         print("plotted")
 
-        hover_layers = [("dtw", "middle"),("seq","kmer"),("dtw","current"),("dtw","dwell")] + self.layers
-        #hover_layers += (l for l in self.prms.layers if l not in {"current","dwell"})
+        hover_layers = [("dtw", "middle"),("seq","kmer"),("dtw","current"),("dtw","length_ms")] + self.layers
+        #hover_layers += (l for l in self.prms.layers if l not in {"current","length_ms"})
         hover_data = dict()
 
         coords = None

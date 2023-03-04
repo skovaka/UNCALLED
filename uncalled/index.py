@@ -40,10 +40,10 @@ from .argparse import Opt
 
 class CoordSpace:
 
-    def __init__(self, ref_name, refs, mrefs, fwd, kmers, pac_shift):
+    def __init__(self, ref_name, refs, mposs, fwd, kmers, pac_shift):
         self.ref_name = ref_name
         self.refs = refs
-        self.mrefs = mrefs
+        self.mposs = mposs
         self.fwd = fwd
         self.pac_shift = pac_shift
         self.pacs = refs + pac_shift
@@ -51,22 +51,22 @@ class CoordSpace:
         self.set_kmers(kmers)
 
         if self.stranded:
-            #if mrefs.step < 0:
+            #if mposs.step < 0:
             #    self.refs = self.refs[::-1]
             #    self.pacs = self.pacs[::-1]
-            if not isinstance(mrefs, pd.Index):
-                raise ValueError("mrefs must be pandas.Index for stranded CoordSpace")
-        if not self.stranded and not isinstance(mrefs, tuple):
-            raise ValueError("mrefs must be tuple for stranded CoordSpace")
+            if not isinstance(mposs, pd.Index):
+                raise ValueError("mposs must be pandas.Index for stranded CoordSpace")
+        if not self.stranded and not isinstance(mposs, tuple):
+            raise ValueError("mposs must be tuple for stranded CoordSpace")
 
-    def pac_to_ref(self, pac):
+    def pac_to_pos(self, pac):
         return pac - self.pac_shift
 
-    def ref_to_pac(self, ref):
+    def pos_to_pac(self, ref):
         return ref + self.pac_shift
 
-    def mref_to_pac(self, mref):
-        return self.pac_shift + self.mref_to_ref(mref)
+    def mpos_to_pac(self, mpos):
+        return self.pac_shift + self.mpos_to_pos(mpos)
 
     def set_kmers(self, kmers):
         self.kmers = kmers
@@ -74,11 +74,11 @@ class CoordSpace:
             self.ref_kmers = None
         elif self.stranded:
             self.ref_kmers = pd.concat(
-                {int(self.fwd) : self.kmers.set_axis(self.mref_to_ref(self.kmers.index, self.fwd))})
+                {int(self.fwd) : self.kmers.set_axis(self.mpos_to_pos(self.kmers.index, self.fwd))})
         else:
             self.ref_kmers = pd.concat(
-                {0 : self.kmers[0].set_axis(self.mref_to_ref(self.kmers[0].index, False)), 
-                 1 : self.kmers[1].set_axis(self.mref_to_ref(self.kmers[1].index, True))}
+                {0 : self.kmers[0].set_axis(self.mpos_to_pos(self.kmers[0].index, False)), 
+                 1 : self.kmers[1].set_axis(self.mpos_to_pos(self.kmers[1].index, True))}
             )
 
     @property
@@ -116,23 +116,23 @@ class CoordSpace:
             en = len(self.refs)
         return self._slice(st,en,fwd)
 
-    def mref_intersect(self, mrefs):
+    def mpos_intersect(self, mposs):
         if self.stranded:
             fwd_in = self.fwd
-            minmax = self._minmax_intersect(self.mrefs, mrefs)
+            minmax = self._minmax_intersect(self.mposs, mposs)
             if np.any(np.isnan(minmax)):
                 return None
-            bounds = self.mrefs.get_indexer(minmax)
+            bounds = self.mposs.get_indexer(minmax)
         else:
             fwd_in = None
             for i in range(2):
-                minmax = self._minmax_intersect(self.mrefs[i], mrefs)
+                minmax = self._minmax_intersect(self.mposs[i], mposs)
                 if not np.any(np.isnan(minmax)):
                     fwd_in = i
                     break
             if fwd_in is None:
                 return None
-            bounds = self.mrefs[fwd_in].get_indexer(minmax)
+            bounds = self.mposs[fwd_in].get_indexer(minmax)
 
         st,en = sorted(bounds)
         en += 1
@@ -170,24 +170,24 @@ class CoordSpace:
 
         if self.stranded:
             fwd = self.fwd
-            mrefs = self.mrefs[st:en]
+            mposs = self.mposs[st:en]
             if self.kmers is not None:
                 kmers = self.kmers[st:en]
 
         elif fwd is None:
-            mrefs = tuple( (m[st:en] for m in self.mrefs) )
+            mposs = tuple( (m[st:en] for m in self.mposs) )
             if self.kmers is not None:
                 kmers = tuple( (k[st:en] for k in self.kmers) )
         else:
-            mrefs = self.mrefs[fwd][st:en]
+            mposs = self.mposs[fwd][st:en]
             if self.kmers is not None:
                 kmers = self.kmers[fwd].loc[st:en]
 
         #elif not stranded_out:
 
-        return CoordSpace(self.ref_name, refs, mrefs, fwd, kmers, self.pac_shift)
+        return CoordSpace(self.ref_name, refs, mposs, fwd, kmers, self.pac_shift)
 
-    def ref_to_mref(self, ref, fwd=None):
+    def pos_to_mpos(self, ref, fwd=None):
         if isinstance(ref, (collections.abc.Sequence, np.ndarray, pd.Index)):
             i = self.refs.get_indexer(ref)
         else:
@@ -196,73 +196,73 @@ class CoordSpace:
         if self.stranded:
             if fwd is not None and fwd != self.fwd:
                 raise ValueError("Invalid 'fwd' value or stranded CoordSpace")
-            return self.mrefs[i]
+            return self.mposs[i]
 
         # not stranded
         if fwd is None:
-            return tuple( (mrefs[i] for mrefs in self.mrefs) )
-        return self.mrefs[fwd][i]
+            return tuple( (mposs[i] for mposs in self.mposs) )
+        return self.mposs[fwd][i]
 
     #TODO check fwd and rev, return None if neither
-    def is_mref_fwd(self, mref):
-        if isinstance(mref, (collections.abc.Sequence, np.ndarray, pd.Index)):
-            mref = mref[0]
+    def is_mpos_fwd(self, mpos):
+        if isinstance(mpos, (collections.abc.Sequence, np.ndarray, pd.Index)):
+            mpos = mpos[0]
 
         if self.stranded:
-            return self.fwd and mref in self.mrefs
+            return self.fwd and mpos in self.mposs
         else:
-            return mref in self.mrefs[1]
+            return mpos in self.mposs[1]
             
     #TODO make single private method with fwd param. Also probably merge with above
             
-    def all_mrefs_fwd(self, mrefs):
+    def all_mposs_fwd(self, mposs):
 
-        if isinstance(mrefs, (collections.abc.Sequence, np.ndarray, pd.Index, pd.Series)):
+        if isinstance(mposs, (collections.abc.Sequence, np.ndarray, pd.Index, pd.Series)):
             isin = lambda a,b: a.dropna().isin(b).all()
         else:
             isin = lambda a,b: a in b
 
         if self.stranded:
-            if isin(mrefs, self.mrefs):
+            if isin(mposs, self.mposs):
                 return self.fwd
             return None
-        for fwd,s_mrefs in enumerate(self.mrefs):
-            if isin(mrefs, s_mrefs):
+        for fwd,s_mposs in enumerate(self.mposs):
+            if isin(mposs, s_mposs):
                 return bool(fwd)
         return None
     
-    def mref_to_ref(self, mref, fwd=None):
-        fwd = fwd if fwd is not None else self.all_mrefs_fwd(mref)
+    def mpos_to_pos(self, mpos, fwd=None):
+        fwd = fwd if fwd is not None else self.all_mposs_fwd(mpos)
 
         if fwd is None:
-            raise ValueError("mref coordinates outside of CoordSpace")
+            raise ValueError("mpos coordinates outside of CoordSpace")
 
         if self.stranded:
-            mrefs = self.mrefs
+            mposs = self.mposs
         else:
-            mrefs = self.mrefs[fwd]
+            mposs = self.mposs[fwd]
 
-        if isinstance(mref, (collections.abc.Sequence, np.ndarray, pd.Index, pd.Series)):
-            i = mrefs.get_indexer(mref)
+        if isinstance(mpos, (collections.abc.Sequence, np.ndarray, pd.Index, pd.Series)):
+            i = mposs.get_indexer(mpos)
         else:
-            i = mrefs.get_loc(mref)
+            i = mposs.get_loc(mpos)
 
         return self.refs[i]
 
-    def mref_to_ref_index(self, mrefs, multi=False):
+    def mpos_to_pos_index(self, mposs, multi=False):
         if self.stranded:
-            refs = self.mref_to_ref(mrefs, self.fwd)
+            refs = self.mpos_to_pos(mposs, self.fwd)
             fwd_mask = np.full(len(refs), self.fwd)
 
         else:
-            revs = self.mrefs[0].get_indexer(mrefs)
-            fwds = self.mrefs[1].get_indexer(mrefs)
+            revs = self.mposs[0].get_indexer(mposs)
+            fwds = self.mposs[1].get_indexer(mposs)
             rev_mask = revs >= 0
             fwd_mask = fwds >= 0
             if not np.all(fwd_mask | rev_mask):
-                raise ValueError("mrefs coordinates are outside of the CoordSpace")
+                raise ValueError("mposs coordinates are outside of the CoordSpace")
 
-            refs = np.zeros(len(mrefs), dtype=int)
+            refs = np.zeros(len(mposs), dtype=int)
             refs[rev_mask] = self.refs[revs[rev_mask]]
             refs[fwd_mask] = self.refs[fwds[fwd_mask]]
 
@@ -276,7 +276,7 @@ class CoordSpace:
             return pd.MultiIndex.from_frame(df)
         return pd.Index(refs, name="ref")
 
-        #strand,refs = self.mref_to_ref(mrefs)
+        #strand,refs = self.mpos_to_pos(mposs)
         #if str_strand:
         #    strand_label = "strand"
         #    strand = "+" if strand else "-"
@@ -289,14 +289,14 @@ class CoordSpace:
     #def validate_refs(self, refs):
     #    return len(self.refs.intersection(refs)) == len(refs)
 
-    #def validate_mrefs(self, mrefs):
-    #    return all_mrefs_fwd(mrefs) or all_mrefs_rev(mrefs)
+    #def validate_mposs(self, mposs):
+    #    return all_mposs_fwd(mposs) or all_mposs_rev(mposs)
 
     def __len__(self):
         return len(self.refs)
 
     def __repr__(self):
-        return ("%s:%d-%d " % (self.ref_name, self.refs.start, self.refs.stop)) + str(self.mrefs)
+        return ("%s:%d-%d " % (self.ref_name, self.refs.start, self.refs.stop)) + str(self.mposs)
 
 class RefIndex:
 
@@ -320,36 +320,36 @@ class RefIndex:
     def __getattr__(self, name):
         return self.instance.__getattribute__(name)
 
-    def mrefs_to_kmers(self, ref_id, mrefs, is_rna, kmer_trim):
-        #if (mrefs.step < 0) == is_rna:
+    def mposs_to_kmers(self, ref_id, mposs, is_rna, kmer_trim):
+        #if (mposs.step < 0) == is_rna:
         #    #ref_coord.end -= kmer_shift
-        #    kmers = self.get_kmers(mrefs.min(), mrefs.max()+1, is_rna)
+        #    kmers = self.get_kmers(mposs.min(), mposs.max()+1, is_rna)
         #else:
         #   #ref_coord.start += kmer_shift
 
-        if (mrefs.step > 0) != is_rna:
+        if (mposs.step > 0) != is_rna:
             i,j = self.trim
         else:
             i,j = reversed(self.trim)
 
         if kmer_trim:
-            kmers = self.get_kmers(ref_id, mrefs.min(), mrefs.max()+1, is_rna)
-            if mrefs.step < 0:
+            kmers = self.get_kmers(ref_id, mposs.min(), mposs.max()+1, is_rna)
+            if mposs.step < 0:
                 kmers = kmers[::-1]
-            ret = pd.Series(index=mrefs[i:-j], data=kmers, name="kmer")
+            ret = pd.Series(index=mposs[i:-j], data=kmers, name="kmer")
         else:
-            kmers = self.get_kmers(ref_id, mrefs.min()-i, mrefs.max()+j+1, is_rna)
-            if mrefs.step < 0:
+            kmers = self.get_kmers(ref_id, mposs.min()-i, mposs.max()+j+1, is_rna)
+            if mposs.step < 0:
                 kmers = kmers[::-1]
-            ret = pd.Series(index=mrefs, data=kmers, name="kmer")
+            ret = pd.Series(index=mposs, data=kmers, name="kmer")
         return ret
 
-    def ref_coord_to_mrefs(self, ref_coord, is_rna, flip_rev=True):
-        st,en = self.ref_to_mref(ref_coord.name, ref_coord.start, ref_coord.end, ref_coord.fwd, is_rna)
-        mrefs = pd.RangeIndex(st,en)
-        if flip_rev and self.is_mref_flipped(mrefs.start):
-            return mrefs[::-1]
-        return mrefs
+    def ref_coord_to_mposs(self, ref_coord, is_rna, flip_rev=True):
+        st,en = self.pos_to_mpos(ref_coord.name, ref_coord.start, ref_coord.end, ref_coord.fwd, is_rna)
+        mposs = pd.RangeIndex(st,en)
+        if flip_rev and self.is_mpos_flipped(mposs.start):
+            return mposs[::-1]
+        return mposs
 
     #def full_coord_space(self, rid):
 
@@ -377,19 +377,19 @@ class RefIndex:
         refs = pd.RangeIndex(ref_coord.start, ref_coord.end)
 
         if ref_coord.stranded:
-            mrefs = self.ref_coord_to_mrefs(ref_coord, is_rna)
+            mposs = self.ref_coord_to_mposs(ref_coord, is_rna)
         else:
-            mrefs = tuple((
-                self.ref_coord_to_mrefs(RefCoord(ref_coord, fwd), is_rna)
+            mposs = tuple((
+                self.ref_coord_to_mposs(RefCoord(ref_coord, fwd), is_rna)
                 for fwd in [False, True]
             ))
 
         if load_kmers:
             if ref_coord.stranded:
-                kmers = self.mrefs_to_kmers(rid, mrefs, is_rna, kmer_trim)
+                kmers = self.mposs_to_kmers(rid, mposs, is_rna, kmer_trim)
             else:
                 kmers = tuple(( 
-                    self.mrefs_to_kmers(rid, m, is_rna, kmer_trim) for m in mrefs
+                    self.mposs_to_kmers(rid, m, is_rna, kmer_trim) for m in mposs
                 ))
         else:
             kmers = None
@@ -399,7 +399,7 @@ class RefIndex:
 
         pac_shift = self.get_pac_offset(ref_coord.name)
 
-        return CoordSpace(ref_coord.name, refs, mrefs, fwd, kmers, pac_shift)
+        return CoordSpace(ref_coord.name, refs, mposs, fwd, kmers, pac_shift)
 
 _index_cache = dict()
 

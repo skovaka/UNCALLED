@@ -144,7 +144,7 @@ int main(int argc, char** argv) {
             shift = -1;
             coord = q.rf_en-1;
         }
-        coord = idx.ref_to_pac(q.rf_name, coord);
+        coord = idx.pos_to_pac(q.rf_name, coord);
 
         //std::string kmer = "";
         //for (u64 i = 0; i < length; i++) {

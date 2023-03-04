@@ -191,7 +191,7 @@ class GuidedDTW:
             df = DtwDF(starts, lengths, cur, std)
             df.set_signal(signal)
             df = df.to_df()
-            df["mref"] = self.moves.index.expand()
+            df["mpos"] = self.moves.index.expand()
 
         #if df is None:
         #    self.empty = True
@@ -212,7 +212,7 @@ class GuidedDTW:
         self.empty = False
 
     def renormalize(self, signal, aln):
-        kmers = self.seq.get_kmer(aln["mref"]) #self.ref_kmers[aln["mref"]]
+        kmers = self.seq.get_kmer(aln["mpos"]) #self.ref_kmers[aln["mpos"]]
         model_current = self.model[kmers]
         reg = TheilSenRegressor(random_state=0)
         return reg.fit(aln[["current"]], model_current)
@@ -269,14 +269,14 @@ class GuidedDTW:
             return (self.prms, read_block['mean'].to_numpy(), self.model.kmer_array(ref_kmers), self.model.instance, DTW_GLOB)
 
     #TODO store in ReadAln metadata
-    def _ll_to_df(self, ll, read_block, min_mref, ref_len):
+    def _ll_to_df(self, ll, read_block, min_mpos, ref_len):
         qry_st = np.clip(ll['qry'],                 0, len(read_block)-1)
         qry_en = np.clip(ll['qry']-self.prms.band_width, 0, len(read_block)-1)
-        mref_st = min_mref + np.clip(ll['ref'],                 0, ref_len-1)
-        mref_en = min_mref + np.clip(ll['ref']+self.prms.band_width, 0, ref_len-1)
+        mpos_st = min_mpos + np.clip(ll['ref'],                 0, ref_len-1)
+        mpos_en = min_mpos + np.clip(ll['ref']+self.prms.band_width, 0, ref_len-1)
 
-        pac_st = self.index.mref_to_pac(mref_en)
-        pac_en = self.index.mref_to_pac(mref_st)
+        pac_st = self.index.mpos_to_pac(mpos_en)
+        pac_en = self.index.mpos_to_pac(mpos_st)
 
         sample_starts = read_block['start'].iloc[qry_en].to_numpy()
         sample_ends = read_block["start"].iloc[qry_st].to_numpy() + read_block["length"].iloc[qry_st].to_numpy()
@@ -306,7 +306,7 @@ class GuidedDTW:
 #
 #    dtw["cuml_mean"] = dtw[length_col] * dtw[mean_col]
 #
-#    grp = dtw.groupby("mref")
+#    grp = dtw.groupby("mpos")
 #
 #    if kmer_col in dtw:
 #        if kmer_str:
@@ -316,12 +316,12 @@ class GuidedDTW:
 #    else:
 #        kmers = None
 #
-#    mrefs = grp["mref"].first()
+#    mposs = grp["mpos"].first()
 #
 #    lengths = grp[length_col].sum()
 #
 #    dtw = pd.DataFrame({
-#        "mref"    : mrefs.astype("int64"),
+#        "mpos"    : mposs.astype("int64"),
 #        "start"  : grp[start_col].min().astype("uint32"),
 #        "length" : lengths.astype("uint32"),
 #        "current"   : grp["cuml_mean"].sum() / lengths
@@ -333,4 +333,4 @@ class GuidedDTW:
 #    if mask_skips:
 #        dtw = dtw[~dtw.duplicated("start", False)]
 #
-#    return dtw.set_index("mref").sort_index()
+#    return dtw.set_index("mpos").sort_index()
