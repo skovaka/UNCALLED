@@ -26,9 +26,9 @@ class Dotplot:
     #plot_read(read_id) -> fig
 
     REQ_LAYERS = [
-        "start", "length", "middle", 
+        "start", "length", "middle_sec", 
         "current", "length_ms", "seq.kmer",  
-        "moves.middle", "seq.current",
+        "moves.middle_sec", "seq.current",
         "start_sec", "length_sec"
     ]
 
@@ -99,11 +99,11 @@ class Dotplot:
 
         Sigplot(tracks, conf=self.conf).plot(fig)
 
-        hover_layers = [("dtw", "middle"),("seq","kmer"),("dtw","current"),("dtw","length_ms")] + self.layers
+        hover_layers = [("dtw", "middle_sec"),("seq","kmer"),("dtw","current"),("dtw","length_ms")] + self.layers
         #hover_layers += (l for l in self.prms.layers if l not in {"current","length_ms"})
         hover_data = dict()
 
-        coords = None
+        coords = tracks.coords
 
         flipped = True
         fwd = True
@@ -112,27 +112,23 @@ class Dotplot:
 
             track_hover = list()
 
-            if track.coords is not None:
-                coords = track.coords
-
-            has_moves = "moves" in track.layers.columns.get_level_values("group")
+            has_moves = "moves" in self.tracks.layers.columns.get_level_values("group")
             only_moves = self.prms.moves_track == track.name
             model = track.model
 
-
             first_aln = True
-            for aln_id, aln in track.alignments.iterrows():
-                layers = track.layers \
-                              .loc[(slice(None),aln_id), slice(None)] \
-                              .droplevel("aln.id")
+            for aln_id, aln in tracks.alignments.loc[track.id].iterrows():
+                layers = self.tracks.layers \
+                              .loc[(track.id,aln_id), slice(None)]#,slice(None)), slice(None)] \
+                              #.droplevel("aln.id")
 
-                layers["dtw","start"] /=    float(self.conf.read_buffer.sample_rate)
-                layers["dtw","length"] /=   float(self.conf.read_buffer.sample_rate)
-                #layers["moves","start"] /=  float(self.conf.read_buffer.sample_rate)
-                #layers["moves","length"] /= float(self.conf.read_buffer.sample_rate)
-                if has_moves:
-                    layers["moves","middle"] /= float(self.conf.read_buffer.sample_rate)
-                layers["dtw","middle"] /=   float(self.conf.read_buffer.sample_rate)
+                #layers["dtw","start"] /=    float(self.conf.read_buffer.sample_rate)
+                #layers["dtw","length"] /=   float(self.conf.read_buffer.sample_rate)
+                ##layers["moves","start"] /=  float(self.conf.read_buffer.sample_rate)
+                ##layers["moves","length"] /= float(self.conf.read_buffer.sample_rate)
+                #if has_moves:
+                #    layers["moves","middle"] /= float(self.conf.read_buffer.sample_rate)
+                #layers["dtw","middle"] /=   float(self.conf.read_buffer.sample_rate)
 
                 
                 fwd = fwd and aln["fwd"]
@@ -166,7 +162,7 @@ class Dotplot:
 
                 if not only_moves: 
                     fig.add_trace(go.Scattergl(
-                        x=layers["dtw","start"], y=layers.index,
+                        x=layers["dtw","start_sec"], y=layers.index,
                         name=track.desc,
                         legendgroup=track.name,
                         line={
@@ -224,14 +220,14 @@ class Dotplot:
 
         if len(hover_data) > 0:
             hover_data = pd.concat(hover_data, axis=1)
-            hover_coords = hover_data.xs("middle", axis=1, level=2).mean(axis=1)
+            hover_coords = hover_data.xs("middle_sec", axis=1, level=2).mean(axis=1)
 
             hover_kmers = model.kmer_to_str(
                 hover_data.xs("kmer", 1, 2)
                           .fillna(method="pad", axis=1)
                           .iloc[:,-1])
 
-            customdata = hover_data.drop(["kmer","middle"], axis=1, level=2).to_numpy()
+            customdata = hover_data.drop(["kmer","middle_sec"], axis=1, level=2).to_numpy()
 
             hover_rows = [
                 "<b>" + coords.ref_name + ":%{y:,d} [%{text}]</b>"
@@ -313,8 +309,8 @@ class Dotplot:
 
     def _plot_moves(self, fig, legend, layers):
         fig.add_trace(go.Scattergl(
-            x=layers["moves","middle"], y=layers.index,#-2, #-1
-            #x=layers["moves","start"], y=layers.index,#+2, #-1
+            x=layers["moves","middle_sec"], y=layers.index,#-2, #-1
+            #x=layers["moves","start_sec"], y=layers.index,#+2, #-1
             name="Basecalled Alignment",
             mode="markers", marker={"size":5,"color":"orange"},
             #line={"color":"orange", "width":2, "shape" : "vh"},

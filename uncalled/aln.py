@@ -17,6 +17,7 @@ ALN_LAYERS = {
     "length_ms" : _Layer(np.float32, "Dwell (ms)", True),
     "end" : _Layer("Int32", "Sample End", False),
     "middle" : _Layer(np.float32, "Sample Middle", False),
+    "middle_sec" : _Layer(np.float32, "Sample Middle", False),
     "model_diff" : _Layer(np.float32, "Model pA Diff.", True),
     "abs_diff" : _Layer(np.float32, "Abs. Model Diff.", False),
 }
@@ -206,7 +207,7 @@ class AlnDF:
 
     @property
     def middle_sec(self):
-        return middle / self.sample_rate
+        return self.middle / self.sample_rate
 
     @property
     def model_diff(self):

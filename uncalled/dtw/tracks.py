@@ -4,7 +4,7 @@ import sqlite3
 import numpy as np
 import pandas as pd
 import collections
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 import scipy
 
 from .io import SQL, TSV, Eventalign, Tombo, BAM, ModelTrainer, INPUTS, OUTPUTS, INPUT_PARAMS, OUTPUT_PARAMS
@@ -118,7 +118,7 @@ class Tracks:
         #if self.coords is not None and  len(self._aln_track_ids) > 0:
         #    self.load()
 
-    def _init_slice(self, parent, coords, tracks):
+    def _init_slice(self, parent, coords, reads):
         self.conf = parent.conf 
         self.prms = parent.prms
 
@@ -139,13 +139,17 @@ class Tracks:
         self.coords = coords
         self._tracks = dict()
         self.alns = list()
+        self.model = parent.model
 
-        if tracks is not None:
-            self._add_tracks(tracks)
+        self._add_tracks(parent._tracks)
 
+        mask = np.minimum(parent.alignments["ref_start"], coords.refs.min()) < np.maximum(parent.alignments["ref_end"], coords.refs.max()+1)
+        if reads is not None:
+            mask &= parent.alignments["read_id"].isin(reads)
+        self.alignments = parent.alignments[mask] #pd.concat(track_alns, axis=0, names=["track", "id"])
+        self.layers = parent.layers.reset_index(level="seq.pos").loc[self.alignments.index].set_index("seq.pos",append=True)
 
-        self.layers = parent.layers #pd.concat(track_layers, axis=0, names=["track.id", "seq.pos", "aln.id"])
-        self.alignments = parent.alignments #pd.concat(track_alns, axis=0, names=["track", "id"])
+        #.reorder_levels(["track.id","aln.id","seq.pos"]).loc[self.alignments.index].reorder_levels(["track.id","seq.pos","aln.id"]) #pd.concat(track_layers, axis=0, names=["track.id", "seq.pos", "aln.id"])
     
         self._init_mat()
 
@@ -161,6 +165,7 @@ class Tracks:
         if name in BUILTIN_TRACKS:
             setattr(self, name[1:], track)
         elif isinstance(track, AlnTrack):
+        #elif isinstance(track, tuple):
             self.alns.append(track)
         else:
             raise ValueError("Unrecognized track type: " + str(track))
@@ -276,8 +281,6 @@ class Tracks:
             for track in self.output.aln_tracks:
                 self._add_track(track.name, track)
 
-                #tracks.append(self.output.aln_tracks)
-
             self.output_track = self.output.aln_tracks[0].name
             #for track in self.output.tracks:
             #    self.output_tracks[track.name] = track
@@ -286,12 +289,6 @@ class Tracks:
             self.output_track = self.inputs[0].aln_tracks[0].name
 
         self.model = None
-
-        #for _,row in pd.concat(tracks).iterrows():
-        #    conf = config.Config(toml=row["config"])
-        #    self.conf.load_config(conf)
-        #    track = AlnTrack(row["id"], row["name"], row["desc"], conf)
-        #    self._add_track(track.name, track)
 
             #TODO each IO should have reference to its AlnTracks?
             #probably construct here in Tracks? or maybe in IO!
@@ -324,13 +321,17 @@ class Tracks:
         raise RuntimeError("Could not determine fast5 filename, may need to provide fast5 index (-x)")
 
     def aln_layers(self, layer_filter=None):
-        ret = pd.Index([])
-        for track in self.alns:
-            layers = track.layers.columns
-            if layer_filter is not None:
-                layers = layers.intersection(layer_filter)
-            ret = ret.union(layers)
-        return ret
+        ret = self.layers.columns
+        if layer_filter is None:
+            return ret
+        return ret.intersection(layer_filter)
+        #ret = pd.Index([])
+        #for track in self.alns:
+        #    layers = track.layers.columns
+        #    if layer_filter is not None:
+        #        layers = layers.intersection(layer_filter)
+        #    ret = ret.union(layers)
+        #return ret
     
     def _track_or_default(self, track_name):
         if track_name is None:
@@ -450,21 +451,22 @@ class Tracks:
                 tracks[name] = track.loc[coords.refs]
 
             elif isinstance(track, AlnTrack):
-                tracks[name] = track.slice(coords, reads=reads, order=order)
+                tracks[name] = track #.slice(coords, reads=reads, order=order)
 
-        return Tracks(self, coords, tracks)
+        return Tracks(self, coords, reads)
 
     def get_shared_reads(self):
-        read_ids = pd.Index(self.alns[0].read_ids)
+        all_ids = self.alignments["read_id"]
+        read_ids = pd.Index(all_ids.loc[self.alns[0].id])
         for track in self.alns[1:]:
-            read_ids = read_ids.intersection(track.read_ids)
+            read_ids = read_ids.intersection(all_ids.loc[track.id])
         return read_ids
 
     def get_all_reads(self):
-        read_ids = pd.Index(self.alns[0].read_ids)
+        all_ids = self.alignments["read_id"]
+        read_ids = pd.Index(all_ids.loc[self.alns[0].id])
         for track in self.alns[1:]:
-            if not track.empty:
-                read_ids = read_ids.union(track.read_ids)
+            read_ids = read_ids.union(all_ids.loc[track.id])
         return read_ids
 
     def get_full_overlap(self, read_ids=None):
@@ -502,10 +504,10 @@ class Tracks:
         track_layers = dict()
 
         for io in self.inputs:
-            alns, layers = io.query(self.conf.tracks.layers, self.coords, ["seq.pos", "aln.id"], full_overlap=full_overlap, read_id=read_filter)
+            alns, layers = io.query(self.conf.tracks.layers, self.coords, ["aln.id","seq.pos"], full_overlap=full_overlap, read_id=read_filter)
 
-            for track in io.aln_tracks:
-                track.set_data(self.coords, alns[track.id], layers[track.id])
+            #for track in io.aln_tracks:
+            #    track.set_data(self.coords, alns[track.id], layers[track.id])
 
             track_alns.update(alns)
             track_layers.update(layers)
@@ -513,11 +515,10 @@ class Tracks:
         #TODO eliminate need for AlnTrack
         #just use self.layers, self.aln_layers
         #will need to initialize Alignment from these dataframes for Dotplot
-        self.layers = pd.concat(track_layers, axis=0, names=["track.id", "seq.pos", "aln.id"])
-        self.alignments = pd.concat(track_alns, axis=0, names=["track", "id"])
+        self.layers = pd.concat(track_layers, axis=0, names=["track.id", "aln.id", "seq.pos"])
+        self.alignments = pd.concat(track_alns, axis=0, names=["track", "id"]).sort_index()#.sort_values(["fwd","ref_start"])
     
         self._init_mat()
-        print(self.mat)
             
         #self.load_compare(alignments.index.droplevel(0).to_numpy())
         self.calc_refstats()
@@ -537,7 +538,9 @@ class Tracks:
                      .reindex(self.coords.refs, axis=1, level=2) \
                      .sort_index(axis=1)
 
-        self.mat = self.mat.reindex(self.alignments.index, copy=False)
+        order = self.alignments.sort_values(["fwd", "ref_start"]).index
+
+        self.mat = self.mat.reindex(order, copy=False)
 
         self.width = len(self.coords.refs)
         self.height = len(self.alignments)
@@ -944,7 +947,7 @@ class Tracks:
 
             tracks[parent.name] = track
 
-        tracks = Tracks(self, coords, tracks)
+        tracks = Tracks(self, coords)
 
         if not tracks.all_empty:
             tracks.load_compare(alignments.index.to_numpy())

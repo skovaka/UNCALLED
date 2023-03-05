@@ -78,8 +78,8 @@ class Trackplot:
             self.tracks.conf.load_config(self.conf)
             self.conf = self.tracks.conf
 
-        if self.tracks.all_empty:       
-            self.tracks.load()
+        #if self.tracks.all_empty:       
+        #    self.tracks.load()
 
         if self.tracks.refstats is None:
             self.tracks.calc_refstats()
@@ -162,22 +162,12 @@ class Trackplot:
                 showticklabels=False,
                 row=row, col=1)
 
-            #if track.empty: 
-            print(i)
-            print(self.tracks.layers)
             if i not in self.tracks.layers.index.get_level_values(0):
                 sys.stderr.write("Warning: no alignments loaded from track \"%d\"\n" % i)
                 row += 1
                 continue
 
-            #if track.mat is None:
-            #    track.load_mat()
-
-            #mat = track.mat[(group,layer)]#.dropna(how="all")
             mat = self.tracks.mat.loc[(i,slice(None)),(group,layer)]#.dropna(how="all")
-
-            print("HERE")
-            print(mat)
 
             read_ids = self.tracks.alignments.loc[mat.index, "read_id"].to_numpy()
 
@@ -202,8 +192,6 @@ class Trackplot:
                 coloraxis="coloraxis",
             ), row=row, col=1)
 
-            print("READS")
-            print(read_ids)
             if self.prms.select_read is not None:
                 ys = np.where(self.prms.select_read == read_ids)[0]
                 for y in ys:
@@ -227,19 +215,21 @@ class Trackplot:
         layer_label = LAYER_META.loc[(group,layer),"label"]
 
         self.fig.update_yaxes(title_text=layer_label, row=row, col=1)
-        for j,track in enumerate(self.tracks.alns):
-            stats = self.tracks.refstats[track.name,group,layer]
+        #for j,track in enumerate(self.tracks.alns):
+        for i in np.arange(self.tracks.track_count)+1:
+            #stats = self.tracks.refstats[track.name,group,layer]
+            stats = self.tracks.refstats[i,group,layer]
             for idx in stats.index[:-1]:
                 self.fig.add_vline(x=idx+0.5, line_color="black", row=row, col=1)
             self.fig.add_trace(go.Box(
-                x=stats.index - 0.25 + j*0.5,
+                x=stats.index - 0.25 + i*0.5,
                 median=stats["median"],
                 lowerfence=stats["q5"],
                 q1=stats["q25"],
                 q3=stats["q75"],
                 upperfence=stats["q95"],
-                name=track.desc,
-                line_color=self.conf.vis.track_colors[j]
+                name=str(i),#track.desc,
+                line_color=self.conf.vis.track_colors[i]
             ), row=row, col=1)
 
     def _line(self, row, layer):

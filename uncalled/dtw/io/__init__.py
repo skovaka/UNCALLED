@@ -12,6 +12,7 @@ import collections
 import numpy as np
 import pandas as pd
 import sys
+from collections import namedtuple
 
 from ..aln_track import AlnTrack
 from ...config import Config
@@ -25,6 +26,8 @@ OUT_EXT = {
     "eventalign_out" : "txt", 
     "bam_out" : "bam"
 }
+
+#AlnTrack = namedtuple("AlnTrack", ["id", "name", "desc", "conf"])
 
 class TrackIO:
     def __init__(self, filename, write, tracks, track_count):

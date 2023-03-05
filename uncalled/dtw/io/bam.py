@@ -336,7 +336,7 @@ class BAM(TrackIO):
 
         return aln_df, layers
 
-    def query(self, layers, coords, index=["seq.fwd","seq.pos","aln.id"], read_id=None, full_overlap=False):
+    def query(self, layers, coords, index=["aln.id","seq.pos"], read_id=None, full_overlap=False):
         itr = self.input.fetch(coords.ref_name, coords.refs.min(), coords.refs.max())
 
         track_alns = defaultdict(list)
@@ -353,7 +353,8 @@ class BAM(TrackIO):
             aln = self.sam_to_aln(sam)
 
             track_alns[self.in_id].append(aln.attrs())
-            track_layers[self.in_id].append(aln.to_pandas(layers, index=index))
+            l = aln.to_pandas(layers, index=index)
+            track_layers[self.in_id].append(l)
 
         track_alns = {
             t : pd.DataFrame(l, columns=Alignment.Attrs._fields)\

@@ -78,20 +78,21 @@ class Sigplot:
             #track_color = self.prms.track_colors[i]
             colors = self.conf.vis.track_colors[i]
 
-            alns = track.alignments.query("@read_id == read_id")
+            alns = self.tracks.alignments.loc[track.id].query("@read_id == read_id")
             aln_ids = alns.index
-
 
             dtws = list()
             seqs = list()
             
             for aln_id,aln in alns.iterrows():
-                dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln.id")
-                seq = track.layers.loc[(slice(None),aln_id),"seq"].droplevel("aln.id")
-                #seq["model_current"] = track.model[seq["kmer"].dropna()]
+                #dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln.id")
+                #seq = track.layers.loc[(slice(None),aln_id),"seq"].droplevel("aln.id")
+                layers = self.tracks.layers.loc[track.id].loc[aln_id]
+                dtw = layers["dtw"]#.droplevel("aln.id")
+                seq = layers["seq"]
 
                 #dtws.append(dtw)
-                seqs.append(track.layers.loc[(slice(None),aln_id),:].droplevel("aln.id"))
+                seqs.append(layers)
 
                 max_i = dtw["start"].argmax()
                 samp_min = min(samp_min, dtw["start"].min())
@@ -124,7 +125,7 @@ class Sigplot:
         current_max = max(current_max, signal.max())
 
         if len(self.tracks) == 1:
-            self._plot_bases(fig, track_dtws[0], track.model, current_min, current_max, row, col)
+            self._plot_bases(fig, track_dtws[0], self.tracks.model, current_min, current_max, row, col)
             colors = ["white"]
             dtw_kws = [{}]
         else:
@@ -133,7 +134,7 @@ class Sigplot:
                 ys = np.linspace(current_min, current_max, len(self.tracks)+1)
                 dy = (ys[1]-ys[0])*0.01
                 for dtw,ymin,ymax in zip(track_dtws, ys[:-1], ys[1:]):
-                    self._plot_bases(fig, dtw, track.model, ymin+dy, ymax-dy, row, col)
+                    self._plot_bases(fig, dtw, self.tracks.model, ymin+dy, ymax-dy, row, col)
 
             colors = self.conf.vis.track_colors
             dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks.alns]
