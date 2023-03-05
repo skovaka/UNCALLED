@@ -135,7 +135,7 @@ class Tombo(TrackIO):
             kmers = coords.ref_kmers.droplevel(0).loc[refs]
 
             idx = pd.MultiIndex.from_product(
-                    [[self.in_id], [fwd], pacs, [aln_id]], names=("track_id","fwd","pac","aln_id"))
+                    [[self.in_id], [fwd], pacs, [aln_id]], names=("track.id","seq.fwd","seq.pac","aln.id"))
 
             layers = pd.DataFrame({
                     "start"  : starts,
@@ -152,15 +152,15 @@ class Tombo(TrackIO):
 
             alns = pd.DataFrame({
                     "id" : [aln_id],
-                    "track_id" : [self.in_id],
+                    "track.id" : [self.in_id],
                     "read_id" : [read.read_id],
                     "ref_name" : [coords.ref_name],
                     "ref_start" : [coords.refs.start],
                     "ref_end" : [coords.refs.stop],
-                    "fwd" :     [coords.fwd],
+                    "seq.fwd" :     [coords.fwd],
                     "samp_start" : [samp_start],
                     "samp_end" : [samp_end],
-                    "tags" : [""]}).set_index(["track_id", "id"])
+                    "tags" : [""]}).set_index(["track.id", "id"])
 
             aln_id += 1
 

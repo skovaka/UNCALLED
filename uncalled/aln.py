@@ -5,7 +5,7 @@ import _uncalled
 from _uncalled import _AlnCoords, _AlnCoordsDF, _AlnDF#, _Alignment
 
 from collections import namedtuple
-_Layer = namedtuple("_Layer", ["dtype", "label", "default"], defaults=[None,None])
+_Layer = namedtuple("_Layer", ["dtype", "label", "default"], defaults=[None,None,False])
 
 ALN_LAYERS = {
     "start" : _Layer("Int32", "Sample Start", True),
@@ -13,7 +13,7 @@ ALN_LAYERS = {
     "current" : _Layer(np.float32, "Current (pA)", True),
     "current_sd" : _Layer(np.float32, "Stdv (pA)", True),
     "start_sec" : _Layer(np.float32, "Time (s)", True),
-    "dwell_sec" : _Layer(np.float32, "Dwell (s)", True),
+    "length_sec" : _Layer(np.float32, "Dwell (s)", True),
     "length_ms" : _Layer(np.float32, "Dwell (ms)", True),
     "end" : _Layer("Int32", "Sample End", False),
     "middle" : _Layer(np.float32, "Sample Middle", False),
@@ -32,6 +32,8 @@ LAYERS = {
         "fwd" : _Layer(bool, "Forward", False),
         "strand" : _Layer(str, "Strand", False),
         "base" : _Layer(str, "Base", False),
+    }, "aln" : {
+        "id" : _Layer("Int64", "Aln. ID"),
     }, "dtw" : ALN_LAYERS, "moves" : ALN_LAYERS,
     #}, "moves" : {
     #    "start" : _Layer("Int32", "BC Sample Start", True),
@@ -88,7 +90,7 @@ def parse_layer(layer):
 
 def parse_layers(layers):
     if layers is None:
-        return pd.Index()
+        return pd.Index([])
 
     if isinstance(layers, str):
         layers = layers.split(",")
@@ -145,7 +147,7 @@ class Sequence:
 
     def to_pandas(self, layers=None):
         if layers is None:
-            layers = ["pos", "kmer"]
+            layers = ["seq.pos", "kmer"]
 
         cols = dict()
         for name in layers:
@@ -195,8 +197,16 @@ class AlnDF:
         return self.start / self.sample_rate
 
     @property
-    def dwell_sec(self):
+    def length_sec(self):
         return self.length / self.sample_rate
+
+    @property
+    def middle(self):
+        return (self.start + self.length / 2).astype(np.float32)
+
+    @property
+    def middle_sec(self):
+        return middle / self.sample_rate
 
     @property
     def model_diff(self):
@@ -275,16 +285,17 @@ class CmpDF:
         return self.instance.__getattribute__(name)
 
 class Alignment:
-    def __init__(self, read, seq, sam=None):
+    def __init__(self, aln_id, read, seq, sam=None):
+        self.id = aln_id
+        self.seq = seq
+        self.sam = sam
+
         if isinstance(read, str):
             read_id = read
             self.read = None
         else:
             read_id = read.id
             self.read = read
-
-        self.seq = seq
-        self.sam = sam
 
         Super = getattr(_uncalled, f"_AlignmentK{seq.K}", None)
         if Super is None:
@@ -310,11 +321,9 @@ class Alignment:
             df = df.instance
         self.instance.set_moves(df)
 
-    def to_pandas(self, layers=None):
+    def to_pandas(self, layers=None, index=None):
         vals = dict()
 
-        if layers is None:
-            layers = LAYERS.index.unique(0)
         layers = parse_layers(layers)
 
         for name in layers.unique(0):
@@ -325,4 +334,24 @@ class Alignment:
 
         df = pd.concat(vals, axis=1, names=["group", "layer"])
 
+        df["aln","id"] = self.id
+        
+        if index is not None:
+            index = list(parse_layers(index))
+            df.set_index(index, inplace=True)
+            df.index.names = [".".join(idx) for idx in index]
+
         return df#.set_index(index)
+
+    Attrs = namedtuple("Attrs", [
+        "id", "read_id", "ref_name", "ref_start", "ref_end", 
+        "fwd", "sample_start", "sample_end", "coords"
+    ])
+
+    #@property
+    def attrs(self):
+        return self.Attrs(
+            self.id, self.read_id, self.seq.name, self.seq.coords.start, self.seq.coords.end,
+            self.seq.fwd, self.moves.samples.start, self.moves.samples.end, self.seq.coords
+        )
+

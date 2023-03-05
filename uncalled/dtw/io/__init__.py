@@ -42,7 +42,7 @@ class TrackIO:
 
         self.aln_tracks = list()
 
-        if not hasattr(self, "aln_id"):
+        if not hasattr(self, "aln.id"):
             self.aln_id = 1
 
         if filename is None:
@@ -117,8 +117,8 @@ class TrackIO:
         layers = layers.droplevel(0)
 
         for track in self.aln_tracks:
-            track_alns = alignments[alignments["track_id"] == track.id]
-            i = layers.index.get_level_values("aln_id").isin(track_alns.index)
+            track_alns = alignments[alignments["track.id"] == track.id]
+            i = layers.index.get_level_values("aln.id").isin(track_alns.index)
             track_layers = layers.iloc[i]
 
             track.set_data(coords, track_alns, track_layers)
@@ -146,7 +146,7 @@ class TrackIO:
         for out in buf:
             self.output.write(out)
             
-    def next_aln(self, aln):
+    def next_aln_id(self):
         self.aln_id += 1
         return self.aln_id
 

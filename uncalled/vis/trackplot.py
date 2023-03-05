@@ -155,47 +155,57 @@ class Trackplot:
         layer_label = LAYER_META.loc[(group,layer),"label"]
 
         t0 = time.time()
-        for i,track in enumerate(self.tracks.alns):
+        #for i,track in enumerate(self.tracks.alns):
+        for i in np.arange(self.tracks.track_count)+1:
             self.fig.update_yaxes(
-                title_text=f"{track.desc}", 
+                title_text=str(i),#f"{track.desc}", 
                 showticklabels=False,
                 row=row, col=1)
 
-            if track.empty: 
-                sys.stderr.write("Warning: no alignments loaded from track \"%s\"\n" % track.desc)
+            #if track.empty: 
+            print(i)
+            print(self.tracks.layers)
+            if i not in self.tracks.layers.index.get_level_values(0):
+                sys.stderr.write("Warning: no alignments loaded from track \"%d\"\n" % i)
                 row += 1
                 continue
 
-            if track.mat is None:
-                track.load_mat()
+            #if track.mat is None:
+            #    track.load_mat()
 
-            mat = track.mat[(group,layer)]#.dropna(how="all")
-            
+            #mat = track.mat[(group,layer)]#.dropna(how="all")
+            mat = self.tracks.mat.loc[(i,slice(None)),(group,layer)]#.dropna(how="all")
 
+            print("HERE")
+            print(mat)
 
-            hover_lines = [track.coords.ref_name + ":%{x}"]
+            read_ids = self.tracks.alignments.loc[mat.index, "read_id"].to_numpy()
+
+            hover_lines = [self.tracks.coords.ref_name + ":%{x}"]
             if self.prms.hover_read:
                 hover_lines.append("%{text}")
-                read_ids = np.tile(track.alignments.loc[mat.index, "read_id"].to_numpy(), (mat.shape[1], 1)).T
+                hover_read = np.tile(read_ids, (mat.shape[1], 1)).T
             else:
-                read_ids = None
+                hover_read = None
             hover_lines.append(layer_label + ": %{z}<extra></extra>")
             hover = "<br>".join(hover_lines)
 
             self.fig.add_trace(go.Heatmap(
-                name=track.desc,
+                name=str(i), #track.desc,
                 x=mat.columns,
                 #y=track.alignments["read_id"],
                 z=mat,
                 zsmooth=False,
                 hoverinfo="text",
                 hovertemplate=hover,
-                text = read_ids,
+                text = hover_read,
                 coloraxis="coloraxis",
             ), row=row, col=1)
 
+            print("READS")
+            print(read_ids)
             if self.prms.select_read is not None:
-                ys = np.where((self.prms.select_read == track.alignments["read_id"]).to_numpy())[0]
+                ys = np.where(self.prms.select_read == read_ids)[0]
                 for y in ys:
                     self.fig.add_hline(y=y, line_color="red", row=row, col=1)
             row += 1

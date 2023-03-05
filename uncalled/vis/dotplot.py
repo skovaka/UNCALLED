@@ -27,17 +27,17 @@ class Dotplot:
 
     REQ_LAYERS = [
         "start", "length", "middle", 
-        "current", "length_ms", "seq.kmer", "base", 
+        "current", "length_ms", "seq.kmer",  
         "moves.middle", "seq.current",
-        "start_sec", "dwell_sec"
+        "start_sec", "length_sec"
     ]
 
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
 
         req_layers = self.REQ_LAYERS.copy()
-        if self.prms.show_bands:
-            req_layers.append("band")
+        #if self.prms.show_bands:
+        #    req_layers.append("band")
 
         self.conf.tracks.layers = req_layers + self.prms.layers
 
@@ -97,11 +97,7 @@ class Dotplot:
         tracks_filter,colors_filter = zip(*[(t,c) for t,c in zip(tracks.alns,self.conf.vis.track_colors) if t.name != self.prms.moves_track])
         #colors_filter = [t for t in tracks if t.name != self.prms.moves_track]
 
-        print("sigplot")
-
         Sigplot(tracks, conf=self.conf).plot(fig)
-
-        print("plotted")
 
         hover_layers = [("dtw", "middle"),("seq","kmer"),("dtw","current"),("dtw","length_ms")] + self.layers
         #hover_layers += (l for l in self.prms.layers if l not in {"current","length_ms"})
@@ -113,8 +109,6 @@ class Dotplot:
         fwd = True
 
         for i,track in enumerate(tracks.alns):
-
-            print(track.layers)
 
             track_hover = list()
 
@@ -130,7 +124,7 @@ class Dotplot:
             for aln_id, aln in track.alignments.iterrows():
                 layers = track.layers \
                               .loc[(slice(None),aln_id), slice(None)] \
-                              .droplevel("aln_id")
+                              .droplevel("aln.id")
 
                 layers["dtw","start"] /=    float(self.conf.read_buffer.sample_rate)
                 layers["dtw","length"] /=   float(self.conf.read_buffer.sample_rate)
@@ -225,14 +219,12 @@ class Dotplot:
         #        if not ("moves","error") in track.layers.columns: 
         #            continue
         #        for aln_id, aln in track.alignments.iterrows():
-        #            layers = track.layers.loc[(slice(None),aln_id)].droplevel("aln_id")
+        #            layers = track.layers.loc[(slice(None),aln_id)].droplevel("aln.id")
         #            self._plot_errors(fig, legend, layers)
 
         if len(hover_data) > 0:
             hover_data = pd.concat(hover_data, axis=1)
             hover_coords = hover_data.xs("middle", axis=1, level=2).mean(axis=1)
-
-            print(hover_data)
 
             hover_kmers = model.kmer_to_str(
                 hover_data.xs("kmer", 1, 2)

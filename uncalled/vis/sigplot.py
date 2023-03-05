@@ -49,7 +49,7 @@ class Sigplot:
         for base, color in enumerate(self.conf.vis.base_colors):
             base_dtw = dtw[bases == base]
             starts = base_dtw["dtw", "start_sec"]
-            ends = starts + base_dtw["dtw", "dwell_sec"] - (1.0 / self.conf.read_buffer.sample_rate)
+            ends = starts + base_dtw["dtw", "length_sec"] - (1.0 / self.conf.read_buffer.sample_rate)
             nones = [None]*len(base_dtw)
 
             ys = [ymax,ymax,ymin,ymin,None]*len(base_dtw)
@@ -86,12 +86,12 @@ class Sigplot:
             seqs = list()
             
             for aln_id,aln in alns.iterrows():
-                dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln_id")
-                seq = track.layers.loc[(slice(None),aln_id),"seq"].droplevel("aln_id")
+                dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln.id")
+                seq = track.layers.loc[(slice(None),aln_id),"seq"].droplevel("aln.id")
                 #seq["model_current"] = track.model[seq["kmer"].dropna()]
 
                 #dtws.append(dtw)
-                seqs.append(track.layers.loc[(slice(None),aln_id),:].droplevel("aln_id"))
+                seqs.append(track.layers.loc[(slice(None),aln_id),:].droplevel("aln.id"))
 
                 max_i = dtw["start"].argmax()
                 samp_min = min(samp_min, dtw["start"].min())

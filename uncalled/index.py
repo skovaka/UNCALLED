@@ -281,7 +281,7 @@ class CoordSpace:
         #    strand_label = "strand"
         #    strand = "+" if strand else "-"
         #else:
-        #    strand_label = "fwd"
+        #    strand_label = "seq.fwd"
         #ret = pd.MultiIndex.from_product(
         #    [[self.ref_name], [, [strand]], 
         #    names=["ref_name", "ref", strand_label])

@@ -57,9 +57,9 @@ class AlnTrack:
         self.set_data(coords, alignments, layers, order)
 
     def _parse_layers(self, df):
-        if df.index.names[0] == "pac":
+        if df.index.names[0] == "seq.pac":
             df = df.rename(index=self.coords.pac_to_pos, level=0)
-            df.index.names = ("pos", "aln_id")
+            df.index.names = ("seq.pos", "aln.id")
 
             refs = df.index.get_level_values(0)
             if len(df) > 1 and refs[0] > refs[1]:
@@ -123,7 +123,7 @@ class AlnTrack:
         #coords = self.coords.ref_slice(ref_start, ref_end)
         if self.empty:
             return AlnTrack(self, coords, self.alignments, self.layers)
-        layer_refs = self.layers.index.get_level_values("pos")
+        layer_refs = self.layers.index.get_level_values("seq.pos")
 
 
         #layers = self.layers.loc[layer_refs.isin(coords.refs)]
@@ -135,7 +135,7 @@ class AlnTrack:
             aln_ids = self.alignments.index[self.alignments["read_id"].isin(reads)]
 
         if aln_ids is not None: 
-            layer_alns = layers.index.get_level_values("aln_id")
+            layer_alns = layers.index.get_level_values("aln.id")
             aln_ids = layer_alns.unique().intersection(aln_ids)
             layers = layers.loc[layer_alns.isin(aln_ids)] 
         else:
@@ -164,8 +164,8 @@ class AlnTrack:
     def add_layer_group(self, group, layers, aln_id, overwrite):
         aln_id = self._aln_id_or_default(aln_id)
 
-        layers["aln_id"] = aln_id
-        df = layers.set_index("aln_id", append=True).reorder_levels(["pos","aln_id"])
+        layers["aln.id"] = aln_id
+        df = layers.set_index("aln.id", append=True).reorder_levels(["seq.pos","aln.id"])
 
         meta = LAYER_META.loc[group]
         df = df[meta.index.intersection(df.columns)]
@@ -212,11 +212,11 @@ class AlnTrack:
 
     def load_mat(self):
         df = self.layers.copy()
-        #df["aln_id"] = df.index.get_level_values("aln_id")
+        #df["aln.id"] = df.index.get_level_values("aln.id")
         df = df.reset_index()
 
-        self.mat = df.pivot(index="aln_id", columns=["pos"]) \
-                     .rename_axis(("group","layer","pos"), axis=1) \
+        self.mat = df.pivot(index="aln.id", columns=["seq.pos"]) \
+                     .rename_axis(("group","layer","seq.pos"), axis=1) \
                      .reindex(self.coords.refs, axis=1, level=2) \
                      .sort_index(axis=1)
 
@@ -284,15 +284,15 @@ class AlnTrack:
 
         aln_b = other.layers \
                    .loc[(slice(None),id_b),group][["start","end"]] \
-                   .reset_index(level="aln_id") \
-                   .rename(columns={"aln_id" : "aln_b"})
+                   .reset_index(level="aln.id") \
+                   .rename(columns={"aln.id" : "aln_b"})
                 
 
         alns_a = aln_a.index.unique(1)
         if len(alns_a) != 1:
             raise ValueError("Can only compare two alignments at a time")
         
-        has_pac = "pac" in aln_b.index.name
+        has_pac = "seq.pac" in aln_b.index.name
         flip = self.all_fwd == self.conf.is_rna
 
         def coords(df, track):
@@ -313,10 +313,10 @@ class AlnTrack:
 
         #cmp_df["aln_b"] = alns_b[0]
         if has_pac:
-            cmp_df["pac"] = self.coords.pos_to_pac(pd.Index(cmp_df["pos"]))
-            cmp_df = cmp_df.set_index("pac")
+            cmp_df["seq.pac"] = self.coords.pos_to_pac(pd.Index(cmp_df["seq.pos"]))
+            cmp_df = cmp_df.set_index("seq.pac")
         else:
-            cmp_df = cmp_df.set_index("pos")
+            cmp_df = cmp_df.set_index("seq.pos")
         df["jaccard"] = cmp_df["jaccard"]
         df["dist"] = cmp_df["dist"]
         df["aln_a"] = alns_a[0]
@@ -330,7 +330,7 @@ class AlnTrack:
 
     @property
     def layer_aln_ids(self):
-        return self.layers.index.get_level_values("aln_id")
+        return self.layers.index.get_level_values("aln.id")
 
     @property
     def layer_pacs(self):
@@ -346,14 +346,14 @@ class AlnTrack:
 
     @property
     def layers_pac_index(self):
-        index = pd.MultiIndex.from_arrays([self.coords.pos_to_pac(self.layer_refs), self.layers.index.get_level_values("aln_id")], names=["pac","aln_id"])
+        index = pd.MultiIndex.from_arrays([self.coords.pos_to_pac(self.layer_refs), self.layers.index.get_level_values("aln.id")], names=["seq.pac","aln.id"])
         return self.layers.set_index(index, drop=True)
 
     @property
     def layers_desc_index(self):
         index = pd.MultiIndex.from_arrays(
             [self.layer_refs, self.layer_strands, self.layer_aln_ids])
-        return pd.concat({self.coords.ref_name : self.layers.set_index(index, drop=True)}, names=[("pos","name"),("pos","coord"),("pos","strand"),"aln_id"])
+        return pd.concat({self.coords.ref_name : self.layers.set_index(index, drop=True)}, names=[("seq.pos","name"),("seq.pos","coord"),("seq.pos","strand"),"aln.id"])
 
         stats.index = pd.MultiIndex.from_product([
             [chunk.coords.ref_name], stats.index, ["+" if chunk.coords.fwd else "-"]
@@ -361,4 +361,4 @@ class AlnTrack:
 
     @property
     def layer_refs(self):
-        return self.layers.index.get_level_values("pos")
+        return self.layers.index.get_level_values("seq.pos")

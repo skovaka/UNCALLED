@@ -69,11 +69,8 @@ class BAM(TrackIO):
 
         self.in_alns = None
 
-        self.aln_id_in = 1
-
     def reset(self):
         self.input.reset()
-        self.aln_id_in = 1
 
     def _init_tags(self, tags):
         self.tags = dict()
@@ -275,12 +272,12 @@ class BAM(TrackIO):
                 continue
             self.bam = sam
 
-            aln = self.tracks.init_alignment(read, sam.reference_id, moves.index, sam)
+            aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, moves.index, sam)
             aln.set_moves(moves)
-            
+
             yield sam, aln
 
-    def _parse_sam(self, sam, coords=None):
+    def sam_to_aln(self, sam):
         samp_bounds = sam.get_tag(SAMP_TAG)
 
         norm_scale, norm_shift = sam.get_tag(NORM_TAG)
@@ -295,7 +292,6 @@ class BAM(TrackIO):
             stdv[das == self.INF_U16] = np.nan
         else:
             stdv = np.full(len(current), np.nan)
-
         
         length = sam.get_tag(LENS_TAG)
 
@@ -307,25 +303,9 @@ class BAM(TrackIO):
 
         samp_start, samp_end = samp_bounds
 
-        #TODO build whole alignment, slice after
-        #if coords is not None:
-        #    clip = IntervalIndexI64([(coords.mposs[fwd].min(), coords.mposs[fwd].max()+1)])
-
-        #    st = icoords.get_index(clip.start) if icoords.start < clip.start else 0
-        #    en = icoords.get_index(clip.end-1)+1  if icoords.end > clip.end else icoords.length
-
-        #    icoords = icoords.islice(st,en)
-
-        #    current = current[st:en]
-        #    stdv = stdv[st:en]
-
-        #    samp_start += np.sum(length[:st])
-        #    samp_end -= np.sum(length[en:])
-        #    length = length[st:en]
-
         read = self.tracks.read_index.get(sam.query_name, None)
 
-        aln = self.tracks.init_alignment(read, sam.reference_id, icoords, sam)
+        aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, icoords, sam)
 
         start = np.full(icoords.length, samp_start, dtype="int32")
         start[1:] += np.cumsum(length)[:-1].astype("int32")
@@ -337,36 +317,30 @@ class BAM(TrackIO):
         if moves is not None:
             aln.set_moves(moves)
 
-        aln_df = pd.DataFrame({
-                "id" : [self.aln_id_in],
-                "track_id" : [self.in_id],
-                "read_id" : [sam.query_name],
-                "ref_name" : [sam.reference_name],
-                "ref_start" : [sam.reference_start],
-                "ref_end" : [sam.reference_end],
-                "fwd" :     [fwd],
-                "samp_start" : [samp_start],
-                "samp_end" : [samp_end],
-                "tags" : [""]}).set_index(["track_id", "id"])
-
         aln.calc_mvcmp()
 
-        l = self.conf.tracks.layers+["dtw.start_sec", "dtw.dwell_sec", "moves.start_sec", "moves.dwell_sec", "seq.pac", "seq.fwd", "seq.kmer", "seq.current"]
-        layers = aln.to_pandas(l)#, "dtw", "moves", "mvcmp"])
-        layers["track_id"] = self.in_id
-        layers["aln_id"] = self.aln_id_in
-        layers = layers.set_index(["track_id", ("seq","fwd"), ("seq","pac"), "aln_id"]).sort_index()
-        layers.index.names = ["track_id", "fwd", "pac", "aln_id"]
+        return aln
 
-        self.aln_id_in += 1
+    def _parse_sam(self, sam, layer_names):
+        aln = self.sam_to_aln(sam)
+
+        layers = aln.to_pandas(layer_names, index=["seq.fwd", "seq.pos", "aln.id"])
+        layers["track.id"] = self.in_id
+        layers = layers.set_index("track.id", append=True)\
+                       .reorder_levels(["track.id", "seq.fwd", "seq.pos", "aln.id"])
+
+        attr = aln.attrs()
+        aln_df = pd.DataFrame([attr], columns=attr._fields)
+        aln_df["track.id"] = self.in_id
+        aln_df.set_index(["track.id","id"], inplace=True)
 
         return aln_df, layers
 
-    def query(self, layers, track_id, coords, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
+    def query(self, layers, coords, index=["seq.fwd","seq.pos","aln.id"], read_id=None, full_overlap=False):
         itr = self.input.fetch(coords.ref_name, coords.refs.min(), coords.refs.max())
 
-        alignments = list()
-        layers = list()
+        track_alns = defaultdict(list)
+        track_layers = defaultdict(list)
 
         if read_id is not None and len(read_id) > 0:
             read_ids = set(read_id)
@@ -376,11 +350,38 @@ class BAM(TrackIO):
         for sam in itr:
             if read_ids is not None and sam.query_name is not read_ids:
                 continue
-            a,l = self._parse_sam(sam, coords)
-            alignments.append(a)
-            layers.append(l)
+            aln = self.sam_to_aln(sam)
 
-        return pd.concat(alignments), pd.concat(layers)
+            track_alns[self.in_id].append(aln.attrs())
+            track_layers[self.in_id].append(aln.to_pandas(layers, index=index))
+
+        track_alns = {
+            t : pd.DataFrame(l, columns=Alignment.Attrs._fields)\
+                  .set_index("id")
+            for t,l in track_alns.items()}
+        track_layers = {t : pd.concat(l) for t,l in track_layers.items()}
+            
+        return track_alns, track_layers
+
+    def query_old(self, layers, track_id, coords, aln_id=None, read_id=None, fwd=None, order=["read_id", "seq.pac"], full_overlap=False):
+        itr = self.input.fetch(coords.ref_name, coords.refs.min(), coords.refs.max())
+
+        aln_dfs = list()
+        layer_dfs = list()
+
+        if read_id is not None and len(read_id) > 0:
+            read_ids = set(read_id)
+        else:
+            read_ids = None
+
+        for sam in itr:
+            if read_ids is not None and sam.query_name is not read_ids:
+                continue
+            a,l = self._parse_sam(sam, layers)
+            aln_dfs.append(a)
+            layer_dfs.append(l)
+
+        return pd.concat(aln_dfs), pd.concat(layer_dfs)
         #self.fill_tracks(coords, pd.concat(alignments), pd.concat(layers))
 
     def iter_refs(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, chunksize=None, full_overlap=False):
@@ -407,11 +408,11 @@ class BAM(TrackIO):
 
         t = time.time()
         for sam in itr:
-            next_alns,next_layers = self._parse_sam(sam)
+            next_alns,next_layers = self._parse_sam(sam, layers)
 
             next_aln = next_alns.iloc[0]
             next_ref = next_aln["ref_name"]
-            next_start = next_layers.index.get_level_values("pac").min()
+            next_start = next_layers.index.get_level_values("seq.pac").min()
 
             #we're losing alignments somewhere. getting out of sync
             #maybe right below
@@ -429,10 +430,10 @@ class BAM(TrackIO):
                 new_layers = list()
                 
                 ret_layers = layer_df.loc[slice(None),slice(None),prev_start:next_start-1]
-                ret_alns = aln_df.loc[ret_layers.index.droplevel(["fwd", "pac"]).unique()]
+                ret_alns = aln_df.loc[ret_layers.index.droplevel(["seq.fwd", "seq.pac"]).unique()]
 
                 layer_df = layer_df.loc[slice(None),slice(None),next_start:]
-                aln_df = aln_df.loc[layer_df.index.droplevel(["fwd", "pac"]).unique()]
+                aln_df = aln_df.loc[layer_df.index.droplevel(["seq.fwd", "seq.pac"]).unique()]
                 #ret_layer_count = 0
 
                 t = time.time()
@@ -455,7 +456,7 @@ class BAM(TrackIO):
         layer_df = pd.concat([layer_df] + new_layers).sort_index()
         
         ret_layers = layer_df.loc[slice(None),slice(None),prev_start:]
-        ret_alns = aln_df.loc[ret_layers.index.droplevel(["fwd", "pac"]).unique()]
+        ret_alns = aln_df.loc[ret_layers.index.droplevel(["seq.fwd", "seq.pac"]).unique()]
 
         if len(ret_alns) > 0:
             yield (ret_alns, ret_layers)
@@ -475,7 +476,7 @@ class BAM(TrackIO):
             ref_bounds = RefCoord(sam.reference_name, ref_start, ref_end, not sam.is_reverse)
             coords = ref_index.get_coord_space(ref_bounds, is_rna=self.conf.is_rna, load_kmers=True, kmer_trim=False)
 
-            yield self._parse_sam(sam, coords)
+            yield self._parse_sam(sam, layers)
 
             aln_id += 1
 

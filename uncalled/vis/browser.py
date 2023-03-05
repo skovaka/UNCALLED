@@ -25,7 +25,8 @@ def browser(conf):
     conf.tracks.load_mat = True
     conf.tracks.load_fast5s = True
     #conf.tracks.refstats_layers = ["cmp.dist"]
-    conf.tracks.layers=["dtw","dtw.length_ms","dtw.model_diff","dtw.middle","moves.middle","moves","cmp","mvcmp"]
+    conf.tracks.layers=["dtw","dtw.length_ms","dtw.model_diff","dtw.middle","moves.middle","cmp","mvcmp", "dtw.start_sec", "dtw.length_sec", "moves.start_sec", "moves.length_sec", "seq.pos", "seq.fwd", "seq.kmer", "seq.current"]
+    
     sys.stderr.write("Loading tracks...\n")
 
     t = time()
