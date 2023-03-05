@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import sys
 from ..aln_track import AlnTrack
-from ..layers import LAYER_META, parse_layers
+from ...aln import LAYER_META, parse_layers
 from . import TrackIO
 import _uncalled
 
@@ -11,7 +11,7 @@ EXTRA_FNS = {
 }
 
 EXTRA_COLS = pd.Index(EXTRA_FNS.keys())
-INDEX_COLS = [("seq","name"),("seq","ref"),("seq","strand")]
+INDEX_COLS = [("seq","name"),("seq","pos"),("seq","strand")]
 
 class TSV(TrackIO):
     FORMAT = "tsv"
@@ -30,7 +30,7 @@ class TSV(TrackIO):
         layer_cols = pd.Index(INDEX_COLS+self.prms.tsv_cols).difference(EXTRA_COLS)
         self.extras = EXTRA_COLS.intersection(self.prms.tsv_cols)
 
-        layers = list(parse_layers(layer_cols, add_deps=False))
+        layers = list(parse_layers(layer_cols))
         self.columns = pd.MultiIndex.from_tuples(layers)
         self.conf.tracks.layers += layers
         self._header = True
@@ -41,17 +41,8 @@ class TSV(TrackIO):
         raise RuntimeError("Reading from TSV not yet supported")
 
     def write_alignment(self, aln):
-        ref_name = self.tracks.index.get_ref_name(aln.seq.ref_id)
-
-        #TODO use this in browser, eventalign
-        df = aln.to_pandas(INDEX_COLS+self.prms.tsv_cols).set_index(INDEX_COLS) 
-        df = df.sort_index()
-
-        #track.calc_layers(self.columns)
-        #df = track.layers_desc_index#.reset_index()
+        df = aln.to_pandas(self.prms.tsv_cols, INDEX_COLS).sort_index()
         
-        df = df[self.columns.intersection(df.columns)].dropna(how="all", axis=0)
-
         for col in df.columns[df.columns.get_level_values(-1).str.endswith("kmer")]:
             kmers = df[col].dropna()
             df[col] = self.tracks.model.kmer_to_str(kmers)

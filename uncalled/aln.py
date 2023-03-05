@@ -325,7 +325,8 @@ class Alignment:
     def to_pandas(self, layers=None, index=None):
         vals = dict()
 
-        layers = parse_layers(layers)
+        index = parse_layers(index)
+        layers = parse_layers(layers).union(index)
 
         for name in layers.unique(0):
             _,group_layers = layers.get_loc_level(name)
@@ -338,8 +339,7 @@ class Alignment:
         df["aln","id"] = self.id
         
         if index is not None:
-            index = list(parse_layers(index))
-            df.set_index(index, inplace=True)
+            df.set_index(list(index), inplace=True)
             df.index.names = [".".join(idx) for idx in index]
 
         return df#.set_index(index)

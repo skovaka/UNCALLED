@@ -17,10 +17,8 @@ class Eventalign(TrackIO):
         self._header = True
 
         if self.write_mode:
-            print("WRITE MODE")
             self.init_write_mode()
         else:
-            print("READ MODE")
             self.init_read_mode()
 
     def init_write_mode(self):
@@ -46,7 +44,6 @@ class Eventalign(TrackIO):
         if self.write_samples:
             self.header += ["samples"]
 
-        print("init_out")
         TrackIO._init_output(self, self.prms.buffered)
 
         if not self.prms.buffered:
@@ -64,15 +61,9 @@ class Eventalign(TrackIO):
 
     #def write_layers(self, track, groups):
     def write_alignment(self, aln):
-        if "dtw" not in groups: 
-            return
+        events = aln.to_pandas(["seq.kmer", "dtw"], ["seq.pac"]).sort_index().droplevel(0, axis=1)
 
-        df = track.layers["dtw"].dropna(how="all").sort_index()
-
-        pacs = df.index.get_level_values(0)
-        events = df.droplevel(1)#.set_index(track.coords.pac_to_pos(pacs))
-
-        model = track.model
+        model = self.tracks.model
         kmers = events["kmer"]
 
         std_level = (events["current"] - model.model_mean) / model.model_stdv
@@ -80,7 +71,7 @@ class Eventalign(TrackIO):
         if "events" in events:
             event_counts = events["events"]
             event_index = (event_counts.cumsum() - event_counts.iloc[0]).astype(int)
-            if track.all_rev: #TODO check for flipped ref
+            if not aln.fwd: #TODO check for flipped ref
                 event_index = event_index.max() - event_index
             event_index += 1
         else:
@@ -101,15 +92,16 @@ class Eventalign(TrackIO):
             signal = []
 
         if self.write_read_name:
-            read_id = track.alignments["read_id"].iloc[0]
+            read_id = aln.read_id #track.alignments["read_id"].iloc[0]
         else:
-            read_id = str(self.prev_aln_id)
+            read_id = str(self.aln_id)
+        self.next_aln_id()
         
         writer = self.writer = getattr(_uncalled, f"write_eventalign_K{model.K}")
 
         eventalign = writer(
-            self.conf, model.instance, read_id, track.coords.fwd, read,
-            track.coords.ref_name, events.index-2, 
+            self.conf, model.instance, read_id, aln.seq.fwd, read,
+            aln.seq.name, events.index-2, 
             self.write_signal_index,
             kmers, 
             event_index, #TODO properly rep skips?
@@ -212,9 +204,6 @@ class Eventalign(TrackIO):
             for alns,layers in iter_layers(leftover, aln_id):
                 yield alns,layers
 
-
-    def write_alignment(self, alns):
-        pass
 
     def init_fast5(self, fast5):
         pass
