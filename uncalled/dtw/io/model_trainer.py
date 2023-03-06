@@ -8,10 +8,11 @@ from time import time
 
 from ...pore_model import PoreModel
 from ..aln_track import AlnTrack
-from ..layers import LAYER_META, parse_layers
+from ...aln import LAYER_META, parse_layers
 from . import TrackIO
 
-LAYERS = [("dtw",l) for l in ("kmer", "current", "stdv", "length_ms")]
+#LAYERS = [("dtw",l) for l in ("kmer", "current", "stdv", "length_ms")]
+LAYERS = [("seq","kmer"), ("dtw","current"), ("dtw","stdv"), ("dtw","length_ms")]
 
 class ModelTrainer(TrackIO):
     FORMAT = "model"
@@ -90,14 +91,22 @@ class ModelTrainer(TrackIO):
         self.kmer_index = None #pd.DataFrame({"start" : 0}, index=self.model.KMERS)
         self.full_kmers = set()
 
-    def write_layers(self, track, groups):
-        if self.model is None:
-            self.set_model(track.model)
 
-        track.calc_layers(LAYERS)
-        mask = track.layers[("cmp", "dist")] <= 1
-        dtw = track.layers.loc[mask, LAYERS]["dtw"].set_index("kmer", drop=True) #\
+    #def write_layers(self, track, groups):
+        #if self.model is None:
+        #    self.set_model(track.model)
+
+        #track.calc_layers(LAYERS)
+    def write_alignment(self, aln):
+        
+        #mask = track.layers[("cmp", "dist")] <= 1
+        #dtw = track.layers.loc[mask, LAYERS]["dtw"].set_index("kmer", drop=True) #\
          #.sort_index() 
+
+        df = aln.to_pandas(LAYERS, index=["seq.kmer"])
+
+        mask = df["mvcmp","dist"] <= 1
+        dtw = track.layers.loc[mask, LAYERS]["dtw"].set_index("kmer", drop=True) #\
 
         if self.prms.buffered:
             self.out_buffer.append(dtw)

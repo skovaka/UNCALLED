@@ -74,7 +74,7 @@ def dtw_worker(p):
     conf,bams,reads,header = p
 
     conf.tracks.io.buffered = True
-    conf.tracks.io.bam_in = None
+    #conf.tracks.io.bam_in = None
 
     header = pysam.AlignmentHeader.from_dict(header)
 
@@ -83,7 +83,8 @@ def dtw_worker(p):
     i = 0
     for bam in bams:
         bam = pysam.AlignedSegment.fromstring(bam, header)
-        dtw = GuidedDTW(tracks, bam)
+        aln = tracks.bam_in.sam_to_aln(bam)
+        dtw = GuidedDTW(tracks, aln, bam)
         i += 1
 
     tracks.close()
@@ -202,8 +203,8 @@ class GuidedDTW:
         #if self.bands is not None:
         #    tracks.add_layers("band", self.bands)#, aln_id=aln_id)
 
-        #if self.conf.mvcmp:
-        #    self.aln.calc_mvcmp()
+        if self.conf.mvcmp:
+            self.aln.calc_mvcmp()
             #tracks.calc_compare("moves", True, True)
 
         tracks.write_alignment(self.aln)

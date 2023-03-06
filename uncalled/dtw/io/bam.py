@@ -131,8 +131,6 @@ class BAM(TrackIO):
 
     def write_alignment(self, aln):
         self.bam = aln.sam
-        #if self.bam is None: 
-        #    return
 
         refs = list()
         for i in range(aln.seq.coords.interval_count()):
@@ -280,15 +278,17 @@ class BAM(TrackIO):
             yield sam, aln
 
     def sam_to_aln(self, sam):
-        has_aln = True
+        has_dtw = True
         for tag in REQ_ALN_TAGS:
             if not sam.has_tag(tag):
-                has_aln = False
+                has_dtw = False
                 break
 
         aln = None
 
-        if has_aln:
+        read = self.tracks.read_index.get(sam.query_name, None)
+
+        if has_dtw:
             samp_bounds = sam.get_tag(SAMP_TAG)
 
             norm_scale, norm_shift = sam.get_tag(NORM_TAG)
@@ -312,8 +312,6 @@ class BAM(TrackIO):
 
             samp_start, samp_end = samp_bounds
 
-            read = self.tracks.read_index.get(sam.query_name, None)
-
             aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, coords, sam)
 
             start = np.full(coords.length, samp_start, dtype="int32")
@@ -324,14 +322,15 @@ class BAM(TrackIO):
 
 
         moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
-        if moves is not None:
+        has_moves = moves is not None
+        if has_moves:
             if aln is None:
-                aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, moves.seq.coords, sam)
+                aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, moves.index, sam)
             aln.set_moves(moves)
 
-        if aln is not None:
+        if has_moves and has_dtw:
             aln.calc_mvcmp()
-        else:
+        elif aln is None:
             fwd = int(not sam.is_reverse)
             if fwd == self.conf.is_rna:
                 coords = IntervalIndexI64([(-sam.reference_end, -sam.reference_start)])
