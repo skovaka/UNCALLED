@@ -20,7 +20,7 @@ LAYER_COLORS = {
     ("moves", "indel") : {"colorscale" : "Picnic", "cmid" : 0, "cmax" : 1, "cmin" : -1, "reversescale":False},
     ("dtw", "events_log2") : {"colorscale" : "Picnic", "cmid" : 0, "cmax" : 2, "cmin" : -2, "reversescale":True},
     ("dtw", "current") : {"colorscale" : "viridis"},
-    ("dtw", "length_ms") : {"colorscale" : "viridis", "cmin" : 0, "cmax" : 25},
+    ("dtw", "dwell") : {"colorscale" : "viridis", "cmin" : 0, "cmax" : 25},
     ("cmp", "dist") : _CMP_COLOR,
     ("mvcmp", "dist") : _CMP_COLOR,
 }
@@ -37,7 +37,7 @@ DEFAULT_HEIGHTS = {
 }
 
 PLOT_LAYERS = {
-    ("dtw", "current"), ("dtw", "length_ms"), ("dtw", "model_diff"), ("dtw", "events_log2"),
+    ("dtw", "current"), ("dtw", "dwell"), ("dtw", "model_diff"), ("dtw", "events_log2"),
     ("moves", "indel"),
     ("cmp", "dist"), ("mvcmp", "dist"),
     ("cmp", "jaccard"), ("mvcmp", "jaccard"), #("moves", "error"), 

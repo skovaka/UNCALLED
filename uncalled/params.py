@@ -93,7 +93,7 @@ TracksParams._def_params(
     ("shared_reads_only", False, bool, "If true will only contain reads shared between all tracks"),
     ("shared_refs_only", False, bool, "If true will only contain reference positions where all tracks have sufficient coverage (see min_coverage)"),
 
-    ("layers", [], None, "Layers to load (e.g. current, length_ms, model_diff)"),
+    ("layers", [], None, "Layers to load (e.g. current, dwell, model_diff)"),
 
     ("load_mat", False, bool, "If true will pivot layers into a matrix"), #TODO change to mat_layers, only do it for them
 

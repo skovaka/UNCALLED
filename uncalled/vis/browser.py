@@ -25,7 +25,7 @@ def browser(conf):
     conf.tracks.load_mat = True
     conf.tracks.load_fast5s = True
     #conf.tracks.refstats_layers = ["cmp.dist"]
-    conf.tracks.layers=["dtw","dtw.length_ms","dtw.model_diff","dtw.middle_sec","moves.middle_sec","cmp","mvcmp", "dtw.start_sec", "dtw.length_sec", "moves.start_sec", "moves.length_sec", "seq.pos", "seq.fwd", "seq.kmer", "seq.current"]
+    conf.tracks.layers=["dtw","dtw.dwell","dtw.model_diff","dtw.middle_sec","moves.middle_sec","cmp","mvcmp", "dtw.start_sec", "dtw.length_sec", "moves.start_sec", "moves.length_sec", "seq.pos", "seq.fwd", "seq.kmer", "seq.current"]
     
     sys.stderr.write("Loading tracks...\n")
 
@@ -230,7 +230,7 @@ def new_browser(tracks, conf):
 
                 table.append(html.Tr(html.Td(html.B("%s:%d" % (chunk.coords.ref_name, ref)), colSpan=2)))
                 table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
-                for l in ["current", "length_ms", "model_diff", "events"]:
+                for l in ["current", "dwell", "model_diff", "events"]:
                     if not l in layers: continue
                     table.append(html.Tr([
                         html.Td(html.B(LAYER_META.loc[("dtw",l), "label"])), 

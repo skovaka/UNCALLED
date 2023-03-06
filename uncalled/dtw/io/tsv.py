@@ -27,12 +27,12 @@ class TSV(TrackIO):
     def init_write_mode(self):
         TrackIO.init_write_mode(self)
 
-        layer_cols = pd.Index(INDEX_COLS+self.prms.tsv_cols).difference(EXTRA_COLS)
+        #layer_cols = pd.Index().difference(EXTRA_COLS)
         self.extras = EXTRA_COLS.intersection(self.prms.tsv_cols)
 
-        layers = list(parse_layers(layer_cols))
-        self.columns = pd.MultiIndex.from_tuples(layers)
-        self.conf.tracks.layers += layers
+        self.layers = INDEX_COLS+self.prms.tsv_cols+["seq.kmer"]
+        self.columns = pd.MultiIndex.from_tuples(self.layers)
+        self.conf.tracks.layers += self.layers
         self._header = True
 
         TrackIO._init_output(self, self.prms.buffered)
@@ -41,7 +41,7 @@ class TSV(TrackIO):
         raise RuntimeError("Reading from TSV not yet supported")
 
     def write_alignment(self, aln):
-        df = aln.to_pandas(self.prms.tsv_cols, INDEX_COLS).sort_index()
+        df = aln.to_pandas(self.layers, INDEX_COLS).sort_index()
         
         for col in df.columns[df.columns.get_level_values(-1).str.endswith("kmer")]:
             kmers = df[col].dropna()

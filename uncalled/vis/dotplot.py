@@ -27,7 +27,7 @@ class Dotplot:
 
     REQ_LAYERS = [
         "start", "length", "middle_sec", 
-        "current", "length_ms", "seq.kmer",  
+        "current", "dwell", "seq.kmer",  
         "moves.middle_sec", "seq.current",
         "start_sec", "length_sec"
     ]
@@ -99,8 +99,8 @@ class Dotplot:
 
         Sigplot(tracks, conf=self.conf).plot(fig)
 
-        hover_layers = [("dtw", "middle_sec"),("seq","kmer"),("dtw","current"),("dtw","length_ms")] + self.layers
-        #hover_layers += (l for l in self.prms.layers if l not in {"current","length_ms"})
+        hover_layers = [("dtw", "middle_sec"),("seq","kmer"),("dtw","current"),("dtw","dwell")] + self.layers
+        #hover_layers += (l for l in self.prms.layers if l not in {"current","dwell"})
         hover_data = dict()
 
         coords = tracks.coords

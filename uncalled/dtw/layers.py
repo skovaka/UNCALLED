@@ -37,7 +37,7 @@ LAYERS = {
         "middle" : _Layer(np.float32, "Sample Middle",  
             lambda track: track.layers["dtw","start"] + (track.layers["dtw","length"] / 2),
             [("dtw", "start"), ("dtw", "length")]),
-        "length_ms" : _Layer(np.float32, "Dwell (ms)",
+        "dwell" : _Layer(np.float32, "Dwell (ms)",
             lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate,
             [("dtw", "length")]),
         "model" : _Layer(np.float32, "Model Current",

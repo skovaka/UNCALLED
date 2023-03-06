@@ -14,7 +14,7 @@ ALN_LAYERS = {
     "current_sd" : _Layer(np.float32, "Stdv (pA)", True),
     "start_sec" : _Layer(np.float32, "Time (s)", True),
     "length_sec" : _Layer(np.float32, "Dwell (s)", True),
-    "length_ms" : _Layer(np.float32, "Dwell (ms)", True),
+    "dwell" : _Layer(np.float32, "Dwell (ms)", True),
     "end" : _Layer("Int32", "Sample End", False),
     "middle" : _Layer(np.float32, "Sample Middle", False),
     "middle_sec" : _Layer(np.float32, "Sample Middle", False),
@@ -218,7 +218,7 @@ class AlnDF:
         return np.array(self.current) - self.seq.current
 
     @property
-    def length_ms(self):
+    def dwell(self):
         return 1000* self.length / AlnDF.sample_rate
 
     def to_pandas(self, layers=None):

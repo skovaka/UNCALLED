@@ -11,8 +11,8 @@ from ..aln_track import AlnTrack
 from ...aln import LAYER_META, parse_layers
 from . import TrackIO
 
-#LAYERS = [("dtw",l) for l in ("kmer", "current", "stdv", "length_ms")]
-LAYERS = [("seq","kmer"), ("dtw","current"), ("dtw","current_sd"), ("dtw","length_ms")]
+#LAYERS = [("dtw",l) for l in ("kmer", "current", "stdv", "dwell")]
+LAYERS = [("seq","kmer"), ("dtw","current"), ("dtw","current_sd"), ("dtw","dwell")]
 
 class ModelTrainer(TrackIO):
     FORMAT = "model"
@@ -203,14 +203,14 @@ class ModelTrainer(TrackIO):
                 kmer,
                 avg(rows["current"]),
                 avg(rows["current_sd"]),
-                avg(rows["length_ms"]),
+                avg(rows["dwell"]),
                 np.std(rows["current"]),
                 np.std(rows["current_sd"]),
-                np.std(rows["length_ms"]),
+                np.std(rows["dwell"]),
                 len(rows)
             ))
 
-        df = pd.DataFrame(model_rows, columns=["kmer", "current.mean", "current_sd.mean", "length_ms.mean", "current.stdv", "current_sd.stdv", "length_ms.stdv", "count"]).set_index("kmer").reindex(self.model.KMERS)
+        df = pd.DataFrame(model_rows, columns=["kmer", "current.mean", "current_sd.mean", "dwell.mean", "current.stdv", "current_sd.stdv", "dwell.stdv", "count"]).set_index("kmer").reindex(self.model.KMERS)
 
         subs_locs = np.array([0,self.model.K-1])
 
