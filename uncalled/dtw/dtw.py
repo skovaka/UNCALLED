@@ -101,7 +101,7 @@ def dtw_single(conf):
     #for bam in tracks.bam_in.iter_sam():
     #    dtw = GuidedDTW(tracks, bam)
 
-    for sam, aln in tracks.bam_in.iter_moves():
+    for sam, aln in tracks.bam_in.iter_alns():
         dtw = GuidedDTW(tracks, aln, sam)
 
     tracks.close()

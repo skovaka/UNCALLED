@@ -25,6 +25,8 @@ LENS_TAG = "ul"
 CURS_TAG = "uc"
 STDS_TAG = "ud"
 
+REQ_ALN_TAGS = [REF_TAG, SAMP_TAG, LENS_TAG, CURS_TAG]
+
 class BAM(TrackIO):
     FORMAT = "bam"
 
@@ -262,7 +264,7 @@ class BAM(TrackIO):
                 if n == self.conf.tracks.max_reads:
                     break
 
-    def iter_moves(self):
+    def iter_alns(self, layers=None, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
         for sam in self.iter_sam():
             if sam.query_name in self.tracks.read_index:
                 read = self.tracks.read_index[sam.query_name]
@@ -278,46 +280,64 @@ class BAM(TrackIO):
             yield sam, aln
 
     def sam_to_aln(self, sam):
-        samp_bounds = sam.get_tag(SAMP_TAG)
+        has_aln = True
+        for tag in REQ_ALN_TAGS:
+            if not sam.has_tag(tag):
+                has_aln = False
+                break
 
-        norm_scale, norm_shift = sam.get_tag(NORM_TAG)
+        aln = None
 
-        dac = np.array(sam.get_tag(CURS_TAG))
-        current = (dac/norm_scale)-norm_shift
-        current[dac == self.INF_U16] = np.nan
+        if has_aln:
+            samp_bounds = sam.get_tag(SAMP_TAG)
 
-        if sam.has_tag(STDS_TAG):
-            das = np.array(sam.get_tag(STDS_TAG))
-            stdv = (das/norm_scale)-norm_shift
-            stdv[das == self.INF_U16] = np.nan
-        else:
-            stdv = np.full(len(current), np.nan)
-        
-        length = sam.get_tag(LENS_TAG)
+            norm_scale, norm_shift = sam.get_tag(NORM_TAG)
 
-        fwd = int(not sam.is_reverse)
-        #ref_start, ref_end = sam.get_tag(REF_TAG)
-        refs = sam.get_tag(REF_TAG)
+            dac = np.array(sam.get_tag(CURS_TAG))
+            current = (dac/norm_scale)-norm_shift
+            current[dac == self.INF_U16] = np.nan
 
-        icoords = IntervalIndexI64([(refs[i], refs[i+1]) for i in range(0, len(refs), 2)])
+            if sam.has_tag(STDS_TAG):
+                das = np.array(sam.get_tag(STDS_TAG))
+                stdv = (das/norm_scale)-norm_shift
+                stdv[das == self.INF_U16] = np.nan
+            else:
+                stdv = np.full(len(current), np.nan)
+            
+            length = sam.get_tag(LENS_TAG)
+            #ref_start, ref_end = sam.get_tag(REF_TAG)
+            refs = sam.get_tag(REF_TAG)
 
-        samp_start, samp_end = samp_bounds
+            coords = IntervalIndexI64([(refs[i], refs[i+1]) for i in range(0, len(refs), 2)])
 
-        read = self.tracks.read_index.get(sam.query_name, None)
+            samp_start, samp_end = samp_bounds
 
-        aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, icoords, sam)
+            read = self.tracks.read_index.get(sam.query_name, None)
 
-        start = np.full(icoords.length, samp_start, dtype="int32")
-        start[1:] += np.cumsum(length)[:-1].astype("int32")
+            aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, coords, sam)
 
-        dtw = AlnDF(aln.seq, start, length, current, stdv)
-        aln.set_dtw(dtw)
+            start = np.full(coords.length, samp_start, dtype="int32")
+            start[1:] += np.cumsum(length)[:-1].astype("int32")
+
+            dtw = AlnDF(aln.seq, start, length, current, stdv)
+            aln.set_dtw(dtw)
+
 
         moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
         if moves is not None:
+            if aln is None:
+                aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, moves.seq.coords, sam)
             aln.set_moves(moves)
 
-        aln.calc_mvcmp()
+        if aln is not None:
+            aln.calc_mvcmp()
+        else:
+            fwd = int(not sam.is_reverse)
+            if fwd == self.conf.is_rna:
+                coords = IntervalIndexI64([(-sam.reference_end, -sam.reference_start)])
+            else:
+                coords = IntervalIndexI64([(sam.reference_start, sam.reference_end)])
+            aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, coords, sam)
 
         return aln
 
@@ -462,7 +482,8 @@ class BAM(TrackIO):
         if len(ret_alns) > 0:
             yield (ret_alns, ret_layers)
 
-    def iter_alns(self, layers=None, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
+
+    def iter_alns_old(self, layers=None, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
         aln_id = 0
 
         if read_id is not None and len(read_id) > 0:

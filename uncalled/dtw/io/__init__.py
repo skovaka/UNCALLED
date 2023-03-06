@@ -213,6 +213,7 @@ def convert(conf):
         aln = read.alns[0]
         dtw = aln.layers["dtw"].droplevel(1)
         read.init_alignment(read_id, read.get_read_fast5(read_id), aln.coords, {"dtw" : dtw})
+        #aln = read.init_alignment(
         
         read.write_alignment()
 
