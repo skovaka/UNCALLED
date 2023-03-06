@@ -272,7 +272,7 @@ DTW_CMD_OPTS = DTW_OPTS + (
     Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
     Opt("--tsv-noref", "tracks.io", action="store_true"),
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
-    Opt("--bc-cmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
+    Opt("--mvcmp", action="store_true", help="Compute distance from basecalled alignment and store in database"),
 )
 
 TRAIN_OPTS = (
