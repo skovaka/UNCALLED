@@ -12,7 +12,7 @@ from ...aln import LAYER_META, parse_layers
 from . import TrackIO
 
 #LAYERS = [("dtw",l) for l in ("kmer", "current", "stdv", "length_ms")]
-LAYERS = [("seq","kmer"), ("dtw","current"), ("dtw","stdv"), ("dtw","length_ms")]
+LAYERS = [("seq","kmer"), ("dtw","current"), ("dtw","current_sd"), ("dtw","length_ms")]
 
 class ModelTrainer(TrackIO):
     FORMAT = "model"
@@ -103,10 +103,9 @@ class ModelTrainer(TrackIO):
         #dtw = track.layers.loc[mask, LAYERS]["dtw"].set_index("kmer", drop=True) #\
          #.sort_index() 
 
-        df = aln.to_pandas(LAYERS, index=["seq.kmer"])
-
+        df = aln.to_pandas(LAYERS+["mvcmp"])
         mask = df["mvcmp","dist"] <= 1
-        dtw = track.layers.loc[mask, LAYERS]["dtw"].set_index("kmer", drop=True) #\
+        dtw = df[mask][LAYERS].droplevel(0,axis=1).set_index("kmer") #[LAYERS]#.set_index("seq.kmer", drop=True) #\
 
         if self.prms.buffered:
             self.out_buffer.append(dtw)
@@ -203,27 +202,27 @@ class ModelTrainer(TrackIO):
             model_rows.append((
                 kmer,
                 avg(rows["current"]),
-                avg(rows["stdv"]),
+                avg(rows["current_sd"]),
                 avg(rows["length_ms"]),
                 np.std(rows["current"]),
-                np.std(rows["stdv"]),
+                np.std(rows["current_sd"]),
                 np.std(rows["length_ms"]),
                 len(rows)
             ))
 
-        df = pd.DataFrame(model_rows, columns=["kmer", "mean", "stdv_mean", "dwell_mean", "stdv", "stdv_stdv", "dwell_stdv", "count"]).set_index("kmer").reindex(self.model.KMERS)
+        df = pd.DataFrame(model_rows, columns=["kmer", "current.mean", "current_sd.mean", "length_ms.mean", "current.stdv", "current_sd.stdv", "length_ms.stdv", "count"]).set_index("kmer").reindex(self.model.KMERS)
 
         subs_locs = np.array([0,self.model.K-1])
 
         #TODO plot pA change for each possible substitution for every kmer
 
-        for kmer in df.index[df["mean"].isna()]:
+        for kmer in df.index[df["current.mean"].isna()]:
             subs = list()
             for i in subs_locs:
                 old = self.model.kmer_base(kmer, i)
                 subs.append(self.model.set_kmer_base(kmer, i, [b for b in range(4) if b != old]))
             subs = np.unique(np.concatenate(subs))
-            means = df.loc[subs, "mean"].dropna().sort_values()
+            means = df.loc[subs, "current.mean"].dropna().sort_values()
             if len(means) > 0:
                 mid = means.index[len(means)//2]
                 df.loc[kmer] = df.loc[mid]
@@ -233,6 +232,7 @@ class ModelTrainer(TrackIO):
 
         df["count"] = df["count"].astype(int)
             
+        print(df)
         model_out = PoreModel(df=df, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True)
         outfile = self._filename("model.tsv")
         model_out.to_tsv(outfile)

@@ -21,6 +21,7 @@ import _uncalled
 from ..signal_processor import ProcessedRead
 
 from . import Bcaln, Tracks
+from ..aln import AlnDF
 
 import multiprocessing as mp
 #from concurrent.futures import ProcessPoolExecutor as Pool
@@ -189,10 +190,12 @@ class GuidedDTW:
             starts = self.moves.samples.starts.to_numpy()
             lengths = self.moves.samples.lengths.to_numpy()
             cur = std = np.array([])
-            df = DtwDF(starts, lengths, cur, std)
-            df.set_signal(signal)
-            df = df.to_df()
-            df["mpos"] = self.moves.index.expand()
+            #df = DtwDF(starts, lengths, cur, std)
+            dtw = AlnDF(self.seq, starts, lengths)
+            dtw.set_signal(signal)
+            self.aln.set_dtw(dtw)
+            #df = df.to_df()
+            #df["mpos"] = self.moves.index.expand()
 
         #if df is None:
         #    self.empty = True

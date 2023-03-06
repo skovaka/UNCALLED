@@ -146,8 +146,8 @@ class PoreModel:
         self.KMERS = np.arange(self.KMER_COUNT)
         self.KMER_STRS = self.kmer_to_str(self.KMERS)
 
-        self._cols["mean"] = self.means
-        self._cols["stdv"] = self.stdvs
+        self._cols["current.mean"] = self.means
+        self._cols["current.stdv"] = self.stdvs
 
     @property
     def name(self):
@@ -157,11 +157,13 @@ class PoreModel:
     def kmer_trim(self):
         return (self.PRMS.shift, self.K-self.PRMS.shift-1)
 
-    COLUMNS = {"kmer", "mean", "stdv"}
+    COLUMNS = {"kmer", "current.mean", "current.stdv"}
     TSV_RENAME = {
-        "level_mean" : "mean", 
-        "level_stdv" : "stdv",
-        "sd"         : "stdv"
+        "mean" : "current.mean", 
+        "stdv" : "current.stdv",
+        "level_mean" : "current.mean", 
+        "level_stdv" : "current.stdv",
+        "sd"         : "current.stdv"
     }
 
     def _vals_from_df(self, df):
@@ -169,16 +171,16 @@ class PoreModel:
         extra = df.columns.difference(self.COLUMNS)
         for col in extra:
             self._cols[col] = df[col].to_numpy()
-        return np.ravel(df.sort_values("kmer")[["mean","stdv"]])
+        return np.ravel(df.sort_values("kmer")[["current.mean","current.stdv"]])
     
     def _usecol(self, name):
         return self.extra_cols or name in self.COLUMNS or name in self.TSV_RENAME
 
     def _vals_from_npz(self, filename):
         arrs = dict(np.load(filename))
-        vals = np.concatenate([arrs["mean"], arrs["stdv"]], axis=0)
+        vals = np.concatenate([arrs["current.mean"], arrs["current.stdv"]], axis=0)
         for name,arr in arrs.items():
-            if name in {"mean","stdv"}: continue
+            if name in {"current.mean","current.stdv"}: continue
             self._cols[name] = arr
         return vals
 

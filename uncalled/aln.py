@@ -27,7 +27,7 @@ LAYERS = {
         "mpos" : _Layer("Int64", "Mirror Ref.", True),
         "pos" : _Layer("Int64", "Reference Coord.", False),
         "pac" : _Layer("Int64", "Packed Ref. Coord.", False),
-        "kmer" : _Layer(str, "Kmer", True),
+        "kmer" : _Layer("Int32", "Kmer", True),
         "current" : _Layer(str, "Model Mean (pA)", False),
         "name" : _Layer(str, "Reference Name", False),
         "fwd" : _Layer(bool, "Forward", False),
@@ -322,11 +322,13 @@ class Alignment:
             df = df.instance
         self.instance.set_moves(df)
 
-    def to_pandas(self, layers=None, index=None):
+    def to_pandas(self, layers=None, index=None, join_index=True):
         vals = dict()
 
-        index = parse_layers(index)
-        layers = parse_layers(layers).union(index)
+        layers = parse_layers(layers)
+        if index is not None:
+            index = parse_layers(index)
+            layers = layers.union(index)
 
         for name in layers.unique(0):
             _,group_layers = layers.get_loc_level(name)
@@ -340,7 +342,8 @@ class Alignment:
         
         if index is not None:
             df.set_index(list(index), inplace=True)
-            df.index.names = [".".join(idx) for idx in index]
+            if join_index:
+                df.index.names = [".".join(idx) for idx in index]
 
         return df#.set_index(index)
 

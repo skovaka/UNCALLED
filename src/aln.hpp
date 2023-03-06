@@ -46,6 +46,21 @@ struct AlnDF {
         return ret;
     }
 
+    void set_signal(const ProcessedRead &read) {
+        if (current.size() == 0) {
+            current = ValArray<float>(size());
+            current_sd = ValArray<float>(size());
+        }
+
+        for (size_t i = 0; i < size(); i++) {
+            auto c = samples.coords[i];
+            auto seg = static_cast<std::valarray<float>>(read.signal[std::slice(c.start, c.length(), 1)]);
+            current[i] = seg.sum() / seg.size();
+            auto deltas = seg - current[i];
+            current_sd[i] = sqrt((deltas*deltas).sum() / seg.size());
+        }
+    }
+
     bool empty() const {
         return size() == 0;
     }
@@ -67,6 +82,7 @@ struct AlnDF {
         c.def(py::init<IntervalIndex<i64>&, py::array_t<i32>, py::array_t<i32>, py::array_t<float>, py::array_t<float>>());
         c.def("slice", &AlnDF::slice);
         c.def("empty", &AlnDF::empty);
+        c.def("set_signal", &AlnDF::set_signal);
         c.def("__len__", &AlnDF::size);
         c.def_readwrite("index", &AlnDF::index);
         c.def_readwrite("samples", &AlnDF::samples);
