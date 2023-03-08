@@ -50,6 +50,8 @@ def sam_to_read_moves(read, sam):
     return moves_to_aln(moves, template_start, mv_stride)
 
 def sam_to_ref_moves(conf, ref_index, read, sam, model_name=None):
+    if read is None: 
+        return None
     read_moves = sam_to_read_moves(read, sam)
     if read_moves is None:
         return None
@@ -82,7 +84,7 @@ def sam_to_ref_moves(conf, ref_index, read, sam, model_name=None):
 
     shift = conf.pore_model.k - mkl - ref_index.trim[0]
     ref_moves.index.shift(shift)
-
+    
     return ref_moves.slice(-shift+ref_index.trim[0], len(ref_moves)-ref_index.trim[1])
 
 

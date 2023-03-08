@@ -81,11 +81,14 @@ def dtw_worker(p):
 
     tracks = Tracks(read_index=reads, conf=conf)
 
+    print(tracks.model)
+
     i = 0
     for bam in bams:
         bam = pysam.AlignedSegment.fromstring(bam, header)
         aln = tracks.bam_in.sam_to_aln(bam)
-        dtw = GuidedDTW(tracks, aln, bam)
+        if aln is not None:
+            dtw = GuidedDTW(tracks, aln, bam)
         i += 1
 
     tracks.close()
@@ -151,7 +154,9 @@ class GuidedDTW:
         self.samp_max = self.moves.samples.ends[len(self.moves)-1]
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
-        if self.conf.normalizer.mode == "ref_mom":
+        if self.prms.iterations == 0:
+            tgt = (self.conf.normalizer.tgt_mean, self.conf.normalizer.tgt_stdv)
+        elif self.conf.normalizer.mode == "ref_mom":
 
             ref_means = self.seq.current.to_numpy()  #self.model[self.ref_kmers]
             

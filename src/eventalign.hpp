@@ -63,8 +63,8 @@ std::string write_eventalign(
            << evt.stdv << "\t"
            << (evt.length / sample_rate) << "\t"
            << ModelType::kmer_to_str(model_kmer) << "\t"
-           << model.kmer_means_[kmer] << "\t"
-           << model.kmer_stdvs_[kmer] << "\t"
+           << model.current_mean[kmer] << "\t"
+           << model.current_stdv[kmer] << "\t"
            << std_level[i];
 
         if (signal_index) {

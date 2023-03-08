@@ -204,6 +204,12 @@ class ReadIndex:
         read = self.infile[read_id]
         self.prev_read = read
         return read
+    
+    def __iter__(self):
+        for filename in self.file_info.keys():
+            self._open(filename)
+            for r in self.infile:
+                yield r
 
     def get(self, read_id, default=None):
         if read_id in self:
@@ -250,7 +256,7 @@ class Fast5Reader:
         return read
 
     def __iter__(self):
-        for r in self.infile:
+        for r in self.infile.get_reads():
             yield self._dict_to_read(r)
 
     def get_run_info(self):

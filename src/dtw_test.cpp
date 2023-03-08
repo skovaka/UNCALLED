@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
         //    //if (kmer.size() == model.k) {
         //    if (kmer.size() == model.KMER_LEN) {
         //        //current.push_back(model.means[kmer]);
-        //        current.push_back(model.kmer_means_[model.str_to_kmer(kmer)]);
+        //        current.push_back(model.current_mean[model.str_to_kmer(kmer)]);
         //        kmer = kmer.substr(1);
         //    }
         //}

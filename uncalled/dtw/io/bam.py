@@ -286,7 +286,14 @@ class BAM(TrackIO):
 
         aln = None
 
-        read = self.tracks.read_index.get(sam.query_name, None)
+        try:
+            read = self.tracks.read_index.get(sam.query_name, None)
+        except:
+            sys.stderr.write(f"Warning: failed to open read {sam.query_name}\n")
+            read = None
+
+        if not has_dtw and read is None:
+            return None
 
         if has_dtw:
             samp_bounds = sam.get_tag(SAMP_TAG)

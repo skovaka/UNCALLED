@@ -125,7 +125,7 @@ class Config(_Conf):
         return (not self.is_default(name, group) and
                 not name.startswith("_") and
                 type(val) in TOML_TYPES and
-                (not hasattr(val, "__len__") or len(val) > 0))
+                (not hasattr(val, "__len__") or len(val) > 0 or isinstance(val, str)))
 
     def load_config(self, other, ignore_defaults=True):
         for param in self._GLOBAL_PARAMS:

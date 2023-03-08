@@ -69,6 +69,10 @@ class PoreModel:
                 else:
                     prms = model
 
+            elif isinstance(model, tuple) and isinstance(model[0], PoreModelParams):
+                self._init_new(model[0], *model)
+                return
+
             else:
                 raise TypeError("PoreModel model must be of type str, PoreModel, or PoreModel.Params")
         else:

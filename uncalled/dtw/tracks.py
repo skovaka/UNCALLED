@@ -302,7 +302,7 @@ class Tracks:
 
         if self.model is None:
             self.conf.pore_model.name = WORKFLOW_PRESETS[self.read_index.default_model]
-            self.model = PoreModel(self.conf.pore_model.name)
+            self.model = PoreModel(self.conf.pore_model)
             for track in self.alns:
                 track.model = self.model
 
