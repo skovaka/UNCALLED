@@ -4,11 +4,23 @@ import importlib
 
 from .argparse import ArgParser, Opt, MutexOpts, CONFIG_PARAM, FAST5_PARAM, comma_split, ref_coords
 
-from .fast5 import parse_read_ids
 from .index import str_to_coord
 import pandas as pd
 
 import cProfile
+
+def parse_read_ids(reads):
+    if reads is None:
+        return []
+
+    if isinstance(reads, str):
+        if os.path.exists(reads):
+            with open(reads) as reads_in:
+                return [line.split()[0] for line in reads_in]
+        else:
+            return reads.split(",")
+
+    return list(reads)
 
 CONFIG_OPT = Opt(("-C", "--config"), type=str, default=None, required=False, help="Configuration file in TOML format", dest = CONFIG_PARAM)
 
@@ -27,82 +39,14 @@ INDEX_OPTS = (
         Opt("--speeds", "index"),
         CONFIG_OPT,
      )
-BWA_OPTS = (
-    Opt("bwa_prefix", "mapper"),
-    Opt(("-p", "--idx-preset"), "mapper"),
-)
 
 FAST5_OPTS = (
-    Opt(FAST5_PARAM, "fast5_reader", nargs="+", type=str),
-    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
-    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
-    Opt(("-x", "--fast5-index"), "fast5_reader"),
-    Opt(("-n", "--max-reads"), "fast5_reader")
+    Opt(FAST5_PARAM, "read_index", nargs="+", type=str),
+    Opt(("-r", "--recursive"), "read_index", action="store_true"),
+    Opt(("-l", "--read-filter"), "read_index", type=parse_read_ids),
+    Opt(("-x", "--read-index"), "read_index"),
+    Opt(("-n", "--max-reads"), "read_index")
 )
-
-MAPPER_OPTS = (
-    Opt(("-t", "--threads"), ""),
-    Opt("--num-channels", "read_buffer"),
-    Opt(("-c", "--max-chunks"), "read_buffer"),
-    Opt("--chunk-time", "read_buffer"),
-    Opt("--rna", fn="set_r94_rna"),
-    CONFIG_OPT,
-)
-
-SIM_OPTS = BWA_OPTS + (
-    Opt("fast5s", 
-        nargs = '+', 
-        type = str, 
-        help = "Reads to unc. Can be a directory which will be recursively searched for all files with the \".fast5\" extension, a text file containing one fast5 filename per line, or a comma-separated list of fast5 file names."
-    ),
-    Opt(("-r", "--recursive"), 
-        action = "store_true"
-    ),
-    Opt("--ctl-seqsum", "simulator"),
-    Opt("--unc-seqsum", "simulator"),
-    Opt("--unc-paf",    "simulator"),
-    Opt("--sim-speed",  "simulator"),
-) + MAPPER_OPTS
-
-RT_OPTS = (
-    MutexOpts("realtime_mode", [
-        Opt(("-D", "--deplete"), fn="set_rt_deplete"),
-        Opt(("-E", "--enrich"), fn="set_rt_enrich"),
-    ]),
-    MutexOpts("active_chs", [
-        Opt("--even", fn="set_active_chs_even", help="world"),
-        Opt("--odd", fn="set_active_chs_odd", help="Hello"),
-    ])
-)
-
-PAF_OPTS = (
-    Opt("infile",  
-        type = str, 
-        help = "PAF file output by UNCALLED"
-    ),
-    Opt(("-n", "--max-reads"), 
-        required = False, 
-        type = int, 
-        default = None, 
-        help = "Will only look at first n reads if specified"
-    ),
-    Opt(("-r", "--ref-paf"), 
-        required = False, 
-        type = str, 
-        default = None, 
-        help = "Reference PAF file. Will output percent true/false positives/negatives with respect to reference. Reads not mapped in reference PAF will be classified as NA."
-    ),
-    Opt(("-a", "--annotate"), 
-        action = 'store_true', 
-        help = "Should be used with --ref-paf. Will output an annotated version of the input with T/P F/P specified in an 'rf' tag"
-    ),
-)
-
-REALTIME_OPTS = BWA_OPTS + MAPPER_OPTS + (
-    Opt("--host", "realtime"),
-    Opt("--port", "realtime"),
-    Opt("--duration", "realtime"),
-) 
 
 DTW_OPTS = (
     Opt(("-p", "--processes"), "tracks.io"),
@@ -112,10 +56,10 @@ DTW_OPTS = (
     Opt(("--out-name", "-o"), "tracks.io"),
     Opt("index_prefix", "tracks"), #+ FAST5_OPTS + (
 
-    Opt(FAST5_PARAM, "fast5_reader", nargs="+", type=str),
-    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+    Opt(FAST5_PARAM, "read_index", nargs="+", type=str),
+    Opt(("-r", "--recursive"), "read_index", action="store_true"),
     Opt(("-l", "--read-filter"), "tracks"),
-    Opt(("-x", "--fast5-index"), "fast5_reader"),
+    Opt(("-x", "--read-index"), "read_index"),
     Opt(("-n", "--max-reads"), "tracks"),
 
     Opt("--del-max", "dtw"),
@@ -141,30 +85,8 @@ DTW_OPTS = (
     Opt(("-N", "--norm-mode"), "normalizer", "mode", choices=["ref_mom", "model_mom"]),
     Opt("--norm-median", "normalizer", "median", action="store_true"),
     Opt("--norm-seg", "normalizer", "full_read", action="store_false"),
-    Opt("--bc-group", "fast5_reader"),
     CONFIG_OPT,
 )
-
-#CONVERT_OPTS = (
-#    Opt("index_prefix", "tracks"),
-#    Opt(FAST5_PARAM, "fast5_reader", nargs="+", type=str),
-#    #Opt("--fast5s", "fast5_reader", "fast5_files", type=comma_split),
-#    #Opt("--fast5-index", "fast5_reader"),
-#    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
-#    Opt(("-l", "--read-filter"), "fast5_reader", type=parse_read_ids),
-#    Opt(("-n", "--max-reads"), "fast5_reader"),
-#
-#    Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
-#    Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-#    Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
-#    Opt(("-a", "--append"), "tracks.io", action="store_true"),
-#    Opt(("-o", "--sql-out"), "tracks.io"),
-#)
-#
-#NANOPOLISH_OPTS = CONVERT_OPTS + (
-#    Opt(("-x", "--fast5-index"), "fast5_reader", required=True), 
-#    Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include")
-#)
 
 CONVERT_OPTS = (
     Opt("index_prefix", "tracks", nargs="?"),
@@ -189,10 +111,10 @@ CONVERT_OPTS = (
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
 
-    Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
+    Opt("--read-paths", "read_index", "paths", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks"),
-    Opt(("-x", "--fast5-index"), "fast5_reader", required=False),
-    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+    Opt(("-x", "--read-index"), "read_index", required=False),
+    Opt(("-r", "--recursive"), "read_index", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
@@ -212,8 +134,8 @@ EDIT_OPTS = (
     Opt("track_name", help="Current track name"),
     Opt(("-N", "--new-name"), default=None, help="New track name"),
     Opt(("-D", "--description"), default=None, help="New track description"),
-    Opt(("-F", "--fast5-files"), "fast5_reader", type=comma_split),
-    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+    Opt(("-F", "--paths"), "read_index", type=comma_split),
+    Opt(("-r", "--recursive"), "read_index", action="store_true"),
 )
 
 MERGE_OPTS = (
@@ -319,9 +241,9 @@ DOTPLOT_OPTS = (
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
 
     Opt("--ref", "tracks", "index_prefix"), 
-    Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
-    Opt(("-x", "--fast5-index"), "fast5_reader"),
-    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+    Opt("--read-paths", "read_index", "paths", nargs="+", type=str),
+    Opt(("-x", "--read-index"), "read_index"),
+    Opt(("-r", "--recursive"), "read_index", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
 
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
@@ -346,9 +268,9 @@ TRACKPLOT_OPTS = (
 	]),
 
     Opt("--ref", "tracks", "index_prefix"), 
-    Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
-    Opt(("-x", "--fast5-index"), "fast5_reader"),
-    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+    Opt("--read-paths", "read_index", "paths", nargs="+", type=str),
+    Opt(("-x", "--read-index"), "read_index"),
+    Opt(("-r", "--recursive"), "read_index", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
     Opt("--pore-model", "pore_model", "name"),
 
@@ -371,9 +293,9 @@ BROWSER_OPTS = (
 	#]),
 
     Opt("--ref", "tracks", "index_prefix"), 
-    Opt("--fast5s", "fast5_reader", "fast5_files", nargs="+", type=str),
-    Opt(("-x", "--fast5-index"), "fast5_reader"),
-    Opt(("-r", "--recursive"), "fast5_reader", action="store_true"),
+    Opt("--read-paths", "read_index", "paths", nargs="+", type=str),
+    Opt(("-x", "--read-index"), "read_index"),
+    Opt(("-r", "--recursive"), "read_index", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
 
     #Opt("layer", "trackplot", default="current", nargs="?"),
@@ -411,12 +333,6 @@ TRACKPLOT_PANEL_OPTS = (
 CMDS = {
     "index" : ("index", 
         "Build an index from a FASTA reference", INDEX_OPTS), 
-    "map" : ("rt.map", 
-        "Rapidly map fast5 read signal to a reference", BWA_OPTS + FAST5_OPTS + MAPPER_OPTS), 
-    "sim" : ("rt.sim", 
-        "Simulate real-time targeted sequencing", SIM_OPTS),
-    "pafstats" : ("rt.pafstats", 
-        "Estimate speed and accuracy from an Uncalled PAF file", PAF_OPTS), 
     "dtw" : ("dtw.dtw", 
         "Perform DTW alignment guided by basecalled alignments", DTW_CMD_OPTS), 
     "convert" : ("dtw.io", "Convert between signal alignment file formats", CONVERT_OPTS),
@@ -455,11 +371,6 @@ _help_lines = [
     "subcommand options:",
     "General:",
     "\tindex      Build an index from a FASTA reference",
-    "Real-Time Enrichment (Rapid Signal Mapping):",
-#    "\trealtime   " + realtime.main.__doc__,
-    "\tmap        Rapidly map fast5 read signal to a reference",
-    "\tsim        Simulate real-time targeted sequencing",
-    "\tpafstats   Estimate speed and accuracy from an Uncalled PAF file", "",
     "Dynamic Time Warping (DTW) Alignment:",
     "\tdtw        Perform DTW alignment guided by basecalled alignments",
     "\ttrain      Train new k-mer pore models",

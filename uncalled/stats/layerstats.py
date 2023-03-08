@@ -14,7 +14,6 @@ import pandas as pd
 import scipy.stats
 
 from .. import config
-from ..fast5 import parse_read_ids
 from ..dtw import Tracks
 from ..dtw.layers import parse_layers
 

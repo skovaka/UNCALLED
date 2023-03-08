@@ -5,8 +5,7 @@ import pandas as pd
 import numpy as np
 
 from .config import ParamGroup, Config
-from .pafstats import parse_paf
-from . import EventDetector, EventProfiler, Normalizer
+from . import EventDetector, Normalizer
 from .pore_model import PoreModel
 import _uncalled
 

@@ -241,9 +241,9 @@ class Tracks:
             for filename in fnames:
                 io = Cls(filename, False, self, track_count)
 
-                p = io.conf.fast5_reader
-                self.read_index.load_paths(p.fast5_files, p.recursive)
-                self.read_index.load_index_file(p.fast5_index)
+                p = io.conf.read_index
+                self.read_index.load_paths(p.paths, p.recursive)
+                self.read_index.load_index_file(p.read_index)
 
                 self.conf.load_config(io.conf)
                 self.inputs.append(io)

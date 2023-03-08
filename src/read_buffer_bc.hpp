@@ -25,7 +25,6 @@
 #define READ_BUFFER_BC
 
 #include <algorithm>
-#include "hdf5_tools.hpp"
 #include "read_buffer.hpp"
 #ifdef PYBIND
 #include <pybind11/pybind11.h>

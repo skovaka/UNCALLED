@@ -92,35 +92,11 @@ class pre_build(build_ext):
 uncalled = Pybind11Extension(
     "_uncalled",
 
-    sources = [ #glob("src/**/*.cpp", recursive=True),
-       "src/pore_model.cpp",
-       #"src/sequence.cpp", 
-       "src/dtw.cpp",
-       "src/pybinder.cpp",
-       "src/config.cpp",
-       "src/event_profiler.cpp", 
-       "src/simulator.cpp",
-       "src/fast5_reader.cpp",
-       "src/mapper.cpp",
-       "src/self_align_ref.cpp",
-       "src/map_pool.cpp",
-       "src/map_pool_ord.cpp",
-       "src/event_detector.cpp", 
-       "src/read_buffer.cpp",
-       "src/realtime_pool.cpp",
-       "src/seed_tracker.cpp", 
-       "src/normalizer.cpp", 
-       "src/paf.cpp", 
-       "src/range.cpp",
-       "src/dataframe.cpp"
-    ],
+    sources = glob("src/**/*.cpp", recursive=True),
 
     include_dirs = [
         "./submods",
-        "./submods/hdf5/include", 
-        "./submods/fast5/include",
         "./submods/pdqsort",
-        "./submods/toml11",
         get_pybind_include()
     ],
 
@@ -141,7 +117,6 @@ uncalled = Pybind11Extension(
 
 requires=[
     'pybind11>=2.6.0', 
-    #'read-until==3.0.0',
     'pandas>=1.1.5',
     'plotly>=5.0.0',
     'dash>=2.0.0',

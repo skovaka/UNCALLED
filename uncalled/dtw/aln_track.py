@@ -9,10 +9,7 @@ from typing import NamedTuple
 import pandas as pd
 import copy
 
-from _uncalled import Compare
-
 from ..pore_model import PoreModel
-from ..pafstats import parse_paf, PafEntry
 from ..argparse import Opt, ref_coords
 from .. import config, index 
 from ..index import load_index, RefCoord

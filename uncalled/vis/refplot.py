@@ -7,7 +7,6 @@ import time
 import sys
 
 from .. import config
-from ..fast5 import parse_read_ids
 from ..dtw.layers import LAYER_META, parse_layer, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks, REFSTAT_LABELS, COMPARE_REFSTATS

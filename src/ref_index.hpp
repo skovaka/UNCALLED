@@ -35,7 +35,6 @@
 #include <algorithm>
 #include "pore_model.hpp"
 #include "util.hpp"
-#include "range.hpp"
 
 #ifdef PYBIND
 #include <pybind11/pybind11.h>
@@ -142,6 +141,8 @@ class RefIndex {
     using KmerType = typename ModelType::kmer_t;
     static constexpr auto K = ModelType::KMER_LEN;
 
+    using Range = std::pair<u64, u64>;
+
     RefIndex() :
         index_(NULL),
         bns_(NULL),
@@ -178,7 +179,7 @@ class RefIndex {
 
         for (KmerType k = 0; k < kmer_ranges_.size(); k++) {
 
-            Range r = get_base_range(ModelType::kmer_head(k));
+            auto r = get_base_range(ModelType::kmer_head(k));
             for (u8 i = 1; i < K; i++) {
                 r = get_neighbor(r, ModelType::kmer_base(k, i));
             }
@@ -234,7 +235,7 @@ class RefIndex {
 
     Range get_neighbor(Range r1, u8 base) const {
         u64 os, oe;
-        bwt_2occ(index_, r1.start_ - 1, r1.end_, base, &os, &oe);
+        bwt_2occ(index_, r1.first - 1, r1.second, base, &os, &oe);
         return Range(index_->L2[base] + os + 1, index_->L2[base] + oe);
     }
 
@@ -243,11 +244,12 @@ class RefIndex {
     }
 
     i64 get_kmer_count(KmerType kmer) const {
-        return kmer_ranges_[kmer].length();
+        auto r = kmer_ranges_[kmer];
+        return r.first - r.second + 1;
     }
 
     Range get_base_range(u8 base) const {
-        return Range(index_->L2[base], index_->L2[base+1]);
+        return {index_->L2[base], index_->L2[base+1]};
     }
 
     i64 fm_to_mpos(i64 fm) {

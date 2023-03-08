@@ -16,7 +16,6 @@ from ..dtw.tracks import Tracks
 from ..dtw.layers import LAYER_META, parse_layer
 from ..argparse import Opt, comma_split
 from ..config import Config
-from ..fast5 import parse_read_ids
 
 from time import time
 

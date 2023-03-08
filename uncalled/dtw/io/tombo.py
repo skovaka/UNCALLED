@@ -5,7 +5,6 @@ from ..aln_track import AlnTrack
 from ...signal_processor import ProcessedRead
 from ...index import str_to_coord, RefCoord
 from ...pore_model import PoreModel
-from ...fast5 import Fast5Reader
 from ont_fast5_api.fast5_interface import get_fast5_file
 from . import TrackIO
 import _uncalled
@@ -36,7 +35,7 @@ class Tombo(TrackIO):
         if self.conf.pore_model.name == "r94_rna":
             self.conf.pore_model.name = "r94_rna_tombo"
 
-        self.conf.fast5_reader.fast5_files = self.prms.tombo_in
+        self.conf.read_index.paths = self.prms.tombo_in
 
         self.in_id = self.init_track(name, name, self.conf)
 
@@ -47,16 +46,15 @@ class Tombo(TrackIO):
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
         
-        #f5reader = self.fast5_in #Fast5Reader(conf=self.conf)
         read_filter = self.read_index.read_filter #f5reader.get_read_filter()
-        fast5_files = self.read_index.file_info.values() #f5reader.prms.fast5_files
+        paths = self.read_index.file_info.values() #f5reader.prms.paths
 
-        if self.conf.fast5_reader.max_reads > 0 and len(fast5_files) > self.conf.fast5_reader.max_reads:
-            fast5_files = fast5_files[:self.conf.fast5_reader.max_reads]
+        if self.conf.read_index.max_reads > 0 and len(paths) > self.conf.read_index.max_reads:
+            paths = paths[:self.conf.read_index.max_reads]
 
         aln_id = 1
 
-        for _,fast5_fname in fast5_files:
+        for _,fast5_fname in paths:
             fast5_basename = os.path.basename(fast5_fname)
 
             try:

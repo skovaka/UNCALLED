@@ -9,7 +9,6 @@ from ..aln_track import AlnTrack
 from ..layers import LAYER_META, LAYER_DB_GROUPS
 from ... import config
 from . import TrackIO
-from _uncalled import _Fast5Reader
 
 class TrackSQL(TrackIO):
     FORMAT = "db"
@@ -565,8 +564,7 @@ def delete(track_name=None, db=None, conf=None):
     print("Deleted track \"%s\"" % track_name)
 
 def edit(conf, db=None):
-    fast5s = _Fast5Reader.Params(conf.fast5_reader)
-    fast5_change = len(conf.fast5_files) > 0
+    fast5_change = len(conf.paths) > 0
     track_name = conf.track_name
     if db is None:
         #db = TrackSQL(conf, "r")
@@ -583,7 +581,7 @@ def edit(conf, db=None):
         params.append(conf.description)
     if fast5_change:
         updates.append("config = ?")
-        conf.fast5_reader = fast5s
+        conf.read_index = fast5s
         del conf.track_name
         del conf.new_name
         del conf.description
@@ -603,7 +601,7 @@ def edit(conf, db=None):
     db.con.commit()
     db.con.close()
 
-def _set_fast5s(track_id, fast5_files, db):
+def _set_fast5s(track_id, paths, db):
     fast5s = pd.read_sql_query(
         "SELECT fast5.id, filename FROM fast5 " \
         "JOIN read ON fast5.id = fast5_id " \
@@ -613,7 +611,7 @@ def _set_fast5s(track_id, fast5_files, db):
 
     basenames = fast5s["filename"].map(os.path.basename)
 
-    new_paths = {os.path.basename(path) : path for path in parse_fast5_paths(fast5_files, True)}
+    new_paths = {os.path.basename(path) : path for path in parse_fast5_paths(paths, True)}
 
     fast5s["filename"] = basenames.map(new_paths)
 

@@ -31,7 +31,6 @@ def init_model(tracks, k):
     tracks.set_model(PoreModel((tracks.conf.pore_model, tracks.conf.normalizer.tgt_mean, tracks.conf.normalizer.tgt_stdv)))
 
 def train(conf):
-    conf.fast5_reader.load_bc = True
     conf.tracks.load_fast5s = True
     conf.mvcmp = True
 

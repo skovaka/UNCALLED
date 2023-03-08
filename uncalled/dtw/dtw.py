@@ -9,12 +9,9 @@ from time import time
 import os
 
 from sklearn.linear_model import TheilSenRegressor
-from ..pafstats import parse_paf
 from ..config import Config
 from ..argparse import ArgParser
 from ..index import str_to_coord
-
-from .io import BAM, Guppy
 
 import _uncalled
 
@@ -34,11 +31,10 @@ METHODS = {
 
 
 def dtw(conf):
-    conf.fast5_reader.load_bc = True
     conf.tracks.load_fast5s = True
     conf.export_static()
 
-    #if len(conf.fast5_reader.fast5_index) == 0:
+    #if len(conf.read_index.read_index) == 0:
     #    raise ValueError("Must specify fast5 index (-x/--fast5-index)")
 
     if conf.tracks.io.processes == 1:

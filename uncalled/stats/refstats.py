@@ -13,7 +13,6 @@ from ..dtw.tracks import RefstatsSplit, ALL_REFSTATS
 from ..dtw.layers import parse_layers
 from ..argparse import Opt, comma_split
 from ..index import str_to_coord
-from ..fast5 import Fast5Reader
 
 
 def refstats(conf):

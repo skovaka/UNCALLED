@@ -111,7 +111,7 @@ class Eventalign(TrackIO):
 
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
-        #read_filter = set(self.conf.fast5_reader.read_filter)
+        #read_filter = set(self.conf.read_index.read_filter)
 
         sample_rate = self.conf.read_buffer.sample_rate
 

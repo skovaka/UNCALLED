@@ -169,7 +169,6 @@ from .tsv import TSV
 from .bam import BAM
 from .eventalign import Eventalign
 from .tombo import Tombo
-from .guppy import Guppy
 from .model_trainer import ModelTrainer
 
 INPUTS = {
