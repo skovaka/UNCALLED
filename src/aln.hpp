@@ -8,6 +8,7 @@
 #include <pybind11/stl_bind.h>
 #include <pybind11/numpy.h>
 #include "pore_model.hpp"
+#include "event_detector.hpp"
 namespace py = pybind11;
 
 struct AlnDF {
@@ -108,8 +109,6 @@ struct CmpDF {
         dist.resize(index.length);
         jaccard.resize(index.length);
 
-        size_t i = 0, j = 0, k = 0;
-
         i64 ref;
         //std::cout << "loop\n";
         //std::cout.flush();
@@ -141,7 +140,7 @@ struct CmpDF {
         DistIter ab(a,b), ba(b,a);
 
         //for (auto &r : rec) {
-        for (i = 0; i < index.length; i++) {
+        for (size_t i = 0; i < index.length; i++) {
             //std::cout << "top2 " << i << "\n";
             //std::cout.flush();
             auto ref = index[i];

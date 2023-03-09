@@ -32,8 +32,8 @@
 #include <algorithm>
 #include <unordered_map>
 #include <iostream>
-#include "event_detector.hpp"
 #include "util.hpp"
+#include "intervals.hpp"
 
 #ifdef PYBIND
 #include <pybind11/pybind11.h>
@@ -46,7 +46,6 @@ PYBIND11_MAKE_OPAQUE(std::vector<u32>);
 //PYBIND11_MAKE_OPAQUE(std::vector<u32>);
 
 void pybind_pore_model_params(py::module_ &m);
-
 #endif
 
 using KmerLen = u8;
@@ -198,11 +197,6 @@ class PoreModel {
 
     float norm_pdf(float samp, KmerType kmer) const {
         return (-pow(samp - current_mean[kmer], 2) / current_var2x[kmer]) - lognorm_denoms_[kmer];
-    }
-
-    //TODO should be able to overload
-    float match_prob_evt(const Event &evt, KmerType kmer) const {
-        return norm_pdf(evt.mean, kmer);
     }
 
     float abs_diff(float samp, KmerType kmer) const {

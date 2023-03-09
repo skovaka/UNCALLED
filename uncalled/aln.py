@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 
 import _uncalled
-from _uncalled import _AlnCoords, _AlnCoordsDF, _AlnDF#, _Alignment
 
 from collections import namedtuple
 _Layer = namedtuple("_Layer", ["dtype", "label", "default"], defaults=[None,None,False])
@@ -168,7 +167,7 @@ class AlnDF:
 
     def __init__(self, seq, start=None, length=None, current=None, current_sd=None):
         self.seq = seq
-        if isinstance(start, _AlnDF):
+        if isinstance(start, _uncalled._AlnDF):
             self.instance = start
             return
 
@@ -177,7 +176,7 @@ class AlnDF:
         if current_sd is None:
             current_sd = np.zeros(0, np.float32)
 
-        self.instance = _AlnDF(self.seq.coords, start, length, current, current_sd)
+        self.instance = _uncalled._AlnDF(self.seq.coords, start, length, current, current_sd)
 
         self._extra = dict()
 

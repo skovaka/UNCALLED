@@ -10,7 +10,7 @@
 #include <vector>
 #include <unordered_map>
 //#include "signal_processor.hpp"
-#include "dataframe.hpp"
+#include "intervals.hpp"
 #include "read_buffer.hpp"
 #include "normalizer.hpp"
 #include "util.hpp"

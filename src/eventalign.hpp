@@ -3,7 +3,7 @@
 
 #include "config.hpp"
 #include "pore_model.hpp"
-#include "dataframe.hpp"
+#include "intervals.hpp"
 
 //template <KmerLen K, typename KmerType=typename std::conditional<(K < 8), u16, u32>::type>
 //struct Eventalign : public DataFrame<i64, KmerType, i32, i32, float> {

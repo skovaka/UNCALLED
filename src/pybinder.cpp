@@ -6,7 +6,7 @@
 #include "read_buffer_bc.hpp"
 #include "signal_processor.hpp"
 #include "dtw.hpp"
-#include "dataframe.hpp"
+#include "intervals.hpp"
 #include "eventalign.hpp"
 #include "aln.hpp"
 
@@ -35,8 +35,8 @@ size_t pybind_kmer(py::module_ &m) {
 }
 
 template<size_t ...Ks>
-void pybind_kmers(py::module_ &m) {
-    auto _ = {(pybind_kmer<Ks>(m))...};
+std::vector<size_t> pybind_kmers(py::module_ &m) {
+    return {(pybind_kmer<Ks>(m))...};
 }
 
 PYBIND11_MODULE(_uncalled, m) {
@@ -63,12 +63,13 @@ PYBIND11_MODULE(_uncalled, m) {
     py::bind_vector<std::vector<u8>>(m, "ArrayU8", py::buffer_protocol());
     py::bind_vector<std::vector<u16>>(m, "ArrayU16", py::buffer_protocol());
     py::bind_vector<std::vector<u32>>(m, "ArrayU32", py::buffer_protocol());
-    pybind_kmers<5,6,7,8,9,10,11,12>(m);
+    pybind_kmers<5>(m);
 
     ProcessedRead::pybind(m);
 
     pybind_dtw(m);
-    pybind_dataframes(m);
+    pybind_intervals(m);
+    pybind_arrays(m);
 
     AlnDF::pybind(m);
     CmpDF::pybind(m);

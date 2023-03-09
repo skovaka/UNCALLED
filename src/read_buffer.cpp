@@ -23,7 +23,7 @@
 
 #include <iostream>
 #include "read_buffer.hpp"
-#include "dataframe.hpp"
+#include "intervals.hpp"
 
 ReadBuffer::Params ReadBuffer::PRMS = {
     num_channels : 512,

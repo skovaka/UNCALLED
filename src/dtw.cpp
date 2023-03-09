@@ -136,7 +136,7 @@ void pybind_dtw(py::module_ &m) {
     m.def("get_guided_bands", &get_guided_bands);
     m.def("moves_to_aln", &moves_to_aln);
     m.def("read_to_ref_moves", &read_to_ref_moves);
-    PyArray<Coord>::pybind(m, "PyArrayCoord");  
+    PyArray<Coord>::pybind(m, "Coord");  
 
     m.attr("DTW_PRMS_DEF") = py::cast(DTW_PRMS_DEF);
     m.attr("DTW_PRMS_EVT_GLOB") = py::cast(DTW_PRMS_EVT_GLOB);
