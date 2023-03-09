@@ -101,8 +101,6 @@ struct CmpDF {
     CmpDF() {}
 
     CmpDF(AlnDF &a, AlnDF &b) {
-        //std::cout << "init\n";
-        //std::cout.flush();
 
         index = a.index.intersect(b.index);
 
@@ -110,59 +108,35 @@ struct CmpDF {
         jaccard.resize(index.length);
 
         i64 ref;
-        //std::cout << "loop\n";
-        //std::cout.flush();
 
         //TODO could optimize so its a single linear scan
         //each get_index call is logn, but n is pretty small
         for (size_t i = 0; i < index.length; i++) {
-            //std::cout << "top " << i << "\n";
-            //std::cout.flush();
             auto ref = index[i];
             auto ai = a.index.get_index(ref), bi = b.index.get_index(ref);
             auto ac = a.samples.coords[ai];
             auto bc = b.samples.coords[bi];
-            //std::cout << "mid " << i << "\n";
-            //std::cout.flush();
             if (ac.is_valid() && bc.is_valid()) {
                 jaccard[i] = calc_jaccard(ac.start, ac.end, bc.start, bc.end);
             } else {
                 jaccard[i] = jaccard.NA;
             }
-            //std::cout << "bot " << i << "\n";
-            //std::cout.flush();
         }
 
-        //std::cout << "predist\n";
-        //std::cout.flush();
-
-        //ref = rec[0].ref;
         DistIter ab(a,b), ba(b,a);
 
         //for (auto &r : rec) {
         for (size_t i = 0; i < index.length; i++) {
-            //std::cout << "top2 " << i << "\n";
-            //std::cout.flush();
             auto ref = index[i];
-            //std::cout << "next2 " << i << "\n";
-            //std::cout.flush();
             auto d0 = ab.next_dist(ref);
-            //std::cout << "d0 " << i << "\n";
-            //std::cout.flush();
             auto d1 = ba.next_dist(ref);
-            //std::cout << "d1 " << i << "\n";
-            //std::cout.flush();
             auto denom = d0.length + d1.length;
-            //std::cout << r.ref << " (" << d0.dist << ", " << d0.length << ") "
-            //          << "(" << d1.dist << ", " << d1.length << ")\n";
             if (denom > 0) {
                 dist[i] = (d0.dist + d1.dist) / denom;
             } else {
                 dist[i] = dist.NA;
                 if (ab.ended() && ba.ended()) break;
             }
-            //std::cout << "bot " << i << "\n";
-            //std::cout.flush();
         }
     }
 

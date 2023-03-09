@@ -14,14 +14,13 @@ namespace py = pybind11;
 using namespace pybind11::literals;
 
 
-template<size_t K>
-size_t pybind_kmer(py::module_ &m) {
-    std::string suffix = "K"+std::to_string(K);
-    using Model = PoreModel<K>;
+//template<size_t K>
+template<typename KmerType>
+size_t pybind_model(py::module_ &m, std::string suffix) {
+    using Model = PoreModel<KmerType>;
     Model::pybind_defs(m, suffix);
     RefIndex<Model>::pybind_defs(m, suffix);//ref_index);
     BandedDTW<Model>::pybind_defs(m, suffix);
-    //StaticBDTW<Model>::pybind_defs(m, suffix);
     GlobalDTW<Model>::pybind_defs(m, suffix);
     SignalProcessor<Model>::pybind(m, suffix);
 
@@ -31,13 +30,13 @@ size_t pybind_kmer(py::module_ &m) {
     //m.def(("write_eventalign_"+suffix).c_str(), write_eventalign<PoreModel<K>>);
     auto fn = write_eventalign<Model>;
     m.def(("write_eventalign_"+suffix).c_str(), fn);
-    return K;
+    return 0;
 }
 
-template<size_t ...Ks>
-std::vector<size_t> pybind_kmers(py::module_ &m) {
-    return {(pybind_kmer<Ks>(m))...};
-}
+//template<size_t ...Ks>
+//std::vector<size_t> pybind_kmers(py::module_ &m) {
+//    return {(pybind_kmer<Ks>(m))...};
+//}
 
 PYBIND11_MODULE(_uncalled, m) {
     m.doc() = R"pbdoc(UNCALLED: a Utility for Nanopore Current ALignment to Large Expanses of DNA)pbdoc";
@@ -63,7 +62,9 @@ PYBIND11_MODULE(_uncalled, m) {
     py::bind_vector<std::vector<u8>>(m, "ArrayU8", py::buffer_protocol());
     py::bind_vector<std::vector<u16>>(m, "ArrayU16", py::buffer_protocol());
     py::bind_vector<std::vector<u32>>(m, "ArrayU32", py::buffer_protocol());
-    pybind_kmers<5>(m);
+    //pybind_kmers<5>(m);
+    pybind_model<u16>(m, "U16");
+    pybind_model<u32>(m, "U32");
 
     ProcessedRead::pybind(m);
 

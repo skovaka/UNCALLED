@@ -50,6 +50,14 @@ class PoreModel:
                     self._init(model.PRMS, model)
                 return 
 
+            if isinstance(model, int):
+                prms = PoreModelParams()
+                prms.k = model
+                prms.shift = (prms.k-1) // 2
+                prms.name = ""
+                self._init_new(prms, prms.k)
+                return
+
             if isinstance(model, str):
 
                 #TODO this will override all other parameters, maybe fine but should clarify
@@ -117,7 +125,7 @@ class PoreModel:
             prms.k = int(np.log2(len(vals)) / 2)
             if prms.shift < 0:
                 prms.shift = PoreModel.get_kmer_shift(prms.k)
-            self._init_new(prms, vals, prms.reverse, prms.complement)
+            self._init_new(prms, vals, prms.reverse, prms.complement, prms.k)
         else:
             self._init_new(prms, prms)
             
@@ -125,9 +133,12 @@ class PoreModel:
             CACHE[prms.name] = self.instance
 
     def _init_new(self, prms, *args):
-        ModelType = getattr(_uncalled, f"PoreModelK{prms.k}", None)
-        if ModelType is None:
-            raise ValueError(f"Invalid k-mer length {prms.k}")
+        if prms.k <= 8:
+            ModelType = _uncalled.PoreModelU16
+        else:
+            ModelType = _uncalled.PoreModelU32
+        #if ModelType is None:
+        #    raise ValueError(f"Invalid k-mer length {prms.k}")
         self._init(prms, ModelType(*args))
 
     def _init(self, prms, instance):
@@ -228,8 +239,9 @@ class PoreModel:
     def kmer_to_str(self, kmer, dtype=str):
         #, self.ModelType.KmerArray
         if isinstance(kmer, (Sequence, np.ndarray, pd.Series, self.array_type)):
-            return self.ModelType.kmer_to_arr(kmer).astype(dtype)
-        return dtype(self.ModelType.kmer_to_str(kmer))
+            return np.array([self.instance.kmer_to_str(k) for k in kmer], dtype=dtype)
+            #return self.ModelType.kmer_to_arr(kmer).astype(dtype)
+        return dtype(self.instance.kmer_to_str(kmer))
 
     def norm_pdf(self, current, kmer):
         return self.instance.norm_pdf(self, current, self.kmer_array(kmer))

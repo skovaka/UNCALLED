@@ -141,10 +141,19 @@ class GuidedDTW:
             raise ValueError(f"Error: unrecongized DTW method \"{method}. Must be one of \"{opts}\"")
 
         method = METHODS[self.method]
-        self.dtw_fn = getattr(_uncalled, f"{method}K{self.model.K}", None)
 
+        #self.dtw_fn = getattr(_uncalled, f"{method}K{self.model.K}", None)
+        #if self.dtw_fn is None:
+        #    raise ValueError(f"Invalid DTW k-mer length {self.model.K}")
+
+        self.dtw_fn = None
+        if isinstance(self.model.instance, _uncalled.PoreModelU16):
+            self.dtw_fn = getattr(_uncalled, f"{method}U16", None)
+        elif isinstance(self.model.instance, _uncalled.PoreModelU32):
+            self.dtw_fn = getattr(_uncalled, f"{method}U32", None)
         if self.dtw_fn is None:
-            raise ValueError(f"Invalid DTW k-mer length {self.model.K}")
+            raise ValueError(f"Unknown PoreModel type: {model.instance}")
+
 
         self.samp_min = self.moves.samples.starts[0]
         self.samp_max = self.moves.samples.ends[len(self.moves)-1]

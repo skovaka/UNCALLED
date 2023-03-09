@@ -73,9 +73,16 @@ class ProcessedRead(_uncalled._ProcessedRead):
 class SignalProcessor:
     def __init__(self, model, conf):
 
-        self.InstanceClass = getattr(_uncalled, f"SignalProcessorK{model.K}", None)
-        if self.InstanceClass is None:
-            raise ValueError(f"Invalid k-mer length {model.K}")
+        #self.InstanceClass = getattr(_uncalled, f"SignalProcessorK{model.K}", None)
+        #if self.InstanceClass is None:
+        #    raise ValueError(f"Invalid k-mer length {model.K}")
+
+        if isinstance(model.instance, _uncalled.PoreModelU16):
+            self.InstanceClass = _uncalled.SignalProcessorU16
+        elif isinstance(model.instance, _uncalled.PoreModelU32):
+            self.InstanceClass = _uncalled.SignalProcessorU32
+        else:
+            raise ValueError(f"Unknown PoreModel type: {model.instance}")
 
         self.model = model
 

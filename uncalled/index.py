@@ -300,22 +300,29 @@ class CoordSpace:
 
 class RefIndex:
 
-    def __init__(self, k, *args, **kwargs):
+    def __init__(self, model, *args, **kwargs):
 
-        self.InstanceClass = getattr(_uncalled, f"RefIndexK{k}", None)
-        self.Model = getattr(_uncalled, f"PoreModelK{k}", None)
-        if self.InstanceClass is None or self.Model is None:
-            raise ValueError(f"Invalid k-mer length {k}")
+        if isinstance(model.instance, _uncalled.PoreModelU16):
+            self.InstanceClass = _uncalled.RefIndexU16
+        elif isinstance(model.instance, _uncalled.PoreModelU32):
+            self.InstanceClass = _uncalled.RefIndexU32
+        else:
+            raise ValueError(f"Unknown PoreModel type: {model.instance}")
+            
+        #self.InstanceClass = getattr(_uncalled, f"RefIndexK{k}", None)
+        #self.Model = getattr(_uncalled, f"PoreModelK{k}", None)
+        #if self.InstanceClass is None or self.Model is None:
+        #    raise ValueError(f"Invalid k-mer length {k}")
         
         if "kmer_shift" in kwargs:
             shift = kwargs["kmer_shift"]
             del kwargs["kmer_shift"]
         else:
-            shift = PoreModel.get_kmer_shift(k)
+            shift = PoreModel.get_kmer_shift(model.K)
 
-        self.trim = (shift, k-shift-1)
+        self.trim = (shift, model.K-shift-1)
 
-        self.instance = self.InstanceClass(*args, **kwargs)
+        self.instance = self.InstanceClass(model.instance, *args, **kwargs)
 
     def __getattr__(self, name):
         return self.instance.__getattribute__(name)
@@ -406,7 +413,7 @@ _index_cache = dict()
 def load_index(k, prefix, load_pacseq=True, load_bwt=False, cache=True, kmer_shift=None):
     idx = _index_cache.get(prefix, None)
     if idx is None:
-        idx = RefIndex(k, prefix, load_pacseq, load_bwt, kmer_shift=kmer_shift)
+        idx = RefIndex(PoreModel(k), prefix, load_pacseq, load_bwt, kmer_shift=kmer_shift)
         if cache: _index_cache[prefix] = idx
     else:
         if load_pacseq and not idx.pacseq_loaded():

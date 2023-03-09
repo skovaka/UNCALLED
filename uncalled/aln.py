@@ -297,9 +297,16 @@ class Alignment:
             read_id = read.id
             self.read = read
 
-        Super = getattr(_uncalled, f"_AlignmentK{seq.K}", None)
-        if Super is None:
-            raise ValueError(f"Invalid k-mer length {seq.K}")
+        if isinstance(self.seq.model, _uncalled.PoreModelU16):
+            Super = _uncalled._AlignmentU16
+        elif isinstance(self.seq.model, _uncalled.PoreModelU32):
+            Super = _uncalled._AlignmentU32
+        else:
+            raise ValueError(f"Unknown PoreModel type: {model.instance}")
+
+        #Super = getattr(_uncalled, f"_AlignmentK{seq.K}", None)
+        #if Super is None:
+        #    raise ValueError(f"Invalid k-mer length {seq.K}")
         self.instance = Super(read_id, seq.instance)
 
         self.dtw = AlnDF(seq, self.instance._dtw)

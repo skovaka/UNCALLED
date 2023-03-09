@@ -139,25 +139,23 @@ class RefIndex {
     public:
 
     using KmerType = typename ModelType::kmer_t;
-    static constexpr auto K = ModelType::KMER_LEN;
+    ModelType model_;
+    const KmerLen K;
 
     using Range = std::pair<u64, u64>;
 
-    RefIndex() :
+    RefIndex(ModelType &model) :
+        model_(model),
+        K(model.KMER_LEN),
         index_(NULL),
         bns_(NULL),
         pacseq_(NULL),
-        kmer_ranges_(ModelType::KMER_COUNT),
+        kmer_ranges_(model_.KMER_COUNT),
         loaded_(false),
         size_(0) {}
 
-    RefIndex(const std::string &prefix, bool pacseq=false, bool bwt=true) : 
-            index_(NULL),
-            bns_(NULL),
-            pacseq_(NULL),
-            kmer_ranges_(ModelType::KMER_COUNT),
-            loaded_(false),
-            size_(0) {
+    RefIndex(ModelType &model, const std::string &prefix, bool pacseq=false, bool bwt=false) : 
+            RefIndex(model) {
         if (!prefix.empty()) {
             bns_ = bns_restore(prefix.c_str());
             size_ = 2 * (bns_->l_pac);
@@ -179,9 +177,9 @@ class RefIndex {
 
         for (KmerType k = 0; k < kmer_ranges_.size(); k++) {
 
-            auto r = get_base_range(ModelType::kmer_head(k));
+            auto r = get_base_range(model_.kmer_head(k));
             for (u8 i = 1; i < K; i++) {
-                r = get_neighbor(r, ModelType::kmer_base(k, i));
+                r = get_neighbor(r, model_.kmer_base(k, i));
             }
 
             kmer_ranges_[k] = r;
@@ -408,7 +406,9 @@ class RefIndex {
     
     private:
     KmerType next_kmer(KmerType kmer, i64 pac, bool comp) {
-        return ModelType::kmer_neighbor(kmer, get_base(pac, comp));
+        auto b = get_base(pac, comp);
+        auto ret = model_.kmer_neighbor(kmer, b);
+        return ret;
     }
 
     void next_kmer(std::vector<KmerType> &kmers, i64 pac, bool comp) {
@@ -459,9 +459,7 @@ class RefIndex {
         } else {
             auto i = pac_end-1;
             if (k == 0) {
-                //kmers[k++] = ModelType::kmer_rev(get_kmer(pac_end-K, comp));
-                kmers[k++] = ModelType::kmer_rev(get_kmer(pac_end-K, comp));
-                //kmers.push_back(ModelType::kmer_rev(get_kmer(pac_end-K, comp)));
+                kmers[k++] = model_.kmer_rev(get_kmer(pac_end-K, comp));
                 i -= K;
             }
             //for (auto i = pac_end-K-1; i >= pac_start; i--) {
@@ -544,10 +542,10 @@ class RefIndex {
     static void pybind_defs(pybind11::module_ m, const std::string &suffix) {
         py::class_<RefIndex<ModelType>> c(m, ("RefIndex" + suffix).c_str());
 
-        c.def(py::init<>());
-        c.def(py::init<const std::string &>());
-        c.def(py::init<const std::string &, bool>());
-        c.def(py::init<const std::string &, bool, bool>());
+        c.def(py::init<ModelType &>());
+        c.def(py::init<ModelType &, const std::string &>());
+        c.def(py::init<ModelType &, const std::string &, bool>());
+        c.def(py::init<ModelType &, const std::string &, bool, bool>());
         PY_BWA_INDEX_METH(create);
         PY_BWA_INDEX_METH(load_index);
         PY_BWA_INDEX_METH(bwt_loaded);
