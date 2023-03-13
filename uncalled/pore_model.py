@@ -161,8 +161,8 @@ class PoreModel:
         self.KMERS = np.arange(self.KMER_COUNT)
         self.KMER_STRS = self.kmer_to_str(self.KMERS)
 
-        self._cols["current.mean"] = self.means
-        self._cols["current.stdv"] = self.stdvs
+        self._cols["current.mean"] = self.current.mean.to_numpy()
+        self._cols["current.stdv"] = self.current.stdv.to_numpy()
 
     @property
     def name(self):
@@ -216,7 +216,7 @@ class PoreModel:
         #no, maybe just wrap in series
         if isinstance(idx, str):
             return self._cols[idx]
-        return self.means[self.kmer_array(idx)]
+        return self.mean.current[self.kmer_array(idx)]
 
     def __getattr__(self, name):
         return self.instance.__getattribute__(name)
@@ -289,7 +289,7 @@ class PoreModel:
         #    tgt_stdv = model.model_stdv
         #scale,shift = self.norm_mom_params(self.means, tgt_mean, tgt_stdv)
 
-        means = self.means * scale + shift
+        means = self.current.mean.to_numpy() * scale + shift
         vals = np.ravel(np.dstack([means,self.stdvs]))
         return PoreModel(self.ModelType(vals), name=self.name)
     

@@ -5,12 +5,13 @@ from time import time
 from _uncalled import EventDetector
 import numpy as np
 
+
 from ..pore_model import PoreModel, PoreModelParams
 
 def init_model(tracks, k):
     p = tracks.conf.event_detector
     p.min_mean = 0
-    p.max_mean = 250
+    p.max_mean = 1000000
     evdt = EventDetector(p)
 
     currents = list()
@@ -20,11 +21,31 @@ def init_model(tracks, k):
         st = read.template_start
         en = st + np.sum(read.moves)*5
         c = evdt.get_means(read.signal[st:en])
-        currents.append(read.signal[st:en])
+        #currents.append(read.signal[st:en])
+        currents.append(c)
         length += len(c)
         if length >= tracks.conf.train.init_events:
             break
     currents = np.concatenate(currents)
+    print(len(currents))
+
+    mn = np.mean(currents)
+    sd = np.std(currents)
+    coef = 3
+    cmin = mn-sd*coef
+    cmax = mn+sd*coef
+
+    print(cmin, cmax, mn,sd, np.mean(currents < cmin), np.mean(currents > cmax))
+
+    currents = currents[(currents >= cmin) & (currents <= cmax)]
+
+    mn = np.mean(currents)
+    sd = np.std(currents)
+    coef = 3
+    cmin = mn-sd*coef
+    cmax = mn+sd*coef
+    print(cmin, cmax, mn,sd, np.mean(currents < cmin), np.mean(currents > cmax))
+
 
     tracks.conf.normalizer.tgt_mean = np.mean(currents)
     tracks.conf.normalizer.tgt_stdv = np.std(currents)
@@ -49,8 +70,10 @@ def train(conf):
 
     tracks = Tracks(conf=conf)
 
+    print(conf.dtw.iterations)
     if conf.dtw.iterations == 0:
         init_model(tracks, prms.kmer_len)
+        sys.exit(0)
 
     trainer = tracks.output
     trainer.model = tracks.model

@@ -102,16 +102,20 @@ class ValArray: public std::valarray<T> {
     using super = std::valarray<T>;
 
     static constexpr T init_na() {
-        return  std::numeric_limits<T>::has_infinity ? std::numeric_limits<T>::infinity() : std::numeric_limits<T>::max();
+        return  std::numeric_limits<T>::has_infinity ? std::numeric_limits<T>::infinity() : std::numeric_limits<T>::min();
     }
 
     static constexpr T NA = init_na();//std::numeric_limits<T>::max();
+
+    const T &at(size_t i) const {
+        return super::operator[](i);
+    }
 
     T &at(size_t i) {
         return super::operator[](i);
     }
 
-    std::string to_string() {
+    std::string to_string() const {
         std::stringstream ss;
         ss << "[";
         if (super::size() > 6) {
@@ -122,7 +126,7 @@ class ValArray: public std::valarray<T> {
             for (size_t i = super::size()-4; i < super::size(); i++) {
                 ss << " " << at(i);
             }
-        } else {
+        } else if (super::size() > 0) {
             for (size_t i = 0; i < super::size()-1; i++) {
                 ss << at(i) << " ";
             }
@@ -134,6 +138,27 @@ class ValArray: public std::valarray<T> {
 
     py::array_t<T> to_numpy() {
         return py::array_t<T>(static_cast<py::ssize_t>(super::size()), &((*this)[0])); 
+    }
+
+    T mean() const {
+        //std::cout << to_string() << " a\n";
+        //std::cout.flush();
+        auto sum = super::sum();
+        //std::cout << sum << " b\n";
+        //std::cout.flush();
+        auto len = super::size();
+        //std::cout << len << " c\n";
+        //std::cout.flush();
+        return super::sum() / super::size();
+    }
+
+    T stdv(T mean) const {
+        auto deltas = (*this) - mean;
+        return sqrt((deltas*deltas).sum() / super::size());
+    }
+
+    T stdv() const {
+        return stdv(mean());
     }
 
     static py::class_<ValArray> pybind(py::module_ &m, std::string suffix) {
@@ -149,8 +174,9 @@ class ValArray: public std::valarray<T> {
                 {sizeof(T)} 
             ); 
         });
-        //a.def("__getitem__", static_cast<T& (super::*)(size_t)> (&super::operator[]));
-        a.def("__getitem__", &ValArray::at);
+        a.def("__getitem__", static_cast<T& (super::*)(size_t)> (&ValArray::at));
+        //        py::vectorize(static_cast< KmerType (*) (const KmerTypePy &, u32)>(&Class::str_to_kmer)), 
+        //a.def("__getitem__", &ValArray::at);
         a.def("__repr__", &ValArray::to_string);
         a.def("to_numpy", &ValArray::to_numpy);
         a.def("__len__", &super::size);
@@ -159,7 +185,6 @@ class ValArray: public std::valarray<T> {
             }, py::keep_alive<0, 1>());
 
         return a;
-
     }
 };
 
@@ -176,6 +201,8 @@ struct PyArray {
     //    data { ptr },
     //    size_ { length } {
     //}
+
+    PyArray() {}
 
     PyArray(py::array_t<T> arr) :
         info { arr.request() },

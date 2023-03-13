@@ -52,7 +52,8 @@ class ReadIndex:
     
     def subset(self, read_ids):
         ret = ReadIndex(read_filter=read_ids)
-        ret.load_index_df(self.read_files.reset_index())
+        if self.read_files is not None:
+            ret.load_index_df(self.read_files.reset_index())
         ret.file_info = self.file_info
         return ret
 

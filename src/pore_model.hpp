@@ -71,6 +71,118 @@ extern const PoreModelParams PORE_MODEL_PRMS_DEF;
 
 using PresetMap = std::unordered_map<std::string, const std::vector<float> &>;
 
+struct ModelDF {
+    using inorm_t = i16;
+    static constexpr inorm_t INORM_MAX = std::numeric_limits<inorm_t>::max(),
+                             INORM_NA = std::numeric_limits<inorm_t>::min();
+    
+    ValArray<float> mean, stdv;
+    float mean_shift, mean_scale, norm_max, inorm_scale;
+
+    ModelDF(size_t len=0, float fill=0) : 
+        mean(fill, len), stdv(fill, len),
+        mean_shift(0), mean_scale(1) {}
+
+    ModelDF(py::array_t<float> means, bool normalize) {
+        PyArray<float> means_py(means);
+        set_means(means_py, normalize);
+    }
+
+    ModelDF(py::array_t<float> means, py::array_t<float> stdvs, bool normalize) {
+        PyArray<float> means_py(means), stdvs_py(stdvs);
+        set_means(means_py, normalize);
+        set_stdvs(stdvs_py, normalize);
+    }
+    
+    template <typename Container>
+    void set_means(Container &vals, bool normalize) {
+        if (vals.size() == 0) return;
+        set_vals(mean, vals);
+        if (normalize && mean.size() > 0) {
+            mean_shift = mean.mean(); 
+            mean_scale = mean.stdv(mean_shift);
+            mean = pa_to_norm(mean);
+        } else {
+            mean_shift = 0;
+            mean_scale = 1;
+        }
+    }
+
+    template <typename Container>
+    void set_stdvs(Container &vals, bool normalize) {
+        if (vals.size() == 0) return;
+        set_vals(stdv, vals);
+        if (normalize && stdv.size() > 0) {
+            //stdv_scale = stdv.stdv();
+            stdv /= mean_scale;
+        } //else {
+        //    stdv_scale = 1;
+        //}
+    }
+
+    template <typename Container>
+    void set_vals(ValArray<float> &dest, const Container &vals) {
+        if (dest.size() > 0 && dest.size() != vals.size()) {
+            throw std::runtime_error("Invalid PoreModel length");
+        }
+        dest = ValArray<float>(vals.begin(), vals.size());
+    }
+
+    float get_mean_pa(size_t i) {
+        return norm_to_pa(mean[i]);
+    }
+
+    float get_stdv_pa(size_t i) {
+        return norm_to_pa(stdv[i]);
+    }
+
+    template<typename T>
+    T norm_to_pa(T norm) {
+        return (norm * mean_scale) + mean_shift;
+    }
+
+    template<typename T>
+    T pa_to_norm(T val) {
+        return (val - mean_shift) / mean_scale;
+    }
+
+    inorm_t norm_to_inorm(float norm) {
+        return static_cast<inorm_t>(round(norm * (INORM_MAX / norm_max)));
+    }
+
+    float inorm_to_norm(inorm_t norm) {
+        return norm * (norm_max / INORM_MAX);
+    }
+
+    size_t size() const {
+        return mean.size();
+    }
+
+    static void pybind(py::module_ &m) {
+        py::class_<ModelDF> c(m, "ModelDF");
+        c.def(py::init<size_t, float>());
+        c.def(py::init<size_t, float>());
+        c.def(py::init<size_t>());
+
+        c.def(py::init<py::array_t<float>, py::array_t<float>, bool>());
+        c.def(py::init<py::array_t<float>, bool>());
+
+
+        c.def(py::init<>());
+        c.def_readonly("mean", &ModelDF::mean);
+        c.def_readonly("stdv", &ModelDF::stdv);
+        c.def_readonly("mean_scale", &ModelDF::mean_scale);
+        c.def_readonly("mean_shift", &ModelDF::mean_shift);
+        //c.def_readonly("stdv_scale", &ModelDF::stdv_scale);
+        //c.def("set_means", static_cast< void (*) (ModelDF::set_means >);
+        //        py::vectorize(static_cast< KmerType (*) (const KmerTypePy &, u32)>(&Class::str_to_kmer)), 
+        //c.def("set_stdvs", &ModelDF::set_stdvs);
+        c.def("get_mean_pa", py::vectorize(&ModelDF::get_mean_pa));
+        c.def("get_stdv_pa", py::vectorize(&ModelDF::get_stdv_pa));
+        c.def("__len__", &ModelDF::size);
+    }
+};
+
 //template<KmerLen KMER_LEN, typename KmerType=typename std::conditional<(KMER_LEN < 8), u16, u32>::type>
 template<typename KmerType>
 class PoreModel {
@@ -83,7 +195,11 @@ class PoreModel {
 
     PoreModelParams PRMS;
 
-    std::vector<float> current_mean, current_stdv, current_var2x, lognorm_denoms_;
+    ModelDF current;
+
+    //current.mean, current.stdv, 
+    ValArray<KmerType> kmer;
+    std::vector<float> current_var2x, lognorm_denoms;
     float model_mean_, model_stdv_;
     bool loaded_, compl_;
 
@@ -91,13 +207,16 @@ class PoreModel {
         KMER_LEN(p.k),
         KMER_MASK((1 << (2*KMER_LEN)) - 1),
         KMER_COUNT(static_cast<KmerType>(pow(BASE_COUNT, KMER_LEN))),
-        PRMS(p) {
+        PRMS(p) ,
+        current(KMER_COUNT)
+            {
         loaded_ = false;
 
-        current_mean.resize(KMER_COUNT);
-        current_stdv.resize(KMER_COUNT);
+        //current.mean.resize(KMER_COUNT);
+        //current.stdv.resize(KMER_COUNT);
+        kmer.resize(KMER_COUNT);
         current_var2x.resize(KMER_COUNT);
-        lognorm_denoms_.resize(KMER_COUNT);
+        lognorm_denoms.resize(KMER_COUNT);
 
         if (p.name.empty()) return;
 
@@ -152,6 +271,18 @@ class PoreModel {
 
         loaded_ = true;
     }
+
+    /* Serializes pore model into the following format:
+    u8  kmer_bytes: number of bytes per k-mer (kmer dtype)
+    u32 kmer_count: number of kmers in model
+    bool current: true if current is stored
+    bool current_sd: true if current_sd is stored
+    bool dwell: true if dwell is stored
+    bool stdv: true if stdv is stored for current, current_sd, and dwell
+    */
+    //ValArray<u8> serialize() const {
+    //    size_t size = sizeof(i32) * 
+    //}
         
     void init_tsv(const std::string &model_fname) {
         std::ifstream model_in(model_fname);
@@ -201,15 +332,15 @@ class PoreModel {
     }
 
     float norm_pdf(float samp, KmerType kmer) const {
-        return (-pow(samp - current_mean[kmer], 2) / current_var2x[kmer]) - lognorm_denoms_[kmer];
+        return (-pow(samp - current.mean[kmer], 2) / current_var2x[kmer]) - lognorm_denoms[kmer];
     }
 
     float abs_diff(float samp, KmerType kmer) const {
-        return std::abs(samp - current_mean[kmer]);
+        return std::abs(samp - current.mean[kmer]);
     }
 
     float z_score(float samp, KmerType kmer) const {
-        return std::abs(samp - current_mean[kmer]) / current_stdv[kmer];
+        return std::abs(samp - current.mean[kmer]) / current.stdv[kmer];
     }
 
     float model_mean() const {
@@ -221,11 +352,11 @@ class PoreModel {
     }
 
     float kmer_current(KmerType kmer) const {
-        return current_mean[kmer];
+        return current.mean[kmer];
     }
 
     float kmer_stdv(KmerType kmer) const {
-        return current_stdv[kmer];
+        return current.stdv[kmer];
     }
 
     bool is_loaded() const {
@@ -240,7 +371,7 @@ class PoreModel {
         model_stdv_ = 0;
 
         for (KmerType kmer = 0; kmer < KMER_COUNT; kmer++) {
-            model_stdv_ += pow(current_mean[kmer] - model_mean_, 2);
+            model_stdv_ += pow(current.mean[kmer] - model_mean_, 2);
         }
 
         model_stdv_ = sqrt(model_stdv_ / KMER_COUNT);
@@ -250,10 +381,11 @@ class PoreModel {
         if (PRMS.reverse)  k = kmer_rev(k);
         if (PRMS.complement) k = kmer_comp(k);
 
-        current_mean[k] = mean;
-        current_stdv[k] = stdv;
+        kmer[k] = k;
+        current.mean[k] = mean;
+        current.stdv[k] = stdv;
         current_var2x[k] = 2 * stdv * stdv;
-        lognorm_denoms_[k] = log(sqrt(M_PI * current_var2x[k]));
+        lognorm_denoms[k] = log(sqrt(M_PI * current_var2x[k]));
     }
 
     char base_to_char(u8 base) const {
@@ -398,7 +530,7 @@ class PoreModel {
 
 
 
-    static void pybind_defs(py::module_ &m, const std::string &suffix) {
+    static void pybind(py::module_ &m, const std::string &suffix) {
         using Class = PoreModel<KmerType>;
 
         py::class_<Class> c(m, ("PoreModel" + suffix).c_str());
@@ -422,15 +554,17 @@ class PoreModel {
         //c.def_static("is_preset", &Class::is_preset, "List of model preset names");
         //c.def_static("get_preset_names", &Class::get_preset_names, "List of model preset names");
 
-        c.def_property_readonly("means", 
-            [](Class &r) -> pybind11::array_t<float> {
-                return pybind11::array_t<float>(r.current_mean.size(), r.current_mean.data());
-        }, "The expected mean current of each k-mer");
+        //c.def_property_readonly("means", 
+        //    [](Class &r) -> pybind11::array_t<float> {
+        //        return pybind11::array_t<float>(r.current.mean.size(), r.current.mean.data());
+        //}, "The expected mean current of each k-mer");
 
-        c.def_property_readonly("stdvs",
-            [](Class &r) -> pybind11::array_t<float> {
-                return pybind11::array_t<float>(r.current_stdv.size(), r.current_stdv.data());
-        }, "The expected standard devaition of each k-mer");
+        //c.def_property_readonly("stdvs",
+        //    [](Class &r) -> pybind11::array_t<float> {
+        //        return pybind11::array_t<float>(r.current.stdv.size(), r.current.stdv.data());
+        //}, "The expected standard devaition of each k-mer");
+
+        c.def_readonly("current", &PoreModel::current);
 
         PY_MODEL_DEFVEC(norm_pdf, "Returns the log probability that the current matches the k-mer based on the normal distibution probability density function");
 

@@ -18,7 +18,7 @@ using namespace pybind11::literals;
 template<typename KmerType>
 size_t pybind_model(py::module_ &m, std::string suffix) {
     using Model = PoreModel<KmerType>;
-    Model::pybind_defs(m, suffix);
+    Model::pybind(m, suffix);
     RefIndex<Model>::pybind_defs(m, suffix);//ref_index);
     BandedDTW<Model>::pybind_defs(m, suffix);
     GlobalDTW<Model>::pybind_defs(m, suffix);
@@ -63,8 +63,10 @@ PYBIND11_MODULE(_uncalled, m) {
     py::bind_vector<std::vector<u16>>(m, "ArrayU16", py::buffer_protocol());
     py::bind_vector<std::vector<u32>>(m, "ArrayU32", py::buffer_protocol());
     //pybind_kmers<5>(m);
+
     pybind_model<u16>(m, "U16");
     pybind_model<u32>(m, "U32");
+    ModelDF::pybind(m);
 
     ProcessedRead::pybind(m);
 
