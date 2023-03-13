@@ -21,7 +21,7 @@ const EventDetector::Params EventDetector::PRMS_DEF = {
     threshold2     : 9.0,
     peak_height    : 0.2,
 
-    min_mean       : 0,
+    min_mean       : -200,
     max_mean       : 200
 };
 

@@ -16,6 +16,8 @@ class Sigplot:
         self.conf, self.prms = config._init_group("sigplot", *args, **kwargs)
         self.tracks = self.prms.tracks #TODO do this better
 
+        self.conf.normalizer.tgt_mean = 0
+        self.conf.normalizer.tgt_stdv = 1
         self.sigproc = SignalProcessor(self.tracks.alns[0].model, self.conf)
 
         self._legend = set()

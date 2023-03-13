@@ -120,7 +120,7 @@ class BAM(TrackIO):
                 return aln
         return None
 
-    INF_U16 = np.iinfo(np.uint16).max
+    INF_U16 = np.iinfo(np.int16).max
 
     def _init_alns(self):
         if self.in_alns is None:
@@ -137,13 +137,15 @@ class BAM(TrackIO):
             c = aln.seq.coords.get_interval(i)
             refs += [c.start, c.end]
 
-        cmin = 0
+        cmin = np.min(aln.dtw.current)
         cmax = np.max(aln.dtw.current)
-        scale = (self.INF_U16 - 1) / (cmax - cmin)
-        shift = -cmin
+        #scale = (self.INF_U16 - 1) / (cmax - cmin)
+        #shift = -cmin
+        scale = self.model.current.inorm_scale
+        shift = 0
 
-        dc = np.round((aln.dtw.current.to_numpy() + shift) * scale).astype(np.uint16)
-        ds = np.round((aln.dtw.current_sd.to_numpy() + shift) * scale).astype(np.uint16)
+        dc = np.round((aln.dtw.current.to_numpy() + shift) * scale).astype(np.int16)
+        ds = np.round((aln.dtw.current_sd.to_numpy() + shift) * scale).astype(np.int16)
 
         lens = aln.dtw.samples.lengths_dedup.to_numpy()
 
@@ -151,8 +153,8 @@ class BAM(TrackIO):
         self.bam.set_tag(SAMP_TAG, array.array("i", (aln.dtw.samples.start, aln.dtw.samples.end)))
         self.bam.set_tag(NORM_TAG, array.array("f", (scale,shift)))
         self.bam.set_tag(LENS_TAG, array.array("H", lens))
-        self.bam.set_tag(CURS_TAG, array.array("H", dc))
-        self.bam.set_tag(STDS_TAG, array.array("H", ds))
+        self.bam.set_tag(CURS_TAG, array.array("h", dc))
+        self.bam.set_tag(STDS_TAG, array.array("h", ds))
 
         #if not self.bam.has_tag("f5"):
         #    self.bam.set_tag("f5", os.path.basename(self.prev_fast5[0]))

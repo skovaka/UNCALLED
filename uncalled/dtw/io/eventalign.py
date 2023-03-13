@@ -61,7 +61,7 @@ class Eventalign(TrackIO):
 
     #def write_layers(self, track, groups):
     def write_alignment(self, aln):
-        events = aln.to_pandas(["seq.kmer", "dtw"], ["seq.pac"]).sort_index().droplevel(0, axis=1)
+        events = aln.to_pandas(["seq.kmer", "dtw"], ["seq.pos"]).sort_index().droplevel(0, axis=1)
 
         model = self.tracks.model
         kmers = events["kmer"]
@@ -77,7 +77,7 @@ class Eventalign(TrackIO):
         else:
             event_index = np.arange(len(events))
 
-        evts = events.rename(columns={"current" : "mean", "current_stdv" : "stdv"})
+        evts = events.rename(columns={"current" : "mean", "current_sd" : "stdv"})
         if self.read is not None:
             self.read.set_events(evts)
             read = self.read
@@ -97,9 +97,15 @@ class Eventalign(TrackIO):
             read_id = str(self.aln_id)
         self.next_aln_id()
         
-        writer = self.writer = getattr(_uncalled, f"write_eventalign_K{model.K}")
+        #self.writer = getattr(_uncalled, f"write_eventalign_K{model.K}")
+        if isinstance(model.instance, _uncalled.PoreModelU16):
+            self.writer = _uncalled.write_eventalign_U16
+        elif isinstance(model.instance, _uncalled.PoreModelU32):
+            self.writer = _uncalled.write_eventalign_U32
+        else:
+            raise ValueError(f"Unknown PoreModel type: {model.instance}")
 
-        eventalign = writer(
+        eventalign = self.writer(
             self.conf, model.instance, read_id, aln.seq.fwd, read,
             aln.seq.name, events.index-2, 
             self.write_signal_index,

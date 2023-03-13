@@ -15,7 +15,7 @@ from ..argparse import Opt, comma_split
 _CMP_COLOR = {"colorscale" : "RdYlGn", "cmin" : 0, "cmid" :5, "cmax" : 10, "reversescale":True}
 
 LAYER_COLORS = {
-    ("dtw", "model_diff") : {"colorscale" : "RdBu", "cmid" : 0, "cmax" : 20, "cmin" : -20, "reversescale":True},
+    ("dtw", "model_diff") : {"colorscale" : "RdBu", "cmid" : 0, "cmax" : 2.5, "cmin" : -2.5, "reversescale":True},
     ("moves", "indel") : {"colorscale" : "Picnic", "cmid" : 0, "cmax" : 1, "cmin" : -1, "reversescale":False},
     ("dtw", "events_log2") : {"colorscale" : "Picnic", "cmid" : 0, "cmax" : 2, "cmin" : -2, "reversescale":True},
     ("dtw", "current") : {"colorscale" : "viridis"},

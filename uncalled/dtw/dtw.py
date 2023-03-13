@@ -91,8 +91,6 @@ def dtw_worker(p):
 
     tracks = Tracks(read_index=reads, conf=conf)
 
-    print(tracks.model)
-
     i = 0
     for bam in bams:
         bam = pysam.AlignedSegment.fromstring(bam, header)
