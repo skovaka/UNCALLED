@@ -193,6 +193,8 @@ class GuidedDTW:
                 tgt = (self.model.model_mean, self.model.model_stdv)
         else:
             raise ValueError(f"Unknown normalization mode: {self.prms.norm_mode}")
+        
+        print(tgt)
 
         if self.conf.normalizer.full_read:
             signal.normalize_mom(*tgt)

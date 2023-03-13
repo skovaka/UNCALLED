@@ -86,6 +86,8 @@ struct ModelDF {
         inorm_scale = INORM_MAX / prms.norm_max;
     }
 
+    ModelDF(const &ModelDF df) = default; 
+
     ModelDF(const PoreModelParams &params, size_t len=0, float fill=0) : 
         mean(fill, len), stdv(fill, len),
         mean_shift(0), mean_scale(1) {
@@ -128,11 +130,8 @@ struct ModelDF {
         if (vals.size() == 0) return;
         set_vals(order, stdv, vals);
         if (normalize && stdv.size() > 0) {
-            //stdv_scale = stdv.stdv();
             stdv /= mean_scale;
-        } //else {
-        //    stdv_scale = 1;
-        //}
+        }
     }
 
     template <typename Container>
@@ -278,6 +277,8 @@ class PoreModel {
             [&kmer_fn](size_t a, size_t b) {return kmer_fn(a) < kmer_fn(b);});
         return order;
     }
+
+    PoreModel(const PoreModel &model) = default; 
 
     //PoreModel(PoreModelParams p, py::array_t<float> current_mean, py::array_t<float> current_stdv, bool normalize) : PoreModel(p) {
     PoreModel(PoreModelParams p, py::array_t<float> current_mean_py, py::array_t<float> current_stdv_py, bool normalize) : PoreModel(p) {

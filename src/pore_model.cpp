@@ -5,7 +5,7 @@
 #include "models/r9.4_dna_450bps_6mer_npl.inl"
 
 const PoreModelParams PORE_MODEL_PRMS_DEF {
-    name        : "r94_dna",
+    name        : "",
     k           : 5,
     shift       : -1,
     norm_max    : 3.0,

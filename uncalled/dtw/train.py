@@ -35,8 +35,6 @@ def init_model(tracks, k):
     cmin = mn-sd*coef
     cmax = mn+sd*coef
 
-    print(cmin, cmax, mn,sd, np.mean(currents < cmin), np.mean(currents > cmax))
-
     currents = currents[(currents >= cmin) & (currents <= cmax)]
 
     mn = np.mean(currents)
@@ -44,12 +42,12 @@ def init_model(tracks, k):
     coef = 3
     cmin = mn-sd*coef
     cmax = mn+sd*coef
-    print(cmin, cmax, mn,sd, np.mean(currents < cmin), np.mean(currents > cmax))
 
 
     tracks.conf.normalizer.tgt_mean = np.mean(currents)
     tracks.conf.normalizer.tgt_stdv = np.std(currents)
-    tracks.set_model(PoreModel((tracks.conf.pore_model, tracks.conf.normalizer.tgt_mean, tracks.conf.normalizer.tgt_stdv)))
+    #tracks.set_model(PoreModel((tracks.conf.pore_model, tracks.conf.normalizer.tgt_mean, tracks.conf.normalizer.tgt_stdv)))
+    tracks.set_model(PoreModel(tracks.conf.pore_model, tracks.conf.normalizer.tgt_mean, tracks.conf.normalizer.tgt_stdv))
 
 def train(conf):
     conf.tracks.load_fast5s = True
@@ -63,17 +61,14 @@ def train(conf):
         conf.pore_model.name = ""
         conf.pore_model.k = prms.kmer_len
         conf.pore_model.shift = (prms.kmer_len-1) // 2
-        print(conf.pore_model.k)
         conf.dtw.iterations = 0
     elif not prms.append:
         raise ValueError(f"Must define kmer_length, init_model, or run in append mode")
 
     tracks = Tracks(conf=conf)
 
-    print(conf.dtw.iterations)
     if conf.dtw.iterations == 0:
         init_model(tracks, prms.kmer_len)
-        sys.exit(0)
 
     trainer = tracks.output
     trainer.model = tracks.model
@@ -82,8 +77,6 @@ def train(conf):
         conf.pore_model.name = trainer.model.name
     else:
         trainer.set_model(tracks.model)
-
-    print(tracks.conf.pore_model.name)
 
     if prms.skip_dtw:
         model_file = trainer.next_model(True)

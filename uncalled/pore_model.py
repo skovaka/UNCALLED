@@ -39,7 +39,7 @@ class PoreModel:
     def get_kmer_shift(k):
         return (k - 1) // 2
 
-    def __init__(self, model=None, reverse=None, complement=None, df=None, extra_cols=False, cache=True):
+    def __init__(self, model=None, k=None, reverse=None, complement=None, df=None, extra_cols=False, cache=True):
         is_preset = False
 
         self._cols = dict()
@@ -98,7 +98,7 @@ class PoreModel:
         vals = None
 
         if df is not None:
-            prms.k, vals = self._vals_from_df(df)
+            prms.k, vals = self._vals_from_df(df, k)
 
         elif cache and prms.name in CACHE:
             self._init(prms, CACHE[prms.name])
@@ -107,13 +107,13 @@ class PoreModel:
         elif not is_preset:
             if os.path.exists(prms.name):
                 if prms.name.endswith(".npz"):
-                    prms.k, vals = self._vals_from_npz(prms.name)
+                    prms.k, vals = self._vals_from_npz(prms.name, k)
                 else:
                     try:
-                        prms.k, vals = self._vals_from_tsv(prms.name)
+                        prms.k, vals = self._vals_from_tsv(prms.name, k)
                     except:
                         try:
-                            prms.k, vals = self._vals_from_hdf5(prms.name)
+                            prms.k, vals = self._vals_from_hdf5(prms.name, k)
                         except:
                             raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
             elif len(prms.name) > 0:
@@ -180,23 +180,25 @@ class PoreModel:
         "sd"         : "current.stdv"
     }
 
-    def _vals_from_df(self, df):
+    def _vals_from_df(self, df, k=None):
         df = df.rename(columns=self.TSV_RENAME)
         extra = df.columns.difference(self.COLUMNS)
         for col in extra:
             self._cols[col] = df[col].to_numpy()
         #return np.ravel(df.sort_values("kmer")[["current.mean","current.stdv"]])
-        df = df.sort_values("kmer")
-        kmer_lens = df["kmer"].str.len().value_counts()
-        if len(kmer_lens) > 1:
-            raise ValueError("All kmer lengths must be the same, found lengths: " + ", ".join(map(str, kmer_lens.index)))
-        k = kmer_lens.index[0]
+        print(df)
+        df = df.reset_index().sort_values("kmer")
+        if k is None:
+            kmer_lens = df["kmer"].str.len().value_counts()
+            if len(kmer_lens) > 1:
+                raise ValueError("All kmer lengths must be the same, found lengths: " + ", ".join(map(str, kmer_lens.index)))
+            k = kmer_lens.index[0]
         return k,(df["current.mean"].to_numpy(), df["current.stdv"].to_numpy(), True)
     
     def _usecol(self, name):
         return self.extra_cols or name in self.COLUMNS or name in self.TSV_RENAME
 
-    def _vals_from_npz(self, filename):
+    def _vals_from_npz(self, filename, k):
         arrs = dict(np.load(filename))
         vals = np.concatenate([arrs["current.mean"], arrs["current.stdv"]], axis=0)
         for name,arr in arrs.items():
@@ -204,14 +206,14 @@ class PoreModel:
             self._cols[name] = arr
         return vals
 
-    def _vals_from_tsv(self, filename):
+    def _vals_from_tsv(self, filename, k):
         df = pd.read_csv(filename, sep="\s+", comment="#", usecols=self._usecol)
-        return self._vals_from_df(df)
+        return self._vals_from_df(df, k)
 
-    def _vals_from_hdf5(self, filename):
+    def _vals_from_hdf5(self, filename, k):
         handle = h5py.File(filename, "r")
         df = pd.DataFrame(handle["model"][()]).reset_index()
-        return self._vals_from_df(df)
+        return self._vals_from_df(df, k)
 
     def keys(self):
         return self._cols.keys()
