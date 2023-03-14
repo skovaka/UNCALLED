@@ -130,6 +130,8 @@ class PoreModel:
             self._init_new(prms, *vals)#, prms.reverse, prms.complement, prms.k)
         else:
             self._init_new(prms)
+
+        print("SHIFT", self.PRMS.shift)
             
         if cache:
             CACHE[prms.name] = self.instance
@@ -193,7 +195,11 @@ class PoreModel:
             if len(kmer_lens) > 1:
                 raise ValueError("All kmer lengths must be the same, found lengths: " + ", ".join(map(str, kmer_lens.index)))
             k = kmer_lens.index[0]
-        return k,(df["current.mean"].to_numpy(), df["current.stdv"].to_numpy(), True)
+        if "current.stdv" in df:
+            stdv = df["current.stdv"].to_numpy()
+        else:
+            stdv = []
+        return k,(df["current.mean"].to_numpy(), stdv, True)
     
     def _usecol(self, name):
         return self.extra_cols or name in self.COLUMNS or name in self.TSV_RENAME

@@ -118,9 +118,9 @@ class Sigplot:
         mask = ((signal >= sig_med - sig_win) &
                 (signal <= sig_med + sig_win))
         
-        samples = np.arange(samp_min, samp_max)[mask]
+        samples = np.arange(samp_min, samp_max)#[mask]
         samp_time = samples / self.conf.read_buffer.sample_rate
-        signal = signal[mask]
+        signal = signal#[mask]
 
         current_min = min(current_min, signal.min())
         current_max = max(current_max, signal.max())

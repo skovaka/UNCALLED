@@ -86,7 +86,7 @@ struct ModelDF {
         inorm_scale = INORM_MAX / prms.norm_max;
     }
 
-    ModelDF(const &ModelDF df) = default; 
+    //ModelDF(const &ModelDF df) = default; 
 
     ModelDF(const PoreModelParams &params, size_t len=0, float fill=0) : 
         mean(fill, len), stdv(fill, len),
