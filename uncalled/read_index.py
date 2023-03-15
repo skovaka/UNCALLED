@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import os
 import re
-from _uncalled import ReadBufferBC
+from _uncalled import ReadBuffer
 from uuid import UUID
 from types import SimpleNamespace
 
@@ -240,7 +240,7 @@ class Fast5Reader:
     def _dict_to_read(self, f5):
         channel = f5.get_channel_info()
         attrs = f5.handle[f5.raw_dataset_group_name].attrs#["start_time"])
-        read = ReadBufferBC(f5.read_id, channel["channel_number"], attrs["read_number"], attrs["start_time"], f5.get_raw_data(scale=True))
+        read = ReadBuffer(f5.read_id, channel["channel_number"], attrs["read_number"], attrs["start_time"], f5.get_raw_data(scale=True))
         #read.filename = filename
 
         bc_group = f5.get_latest_analysis("Basecall_1D")
@@ -294,7 +294,7 @@ class Pod5Reader:
         r = next(self.infile.reads(selection=[read_id]))
         c = r.calibration
         signal = (r.signal + c.offset) * c.scale
-        return ReadBufferBC(read_id, 0, 0, 0, signal)
+        return ReadBuffer(read_id, 0, 0, 0, signal)
 
     def __iter__(self):
         for r in self.infile.seq_read():
@@ -315,7 +315,7 @@ class Slow5Reader:
         return self.infile.get_read_ids()[0]
 
     def _dict_to_read(self, d):
-        return ReadBufferBC(d["read_id"], 0, 0, 0, d["signal"])
+        return ReadBuffer(d["read_id"], 0, 0, 0, d["signal"])
 
     def __getitem__(self, read_id):
         r = self.infile.get_read(read_id, pA=True)

@@ -138,13 +138,30 @@ class ReadBuffer {
     //only used if chunk_count() == 1
     bool add_next_chunk(ReadBuffer &r);
 
+    template <typename Container>
+    void set_moves(const Container &moves_, u32 template_start_, u32 stride) {
+        moves = ValArray<bool>(moves_.begin(), moves_.size());
+        template_start = template_start_;
+        move_stride = stride;
+        bc_loaded = true;
+    }
+
     #ifdef PYBIND
 
     #define PY_READ_METH(P, D) c.def(#P, &ReadBuffer::P, D);
     #define PY_READ_RPROP(P, D) c.def_property_readonly(#P, &ReadBuffer::get_##P, D);
     #define PY_READ_PRM(P, D) p.def_readwrite(#P, &ReadBuffer::Params::P, D);
 
-    static void pybind_defs(pybind11::class_<ReadBuffer> &c) {
+    #define PY_READ_ATTR(P,D) c.def_readonly(#P, &ReadBuffer::P, D);
+
+    void set_moves(py::array_t<bool> moves_py, u32 template_start, u32 stride) {
+        PyArray<bool> moves_(moves_py);
+        set_moves(moves_, template_start, stride);
+    }
+
+    //static void pybind_defs(pybind11::class_<ReadBuffer> &c) {
+    static void pybind_defs(pybind11::module_ m) {
+        py::class_<ReadBuffer> c(m, "ReadBuffer");
         c.def(pybind11::init<ReadBuffer>());
         c.def(pybind11::init<const std::string &, u16, u32, u64, const py::array_t<float> &>());
     
@@ -160,6 +177,14 @@ class ReadBuffer {
              return pybind11::array_t<float>(r.signal_.size(), r.signal_.data());
         }, "Read Signal");
 
+
+        c.def("set_moves", 
+            static_cast<void (ReadBuffer::*) (py::array_t<bool>,u32,u32)>(&ReadBuffer::set_moves), "Set move data");
+        PY_READ_ATTR(bc_loaded, "True if basecalling data loaded");
+        PY_READ_ATTR(moves, "Guppy BC event moves");
+        PY_READ_ATTR(move_stride, "Guppy BC event length");
+        PY_READ_ATTR(template_start, "Sample where guppy basecalling starts");
+
         c.def("__len__", &ReadBuffer::size);
         c.def("__getitem__", &ReadBuffer::operator[]);
 
@@ -172,6 +197,8 @@ class ReadBuffer {
         PY_READ_PRM(max_chunks, "Will give up on a read after this many chunks have been processed.");
         PY_READ_PRM(seq_fwd, "If true indicates that the signal moves 5' -> 3'");
         PY_READ_PRM(skip_notempl, "If true will skip pre-template-start if basecaller data is loaded");
+
+
     }
 
     #endif
@@ -184,6 +211,10 @@ class ReadBuffer {
     std::vector<float> signal_; //TODO store one
     u16 chunk_count_; //TODO derive from chunk_len?
     bool single_chunk_;
+
+    bool bc_loaded = false;
+    u32 template_start, move_stride;
+    ValArray<bool> moves;
 
     friend bool operator< (const ReadBuffer &r1, const ReadBuffer &r2);
 };

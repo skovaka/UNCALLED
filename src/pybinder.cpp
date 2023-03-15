@@ -3,7 +3,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include "ref_index.hpp"
-#include "read_buffer_bc.hpp"
+#include "read_buffer.hpp"
 #include "signal_processor.hpp"
 #include "dtw.hpp"
 #include "intervals.hpp"
@@ -46,12 +46,8 @@ PYBIND11_MODULE(_uncalled, m) {
 
     RefCoord::pybind_defs(m);
 
-    py::class_<ReadBuffer> read_buffer(m, "ReadBuffer");
-    ReadBuffer::pybind_defs(read_buffer);
+    ReadBuffer::pybind_defs(m);
 
-    py::class_<ReadBufferBC, ReadBuffer> read_buffer_bc(m, "ReadBufferBC");
-    ReadBufferBC::pybind_defs(read_buffer_bc);
-    
     EventDetector::pybind_defs(m);
 
     py::class_<Normalizer> norm(m, "Normalizer");

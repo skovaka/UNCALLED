@@ -2,6 +2,7 @@
     
 void pybind_arrays(py::module_ &m) {
     pybind_array<float>(m, "F32");
+    pybind_array<bool>(m, "Bool");
     pybind_array<i8> (m, "I8");
     pybind_array<i16>(m, "I16");
     pybind_array<i32>(m, "I32");

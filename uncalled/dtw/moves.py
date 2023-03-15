@@ -33,7 +33,7 @@ INT32_NA = np.iinfo(np.int32).max
 
 def sam_to_read_moves(read, sam):
     if read.bc_loaded:
-        mv_stride = read.bce_stride
+        mv_stride = read.move_stride
         moves = np.array(read.moves)
         template_start = read.template_start
 
