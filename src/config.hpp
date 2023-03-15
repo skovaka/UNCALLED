@@ -52,8 +52,6 @@ class Config {
     void set_r94_rna() {
         read_buffer.sample_rate = 3012;
         read_buffer.bp_per_sec  = 70;
-        read_buffer.chunk_time  = 1.0;
-        //read_buffer.max_chunks  = 20;
         read_buffer.seq_fwd     = false;
 
         pore_model.name    = "r94_rna";

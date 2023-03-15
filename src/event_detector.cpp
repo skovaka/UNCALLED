@@ -131,7 +131,7 @@ bool EventDetector::add_sample(float s) {
     return false;
 }
 
-std::vector<Event> EventDetector::get_events(const std::vector<float> &raw) {
+std::vector<Event> EventDetector::get_events(const ValArray<float> &raw) {
     std::vector<Event> events;
     events.reserve(raw.size() / PRMS.window_length2);
     reset();
@@ -147,8 +147,8 @@ std::vector<Event> EventDetector::get_events(const std::vector<float> &raw) {
 
 ProcessedRead EventDetector::process_read(const ReadBuffer &read) {
     ProcessedRead ret;
-    ret.events = get_events(read.signal_);
-    ret.set_signal(read.signal_);
+    ret.events = get_events(read.signal);
+    ret.set_signal(read.signal);
     return ret;
 }
 
@@ -157,7 +157,7 @@ Event EventDetector::get_event() const {
 }
 
 //TODO: template with float, double, Event?
-std::vector<float> EventDetector::get_means(const std::vector<float> &raw) {
+std::vector<float> EventDetector::get_means(const ValArray<float> &raw) {
     std::vector<float> events;
     events.reserve(raw.size() / PRMS.window_length2);
     reset();

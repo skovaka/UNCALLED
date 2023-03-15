@@ -157,6 +157,10 @@ class ValArray: public std::valarray<T> {
         return sqrt((deltas*deltas).sum() / super::size());
     }
 
+    bool empty() const {
+        return super::size() == 0;
+    }
+
     T stdv() const {
         return stdv(mean());
     }

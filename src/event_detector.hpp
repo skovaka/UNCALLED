@@ -224,12 +224,12 @@ class EventDetector {
     void reset();
     bool add_sample(float s);
     Event get_event() const;
-    std::vector<Event> get_events(const std::vector<float> &raw);
+    std::vector<Event> get_events(const ValArray<float> &raw);
 
     ProcessedRead process_read(const ReadBuffer &read);
 
     float kmer_current() const;
-    std::vector<float> get_means(const std::vector<float> &raw);
+    std::vector<float> get_means(const ValArray<float> &raw);
 
     float mean_event_len() const;
     u32 event_to_bp(u32 evt_i, bool last=false) const;
