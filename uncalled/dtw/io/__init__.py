@@ -58,40 +58,11 @@ class TrackIO:
         else:
             self.in_tracks = None
 
-            #spl = filename.split(":")
-
-            #if len(spl) == 1:
-            #    self.filename = filename
-            #    self.track_names = None
-
-            #elif len(spl) == 2:
-            #    self.filename = spl[0]
-            #    self.track_names = spl[1].split(",")
-            #else:
-            #    raise ValueError("Invalid database specifier format: " + filename)
-
-        #self.track_names = None
         self.write_mode = write
 
     @property
     def read_filter(self):
         return self.tracks.read_index.read_filter
-
-    #def init_alignment(self, read_id, fast5, read, bam):
-    #    self.read = read
-    #    self.bam = bam
-
-    #    if fast5 == self.prev_fast5[0]:
-    #        fast5_id = self.prev_fast5[1]
-    #    else:
-    #        fast5_id = self.init_fast5(fast5)
-    #        self.prev_fast5 = (fast5, fast5_id)
-
-    #    if self.prev_read != read_id:
-    #        self.init_read(read_id, fast5_id)
-    #        self.prev_read = read_id
-
-    #    return self.prev_aln_id
 
     def init_write_mode(self):
         if self.prms.out_name is not None:

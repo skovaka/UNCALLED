@@ -90,7 +90,7 @@ class BAM(TrackIO):
         TrackIO.init_write_mode(self)
 
         #TODO load from AlnTrack instance (initialized by Tracks)
-        self.model = PoreModel(self.conf.pore_model)
+        self.model = PoreModel(params=self.conf.pore_model)
         #self.kmer_trim = self.model.kmer_trim
 
         if self.prms.buffered:
@@ -141,7 +141,7 @@ class BAM(TrackIO):
         cmax = np.max(aln.dtw.current)
         #scale = (self.INF_U16 - 1) / (cmax - cmin)
         #shift = -cmin
-        scale = self.model.current.inorm_scale
+        scale = self.model.current.INORM_SCALE
         shift = 0
 
         dc = np.round((aln.dtw.current.to_numpy() + shift) * scale).astype(np.int16)

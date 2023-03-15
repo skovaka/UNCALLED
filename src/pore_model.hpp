@@ -54,84 +54,83 @@ using KmerLen = u8;
 struct PoreModelParams {
     std::string name;
     int k, shift;
-    float norm_max;
+    float pa_mean, pa_stdv, norm_max;
     bool reverse, complement;
 };
 
-//struct PoreModelPreset {
-//    PoreModelParams prms;
-//    const std::vector<float> &vals;
-//
-//    std::pair<std::string, PoreModelPreset> map() const {
-//        return {prms.name, *this};
-//    }
-//};
-
-//extern const std::unordered_map<std::string, PoreModelPreset> PORE_MODEL_PRESETS;
-
 extern const PoreModelParams PORE_MODEL_PRMS_DEF;
-
-//using PresetMap = std::unordered_map<std::string, const std::vector<float> &>;
 
 struct ModelDF {
     using inorm_t = i16;
     static constexpr inorm_t INORM_MAX = std::numeric_limits<inorm_t>::max(),
                              INORM_NA = std::numeric_limits<inorm_t>::min();
     
-    //PoreModelParams &PRMS;
+    std::reference_wrapper<PoreModelParams> PRMS;
+    float INORM_SCALE;
     ValArray<float> mean, stdv;
-    float mean_shift, mean_scale, inorm_scale;
 
-    void init_params(const PoreModelParams &prms) {
-        inorm_scale = INORM_MAX / prms.norm_max;
+    static float init_inorm(const PoreModelParams &prms) {
+        return INORM_MAX / prms.norm_max;
     }
 
     //ModelDF(const &ModelDF df) = default; 
 
-    ModelDF(const PoreModelParams &params, size_t len=0, float fill=0) : 
-        mean(fill, len), stdv(fill, len),
-        mean_shift(0), mean_scale(1) {
-        init_params(params);
+    ModelDF(PoreModelParams &params, size_t len=0, float fill=0) : 
+        PRMS(params),
+        INORM_SCALE(init_inorm(params)),
+        mean(fill, len), stdv(fill, len) {
+        //mean_shift(0), mean_scale(1) {
     }
 
     template <typename Container>
-    ModelDF(const PoreModelParams &params, std::vector<size_t> &order, Container &means, bool normalize) {
-    //ModelDF(const PoreModelParams &params, PyArray<float> means, bool normalize) {
-        //PyArray<float> means_py(means);
-        set_means(order, means, normalize);
-        init_params(params);
+    ModelDF(PoreModelParams &params, std::vector<size_t> &order, Container &means) :
+            PRMS(params),
+            INORM_SCALE(init_inorm(params)) {
+        set_means(order, means);
     }
 
     //ModelDF(const PoreModelParams &params, PyArray<float> means, PyArray<float> stdvs, bool normalize) {
     template <typename Container>
-    ModelDF(const PoreModelParams &params, std::vector<size_t> &order, Container &means, Container &stdvs, bool normalize) {
-        init_params(params);
+    ModelDF(PoreModelParams &params, std::vector<size_t> &order, Container &means, Container &stdvs) :
+            PRMS(params),
+            INORM_SCALE(init_inorm(params)) {
         //PyArray<float> means_py(means), stdvs_py(stdvs);
-        set_means(order, means, normalize);
-        set_stdvs(order, stdvs, normalize);
+        set_means(order, means);
+        set_stdvs(order, stdvs);
+    }
+
+    //std::pair<float, float> get_norm_params() const {
+    //    auto shift = mean.mean(),
+    //         scale = mean.stdv(shift);
+    //    return {scale, shift};
+    //}
+
+    void normalize() {
+        mean = pa_to_norm(mean);
+        stdv = pa_sd_to_norm(stdv);
     }
     
     template <typename Container>
-    void set_means(std::vector<size_t> &order, Container &vals, bool normalize) {
+    void set_means(std::vector<size_t> &order, Container &vals) {
         if (vals.size() == 0) return;
         set_vals(order, mean, vals);
-        if (normalize && mean.size() > 0) {
-            mean_shift = mean.mean(); 
-            mean_scale = mean.stdv(mean_shift);
-            mean = pa_to_norm(mean);
-        } else {
-            mean_shift = 0;
-            mean_scale = 1;
-        }
+        //if (normalize && mean.size() > 0) {
+        //    mean_shift = mean.mean(); 
+        //    mean_scale = mean.stdv(mean_shift);
+        //    mean = pa_to_norm(mean);
+        //} else {
+        //    mean_shift = 0;
+        //    mean_scale = 1;
+        //}
     }
 
     template <typename Container>
-    void set_stdvs(std::vector<size_t> &order, Container &vals, bool normalize) {
+    void set_stdvs(std::vector<size_t> &order, Container &vals) {
         if (vals.size() == 0) return;
         set_vals(order, stdv, vals);
-        if (normalize && stdv.size() > 0) {
-            stdv /= mean_scale;
-        }
+       // if (normalize && stdv.size() > 0) {
+       //     stdv /= mean_scale;
+       // }
     }
 
     template <typename Container>
@@ -169,21 +168,31 @@ struct ModelDF {
     }
 
     template<typename T>
-    T norm_to_pa(T norm) {
-        return (norm * mean_scale) + mean_shift;
+    T norm_to_pa(T norm) const {
+        return (norm * PRMS.get().pa_stdv) + PRMS.get().pa_mean;
     }
 
     template<typename T>
-    T pa_to_norm(T val) {
-        return (val - mean_shift) / mean_scale;
+    T pa_to_norm(T val) const {
+        return (val - PRMS.get().pa_mean) / PRMS.get().pa_stdv;
     }
 
-    inorm_t norm_to_inorm(float norm) {
-        return static_cast<inorm_t>(round(norm * inorm_scale));
+    template<typename T>
+    T pa_sd_to_norm(T val) const {
+        return val / PRMS.get().pa_stdv;
     }
 
-    float inorm_to_norm(inorm_t norm) {
-        return norm / inorm_scale; //(norm_max / INORM_MAX);
+    template<typename T>
+    T norm_to_pa_sd(T val) const {
+        return val * PRMS.get().pa_stdv;
+    }
+
+    inorm_t norm_to_inorm(float norm) const {
+        return static_cast<inorm_t>(round(norm * INORM_SCALE));
+    }
+
+    float inorm_to_norm(inorm_t norm) const {
+        return norm / INORM_SCALE; //(norm_max / INORM_MAX);
     }
 
     size_t size() const {
@@ -192,9 +201,9 @@ struct ModelDF {
 
     static void pybind(py::module_ &m) {
         py::class_<ModelDF> c(m, "ModelDF");
-        c.def(py::init<const PoreModelParams &, size_t, float>());
-        c.def(py::init<const PoreModelParams &, size_t, float>());
-        c.def(py::init<const PoreModelParams &, size_t>());
+        c.def(py::init<PoreModelParams &, size_t, float>());
+        c.def(py::init<PoreModelParams &, size_t, float>());
+        c.def(py::init<PoreModelParams &, size_t>());
 
         //c.def(py::init<const PoreModelParams &, py::array_t<float>, py::array_t<float>, bool>());
         //c.def(py::init<const PoreModelParams &, py::array_t<float>, bool>());
@@ -203,13 +212,13 @@ struct ModelDF {
         //c.def(py::init<>());
         c.def_readonly("mean", &ModelDF::mean);
         c.def_readonly("stdv", &ModelDF::stdv);
-        c.def_readonly("mean_scale", &ModelDF::mean_scale);
-        c.def_readonly("mean_shift", &ModelDF::mean_shift);
+        //c.def_readonly("mean_scale", &ModelDF::mean_scale);
+        //c.def_readonly("mean_shift", &ModelDF::mean_shift);
         //c.def_readonly("stdv_scale", &ModelDF::stdv_scale);
         //c.def("set_means", static_cast< void (*) (ModelDF::set_means >);
         //        py::vectorize(static_cast< KmerType (*) (const KmerTypePy &, u32)>(&Class::str_to_kmer)), 
         //c.def("set_stdvs", &ModelDF::set_stdvs);
-        c.def_readonly("inorm_scale", &ModelDF::inorm_scale);
+        c.def_readonly("INORM_SCALE", &ModelDF::INORM_SCALE);
         c.def("norm_to_inorm", py::vectorize(&ModelDF::norm_to_inorm));
         c.def("get_mean_inorm", py::vectorize(&ModelDF::get_mean_inorm));
         c.def("get_mean_pa", py::vectorize(&ModelDF::get_mean_pa));
@@ -280,7 +289,6 @@ class PoreModel {
 
     PoreModel(const PoreModel &model) = default; 
 
-    //PoreModel(PoreModelParams p, py::array_t<float> current_mean, py::array_t<float> current_stdv, bool normalize) : PoreModel(p) {
     PoreModel(PoreModelParams p, py::array_t<float> current_mean_py, py::array_t<float> current_stdv_py, bool normalize) : PoreModel(p) {
         PyArray<float> current_mean(current_mean_py), current_stdv(current_stdv_py);
 
@@ -298,42 +306,17 @@ class PoreModel {
             order = kmer_order(n, [&](size_t i) {return i;});
         }
 
-        //auto get_kmer = [&](size_t i) {return i;};
-        //if (PRMS.reverse && PRMS.complement) {
-        //    get_kmer = [&](size_t i) {return kmer_revcomp(i);};
-        //} else if (PRMS.reverse) {
-        //    get_kmer = [&](size_t i) {return kmer_rev(i);};
-        //} else if (PRMS.complement) {
-        //    get_kmer = [&](size_t i) {return kmer_comp(i);};
-        //}
+        current = ModelDF(PRMS, order, current_mean, current_stdv);
 
-        //std::stable_sort(order.begin(), order.end(), 
-        //    [&get_kmer](size_t a, size_t b) {return get_kmer(a) < get_kmer(b);});
-            
-        current = ModelDF(PRMS, order, current_mean, current_stdv, normalize);
+        if (normalize) {
+            PRMS.pa_mean = current.mean.mean();
+            PRMS.pa_stdv = current.mean.stdv(PRMS.pa_mean);
+            current.normalize();
+        }
     }
-
-    //PoreModel(KmerLen k) : 
-    //    PoreModel(PoreModelParams({"", k, (k-1)/2, false, false})) {
-    //}
 
     PoreModel() : PoreModel(PORE_MODEL_PRMS_DEF) {
     }
-
-    //PoreModel(const std::string &name, bool reverse=false, bool complement=false, KmerLen k=5) : 
-    //        PoreModel(PoreModelParams({name, k, (k-1)/2, reverse, complement})) {
-    //}
-
-    //PoreModel(const std::vector<float> &means_stdvs, bool reverse, bool complement, KmerLen k) 
-    //    : PoreModel("", reverse, complement, k) {
-    //    init_vals(means_stdvs);
-    //}
-
-    //PoreModel(PoreModelParams p, float model_current_mean, float model_current_stdv) : 
-    //        PoreModel(p) {
-    //    model_mean_ = model_current_mean;
-    //    model_stdv_ = model_current_stdv;
-    //}
 
     void init_vals(const std::vector<float> &vals) {
         model_mean_ = 0;

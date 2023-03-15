@@ -6,8 +6,10 @@
 
 const PoreModelParams PORE_MODEL_PRMS_DEF {
     name        : "",
-    k           : 5,
+    k           : -1,
     shift       : -1,
+    pa_mean     : -1,
+    pa_stdv     : -1,
     norm_max    : 3.0,
     reverse     : false,
     complement  : false,
@@ -28,6 +30,11 @@ void pybind_pore_model_params(py::module_ &m) {
     py::class_<PoreModelParams> p(m, "PoreModelParams");
     p.def(py::init<>());
     p.def(py::init<PoreModelParams>());
+    p.def("to_tuple", 
+        [&](const PoreModelParams &p) 
+            -> std::tuple<std::string, int, int, float, bool, bool> {
+                return {p.name, p.k, p.shift, p.norm_max, p.reverse, p.complement};
+            });
     PY_MODEL_PARAM(name, "Model preset name or TSV filename");
     PY_MODEL_PARAM(k, "K-mer length");
     PY_MODEL_PARAM(shift, "K-mer shift");

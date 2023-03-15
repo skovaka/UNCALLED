@@ -121,7 +121,6 @@ class Config(_Conf):
             if ignore and (name in getattr(self.get_group(group), "_ignore_toml", {}) 
                 or name == "read_filter"): #TODO not great - should wrap Fast5Params in ParamGroup
                 return False
-        #print(group, name, self.is_default(name, group), not hasattr(val, "__len__") or len(val) > 0)
         return (not self.is_default(name, group) and
                 not name.startswith("_") and
                 type(val) in TOML_TYPES and
@@ -144,10 +143,11 @@ class Config(_Conf):
             for param in dir(ogroup):
                 if not (param.startswith("_") or (ignore_defaults and other.is_default(param, group))):
                     val = getattr(ogroup, param)
-                    if isinstance(val, ParamGroup):
-                        _load_group(".".join([group,param]))
-                    else:
-                        setattr(sgroup, param, val)
+                    if not callable(val):
+                        if isinstance(val, ParamGroup):
+                            _load_group(".".join([group,param]))
+                        else:
+                            setattr(sgroup, param, val)
 
         for group_name in groups:
             ogroup = getattr(other, group_name)
@@ -286,37 +286,46 @@ class Config(_Conf):
         return getattr(sg, param, None) == getattr(dg, param, None)
 
 CONF_KW = "conf"
+PARAM_KW = "params"
 
-def _init_group(name, *args, copy_conf=True, **kwargs):
+def _init_group(name, *args, _param_names=None, copy_conf=True, **kwargs):
     if not copy_conf and CONF_KW in kwargs:
         conf = kwargs[CONF_KW]
     else:
         conf = Config(kwargs.get(CONF_KW, rc))
 
+    if PARAM_KW in kwargs:
+        setattr(conf, name, kwargs[PARAM_KW])
+
     if not hasattr(conf, name):
         raise ValueError("Invalid parameter group: " + str(name))
 
-    params = getattr(conf, name)
+    group = getattr(conf, name)
 
-    if len(args) > params.count:
+    if _param_names is None:
+        _param_names = group._order
+    elif not isinstance(_param_names, list):
+        raise ValueError(f"Unknown parameters: {_param_names}")
+
+    if len(args) > len(_param_names):
         raise ValueError("Too many arguments for " + name)
 
     arg_params = set()
     
     for i,val in enumerate(args):
-        arg = params._order[i]
+        arg = _param_names[i]
         arg_params.add(arg)
-        setattr(params, arg, val)
+        setattr(group, arg, val)
 
     for arg, val in kwargs.items():
         if arg in arg_params:
             raise ValueError("Conflicting *arg and **kwarg values for %s.%s" % (name, param))
 
-        if hasattr(params, arg):
-            setattr(params, arg, val)
+        if hasattr(group, arg):
+            setattr(group, arg, val)
 
-        elif arg != CONF_KW:
+        elif arg not in [CONF_KW, PARAM_KW]:
             raise ValueError("Unknown kwarg \"%s\" for %s parameters" % (arg, name))
 
-    return conf, params
+    return conf, group
 

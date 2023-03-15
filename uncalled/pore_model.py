@@ -39,10 +39,23 @@ class PoreModel:
     def get_kmer_shift(k):
         return (k - 1) // 2
 
-    def __init__(self, model=None, k=None, reverse=None, complement=None, df=None, extra_cols=False, cache=True):
+    #TODO load params like normal, maybe need python wrapper
+    #store in pore model comments or binary
+    #usually pass params, optionaly df/cache
+    def __init__(self, *args, model=None, df=None, extra_cols=False, cache=True, **kwargs):
+        self.conf, prms = config._init_group(
+            "pore_model", _param_names=["name", "k", "shift", "norm_max", "reverse", "complement"], *args, **kwargs)
+
         is_preset = False
 
         self._cols = dict()
+
+        vals = None
+
+        self.extra_cols = extra_cols
+        self.extra = pd.DataFrame() if self.extra_cols else None
+
+        is_preset = False
 
         if model is not None: 
             if isinstance(getattr(model, "PRMS", None), PoreModelParams):
@@ -50,97 +63,49 @@ class PoreModel:
                     self._init(model.PRMS, model.instance)
                 else:
                     self._init(model.PRMS, model)
-                return 
-
-            if isinstance(model, int):
-                prms = PoreModelParams()
-                prms.k = model
-                prms.shift = (prms.k-1) // 2
-                prms.name = ""
-                self._init_new(prms)
-                return
-
-            if isinstance(model, str):
-
-                #TODO this will override all other parameters, maybe fine but should clarify
-                if model in PORE_MODEL_PRESETS:
-                    prms = PORE_MODEL_PRESETS[model].prms
-                    is_preset = True
-                else:
-                    prms = self._param_defaults()
-                    prms.name = model
-
-            elif isinstance(model, PoreModelParams):
-                is_preset = model.name in PORE_MODEL_PRESETS
-                if is_preset:
-                    prms = PORE_MODEL_PRESETS[model.name].prms
-                    if model.shift > 0:
-                        prms.shift = model.shift
-                else:
-                    prms = model
-
-            elif isinstance(model, tuple) and isinstance(model[0], PoreModelParams):
-                self._init_new(model[0], *model)
-                return
+            
+            elif isinstance(model, pd.DataFrame):
+                vals = self._vals_from_df(prms, df)
+                self._init_new(prms, *vals)
 
             else:
-                raise TypeError("PoreModel model must be of type str, PoreModel, or PoreModel.Params")
-        else:
-            prms = self._param_defaults()
-            if df is None: is_preset = True
+                raise TypeError(f"Invalid PoreModel type: {type(model)}")
 
-        if reverse is not None: prms.reverse = reverse
-        if complement is not None: prms.complement = complement
+        elif len(prms.name) > 0:
 
-        self.extra_cols = extra_cols
-        self.extra = pd.DataFrame() if self.extra_cols else None
+            cache_key = prms.to_tuple()
 
-        vals = None
+            if cache and cache_key in CACHE:
+                self._init(prms, CACHE[cache_key])
 
-        if df is not None:
-            prms.k, vals = self._vals_from_df(df, k)
-
-        elif cache and prms.name in CACHE:
-            self._init(prms, CACHE[prms.name])
-            return
-
-        elif not is_preset:
-            if os.path.exists(prms.name):
-                if prms.name.endswith(".npz"):
-                    prms.k, vals = self._vals_from_npz(prms.name, k)
-                else:
+            elif os.path.exists(prms.name):
+                try:
+                    vals = self._vals_from_tsv(prms)
+                except:
                     try:
-                        prms.k, vals = self._vals_from_tsv(prms.name, k)
+                        vals = self._vals_from_hdf5(prms)
                     except:
-                        try:
-                            prms.k, vals = self._vals_from_hdf5(prms.name, k)
-                        except:
-                            raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
-            elif len(prms.name) > 0:
-                models = ", ".join(PORE_MODEL_PRESETS.keys())
-                raise ValueError(
-                    f"Unknown PoreModel: {prms.name}. Must be a filename, or one of {models}" \
-                    
-                )
+                        raise ValueError("Unrecognized PoreModel file format. Must be a valid TSV or HDF5 file.")
+                self._init_new(prms, *vals)
+            
+                if cache:
+                    CACHE[cache_key] = self.instance
 
-        if vals is not None:
-            #prms.k = int(np.log2(len(vals)) / 2)
-            if prms.shift < 0:
-                prms.shift = PoreModel.get_kmer_shift(prms.k)
-            self._init_new(prms, *vals)#, prms.reverse, prms.complement, prms.k)
+            else:
+                models = ", ".join(PORE_MODEL_PRESETS.keys())
+                raise FileNotFoundError(f"PoreModel file not found: {prms.name}")
         else:
             self._init_new(prms)
-
-        print("SHIFT", self.PRMS.shift)
-            
-        if cache:
-            CACHE[prms.name] = self.instance
 
     def _init_new(self, prms, *args):
         if prms.k <= 8:
             ModelType = _uncalled.PoreModelU16
         else:
             ModelType = _uncalled.PoreModelU32
+
+        if prms.shift < 0:
+            prms.shift = PoreModel.get_kmer_shift(prms.k)
+
         self._init(prms, ModelType(prms, *args))
 
     def _init(self, prms, instance):
@@ -149,8 +114,10 @@ class PoreModel:
 
         if prms.name is not None:
             self.PRMS.name = prms.name
-        self.PRMS.k = prms.k
-        self.PRMS.shift = prms.shift
+        if prms.k > 0:
+            self.PRMS.k = prms.k
+        if prms.shift >= 0:
+            self.PRMS.shift = prms.shift
 
         if self.K > 8:
             self.kmer_dtype = "uint32"
@@ -182,29 +149,29 @@ class PoreModel:
         "sd"         : "current.stdv"
     }
 
-    def _vals_from_df(self, df, k=None):
+    def _vals_from_df(self, prms, df):
         df = df.rename(columns=self.TSV_RENAME)
         extra = df.columns.difference(self.COLUMNS)
         for col in extra:
             self._cols[col] = df[col].to_numpy()
-        #return np.ravel(df.sort_values("kmer")[["current.mean","current.stdv"]])
-        print(df)
+
         df = df.reset_index().sort_values("kmer")
-        if k is None:
+        if prms.k < 0:
             kmer_lens = df["kmer"].str.len().value_counts()
             if len(kmer_lens) > 1:
                 raise ValueError("All kmer lengths must be the same, found lengths: " + ", ".join(map(str, kmer_lens.index)))
-            k = kmer_lens.index[0]
+            prms.k = kmer_lens.index[0]
+
         if "current.stdv" in df:
             stdv = df["current.stdv"].to_numpy()
         else:
             stdv = []
-        return k,(df["current.mean"].to_numpy(), stdv, True)
+        return (df["current.mean"].to_numpy(), stdv, True)
     
     def _usecol(self, name):
         return self.extra_cols or name in self.COLUMNS or name in self.TSV_RENAME
 
-    def _vals_from_npz(self, filename, k):
+    def _vals_from_npz(self, prms):
         arrs = dict(np.load(filename))
         vals = np.concatenate([arrs["current.mean"], arrs["current.stdv"]], axis=0)
         for name,arr in arrs.items():
@@ -212,14 +179,14 @@ class PoreModel:
             self._cols[name] = arr
         return vals
 
-    def _vals_from_tsv(self, filename, k):
-        df = pd.read_csv(filename, sep="\s+", comment="#", usecols=self._usecol)
-        return self._vals_from_df(df, k)
+    def _vals_from_tsv(self, prms):
+        df = pd.read_csv(prms.name, sep="\s+", comment="#", usecols=self._usecol)
+        return self._vals_from_df(prms, df)
 
-    def _vals_from_hdf5(self, filename, k):
-        handle = h5py.File(filename, "r")
+    def _vals_from_hdf5(self, prms):
+        handle = h5py.File(prms.name, "r")
         df = pd.DataFrame(handle["model"][()]).reset_index()
-        return self._vals_from_df(df, k)
+        return self._vals_from_df(prms, df)
 
     def keys(self):
         return self._cols.keys()

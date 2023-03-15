@@ -194,8 +194,6 @@ class GuidedDTW:
         else:
             raise ValueError(f"Unknown normalization mode: {self.prms.norm_mode}")
         
-        print(tgt)
-
         if self.conf.normalizer.full_read:
             signal.normalize_mom(*tgt)
         else:
@@ -249,8 +247,6 @@ class GuidedDTW:
     def _calc_dtw(self, signal):
         read_block = signal.events[self.evt_start:self.evt_end] #.to_df()[self.evt_start:self.evt_end]
 
-        #print(read_block)
-        
         #prms, means, kmers, inst, bands = self._get_dtw_args(read_block)#, self.ref_kmers)
 
         qry_len = self.evt_end - self.evt_start
@@ -270,11 +266,8 @@ class GuidedDTW:
         if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
             return None
 
-        #print(list(dtw.path))
-
         dtw.fill_aln(self.aln.instance)
 
-        #print(self.aln.dtw.to_pandas().to_string())
 
     def _get_dtw_args(self, read_block):#, ref_kmers):
         qry_len = len(read_block)

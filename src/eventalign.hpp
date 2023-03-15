@@ -60,7 +60,7 @@ std::string write_eventalign(
            << "t" << "\t"
            << event_index[i] << "\t"
            << model.current.norm_to_pa(evt.mean) << "\t"
-           << (model.current.mean_scale * evt.stdv) << "\t"
+           << (model.current.norm_to_pa_sd(evt.stdv)) << "\t"
            << (evt.length / sample_rate) << "\t"
            << model.kmer_to_str(model_kmer) << "\t"
            << model.current.mean[kmer] << "\t"

@@ -82,7 +82,7 @@ def sam_to_ref_moves(conf, ref_index, read, sam, model_name=None):
     else:
         mkl = conf.pore_model.k
 
-    shift = conf.pore_model.k - mkl - ref_index.trim[0]
+    shift = ref_index.K - mkl - ref_index.trim[0]
     ref_moves.index.shift(shift)
     
     return ref_moves.slice(-shift+ref_index.trim[0], len(ref_moves)-ref_index.trim[1])

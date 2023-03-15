@@ -91,6 +91,7 @@ class Tracks:
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers))
 
         self.alns = list()
+        self.models = dict()
         self._tracks = dict()
         self.new_alignment = False
         self.new_layers = set()
@@ -109,7 +110,7 @@ class Tracks:
 
         self._aln_track_ids = [t.id for t in self.alns]
 
-        self.index = load_index(self.model.K, self.prms.index_prefix, kmer_shift=self.model.PRMS.shift)
+        self.index = load_index(self.model, self.prms.index_prefix)
 
         self.coords = self._ref_bounds_to_coords(self.prms.ref_bounds)
 

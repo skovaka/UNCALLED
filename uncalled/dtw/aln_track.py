@@ -45,7 +45,7 @@ class AlnTrack:
         if model is not None:
             self.model = model 
         elif len(conf.pore_model.name) > 0:
-            self.model = PoreModel(conf.pore_model)
+            self.model = PoreModel(params=conf.pore_model)
         else:
             self.model = None
 
