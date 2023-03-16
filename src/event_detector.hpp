@@ -225,6 +225,7 @@ class EventDetector {
     bool add_sample(float s);
     Event get_event() const;
     std::vector<Event> get_events(const ValArray<float> &raw);
+    std::vector<Event> get_events2(const ValArray<float> &raw);
 
     ProcessedRead process_read(const ReadBuffer &read);
 

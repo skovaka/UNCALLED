@@ -145,6 +145,55 @@ std::vector<Event> EventDetector::get_events(const ValArray<float> &raw) {
     return events;
 }
 
+std::vector<Event> EventDetector::get_events2(const ValArray<float> &raw) {
+    std::vector<Event> events;
+    events.reserve(raw.size() / PRMS.window_length2);
+    reset();
+
+    float mean = 0, stdv = 0;
+
+    for (u32 i = 0; i < raw.size(); i++) {
+        if (add_sample(raw[i])) {
+            events.push_back(event_);
+            mean += event_.mean;
+        }
+    }
+    
+    mean /= events.size();
+
+    for (auto &e : events) {
+        auto delta = e.mean - mean;
+        stdv += delta*delta;
+    }
+
+    stdv = sqrt(stdv / events.size());
+
+    auto win = stdv * 2.5,
+         min_mean = mean - win, 
+         max_mean = mean + win;
+
+    std::cout << min_mean << " " << max_mean << " BLAH\n";
+    size_t i = 0, j = 0;
+    for (; i < events.size(); i++) {
+        if (events[i].mean >= min_mean && events[i].mean <= max_mean) {
+            events[j++] = events[i];
+        } else {
+            std::cout << "NO " << events[i].mean << "\n";
+        }
+    }
+    events.resize(j);
+
+    //IntervalArray<i32> coords;
+    //coords.reserve(events.size();
+    //for (auto &e : events) {
+    //    if (e.mean >= min_mean && e.mean <= max_mean) {
+    //        coords.append(e.start, e.start+e.length);
+    //    }
+    //}
+
+    return events;
+}
+
 ProcessedRead EventDetector::process_read(const ReadBuffer &read) {
     ProcessedRead ret;
     ret.events = get_events(read.signal);
@@ -337,12 +386,12 @@ Event EventDetector::create_event(u32 evt_en) {
     event_.start = evt_st;
     event_.length = (float)(evt_en - evt_st);
     event_.mean = (sum[evt_en_buf] - evt_st_sum) / event_.length;
-    const float deltasqr = (sumsq[evt_en_buf] - evt_st_sumsq);
-    const float var = deltasqr / event_.length - event_.mean * event_.mean;
-    event_.stdv = sqrtf(fmaxf(var, 0.0f));
+    //const float deltasqr = (sumsq[evt_en_buf] - evt_st_sumsq);
+    //const float var = deltasqr / event_.length - event_.mean * event_.mean;
+    //event_.stdv = sqrtf(fmaxf(var, 0.0f));
 
     event_.mean = calibrate(event_.mean);
-    event_.stdv = calibrate(event_.stdv);
+    //event_.stdv = calibrate(event_.stdv);
 
     evt_st = evt_en;
     evt_st_sum = sum[evt_en_buf];

@@ -149,6 +149,9 @@ class ReadBuffer {
     u64 start_sample; //TODO no raw len
     ValArray<float> signal; //TODO store one
 
+    //IntervalIndex<i32> events;
+    //ValArray<float> event_mean, event_stdv;
+
     bool bc_loaded = false;
     u32 template_start, move_stride;
     ValArray<bool> moves;
