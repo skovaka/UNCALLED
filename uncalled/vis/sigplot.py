@@ -95,9 +95,9 @@ class Sigplot:
                 #dtws.append(dtw)
                 seqs.append(layers)
 
-                max_i = dtw["start"].argmax()
+
                 samp_min = min(samp_min, dtw["start"].min())
-                samp_max = max(samp_max, dtw["start"].iloc[max_i] + dtw["length"].iloc[max_i])
+                samp_max = max(samp_max, dtw["start"].iloc[-1] + dtw["length"].iloc[-1])
 
                 current_min = min(current_min, seq["current"].min())
                 current_max = max(current_max, seq["current"].max())

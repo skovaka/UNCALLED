@@ -178,14 +178,22 @@ def convert(conf):
     conf.tracks.load_fast5s = True
     tracks = Tracks(conf=conf)
 
-    for read_id, read in tracks.iter_reads():
-        sys.stderr.write(f"{read_id}\n")
-        aln = read.alns[0]
-        dtw = aln.layers["dtw"].droplevel(1)
-        read.init_alignment(read_id, read.get_read_fast5(read_id), aln.coords, {"dtw" : dtw})
+    if len(tracks.inputs) == 2:
+        if tracks.bam_in is None:
+            raise ValueError("Only one non-BAM input can be specified")
+        ignore_bam = True
+    else:
+        ignore_bam = False
+        
+    for aln in tracks.iter_reads(ignore_bam=True):
+        sys.stderr.write(f"{aln.read_id}\n")
+        #aln = read.alns[0]
+        #dtw = aln.layers["dtw"].droplevel(1)
+        #read.init_alignment(read_id, read.get_read_fast5(read_id), aln.coords, {"dtw" : dtw})
         #aln = read.init_alignment(
         
-        read.write_alignment()
+        tracks.write_alignment(aln)
+        #read.write_alignment()
 
     tracks.close()
 

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import sys
 from ..aln_track import AlnTrack
+from ...aln import AlnDF
 from ...signal_processor import ProcessedRead
 from ...index import str_to_coord, RefCoord
 from ...pore_model import PoreModel
@@ -56,6 +57,8 @@ class Eventalign(TrackIO):
         
         if self.conf.pore_model.name == "r94_dna":
             self.conf.pore_model.name = "r9.4_dna_450bps_6mer_npl"
+
+        self.model = None
 
         self.in_id = self.init_track(name, name, self.conf)
 
@@ -124,10 +127,11 @@ class Eventalign(TrackIO):
         csv_iter = pd.read_csv(
             self.filename, sep="\t", chunksize=10000,
             usecols=["read_name","contig","position", "event_index",
-                     "start_idx","event_level_mean","model_mean",
+                     "start_idx","event_level_mean","event_stdv","model_mean",
                      "event_length","strand","model_kmer"])
 
-        model = PoreModel(self.conf.pore_model)
+        if self.model is None:
+            self.model = self.tracks.model
 
         kmer_trim = ref_index.trim
 
@@ -141,55 +145,86 @@ class Eventalign(TrackIO):
 
                     continue
 
-                df.drop(df.index[df["model_mean"] == 0], inplace=True)
+                #df.drop(df.index[df["model_mean"] == 0], inplace=True)
 
                 start = df["position"].min()
                 end = df["position"].max()+1
                 
+                sam = None
+                for read_sam in self.tracks.bam_in.iter_read(read_id):
+                    if read_sam.reference_name == contig and start >= read_sam.reference_start and end < read_sam.reference_end:
+                        sam = read_sam
+                        break
+
+                aln = self.tracks.bam_in.sam_to_aln(sam, load_moves=False)
+                #aln = self.tracks.init_alignment(self.next_aln_id(), read_id, sam.reference_id, coords, sam)
+                
                 fwd = int( (df["event_index"].iloc[0] < df["event_index"].iloc[-1]) == (df["position"].iloc[0] < df["position"].iloc[-1]))
 
-                kmers = model.str_to_kmer(df["model_kmer"])
-                if self.conf.is_rna:
-                    kmers = model.kmer_rev(kmers)
-                else:
-                    fwd = int(df["event_index"].iloc[0] < df["event_index"].iloc[-1])
+                pos = df["position"].to_numpy()
+                df["mpos"] = self.tracks.index.pos_to_mpos(pos, fwd, self.conf.is_rna)-kmer_trim[0]
+                df["mean_cml"]  = df["event_length"] * df["event_level_mean"]
+                df["stdv_cml"]  = df["event_length"] * df["event_stdv"]
 
-                ref_coord = RefCoord(contig, start, end, fwd)
-                coords = ref_index.get_coord_space(ref_coord, self.conf.is_rna, kmer_trim=True)
+                grp = df.groupby("mpos")
+
+                lengths = grp["event_length"].sum()
+                df = pd.DataFrame({
+                    "start" : grp["start_idx"].min(),
+                    "length" : lengths,
+                    "mean" : self.model.pa_to_norm(grp["mean_cml"].sum() / lengths),
+                    "stdv" : self.model.pa_sd_to_norm(grp["stdv_cml"].sum() / lengths)
+                }).set_index(grp["mpos"].min())
+
+                #coords = _uncalled.IntervalIndexI64([(df.index.min()-kmer_trim[0], df.index.max()+1+kmer_trim[1])])
+                coords = _uncalled.IntervalIndexI64([(df.index.min(), df.index.max()+1)])
+                df = df.reindex(coords.expand())
+                aln = self.tracks.init_alignment(self.next_aln_id(), read_id, read_sam.reference_id, coords, read_sam)
+                dtw = AlnDF(aln.seq, df["start"], df["length"], df["mean"], df["stdv"])
+                aln.set_dtw(dtw)
+
+                #kmers = self.model.str_to_kmer(df["model_kmer"])
+                #if self.conf.is_rna:
+                #    kmers = self.model.kmer_rev(kmers)
+                #else:
+                #    fwd = int(df["event_index"].iloc[0] < df["event_index"].iloc[-1])
+
+                #ref_coord = RefCoord(contig, start, end, fwd)
+                #coords = ref_index.get_coord_space(ref_coord, self.conf.is_rna, kmer_trim=True)
 
 
-                df["kmer"] = kmers
+                #df["kmer"] = kmers
 
-                pacs = coords.pos_to_pac(df["position"].to_numpy()+kmer_trim[0])
+                #pacs = coords.pos_to_pac(df["position"].to_numpy()+kmer_trim[0])
 
-                layers = df.rename(columns={
-                        "start_idx" : "start",
-                        "event_length" : "length",
-                        "event_level_mean" : "current",
-                     }).set_index(pd.MultiIndex.from_product(
-                        [[self.in_id], [fwd], pacs, [aln_id]], names=("track.id","seq.fwd","seq.pac","aln.id")))
+                #layers = df.rename(columns={
+                #        "start_idx" : "start",
+                #        "event_length" : "length",
+                #        "event_level_mean" : "current",
+                #     }).set_index(pd.MultiIndex.from_product(
+                #        [[self.in_id], [fwd], pacs, [aln_id]], names=("track.id","seq.fwd","seq.pac","aln.id")))
 
-                samp_start = layers["start"].min()
-                e = layers["start"].argmax()
-                samp_end = layers["start"].iloc[e] + layers["length"].iloc[e]
+                #samp_start = layers["start"].min()
+                #e = layers["start"].argmax()
+                #samp_end = layers["start"].iloc[e] + layers["length"].iloc[e]
 
-                layers = pd.concat({"dtw" : layers}, names=("group","layer"), axis=1).sort_index()
+                #layers = pd.concat({"dtw" : layers}, names=("group","layer"), axis=1).sort_index()
 
-                alns = pd.DataFrame({
-                        "id" : [aln_id],
-                        "track.id" : [self.in_id],
-                        "read_id" : [read_id],
-                        "ref_name" : [coords.ref_name],
-                        "ref_start" : [coords.refs.start],
-                        "ref_end" : [coords.refs.stop],
-                        "seq.fwd" :     [coords.fwd],
-                        "samp_start" : [samp_start],
-                        "samp_end" : [samp_end],
-                        "tags" : [""]}).set_index(["track.id", "id"])
+                #alns = pd.DataFrame({
+                #        "id" : [aln_id],
+                #        "track.id" : [self.in_id],
+                #        "read_id" : [read_id],
+                #        "ref_name" : [coords.ref_name],
+                #        "ref_start" : [coords.refs.start],
+                #        "ref_end" : [coords.refs.stop],
+                #        "seq.fwd" :     [coords.fwd],
+                #        "samp_start" : [samp_start],
+                #        "samp_end" : [samp_end],
+                #        "tags" : [""]}).set_index(["track.id", "id"])
 
-                aln_id += 1
-
-                yield alns,layers
+                #aln_id += 1
+                #yield alns,layers
+                yield aln
 
         leftover = pd.DataFrame()
 
@@ -203,12 +238,12 @@ class Eventalign(TrackIO):
             leftover = events[i]
             events = events[~i]
 
-            for alns,layers in iter_layers(events, aln_id):
-                yield alns,layers
+            for aln in iter_layers(events, aln_id):
+                yield aln#s,layers
 
         if len(leftover) > 0:
             for alns,layers in iter_layers(leftover, aln_id):
-                yield alns,layers
+                yield aln#s,layers
 
 
     def init_fast5(self, fast5):

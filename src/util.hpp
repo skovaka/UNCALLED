@@ -102,7 +102,7 @@ class ValArray: public std::valarray<T> {
     using super = std::valarray<T>;
 
     static constexpr T init_na() {
-        return  std::numeric_limits<T>::has_infinity ? std::numeric_limits<T>::infinity() : std::numeric_limits<T>::min();
+        return  std::numeric_limits<T>::has_quiet_NaN ? std::numeric_limits<T>::quiet_NaN() : std::numeric_limits<T>::min();
     }
 
     static constexpr T NA = init_na();//std::numeric_limits<T>::max();

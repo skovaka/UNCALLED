@@ -62,6 +62,20 @@ struct AlnDF {
         }
     }
 
+    void mask(py::array_t<bool> mask_py) {
+        PyArray<bool> mask(mask_py);
+        if (mask.size() != size()) {
+            throw std::runtime_error("Mask must be same length as dataframe");
+        }
+        for (size_t i = 0; i < size(); i++) {
+            if (!mask[i]) {
+                if (current.size() > 0) current[i] = current.NA;
+                if (current_sd.size() > 0) current_sd[i] = current_sd.NA;
+                samples.coords[i].clear();
+            }
+        }
+    }
+
     bool empty() const {
         return size() == 0;
     }
@@ -83,6 +97,7 @@ struct AlnDF {
         c.def(py::init<IntervalIndex<i64>&, py::array_t<i32>, py::array_t<i32>, py::array_t<float>, py::array_t<float>>());
         c.def("slice", &AlnDF::slice);
         c.def("empty", &AlnDF::empty);
+        c.def("mask", &AlnDF::mask);
         c.def("set_signal", &AlnDF::set_signal);
         c.def("__len__", &AlnDF::size);
         c.def_readwrite("index", &AlnDF::index);

@@ -69,10 +69,21 @@ class BAM(TrackIO):
         name = os.path.basename(self.filename)
         self.in_id = self.init_track(name, name, conf)
 
+        self.read_id_index = None
+
         self.in_alns = None
 
     def reset(self):
         self.input.reset()
+
+    def iter_read(self, read_id):
+        if self.read_id_index is None:
+            sys.stderr.write("Indexing BAM file by-read...\n")
+            self.read_id_index = pysam.IndexedReads(self.input)
+            self.read_id_index.build()
+        ret = self.read_id_index.find(read_id)
+        return ret
+
 
     def _init_tags(self, tags):
         self.tags = dict()
@@ -147,12 +158,12 @@ class BAM(TrackIO):
         dc = np.round((aln.dtw.current.to_numpy() + shift) * scale).astype(np.int16)
         ds = np.round((aln.dtw.current_sd.to_numpy() + shift) * scale).astype(np.int16)
 
-        lens = aln.dtw.samples.lengths_dedup.to_numpy()
+        lens = aln.dtw.samples.lengths_dedup.to_numpy().astype("int16")
 
         self.bam.set_tag(REF_TAG, array.array("i", refs))
         self.bam.set_tag(SAMP_TAG, array.array("i", (aln.dtw.samples.start, aln.dtw.samples.end)))
         self.bam.set_tag(NORM_TAG, array.array("f", (scale,shift)))
-        self.bam.set_tag(LENS_TAG, array.array("H", lens))
+        self.bam.set_tag(LENS_TAG, array.array("h", lens))
         self.bam.set_tag(CURS_TAG, array.array("h", dc))
         self.bam.set_tag(STDS_TAG, array.array("h", ds))
 
@@ -279,7 +290,7 @@ class BAM(TrackIO):
 
             yield sam, aln
 
-    def sam_to_aln(self, sam):
+    def sam_to_aln(self, sam, load_moves=True):
         has_dtw = True
         for tag in REQ_ALN_TAGS:
             if not sam.has_tag(tag):
@@ -328,13 +339,19 @@ class BAM(TrackIO):
 
             dtw = AlnDF(aln.seq, start, length, current, stdv)
             aln.set_dtw(dtw)
+            #print(aln.to_pandas(["dtw"]))
 
 
         moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
         has_moves = moves is not None
-        if has_moves:
+        if has_moves and load_moves:
             if aln is None:
                 aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, moves.index, sam)
+            else:
+                i = max(0, moves.index.start - aln.seq.coords.start)
+                j = min(len(moves), len(moves) + moves.index.end -  aln.seq.coords.end)
+                moves = moves.slice(i,j)
+                
             aln.set_moves(moves)
 
         if has_moves and has_dtw:
@@ -392,26 +409,6 @@ class BAM(TrackIO):
             
         return track_alns, track_layers
 
-    def query_old(self, layers, track_id, coords, aln_id=None, read_id=None, fwd=None, order=["read_id", "seq.pac"], full_overlap=False):
-        itr = self.input.fetch(coords.ref_name, coords.refs.min(), coords.refs.max())
-
-        aln_dfs = list()
-        layer_dfs = list()
-
-        if read_id is not None and len(read_id) > 0:
-            read_ids = set(read_id)
-        else:
-            read_ids = None
-
-        for sam in itr:
-            if read_ids is not None and sam.query_name is not read_ids:
-                continue
-            a,l = self._parse_sam(sam, layers)
-            aln_dfs.append(a)
-            layer_dfs.append(l)
-
-        return pd.concat(aln_dfs), pd.concat(layer_dfs)
-        #self.fill_tracks(coords, pd.concat(alignments), pd.concat(layers))
 
     def iter_refs(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, chunksize=None, full_overlap=False):
 
@@ -490,25 +487,6 @@ class BAM(TrackIO):
         if len(ret_alns) > 0:
             yield (ret_alns, ret_layers)
 
-
-    def iter_alns_old(self, layers=None, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
-        aln_id = 0
-
-        if read_id is not None and len(read_id) > 0:
-            read_ids = set(read_id)
-        else:
-            read_ids = None
-
-        for sam in self.iter_sam():
-            if read_ids is not None and sam.query_name not in read_ids:
-                continue
-            ref_start, ref_end = sam.get_tag(REF_TAG)
-            ref_bounds = RefCoord(sam.reference_name, ref_start, ref_end, not sam.is_reverse)
-            coords = ref_index.get_coord_space(ref_bounds, is_rna=self.conf.is_rna, load_kmers=True, kmer_trim=False)
-
-            yield self._parse_sam(sam, layers)
-
-            aln_id += 1
 
 
     def close(self):

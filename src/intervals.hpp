@@ -232,10 +232,22 @@ class IntervalIndex {
         return ret;
     }
 
+    ValArray<bool> get_mask() const {
+        ValArray<bool> ret(coords.size());
+        for (size_t i = 0; i < ret.size(); i++) {
+            ret[i] = coords[i].is_valid();//coords[i+1].start - coords[i].end;
+        }
+        return ret;
+    }
+
     ValArray<T> get_lengths() const {
         ValArray<T> ret(coords.size());
         for (size_t i = 0; i < coords.size(); i++) {
-            ret[i] = coords[i].end - coords[i].start;
+            if (coords[i].is_valid()) {
+                ret[i] = coords[i].end - coords[i].start;
+            } else {
+                ret[i] = ValArray<T>::NA;
+            }
         }
         return ret;
     }
@@ -341,6 +353,7 @@ class IntervalIndex {
             .def_property_readonly("lengths", &IntervalIndex::get_lengths)
             .def_property_readonly("lengths_dedup", &IntervalIndex::get_lengths_dedup)
             .def_property_readonly("gaps", &IntervalIndex::get_gaps)
+            .def_property_readonly("mask", &IntervalIndex::get_mask)
             .def_property_readonly("starts", &IntervalIndex::get_starts)
             .def_property_readonly("ends", &IntervalIndex::get_ends)
             .def_property_readonly("start", &IntervalIndex::get_start)

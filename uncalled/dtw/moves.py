@@ -72,7 +72,7 @@ def sam_to_ref_moves(conf, ref_index, read, sam, model_name=None):
         qrys = ar[:,0]
         qrys[qrys == None] = INT32_NA
 
-    refs = ref_index.pos_to_mpos(sam.reference_id, ar[:,1], is_fwd, conf.is_rna)
+    refs = ref_index.pos_to_mpos(ar[:,1], is_fwd, conf.is_rna)
     qrys = qrys.astype(np.int64)
 
     ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, True)

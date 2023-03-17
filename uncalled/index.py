@@ -354,7 +354,7 @@ class RefIndex:
         return ret
 
     def ref_coord_to_mposs(self, ref_coord, is_rna, flip_rev=True):
-        st,en = self.pos_to_mpos(ref_coord.name, ref_coord.start, ref_coord.end, ref_coord.fwd, is_rna)
+        st,en = self.pos_to_mpos(ref_coord.start, ref_coord.end, ref_coord.fwd, is_rna)
         mposs = pd.RangeIndex(st,en)
         if flip_rev and self.is_mpos_flipped(mposs.start):
             return mposs[::-1]

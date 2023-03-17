@@ -92,11 +92,12 @@ CONVERT_OPTS = (
     Opt("index_prefix", "tracks", nargs="?"),
     MutexOpts("input", [
         Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
-        Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
         Opt("--eventalign-in", "tracks.io", type=comma_split, nargs="?", const="-"),
         Opt("--tombo-in", "tracks.io", type=comma_split, action="extend"),
     ]),
+    Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
     Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
+    Opt("--pore-model", "pore_model", "name"),
 
     MutexOpts("output", [
         Opt("--sql-out", "tracks.io"),

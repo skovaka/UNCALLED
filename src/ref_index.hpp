@@ -368,19 +368,13 @@ class RefIndex {
         return pacseq_ != NULL;
     }
 
-    std::pair<i64, i64> pos_to_mpos(const std::string &ref_name, i64 st, i64 en, bool is_fwd, bool is_rna) {
-        auto shift = get_pac_offset(ref_name);
-
-        i64 pac_st = shift+st, 
-            pac_en = shift+en;
-
+    std::pair<i64, i64> pos_to_mpos(i64 st, i64 en, bool is_fwd, bool is_rna) {
         auto flip = is_fwd == is_rna;
-
-        if (!flip) return {pac_st, pac_en};
-        return {-pac_en-1, -pac_st-1};
+        if (!flip) return {st, en};
+        return {-en, -st};
     }
 
-    i64 pos_to_mpos(i32 rid, i64 ref, bool is_fwd, bool is_rna) {
+    i64 pos_to_mpos(i64 ref, bool is_fwd, bool is_rna) {
         if (is_fwd == is_rna) return -ref-1;
         return ref;
     }
@@ -576,8 +570,8 @@ class RefIndex {
         c.def("pac_to_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::pac_to_ref_id) );
         c.def("get_ref_id", static_cast<i32 (RefIndex::*)(const std::string &)> (&RefIndex::get_ref_id));
         //c.def("get_kmers_new", &RefIndex::get_kmers_new);
-        c.def("pos_to_mpos", static_cast<std::pair<i64, i64> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::pos_to_mpos));
-        c.def("pos_to_mpos", pybind11::vectorize(static_cast<i64 (RefIndex::*)(i32, i64, bool, bool)> (&RefIndex::pos_to_mpos)));
+        c.def("pos_to_mpos", static_cast<std::pair<i64, i64> (RefIndex::*)(i64, i64, bool, bool)> (&RefIndex::pos_to_mpos));
+        c.def("pos_to_mpos", pybind11::vectorize(static_cast<i64 (RefIndex::*)(i64, bool, bool)> (&RefIndex::pos_to_mpos)));
         c.def("mpos_to_pos", pybind11::vectorize(&RefIndex::mpos_to_pos));
         //c.def("get_kmers", static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64)> (&RefIndex::get_kmers) );
         

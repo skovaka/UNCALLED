@@ -534,10 +534,10 @@ class Tracks:
     def _init_mat(self):
         df = self.layers.reset_index()
 
-        self.mat = df.pivot(index=["track.id","aln.id"], columns=["seq.pos"]) \
-                     .rename_axis(("group","layer","seq.pos"), axis=1) \
-                     .reindex(self.coords.refs, axis=1, level=2) \
-                     .sort_index(axis=1)
+        self.mat = df.pivot(index=["track.id","aln.id"], columns=["seq.pos"]) 
+        self.mat = self.mat.rename_axis(("group","layer","seq.pos"), axis=1) 
+        self.mat = self.mat.reindex(self.coords.refs, axis=1, level=2) 
+        self.mat = self.mat.sort_index(axis=1)
 
         order = self.alignments.sort_values(["fwd", "ref_start"]).index
 
@@ -838,7 +838,7 @@ class Tracks:
 
                 yield ret
 
-    def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None):
+    def iter_reads(self, read_filter=None, ref_bounds=None, full_overlap=False, max_reads=None, ignore_bam=False):
 
         if read_filter is None and self.read_index is not None:
             read_filter = self.read_index.read_filter
@@ -850,12 +850,13 @@ class Tracks:
             (read_filter is not None and 
              len(self.get_all_reads().intersection(read_filter)) < len(read_filter)) or
             (ref_bounds is not None and not self.coords.contains(ref_bounds))):
-            gen = self.iter_reads_db(read_filter, ref_bounds, full_overlap, max_reads)
+            gen = self.iter_reads_db(read_filter, ref_bounds, full_overlap, max_reads, ignore_bam)
         else:
             gen = self.iter_reads_slice(read_filter, ref_bounds)
 
-        for read_id,chunk in gen:
-            yield read_id,chunk
+        return gen
+        #for read_id,chunk in gen:
+        #    yield read_id,chunk
             
     def iter_reads_slice(self, reads=None, ref_bounds=None):
         all_reads = self.get_all_reads()
@@ -871,7 +872,7 @@ class Tracks:
         for read_id in all_reads:
             yield read_id, self.slice(ref_start, ref_end, [read_id])
 
-    def iter_reads_db(self, reads, ref_bounds, full_overlap, max_reads):
+    def iter_reads_db(self, reads, ref_bounds, full_overlap, max_reads, ignore_bam=False):
         if ref_bounds is not None:
             self._set_ref_bounds(ref_bounds)
         if reads is None:
@@ -881,7 +882,9 @@ class Tracks:
 
         #TODO handle multiple inputs properly
         for io in self.inputs:
-            #aln_iter = self.input.iter_alns(
+            if ignore_bam and io == self.bam_in:
+                continue
+
             aln_iter = io.iter_alns(
                 self.db_layers, 
                 self._aln_track_ids,
@@ -890,12 +893,14 @@ class Tracks:
                 full_overlap=full_overlap,
                 ref_index=self.index)
 
-            for alignments,layers in aln_iter:
-                for ref_name,ref_alns in alignments.groupby("ref_name"):
-                    coords = self._alns_to_coords(ref_alns)
-                    cache = self._tables_to_tracks(coords, ref_alns, layers)
-                    for ret in cache.iter_reads_slice():
-                        yield ret
+            for aln in aln_iter:
+                yield aln
+                #print(aln)
+                #for ref_name,ref_alns in alignments.groupby("ref_name"):
+                #    coords = self._alns_to_coords(ref_alns)
+                #    cache = self._tables_to_tracks(coords, ref_alns, layers)
+                #    for ret in cache.iter_reads_slice():
+                #        yield ret
         
     def _tables_to_tracks(self, coords, alignments, layers):
         tracks = dict()

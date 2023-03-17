@@ -56,6 +56,26 @@ struct PoreModelParams {
     int k, shift;
     float pa_mean, pa_stdv, norm_max;
     bool reverse, complement;
+
+    template<typename T>
+    T norm_to_pa(T norm) const {
+        return (norm * pa_stdv) + pa_mean;
+    }
+
+    template<typename T>
+    T pa_to_norm(T val) const {
+        return (val - pa_mean) / pa_stdv;
+    }
+
+    template<typename T>
+    T pa_sd_to_norm(T val) const {
+        return val / pa_stdv;
+    }
+
+    template<typename T>
+    T norm_to_pa_sd(T val) const {
+        return val * pa_stdv;
+    }
 };
 
 extern const PoreModelParams PORE_MODEL_PRMS_DEF;
@@ -168,23 +188,27 @@ struct ModelDF {
     }
 
     template<typename T>
-    T norm_to_pa(T norm) const {
-        return (norm * PRMS.get().pa_stdv) + PRMS.get().pa_mean;
+    T norm_to_pa(T val) const {
+        return PRMS.get().norm_to_pa(val);
+        //return (norm * PRMS.get().pa_stdv) + PRMS.get().pa_mean;
     }
 
     template<typename T>
     T pa_to_norm(T val) const {
-        return (val - PRMS.get().pa_mean) / PRMS.get().pa_stdv;
+        return PRMS.get().pa_to_norm(val);
+        //(val - PRMS.get().pa_mean) / PRMS.get().pa_stdv;
     }
 
     template<typename T>
     T pa_sd_to_norm(T val) const {
-        return val / PRMS.get().pa_stdv;
+        return PRMS.get().pa_sd_to_norm(val);
+        //return val / PRMS.get().pa_stdv;
     }
 
     template<typename T>
     T norm_to_pa_sd(T val) const {
-        return val * PRMS.get().pa_stdv;
+        return PRMS.get().norm_to_pa_sd(val);
+        //return val * PRMS.get().pa_stdv;
     }
 
     inorm_t norm_to_inorm(float norm) const {
@@ -395,6 +419,22 @@ class PoreModel {
         init_stdv();
 
         loaded_ = true;
+    }
+
+    float norm_to_pa(float val) const {
+        return PRMS.norm_to_pa(val);
+    }
+
+    float pa_to_norm(float val) const {
+        return PRMS.pa_to_norm(val);
+    }
+
+    float pa_sd_to_norm(float val) const {
+        return PRMS.pa_sd_to_norm(val);
+    }
+
+    float norm_to_pa_sd(float val) const {
+        return PRMS.norm_to_pa_sd(val);
     }
 
     float norm_pdf(float samp, KmerType kmer) const {
@@ -664,6 +704,11 @@ class PoreModel {
         c.def("kmer_base_count",     py::vectorize(&Class::kmer_base_count), "Returns the number of occurances of the specified base index in the binary k-mer");
         c.def("kmer_neighbor", py::vectorize(&Class::kmer_neighbor), "Returns the binary k-mer shifted left with the specified base appended");
 
+        c.def("norm_to_pa",     py::vectorize(&Class::norm_to_pa), "Convert normalized current levels to picoamps");
+        c.def("norm_to_pa_sd",     py::vectorize(&Class::norm_to_pa_sd), "Convert normalized current standard deviations to picoamps");
+
+        c.def("pa_to_norm",     py::vectorize(&Class::pa_to_norm), "Convert pA current levels to 0-mean 1-stdv normalized");
+        c.def("pa_sd_to_norm",     py::vectorize(&Class::pa_sd_to_norm), "Convert picoamps standard deviations to 0-mean 1-stdv normalized");
 
     }
 

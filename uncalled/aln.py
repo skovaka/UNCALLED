@@ -162,6 +162,15 @@ class Sequence:
             raise AttributeError(f"Sequence has no attribute '{name}'")
         return self.instance.__getattribute__(name)
 
+PANDAS_DTYPES = {
+    "int16" : pd.Int16Dtype(),
+    "int32" : pd.Int32Dtype(),
+    "int64" : pd.Int64Dtype(),
+    "uint16" : pd.UInt16Dtype(),
+    "uint32" : pd.UInt32Dtype(),
+    "uint64" : pd.UInt64Dtype(),
+}
+
 class AlnDF:
     sample_rate = 4000
 
@@ -169,36 +178,40 @@ class AlnDF:
         self.seq = seq
         if isinstance(start, _uncalled._AlnDF):
             self.instance = start
-            return
+        else:
+            if current is None:
+                current = np.zeros(0, np.float32)
+            if current_sd is None:
+                current_sd = np.zeros(0, np.float32)
 
-        if current is None:
-            current = np.zeros(0, np.float32)
-        if current_sd is None:
-            current_sd = np.zeros(0, np.float32)
+            self.instance = _uncalled._AlnDF(self.seq.coords, start, length, current, current_sd)
 
-        self.instance = _uncalled._AlnDF(self.seq.coords, start, length, current, current_sd)
-
+        self.instance.mask(self.na_mask)
         self._extra = dict()
 
+        
+    @property
+    def na_mask(self):
+        return self.samples.mask.to_numpy()
     @property
     def start(self):
-        return self.samples.starts.to_numpy()
+        return (self.samples.starts.to_numpy())
 
     @property
     def end(self):
-        return self.samples.ends.to_numpy()
+        return (self.samples.ends.to_numpy())
 
     @property
     def length(self):
-        return self.samples.lengths.to_numpy()
+        return (self.samples.lengths.to_numpy())
 
     @property
     def start_sec(self):
-        return self.start / self.sample_rate
+        return (self.start / self.sample_rate)
 
     @property
     def length_sec(self):
-        return self.length / self.sample_rate
+        return (self.length / self.sample_rate)
 
     @property
     def middle(self):
@@ -220,19 +233,28 @@ class AlnDF:
     def dwell(self):
         return 1000* self.length / AlnDF.sample_rate
 
+    def _get_series(self, name):
+        vals = getattr(self, name, None)
+        if vals is None:
+            return None
+        ret = pd.Series(vals)
+        dtype = PANDAS_DTYPES.get(ret.dtype.name, None)
+        na = np.nan
+        if dtype is not None:
+            ret = ret.astype(dtype)
+            na = pd.NA
+        if len(self.na_mask) > 0:
+            ret[~self.na_mask] = na
+        return ret
+
     def to_pandas(self, layers=None):
         if layers is None:
-            df = pd.DataFrame({
-                #"mpos" : self.index.expand(),
-                "start" : self.samples.starts,
-                "length" : self.samples.lengths,
-                "current" : self.current,
-                "current_sd" : self.current_sd
-            })#.set_index("mpos")
-        else:
-            df = pd.DataFrame({
-                l : getattr(self, l) for l in layers if hasattr(self,l)
-            })
+            layers = ["start", "length", "current", "current_sd"]
+
+        df = pd.DataFrame({
+            name : self._get_series(name) 
+            for name in layers if hasattr(self,name)
+        })
         
         #idx = self.index.expand().to_numpy()
         #if index == "ref" and idx[0] < 0:
