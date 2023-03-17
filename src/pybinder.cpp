@@ -19,7 +19,7 @@ template<typename KmerType>
 size_t pybind_model(py::module_ &m, std::string suffix) {
     using Model = PoreModel<KmerType>;
     Model::pybind(m, suffix);
-    RefIndex<Model>::pybind_defs(m, suffix);//ref_index);
+    BwaIndex<Model>::pybind_defs(m, suffix);//ref_index);
     BandedDTW<Model>::pybind_defs(m, suffix);
     GlobalDTW<Model>::pybind_defs(m, suffix);
     SignalProcessor<Model>::pybind(m, suffix);
@@ -45,6 +45,7 @@ PYBIND11_MODULE(_uncalled, m) {
     Config::pybind_defs(config);
 
     RefCoord::pybind_defs(m);
+    SeqRecord::pybind(m);
 
     ReadBuffer::pybind_defs(m);
 

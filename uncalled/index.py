@@ -29,14 +29,26 @@ import numpy as np
 from bisect import bisect_left, bisect_right
 from typing import NamedTuple
 import collections.abc
+import pysam
 
 import pandas as pd
-from . import RefCoord, str_to_coord
+from . import RefCoord, str_to_coord, SeqRecord
 
 import _uncalled
 from .pore_model import PoreModel
 from .argparse import Opt
 
+class FastaIndex:
+    def __init__(self, filename):
+        self.infile = pysam.FastaFile(filename)
+        self.ref_ids = dict()
+        self.seqs = list()
+        offs = 0
+        for i in range(self.infile.nreferences):
+            name = self.infile.references[i]
+            size = self.infile.lengths[i]
+            self.seqs.append(SeqRecord(name, i, size, offs))
+            offs += size
 
 class CoordSpace:
 
@@ -298,18 +310,18 @@ class CoordSpace:
     def __repr__(self):
         return ("%s:%d-%d " % (self.ref_name, self.refs.start, self.refs.stop)) + str(self.mposs)
 
-class RefIndex:
+class BwaIndex:
 
     def __init__(self, model, *args, **kwargs):
 
         if isinstance(model.instance, _uncalled.PoreModelU16):
-            self.InstanceClass = _uncalled.RefIndexU16
+            self.InstanceClass = _uncalled.BwaIndexU16
         elif isinstance(model.instance, _uncalled.PoreModelU32):
-            self.InstanceClass = _uncalled.RefIndexU32
+            self.InstanceClass = _uncalled.BwaIndexU32
         else:
             raise ValueError(f"Unknown PoreModel type: {model.instance}")
             
-        #self.InstanceClass = getattr(_uncalled, f"RefIndexK{k}", None)
+        #self.InstanceClass = getattr(_uncalled, f"BwaIndexK{k}", None)
         #self.Model = getattr(_uncalled, f"PoreModelK{k}", None)
         #if self.InstanceClass is None or self.Model is None:
         #    raise ValueError(f"Invalid k-mer length {k}")
@@ -415,7 +427,7 @@ _index_cache = dict()
 def load_index(model, prefix, load_pacseq=True, load_bwt=False, cache=True):
     idx = _index_cache.get(prefix, None)
     if idx is None:
-        idx = RefIndex(model, prefix, load_pacseq, load_bwt)
+        idx = BwaIndex(model, prefix, load_pacseq, load_bwt)
         if cache: _index_cache[prefix] = idx
     else:
         if load_pacseq and not idx.pacseq_loaded():
@@ -446,7 +458,7 @@ def index(conf):
     if bwa_built:
         sys.stderr.write("Using previously built BWA index.\nNote: to fully re-build the index delete files with the \"%s.*\" prefix.\n" % prms.index_prefix)
     else:
-        _uncalled.RefIndexK5.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
+        _uncalled.BwaIndexK5.create(prms.fasta_filename, prms.index_prefix, prms.no_bwt)
         
         if prms.no_bwt: 
             sys.stderr.write("Pacseq built\n")
@@ -477,7 +489,7 @@ def index(conf):
 
     sys.stderr.write("Done\n")
 
-#TODO move to RefIndex?
+#TODO move to BwaIndex?
 UNCL_SUFF = ".uncl"
 AMB_SUFF = ".amb"
 ANN_SUFF = ".ann"

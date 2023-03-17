@@ -48,6 +48,32 @@ namespace py = pybind11;
 
 enum class Strand {fwd='+', rev='-', na='*'};
 
+struct SeqRecord {
+    std::string name;
+    i32 id, length, offset;
+
+    static void pybind(py::module_ &m) {
+        py::class_<SeqRecord> c(m, "SeqRecord");
+        c.def(py::init<std::string, i32, i32, i32>());
+        c.def_readwrite("name", &SeqRecord::name);
+        c.def_readwrite("id", &SeqRecord::id);
+        c.def_readwrite("length", &SeqRecord::length);
+        c.def_readwrite("offset", &SeqRecord::offset);
+    }
+};
+
+//struct RefCoords : public IntervalIndex<i64> {
+//    const SeqRecord &ref;
+//
+//    RefCoords(const SeqRecord &ref_, IntervalIndex<i64> idx) : ref(ref_) {
+//        init_coords(idx);
+//    }
+//
+//    RefCoords(const SeqRecord &ref_, i64 start, i64 end) : ref_ {
+//
+//    }
+//}
+
 class RefCoord {
     public:
     std::string name;
@@ -135,7 +161,7 @@ class RefCoord {
 };
 
 template<class ModelType>
-class RefIndex {
+class BwaIndex {
     public:
 
     using KmerType = typename ModelType::kmer_t;
@@ -144,7 +170,7 @@ class RefIndex {
 
     using Range = std::pair<u64, u64>;
 
-    RefIndex(ModelType &model) :
+    BwaIndex(ModelType &model) :
         model_(model),
         K(model.KMER_LEN),
         index_(NULL),
@@ -154,8 +180,8 @@ class RefIndex {
         loaded_(false),
         size_(0) {}
 
-    RefIndex(ModelType &model, const std::string &prefix, bool pacseq=false, bool bwt=false) : 
-            RefIndex(model) {
+    BwaIndex(ModelType &model, const std::string &prefix, bool pacseq=false, bool bwt=false) : 
+            BwaIndex(model) {
         if (!prefix.empty()) {
             bns_ = bns_restore(prefix.c_str());
             size_ = 2 * (bns_->l_pac);
@@ -530,11 +556,11 @@ class RefIndex {
 
     #ifdef PYBIND
 
-    #define PY_BWA_INDEX_METH(P) c.def(#P, &RefIndex<ModelType>::P);
-    #define PY_BWA_INDEX_VEC(P) c.def(#P, py::vectorize(&RefIndex<ModelType>::P));
+    #define PY_BWA_INDEX_METH(P) c.def(#P, &BwaIndex<ModelType>::P);
+    #define PY_BWA_INDEX_VEC(P) c.def(#P, py::vectorize(&BwaIndex<ModelType>::P));
 
     static void pybind_defs(pybind11::module_ m, const std::string &suffix) {
-        py::class_<RefIndex<ModelType>> c(m, ("RefIndex" + suffix).c_str());
+        py::class_<BwaIndex<ModelType>> c(m, ("BwaIndex" + suffix).c_str());
 
         c.def(py::init<ModelType &>());
         c.def(py::init<ModelType &, const std::string &>());
@@ -548,7 +574,7 @@ class RefIndex {
         PY_BWA_INDEX_METH(get_neighbor);
         PY_BWA_INDEX_METH(get_kmer_range);
         PY_BWA_INDEX_METH(get_kmer_count);
-        c.def("get_kmer_count", py::vectorize(&RefIndex<ModelType>::get_kmer_count));
+        c.def("get_kmer_count", py::vectorize(&BwaIndex<ModelType>::get_kmer_count));
         PY_BWA_INDEX_METH(get_base_range);
         PY_BWA_INDEX_METH(fm_to_pac);
         PY_BWA_INDEX_METH(fm_to_mpos);
@@ -562,41 +588,41 @@ class RefIndex {
         PY_BWA_INDEX_METH(get_sa_loc);
         PY_BWA_INDEX_METH(get_ref_name);
         PY_BWA_INDEX_METH(get_ref_len);
-        c.def("get_pac_offset", static_cast<i64 (RefIndex::*)(i32)> (&RefIndex::get_pac_offset) );
-        c.def("get_pac_offset", static_cast<i64 (RefIndex::*)(const std::string &)> (&RefIndex::get_pac_offset) );
+        c.def("get_pac_offset", static_cast<i64 (BwaIndex::*)(i32)> (&BwaIndex::get_pac_offset) );
+        c.def("get_pac_offset", static_cast<i64 (BwaIndex::*)(const std::string &)> (&BwaIndex::get_pac_offset) );
         PY_BWA_INDEX_METH(is_mpos_fwd);
         PY_BWA_INDEX_METH(is_mpos_flipped);
         PY_BWA_INDEX_VEC(get_base);
-        c.def("pac_to_ref_id", static_cast<i32 (RefIndex::*)(i64)> (&RefIndex::pac_to_ref_id) );
-        c.def("get_ref_id", static_cast<i32 (RefIndex::*)(const std::string &)> (&RefIndex::get_ref_id));
-        //c.def("get_kmers_new", &RefIndex::get_kmers_new);
-        c.def("pos_to_mpos", static_cast<std::pair<i64, i64> (RefIndex::*)(i64, i64, bool, bool)> (&RefIndex::pos_to_mpos));
-        c.def("pos_to_mpos", pybind11::vectorize(static_cast<i64 (RefIndex::*)(i64, bool, bool)> (&RefIndex::pos_to_mpos)));
-        c.def("mpos_to_pos", pybind11::vectorize(&RefIndex::mpos_to_pos));
-        //c.def("get_kmers", static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64)> (&RefIndex::get_kmers) );
+        c.def("pac_to_ref_id", static_cast<i32 (BwaIndex::*)(i64)> (&BwaIndex::pac_to_ref_id) );
+        c.def("get_ref_id", static_cast<i32 (BwaIndex::*)(const std::string &)> (&BwaIndex::get_ref_id));
+        //c.def("get_kmers_new", &BwaIndex::get_kmers_new);
+        c.def("pos_to_mpos", static_cast<std::pair<i64, i64> (BwaIndex::*)(i64, i64, bool, bool)> (&BwaIndex::pos_to_mpos));
+        c.def("pos_to_mpos", pybind11::vectorize(static_cast<i64 (BwaIndex::*)(i64, bool, bool)> (&BwaIndex::pos_to_mpos)));
+        c.def("mpos_to_pos", pybind11::vectorize(&BwaIndex::mpos_to_pos));
+        //c.def("get_kmers", static_cast< std::vector<KmerType> (BwaIndex::*)(i64, i64)> (&BwaIndex::get_kmers) );
         
         c.def("get_kmers", 
-            static_cast< std::vector<KmerType> (RefIndex::*)(i64, i64, bool, bool)> (&RefIndex::get_kmers),
+            static_cast< std::vector<KmerType> (BwaIndex::*)(i64, i64, bool, bool)> (&BwaIndex::get_kmers),
             py::arg("pac_start"), py::arg("pac_end"), py::arg("rev"), py::arg("comp"));
 
         //c.def("get_kmers", 
-        //    static_cast< std::vector<KmerType> (RefIndex::*)(std::vector<std::pair<i64, i64>>, bool, bool)> (&RefIndex::get_kmers),
+        //    static_cast< std::vector<KmerType> (BwaIndex::*)(std::vector<std::pair<i64, i64>>, bool, bool)> (&BwaIndex::get_kmers),
         //    py::arg("pac_blocks"), py::arg("rev"), py::arg("comp"));
 
         //c.def("get_kmers", 
-        //    static_cast< std::vector<KmerType> (RefIndex::*)(i32, std::vector<std::pair<i64, i64>>, bool)> (&RefIndex::get_kmers),
+        //    static_cast< std::vector<KmerType> (BwaIndex::*)(i32, std::vector<std::pair<i64, i64>>, bool)> (&BwaIndex::get_kmers),
         //    py::arg("ref_id"), py::arg("mpos_blocks"), py::arg("is_rna"));
 
         c.def("get_kmers", 
-            static_cast< Sequence<ModelType> (RefIndex::*)(ModelType&, i32, IntervalIndex<i64>&, bool)> (&RefIndex::get_kmers),
+            static_cast< Sequence<ModelType> (BwaIndex::*)(ModelType&, i32, IntervalIndex<i64>&, bool)> (&BwaIndex::get_kmers),
             py::arg("model"), py::arg("ref_id"), py::arg("mpos_blocks"), py::arg("is_rna"));
 
         c.def("get_kmers", 
-            static_cast< std::vector<KmerType> (RefIndex::*)(const std::string &, i64, i64, bool, bool)> (&RefIndex::get_kmers),
+            static_cast< std::vector<KmerType> (BwaIndex::*)(const std::string &, i64, i64, bool, bool)> (&BwaIndex::get_kmers),
 
             py::arg("name"), py::arg("start"), py::arg("end"), py::arg("rev")=false, py::arg("comp")=false);
         c.def("get_kmers", 
-            static_cast< std::vector<KmerType> (RefIndex::*)(i32, i64, i64, bool)> (&RefIndex::get_kmers),
+            static_cast< std::vector<KmerType> (BwaIndex::*)(i32, i64, i64, bool)> (&BwaIndex::get_kmers),
             py::arg("ref_id"), py::arg("miref_start"), py::arg("miref_end"), py::arg("is_rna"));
 
     }

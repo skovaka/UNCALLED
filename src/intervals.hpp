@@ -119,6 +119,15 @@ class IntervalIndex {
         }
     }
 
+    void init_coords(IntervalIndex coords_) {
+        coords.reserve(coords_.interval_count());
+        starts.reserve(coords_.interval_count());
+        length = 0;
+        for (auto &c : coords_) {
+            append(c);
+        }
+    }
+
     void shift(i64 delta) {
         for (auto &c : coords) {
             if (c.is_valid()) {

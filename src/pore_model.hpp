@@ -765,7 +765,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
     }
 
     //TODO input pacseq and interval index, set from each segment
-    //then RefIndex can just feed right in
+    //then BwaIndex can just feed right in
     //need to figure out mposs, k-mer trim
     
     //eventually need to write new FastaIndex based on FAI
