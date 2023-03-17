@@ -15,7 +15,7 @@ from ... import PoreModel
 from ... import Config
 from ...aln import Alignment, AlnDF
 from . import TrackIO
-from _uncalled import IntervalIndexI64
+from _uncalled import IntervalIndexI64, ValArrayI16
 
 
 REF_TAG  = "ur"
@@ -132,6 +132,7 @@ class BAM(TrackIO):
         return None
 
     INF_U16 = np.iinfo(np.int16).max
+    NA_I16 = ValArrayI16.NA
 
     def _init_alns(self):
         if self.in_alns is None:
@@ -155,65 +156,24 @@ class BAM(TrackIO):
         scale = self.model.current.INORM_SCALE
         shift = 0
 
-        dc = np.round((aln.dtw.current.to_numpy() + shift) * scale).astype(np.int16)
-        ds = np.round((aln.dtw.current_sd.to_numpy() + shift) * scale).astype(np.int16)
+        dc = np.round((aln.dtw.current.to_numpy() + shift) * scale)#.astype(np.int16)
+        ds = np.round((aln.dtw.current_sd.to_numpy() + shift) * scale)#.astype(np.int16)
+
+        na = np.isnan(dc)
+        dc[na] = self.NA_I16
+        ds[na] = self.NA_I16
 
         lens = aln.dtw.samples.lengths_dedup.to_numpy().astype("int16")
 
         self.bam.set_tag(REF_TAG, array.array("i", refs))
         self.bam.set_tag(SAMP_TAG, array.array("i", (aln.dtw.samples.start, aln.dtw.samples.end)))
         self.bam.set_tag(NORM_TAG, array.array("f", (scale,shift)))
-        self.bam.set_tag(LENS_TAG, array.array("h", lens))
-        self.bam.set_tag(CURS_TAG, array.array("h", dc))
-        self.bam.set_tag(STDS_TAG, array.array("h", ds))
+        self.bam.set_tag(LENS_TAG, array.array("h", lens.astype(np.int16)))
+        self.bam.set_tag(CURS_TAG, array.array("h", dc.astype(np.int16)))
+        self.bam.set_tag(STDS_TAG, array.array("h", ds.astype(np.int16)))
 
         #if not self.bam.has_tag("f5"):
         #    self.bam.set_tag("f5", os.path.basename(self.prev_fast5[0]))
-
-        if self.prms.buffered:
-            self.out_buffer.append(self.bam.to_string())
-        else:
-            self.output.write(self.bam)
-
-    def write_layers(self, track, groups):
-        aln = track.alignments.iloc[0]
-        if self.bam is None: 
-            return
-        
-        refs = track.coords.refs
-        dtw = track.layers["dtw"].reset_index(level=1).reindex(refs)
-
-        lens = dtw["length"]
-        lens[dtw["start"].duplicated()] = 0 #skips
-
-        cmin = 0
-        cmax = dtw["current"].max()
-        scale = (self.INF_U16 - 1) / (cmax - cmin)
-        shift = -cmin
-
-        dc = np.round((dtw["current"]+ shift) * scale)#.astype("uint16")
-        ds = np.round((dtw["stdv"]+ shift) * scale)#.astype("uint16")
-
-        dc = dc.fillna(self.INF_U16).to_numpy(np.uint16)
-        ds = ds.fillna(self.INF_U16).to_numpy(np.uint16)
-        lens = dtw["length"].reindex(refs).to_numpy(np.uint16, na_value=0)
-
-        if dtw["start"].iloc[0] < dtw["start"].iloc[-1]:
-            sample_start = dtw["start"].iloc[0]
-            sample_end = dtw["start"].iloc[-1] + dtw["length"].iloc[-1]
-        else:
-            sample_start = dtw["start"].iloc[0] + dtw["length"].iloc[0]
-            sample_end = dtw["start"].iloc[-1] 
-
-        self.bam.set_tag(REF_TAG, array.array("I", (refs[0], refs[-1]+1)))
-        self.bam.set_tag(SAMP_TAG, array.array("I", (sample_start, sample_end)))
-        self.bam.set_tag(NORM_TAG, array.array("f", (scale,shift)))
-        self.bam.set_tag(LENS_TAG, array.array("H", lens))
-        self.bam.set_tag(CURS_TAG, array.array("H", dc))
-        self.bam.set_tag(STDS_TAG, array.array("H", ds))
-
-        if not self.bam.has_tag("f5"):
-            self.bam.set_tag("f5", os.path.basename(self.prev_fast5[0]))
 
         if self.prms.buffered:
             self.out_buffer.append(self.bam.to_string())
@@ -314,17 +274,18 @@ class BAM(TrackIO):
             norm_scale, norm_shift = sam.get_tag(NORM_TAG)
 
             dac = np.array(sam.get_tag(CURS_TAG))
+            cna = dac == self.NA_I16
             current = (dac/norm_scale)-norm_shift
-            current[dac == self.INF_U16] = np.nan
+            current[cna] = np.nan
 
             if sam.has_tag(STDS_TAG):
                 das = np.array(sam.get_tag(STDS_TAG))
                 stdv = (das/norm_scale)-norm_shift
-                stdv[das == self.INF_U16] = np.nan
+                stdv[das == self.NA_I16] = np.nan
             else:
                 stdv = np.full(len(current), np.nan)
             
-            length = sam.get_tag(LENS_TAG)
+            length = np.array(sam.get_tag(LENS_TAG))
             #ref_start, ref_end = sam.get_tag(REF_TAG)
             refs = sam.get_tag(REF_TAG)
 
@@ -335,11 +296,14 @@ class BAM(TrackIO):
             aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, coords, sam)
 
             start = np.full(coords.length, samp_start, dtype="int32")
-            start[1:] += np.cumsum(length)[:-1].astype("int32")
+            start[1:] += np.cumsum(length.astype("int32"))[:-1]
+
+            lna = (length == 0) & cna
+            length[cna] = -1
 
             dtw = AlnDF(aln.seq, start, length, current, stdv)
             aln.set_dtw(dtw)
-            #print(aln.to_pandas(["dtw"]))
+
 
 
         moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
@@ -408,7 +372,6 @@ class BAM(TrackIO):
         track_layers = {t : pd.concat(l) for t,l in track_layers.items()}
             
         return track_alns, track_layers
-
 
     def iter_refs(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, chunksize=None, full_overlap=False):
 

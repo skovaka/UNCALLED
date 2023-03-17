@@ -27,7 +27,7 @@ struct Interval {
     }
 
     bool is_valid() const {
-        return !(start == NA || end == NA) && start < end;
+        return !(start == NA || end == NA) && start <= end;
     }
 
     std::pair<T,T> to_pair() const {

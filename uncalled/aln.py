@@ -193,6 +193,7 @@ class AlnDF:
     @property
     def na_mask(self):
         return self.samples.mask.to_numpy()
+
     @property
     def start(self):
         return (self.samples.starts.to_numpy())
@@ -237,7 +238,7 @@ class AlnDF:
         vals = getattr(self, name, None)
         if vals is None:
             return None
-        ret = pd.Series(vals)
+        ret = pd.Series(vals, copy=True)
         dtype = PANDAS_DTYPES.get(ret.dtype.name, None)
         na = np.nan
         if dtype is not None:

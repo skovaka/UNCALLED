@@ -178,6 +178,7 @@ class ValArray: public std::valarray<T> {
                 {sizeof(T)} 
             ); 
         });
+        a.attr("NA") = py::cast(ValArray::NA);
         a.def("__getitem__", static_cast<T& (super::*)(size_t)> (&ValArray::at));
         //        py::vectorize(static_cast< KmerType (*) (const KmerTypePy &, u32)>(&Class::str_to_kmer)), 
         //a.def("__getitem__", &ValArray::at);

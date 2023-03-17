@@ -10,7 +10,7 @@ const PoreModelParams PORE_MODEL_PRMS_DEF {
     shift       : -1,
     pa_mean     : -1,
     pa_stdv     : -1,
-    norm_max    : 3.0,
+    norm_max    : 5.0,
     reverse     : false,
     complement  : false,
 };
@@ -38,6 +38,7 @@ void pybind_pore_model_params(py::module_ &m) {
     PY_MODEL_PARAM(name, "Model preset name or TSV filename");
     PY_MODEL_PARAM(k, "K-mer length");
     PY_MODEL_PARAM(shift, "K-mer shift");
+    PY_MODEL_PARAM(norm_max, "K-mer shift");
     PY_MODEL_PARAM(reverse, "Will reverse (flip) k-mer sequences if True");
     PY_MODEL_PARAM(complement, "Will complement k-mer sequences if True");
 
