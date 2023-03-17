@@ -237,18 +237,8 @@ class BAM(TrackIO):
 
     def iter_alns(self, layers=None, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
         for sam in self.iter_sam():
-            if sam.query_name in self.tracks.read_index:
-                read = self.tracks.read_index[sam.query_name]
-
-            moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
-            if moves is None:
-                continue
-            self.bam = sam
-
-            aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, moves.index, sam)
-            aln.set_moves(moves)
-
-            yield sam, aln
+            aln = self.sam_to_aln(sam)
+            yield aln
 
     def sam_to_aln(self, sam, load_moves=True):
         has_dtw = True

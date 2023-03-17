@@ -114,8 +114,8 @@ def dtw_single(conf):
     #for bam in tracks.bam_in.iter_sam():
     #    dtw = GuidedDTW(tracks, bam)
 
-    for sam, aln in tracks.bam_in.iter_alns():
-        dtw = GuidedDTW(tracks, aln, sam)
+    for aln in tracks.bam_in.iter_alns():
+        dtw = GuidedDTW(tracks, aln)
 
     tracks.close()
 
@@ -126,7 +126,7 @@ class GuidedDTW:
         return ProcessedRead(evdt.process_read(read))
 
     #def __init__(self, tracks, bam, **kwargs):
-    def __init__(self, tracks, aln, sam):
+    def __init__(self, tracks, aln):
         self.conf = tracks.conf
         self.prms = self.conf.dtw
 

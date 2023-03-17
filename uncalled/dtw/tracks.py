@@ -731,6 +731,7 @@ class Tracks:
 
             return seq_coords, coords
 
+
         #NEW CODE START 
 
         layer_iters = [
@@ -895,12 +896,6 @@ class Tracks:
 
             for aln in aln_iter:
                 yield aln
-                #print(aln)
-                #for ref_name,ref_alns in alignments.groupby("ref_name"):
-                #    coords = self._alns_to_coords(ref_alns)
-                #    cache = self._tables_to_tracks(coords, ref_alns, layers)
-                #    for ret in cache.iter_reads_slice():
-                #        yield ret
         
     def _tables_to_tracks(self, coords, alignments, layers):
         tracks = dict()
