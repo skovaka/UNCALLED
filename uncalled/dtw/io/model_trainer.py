@@ -66,7 +66,7 @@ class ModelTrainer(TrackIO):
 
             self.iter = max_itr + int(not self.tprms.skip_dtw)
             self.conf.pore_model.name = fname
-            self.set_model(PoreModel(self.conf.pore_model))
+            self.set_model(PoreModel(params=self.conf.pore_model))
 
         elif self.tprms.skip_dtw:
             self.iter = self.tprms.iterations
@@ -233,14 +233,16 @@ class ModelTrainer(TrackIO):
         df["count"] = df["count"].astype(int)
             
         print(df)
-        model_out = PoreModel(df=df, k=self.model.PRMS.k, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True)
         outfile = self._filename("model.tsv")
+        self.model.PRMS.name = outfile
+        model_out = PoreModel(model=df, params=self.model.PRMS, extra_cols=True)#k=self.model.PRMS.k, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True)
         model_out.to_tsv(outfile)
 
-        self.set_model(PoreModel(outfile, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True))
+        #self.set_model(PoreModel(outfile, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True))
+        self.set_model(PoreModel(params=self.model.PRMS, extra_cols=True))
 
         self.iter += 1
-        print("write", self.model.PRMS.reverse, self.model.PRMS.complement)
+        print("write", self.model.PRMS.shift, self.model.PRMS.reverse, self.model.PRMS.complement)
         return self.model #outfile#self._filename("model.tsv")
         #return outfile
         

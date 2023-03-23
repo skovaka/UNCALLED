@@ -205,20 +205,17 @@ Event EventDetector::get_event() const {
     return event_;
 }
 
-//TODO: template with float, double, Event?
-std::vector<float> EventDetector::get_means(const ValArray<float> &raw) {
-    std::vector<float> events;
-    events.reserve(raw.size() / PRMS.window_length2);
-    reset();
-
-    for (u32 i = 0; i < raw.size(); i++) {
-        if (add_sample(raw[i])) {
-            events.push_back(event_.mean);
-        }
-    }
-
-    return events;
+ValArray<float> EventDetector::get_means_py(py::array_t<float> raw_py) {
+    PyArray<float> raw(raw_py);
+    auto events = get_means(raw);
+    ValArray<float> ret(events.data(), events.size());
+    return ret;
 }
+
+//TODO: template with float, double, Event?
+//template <typename Container>
+//std::vector<float> EventDetector::get_means(const Container &raw) {
+//}
 
 float EventDetector::kmer_current() const {
     return event_.mean;

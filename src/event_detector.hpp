@@ -230,7 +230,23 @@ class EventDetector {
     ProcessedRead process_read(const ReadBuffer &read);
 
     float kmer_current() const;
-    std::vector<float> get_means(const ValArray<float> &raw);
+
+    template <typename Container>
+    std::vector<float> get_means(const Container &raw) {
+        std::vector<float> events;
+        events.reserve(raw.size() / PRMS.window_length2);
+        reset();
+
+        for (u32 i = 0; i < raw.size(); i++) {
+            if (add_sample(raw[i])) {
+                events.push_back(event_.mean);
+            }
+        }
+
+        return events;
+    }
+
+    ValArray<float> get_means_py(py::array_t<float> raw);
 
     float mean_event_len() const;
     u32 event_to_bp(u32 evt_i, bool last=false) const;
@@ -280,7 +296,9 @@ class EventDetector {
         PY_EVTD_METH(get_events, "");
         PY_EVTD_METH(process_read, "");
         PY_EVTD_METH(kmer_current, "");
-        PY_EVTD_METH(get_means, "");
+        
+        evdt.def("get_means", &EventDetector::get_means_py);
+        //PY_EVTD_METH(get_means, "");
         PY_EVTD_METH(mean_event_len, "");
 
         evdt.def_readonly_static("PRMS_DEF", &EventDetector::PRMS_DEF, "");

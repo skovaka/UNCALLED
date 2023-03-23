@@ -557,7 +557,7 @@ class PoreModel {
     }
 
     KmerType set_kmer_base(KmerType kmer, u8 i, u8 b) const {
-        auto shift = 2*i;
+        auto shift = 2 * (KMER_LEN-i-1);
         auto mask = ~(0x3 << shift);
         return (kmer & mask) | (b << shift); 
     }

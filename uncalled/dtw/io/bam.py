@@ -294,8 +294,6 @@ class BAM(TrackIO):
             dtw = AlnDF(aln.seq, start, length, current, stdv)
             aln.set_dtw(dtw)
 
-
-
         moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
         has_moves = moves is not None
         if has_moves and load_moves:

@@ -251,10 +251,9 @@ struct Alignment {
     }
 
     void calc_mvcmp() {
-        if (dtw.empty() || moves.empty()) {
-            throw std::runtime_error("Both 'dtw' and 'moves' must be defined");
+        if (!(dtw.empty() || moves.empty())) {
+            mvcmp = CmpDF(dtw, moves);
         }
-        mvcmp = CmpDF(dtw, moves);
     }
 
     static void pybind(py::module_ &m, std::string suffix) {

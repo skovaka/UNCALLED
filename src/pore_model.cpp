@@ -39,6 +39,8 @@ void pybind_pore_model_params(py::module_ &m) {
     PY_MODEL_PARAM(k, "K-mer length");
     PY_MODEL_PARAM(shift, "K-mer shift");
     PY_MODEL_PARAM(norm_max, "K-mer shift");
+    PY_MODEL_PARAM(pa_mean, "Current mean picoamp mean");
+    PY_MODEL_PARAM(pa_stdv, "Current mean picoamp stdv");
     PY_MODEL_PARAM(reverse, "Will reverse (flip) k-mer sequences if True");
     PY_MODEL_PARAM(complement, "Will complement k-mer sequences if True");
 

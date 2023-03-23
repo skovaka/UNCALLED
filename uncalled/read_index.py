@@ -55,6 +55,7 @@ class ReadIndex:
         if self.read_files is not None:
             ret.load_index_df(self.read_files.reset_index())
         ret.file_info = self.file_info
+        ret._default_model = self._default_model
         return ret
 
     def load_index_file(self, fname=None):

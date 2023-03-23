@@ -20,14 +20,13 @@ def init_model(tracks, k):
     for read in tracks.read_index:
         st = read.template_start
         en = st + np.sum(read.moves)*5
-        c = evdt.get_means(read.signal[st:en])
+        c = evdt.get_means(read.signal.to_numpy()[st:en])
         #currents.append(read.signal[st:en])
         currents.append(c)
         length += len(c)
         if length >= tracks.conf.train.init_events:
             break
     currents = np.concatenate(currents)
-    print(len(currents))
 
     mn = np.mean(currents)
     sd = np.std(currents)
@@ -44,10 +43,10 @@ def init_model(tracks, k):
     cmax = mn+sd*coef
 
 
-    tracks.conf.normalizer.tgt_mean = np.mean(currents)
-    tracks.conf.normalizer.tgt_stdv = np.std(currents)
+    tracks.conf.pore_model.pa_mean = np.mean(currents)
+    tracks.conf.pore_model.pa_stdv = np.std(currents)
     #tracks.set_model(PoreModel((tracks.conf.pore_model, tracks.conf.normalizer.tgt_mean, tracks.conf.normalizer.tgt_stdv)))
-    tracks.set_model(PoreModel(tracks.conf.pore_model, tracks.conf.normalizer.tgt_mean, tracks.conf.normalizer.tgt_stdv))
+    tracks.set_model(PoreModel(params=tracks.conf.pore_model))
 
 def train(conf):
     conf.tracks.load_fast5s = True
@@ -57,15 +56,15 @@ def train(conf):
 
     if prms.init_model is not None:
         conf.pore_model.name = prms.init_model
-    elif prms.kmer_len is not None:
-        conf.pore_model.name = ""
+    elif not prms.append and prms.kmer_len is not None:
+        #conf.pore_model.name = ""
         conf.pore_model.k = prms.kmer_len
-        conf.pore_model.shift = (prms.kmer_len-1) // 2
         conf.dtw.iterations = 0
     elif not prms.append:
         raise ValueError(f"Must define kmer_length, init_model, or run in append mode")
 
     tracks = Tracks(conf=conf)
+    _ = tracks.read_index.default_model
 
     if conf.dtw.iterations == 0:
         init_model(tracks, prms.kmer_len)

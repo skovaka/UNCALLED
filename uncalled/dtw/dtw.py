@@ -58,6 +58,7 @@ def dtw_pool(conf):
     assert(tracks.output is not None)
     #tracks.output.set_model(tracks.model)
     i = 0
+    _ = tracks.read_index.default_model #load property
     for chunk in dtw_pool_iter(tracks):
         i += len(chunk)
         tracks.output.write_buffer(chunk)
@@ -96,7 +97,7 @@ def dtw_worker(p):
         bam = pysam.AlignedSegment.fromstring(bam, header)
         aln = tracks.bam_in.sam_to_aln(bam)
         if aln is not None:
-            dtw = GuidedDTW(tracks, aln, bam)
+            dtw = GuidedDTW(tracks, aln)
         i += 1
 
     tracks.close()
@@ -172,7 +173,7 @@ class GuidedDTW:
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
         if self.prms.iterations == 0:
-            tgt = (self.conf.normalizer.tgt_mean, self.conf.normalizer.tgt_stdv)
+            tgt = (0, 1)
         elif self.conf.normalizer.mode == "ref_mom":
 
             ref_means = self.seq.current.to_numpy()  #self.model[self.ref_kmers]
@@ -201,41 +202,33 @@ class GuidedDTW:
         
         tracks.set_read(signal)
 
+        
+
         if self.prms.iterations > 0:
-            self._calc_dtw(signal)
+            success = self._calc_dtw(signal)
 
             for i in range(self.prms.iterations-1):
                 reg = self.renormalize(signal, df)
                 signal.normalize(reg.coef_, reg.intercept_)
-                self._calc_dtw(signal)
+                success = self._calc_dtw(signal)
         else:
             starts = self.moves.samples.starts.to_numpy()
             lengths = self.moves.samples.lengths.to_numpy()
             cur = std = np.array([])
-            #df = DtwDF(starts, lengths, cur, std)
             dtw = AlnDF(self.seq, starts, lengths)
             dtw.set_signal(signal)
             self.aln.set_dtw(dtw)
-            #df = df.to_df()
-            #df["mpos"] = self.moves.index.expand()
+            success = True
 
-        #if df is None:
-        #    self.empty = True
-        #    sys.stderr.write(f"Warning: dtw failed for read {read.id}\n")
-        #    return
-        #tracks.write_dtw_events(self.df, read=signal)#, aln_id=aln_id
+        if success:
+            try:
+                if self.conf.mvcmp:
+                    self.aln.calc_mvcmp()
+                tracks.write_alignment(self.aln)
+                self.empty = False
+            except:
+                sys.stderr.write(f"Failed to write alignment for {read.id}\n")
 
-        #if self.bands is not None:
-        #    tracks.add_layers("band", self.bands)#, aln_id=aln_id)
-
-        if self.conf.mvcmp:
-            self.aln.calc_mvcmp()
-            #tracks.calc_compare("moves", True, True)
-
-        tracks.write_alignment(self.aln)
-        #aln_id, aln_coords = self.init_alignment(aln.read_id, read.filename, moves.coords, {"moves" : moves.df}, bam=bam) #, read=signal
-
-        self.empty = False
 
     def renormalize(self, signal, aln):
         kmers = self.seq.get_kmer(aln["mpos"]) #self.ref_kmers[aln["mpos"]]
@@ -264,9 +257,10 @@ class GuidedDTW:
         dtw = self.dtw_fn(self.prms, signal, self.evt_start, self.evt_end, self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
-            return None
+            return False
 
         dtw.fill_aln(self.aln.instance)
+        return True
 
 
     def _get_dtw_args(self, read_block):#, ref_kmers):

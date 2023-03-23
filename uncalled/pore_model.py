@@ -42,7 +42,7 @@ class PoreModel:
     #TODO load params like normal, maybe need python wrapper
     #store in pore model comments or binary
     #usually pass params, optionaly df/cache
-    def __init__(self, *args, model=None, df=None, extra_cols=False, cache=True, **kwargs):
+    def __init__(self, *args, model=None, df=None, extra_cols=True, cache=True, **kwargs):
         self.conf, prms = config._init_group(
             "pore_model", _param_names=["name", "k", "shift", "norm_max", "reverse", "complement"], *args, **kwargs)
 
@@ -65,7 +65,7 @@ class PoreModel:
                     self._init(model.PRMS, model)
             
             elif isinstance(model, pd.DataFrame):
-                vals = self._vals_from_df(prms, df)
+                vals = self._vals_from_df(prms, model)
                 self._init_new(prms, *vals)
 
             else:
@@ -142,6 +142,7 @@ class PoreModel:
 
     COLUMNS = {"kmer", "current.mean", "current.stdv"}
     TSV_RENAME = {
+        "current" : "current.mean",
         "mean" : "current.mean", 
         "stdv" : "current.stdv",
         "level_mean" : "current.mean", 
