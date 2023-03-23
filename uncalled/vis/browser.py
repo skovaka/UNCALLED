@@ -214,15 +214,17 @@ def new_browser(tracks, conf):
         if len(track_names) == 0:
             track_names = None
 
-        chunk = chunk.slice(tracks=track_names, shared_reads=shared_reads, full_overlap=full_overlap)
+        chunk = tracks.slice(tracks=track_names, shared_reads=shared_reads, full_overlap=full_overlap)
 
         if click is not None:
             coord = click["points"][0]
             ref = coord["x"]
+            track_idx = coord["curveNumber"]
 
-            if coord["curveNumber"] < len(chunk):
-                #track_id = chunk.alns[coord["curveNumber"]].id
-                track_id, aln_id = chunk.mat.iloc[coord["y"]].name
+            if track_idx < len(chunk):
+                track_id = chunk.mat.index.levels[0][track_idx]
+
+                aln_id = chunk.mat.loc[track_id].iloc[coord["y"]].name
                 read = chunk.alignments.loc[(track_id,aln_id), "read_id"]
 
                 layers = chunk.layers.loc[(track_id, aln_id, ref)]["dtw"]
