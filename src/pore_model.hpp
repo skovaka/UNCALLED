@@ -240,7 +240,6 @@ struct ModelDF {
         //c.def_readonly("mean_shift", &ModelDF::mean_shift);
         //c.def_readonly("stdv_scale", &ModelDF::stdv_scale);
         //c.def("set_means", static_cast< void (*) (ModelDF::set_means >);
-        //        py::vectorize(static_cast< KmerType (*) (const KmerTypePy &, u32)>(&Class::str_to_kmer)), 
         //c.def("set_stdvs", &ModelDF::set_stdvs);
         c.def_readonly("INORM_SCALE", &ModelDF::INORM_SCALE);
         c.def("norm_to_inorm", py::vectorize(&ModelDF::norm_to_inorm));
@@ -256,6 +255,7 @@ template<typename KmerType>
 class PoreModel {
 
     public:
+    static constexpr KmerLen MAX_K = sizeof(KmerType)*4; //TODO use to make kmer string
     const KmerLen KMER_LEN;
     const KmerType KMER_MASK, KMER_COUNT;
 
@@ -313,26 +313,26 @@ class PoreModel {
 
     PoreModel(const PoreModel &model) = default; 
 
-    PoreModel(PoreModelParams p, py::array_t<float> current_mean_py, py::array_t<float> current_stdv_py, bool normalize) : PoreModel(p) {
+    PoreModel(PoreModelParams p, py::array_t<float> current_mean_py, py::array_t<float> current_stdv_py, bool preprocess) : PoreModel(p) {
         PyArray<float> current_mean(current_mean_py), current_stdv(current_stdv_py);
 
         std::vector<size_t> order; //(current_mean.size());
         //std::iota(order.begin(), order.end(), 0);
         auto n = current_mean.size();
         auto get_kmer = [&](size_t i) {return i;};
-        if (PRMS.reverse && PRMS.complement) {
+        if (not preprocess || not (PRMS.reverse || PRMS.complement)) {
+            order = kmer_order(n, [&](size_t i) {return i;});
+        } else if (PRMS.reverse && PRMS.complement) {
             order = kmer_order(n, [&](size_t i) {return kmer_revcomp(i);});
         } else if (PRMS.reverse) {
             order = kmer_order(n, [&](size_t i) {return kmer_rev(i);});
         } else if (PRMS.complement) {
             order = kmer_order(n, [&](size_t i) {return kmer_comp(i);});
-        } else {
-            order = kmer_order(n, [&](size_t i) {return i;});
         }
 
         current = ModelDF(PRMS, order, current_mean, current_stdv);
 
-        if (normalize) {
+        if (preprocess) {
             PRMS.pa_mean = current.mean.mean();
             PRMS.pa_stdv = current.mean.stdv(PRMS.pa_mean);
             current.normalize();
@@ -619,20 +619,20 @@ class PoreModel {
 
     public:
 
-	//using KmerTypePy = std::array<char, KMER_LEN+1>;
+	using KmerTypePy = std::array<char, MAX_K+1>;
 
-	//KmerTypePy kmer_to_arr(KmerType kmer) {
-	//	KmerTypePy ret{0};
-	//	for (size_t i = 0; i < KMER_LEN; i++) {
-	//		ret[i] = BASE_CHARS[kmer_base(kmer, i)];
-	//	}
-	//	return ret;
-    //}
+	KmerTypePy kmer_to_arr(KmerType kmer) {
+		KmerTypePy ret{0};
+		for (size_t i = 0; i < KMER_LEN; i++) {
+			ret[i] = BASE_CHARS[kmer_base(kmer, i)];
+		}
+		return ret;
+    }
 
-    //KmerType str_to_kmer(const KmerTypePy &kmer, u32 offs) {
-	//	auto s = std::string(kmer.data());
-	//	return str_to_kmer(s, offs);
-	//}
+    KmerType str_to_kmer(KmerTypePy kmer, u32 offs) {
+		auto s = std::string(kmer.data(), KMER_LEN);
+		return str_to_kmer(s, offs);
+	}
 
 
 
@@ -642,33 +642,13 @@ class PoreModel {
         py::class_<Class> c(m, ("PoreModel" + suffix).c_str());
 
         c.def(pybind11::init<const Class &>());
-        //c.def(pybind11::init<KmerLen>());
         c.def(pybind11::init<PoreModelParams>());
         c.def(pybind11::init<PoreModelParams, py::array_t<float>, py::array_t<float>, bool>());
-        //c.def(pybind11::init<const std::string &, bool, bool, KmerLen>(), 
-        //      py::arg("name"), py::arg("reverse")=PORE_MODEL_PRMS_DEF.reverse, py::arg("complement")=PORE_MODEL_PRMS_DEF.complement, py::arg("k")=PORE_MODEL_PRMS_DEF.k);
-        //c.def(pybind11::init<const std::vector<float> &, bool, bool, KmerLen>(), 
-        //      py::arg("vals"), py::arg("reverse")=PORE_MODEL_PRMS_DEF.reverse, py::arg("complement")=PORE_MODEL_PRMS_DEF.complement, py::arg("k")=PORE_MODEL_PRMS_DEF.k);
-        
-        //c.attr("KmerArray") = m.attr("PyArray;
 
         c.def_property_readonly("kmer_count", &Class::get_kmer_count, "The number of k-mers in the model");
         c.def_readwrite("PRMS", &Class::PRMS, "Class parameters");
         PY_MODEL_PROP(model_mean, "The mean of all model k-mer currents");
         PY_MODEL_PROP(model_stdv, "The standard deviation of all model k-mer currents");
-
-        //c.def_static("is_preset", &Class::is_preset, "List of model preset names");
-        //c.def_static("get_preset_names", &Class::get_preset_names, "List of model preset names");
-
-        //c.def_property_readonly("means", 
-        //    [](Class &r) -> pybind11::array_t<float> {
-        //        return pybind11::array_t<float>(r.current.mean.size(), r.current.mean.data());
-        //}, "The expected mean current of each k-mer");
-
-        //c.def_property_readonly("stdvs",
-        //    [](Class &r) -> pybind11::array_t<float> {
-        //        return pybind11::array_t<float>(r.current.stdv.size(), r.current.stdv.data());
-        //}, "The expected standard devaition of each k-mer");
 
         c.def_readonly("current", &PoreModel::current);
 
@@ -679,18 +659,14 @@ class PoreModel {
         c.def("__getitem__", py::vectorize(&Class::kmer_current), "Alias for get_current()");
 
         c.def("__len__", &Class::get_kmer_count, "Alias for kmer_count");
-
-        //c.def_readonly_static("KMER_LEN", &Class::KMER_LEN);
-        //c.def_readonly_static("KMER_COUNT", &Class::KMER_COUNT);
         c.def_readonly("K", &Class::KMER_LEN);
         c.def_readonly("KMER_COUNT", &Class::KMER_COUNT);
 
-        c.def("str_to_kmer", &PoreModel::str_to_kmer);
-        //        py::vectorize(static_cast< KmerType (*) (const KmerTypePy &, u32)>(&Class::str_to_kmer)), 
-        //        py::arg("kmer"), py::arg("offs")=0);
-
+        c.def("str_to_kmer",
+              py::vectorize(static_cast< KmerType (PoreModel::*) (KmerTypePy, u32)>(&Class::str_to_kmer)), 
+              py::arg("kmer"), py::arg("offs") = 0);
         c.def("kmer_to_str",  &Class::kmer_to_str, "Convert binary k-mers to strings");
-        //c.def("kmer_to_arr",  py::vectorize(&Class::kmer_to_arr));
+        c.def("kmer_to_arr",  py::vectorize(&Class::kmer_to_arr), "Convert binary k-mers to strings");
 
         c.def("base_to_char", py::vectorize(&Class::base_to_char), "Convert base index to base character"); 
         c.def("base_comp", py::vectorize(&Class::base_comp), "Returns the complement of a base index");

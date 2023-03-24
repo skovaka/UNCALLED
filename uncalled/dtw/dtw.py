@@ -54,15 +54,19 @@ def dtw(conf):
         dtw_pool(conf)
 
 def dtw_pool(conf):
+    t = time()
     tracks = Tracks(conf=conf)
     assert(tracks.output is not None)
     #tracks.output.set_model(tracks.model)
     i = 0
     _ = tracks.read_index.default_model #load property
+    #print("Aligning", time()-t)
+    #t = time()
     for chunk in dtw_pool_iter(tracks):
         i += len(chunk)
         tracks.output.write_buffer(chunk)
-    tracks.close()
+    #print("done", time()-t)
+    #tracks.close()
 
 def dtw_pool_iter(tracks):
     def iter_args(): 
@@ -71,7 +75,6 @@ def dtw_pool_iter(tracks):
             reads = tracks.read_index.subset(read_ids)
             i += len(bams)
             yield (tracks.conf, bams, reads, tracks.bam_in.header)
-
     try:
         with mp.Pool(processes=tracks.conf.tracks.io.processes) as pool:
             i = 0

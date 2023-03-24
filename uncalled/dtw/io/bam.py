@@ -249,11 +249,11 @@ class BAM(TrackIO):
 
         aln = None
 
-        try:
-            read = self.tracks.read_index.get(sam.query_name, None)
-        except:
-            sys.stderr.write(f"Warning: failed to open read {sam.query_name}\n")
-            read = None
+        #try:
+        read = self.tracks.read_index.get(sam.query_name, None)
+        #except:
+        #    sys.stderr.write(f"Warning: failed to open read {sam.query_name}\n")
+        #    read = None
 
         if not has_dtw and read is None:
             return None
