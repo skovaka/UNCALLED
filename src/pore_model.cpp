@@ -30,10 +30,10 @@ void pybind_pore_model_params(py::module_ &m) {
     py::class_<PoreModelParams> p(m, "PoreModelParams");
     p.def(py::init<>());
     p.def(py::init<PoreModelParams>());
-    p.def("to_tuple", 
+    p.def("to_key", 
         [&](const PoreModelParams &p) 
-            -> std::tuple<std::string, int, int, float, bool, bool> {
-                return {p.name, p.k, p.shift, p.norm_max, p.reverse, p.complement};
+            -> std::tuple<std::string, bool, bool> {
+                return {p.name, p.reverse, p.complement};
             });
     PY_MODEL_PARAM(name, "Model preset name or TSV filename");
     PY_MODEL_PARAM(k, "K-mer length");

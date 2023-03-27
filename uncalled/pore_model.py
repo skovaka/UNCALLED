@@ -40,6 +40,16 @@ PARAM_TYPES = {
     "complement" : bool
 }
 
+ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+
+PRESETS = {
+    "dna_r9.4_400bps_5mer",
+    "dna_r10.4.1_400bps_9mer",
+    "rna_r9.4_70bps_5mer",
+}
+PRESET_DIR = os.path.join(ROOT_DIR, "models")
+PRESET_EXT = ".npz"
+
 class PoreModel:
 
     @staticmethod
@@ -72,10 +82,7 @@ class PoreModel:
 
         if model is not None: 
             if isinstance(getattr(model, "PRMS", None), PoreModelParams):
-                if isinstance(model, PoreModel):
-                    self._init(model.PRMS, model.instance)
-                else:
-                    self._init(model.PRMS, model)
+                self._init(model.PRMS, model)
             
             elif isinstance(model, pd.DataFrame):
                 vals = self._vals_from_df(prms, model, True)
@@ -90,25 +97,32 @@ class PoreModel:
 
         elif len(prms.name) > 0:
 
-            cache_key = prms.to_tuple()
-
+            cache_key = prms.to_key()
             if cache and cache_key in CACHE:
                 self._init(prms, CACHE[cache_key])
+                return
 
-            elif os.path.exists(prms.name):
-                ext = prms.name.split(".")[-1]
+            if prms.name in PRESETS:
+                filename = os.path.join(PRESET_DIR, prms.name + PRESET_EXT)
+                ext = PRESET_EXT[1:]
+            else:
+                filename = prms.name
+                ext = filename.split(".")[-1]
+
+            if os.path.exists(filename):
                 loader = self.FILE_LOADERS.get(ext, PoreModel._vals_from_tsv)
-                vals = loader(self, prms)
+                vals = loader(self, filename, prms)
                 self._init_new(prms, *vals)
-            
-                if cache:
-                    CACHE[cache_key] = self.instance
 
             else:
                 models = ", ".join(PORE_MODEL_PRESETS.keys())
-                raise FileNotFoundError(f"PoreModel file not found: {prms.name}")
+                raise FileNotFoundError(f"PoreModel file not found: {filename}")
         else:
             self._init_new(prms)
+            
+        cache_key = self.PRMS.to_key()
+        if cache and not cache_key in CACHE:
+            CACHE[cache_key] = self
 
     def _init_new(self, prms, *args):
         if prms.k <= 8:
@@ -122,9 +136,14 @@ class PoreModel:
 
         self._init(prms, ModelType(prms, *args))
 
-    def _init(self, prms, instance):
-        self.instance = instance
-        self.ModelType = type(instance)
+    def _init(self, prms, model):
+        if isinstance(model, PoreModel):
+            self.instance = model.instance
+            self._cols = model._cols
+        else:
+            self.instance = model
+
+        self.ModelType = type(self.instance)
 
         if prms.name is not None:
             self.PRMS.name = prms.name
@@ -150,7 +169,6 @@ class PoreModel:
     @property
     def KMER_STRS(self):
         if self._KMER_STRS is None:
-            print("KEMRS")
             self._KMER_STRS = self.kmer_to_str(self.KMERS)
         return self._KMER_STRS
 
@@ -215,16 +233,16 @@ class PoreModel:
 
         #return self._vals_from_df(prms, pd.DataFrame(d), False)
 
-    def _vals_from_npz(self, prms):
-        d = dict(np.load(prms.name))
+    def _vals_from_npz(self, filename, prms):
+        d = dict(np.load(filename))
         return self._vals_from_dict(prms, d)
 
-    def _vals_from_tsv(self, prms):
-        df = pd.read_csv(prms.name, sep="\s+", comment="#", usecols=self._usecol)
+    def _vals_from_tsv(self, filename, prms):
+        df = pd.read_csv(filename, sep="\s+", comment="#", usecols=self._usecol)
         return self._vals_from_df(prms, df, True)
 
-    def _vals_from_hdf5(self, prms):
-        handle = h5py.File(prms.name, "r")
+    def _vals_from_hdf5(self, filename, prms):
+        handle = h5py.File(filename, "r")
         df = pd.DataFrame(handle["model"][()]).reset_index()
         return self._vals_from_df(prms, df, True)
 
@@ -289,13 +307,16 @@ class PoreModel:
         return d
 
     def to_df(self, kmer_str=True):
-        return pd.DataFrame(self.to_dict(kmer_str))
+        return pd.DataFrame({
+            key : vals for key,vals in self.to_dict(kmer_str).items()
+            if len(vals) > 0
+        })
 
     def to_tsv(self, out=None):
         return self.to_df().to_csv(out, sep="\t", index=False)
 
     def to_npz(self, fname):
-        np.savez(fname, **self.to_dict(params=True))
+        np.savez_compressed(fname, **self.to_dict(params=True))
 
     def norm_mom_params(self, current, tgt_mean=None, tgt_stdv=None):
         tgt_mean = self.model_mean if tgt_mean is None else tgt_mean

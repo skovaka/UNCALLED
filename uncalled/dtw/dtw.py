@@ -74,7 +74,7 @@ def dtw_pool_iter(tracks):
         for read_ids, bams in tracks.bam_in.iter_str_chunks():
             reads = tracks.read_index.subset(read_ids)
             i += len(bams)
-            yield (tracks.conf, bams, reads, tracks.bam_in.header)
+            yield (tracks.conf, tracks.model, bams, reads, tracks.bam_in.header)
     try:
         with mp.Pool(processes=tracks.conf.tracks.io.processes) as pool:
             i = 0
@@ -86,14 +86,14 @@ def dtw_pool_iter(tracks):
         raise ExceptionWrapper(e).re_raise()
 
 def dtw_worker(p):
-    conf,bams,reads,header = p
+    conf,model,bams,reads,header = p
 
     conf.tracks.io.buffered = True
     #conf.tracks.io.bam_in = None
 
     header = pysam.AlignmentHeader.from_dict(header)
 
-    tracks = Tracks(read_index=reads, conf=conf)
+    tracks = Tracks(model=model, read_index=reads, conf=conf)
 
     i = 0
     for bam in bams:
@@ -136,12 +136,13 @@ class GuidedDTW:
 
         self.aln = aln
 
-        try:
-            #read = tracks.read_index[bam.query_name]
-            read = tracks.read_index[self.aln.read_id] #TODO don't load twice (reuse from BAM IO)
-        except:
-            sys.stderr.write(f"Warning: failed to load signal from read {bam.query_name}\n")
-            return
+        read = self.aln.read
+        #try:
+        #    #read = tracks.read_index[bam.query_name]
+        #    read = tracks.read_index[self.aln.read_id] #TODO don't load twice (reuse from BAM IO)
+        #except:
+        #    sys.stderr.write(f"Warning: failed to load signal from read {bam.query_name}\n")
+        #    return
 
         signal = self.process(read)
 

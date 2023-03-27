@@ -85,7 +85,7 @@ class Tracks:
         else:
             self._init_new(*args, **kwargs)
 
-    def _init_new(self, *args, **kwargs):
+    def _init_new(self, *args, model=None, **kwargs):
 
         self.conf, self.prms = config._init_group("tracks", copy_conf=True, *args, **kwargs)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers))
@@ -96,6 +96,8 @@ class Tracks:
         self.new_alignment = False
         self.new_layers = set()
 
+        if model is not None:
+            self.set_model(model)
         
         if self.read_index is None:
             #self.read_index = Slow5Reader(read_filter=self.prms.read_filter)

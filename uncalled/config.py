@@ -32,7 +32,6 @@ from _uncalled import _Conf
 
 TOML_TYPES = {int, float, str, list, bool}
 
-#TODO make this a factory function or whatever
 Param = namedtuple("Param", ["name", "default", "type", "doc"])
 class ParamGroup:
     _name = None

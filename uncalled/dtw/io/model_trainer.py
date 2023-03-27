@@ -233,10 +233,10 @@ class ModelTrainer(TrackIO):
         df["count"] = df["count"].astype(int)
             
         print(df)
-        outfile = self._filename("model.tsv")
+        outfile = self._filename("model.npz")
         self.model.PRMS.name = outfile
         model_out = PoreModel(model=df, params=self.model.PRMS, extra_cols=True)#k=self.model.PRMS.k, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True)
-        model_out.to_tsv(outfile)
+        model_out.to_npz(outfile)
 
         #self.set_model(PoreModel(outfile, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True))
         self.set_model(PoreModel(params=self.model.PRMS, extra_cols=True))
