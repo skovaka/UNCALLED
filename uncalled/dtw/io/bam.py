@@ -165,7 +165,6 @@ class BAM(TrackIO):
 
         #lens = aln.dtw.samples.lengths_dedup.to_numpy().astype("int16")
         lens = aln.dtw.samples.to_runlen().to_numpy().astype("int16")
-        print(np.sort(lens), "ELNS")
 
         self.bam.set_tag(REF_TAG, array.array("i", refs))
         self.bam.set_tag(SAMP_TAG, array.array("i", (aln.dtw.samples.start, aln.dtw.samples.end)))
@@ -340,7 +339,7 @@ class BAM(TrackIO):
         return aln_df, layers
 
     def query(self, layers, coords, index=["aln.id","seq.pos"], read_id=None, full_overlap=False):
-        itr = self.input.fetch(coords.ref_name, coords.refs.min(), coords.refs.max())
+        itr = self.input.fetch(coords.name, coords.start, coords.end)
 
         track_alns = defaultdict(list)
         track_layers = defaultdict(list)
@@ -391,10 +390,18 @@ class BAM(TrackIO):
 
         t = time.time()
         for sam in itr:
-            next_alns,next_layers = self._parse_sam(sam, layers)
+            aln = self.sam_to_aln(sam)
 
-            next_aln = next_alns.iloc[0]
-            next_ref = next_aln["ref_name"]
+            next_aln = aln.attrs()
+            next_layers = aln.to_pandas(layers, index=["seq.fwd", "seq.pac", "aln.id"])
+            next_ref = next_aln.ref_name
+            #next_start = 
+            #l = aln.to_pandas(layers, index=index)
+            #track_layers[self.in_id].append(l)
+
+            #next_alns,next_layers = self._parse_sam(sam, layers)
+            #next_aln = next_alns.iloc[0]
+            #next_ref = next_aln["ref_name"]
             next_start = next_layers.index.get_level_values("seq.pac").min()
 
             #we're losing alignments somewhere. getting out of sync
@@ -432,10 +439,12 @@ class BAM(TrackIO):
                 prev_start = next_start
 
 
-            new_alns.append(next_alns)
+            new_alns.append(next_aln)
             new_layers.append(next_layers)
 
-        aln_df = pd.concat([aln_df] + new_alns).sort_index()
+        
+        new_alns = pd.DataFrame(new_alns, columns=new_alns[0]._fields).set_index("id")
+        aln_df = pd.concat([aln_df] + [new_alns]).sort_index()
         layer_df = pd.concat([layer_df] + new_layers).sort_index()
         
         ret_layers = layer_df.loc[slice(None),slice(None),prev_start:]

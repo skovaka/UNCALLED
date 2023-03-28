@@ -99,6 +99,10 @@ class RefCoord {
 
     RefCoord() : RefCoord("",-1,-1) {};
 
+    RefCoord intersection(RefCoord other) const {
+        return RefCoord(name, std::max(start, other.start), std::min(end, other.end), strand, ref_id, ref_len);
+    }
+
     bool fwd() const {
         return strand == Strand::fwd;
     }
@@ -140,6 +144,8 @@ class RefCoord {
         });
 
 
+        c.def("intersection", &RefCoord::intersection);
+        c.def("__len__", &RefCoord::length);
         c.def_readwrite("name", &RefCoord::name);
         c.def_readwrite("start", &RefCoord::start);
         c.def_readwrite("end", &RefCoord::end);

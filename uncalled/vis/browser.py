@@ -229,7 +229,7 @@ def new_browser(tracks, conf):
 
                 layers = chunk.layers.loc[(track_id, aln_id, ref)]["dtw"]
 
-                table.append(html.Tr(html.Td(html.B("%s:%d" % (chunk.coords.ref_name, ref)), colSpan=2)))
+                table.append(html.Tr(html.Td(html.B("%s:%d" % (chunk.coords.name, ref)), colSpan=2)))
                 table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
                 for l in ["current", "dwell", "model_diff", "events"]:
                     if not l in layers: continue

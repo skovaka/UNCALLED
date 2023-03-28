@@ -102,7 +102,7 @@ class Trackplot:
         n_rows = len(panel_heights)
 
         t0 = time.time()
-        ref_title = "Reference (%s)" % self.tracks.coords.ref_name
+        ref_title = "Reference (%s)" % self.tracks.coords.name
         self.fig = make_subplots(
             rows=n_rows, cols=1, 
             row_heights=panel_heights,
@@ -170,7 +170,7 @@ class Trackplot:
 
             read_ids = self.tracks.alignments.loc[mat.index, "read_id"].to_numpy()
 
-            hover_lines = [self.tracks.coords.ref_name + ":%{x}"]
+            hover_lines = [self.tracks.coords.name + ":%{x}"]
             if self.prms.hover_read:
                 hover_lines.append("%{text}")
                 hover_read = np.tile(read_ids, (mat.shape[1], 1)).T

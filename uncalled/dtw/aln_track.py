@@ -52,7 +52,7 @@ class AlnTrack:
 
     def _init_slice(self, p, coords=None, alignments=None, layers=None, order=["fwd", "ref_start"]):
         self._init_new(p.id, p.name, p.desc, p.conf, p.model, p.fast5s)
-        self.set_data(coords, alignments, layers, order)
+        #self.set_data(coords, alignments, layers, order)
 
     def _parse_layers(self, df):
         if df.index.names[0] == "seq.pac":

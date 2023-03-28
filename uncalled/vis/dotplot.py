@@ -166,7 +166,7 @@ class Dotplot:
                         legendgroup=track.name,
                         line={
                             "color":self.conf.vis.track_colors[i], 
-                            "width":2, "shape" : "vh" if flipped else "hv" },
+                            "width":2, "shape" : "hv" if flipped else "vh" },
                         hoverinfo="skip",
                         showlegend=first_aln
                     ), row=2, col=1)
@@ -229,7 +229,7 @@ class Dotplot:
             customdata = hover_data.drop(["kmer","middle_sec"], axis=1, level=2).to_numpy()
 
             hover_rows = [
-                "<b>" + coords.ref_name + ":%{y:,d} [%{text}]</b>"
+                "<b>" + coords.name + ":%{y:,d} [%{text}]</b>"
             ]
             labels = [LAYER_META.loc[(g,l),"label"] for g,l in hover_layers[2:]]
 
@@ -266,7 +266,7 @@ class Dotplot:
 
         strand = "+" if fwd else "-"
         fig.update_yaxes(row=2, col=1,
-            title_text=tracks.coords.ref_name + f" ({strand})")
+            title_text=tracks.coords.name + f" ({strand})")
 
         for i,(group,layer) in enumerate(self.layers):
             fig.update_xaxes(row=2, col=i+2,
