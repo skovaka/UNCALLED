@@ -97,7 +97,7 @@ class Eventalign(TrackIO):
         if self.write_read_name:
             read_id = aln.read_id #track.alignments["read_id"].iloc[0]
         else:
-            read_id = str(self.aln_id)
+            read_id = str(aln.id)
         self.next_aln_id()
         
         #self.writer = getattr(_uncalled, f"write_eventalign_K{model.K}")
@@ -111,8 +111,7 @@ class Eventalign(TrackIO):
         eventalign = self.writer(
             self.conf, model.instance, read_id, aln.seq.fwd, read,
             aln.seq.name, events.index-2, 
-            self.write_signal_index,
-            kmers, 
+            self.write_signal_index, kmers, 
             event_index, #TODO properly rep skips?
             std_level, signal) #TODO compute internally?
 
@@ -183,47 +182,6 @@ class Eventalign(TrackIO):
                 dtw = AlnDF(aln.seq, df["start"], df["length"], df["mean"], df["stdv"])
                 aln.set_dtw(dtw)
 
-                #kmers = self.model.str_to_kmer(df["model_kmer"])
-                #if self.conf.is_rna:
-                #    kmers = self.model.kmer_rev(kmers)
-                #else:
-                #    fwd = int(df["event_index"].iloc[0] < df["event_index"].iloc[-1])
-
-                #ref_coord = RefCoord(contig, start, end, fwd)
-                #coords = ref_index.get_coord_space(ref_coord, self.conf.is_rna, kmer_trim=True)
-
-
-                #df["kmer"] = kmers
-
-                #pacs = coords.pos_to_pac(df["position"].to_numpy()+kmer_trim[0])
-
-                #layers = df.rename(columns={
-                #        "start_idx" : "start",
-                #        "event_length" : "length",
-                #        "event_level_mean" : "current",
-                #     }).set_index(pd.MultiIndex.from_product(
-                #        [[self.in_id], [fwd], pacs, [aln_id]], names=("track.id","seq.fwd","seq.pac","aln.id")))
-
-                #samp_start = layers["start"].min()
-                #e = layers["start"].argmax()
-                #samp_end = layers["start"].iloc[e] + layers["length"].iloc[e]
-
-                #layers = pd.concat({"dtw" : layers}, names=("group","layer"), axis=1).sort_index()
-
-                #alns = pd.DataFrame({
-                #        "id" : [aln_id],
-                #        "track.id" : [self.in_id],
-                #        "read_id" : [read_id],
-                #        "ref_name" : [coords.ref_name],
-                #        "ref_start" : [coords.refs.start],
-                #        "ref_end" : [coords.refs.stop],
-                #        "seq.fwd" :     [coords.fwd],
-                #        "samp_start" : [samp_start],
-                #        "samp_end" : [samp_end],
-                #        "tags" : [""]}).set_index(["track.id", "id"])
-
-                #aln_id += 1
-                #yield alns,layers
                 yield aln
 
         leftover = pd.DataFrame()

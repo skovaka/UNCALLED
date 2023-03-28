@@ -67,10 +67,11 @@ def dtw_pool(conf):
 def dtw_pool_iter(tracks):
     def iter_args(): 
         i = 0
+        aln_count = 0
         for read_ids, bams in tracks.bam_in.iter_str_chunks():
             reads = tracks.read_index.subset(read_ids)
-            i += len(bams)
-            yield (tracks.conf, tracks.model, bams, reads, tracks.bam_in.header)
+            yield (tracks.conf, tracks.model, bams, reads, aln_count, tracks.bam_in.header)
+            aln_count += len(bams)
     try:
         with mp.Pool(processes=tracks.conf.tracks.io.processes) as pool:
             i = 0
@@ -82,7 +83,7 @@ def dtw_pool_iter(tracks):
         raise ExceptionWrapper(e).re_raise()
 
 def dtw_worker(p):
-    conf,model,bams,reads,header = p
+    conf,model,bams,reads,aln_start,header = p
 
     conf.tracks.io.buffered = True
     #conf.tracks.io.bam_in = None
@@ -90,11 +91,15 @@ def dtw_worker(p):
     header = pysam.AlignmentHeader.from_dict(header)
 
     tracks = Tracks(model=model, read_index=reads, conf=conf)
+    #sys.stderr.write(f"START {aln_start}\n")
 
     i = 0
     for bam in bams:
         bam = pysam.AlignedSegment.fromstring(bam, header)
         aln = tracks.bam_in.sam_to_aln(bam)
+        #sys.stderr.write(f"a {aln.id}\n")
+        aln.id += aln_start
+        #sys.stderr.write(f"b {aln.id}\n")
         if aln is not None:
             dtw = GuidedDTW(tracks, aln)
         i += 1
@@ -123,7 +128,7 @@ class GuidedDTW:
 
     def process(self, read):
         evdt = _uncalled.EventDetector(self.conf.event_detector)
-        return ProcessedRead(evdt.process_read_new(read))
+        return ProcessedRead(evdt.process_read(read))
 
     #def __init__(self, tracks, bam, **kwargs):
     def __init__(self, tracks, aln):
@@ -133,16 +138,9 @@ class GuidedDTW:
         self.aln = aln
 
         read = self.aln.read
-        #try:
-        #    #read = tracks.read_index[bam.query_name]
-        #    read = tracks.read_index[self.aln.read_id] #TODO don't load twice (reuse from BAM IO)
-        #except:
-        #    sys.stderr.write(f"Warning: failed to load signal from read {bam.query_name}\n")
-        #    return
 
         signal = self.process(read)
 
-        self.index = tracks.index
         self.model = tracks.model
 
         self.moves = self.aln.moves #moves.aln
@@ -154,10 +152,6 @@ class GuidedDTW:
             raise ValueError(f"Error: unrecongized DTW method \"{method}. Must be one of \"{opts}\"")
 
         method = METHODS[self.method]
-
-        #self.dtw_fn = getattr(_uncalled, f"{method}K{self.model.K}", None)
-        #if self.dtw_fn is None:
-        #    raise ValueError(f"Invalid DTW k-mer length {self.model.K}")
 
         self.dtw_fn = None
         if isinstance(self.model.instance, _uncalled.PoreModelU16):
@@ -257,7 +251,6 @@ class GuidedDTW:
             return False
 
         dtw.fill_aln(self.aln.instance)
-        print(np.sort(self.aln.dtw.samples.gaps))
         return True
 
 
