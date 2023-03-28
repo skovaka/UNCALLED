@@ -60,13 +60,9 @@ def dtw_pool(conf):
     #tracks.output.set_model(tracks.model)
     i = 0
     _ = tracks.read_index.default_model #load property
-    #print("Aligning", time()-t)
-    #t = time()
     for chunk in dtw_pool_iter(tracks):
         i += len(chunk)
         tracks.output.write_buffer(chunk)
-    #print("done", time()-t)
-    #tracks.close()
 
 def dtw_pool_iter(tracks):
     def iter_args(): 
@@ -127,7 +123,7 @@ class GuidedDTW:
 
     def process(self, read):
         evdt = _uncalled.EventDetector(self.conf.event_detector)
-        return ProcessedRead(evdt.process_read(read))
+        return ProcessedRead(evdt.process_read_new(read))
 
     #def __init__(self, tracks, bam, **kwargs):
     def __init__(self, tracks, aln):
@@ -255,15 +251,13 @@ class GuidedDTW:
 
         bands = _uncalled.get_guided_bands(np.arange(len(self.seq)), mv_starts, read_block['start'], band_count, shift)
 
-        #return (self.prms, _uncalled.PyArrayF32(read_block['mean']), self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
-
-
         dtw = self.dtw_fn(self.prms, signal, self.evt_start, self.evt_end, self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
             return False
 
         dtw.fill_aln(self.aln.instance)
+        print(np.sort(self.aln.dtw.samples.gaps))
         return True
 
 

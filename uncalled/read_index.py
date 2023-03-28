@@ -40,9 +40,7 @@ class ReadIndex:
         if self._default_model is None:
             self._open(next(iter(self.file_info.keys())))   
             flowcell,kit = self.infile.get_run_info()
-            models = pd.read_csv(os.path.join(ROOT_DIR, "config", "workflows.tsv"), sep="\t")\
-                       .set_index(["flowcell","kit"]).sort_index()
-            self._default_model = models.loc[(flowcell,kit), "config_name"].iloc[0]
+            self._default_model = (flowcell,kit)
 
         return self._default_model
         

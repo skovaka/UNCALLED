@@ -303,9 +303,20 @@ class Tracks:
             elif self.model.K != track.model.K:
                 raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
 
+        rp = self.conf.read_buffer
+        if len(rp.flowcell) == 0 or len(rp.kit) == 0:
+            flowcell, kit = self.read_index.default_model
+            if len(rp.flowcell) == 0:
+                rp.flowcell = flowcell
+            if len(rp.kit) == 0:
+                rp.kit = kit
+
         if self.model is None:
             #self.conf.pore_model.name = WORKFLOW_PRESETS[self.read_index.default_model]
-            self.model = PoreModel(params=self.conf.pore_model)
+            if len(self.conf.pore_model.name) == 0:
+                self.model = PoreModel(PoreModel.PRESET_MAP.loc[(rp.flowcell, rp.kit), "preset_model"])
+            else:
+                self.model = PoreModel(params=self.conf.pore_model)
             for track in self.alns:
                 track.model = self.model
 

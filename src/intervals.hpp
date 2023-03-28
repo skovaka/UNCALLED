@@ -261,16 +261,31 @@ class IntervalIndex {
         return ret;
     }
 
-    ValArray<T> get_lengths_dedup() const { 
-        ValArray<T> ret(coords.size());
+    size_t count_gaps() const {
+        size_t gaps = 0;
+        auto prev = coords[0];
+        for (size_t i = 1; i < coords.size(); i++) {
+            gaps += coords[i-1].end < coords[i].start;
+        }
+        return gaps;
+    }
+
+    ValArray<T> to_runlen() const { 
+        ValArray<T> ret(coords.size() + count_gaps());
+
         auto prev = coords[0];
         ret[0] = prev.length();
+        size_t j = 1;
         for (size_t i = 1; i < coords.size(); i++) {
             if (coords[i] != prev) {
-                ret[i] = coords[i].length();
+                auto gap = coords[i].start - prev.end;
+                if (gap > 0) {
+                    ret[j++] = -gap;
+                }
+                ret[j++] = coords[i].length();
                 prev = coords[i];
             } else {
-                ret[i] = 0;
+                ret[j++] = 0;
             }
         }
         return ret;
@@ -360,7 +375,7 @@ class IntervalIndex {
             .def("get_interval", py::vectorize(&IntervalIndex::get_interval))
             .def("get_index", py::vectorize(&IntervalIndex::get_index))
             .def_property_readonly("lengths", &IntervalIndex::get_lengths)
-            .def_property_readonly("lengths_dedup", &IntervalIndex::get_lengths_dedup)
+            .def("to_runlen", &IntervalIndex::to_runlen)
             .def_property_readonly("gaps", &IntervalIndex::get_gaps)
             .def_property_readonly("mask", &IntervalIndex::get_mask)
             .def_property_readonly("starts", &IntervalIndex::get_starts)

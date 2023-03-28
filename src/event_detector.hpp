@@ -228,6 +228,7 @@ class EventDetector {
     std::vector<Event> get_events2(const ValArray<float> &raw);
 
     ProcessedRead process_read(const ReadBuffer &read);
+    ProcessedRead process_read_new(const ReadBuffer &read);
 
     float kmer_current() const;
 
@@ -295,6 +296,7 @@ class EventDetector {
         //:PY_EVTD_METH(get_event, "");
         PY_EVTD_METH(get_events, "");
         PY_EVTD_METH(process_read, "");
+        PY_EVTD_METH(process_read_new, "");
         PY_EVTD_METH(kmer_current, "");
         
         evdt.def("get_means", &EventDetector::get_means_py);

@@ -14,7 +14,7 @@ PORE_MODEL_PRESETS = {}
 
 WORKFLOW_PRESETS = {
    "dna_r10.3_450bps" : "",
-   "dna_r10.3_450bpsm" : "",
+   "dna_r10.3_450bps" : "",
    "dna_r10.4.1_e8.2_260bps" : "",
    "dna_r10.4.1_e8.2_400bps" : "",
    "dna_r10_450bps" : "",
@@ -42,15 +42,24 @@ PARAM_TYPES = {
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-PRESETS = {
-    "dna_r9.4_400bps_5mer",
-    "dna_r10.4.1_400bps_9mer",
-    "rna_r9.4_70bps_5mer",
-}
-PRESET_DIR = os.path.join(ROOT_DIR, "models")
-PRESET_EXT = ".npz"
-
 class PoreModel:
+
+    PRESET_DIR = os.path.join(ROOT_DIR, "models")
+    PRESET_EXT = ".npz"
+
+    PRESET_MAP = None
+    PRESETS = None
+
+    @classmethod
+    def _init_presets(cls):
+        if cls.PRESET_MAP is None:
+            df = pd.read_csv(
+                os.path.join(cls.PRESET_DIR, "presets.tsv"), 
+                sep="\t", index_col=("flowcell","kit")
+            ).sort_index()
+
+            cls.PRESET_MAP = df[df["preset_model"] != "_"]
+            cls.PRESETS = set(cls.PRESET_MAP["preset_model"])
 
     @staticmethod
     def _param_defaults():
@@ -102,9 +111,9 @@ class PoreModel:
                 self._init(prms, CACHE[cache_key])
                 return
 
-            if prms.name in PRESETS:
-                filename = os.path.join(PRESET_DIR, prms.name + PRESET_EXT)
-                ext = PRESET_EXT[1:]
+            if prms.name in self.PRESETS:
+                filename = os.path.join(self.PRESET_DIR, prms.name + self.PRESET_EXT)
+                ext = self.PRESET_EXT[1:]
             else:
                 filename = prms.name
                 ext = filename.split(".")[-1]
@@ -179,6 +188,10 @@ class PoreModel:
     @property
     def kmer_trim(self):
         return (self.PRMS.shift, self.K-self.PRMS.shift-1)
+
+    @property
+    def reverse(self):
+        return self.PRMS.reverse
 
     COLUMNS = {"kmer", "current.mean", "current.stdv"}
     TSV_RENAME = {
@@ -362,3 +375,4 @@ class PoreModel:
         "hdf5" : _vals_from_hdf5,
     }
 
+PoreModel._init_presets()

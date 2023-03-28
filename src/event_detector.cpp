@@ -172,13 +172,11 @@ std::vector<Event> EventDetector::get_events2(const ValArray<float> &raw) {
          min_mean = mean - win, 
          max_mean = mean + win;
 
-    std::cout << min_mean << " " << max_mean << " BLAH\n";
+    //std::cout << min_mean << " " << max_mean << " BLAH\n";
     size_t i = 0, j = 0;
     for (; i < events.size(); i++) {
         if (events[i].mean >= min_mean && events[i].mean <= max_mean) {
             events[j++] = events[i];
-        } else {
-            std::cout << "NO " << events[i].mean << "\n";
         }
     }
     events.resize(j);
@@ -197,6 +195,13 @@ std::vector<Event> EventDetector::get_events2(const ValArray<float> &raw) {
 ProcessedRead EventDetector::process_read(const ReadBuffer &read) {
     ProcessedRead ret;
     ret.events = get_events(read.signal);
+    ret.set_signal(read.signal);
+    return ret;
+}
+
+ProcessedRead EventDetector::process_read_new(const ReadBuffer &read) {
+    ProcessedRead ret;
+    ret.events = get_events2(read.signal);
     ret.set_signal(read.signal);
     return ret;
 }

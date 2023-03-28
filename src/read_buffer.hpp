@@ -40,6 +40,7 @@ class ReadBuffer {
     public:
 
     typedef struct {
+        std::string flowcell, kit;
         u16 num_channels;
         float bp_per_sec;
         float sample_rate;
@@ -134,6 +135,8 @@ class ReadBuffer {
         c.def("__getitem__", &ReadBuffer::operator[]);
 
         pybind11::class_<Params> p(c, "Params");
+        PY_READ_PRM(flowcell, "Flowcell ID");
+        PY_READ_PRM(kit, "Kit ID");
         PY_READ_PRM(num_channels, "Number of channels on device");
         PY_READ_PRM(bp_per_sec, "Expected bases sequenced per second");
         PY_READ_PRM(sample_rate, "Number of raw samples per second");

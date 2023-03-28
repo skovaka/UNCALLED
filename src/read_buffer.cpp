@@ -26,6 +26,8 @@
 #include "intervals.hpp"
 
 ReadBuffer::Params ReadBuffer::PRMS = {
+    flowcell : "",
+    kit : "",
     num_channels : 512,
     bp_per_sec   : 450,
     sample_rate  : 4000,

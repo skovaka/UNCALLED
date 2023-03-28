@@ -51,10 +51,12 @@ FAST5_OPTS = (
 DTW_OPTS = (
     Opt(("-p", "--processes"), "tracks.io"),
     Opt("--bam-chunksize", "tracks.io"),
-    Opt("--guppy-in", "tracks.io"),
     Opt("--bam-in", "tracks.io", nargs="?", const="-", required=True),
     Opt(("--out-name", "-o"), "tracks.io"),
     Opt("index_prefix", "tracks"), #+ FAST5_OPTS + (
+    
+    Opt("--flowcell", "read_buffer"),
+    Opt("--kit", "read_buffer"),
 
     Opt(FAST5_PARAM, "read_index", nargs="+", type=str),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),

@@ -54,7 +54,7 @@ class Config {
         read_buffer.bp_per_sec  = 70;
         read_buffer.seq_fwd     = false;
 
-        pore_model.name    = "r94_rna";
+        //pore_model.name    = "r94_rna";
         pore_model.reverse    = true;
 
         event_detector.window_length1 = 7;

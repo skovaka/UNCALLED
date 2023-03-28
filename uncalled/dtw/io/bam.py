@@ -163,7 +163,9 @@ class BAM(TrackIO):
         dc[na] = self.NA_I16
         ds[na] = self.NA_I16
 
-        lens = aln.dtw.samples.lengths_dedup.to_numpy().astype("int16")
+        #lens = aln.dtw.samples.lengths_dedup.to_numpy().astype("int16")
+        lens = aln.dtw.samples.to_runlen().to_numpy().astype("int16")
+        print(np.sort(lens), "ELNS")
 
         self.bam.set_tag(REF_TAG, array.array("i", refs))
         self.bam.set_tag(SAMP_TAG, array.array("i", (aln.dtw.samples.start, aln.dtw.samples.end)))
@@ -285,8 +287,12 @@ class BAM(TrackIO):
 
             aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, coords, sam)
 
-            start = np.full(coords.length, samp_start, dtype="int32")
-            start[1:] += np.cumsum(length.astype("int32"))[:-1]
+            mask = length >= 0
+            start = samp_start + np.pad(np.cumsum(np.abs(length)), (1,0))[:-1][mask]
+            length = length[mask]
+
+            #start = np.full(coords.length, samp_start, dtype="int32")
+            #start[1:] += np.cumsum(length.astype("int32"))[:-1]
 
             lna = (length == 0) & cna
             length[cna] = -1

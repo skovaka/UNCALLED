@@ -11,6 +11,7 @@ import scipy.stats
 import copy
 
 from _uncalled import _AlnDF, IntervalIndexI64, IntervalIndexI32, moves_to_aln, read_to_ref_moves
+from ..pore_model import PoreModel
 from ..config import Config
 from ..argparse import Opt
 from ..index import RefCoord
@@ -49,7 +50,7 @@ def sam_to_read_moves(read, sam):
         
     return moves_to_aln(moves, template_start, mv_stride)
 
-def sam_to_ref_moves(conf, ref_index, read, sam, model_name=None):
+def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
     if read is None: 
         return None
     read_moves = sam_to_read_moves(read, sam)
@@ -77,10 +78,10 @@ def sam_to_ref_moves(conf, ref_index, read, sam, model_name=None):
 
     ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, True)
 
-    if model_name is not None:
-        mkl = MOVE_KMER_LENS[model_name]
-    else:
-        mkl = conf.pore_model.k
+    if workflow is None:
+        workflow = (conf.read_buffer.flowcell, conf.read_buffer.kit)
+
+    mkl = MOVE_KMER_LENS[PoreModel.PRESET_MAP.loc[workflow, "ont_model"]]
 
     shift = ref_index.K - mkl - ref_index.trim[0]
     ref_moves.index.shift(shift)
