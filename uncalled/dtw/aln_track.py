@@ -46,7 +46,6 @@ class AlnTrack:
             self.model = model 
         elif len(conf.pore_model.name) > 0:
             self.model = PoreModel(params=conf.pore_model)
-            print(self.model.current.mean, "ERERADSF")
         else:
             self.model = None
 

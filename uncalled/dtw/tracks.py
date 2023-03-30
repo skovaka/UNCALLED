@@ -104,6 +104,8 @@ class Tracks:
 
         if model is not None:
             self.set_model(model)
+        else:
+            self.model = None
         
         if self.read_index is None:
             #self.read_index = Slow5Reader(read_filter=self.prms.read_filter)
@@ -303,8 +305,6 @@ class Tracks:
             self.output = None
             self.output_track = self.inputs[0].aln_tracks[0].name
 
-        self.model = None
-
             #TODO each IO should have reference to its AlnTracks?
             #probably construct here in Tracks? or maybe in IO!
             #iterate through each input, it will populate its own AlnTracks
@@ -312,7 +312,7 @@ class Tracks:
         for track in self.alns:
             if self.model is None:
                 self.model = track.model
-            elif self.model.K != track.model.K:
+            elif track.model is not None and self.model.K != track.model.K:
                 raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
 
         rp = self.conf.read_buffer

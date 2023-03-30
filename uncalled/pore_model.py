@@ -111,12 +111,12 @@ class PoreModel:
                 self._init(prms, CACHE[cache_key])
                 return
 
-            if prms.name in self.PRESETS:
-                filename = os.path.join(self.PRESET_DIR, prms.name + self.PRESET_EXT)
-                ext = self.PRESET_EXT[1:]
-            else:
-                filename = prms.name
-                ext = filename.split(".")[-1]
+            #if prms.name in self.PRESETS:
+            #    filename = os.path.join(self.PRESET_DIR, prms.name + self.PRESET_EXT)
+            #    ext = self.PRESET_EXT[1:]
+            #else:
+            filename = prms.name
+            ext = filename.split(".")[-1]
 
             if os.path.exists(filename):
                 loader = self.FILE_LOADERS.get(ext, PoreModel._vals_from_tsv)

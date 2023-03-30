@@ -63,8 +63,10 @@ def train(conf):
     elif not prms.append:
         raise ValueError(f"Must define kmer_length, init_model, or run in append mode")
 
-    tracks = Tracks(conf=conf)
+    tracks = Tracks(model=PoreModel(prms.init_model), conf=conf)
     _ = tracks.read_index.default_model
+
+    print(tracks.model)
 
     if conf.dtw.iterations == 0:
         init_model(tracks, prms.kmer_len)

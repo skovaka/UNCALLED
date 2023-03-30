@@ -197,13 +197,23 @@ class ModelTrainer(TrackIO):
             else:
                 avg = np.mean
 
+            def filt(a):
+                #mn,mx = np.percentile(a, [25,75])
+                return a#[(a >= mn) & (a <= mx)]
+
+            #print(len(rows))
+            current = filt(rows["current"])
+            #print(len(current))
+            current_sd = filt(rows["current_sd"])
+            dwell = filt(rows["dwell"])
+
             k = self.model.kmer_to_str(kmer)
 
             model_rows.append((
                 kmer,
-                avg(rows["current"]),
-                avg(rows["current_sd"]),
-                avg(rows["dwell"]),
+                avg(current),
+                avg(current_sd),
+                avg(dwell),
                 np.std(rows["current"]),
                 np.std(rows["current_sd"]),
                 np.std(rows["dwell"]),
@@ -232,7 +242,7 @@ class ModelTrainer(TrackIO):
 
         df["count"] = df["count"].astype(int)
             
-        print(df)
+        #print(df)
         outfile = self._filename("model.npz")
         self.model.PRMS.name = outfile
         model_out = PoreModel(model=df, params=self.model.PRMS, extra_cols=True)#k=self.model.PRMS.k, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True)
@@ -242,7 +252,7 @@ class ModelTrainer(TrackIO):
         self.set_model(PoreModel(params=self.model.PRMS, extra_cols=True))
 
         self.iter += 1
-        print("write", self.model.PRMS.shift, self.model.PRMS.reverse, self.model.PRMS.complement)
+        #print("write", self.model.PRMS.shift, self.model.PRMS.reverse, self.model.PRMS.complement)
         return self.model #outfile#self._filename("model.tsv")
         #return outfile
         

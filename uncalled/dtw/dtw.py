@@ -91,7 +91,6 @@ def dtw_worker(p):
     header = pysam.AlignmentHeader.from_dict(header)
 
     tracks = Tracks(model=model, read_index=reads, conf=conf)
-    #sys.stderr.write(f"START {aln_start}\n")
 
     i = 0
     for bam in bams:
@@ -102,6 +101,9 @@ def dtw_worker(p):
         #sys.stderr.write(f"b {aln.id}\n")
         if aln is not None:
             dtw = GuidedDTW(tracks, aln)
+        else:
+            sys.stderr.write(f"Warning: {aln.read_id} BAM parse failed\n")
+
         i += 1
 
     tracks.close()
@@ -220,8 +222,10 @@ class GuidedDTW:
                     self.aln.calc_mvcmp()
                 tracks.write_alignment(self.aln)
                 self.empty = False
+                return
             except:
-                sys.stderr.write(f"Failed to write alignment for {read.id}\n")
+                pass
+        sys.stderr.write(f"Failed to write alignment for {read.id}\n")
 
 
     def renormalize(self, signal, aln):

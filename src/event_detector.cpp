@@ -168,7 +168,7 @@ std::vector<Event> EventDetector::get_events2(const ValArray<float> &raw) {
 
     stdv = sqrt(stdv / events.size());
 
-    auto win = stdv * 2.5,
+    auto win = stdv * 2,
          min_mean = mean - win, 
          max_mean = mean + win;
 
