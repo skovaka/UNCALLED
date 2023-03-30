@@ -5,6 +5,7 @@ import sys
 import numpy as np
 import pandas as pd
 import h5py
+import itertools
 
 from _uncalled import PoreModelParams, ArrayU32, ArrayU16
 import _uncalled
@@ -80,12 +81,11 @@ class PoreModel:
 
         is_preset = False
 
-        self._cols = dict()
+        self._base = dict()
+        self._extra = dict() if extra_cols else None
 
         vals = None
 
-        self.extra_cols = extra_cols
-        self.extra = pd.DataFrame() if self.extra_cols else None
 
         is_preset = False
 
@@ -111,12 +111,12 @@ class PoreModel:
                 self._init(prms, CACHE[cache_key])
                 return
 
-            #if prms.name in self.PRESETS:
-            #    filename = os.path.join(self.PRESET_DIR, prms.name + self.PRESET_EXT)
-            #    ext = self.PRESET_EXT[1:]
-            #else:
-            filename = prms.name
-            ext = filename.split(".")[-1]
+            if prms.name in self.PRESETS:
+                filename = os.path.join(self.PRESET_DIR, prms.name + self.PRESET_EXT)
+                ext = self.PRESET_EXT[1:]
+            else:
+                filename = prms.name
+                ext = filename.split(".")[-1]
 
             if os.path.exists(filename):
                 loader = self.FILE_LOADERS.get(ext, PoreModel._vals_from_tsv)
@@ -142,15 +142,20 @@ class PoreModel:
         if prms.shift < 0:
             prms.shift = PoreModel.get_kmer_shift(prms.k)
 
-
         self._init(prms, ModelType(prms, *args))
 
     def _init(self, prms, model):
+
         if isinstance(model, PoreModel):
             self.instance = model.instance
-            self._cols = model._cols
+            self._base.update(model._base)
+            self._extra.update(model._extra)
         else:
             self.instance = model
+            self._base["current.mean"] = model.current.mean.to_numpy()
+            self._base["current.stdv"] = model.current.stdv.to_numpy()
+            self._base["current_sd.mean"] = model.current_sd.mean.to_numpy()
+            self._base["current_sd.stdv"] = model.current_sd.stdv.to_numpy()
 
         self.ModelType = type(self.instance)
 
@@ -169,11 +174,7 @@ class PoreModel:
             self.array_type = ArrayU16
 
         self.KMERS = np.arange(self.KMER_COUNT)
-        #self.KMER_STRS = self.kmer_to_str(self.KMERS)
         self._KMER_STRS = None
-
-        self._cols["current.mean"] = self.current.mean.to_numpy()
-        self._cols["current.stdv"] = self.current.stdv.to_numpy()
 
     @property
     def KMER_STRS(self):
@@ -193,21 +194,24 @@ class PoreModel:
     def reverse(self):
         return self.PRMS.reverse
 
-    COLUMNS = {"kmer", "current.mean", "current.stdv"}
+    COLUMNS = {"kmer", "current.mean", "current.stdv", "current_sd.mean", "current_sd.stdv"}
     TSV_RENAME = {
         "current" : "current.mean",
         "mean" : "current.mean", 
         "stdv" : "current.stdv",
         "level_mean" : "current.mean", 
         "level_stdv" : "current.stdv",
-        "sd"         : "current.stdv"
+        "sd_mean"         : "current_sd.mean",
+        "sd_stdv"         : "current_sd.stdv",
+        "sd"         : "current.stdv",
     }
 
     def _vals_from_df(self, prms, df, preprocess):
         df = df.rename(columns=self.TSV_RENAME)
         extra = df.columns.difference(self.COLUMNS)
         for col in extra:
-            self._cols[col] = df[col].to_numpy()
+            #self._cols[col] = df[col].to_numpy()
+            self._extra[col] = df[col].to_numpy()
 
         if preprocess:
             df = df.reset_index().sort_values("kmer")
@@ -218,14 +222,12 @@ class PoreModel:
                 raise ValueError("All kmer lengths must be the same, found lengths: " + ", ".join(map(str, kmer_lens.index)))
             prms.k = kmer_lens.index[0]
 
-        if "current.stdv" in df:
-            stdv = df["current.stdv"].to_numpy()
-        else:
-            stdv = []
-        return (df["current.mean"].to_numpy(), stdv, preprocess)
+        get = lambda c: df[c] if c in df else []
+
+        return (get("current.mean"), get("current.stdv"), get("current_sd.mean"), get("current_sd.stdv"), preprocess)
     
     def _usecol(self, name):
-        return self.extra_cols or name in self.COLUMNS or name in self.TSV_RENAME
+        return self._extra is not None or name in self.COLUMNS or name in self.TSV_RENAME
 
     def _vals_from_dict(self, prms, d):
         for name,typ in PARAM_TYPES.items():
@@ -240,9 +242,12 @@ class PoreModel:
             if k in self.TSV_RENAME:
                 k = self.TSV_RENAME[k]
             if k not in self.COLUMNS:
-                self._cols[k] = v
+                self._base[k] = v
 
-        return (d["current.mean"], d["current.stdv"], False)
+        get = lambda c: d[c] if c in d else []
+
+        #return (d["current.mean"], get("current.stdv"], False)
+        return (get("current.mean"), get("current.stdv"), get("current_sd.mean"), get("current_sd.stdv"), False)
 
         #return self._vals_from_df(prms, pd.DataFrame(d), False)
 
@@ -260,13 +265,13 @@ class PoreModel:
         return self._vals_from_df(prms, df, True)
 
     def keys(self):
-        return self._cols.keys()
+        return itertools.chain(self._base.keys(), self._extra.keys())
 
     def __getitem__(self, idx):
         #TODO store master self._fields = {"mean" : self.means, ..., extra...}
         #no, maybe just wrap in series
         if isinstance(idx, str):
-            return self._cols[idx]
+            return self._base[idx]
         return self.mean.current[self.kmer_array(idx)]
 
     def __getattr__(self, name):
@@ -301,19 +306,19 @@ class PoreModel:
             return self.instance.kmer_to_arr(kmer).astype(dtype)
         return dtype(self.instance.kmer_to_str(kmer))
 
-    def norm_pdf(self, current, kmer):
-        return self.instance.norm_pdf(self, current, self.kmer_array(kmer))
+    #def norm_pdf(self, current, kmer):
+    #    return self.instance.norm_pdf(current, self.kmer_array(kmer))
 
     def abs_diff(self, current, kmer):
         return self.instance.abs_diff(self, current, self.kmer_array(kmer))
 
     def to_dict(self, kmer_str=True, params=False):
-        d = self._cols.copy()
-        d.update(self.extra)
         if kmer_str:
-            d["kmer"] = self.KMER_STRS
+            d = {"kmer" : self.KMER_STRS}
         else:
-            d["kmer"] = self.KMERS
+            d = {"kmer" : self.KMERS}
+        d.update(self._base)
+        d.update(self._extra)
         if params:
             for name in PARAM_TYPES.keys():
                 d[f"_{name}"] = getattr(self.PRMS, name)
