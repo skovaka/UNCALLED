@@ -365,8 +365,8 @@ class PoreModel {
     }
 
     void init_norm_pdf() {
-        current_var2x = 2 * current.stdv * current.stdv;
-        lognorm_denoms = std::log(std::sqrt(M_PI * current_var2x));
+        current_var2x = 2 * (current.stdv * current.stdv);
+        lognorm_denoms = std::log(std::sqrt((float) M_PI * current_var2x));
     }
 
     void init_stdv() {
