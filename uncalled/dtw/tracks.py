@@ -36,6 +36,10 @@ _REFSTAT_AGGS = {
     "max"  : np.min,
 }
 
+_REFSTAT_CMPS = {
+    "ks" : lambda df: scipy.stats.stats.ks_2samp(df.loc[df.index.unique(0)],df.loc[df.index.unique(1)],mode="asymp")
+}
+
 LAYER_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95"}
 COMPARE_REFSTATS = {"ks"}
 ALL_REFSTATS = LAYER_REFSTATS | COMPARE_REFSTATS
@@ -675,65 +679,32 @@ class Tracks:
         groups = self.layers[self.prms.refstats_layers].groupby(level=["track.id", "seq.pac", "seq.fwd"])
 
         refstats = groups.agg(stats.layer_agg).reset_index().pivot(index=["seq.pac","seq.fwd"], columns="track.id")
-        rename = ({
-            old[-1] : new
-            for old,new in zip(refstats.columns, stats.layer)
-        })
-        refstats.rename(columns=rename, inplace=True)
+        #rename = ({
+        #    old[-1] : new
+        #    for old,new in zip(refstats.columns, stats.layer)
+        #})
+        #refstats.rename(columns=rename, inplace=True)
         if cov:
             refstats[track.name].insert(0, "cov", groups.size())
 
-        #for track,groups in zip(self.alns, grouped):
-        #    if track.empty:
-        #        refstats[track.name] = None
-        #        continue
-
-        #    refstats[track.name] = groups.agg(stats.layer_agg)
-        #    rename = ({
-        #        old[-1] : new
-        #        for old,new in zip(refstats[track.name].columns, stats.layer)
-        #    })
-        #    refstats[track.name].rename(columns=rename, inplace=True)
-
-        #    if cov:
-        #        refstats[track.name].insert(0, "cov", groups.size())
-
         if len(stats.compare) > 0:
-            if self.any_empty:
-                refstats["ks"] = None
+            if len(self.layers.index.unique(0)) != 2:
+                raise ValueError("Exactly two tracks must be input for comparison")
+                #refstats["ks"] = None
             
             else:
-                groups_a, groups_b = grouped
-                refs_a = self.alns[0].layers.index.unique("seq.pos")
-                refs_b = self.alns[1].layers.index.unique("seq.pos")
-                refs = refs_a.intersection(refs_b)
-                cmps = {l : defaultdict(list) for l in self.prms.refstats_layers}
-                for pos in refs:
-                    track_a = groups_a.get_group(pos)
-                    track_b = groups_b.get_group(pos)
-                    for layer in self.prms.refstats_layers:
-                        a = track_a[layer]
-                        b = track_b[layer]
-                        for stat in stats.compare:
-                            ks = scipy.stats.stats.ks_2samp(a,b,mode="asymp")
-                            cmps[layer]["stat"].append(ks.statistic)
-                            cmps[layer]["pval"].append(ks.pvalue)
+                cmp_groups = self.layers[self.prms.refstats_layers].groupby(level=["seq.pac","seq.fwd"])
+                def ks(df):
+                    idx = df.index.levels[0]
+                    d = dict()
+                    for col in df.columns:
+                        vals = scipy.stats.stats.ks_2samp(df.loc[idx[0],col],df.loc[idx[1],col],mode="asymp")
+                        d[col+("ks",)] = pd.Series(vals, index=["stat","pval"], name=df.name)
+                        #return pd.Series(v, index=pd.MultiIndex.from_product([["ks"],["stat","pval"]]), name=df.name)
+                    return pd.concat(d, axis=0)
 
-                refstats["ks"] = pd.concat({k : pd.DataFrame(index=refs, data=c) for k,c in cmps.items()}, axis=1) 
-        
-        #if np.any([df is None for df in refstats.values()]):
-        #    columns = None
-        #    for df in refstats.values():
-        #        if df is not None:
-        #            columns = df.columns
-        #            break
-        #    for name,df in refstats.items():
-        #        if df is None:
-        #            refstats[name] = pd.DataFrame(columns=columns)
-        #refstats = pd.concat(refstats, axis=1, names=["track", "group", "layer", "stat"])
-
-        #TODO make verbose ref indexing
-        #refstats.index = self.alns[0].coords.mpos_to_pos_index(refstats.index, multi=verbose_refs)
+                df = cmp_groups.apply(ks)
+                refstats = pd.concat([refstats, df], axis=1)
 
         self.refstats = refstats.dropna()
 
