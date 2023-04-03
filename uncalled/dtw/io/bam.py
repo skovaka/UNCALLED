@@ -156,22 +156,27 @@ class BAM(TrackIO):
         scale = self.model.current.INORM_SCALE
         shift = 0
 
-        dc = np.round((aln.dtw.current.to_numpy() + shift) * scale)#.astype(np.int16)
-        ds = np.round((aln.dtw.current_sd.to_numpy() + shift) * scale)#.astype(np.int16)
 
+        dc = np.round((aln.dtw.current.to_numpy() + shift) * scale)#.astype(np.int16)
         na = np.isnan(dc)
         dc[na] = self.NA_I16
-        ds[na] = self.NA_I16
+
+        if len(aln.dtw.current_sd) > 0:
+            ds = np.round((aln.dtw.current_sd.to_numpy() + shift) * scale)#.astype(np.int16)
+            ds[na] = self.NA_I16
+            self.bam.set_tag(STDS_TAG, array.array("h", ds.astype(np.int16)))
+
+        a = aln.dtw.samples.to_runlen()
 
         #lens = aln.dtw.samples.lengths_dedup.to_numpy().astype("int16")
-        lens = aln.dtw.samples.to_runlen().to_numpy().astype("int16")
+        lens = np.array(aln.dtw.samples.to_runlen()).astype("int16")
 
         self.bam.set_tag(REF_TAG, array.array("i", refs))
         self.bam.set_tag(SAMP_TAG, array.array("i", (aln.dtw.samples.start, aln.dtw.samples.end)))
         self.bam.set_tag(NORM_TAG, array.array("f", (scale,shift)))
         self.bam.set_tag(LENS_TAG, array.array("h", lens.astype(np.int16)))
         self.bam.set_tag(CURS_TAG, array.array("h", dc.astype(np.int16)))
-        self.bam.set_tag(STDS_TAG, array.array("h", ds.astype(np.int16)))
+
 
         #if not self.bam.has_tag("f5"):
         #    self.bam.set_tag("f5", os.path.basename(self.prev_fast5[0]))
@@ -250,11 +255,11 @@ class BAM(TrackIO):
 
         aln = None
 
-        try:
-            read = self.tracks.read_index.get(sam.query_name, None)
-        except:
-            sys.stderr.write(f"Warning: failed to open read {sam.query_name}\n")
-            read = None
+        #try:
+        read = self.tracks.read_index.get(sam.query_name, None)
+        #except:
+        #    sys.stderr.write(f"Warning: failed to open read {sam.query_name}\n")
+        #    read = None
 
         if not has_dtw and read is None:
             return None

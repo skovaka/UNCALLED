@@ -143,21 +143,12 @@ class IntervalIndex {
              b = other.coords.begin();
         
         while (a != coords.end() && b != other.coords.end()) {
-             //std::cout << (a-coords.begin()) << " "
-             //         << (b - other.coords.begin()) << "\n";
              if      (b == other.coords.end() || a->end <= b->start) a++;
              else if (a == coords.end() || b->end <= a->start) b++;
              else {
                 auto c = a->intersect(*b);
                 if (c.is_valid()) {
-                    //std::cout << "gotit  " << (a->to_string()) << " " 
-                    //          << (b->to_string()) << " "
-                    //          << c.to_string() << "\n";
                     ret.append(c);
-                } else {
-                    std::cout << "failed " << (a->to_string()) << " " 
-                              << (b->to_string()) << " "
-                              << c.to_string() << "\n";
                 }
 
                 if (a->start < b->start) a++;
@@ -265,25 +256,32 @@ class IntervalIndex {
         size_t gaps = 0;
         auto prev = coords[0];
         for (size_t i = 1; i < coords.size(); i++) {
-            gaps += coords[i-1].end < coords[i].start;
+            if (prev.is_valid() && coords[i].is_valid()) {
+                gaps += prev.end < coords[i].start;
+                prev = coords[i];
+            }
         }
         return gaps;
     }
 
     ValArray<T> to_runlen() const { 
-        ValArray<T> ret(coords.size() + count_gaps());
+        auto gap_count = count_gaps(), ret_size = coords.size() + gap_count;
+
+        ValArray<T> ret(ret_size);
 
         auto prev = coords[0];
         ret[0] = prev.length();
         size_t j = 1;
         for (size_t i = 1; i < coords.size(); i++) {
             if (coords[i] != prev) {
-                auto gap = coords[i].start - prev.end;
-                if (gap > 0) {
-                    ret[j++] = -gap;
+                if (coords[i].is_valid() && prev.is_valid()) {
+                    auto gap = coords[i].start - prev.end;
+                    if (gap > 0) {
+                        ret[j++] = -gap;
+                    }
+                    prev = coords[i];
                 }
                 ret[j++] = coords[i].length();
-                prev = coords[i];
             } else {
                 ret[j++] = 0;
             }

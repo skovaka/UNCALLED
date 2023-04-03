@@ -263,7 +263,8 @@ class Tracks:
                 io = Cls(filename, False, self, track_count)
 
                 p = io.conf.read_index
-                self.read_index.load_paths(p.paths, p.recursive)
+                if p.paths is not None:
+                    self.read_index.load_paths(p.paths, p.recursive)
                 self.read_index.load_index_file(p.read_index)
 
                 self.conf.load_config(io.conf)
@@ -320,14 +321,17 @@ class Tracks:
                 raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
 
         rp = self.conf.read_buffer
-        if len(rp.flowcell) == 0 or len(rp.kit) == 0:
+        has_flowkit = not (len(rp.flowcell) == 0 or len(rp.kit) == 0)
+        if not has_flowkit:
             flowcell, kit = self.read_index.default_model
-            if len(rp.flowcell) == 0:
-                rp.flowcell = flowcell
-            if len(rp.kit) == 0:
-                rp.kit = kit
+            if not (kit is None or flowcell is None):
+                if len(rp.flowcell) == 0:
+                    rp.flowcell = flowcell
+                if len(rp.kit) == 0:
+                    rp.kit = kit
+                has_flowkit = True
 
-        if self.model is None:
+        if self.model is None and has_flowkit:
             #self.conf.pore_model.name = WORKFLOW_PRESETS[self.read_index.default_model]
             if len(self.conf.pore_model.name) == 0:
                 self.model = PoreModel(PoreModel.PRESET_MAP.loc[(rp.flowcell, rp.kit), "preset_model"])

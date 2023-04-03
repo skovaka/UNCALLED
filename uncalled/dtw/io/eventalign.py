@@ -119,6 +119,7 @@ class Eventalign(TrackIO):
 
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
+        print("HERE")
         #read_filter = set(self.conf.read_index.read_filter)
 
         sample_rate = self.conf.read_buffer.sample_rate
@@ -128,6 +129,7 @@ class Eventalign(TrackIO):
             usecols=["read_name","contig","position", "event_index",
                      "start_idx","event_level_mean","event_stdv","model_mean",
                      "event_length","strand","model_kmer"])
+        print("HEREereerr")
 
         if self.model is None:
             self.model = self.tracks.model
@@ -136,6 +138,7 @@ class Eventalign(TrackIO):
 
         aln_id = 1
 
+        print("a")
         def iter_layers(events, aln_id):
             groups = events.groupby(["contig", "read_name"])
             for (contig,read_id), df in groups:
@@ -155,8 +158,12 @@ class Eventalign(TrackIO):
                         sam = read_sam
                         break
 
+                print("b")
+                sys.stdout.flush();
                 aln = self.tracks.bam_in.sam_to_aln(sam, load_moves=False)
                 #aln = self.tracks.init_alignment(self.next_aln_id(), read_id, sam.reference_id, coords, sam)
+                print("c")
+                sys.stdout.flush();
                 
                 fwd = int( (df["event_index"].iloc[0] < df["event_index"].iloc[-1]) == (df["position"].iloc[0] < df["position"].iloc[-1]))
 
@@ -174,14 +181,15 @@ class Eventalign(TrackIO):
                     "mean" : self.model.pa_to_norm(grp["mean_cml"].sum() / lengths),
                     "stdv" : self.model.pa_sd_to_norm(grp["stdv_cml"].sum() / lengths)
                 }).set_index(grp["mpos"].min())
+                print("d")
 
                 #coords = _uncalled.IntervalIndexI64([(df.index.min()-kmer_trim[0], df.index.max()+1+kmer_trim[1])])
                 coords = _uncalled.IntervalIndexI64([(df.index.min(), df.index.max()+1)])
                 df = df.reindex(coords.expand())
-                aln = self.tracks.init_alignment(self.next_aln_id(), read_id, read_sam.reference_id, coords, read_sam)
+                df["length"].fillna(-1, inplace=True)
+                aln = self.tracks.init_alignment(self.next_aln_id(), read_id, sam.reference_id, coords, sam)
                 dtw = AlnDF(aln.seq, df["start"], df["length"], df["mean"], df["stdv"])
                 aln.set_dtw(dtw)
-
                 yield aln
 
         leftover = pd.DataFrame()

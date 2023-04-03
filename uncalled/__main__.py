@@ -99,7 +99,7 @@ CONVERT_OPTS = (
     ]),
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
     Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
-    Opt("--pore-model", "pore_model", "name"),
+    Opt(("-m", "--pore-model"), "pore_model", "name"),
 
     MutexOpts("output", [
         Opt("--sql-out", "tracks.io"),
@@ -114,7 +114,7 @@ CONVERT_OPTS = (
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
 
-    Opt("--read-paths", "read_index", "paths", nargs="+", type=str),
+    Opt("--reads", "read_index", "paths", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks"),
     Opt(("-x", "--read-index"), "read_index", required=False),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),
@@ -244,7 +244,7 @@ DOTPLOT_OPTS = (
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
 
     Opt("--ref", "tracks", "index_prefix"), 
-    Opt("--read-paths", "read_index", "paths", nargs="+", type=str),
+    Opt("--reads", "read_index", "paths", nargs="+", type=str),
     Opt(("-x", "--read-index"), "read_index"),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
@@ -271,7 +271,7 @@ TRACKPLOT_OPTS = (
 	]),
 
     Opt("--ref", "tracks", "index_prefix"), 
-    Opt("--read-paths", "read_index", "paths", nargs="+", type=str),
+    Opt("--reads", "read_index", "paths", nargs="+", type=str),
     Opt(("-x", "--read-index"), "read_index"),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),
@@ -296,7 +296,7 @@ BROWSER_OPTS = (
 	#]),
 
     Opt("--ref", "tracks", "index_prefix"), 
-    Opt("--read-paths", "read_index", "paths", nargs="+", type=str),
+    Opt("--reads", "read_index", "paths", nargs="+", type=str),
     Opt(("-x", "--read-index"), "read_index"),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),
     Opt("--rna", fn="set_r94_rna", help="Should be set for direct RNA data"),

@@ -45,7 +45,6 @@ def sam_to_read_moves(read, sam):
         moves = mv[1:]
 
     else:
-        sys.stderr.write(f"Basecaller moves not found for read {read.id}, skipping\n")
         return None
         
     return moves_to_aln(moves, template_start, mv_stride)

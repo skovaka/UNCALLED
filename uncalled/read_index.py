@@ -38,7 +38,11 @@ class ReadIndex:
     @property
     def default_model(self):
         if self._default_model is None:
-            self._open(next(iter(self.file_info.keys())))   
+            try:
+                self._open(next(iter(self.file_info.keys())))   
+            except StopIteration:
+                return None, None
+
             flowcell,kit = self.infile.get_run_info()
             self._default_model = (flowcell,kit)
 
@@ -200,10 +204,20 @@ class ReadIndex:
     def __getitem__(self, read_id):
         if self.prev_read is not None and self.prev_read.id == read_id: 
             return self.prev_read
-        self._open(self.get_read_file(read_id))
-        read = self.infile[read_id]
+        filename = self.get_read_file(read_id)
+        if self.has_signal:
+            self._open(filename)
+            read = self.infile[read_id]
+        else:
+            read = ReadBuffer(read_id, 0, 0, 0, [])
+
         self.prev_read = read
         return read
+
+    @property
+    def has_signal(self):
+        return len(self.file_info) > 0
+        #return self.read_files is not None
     
     def __iter__(self):
         for filename in self.file_info.keys():
