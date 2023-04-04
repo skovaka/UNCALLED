@@ -62,6 +62,14 @@ struct PoreModelParams {
     bool reverse, complement;
     std::string flowcell, kit;
 
+    std::pair<std::string, std::string> get_workflow() {
+        return {flowcell, kit};
+    }
+
+    bool has_workflow() {
+        return flowcell.size() > 0 && kit.size() > 0;
+    }
+
     float bases_per_sample() const {
         return bases_per_sec / sample_rate;
     }

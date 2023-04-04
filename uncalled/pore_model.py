@@ -103,31 +103,34 @@ class PoreModel:
 
             else:
                 raise TypeError(f"Invalid PoreModel type: {type(model)}")
-
-        elif len(prms.name) > 0:
-
-            cache_key = prms.to_key()
-            if cache and cache_key in CACHE:
-                self._init(prms, CACHE[cache_key])
-                return
-
-            if prms.name in self.PRESETS:
-                filename = os.path.join(self.PRESET_DIR, prms.name + self.PRESET_EXT)
-                ext = self.PRESET_EXT[1:]
-            else:
-                filename = prms.name
-                ext = filename.split(".")[-1]
-
-            if os.path.exists(filename):
-                loader = self.FILE_LOADERS.get(ext, PoreModel._vals_from_tsv)
-                vals = loader(self, filename, prms)
-                self._init_new(prms, *vals)
-
-            else:
-                models = ", ".join(PORE_MODEL_PRESETS.keys())
-                raise FileNotFoundError(f"PoreModel file not found: {filename}")
         else:
-            self._init_new(prms)
+            if len(prms.name) == 0 and prms.has_workflow():
+                prms.name = PoreModel.PRESET_MAP.loc[(prms.flowcell, prms.kit), "preset_model"]
+
+            if len(prms.name) > 0:
+                cache_key = prms.to_key()
+                if cache and cache_key in CACHE:
+                    self._init(prms, CACHE[cache_key])
+                    return
+
+                if prms.name in self.PRESETS:
+                    filename = os.path.join(self.PRESET_DIR, prms.name + self.PRESET_EXT)
+                    ext = self.PRESET_EXT[1:]
+                else:
+                    filename = prms.name
+                    ext = filename.split(".")[-1]
+
+                if os.path.exists(filename):
+                    loader = self.FILE_LOADERS.get(ext, PoreModel._vals_from_tsv)
+                    vals = loader(self, filename, prms)
+                    self._init_new(prms, *vals)
+
+                else:
+                    models = ", ".join(PORE_MODEL_PRESETS.keys())
+                    raise FileNotFoundError(f"PoreModel file not found: {filename}")
+
+            else:
+                self._init_new(prms)
             
         cache_key = self.PRMS.to_key()
         if cache and not cache_key in CACHE:

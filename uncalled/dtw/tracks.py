@@ -105,15 +105,23 @@ class Tracks:
         self._tracks = dict()
         self.new_alignment = False
         self.new_layers = set()
+        
+        if self.read_index is None:
+            self.read_index = ReadIndex(self.conf.read_index.paths, self.prms.read_filter, self.conf.read_index.read_index, self.conf.read_index.recursive)
 
         if model is not None:
             self.set_model(model)
         else:
-            self.model = None
-        
-        if self.read_index is None:
-            #self.read_index = Slow5Reader(read_filter=self.prms.read_filter)
-            self.read_index = ReadIndex(read_filter=self.prms.read_filter)
+            pm = self.conf.pore_model
+            if len(pm.name) == 0 and not pm.has_workflow():
+                flowcell, kit = self.read_index.default_model
+                if flowcell is not None and kit is not None:
+                    pm.flowcell = flowcell
+                    pm.kit = kit
+            if len(pm.name) > 0 or pm.has_workflow():
+                self.set_model(PoreModel(params=self.conf.pore_model))
+            else:
+                self.model = None
 
         self._init_io()
 
@@ -316,24 +324,25 @@ class Tracks:
             elif track.model is not None and self.model.K != track.model.K:
                 raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
 
-        pm = self.conf.pore_model
-        has_flowkit = not (len(pm.flowcell) == 0 or len(pm.kit) == 0)
-        if not has_flowkit:
-            flowcell, kit = self.read_index.default_model
-            if not (kit is None or flowcell is None):
-                if len(pm.flowcell) == 0:
-                    pm.flowcell = flowcell
-                if len(pm.kit) == 0:
-                    pm.kit = kit
-                has_flowkit = True
+        #pm = self.conf.pore_model
+        #has_flowkit = not (len(pm.flowcell) == 0 or len(pm.kit) == 0)
+        #if not has_flowkit:
+        #    flowcell, kit = self.read_index.default_model
+        #    if not (kit is None or flowcell is None):
+        #        if len(pm.flowcell) == 0:
+        #            pm.flowcell = flowcell
+        #        if len(pm.kit) == 0:
+        #            pm.kit = kit
+        #        has_flowkit = True
+        ##PoreModel.PRESET_MAP.loc[(pm.flowcell, pm.kit), "preset_model"]
 
-        if self.model is None and has_flowkit:
-            if len(self.conf.pore_model.name) == 0:
-                self.model = PoreModel(PoreModel.PRESET_MAP.loc[(pm.flowcell, pm.kit), "preset_model"])
-            else:
-                self.model = PoreModel(params=self.conf.pore_model)
-            for track in self.alns:
-                track.model = self.model
+        #if self.model is None and has_flowkit:
+        #    if len(self.conf.pore_model.name) == 0:
+        #        self.model = PoreModel(PoreModel.PRESET_MAP.loc[(pm.flowcell, pm.kit), "preset_model"])
+        #    else:
+        #        self.model = PoreModel(params=self.conf.pore_model)
+        #    for track in self.alns:
+        #        track.model = self.model
 
     def set_model(self, model):
         self.conf.pore_model = model.PRMS

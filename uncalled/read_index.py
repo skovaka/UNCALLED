@@ -23,6 +23,8 @@ class ReadIndex:
         self.index_filename = index_filename
         self.file_info = dict()
         self.read_files = None
+        self.index_files = set()
+        self.base_paths = set()
 
         if file_paths is not None:
             self.load_paths(file_paths, recursive)
@@ -65,6 +67,10 @@ class ReadIndex:
             if self.index_filename is None or len(self.index_filename) == 0:
                 return
             fname = self.index_filename
+
+        if fname in self.index_files:
+            return
+        self.index_files.add(fname)
 
         read_files = None
         with open(fname) as infile:
@@ -113,6 +119,11 @@ class ReadIndex:
 
         for path in paths:
             path = path.strip()
+
+            if (path, recursive) in self.base_paths:
+                continue
+            self.base_paths.add((path, recursive))
+
             if not os.path.exists(path):
                 raise ValueError("Error: \"%s\" does not exist\n" % path)
 

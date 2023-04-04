@@ -55,6 +55,8 @@ void pybind_pore_model_params(py::module_ &m) {
     PY_MODEL_PARAM(complement, "Will complement k-mer sequences if True");
     PY_MODEL_PARAM(flowcell, "Flowcell used for sequencing (e.g. FLO-MIN106)");
     PY_MODEL_PARAM(kit, "Kit used for sequencing (e.g. SQK-LSK109)");
+    p.def("has_workflow", &PoreModelParams::has_workflow);
+    p.def("get_workflow", &PoreModelParams::get_workflow);
 
     //py::class_<PoreModelPreset> pre(m, "PoreModelPresets");
     //pre.def_readwrite("prms", &PoreModelPreset::prms);
