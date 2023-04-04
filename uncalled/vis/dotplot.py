@@ -121,14 +121,6 @@ class Dotplot:
                               .loc[(track.id,aln_id), slice(None)]#,slice(None)), slice(None)] \
                               #.droplevel("aln.id")
 
-                #layers["dtw","start"] /=    float(self.conf.read_buffer.sample_rate)
-                #layers["dtw","length"] /=   float(self.conf.read_buffer.sample_rate)
-                ##layers["moves","start"] /=  float(self.conf.read_buffer.sample_rate)
-                ##layers["moves","length"] /= float(self.conf.read_buffer.sample_rate)
-                #if has_moves:
-                #    layers["moves","middle"] /= float(self.conf.read_buffer.sample_rate)
-                #layers["dtw","middle"] /=   float(self.conf.read_buffer.sample_rate)
-
                 
                 fwd = fwd and aln["fwd"]
                 flipped = flipped and aln["fwd"] == self.conf.is_rna

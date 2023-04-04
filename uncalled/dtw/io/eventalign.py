@@ -60,7 +60,7 @@ class Eventalign(TrackIO):
 
         self.model = None
 
-        self.in_id = self.init_track(name, name, self.conf)
+        self.init_track(name, name, self.conf)
 
     #def write_layers(self, track, groups):
     def write_alignment(self, aln):
@@ -121,8 +121,6 @@ class Eventalign(TrackIO):
 
         print("HERE")
         #read_filter = set(self.conf.read_index.read_filter)
-
-        sample_rate = self.conf.read_buffer.sample_rate
 
         csv_iter = pd.read_csv(
             self.filename, sep="\t", chunksize=10000,
@@ -195,7 +193,7 @@ class Eventalign(TrackIO):
         leftover = pd.DataFrame()
 
         for events in csv_iter:
-            events['event_length'] = np.round(events['event_length'] * sample_rate).astype(int)
+            events['event_length'] = np.round(events['event_length'] * self.model.sample_rate).astype(int)
             events['sum'] = events['event_level_mean'] * events['event_length']
 
             events = pd.concat([leftover, events])

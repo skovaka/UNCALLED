@@ -5,14 +5,18 @@
 #include "models/r9.4_dna_450bps_6mer_npl.inl"
 
 const PoreModelParams PORE_MODEL_PRMS_DEF {
-    name        : "",
-    k           : -1,
-    shift       : -1,
-    pa_mean     : -1,
-    pa_stdv     : -1,
-    norm_max    : 5.0,
-    reverse     : false,
-    complement  : false,
+    name          : "",
+    k             : -1,
+    shift         : -1,
+    pa_mean       : -1,
+    pa_stdv       : -1,
+    norm_max      : 5.0,
+    sample_rate   : 4000, 
+    bases_per_sec : 450,
+    reverse       : false,
+    complement    : false,
+    flowcell      : "",
+    kit           : "",
 };
 
 //using M = PoreModelPreset;
@@ -43,10 +47,14 @@ void pybind_pore_model_params(py::module_ &m) {
     PY_MODEL_PARAM(k, "K-mer length");
     PY_MODEL_PARAM(shift, "K-mer shift");
     PY_MODEL_PARAM(norm_max, "K-mer shift");
+    PY_MODEL_PARAM(sample_rate, "Raw signal samples per second");
+    PY_MODEL_PARAM(bases_per_sec, "Average bases sequenced per second (approximate)");
     PY_MODEL_PARAM(pa_mean, "Current mean picoamp mean");
     PY_MODEL_PARAM(pa_stdv, "Current mean picoamp stdv");
     PY_MODEL_PARAM(reverse, "Will reverse (flip) k-mer sequences if True");
     PY_MODEL_PARAM(complement, "Will complement k-mer sequences if True");
+    PY_MODEL_PARAM(flowcell, "Flowcell used for sequencing (e.g. FLO-MIN106)");
+    PY_MODEL_PARAM(kit, "Kit used for sequencing (e.g. SQK-LSK109)");
 
     //py::class_<PoreModelPreset> pre(m, "PoreModelPresets");
     //pre.def_readwrite("prms", &PoreModelPreset::prms);

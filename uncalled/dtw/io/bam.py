@@ -6,6 +6,7 @@ import array
 import os
 import re
 import time
+import json
 from collections import defaultdict, deque
 from ..moves import sam_to_ref_moves, INT32_NA
 from ..aln_track import AlnTrack
@@ -62,12 +63,11 @@ class BAM(TrackIO):
 
         if conf is None:
             conf = self.conf
-            #toml = self.conf.to_toml()
 
         self._init_tags(conf.tracks.io.bam_tags)
 
         name = os.path.basename(self.filename)
-        self.in_id = self.init_track(name, name, conf)
+        self.track_in = self.init_track(name, name, conf)
 
         self.read_id_index = None
 
@@ -113,7 +113,19 @@ class BAM(TrackIO):
         conf_line = self.conf.to_toml() \
                         .replace(";", "\\;") \
                         .replace("\n", ";")   
-        #header = self.input.header.to_dict()
+
+        print(conf_line)
+        print("MODEL", self.track_out.model)
+        #p = self.track_out.model.PRMS
+        #params = {
+        #    "name" : self.track_out.name,
+        #    "desc" : self.track_out.desc,
+        #    "model" : self.track_out.model.params_to_dict()
+        #    #"layers" : 
+        #}
+        #print(params)
+        #print(json.dumps(self.conf.to_dict()))
+
         if not "CO" in self.header:
             self.header["CO"] = list()
         self.header["CO"].append("UNC:" + conf_line)
@@ -332,13 +344,13 @@ class BAM(TrackIO):
         aln = self.sam_to_aln(sam)
 
         layers = aln.to_pandas(layer_names, index=["seq.fwd", "seq.pos", "aln.id"])
-        layers["track.id"] = self.in_id
+        layers["track.id"] = self.track_in.name
         layers = layers.set_index("track.id", append=True)\
                        .reorder_levels(["track.id", "seq.fwd", "seq.pos", "aln.id"])
 
         attr = aln.attrs()
         aln_df = pd.DataFrame([attr], columns=attr._fields)
-        aln_df["track.id"] = self.in_id
+        aln_df["track.id"] = self.track_in.id
         aln_df.set_index(["track.id","id"], inplace=True)
 
         return aln_df, layers
@@ -359,9 +371,9 @@ class BAM(TrackIO):
                 continue
             aln = self.sam_to_aln(sam)
 
-            track_alns[self.in_id].append(aln.attrs())
+            track_alns[self.track_in.id].append(aln.attrs())
             l = aln.to_pandas(layers, index=index)
-            track_layers[self.in_id].append(l)
+            track_layers[self.track_in.id].append(l)
 
         track_alns = {
             t : pd.DataFrame(l, columns=Alignment.Attrs._fields)\

@@ -43,7 +43,7 @@ METHODS = {
 
 def dtw(conf):
     conf.tracks.load_fast5s = True
-    conf.export_static()
+    #conf.export_static()
 
     #if len(conf.read_index.read_index) == 0:
     #    raise ValueError("Must specify fast5 index (-x/--fast5-index)")

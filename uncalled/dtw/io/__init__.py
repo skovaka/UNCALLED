@@ -66,14 +66,15 @@ class TrackIO:
 
     def init_write_mode(self):
         if self.prms.out_name is not None:
-            self.out_track = self.prms.out_name
+            track_name = self.prms.out_name
         else:
-            self.out_track = os.path.splitext(os.path.basename(self.filename))[0]
+            track_name = os.path.splitext(os.path.basename(self.filename))[0]
+        print("WRITE", self.filename, track_name, os.path.basename(self.filename))
 
         self.prev_fast5 = (None, None)
         self.prev_read = None
 
-        self.out_id = self.init_track(self.out_track, self.out_track, self.conf)
+        self.track_out = self.init_track(track_name, track_name, self.conf)
 
         self.out_buffer = None
 
@@ -82,10 +83,11 @@ class TrackIO:
             id = self.next_id
         self.next_id = id + 1
 
-        self.aln_tracks.append(AlnTrack(id, name, desc, conf))
+        t = AlnTrack(id, name, desc, conf)
+        self.aln_tracks.append(t)
         self.conf.load_config(conf)
 
-        return id
+        return t
 
     def fill_tracks(self, coords, alignments, layers):
         layers = layers.droplevel(0)

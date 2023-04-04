@@ -39,19 +39,14 @@ namespace py = pybind11;
 class ReadBuffer {
     public:
 
-    typedef struct {
-        std::string flowcell, kit;
-        u16 num_channels;
-        float bp_per_sec;
-        float sample_rate;
-        bool seq_fwd; //If true reads start at 5', end at 3' (DNA)
-                      //If false start=3', end=5' (RNA)
-        float bp_per_samp() {
-            return bp_per_sec / sample_rate;
-        }
-    } Params;
+    //typedef struct {
+    //    u16 num_channels;
+    //    float bp_per_sec;
+    //    float sample_rate;
+    //    bool seq_fwd; //If true reads start at 5', end at 3' (DNA)
+    //} Params;
 
-    static Params PRMS;
+    //static Params PRMS;
 
     ReadBuffer();
 
@@ -134,13 +129,13 @@ class ReadBuffer {
         c.def("__len__", &ReadBuffer::size);
         c.def("__getitem__", &ReadBuffer::operator[]);
 
-        pybind11::class_<Params> p(c, "Params");
-        PY_READ_PRM(flowcell, "Flowcell ID");
-        PY_READ_PRM(kit, "Kit ID");
-        PY_READ_PRM(num_channels, "Number of channels on device");
-        PY_READ_PRM(bp_per_sec, "Expected bases sequenced per second");
-        PY_READ_PRM(sample_rate, "Number of raw samples per second");
-        PY_READ_PRM(seq_fwd, "If true indicates that the signal moves 5' -> 3'");
+        //pybind11::class_<Params> p(c, "Params");
+        //PY_READ_PRM(flowcell, "Flowcell ID");
+        //PY_READ_PRM(kit, "Kit ID");
+        //PY_READ_PRM(num_channels, "Number of channels on device");
+        //PY_READ_PRM(bp_per_sec, "Expected bases sequenced per second");
+        //PY_READ_PRM(sample_rate, "Number of raw samples per second");
+        //PY_READ_PRM(seq_fwd, "If true indicates that the signal moves 5' -> 3'");
     }
 
     #endif

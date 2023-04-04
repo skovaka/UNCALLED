@@ -50,7 +50,7 @@ class Sigplot:
         for base, color in enumerate(self.conf.vis.base_colors):
             base_dtw = dtw[bases == base]
             starts = base_dtw["dtw", "start_sec"]
-            ends = starts + base_dtw["dtw", "length_sec"] - (1.0 / self.conf.read_buffer.sample_rate)
+            ends = starts + base_dtw["dtw", "length_sec"] - (1.0 / model.sample_rate)
             nones = [None]*len(base_dtw)
 
             ys = [ymax,ymax,ymin,ymin,None]*len(base_dtw)
@@ -95,15 +95,11 @@ class Sigplot:
                 #dtws.append(dtw)
                 seqs.append(layers)
 
-
                 samp_min = min(samp_min, dtw["start"].min())
                 samp_max = max(samp_max, dtw["start"].iloc[-1] + dtw["length"].iloc[-1])
 
                 current_min = min(current_min, seq["current"].min())
                 current_max = max(current_max, seq["current"].max())
-
-                #dtw["start"] /=  self.conf.read_buffer.sample_rate
-                #dtw["length"] /=  self.conf.read_buffer.sample_rate
 
             if len(seqs) > 0:
                 track_dtws.append(pd.concat(seqs).sort_index())
@@ -119,7 +115,7 @@ class Sigplot:
                 (signal <= sig_med + sig_win))
         
         samples = np.arange(samp_min, samp_max)#[mask]
-        samp_time = samples / self.conf.read_buffer.sample_rate
+        samp_time = samples / self.tracks.model.sample_rate
         signal = signal#[mask]
 
         current_min = min(current_min, signal.min())

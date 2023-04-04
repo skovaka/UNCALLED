@@ -109,7 +109,10 @@ class Config(_Conf):
             setattr(self, name, cls())
 
         if conf is not None:
-            self.load_config(conf)
+            if isinstance(conf, _Conf):
+                self.load_config(conf)
+            elif isinstance(conf, dict):
+                self.load_dict(conf)
         
         if toml is not None:
             self.load_toml(text=toml)
@@ -160,26 +163,34 @@ class Config(_Conf):
 
 
     def to_toml(self, filename=None, force_all=False):
+        ret = self.to_dict(force_all)
+        if filename is None:
+            return toml.dumps(ret)
+        else:
+            with open(filename, "w") as fout:
+                toml.dump(ret, fout)
 
+
+    def to_dict(self, force_all=False):
         def fmt(val):
             if isinstance(val, str) and os.path.exists(val):
                 return os.path.abspath(val)
             return val
         
-        out = dict()
+        ret = dict()
 
         for param in self._GLOBAL_PARAMS:
             val = getattr(self,param)
             if self._param_writable(param, val, ignore=not force_all):
-                out[param] = fmt(val)
+                ret[param] = fmt(val)
 
         for param, val in vars(self).items():
             if self._param_writable(param, val, ignore=not force_all):
-                out[param] = fmt(val)
+                ret[param] = fmt(val)
 
         groups = self._PARAM_GROUPS + list(self._EXTRA_GROUPS.keys())
 
-        def write_group(group_name, out):
+        def write_group(group_name, ret):
             group = self.get_group(group_name)
 
             vals = dict()
@@ -188,28 +199,18 @@ class Config(_Conf):
                 if self._param_writable(param, val, group_name, ignore=not force_all):
                     vals[param] = fmt(val)
                 elif isinstance(val, ParamGroup):
-                    #out[param] = dict()
+                    #ret[param] = dict()
                     write_group(f"{group_name}.{param}", vals)
 
             if len(vals) > 0:
-                out[group_name.split(".")[-1]] = fmt(vals)
+                ret[group_name.split(".")[-1]] = fmt(vals)
 
         for group_name in groups:
-            write_group(group_name, out)
+            write_group(group_name, ret)
 
-        if filename is None:
-            return toml.dumps(out)
-        else:
-            with open(filename, "w") as fout:
-                toml.dump(out, fout)
+        return ret
 
-    def load_toml(self, filename=None, text=None):
-        if filename is not None:
-            toml_dict = toml.load(filename)
-        elif text is not None:
-            toml_dict = toml.loads(text)
-
-
+    def load_dict(self, d):
         def load_group(name, vals):
             group = self.get_group(name)
             if group is None:
@@ -225,12 +226,20 @@ class Config(_Conf):
                     elif self.is_default(param, name):
                         setattr(group, param, value)
 
-        for name, val in toml_dict.items():
+        for name, val in d.items():
             if isinstance(val, dict):
                 load_group(name, val)
             else:
                 if self.is_default(name):
                     setattr(self, name, val)
+
+    def load_toml(self, filename=None, text=None):
+        if filename is not None:
+            toml_dict = toml.load(filename)
+        elif text is not None:
+            toml_dict = toml.loads(text)
+        self.load_dict(toml_dict)
+
 
     #support pickling via toml
     def __setstate__(self, toml):

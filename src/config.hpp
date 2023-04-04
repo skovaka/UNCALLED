@@ -40,7 +40,7 @@ class Config {
 
     bool cprof;
 
-    ReadBuffer::Params    read_buffer    = ReadBuffer::PRMS;
+    //ReadBuffer::Params    read_buffer    = ReadBuffer::PRMS;
     NormalizerParams    normalizer     = NORMALIZER_PRMS_DEF;
     EventDetector::Params event_detector = EventDetector::PRMS_DEF;
     PoreModelParams       pore_model     = PORE_MODEL_PRMS_DEF;
@@ -50,11 +50,8 @@ class Config {
     Config() : cprof(false) {}
 
     void set_r94_rna() {
-        read_buffer.sample_rate = 3012;
-        read_buffer.bp_per_sec  = 70;
-        read_buffer.seq_fwd     = false;
-
-        //pore_model.name    = "r94_rna";
+        pore_model.sample_rate = 3012;
+        pore_model.bases_per_sec  = 70;
         pore_model.reverse    = true;
 
         event_detector.window_length1 = 7;
@@ -63,9 +60,9 @@ class Config {
         event_detector.threshold2     = 18.0;
     }
 
-    void export_static() {
-        ReadBuffer::PRMS = read_buffer;
-    }
+    //void export_static() {
+    //    ReadBuffer::PRMS = read_buffer;
+    //}
 
     EventDetector::Params &get_event_detector_prms() {
         return event_detector;
@@ -91,7 +88,7 @@ class Config {
         c.def(pybind11::init());
 
         DEF_METH(set_r94_rna, "Sets parameters for RNA sequencing")
-        DEF_METH(export_static, "Sets static parameters for ReadBuffer and Mapper")
+        //DEF_METH(export_static, "Sets static parameters for ReadBuffer and Mapper")
 
         #define CONF_ATTR(P, D, V) \
             c.def_readwrite(#P, &Config::P, D); \
@@ -99,7 +96,7 @@ class Config {
         #define CONF_GROUP(P, D) CONF_ATTR(P, D, _PARAM_GROUPS)
         #define CONF_GLOBAL(P, D) CONF_ATTR(P, D, _GLOBAL_PARAMS)
 
-        CONF_GROUP(read_buffer, "ReadBuffer parameters")
+        //CONF_GROUP(read_buffer, "ReadBuffer parameters")
 
         CONF_GROUP(normalizer, "") 
         CONF_GROUP(event_detector, "")

@@ -276,6 +276,8 @@ class PoreModel:
 
     def __getattr__(self, name):
         if not hasattr(self.instance, name):
+            if hasattr(self.PRMS, name):
+                return getattr(self.PRMS, name)
             raise ValueError(f"PoreModel has no attribute '{name}'")
         return self.instance.__getattribute__(name)
 
@@ -320,8 +322,13 @@ class PoreModel:
         d.update(self._base)
         d.update(self._extra)
         if params:
-            for name in PARAM_TYPES.keys():
-                d[f"_{name}"] = getattr(self.PRMS, name)
+            d.update(self.params_to_dict("_"))
+        return d
+
+    def params_to_dict(self, prefix=""):
+        d = dict()
+        for name in PARAM_TYPES.keys():
+            d[f"{prefix}{name}"] = getattr(self.PRMS, name)
         return d
 
     def to_df(self, kmer_str=True):
@@ -367,7 +374,9 @@ class PoreModel:
         self.__init__(model=d)
 
     def __getstate__(self):
-        return self.to_dict(params=True)
+        d = self.to_dict(params=True)
+        print(d)
+        return d
     
     def __repr__(self):
         ret = "<PoreModel mean=%.3f stdv=%.3f>\n" % (self.model_mean, self.model_stdv)

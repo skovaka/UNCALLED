@@ -172,7 +172,7 @@ PANDAS_DTYPES = {
 }
 
 class AlnDF:
-    sample_rate = 4000
+    #sample_rate = 4000
 
     def __init__(self, seq, start=None, length=None, current=None, current_sd=None):
         self.seq = seq
@@ -208,11 +208,11 @@ class AlnDF:
 
     @property
     def start_sec(self):
-        return (self.start / self.sample_rate)
+        return (self.start / self.seq.model.PRMS.sample_rate)
 
     @property
     def length_sec(self):
-        return (self.length / self.sample_rate)
+        return (self.length / self.seq.model.PRMS.sample_rate)
 
     @property
     def middle(self):
@@ -220,7 +220,7 @@ class AlnDF:
 
     @property
     def middle_sec(self):
-        return self.middle / self.sample_rate
+        return self.middle / self.seq.model.PRMS.sample_rate
 
     @property
     def model_diff(self):
@@ -232,7 +232,7 @@ class AlnDF:
 
     @property
     def dwell(self):
-        return 1000* self.length / AlnDF.sample_rate
+        return 1000 * self.length / self.seq.model.PRMS.sample_rate
 
     def _get_series(self, name):
         vals = getattr(self, name, None)

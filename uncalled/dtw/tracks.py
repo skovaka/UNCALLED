@@ -129,8 +129,6 @@ class Tracks:
         #self.coords = self._ref_bounds_to_coords(self.prms.ref_bounds)
         self.coords = self.prms.ref_bounds
 
-        AlnDF.sample_rate = self.conf.read_buffer.sample_rate
-
         #if self.coords is not None and  len(self._aln_track_ids) > 0:
         #    self.load()
 
@@ -245,8 +243,6 @@ class Tracks:
 
     def _init_io(self):
 
-        #tracks = list()
-
         self.inputs = list()
         self.bam_in = None
 
@@ -320,21 +316,20 @@ class Tracks:
             elif track.model is not None and self.model.K != track.model.K:
                 raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
 
-        rp = self.conf.read_buffer
-        has_flowkit = not (len(rp.flowcell) == 0 or len(rp.kit) == 0)
+        pm = self.conf.pore_model
+        has_flowkit = not (len(pm.flowcell) == 0 or len(pm.kit) == 0)
         if not has_flowkit:
             flowcell, kit = self.read_index.default_model
             if not (kit is None or flowcell is None):
-                if len(rp.flowcell) == 0:
-                    rp.flowcell = flowcell
-                if len(rp.kit) == 0:
-                    rp.kit = kit
+                if len(pm.flowcell) == 0:
+                    pm.flowcell = flowcell
+                if len(pm.kit) == 0:
+                    pm.kit = kit
                 has_flowkit = True
 
         if self.model is None and has_flowkit:
-            #self.conf.pore_model.name = WORKFLOW_PRESETS[self.read_index.default_model]
             if len(self.conf.pore_model.name) == 0:
-                self.model = PoreModel(PoreModel.PRESET_MAP.loc[(rp.flowcell, rp.kit), "preset_model"])
+                self.model = PoreModel(PoreModel.PRESET_MAP.loc[(pm.flowcell, pm.kit), "preset_model"])
             else:
                 self.model = PoreModel(params=self.conf.pore_model)
             for track in self.alns:

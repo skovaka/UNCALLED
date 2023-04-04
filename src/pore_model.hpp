@@ -58,8 +58,13 @@ static constexpr inorm_t INORM_MAX = std::numeric_limits<inorm_t>::max(),
 struct PoreModelParams {
     std::string name;
     int k, shift;
-    float pa_mean, pa_stdv, norm_max;
+    float pa_mean, pa_stdv, norm_max, sample_rate, bases_per_sec;
     bool reverse, complement;
+    std::string flowcell, kit;
+
+    float bases_per_sample() const {
+        return bases_per_sec / sample_rate;
+    }
 
     inline float inorm_scale() const {
         return INORM_MAX / norm_max;

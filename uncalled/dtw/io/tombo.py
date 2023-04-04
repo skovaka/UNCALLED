@@ -38,7 +38,7 @@ class Tombo(TrackIO):
 
         self.conf.read_index.paths = self.prms.tombo_in
 
-        self.in_id = self.init_track(name, name, self.conf)
+        self.init_track(name, name, self.conf)
 
     #def init_fast5(self, fast5):
     #    self.
