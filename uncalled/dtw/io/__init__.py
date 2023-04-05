@@ -1,4 +1,5 @@
 """Edit, merge, and ls alignment databases
+        print(d)
 
 subcommand options:
 ls       List all tracks in a database
@@ -69,7 +70,6 @@ class TrackIO:
             track_name = self.prms.out_name
         else:
             track_name = os.path.splitext(os.path.basename(self.filename))[0]
-        print("WRITE", self.filename, track_name, os.path.basename(self.filename))
 
         self.prev_fast5 = (None, None)
         self.prev_read = None

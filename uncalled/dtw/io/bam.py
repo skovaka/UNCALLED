@@ -26,6 +26,14 @@ LENS_TAG = "ul"
 CURS_TAG = "uc"
 STDS_TAG = "ud"
 
+#BamLayer = namedtuple("BamLayer", ["name","dtype","shift","scale"], defaults=[None,None,None,None])
+LAYER_TAGS = {
+    "dtw.length"     : LENS_TAG,
+    "dtw.current"    : CURS_TAG,
+    "dtw.current_sd" : STDS_TAG,
+}
+EXTRA_LAYER_PRE = ["u","v","w"]
+
 REQ_ALN_TAGS = [REF_TAG, SAMP_TAG, LENS_TAG, CURS_TAG]
 
 class BAM(TrackIO):
@@ -33,6 +41,7 @@ class BAM(TrackIO):
 
     def __init__(self, filename, write, tracks, track_count):
         TrackIO.__init__(self, filename, write, tracks, track_count)
+        self.layer_tags = None
 
         if write:
             if not self.prms.buffered:
@@ -58,13 +67,14 @@ class BAM(TrackIO):
         if "CO" in self.header:
             for line in self.header["CO"]:
                 if not line.startswith("UNC:"): continue
-                toml = re.sub(r"(?<!\\);", "\n", line[4:]).replace("\\;",";")
-                conf = Config(toml=toml)
+                prms = json.loads(line[4:])
+                conf = Config(prms["config"])
+                self.layer_tags = prms["layers"]
 
         if conf is None:
             conf = self.conf
 
-        self._init_tags(conf.tracks.io.bam_tags)
+        #self._init_tags(conf.tracks.io.bam_tags)
 
         name = os.path.basename(self.filename)
         self.track_in = self.init_track(name, name, conf)
@@ -84,19 +94,18 @@ class BAM(TrackIO):
         ret = self.read_id_index.find(read_id)
         return ret
 
-
-    def _init_tags(self, tags):
-        self.tags = dict()
-        for t in tags:
-            label, tag = t.split(":")
-            self.tags[label] = tag
+    #def _init_tags(self, tags):
+    #    self.tags = dict()
+    #    for t in tags:
+    #        label, tag = t.split(":")
+    #        self.tags[label] = tag
 
     def init_write_mode(self):
         if self.conf.tracks.io.bam_out is None:
             self.output = None
             return
 
-        self._init_tags(self.prms.bam_tags)
+        #self._init_tags(self.prms.bam_tags)
 
         TrackIO.init_write_mode(self)
 
@@ -114,21 +123,21 @@ class BAM(TrackIO):
                         .replace(";", "\\;") \
                         .replace("\n", ";")   
 
-        print(conf_line)
-        print("MODEL", self.track_out.model)
-        #p = self.track_out.model.PRMS
-        #params = {
-        #    "name" : self.track_out.name,
-        #    "desc" : self.track_out.desc,
-        #    "model" : self.track_out.model.params_to_dict()
-        #    #"layers" : 
-        #}
-        #print(params)
-        #print(json.dumps(self.conf.to_dict()))
-
+        p = self.track_out.model.PRMS
+        params = {
+            "name" : self.track_out.name,
+            "desc" : self.track_out.desc,
+            "layers" : {
+                LENS_TAG : {"name" : "dtw.length"},
+                CURS_TAG : {"name" : "dtw.current", "scale" : self.model.inorm_scale},
+                STDS_TAG : {"name" : "dtw.current_sd", "scale" : self.model.inorm_scale},
+            },
+            "config" : self.conf.to_dict(),
+        }
         if not "CO" in self.header:
             self.header["CO"] = list()
-        self.header["CO"].append("UNC:" + conf_line)
+        #self.header["CO"].append("UNC:" + conf_line)
+        self.header["CO"].append("UNC:" + json.dumps(params))
 
         self.output = pysam.AlignmentFile(self.conf.tracks.io.bam_out, "wb", header=self.header)#template=self.input)
 
@@ -176,7 +185,7 @@ class BAM(TrackIO):
         if len(aln.dtw.current_sd) > 0:
             ds = np.round((aln.dtw.current_sd.to_numpy() + shift) * scale)#.astype(np.int16)
             ds[na] = self.NA_I16
-            self.bam.set_tag(STDS_TAG, array.array("h", ds.astype(np.int16)))
+            #self.bam.set_tag(STDS_TAG, array.array("h", ds.astype(np.int16)))
 
         a = aln.dtw.samples.to_runlen()
 
@@ -188,10 +197,6 @@ class BAM(TrackIO):
         self.bam.set_tag(NORM_TAG, array.array("f", (scale,shift)))
         self.bam.set_tag(LENS_TAG, array.array("h", lens.astype(np.int16)))
         self.bam.set_tag(CURS_TAG, array.array("h", dc.astype(np.int16)))
-
-
-        #if not self.bam.has_tag("f5"):
-        #    self.bam.set_tag("f5", os.path.basename(self.prev_fast5[0]))
 
         if self.prms.buffered:
             self.out_buffer.append(self.bam.to_string())
@@ -258,6 +263,18 @@ class BAM(TrackIO):
             aln = self.sam_to_aln(sam)
             yield aln
 
+    def _tag_to_layer(self, sam, tag):
+        if sam.has_tag(tag):
+            return None
+        if not tag in self.layer_tags:
+            raise ValueError(f"Unknown layer tag: {tag}")
+        l = self.layer_tags[tag]
+        vals = np.array(sam.get_tag(tag))
+        na = vals == self.NA_I16
+        vals = (vals - l["shift"]) / l["scale"]
+        vals[na] = pd.nan
+        return (l["name"], vals)
+
     def sam_to_aln(self, sam, load_moves=True):
         has_dtw = True
         for tag in REQ_ALN_TAGS:
@@ -281,20 +298,17 @@ class BAM(TrackIO):
 
             norm_scale, norm_shift = sam.get_tag(NORM_TAG)
 
-            dac = np.array(sam.get_tag(CURS_TAG))
-            cna = dac == self.NA_I16
-            current = (dac/norm_scale)-norm_shift
-            current[cna] = np.nan
+            layers = dict()
 
-            if sam.has_tag(STDS_TAG):
-                das = np.array(sam.get_tag(STDS_TAG))
-                stdv = (das/norm_scale)-norm_shift
-                stdv[das == self.NA_I16] = np.nan
-            else:
-                stdv = np.full(len(current), np.nan)
-            
-            length = np.array(sam.get_tag(LENS_TAG))
-            #ref_start, ref_end = sam.get_tag(REF_TAG)
+            for tag, meta in self.layer_tags.items():
+                if not sam.has_tag(tag):
+                    continue
+                vals = np.array(sam.get_tag(tag))
+                na = vals == self.NA_I16
+                vals = (vals - meta.get("shift",0)) / meta.get("scale", 1)
+                vals[na] = np.nan
+                layers[meta["name"]] = vals
+
             refs = sam.get_tag(REF_TAG)
 
             coords = IntervalIndexI64([(refs[i], refs[i+1]) for i in range(0, len(refs), 2)])
@@ -303,17 +317,17 @@ class BAM(TrackIO):
 
             aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, coords, sam)
 
+            length = layers["dtw.length"]
             mask = length >= 0
-            start = samp_start + np.pad(np.cumsum(np.abs(length)), (1,0))[:-1][mask]
+            layers["dtw.start"] = samp_start + np.pad(np.cumsum(np.abs(length)), (1,0))[:-1][mask]
+
             length = length[mask]
+            lna = (length == 0) & np.isnan(layers["dtw.current"])
+            length[lna] = -1
+            layers["dtw.length"] = length.astype(np.int32)
 
-            #start = np.full(coords.length, samp_start, dtype="int32")
-            #start[1:] += np.cumsum(length.astype("int32"))[:-1]
+            dtw = AlnDF(aln.seq, layers["dtw.start"], layers["dtw.length"], layers.get("dtw.current", None), layers.get("dtw.current_sd", None))#start, length, current, stdv)
 
-            lna = (length == 0) & cna
-            length[cna] = -1
-
-            dtw = AlnDF(aln.seq, start, length, current, stdv)
             aln.set_dtw(dtw)
 
         moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
@@ -412,19 +426,8 @@ class BAM(TrackIO):
             next_aln = aln.attrs()
             next_layers = aln.to_pandas(layers, index=["seq.fwd", "seq.pac", "aln.id"])
             next_ref = next_aln.ref_name
-            #next_start = 
-            #l = aln.to_pandas(layers, index=index)
-            #track_layers[self.in_id].append(l)
 
-            #next_alns,next_layers = self._parse_sam(sam, layers)
-            #next_aln = next_alns.iloc[0]
-            #next_ref = next_aln["ref_name"]
             next_start = next_layers.index.get_level_values("seq.pac").min()
-
-            #we're losing alignments somewhere. getting out of sync
-            #maybe right below
-            #but also, not sure if I'm syncing inputs in "Tracks"
-            #probably need to always advance the minimum ref pos/ID
 
             ret_layer_count = 0
 

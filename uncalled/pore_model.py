@@ -37,8 +37,12 @@ PARAM_TYPES = {
     "pa_mean" : np.float32, 
     "pa_stdv" : np.float32, 
     "norm_max" : np.float32,
+    "sample_rate" : np.float32,
+    "bases_per_sec" : np.float32,
     "reverse" : bool,
-    "complement" : bool
+    "complement" : bool,
+    "flowcell" : str,
+    "kit" : str
 }
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -331,7 +335,9 @@ class PoreModel:
     def params_to_dict(self, prefix=""):
         d = dict()
         for name in PARAM_TYPES.keys():
-            d[f"{prefix}{name}"] = getattr(self.PRMS, name)
+            val = getattr(self.PRMS, name)
+            if not isinstance(val, str) or len(val) > 0:
+                d[f"{prefix}{name}"] = val 
         return d
 
     def to_df(self, kmer_str=True):
@@ -378,7 +384,6 @@ class PoreModel:
 
     def __getstate__(self):
         d = self.to_dict(params=True)
-        print(d)
         return d
     
     def __repr__(self):

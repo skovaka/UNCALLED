@@ -296,19 +296,19 @@ class Config(_Conf):
 CONF_KW = "conf"
 PARAM_KW = "params"
 
-def _init_group(name, *args, _param_names=None, copy_conf=True, **kwargs):
+def _init_group(group_name, *args, _param_names=None, copy_conf=True, **kwargs):
     if not copy_conf and CONF_KW in kwargs:
         conf = kwargs[CONF_KW]
     else:
         conf = Config(kwargs.get(CONF_KW, rc))
 
     if PARAM_KW in kwargs:
-        setattr(conf, name, kwargs[PARAM_KW])
+        setattr(conf, group_name, kwargs[PARAM_KW])
 
-    if not hasattr(conf, name):
-        raise ValueError("Invalid parameter group: " + str(name))
+    if not hasattr(conf, group_name):
+        raise ValueError("Invalid parameter group: " + str(group_name))
 
-    group = getattr(conf, name)
+    group = getattr(conf, group_name)
 
     if _param_names is None:
         _param_names = group._order
@@ -316,7 +316,7 @@ def _init_group(name, *args, _param_names=None, copy_conf=True, **kwargs):
         raise ValueError(f"Unknown parameters: {_param_names}")
 
     if len(args) > len(_param_names):
-        raise ValueError("Too many arguments for " + name)
+        raise ValueError("Too many arguments for " + group_name)
 
     arg_params = set()
     

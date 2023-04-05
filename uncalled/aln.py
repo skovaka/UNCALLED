@@ -236,7 +236,7 @@ class AlnDF:
 
     def _get_series(self, name):
         vals = getattr(self, name, None)
-        if vals is None:
+        if vals is None or len(vals) == 0:
             return None
         ret = pd.Series(vals, copy=True)
         dtype = PANDAS_DTYPES.get(ret.dtype.name, None)

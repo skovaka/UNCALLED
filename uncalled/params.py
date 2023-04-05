@@ -38,16 +38,12 @@ IOParams._def_params(
     ("sql_out", None, str, "Output track database"),
 
     ("tsv_out", None, str, "TSV output file (or \"-\"/no argument for stdout)"),
-    ("tsv_cols", None, list, "TSV file output alignment layers (comma-separated, can also include \"read_id\""),
+    ("tsv_cols", ["dtw"], list, "TSV file output alignment layers (comma-separated, can also include \"read_id\""),
     ("tsv_na", "*", str, "Missing value representation for TSV output"),
     ("tsv_noref", False, bool, "Will NOT output reference coordinates to TSV if True"),
 
     ("bam_in", None, None, "BAM input file (or \"-\"/no argument for stdin)"),
     ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
-    ("bam_tags", [
-        "ref_bounds:ur", "samp_bounds:us" , "norm_params:un",
-        "length:ul", "current:uc", "stdv:ud"
-        ], list, "BAM output file (or \"-\"/no argument for stdout)"),
 
     ("model_dir", None, str, "Pore model training output directory"),
 

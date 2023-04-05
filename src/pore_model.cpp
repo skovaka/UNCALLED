@@ -43,6 +43,7 @@ void pybind_pore_model_params(py::module_ &m) {
     p.def("inorm_to_norm", py::vectorize(static_cast<float (PoreModelParams::*) (inorm_t) const>(&PoreModelParams::inorm_to_norm)));
     p.def("norm_to_pa", py::vectorize(static_cast<float (PoreModelParams::*) (float) const>(&PoreModelParams::norm_to_pa)));
     p.def("pa_to_norm", py::vectorize(static_cast<float (PoreModelParams::*) (float) const>(&PoreModelParams::pa_to_norm)));
+    p.def_property_readonly("inorm_scale", &PoreModelParams::inorm_scale);
     PY_MODEL_PARAM(name, "Model preset name or TSV filename");
     PY_MODEL_PARAM(k, "K-mer length");
     PY_MODEL_PARAM(shift, "K-mer shift");
