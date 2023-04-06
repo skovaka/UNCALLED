@@ -155,18 +155,19 @@ class Trackplot:
 
         t0 = time.time()
         #for i,track in enumerate(self.tracks.alns):
-        for i in np.arange(self.tracks.track_count)+1:
+        #for i in np.arange(self.tracks.track_count)+1:
+        for track_name in self.tracks.alignments.index.levels[0]:
             self.fig.update_yaxes(
-                title_text=str(i),#f"{track.desc}", 
+                title_text=track_name,#f"{track.desc}", 
                 showticklabels=False,
                 row=row, col=1)
 
-            if i not in self.tracks.layers.index.get_level_values(0):
-                sys.stderr.write("Warning: no alignments loaded from track \"%d\"\n" % i)
+            if track_name not in self.tracks.layers.index.get_level_values(0):
+                sys.stderr.write("Warning: no alignments loaded from track \"%d\"\n" % track_name)
                 row += 1
                 continue
 
-            mat = self.tracks.mat.loc[(i,slice(None)),(group,layer)]#.dropna(how="all")
+            mat = self.tracks.mat.loc[(track_name,slice(None)),(group,layer)]#.dropna(how="all")
 
             read_ids = self.tracks.alignments.loc[mat.index, "read_id"].to_numpy()
 
@@ -180,7 +181,7 @@ class Trackplot:
             hover = "<br>".join(hover_lines)
 
             self.fig.add_trace(go.Heatmap(
-                name=str(i), #track.desc,
+                name=track_name, #track.desc,
                 x=mat.columns,
                 #y=track.alignments["read_id"],
                 z=mat,

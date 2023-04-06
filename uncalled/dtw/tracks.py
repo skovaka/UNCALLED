@@ -175,7 +175,7 @@ class Tracks:
             self.alignments = None
             self.layers = None
 
-        #.reorder_levels(["track.id","aln.id","seq.pos"]).loc[self.alignments.index].reorder_levels(["track.id","seq.pos","aln.id"]) #pd.concat(track_layers, axis=0, names=["track.id", "seq.pos", "aln.id"])
+        #.reorder_levels(["track.name","aln.id","seq.pos"]).loc[self.alignments.index].reorder_levels(["track.name","seq.pos","aln.id"]) #pd.concat(track_layers, axis=0, names=["track.name", "seq.pos", "aln.id"])
     
         if self.alignments is not None:
             self._init_mat()
@@ -497,14 +497,14 @@ class Tracks:
         all_ids = self.alignments["read_id"]
         read_ids = pd.Index(all_ids.loc[self.alns[0].id])
         for track in self.alns[1:]:
-            read_ids = read_ids.intersection(all_ids.loc[track.id])
+            read_ids = read_ids.intersection(all_ids.loc[track.name])
         return read_ids
 
     def get_all_reads(self):
         all_ids = self.alignments["read_id"]
-        read_ids = pd.Index(all_ids.loc[self.alns[0].id])
+        read_ids = pd.Index(all_ids.loc[self.alns[0].name])
         for track in self.alns[1:]:
-            read_ids = read_ids.union(all_ids.loc[track.id])
+            read_ids = read_ids.union(all_ids.loc[track.name])
         return read_ids
 
     def get_full_overlap(self, read_ids=None):
@@ -545,7 +545,7 @@ class Tracks:
             alns, layers = io.query(self.conf.tracks.layers, self.coords, ["aln.id","seq.pos"], full_overlap=full_overlap, read_id=read_filter)
 
             #for track in io.aln_tracks:
-            #    track.set_data(self.coords, alns[track.id], layers[track.id])
+            #    track.set_data(self.coords, alns[track.name], layers[track.name])
 
             track_alns.update(alns)
             track_layers.update(layers)
@@ -553,7 +553,7 @@ class Tracks:
         #TODO eliminate need for AlnTrack
         #just use self.layers, self.aln_layers
         #will need to initialize Alignment from these dataframes for Dotplot
-        self.layers = pd.concat(track_layers, axis=0, names=["track.id", "aln.id", "seq.pos"])
+        self.layers = pd.concat(track_layers, axis=0, names=["track.name", "aln.id", "seq.pos"])
         self.alignments = pd.concat(track_alns, axis=0, names=["track", "id"]).sort_index()#.sort_values(["fwd","ref_start"])
     
         self._init_mat()
@@ -571,7 +571,7 @@ class Tracks:
     def _init_mat(self):
         df = self.layers.reset_index()
 
-        self.mat = df.pivot(index=["track.id","aln.id"], columns=["seq.pos"]) 
+        self.mat = df.pivot(index=["track.name","aln.id"], columns=["seq.pos"]) 
         self.mat = self.mat.rename_axis(("group","layer","seq.pos"), axis=1) 
         self.mat = self.mat.reindex(pd.RangeIndex(self.coords.start, self.coords.end), axis=1, level=2) 
         self.mat = self.mat.sort_index(axis=1)
@@ -672,9 +672,9 @@ class Tracks:
         #    t.layers[self.prms.refstats_layers].groupby(level=0)
         #    for t in self.alns]
 
-        groups = self.layers[self.prms.refstats_layers].groupby(level=["track.id", "seq.pac", "seq.fwd"])
+        groups = self.layers[self.prms.refstats_layers].groupby(level=["track.name", "seq.pac", "seq.fwd"])
 
-        refstats = groups.agg(stats.layer_agg).reset_index().pivot(index=["seq.pac","seq.fwd"], columns="track.id")
+        refstats = groups.agg(stats.layer_agg).reset_index().pivot(index=["seq.pac","seq.fwd"], columns="track.name")
         #rename = ({
         #    old[-1] : new
         #    for old,new in zip(refstats.columns, stats.layer)
@@ -819,8 +819,8 @@ class Tracks:
                 #layers = pd.concat([l[mask] for (a,l),mask in zip(chunks, masks)])
                 #alns = pd.concat([a.loc[l[mask].index.droplevel(["seq.fwd","seq.pac"]).unique()] for (a,l),mask in zip(chunks, masks)])
 
-                layers = pd.concat({(i+1) : l for i,(a,l) in enumerate(chunks)}, names=["track.id","seq.fwd","seq.pac","aln.id"])
-                alns = pd.concat({(i+1) : a.loc[l.index.droplevel(["seq.fwd","seq.pac"]).unique()] for i,(a,l) in enumerate(chunks)}, names=["track.id","aln.id"])
+                layers = pd.concat({(i+1) : l for i,(a,l) in enumerate(chunks)}, names=["track.name","seq.fwd","seq.pac","aln.id"])
+                alns = pd.concat({(i+1) : a.loc[l.index.droplevel(["seq.fwd","seq.pac"]).unique()] for i,(a,l) in enumerate(chunks)}, names=["track.name","aln.id"])
                 aln_ids = alns.index
 
                 refs = self.index.pac_to_pos(layers.index.get_level_values("seq.pac"))
@@ -913,10 +913,10 @@ class Tracks:
         layer_alns = layers.index.get_level_values("aln.id")
 
         if self.prms.shared_refs_only or self.prms.min_coverage > 1:
-            #track_covs = alignments.loc[layer_alns, ["track.id"]] 
+            #track_covs = alignments.loc[layer_alns, ["track.name"]] 
             #track_covs = track_covs.set_index(layers.index)
             #track_covs = track_covs.reset_index("aln.id", drop=True) 
-            #track_covs = track_covs.set_index("track.id", append=True) 
+            #track_covs = track_covs.set_index("track.name", append=True) 
             track_covs = layers.index.droplevel("aln.id")
             track_covs = track_covs.value_counts()
 
@@ -937,11 +937,11 @@ class Tracks:
                 idx = track_covs[mask].index.unique()
 
             l = layers.index.drop
-            layers = layers[layers.index.droplevel(["track.id","aln.id"]).isin(idx)] # .loc[(slice(None),idx.get_level_values(0),idx.get_level_values(1),slice(None))]
+            layers = layers[layers.index.droplevel(["track.name","aln.id"]).isin(idx)] # .loc[(slice(None),idx.get_level_values(0),idx.get_level_values(1),slice(None))]
             layer_alns = layers.index.droplevel(["seq.fwd","seq.pac"])
             alignments = alignments.loc[layer_alns.unique()]
 
-        aln_groups = alignments.index.unique("track.id")
+        aln_groups = alignments.index.unique("track.name")
         for parent in self.alns:
             if parent.id in aln_groups:
                 track_alns = alignments.loc[parent.id]
@@ -958,7 +958,7 @@ class Tracks:
             tracks[parent.name] = track
 
         tracks = Tracks(self, coords)
-        tracks.layers = layers #, axis=0, names=["track.id", "aln.id", "seq.pos"])
+        tracks.layers = layers #, axis=0, names=["track.name", "aln.id", "seq.pos"])
         tracks.alignments = alignments #, axis=0, names=["track", "id"]).sort_index()#.sort_values(["fwd","ref_start"])
 
         #if not tracks.all_empty:

@@ -116,9 +116,9 @@ class Dotplot:
             model = track.model
 
             first_aln = True
-            for aln_id, aln in tracks.alignments.loc[track.id].iterrows():
+            for aln_id, aln in tracks.alignments.loc[track.name].iterrows():
                 layers = self.tracks.layers \
-                              .loc[(track.id,aln_id), slice(None)]#,slice(None)), slice(None)] \
+                              .loc[(track.name,aln_id), slice(None)]#,slice(None)), slice(None)] \
                               #.droplevel("aln.id")
 
                 

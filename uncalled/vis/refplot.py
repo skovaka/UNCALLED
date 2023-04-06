@@ -80,7 +80,7 @@ class Refplot:
 
         for r,ref in enumerate(self.refs):
             for i,track in enumerate(self.tracks.alns):
-                vals = self.tracks.layers.loc[(track.id,slice(None),ref),self.layer].dropna()
+                vals = self.tracks.layers.loc[(track.name,slice(None),ref),self.layer].dropna()
                 counts, bins = np.histogram(vals, bins=25)
                 dens = counts / counts.sum()
                 if len(self.tracks.alns) == 2 and i == 1:

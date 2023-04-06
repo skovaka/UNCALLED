@@ -93,7 +93,7 @@ class TrackIO:
         layers = layers.droplevel(0)
 
         for track in self.aln_tracks:
-            track_alns = alignments[alignments["track.id"] == track.id]
+            track_alns = alignments[alignments["track.name"] == track.name]
             i = layers.index.get_level_values("aln.id").isin(track_alns.index)
             track_layers = layers.iloc[i]
 
