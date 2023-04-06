@@ -104,7 +104,9 @@ class Sigplot:
             if len(seqs) > 0:
                 track_dtws.append(pd.concat(seqs).sort_index())
 
-        read = self.sigproc.process(self.tracks.read_index[read_id], True)
+        read = self.tracks.read_index[read_id]
+        read = self.sigproc.process(read, True)
+
         signal = read.get_norm_signal(int(samp_min), int(samp_max))
 
         sig_med = np.median(signal)

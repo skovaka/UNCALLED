@@ -217,14 +217,14 @@ class GuidedDTW:
             success = True
 
         if success:
-            try:
-                if self.conf.mvcmp:
-                    self.aln.calc_mvcmp()
-                tracks.write_alignment(self.aln)
-                self.empty = False
-                return
-            except:
-                pass
+            #try:
+            if self.conf.mvcmp:
+                self.aln.calc_mvcmp()
+            tracks.write_alignment(self.aln)
+            self.empty = False
+            return
+            #except:
+            #    pass
         sys.stderr.write(f"Failed to write alignment for {read.id}\n")
 
 
@@ -237,8 +237,6 @@ class GuidedDTW:
     #TODO refactor inner loop to call function per-block
     def _calc_dtw(self, signal):
         read_block = signal.events[self.evt_start:self.evt_end] #.to_df()[self.evt_start:self.evt_end]
-
-        #prms, means, kmers, inst, bands = self._get_dtw_args(read_block)#, self.ref_kmers)
 
         qry_len = self.evt_end - self.evt_start
         ref_len = len(self.seq)

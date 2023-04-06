@@ -155,7 +155,8 @@ class Sequence:
             if name in self.CONST_LAYERS:
                 val = np.full(len(self), val)
             cols[name] = val
-        return pd.DataFrame(cols)
+        cols["index"] = self.coords.expand()
+        return pd.DataFrame(cols).set_index("index")
 
     def __getattr__(self, name):
         if not hasattr(self.instance, name):
@@ -256,6 +257,7 @@ class AlnDF:
             name : self._get_series(name) 
             for name in layers if hasattr(self,name)
         })
+        df["index"] = self.index.expand()
         
         #idx = self.index.expand().to_numpy()
         #if index == "ref" and idx[0] < 0:
@@ -264,7 +266,7 @@ class AlnDF:
         #    raise ValueError(f"Unknown index column: {index}")
         #df[index] = idx
 
-        return df#.set_index(index)
+        return df.set_index("index")
 
     def __len__(self):
         return len(self.instance)
@@ -296,8 +298,9 @@ class CmpDF:
         #elif index != "mpos":
         #    raise ValueError(f"Unknown index column: {index}")
         #df[index] = idx
+        df["index"] = self.index.expand()
 
-        return df#.set_index(index)
+        return df.set_index("index")
 
     def __len__(self):
         return len(self.instance)
@@ -359,13 +362,19 @@ class Alignment:
             index = parse_layers(index)
             layers = layers.union(index)
 
+        idx = self.seq.coords.expand().to_numpy()
+
         for name in layers.unique(0):
             _,group_layers = layers.get_loc_level(name)
             group = getattr(self, name, [])
             if len(group) > 0:
-                vals[name] = group.to_pandas(group_layers)
+                vals[name] = group.to_pandas(group_layers).reindex(idx)#.reset_index(drop=True)
+                #if idx is None:
+                #    idx = vals[name].index
+                #else:
+                #    idx = vals[name].index.intersection(idx)
 
-        df = pd.concat(vals, axis=1, names=["group", "layer"])
+        df = pd.concat(vals, axis=1, names=["group", "layer"]).reset_index(drop=True)
 
         df["aln","id"] = self.id
         
@@ -383,8 +392,15 @@ class Alignment:
 
     #@property
     def attrs(self):
+        samp_start = 1000000000
+        samp_end = 0
+        for df in [self.dtw, self.moves]:
+            if not df.empty():
+                samp_start = min(samp_start, df.samples.start)
+                samp_end = max(samp_end, df.samples.end)
+
         return self.Attrs(
             self.id, self.read_id, self.seq.name, self.seq.coords.start, self.seq.coords.end,
-            self.seq.fwd, self.moves.samples.start, self.moves.samples.end, self.seq.coords
+            self.seq.fwd, samp_start, samp_end, self.seq.coords
         )
 

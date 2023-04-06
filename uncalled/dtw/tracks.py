@@ -627,20 +627,8 @@ class Tracks:
     def calc_compare(self, group_b, single_track, save):
         if len(self.alns) > 0:
             alns = self.alns
-        #elif len(self.output_tracks) > 0:
-        #    alns = list(self.output_tracks.values())
         else:
             raise ValueError("Must input at least one track")
-
-        #if single_track:
-        #    if self.output_track is None:
-        #        track_a = self.alns[0]
-        #    else:
-        #        track_a = self._tracks[self.output_track]
-        #    track_b = track_a
-        #elif len(self.alns) == 1:
-        #    track_a = self.alns[0]
-        #elif self.output_track is not None:
         
         if self.output_track is not None:
             track_a = self._tracks[self.output_track]

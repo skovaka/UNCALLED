@@ -215,8 +215,8 @@ class ReadIndex:
     def __getitem__(self, read_id):
         if self.prev_read is not None and self.prev_read.id == read_id: 
             return self.prev_read
-        filename = self.get_read_file(read_id)
         if self.has_signal:
+            filename = self.get_read_file(read_id)
             self._open(filename)
             read = self.infile[read_id]
         else:

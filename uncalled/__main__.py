@@ -148,7 +148,7 @@ MERGE_OPTS = (
 )
 
 COMPARE_OPTS = (
-    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+    Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
     Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
     #Opt(("-l", "--read-filter"), "tracks", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),

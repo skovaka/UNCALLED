@@ -50,7 +50,7 @@ def sam_to_read_moves(read, sam):
     return moves_to_aln(moves, template_start, mv_stride)
 
 def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
-    if read is None: 
+    if read is None or read.empty(): 
         return None
     read_moves = sam_to_read_moves(read, sam)
     if read_moves is None:
@@ -91,10 +91,10 @@ def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
 class Bcaln:
 
     def __init__(self, conf, ref_index, read, sam, clip_coords=None, model_name=None):
+            
         self.aln = sam_to_ref_moves(conf, ref_index, read, sam, model_name)
 
         if self.aln is None:
-            self.df = pd.DataFrame()
             return
 
         df = pd.DataFrame({

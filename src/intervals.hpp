@@ -38,8 +38,16 @@ struct Interval {
         return val >= start && val < end;
     }
 
+    bool overlaps(const Interval &b) const {
+        return std::max(start, b.start) < std::min(end, b.end);
+    }
+
     Interval intersect(const Interval &b) const {
         return {std::max(start, b.start), std::min(end, b.end)};
+    }
+
+    Interval get_union(const Interval &b) const {
+        return {std::min(start, b.start), std::max(end, b.end)};
     }
 
     size_t length() const {
@@ -151,10 +159,40 @@ class IntervalIndex {
                     ret.append(c);
                 }
 
-                if (a->start < b->start) a++;
+                if (a->end < b->end) a++;
                 else b++;
              }
         }
+        return ret;
+    }
+
+    IntervalIndex<T> get_union(IntervalIndex<T> other) const {
+        IntervalIndex<T> ret;
+        auto a = coords.begin(),
+             b = other.coords.begin();
+
+        Interval<T> u = *a;
+        a++;
+        
+        while (a != coords.end() || b != other.coords.end()) {
+            if (a != coords.end() && a->overlaps(u)) {
+                u = u.get_union(*a);
+                a++;
+            } else if (b != other.coords.end() && b->overlaps(u)) {
+                u = u.get_union(*b);
+                b++;
+            } else {
+                ret.append(u);
+                if (b == coords.end() || (a != coords.end() && *a < *b)) {
+                    u = *a;
+                    a++;
+                } else {
+                    u = *b;
+                    b++;
+                }
+            }
+        }
+        ret.append(u);
         return ret;
     }
 
@@ -370,6 +408,7 @@ class IntervalIndex {
             .def("slice", &IntervalIndex::slice)
             .def("islice", &IntervalIndex::islice)
             .def("intersect", &IntervalIndex::intersect)
+            .def("get_union", &IntervalIndex::get_union)
             .def("get_interval", py::vectorize(&IntervalIndex::get_interval))
             .def("get_index", py::vectorize(&IntervalIndex::get_index))
             .def_property_readonly("lengths", &IntervalIndex::get_lengths)
@@ -386,6 +425,7 @@ class IntervalIndex {
             .def("__repr__", &Interval<T>::to_string)
             .def("__getitem__", &Interval<T>::operator[])
             .def("intersect", &Interval<T>::intersect)
+            .def("get_union", &Interval<T>::get_union)
             .def_readwrite("start", &Interval<T>::start)
             .def_readwrite("end", &Interval<T>::end)
             .def("to_tuple", &Interval<T>::to_pair);

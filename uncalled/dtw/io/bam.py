@@ -21,7 +21,6 @@ from _uncalled import IntervalIndexI64, ValArrayI16
 
 REF_TAG  = "ur"
 SAMP_TAG = "us"
-NORM_TAG = "un"
 LENS_TAG = "ul"
 CURS_TAG = "uc"
 STDS_TAG = "ud"
@@ -32,9 +31,9 @@ LAYER_TAGS = {
     "dtw.current"    : CURS_TAG,
     "dtw.current_sd" : STDS_TAG,
 }
-EXTRA_LAYER_PRE = ["u","v","w"]
+LAYER_PREFIXES = ["u","v","w","x","y","z"]
 
-REQ_ALN_TAGS = [REF_TAG, SAMP_TAG, LENS_TAG, CURS_TAG]
+REQ_ALN_TAGS = [REF_TAG, LENS_TAG, CURS_TAG]
 
 class BAM(TrackIO):
     FORMAT = "bam"
@@ -68,16 +67,27 @@ class BAM(TrackIO):
             for line in self.header["CO"]:
                 if not line.startswith("UNC:"): continue
                 prms = json.loads(line[4:])
-                conf = Config(prms["config"])
-                self.layer_tags = prms["layers"]
+                
+                self.conf.tracks.index_prefix = prms["reference"]
 
-        if conf is None:
-            conf = self.conf
+                for name,vals in prms["tracks"].items():
+                    c = self.conf.to_dict()
+                    if not "pore_model" in c:
+                        c["pore_model"] = {}
+                    c["pore_model"].update(prms["models"][vals["model"]])
+                    conf = Config(c)
+                    conf.read_index.paths = vals["read"]["paths"]
+                    conf.read_index.read_index = vals["read"]["index"]
 
+                    #TODO handle multiple tracks
+                    self.track_in = self.init_track(name, vals["desc"], conf)
+                    self.layer_tags = vals["layers"]
+
+        #if conf is None:
+        #    conf = self.conf
         #self._init_tags(conf.tracks.io.bam_tags)
-
-        name = os.path.basename(self.filename)
-        self.track_in = self.init_track(name, name, conf)
+        #name = os.path.basename(self.filename)
+        #self.track_in = self.init_track(name, name, conf)
 
         self.read_id_index = None
 
@@ -123,17 +133,23 @@ class BAM(TrackIO):
                         .replace(";", "\\;") \
                         .replace("\n", ";")   
 
-        p = self.track_out.model.PRMS
         params = {
-            "name" : self.track_out.name,
-            "desc" : self.track_out.desc,
-            "layers" : {
-                LENS_TAG : {"name" : "dtw.length"},
-                CURS_TAG : {"name" : "dtw.current", "scale" : self.model.inorm_scale},
-                STDS_TAG : {"name" : "dtw.current_sd", "scale" : self.model.inorm_scale},
+            "tracks" : {
+                self.track_out.name : {
+                    "desc" : self.track_out.desc,
+                    "model" : self.track_out.model.name,
+                    "read" : {"paths" : self.conf.read_index.paths, "index" : self.conf.read_index.read_index},
+                    "layers" : {                                                                 
+                        LENS_TAG : {"name" : "dtw.length"},                                      
+                        CURS_TAG : {"name" : "dtw.current", "scale" : self.track_out.model.inorm_scale},   
+                        STDS_TAG : {"name" : "dtw.current_sd", "scale" : self.track_out.model.inorm_scale},
+            }}},
+            "models" : {
+                self.track_out.model.name : self.track_out.model.params_to_dict()
             },
-            "config" : self.conf.to_dict(),
+            "reference" : self.conf.tracks.index_prefix
         }
+
         if not "CO" in self.header:
             self.header["CO"] = list()
         #self.header["CO"].append("UNC:" + conf_line)
@@ -152,7 +168,8 @@ class BAM(TrackIO):
                 return aln
         return None
 
-    INF_U16 = np.iinfo(np.int16).max
+    MIN_I16 = np.iinfo(np.int16).min+1
+    MAX_I16 = np.iinfo(np.int16).max
     NA_I16 = ValArrayI16.NA
 
     def _init_alns(self):
@@ -172,30 +189,28 @@ class BAM(TrackIO):
 
         cmin = np.min(aln.dtw.current)
         cmax = np.max(aln.dtw.current)
-        #scale = (self.INF_U16 - 1) / (cmax - cmin)
-        #shift = -cmin
         scale = self.model.current.INORM_SCALE
-        shift = 0
 
-
-        dc = np.round((aln.dtw.current.to_numpy() + shift) * scale)#.astype(np.int16)
+        dc = np.round(aln.dtw.current.to_numpy() * scale)#.astype(np.int16)
         na = np.isnan(dc)
         dc[na] = self.NA_I16
 
         if len(aln.dtw.current_sd) > 0:
-            ds = np.round((aln.dtw.current_sd.to_numpy() + shift) * scale)#.astype(np.int16)
+            ds = np.round(aln.dtw.current_sd.to_numpy() * scale)#.astype(np.int16)
             ds[na] = self.NA_I16
-            #self.bam.set_tag(STDS_TAG, array.array("h", ds.astype(np.int16)))
+            self.bam.set_tag(STDS_TAG, array.array("h", ds.astype(np.int16)))
 
-        a = aln.dtw.samples.to_runlen()
-
-        #lens = aln.dtw.samples.lengths_dedup.to_numpy().astype("int16")
-        lens = np.array(aln.dtw.samples.to_runlen()).astype("int16")
+        start_pad = list()
+        start = -aln.dtw.samples.start
+        while start < self.MIN_I16:
+            start_pad.append(self.MIN_I16)
+            start -= self.MIN_I16
+        if start < 0:
+            start_pad.append(start)
+        lens = np.concatenate([start_pad, aln.dtw.samples.to_runlen()]).astype(np.int16)
 
         self.bam.set_tag(REF_TAG, array.array("i", refs))
-        self.bam.set_tag(SAMP_TAG, array.array("i", (aln.dtw.samples.start, aln.dtw.samples.end)))
-        self.bam.set_tag(NORM_TAG, array.array("f", (scale,shift)))
-        self.bam.set_tag(LENS_TAG, array.array("h", lens.astype(np.int16)))
+        self.bam.set_tag(LENS_TAG, array.array("h", lens))
         self.bam.set_tag(CURS_TAG, array.array("h", dc.astype(np.int16)))
 
         if self.prms.buffered:
@@ -285,7 +300,7 @@ class BAM(TrackIO):
         aln = None
 
         #try:
-        read = self.tracks.read_index.get(sam.query_name, None)
+        read = self.tracks.read_index[sam.query_name]# None)
         #except:
         #    sys.stderr.write(f"Warning: failed to open read {sam.query_name}\n")
         #    read = None
@@ -294,10 +309,6 @@ class BAM(TrackIO):
             return None
 
         if has_dtw:
-            samp_bounds = sam.get_tag(SAMP_TAG)
-
-            norm_scale, norm_shift = sam.get_tag(NORM_TAG)
-
             layers = dict()
 
             for tag, meta in self.layer_tags.items():
@@ -313,13 +324,11 @@ class BAM(TrackIO):
 
             coords = IntervalIndexI64([(refs[i], refs[i+1]) for i in range(0, len(refs), 2)])
 
-            samp_start, samp_end = samp_bounds
-
             aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, coords, sam)
 
             length = layers["dtw.length"]
             mask = length >= 0
-            layers["dtw.start"] = samp_start + np.pad(np.cumsum(np.abs(length)), (1,0))[:-1][mask]
+            layers["dtw.start"] = np.pad(np.cumsum(np.abs(length)), (1,0))[:-1][mask]
 
             length = length[mask]
             lna = (length == 0) & np.isnan(layers["dtw.current"])
@@ -351,7 +360,7 @@ class BAM(TrackIO):
             else:
                 coords = IntervalIndexI64([(sam.reference_start, sam.reference_end)])
             aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, coords, sam)
-
+        
         return aln
 
     def _parse_sam(self, sam, layer_names):
@@ -386,6 +395,7 @@ class BAM(TrackIO):
             aln = self.sam_to_aln(sam)
 
             track_alns[self.track_in.id].append(aln.attrs())
+
             l = aln.to_pandas(layers, index=index)
             track_layers[self.track_in.id].append(l)
 
