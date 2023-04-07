@@ -39,16 +39,24 @@ from .pore_model import PoreModel
 from .argparse import Opt
 
 class FastaIndex:
-    def __init__(self, filename):
+    def __init__(self, filename, model):
         self.infile = pysam.FastaFile(filename)
+        self.model = model
+
         self.ref_ids = dict()
-        self.seqs = list()
+        self.anno = list()
         offs = 0
         for i in range(self.infile.nreferences):
             name = self.infile.references[i]
             size = self.infile.lengths[i]
-            self.seqs.append(SeqRecord(name, i, size, offs))
+            self.anno.append(SeqRecord(name, i, size, offs))
             offs += size
+
+    def query(name, start, end, fwd=None):
+        if fwd is None:
+            fwd = start >= 0
+        
+
 
 class CoordSpace:
 

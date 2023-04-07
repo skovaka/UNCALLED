@@ -113,16 +113,14 @@ class Tracks:
             self.set_model(model)
         else:
             pm = self.conf.pore_model
-            if len(pm.name) == 0 and not pm.has_workflow():
+            if not pm.has_workflow():
                 flowcell, kit = self.read_index.default_model
                 if flowcell is not None and kit is not None:
                     pm.flowcell = flowcell
                     pm.kit = kit
-                    pm.name = PoreModel.PRESET_MAP.loc[pm.get_workflow(), "preset_model"]
-            
-            #if len(pm.name) > 0:
-            #    self.set_model(PoreModel(params=self.conf.pore_model))
-            #else:
+
+            if len(pm.name) == 0 and pm.has_workflow():
+                pm.name = PoreModel.PRESET_MAP.loc[pm.get_workflow(), "preset_model"]
             self.model = None
 
         self._init_io()
@@ -135,12 +133,13 @@ class Tracks:
         self._aln_track_ids = [t.id for t in self.alns]
 
         self.index = load_index(self.model, self.prms.index_prefix)
+        self.refstats = None
 
         #self.coords = self._ref_bounds_to_coords(self.prms.ref_bounds)
         self.coords = self.prms.ref_bounds
 
-        #if self.coords is not None and  len(self._aln_track_ids) > 0:
-        #    self.load()
+        if self.coords is not None and  len(self._aln_track_ids) > 0:
+            self.load()
 
     def _init_slice(self, parent, coords, reads=None):
         self.conf = parent.conf 
