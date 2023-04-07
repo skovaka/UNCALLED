@@ -360,6 +360,17 @@ class PoreModel {
         return index;
     }
 
+    static std::vector<KmerType> str_to_kmers(const std::string &seq) {
+        std::vector<KmerType> ret;
+        auto kmer = str_to_kmer(seq, 0);
+        ret.push_back(kmer);
+        for (u8 i = 1; i < seq.size() - K + 1; i++) {
+            kmer = kmer_neighbor(kmer,  BASE_BYTES[(u8) seq[i]]);
+            ret.push_back(kmer);
+        }
+        return ret;
+    }
+
     static KmerType kmer_comp(KmerType kmer) {
         return kmer ^ KMER_MASK;
     }
@@ -530,6 +541,7 @@ class PoreModel {
         c.def_static("str_to_kmer",
                 py::vectorize(static_cast< KmerType (*) (const KmerTypePy &, u32)>(&Class::str_to_kmer)), 
                 py::arg("kmer"), py::arg("offs")=0);
+        c.def_static("str_to_kmers", &Class::str_to_kmers);
 
         c.def_static("kmer_to_str",  &Class::kmer_to_str, "Convert binary k-mers to strings");
         c.def_static("kmer_to_arr",  py::vectorize(&Class::kmer_to_arr));
