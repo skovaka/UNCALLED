@@ -60,7 +60,7 @@ class Eventalign(TrackIO):
 
         self.model = None
 
-        self.init_track(name, name, self.conf)
+        self.track_in = self.init_track(name, name, self.conf)
 
     #def write_layers(self, track, groups):
     def write_alignment(self, aln):
@@ -154,7 +154,6 @@ class Eventalign(TrackIO):
                         break
 
                 aln = self.tracks.bam_in.sam_to_aln(sam, load_moves=False)
-                #aln = self.tracks.init_alignment(self.next_aln_id(), read_id, sam.reference_id, coords, sam)
                 
                 fwd = int( (df["event_index"].iloc[0] < df["event_index"].iloc[-1]) == (df["position"].iloc[0] < df["position"].iloc[-1]))
 
@@ -177,7 +176,7 @@ class Eventalign(TrackIO):
                 coords = _uncalled.IntervalIndexI64([(df.index.min(), df.index.max()+1)])
                 df = df.reindex(coords.expand())
                 df["length"].fillna(-1, inplace=True)
-                aln = self.tracks.init_alignment(self.next_aln_id(), read_id, sam.reference_id, coords, sam)
+                aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read_id, sam.reference_id, coords, sam)
                 dtw = AlnDF(aln.seq, df["start"], df["length"], df["mean"], df["stdv"])
                 aln.set_dtw(dtw)
                 yield aln

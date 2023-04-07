@@ -178,6 +178,10 @@ def convert(conf):
 
     conf.tracks.layers = ["dtw"]
     conf.tracks.load_fast5s = True
+    
+    if conf.tracks.io.tombo_in is not None:
+        conf.read_index.paths = conf.tracks.io.tombo_in
+
     tracks = Tracks(conf=conf)
 
     if len(tracks.inputs) == 2:

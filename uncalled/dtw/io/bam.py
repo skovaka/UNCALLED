@@ -63,6 +63,7 @@ class BAM(TrackIO):
         self.header = self.input.header.to_dict()
 
         conf = None
+        self.track_in = None
         if "CO" in self.header:
             for line in self.header["CO"]:
                 if not line.startswith("UNC:"): continue
@@ -82,6 +83,10 @@ class BAM(TrackIO):
                     #TODO handle multiple tracks
                     self.track_in = self.init_track(name, vals["desc"], conf)
                     self.layer_tags = vals["layers"]
+
+        if self.track_in is None:
+            name = os.path.basename(self.filename)
+            self.track_in = self.init_track(name, name, self.conf)
 
         #if conf is None:
         #    conf = self.conf
@@ -324,7 +329,7 @@ class BAM(TrackIO):
 
             coords = IntervalIndexI64([(refs[i], refs[i+1]) for i in range(0, len(refs), 2)])
 
-            aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, coords, sam)
+            aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
 
             length = layers["dtw.length"]
             mask = length >= 0
@@ -343,7 +348,7 @@ class BAM(TrackIO):
         has_moves = moves is not None
         if has_moves and load_moves:
             if aln is None:
-                aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, moves.index, sam)
+                aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, moves.index, sam)
             else:
                 i = max(0, moves.index.start - aln.seq.coords.start)
                 j = min(len(moves), len(moves) + moves.index.end -  aln.seq.coords.end)
@@ -359,7 +364,7 @@ class BAM(TrackIO):
                 coords = IntervalIndexI64([(-sam.reference_end, -sam.reference_start)])
             else:
                 coords = IntervalIndexI64([(sam.reference_start, sam.reference_end)])
-            aln = self.tracks.init_alignment(self.next_aln_id(), read, sam.reference_id, coords, sam)
+            aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
         
         return aln
 

@@ -45,6 +45,7 @@ PARAM_TYPES = {
     "kit" : str
 }
 
+
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class PoreModel:
@@ -53,7 +54,7 @@ class PoreModel:
     PRESET_EXT = ".npz"
 
     PRESET_MAP = None
-    PRESETS = None
+    PRESETS = {"dna_r10.4.1_400bps_9mer", "dna_r9.4_400bps_5mer", "rna_r9.4_70bps_5mer", "tombo/rna_r9.4_70bps_5mer"}
 
     @classmethod
     def _init_presets(cls):
@@ -64,7 +65,12 @@ class PoreModel:
             ).sort_index()
 
             cls.PRESET_MAP = df[df["preset_model"] != "_"]
-            cls.PRESETS = set(cls.PRESET_MAP["preset_model"])
+        #if True:# cls.PRESETS is None:
+        #    #cls.PRESETS = set()
+        #    for root, dirs, files in os.walk(cls.PRESET_DIR):
+        #        for fname in files:
+        #            if fname.endswith(".npz"):
+                        #cls.PRESETS.add(fname)
 
     @staticmethod
     def _param_defaults():
@@ -107,34 +113,30 @@ class PoreModel:
 
             else:
                 raise TypeError(f"Invalid PoreModel type: {type(model)}")
-        else:
-            if len(prms.name) == 0 and prms.has_workflow():
-                prms.name = PoreModel.PRESET_MAP.loc[(prms.flowcell, prms.kit), "preset_model"]
+        elif len(prms.name) > 0:
+            cache_key = prms.to_key()
+            if cache and cache_key in CACHE:
+                self._init(prms, CACHE[cache_key])
+                return
 
-            if len(prms.name) > 0:
-                cache_key = prms.to_key()
-                if cache and cache_key in CACHE:
-                    self._init(prms, CACHE[cache_key])
-                    return
+            if prms.name in self.PRESETS:
+                filename = os.path.join(self.PRESET_DIR, prms.name + self.PRESET_EXT)
+                ext = self.PRESET_EXT[1:]
+            else:
+                filename = prms.name
+                ext = filename.split(".")[-1]
 
-                if prms.name in self.PRESETS:
-                    filename = os.path.join(self.PRESET_DIR, prms.name + self.PRESET_EXT)
-                    ext = self.PRESET_EXT[1:]
-                else:
-                    filename = prms.name
-                    ext = filename.split(".")[-1]
-
-                if os.path.exists(filename):
-                    loader = self.FILE_LOADERS.get(ext, PoreModel._vals_from_tsv)
-                    vals = loader(self, filename, prms)
-                    self._init_new(prms, *vals)
-
-                else:
-                    models = ", ".join(PORE_MODEL_PRESETS.keys())
-                    raise FileNotFoundError(f"PoreModel file not found: {filename}")
+            if os.path.exists(filename):
+                loader = self.FILE_LOADERS.get(ext, PoreModel._vals_from_tsv)
+                vals = loader(self, filename, prms)
+                self._init_new(prms, *vals)
 
             else:
-                self._init_new(prms)
+                models = ", ".join(PORE_MODEL_PRESETS.keys())
+                raise FileNotFoundError(f"PoreModel file not found: {filename}")
+
+        else:
+            self._init_new(prms)
             
         cache_key = self.PRMS.to_key()
         if cache and not cache_key in CACHE:
@@ -239,9 +241,7 @@ class PoreModel:
     def _vals_from_dict(self, prms, d):
         for name,typ in PARAM_TYPES.items():
             dname = "_"+name
-            if not dname in d:
-                sys.stderr.write(f"Warning: missing PoreModel parameter {name}\n")
-            else:
+            if dname in d:
                 setattr(prms, name, typ(d[dname]))
                 del d[dname]
 
@@ -268,7 +268,7 @@ class PoreModel:
 
     def _vals_from_hdf5(self, filename, prms):
         handle = h5py.File(filename, "r")
-        df = pd.DataFrame(handle["model"][()]).reset_index()
+        df = pd.DataFrame(handle["model"][()])#.reset_index()
         return self._vals_from_df(prms, df, True)
 
     def keys(self):

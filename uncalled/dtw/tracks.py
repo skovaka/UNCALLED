@@ -118,10 +118,12 @@ class Tracks:
                 if flowcell is not None and kit is not None:
                     pm.flowcell = flowcell
                     pm.kit = kit
-            if len(pm.name) > 0 or pm.has_workflow():
-                self.set_model(PoreModel(params=self.conf.pore_model))
-            else:
-                self.model = None
+                    pm.name = PoreModel.PRESET_MAP.loc[pm.get_workflow(), "preset_model"]
+            
+            #if len(pm.name) > 0:
+            #    self.set_model(PoreModel(params=self.conf.pore_model))
+            #else:
+            self.model = None
 
         self._init_io()
 
@@ -428,8 +430,11 @@ class Tracks:
         self.new_layers.add(group)
 
 
-    def init_alignment(self, aln_id, read, ref_id, coords, sam=None):
-        seq = self.index.instance.get_kmers(self.model.instance, ref_id, coords, self.conf.is_rna)
+    def init_alignment(self, track_name, aln_id, read, ref_id, coords, sam=None):
+        #TODO make model name paramter, initialize with track specific model
+        track = self._track_or_default(track_name)
+        model = track.model.instance
+        seq = self.index.instance.get_kmers(model, ref_id, coords, self.conf.is_rna)
         seq = Sequence(seq, self.index.get_ref_name(ref_id), self.index.get_pac_offset(ref_id))
         return Alignment(aln_id, read, seq, sam)
 

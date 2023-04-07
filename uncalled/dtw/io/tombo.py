@@ -33,12 +33,11 @@ class Tombo(TrackIO):
     def init_read_mode(self):
         name = self.filename
         
-        if self.conf.pore_model.name == "r94_rna":
-            self.conf.pore_model.name = "r94_rna_tombo"
+        self.conf.pore_model.name = os.path.join("tombo", self.conf.pore_model.name)
 
         self.conf.read_index.paths = self.prms.tombo_in
 
-        self.init_track(name, name, self.conf)
+        self.track_in = self.init_track(name, name, self.conf)
 
     #def init_fast5(self, fast5):
     #    self.
@@ -114,8 +113,6 @@ class Tombo(TrackIO):
 
             sig_fwd = fwd != is_rna
 
-            #coords = ref_index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True, kmer_trim=True)
-            #aln_id,_ = tracks.init_alignment(read.read_id, fast5_fname, coords)
             if sig_fwd:
                 coords = _uncalled.IntervalIndexI64([(start+2, end-2)])
                 step = 1
@@ -125,9 +122,6 @@ class Tombo(TrackIO):
 
             tombo_events = np.array(handle["Events"])[clip:]
 
-            #if not ref_bounds.fwd:
-            #    tombo_events = tombo_events[::-1]
-                
             tombo_start = handle["Events"].attrs["read_start_rel_to_raw"]
             
             raw_len = len(read.get_raw_data())
@@ -135,18 +129,10 @@ class Tombo(TrackIO):
 
 
             lengths = tombo_events["length"]
-            currents = tombo_events["norm_mean"]
+            currents = self.track_in.model.pa_to_norm(tombo_events["norm_mean"])
 
             if is_rna:
                 starts = raw_len - tombo_start - starts - tombo_events["length"]
-
-            #if is_rna == ref_bounds.fwd:
-            #refs = coords.refs[2:-2]
-            #pacs = coords.pacs[2:-2] #pos_to_pac(df["position"].to_numpy()+kmer_trim[0])
-            #kmers = coords.ref_kmers.droplevel(0).loc[refs]
-
-            #idx = pd.MultiIndex.from_product(
-            #        [[self.in_id], [fwd], pacs, [aln_id]], names=("track.id","seq.fwd","seq.pac","aln.id"))
 
             df = pd.DataFrame({
                     "mpos" : np.array(coords.expand()),#[2:-2]
@@ -156,27 +142,12 @@ class Tombo(TrackIO):
                     #"kmer" : kmers.to_numpy()
                  })#, index=idx)
 
-            df["length"].fillna(-1, inplace=True)
-            aln = self.tracks.init_alignment(self.next_aln_id(), read_id, read_sam.reference_id, coords, read_sam)
+            #lengths.fillna(-1, inplace=True)
+            aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read_id, read_sam.reference_id, coords, read_sam)
 
-            #print(len(aln.seq), len(df["start"]), len(df["length"]), len(df["current"]))
-            #dtw = AlnDF(aln.seq, df["start"], df["length"], df["current"], None) #df["stdv"])
-            dtw = AlnDF(aln.seq, starts[::step], lengths[::step], currents[::step]) #df["stdv"])
+            dtw = AlnDF(aln.seq, np.array(starts[::step]), np.array(lengths[::step]), np.array(currents[::step])) #df["stdv"])
+
             aln.set_dtw(dtw)
-
-            #layers = pd.concat({"dtw" : layers}, names=("group","layer"), axis=1).sort_index()
-
-            #alns = pd.DataFrame({
-            #        "id" : [aln_id],
-            #        "track.id" : [self.in_id],
-            #        "read_id" : [read.read_id],
-            #        "ref_name" : [coords.ref_name],
-            #        "ref_start" : [coords.refs.start],
-            #        "ref_end" : [coords.refs.stop],
-            #        "seq.fwd" :     [coords.fwd],
-            #        "samp_start" : [samp_start],
-            #        "samp_end" : [samp_end],
-            #        "tags" : [""]}).set_index(["track.id", "id"])
 
             aln_id += 1
 
