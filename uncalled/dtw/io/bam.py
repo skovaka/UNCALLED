@@ -16,7 +16,7 @@ from ... import PoreModel
 from ... import Config
 from ...aln import Alignment, AlnDF
 from . import TrackIO
-from _uncalled import IntervalIndexI64, ValArrayI16
+from _uncalled import IntervalIndexI64, ValArrayI16, _RefCoord
 
 
 REF_TAG  = "ur"
@@ -187,10 +187,7 @@ class BAM(TrackIO):
     def write_alignment(self, aln):
         self.bam = aln.sam
 
-        refs = list()
-        for i in range(aln.seq.coords.interval_count()):
-            c = aln.seq.coords.get_interval(i)
-            refs += [c.start, c.end]
+        refs = aln.seq.coord.bounds
 
         cmin = np.min(aln.dtw.current)
         cmax = np.max(aln.dtw.current)
@@ -313,6 +310,8 @@ class BAM(TrackIO):
         if not has_dtw and read is None:
             return None
 
+        fwd = int(not sam.is_reverse)
+
         if has_dtw:
             layers = dict()
 
@@ -327,7 +326,8 @@ class BAM(TrackIO):
 
             refs = sam.get_tag(REF_TAG)
 
-            coords = IntervalIndexI64([(refs[i], refs[i+1]) for i in range(0, len(refs), 2)])
+            coords = RefCoord(sam.reference_name, refs, fwd)
+            #coords = IntervalIndexI64([(refs[i], refs[i+1]) for i in range(0, len(refs), 2)])
 
             aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
 
@@ -348,10 +348,11 @@ class BAM(TrackIO):
         has_moves = moves is not None
         if has_moves and load_moves:
             if aln is None:
-                aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, moves.index, sam)
+                coords = RefCoord(sam.reference_name, moves.index, fwd)
+                aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
             else:
-                i = max(0, moves.index.start - aln.seq.coords.start)
-                j = min(len(moves), len(moves) + moves.index.end -  aln.seq.coords.end)
+                i = max(0, moves.index.start - aln.seq.index.start)
+                j = min(len(moves), len(moves) + moves.index.end -  aln.seq.index.end)
                 moves = moves.slice(i,j)
                 
             aln.set_moves(moves)
@@ -359,11 +360,11 @@ class BAM(TrackIO):
         if has_moves and has_dtw:
             aln.calc_mvcmp()
         elif aln is None:
-            fwd = int(not sam.is_reverse)
-            if fwd == self.conf.is_rna:
-                coords = IntervalIndexI64([(-sam.reference_end, -sam.reference_start)])
-            else:
-                coords = IntervalIndexI64([(sam.reference_start, sam.reference_end)])
+            coords = RefCoord(sam.reference_name, sam.reference_start, sam.reference_end, fwd)
+            #if fwd == self.conf.is_rna:
+            #    coords = IntervalIndexI64([(-sam.reference_end, -sam.reference_start)])
+            #else:
+            #    coords = IntervalIndexI64([(sam.reference_start, sam.reference_end)])
             aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
         
         return aln

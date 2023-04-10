@@ -242,7 +242,9 @@ class PoreModel:
         for name,typ in PARAM_TYPES.items():
             dname = "_"+name
             if dname in d:
-                setattr(prms, name, typ(d[dname]))
+                v = getattr(prms, name)
+                if not isinstance(v, int) or v < 0:
+                    setattr(prms, name, typ(d[dname]))
                 del d[dname]
 
         for k,v in d.items():

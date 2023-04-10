@@ -114,10 +114,10 @@ class Tombo(TrackIO):
             sig_fwd = fwd != is_rna
 
             if sig_fwd:
-                coords = _uncalled.IntervalIndexI64([(start+2, end-2)])
+                mpos = pd.RangeIndex(start+2, end-2)
                 step = 1
             else:
-                coords = _uncalled.IntervalIndexI64([(-end+2, -start-2)])
+                mpos = pd.RangeIndex(-end+2, -start-2)
                 step = -1
 
             tombo_events = np.array(handle["Events"])[clip:]
@@ -135,12 +135,14 @@ class Tombo(TrackIO):
                 starts = raw_len - tombo_start - starts - tombo_events["length"]
 
             df = pd.DataFrame({
-                    "mpos" : np.array(coords.expand()),#[2:-2]
+                    "mpos" : mpos,#[2:-2]
                     "start"  : starts[::step],
                     "length" : lengths[::step],
                     "current"   : currents[::step],
                     #"kmer" : kmers.to_numpy()
                  })#, index=idx)
+
+            coords = RefCoord(read_sam.reference_name, start, end, fwd)
 
             #lengths.fillna(-1, inplace=True)
             aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read_id, read_sam.reference_id, coords, read_sam)

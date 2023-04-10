@@ -46,8 +46,6 @@ namespace py = pybind11;
 //From submods/bwa/bwtindex.c
 #define BWA_BLOCK_SIZE 10000000
 
-enum class Strand {fwd='+', rev='-', na='*'};
-
 struct SeqRecord {
     std::string name;
     i32 id, length, offset;
@@ -73,98 +71,6 @@ struct SeqRecord {
 //
 //    }
 //}
-
-class RefCoord {
-    public:
-    std::string name;
-    i64 start, end, ref_len;
-    Strand strand;
-    i32 ref_id;
-    //bool fwd;
-    
-    RefCoord(std::string _name, i64 _start, i64 _end, Strand _strand=Strand::na, 
-              i32 _ref_id=-1, i64 _ref_len=-1) :
-        name(_name),
-        start(_start),
-        end(_end),
-        ref_len(_ref_len),
-        strand(_strand),
-        ref_id(_ref_id) {}
-
-    RefCoord(std::string _name, i64 _start, i64 _end, bool fwd) :
-        RefCoord(_name,_start,_end, fwd ? Strand::fwd : Strand::rev) {}
-
-    RefCoord(const RefCoord &rc, bool fwd) :
-        RefCoord(rc.name,rc.start,rc.end, fwd ? Strand::fwd : Strand::rev) {}
-
-    RefCoord() : RefCoord("",-1,-1) {};
-
-    RefCoord intersection(RefCoord other) const {
-        return RefCoord(name, std::max(start, other.start), std::min(end, other.end), strand, ref_id, ref_len);
-    }
-
-    bool fwd() const {
-        return strand == Strand::fwd;
-    }
-
-    bool rev() const {
-        return strand == Strand::rev;
-    }
-
-    bool stranded() const {
-        return strand != Strand::na;
-    }
-
-    i64 length() const {
-        return end-start;
-    }
-
-    #ifdef PYBIND
-
-    static void pybind_defs(pybind11::module_ m) {
-        py::class_<RefCoord> c(m, "_RefCoord");
-
-        c.def(py::init<std::string, i64, i64>());
-        c.def(py::init<std::string, i64, i64, bool>());
-        c.def(py::init<const RefCoord &, bool>());
-        c.def(py::init<const RefCoord &>());
-
-        c.def("__repr__", 
-            [](RefCoord &c) -> std::string {
-                if (c.start < 0) {
-                    return c.name;
-                }
-                auto s = c.name + ":" + 
-                         std::to_string(c.start) + "-" +
-                         std::to_string(c.end);
-                if (c.stranded()) {
-                    return s + ":" + std::string(1, static_cast<char>(c.strand));
-                }
-                return s;
-        });
-
-
-        c.def("intersection", &RefCoord::intersection);
-        c.def("__len__", &RefCoord::length);
-        c.def_readwrite("name", &RefCoord::name);
-        c.def_readwrite("start", &RefCoord::start);
-        c.def_readwrite("end", &RefCoord::end);
-        c.def_readwrite("ref_len", &RefCoord::ref_len);
-        c.def_property("fwd", &RefCoord::fwd, 
-            [](RefCoord &c, bool fwd) -> bool {
-                if (fwd) {
-                    c.strand = Strand::fwd;
-                    return true;
-                }
-                c.strand = Strand::rev;
-                return false;
-        });
-        c.def_property_readonly("rev", &RefCoord::rev);
-        c.def_property_readonly("stranded", &RefCoord::stranded);
-    }
-
-    #endif
-};
 
 template<class ModelType>
 class BwaIndex {
@@ -363,7 +269,7 @@ class BwaIndex {
         auto end = start + (mpos_end-mpos_start);
         auto strand = flip != read_fwd ? Strand::fwd : Strand::rev;
 
-        return RefCoord(name,start,end,strand,rid,bns_->anns[rid].len);
+        return RefCoord(name,start,end,strand);//,bns_->anns[rid].len
     }
 
     std::vector< std::pair<std::string, i64> > get_seqs() const {
@@ -522,7 +428,7 @@ class BwaIndex {
         bool rev = is_mpos_flipped(mpos_end);
         auto seq_idx = mpos_blocks;//.islice(trim_st, mpos_blocks.length-trim_en);
         
-        Sequence<ModelType> seq(model, ref_id, seq_idx, rev == is_rna);
+        Sequence<ModelType> seq(model, seq_idx, rev == is_rna);
         auto lpad = (K - 1) / 2, rpad = K - lpad - 1;
         size_t k = 0;
         for (size_t i = 0; i < mpos_blocks.interval_count()-1; i++) {

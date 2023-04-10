@@ -72,7 +72,7 @@ def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
         qrys = ar[:,0]
         qrys[qrys == None] = INT32_NA
 
-    refs = ref_index.pos_to_mpos(ar[:,1], is_fwd, conf.is_rna)
+    refs = ref_index.pos_to_mpos(ar[:,1], is_fwd)
     qrys = qrys.astype(np.int64)
 
     ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, True)
@@ -82,10 +82,12 @@ def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
 
     mkl = MOVE_KMER_LENS[PoreModel.PRESET_MAP.loc[workflow, "ont_model"]]
 
-    shift = ref_index.K - mkl - ref_index.trim[0]
+    model = ref_index.model
+
+    shift = model.K - mkl - model.shift
     ref_moves.index.shift(shift)
     
-    return ref_moves.slice(-shift+ref_index.trim[0], len(ref_moves)-ref_index.trim[1])
+    return ref_moves.slice(-shift+model.shift, len(ref_moves)-model.K+model.shift+1)
 
 
 class Bcaln:

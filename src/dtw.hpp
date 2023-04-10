@@ -563,7 +563,7 @@ class BandedDTW {
     }
 
     void fill_aln(Alignment<ModelType> &aln) {
-        aln.dtw = AlnDF(aln.seq.coords);
+        aln.dtw = AlnDF(aln.seq.mpos);
         auto &dtw = aln.dtw;
 
         i32 i = 0, prev_ref = -1, qry_st = -1;

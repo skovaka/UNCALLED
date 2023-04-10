@@ -130,8 +130,6 @@ class Eventalign(TrackIO):
         if self.model is None:
             self.model = self.tracks.model
 
-        kmer_trim = ref_index.trim
-
         aln_id = 1
 
         def iter_layers(events, aln_id):
@@ -145,7 +143,7 @@ class Eventalign(TrackIO):
                 #df.drop(df.index[df["model_mean"] == 0], inplace=True)
 
                 start = df["position"].min()
-                end = df["position"].max()+1
+                end = df["position"].max()
                 
                 sam = None
                 for read_sam in self.tracks.bam_in.iter_read(read_id):
@@ -158,7 +156,7 @@ class Eventalign(TrackIO):
                 fwd = int( (df["event_index"].iloc[0] < df["event_index"].iloc[-1]) == (df["position"].iloc[0] < df["position"].iloc[-1]))
 
                 pos = df["position"].to_numpy()
-                df["mpos"] = self.tracks.index.pos_to_mpos(pos, fwd, self.conf.is_rna)-kmer_trim[0]
+                df["mpos"] = self.tracks.index.pos_to_mpos(pos, fwd)-self.model.shift
                 df["mean_cml"]  = df["event_length"] * df["event_level_mean"]
                 df["stdv_cml"]  = df["event_length"] * df["event_stdv"]
 
@@ -172,9 +170,8 @@ class Eventalign(TrackIO):
                     "stdv" : self.model.pa_sd_to_norm(grp["stdv_cml"].sum() / lengths)
                 }).set_index(grp["mpos"].min())
 
-                #coords = _uncalled.IntervalIndexI64([(df.index.min()-kmer_trim[0], df.index.max()+1+kmer_trim[1])])
-                coords = _uncalled.IntervalIndexI64([(df.index.min(), df.index.max()+1)])
-                df = df.reindex(coords.expand())
+                coords = RefCoord(sam.reference_name, start, end+self.model.K, fwd)#_uncalled.IntervalIndexI64([(df.index.min(), df.index.max()+1)])
+                df = df.reindex(pd.RangeIndex(df.index.min(), df.index.max()+1))
                 df["length"].fillna(-1, inplace=True)
                 aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read_id, sam.reference_id, coords, sam)
                 dtw = AlnDF(aln.seq, df["start"], df["length"], df["mean"], df["stdv"])

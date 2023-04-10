@@ -39,24 +39,64 @@ from .pore_model import PoreModel
 from .argparse import Opt
 
 class FastaIndex:
-    def __init__(self, filename, model):
+    def __init__(self, model, filename):
         self.infile = pysam.FastaFile(filename)
         self.model = model
 
+        if isinstance(self.model.instance, _uncalled.PoreModelU16):
+            self.SeqInst = _uncalled.SequenceU16
+        elif isinstance(self.model.instance, _uncalled.PoreModelU32):
+            self.SeqInst = _uncalled.SequenceU32
+        else:
+            raise ValueError(f"Unknown PoreModel type: {model.instance}")
+
         self.ref_ids = dict()
         self.anno = list()
+        self.offsets = list()
         offs = 0
         for i in range(self.infile.nreferences):
             name = self.infile.references[i]
             size = self.infile.lengths[i]
             self.anno.append(SeqRecord(name, i, size, offs))
+            self.offsets.append(offs)
             offs += size
 
-    def query(name, start, end, fwd=None):
-        if fwd is None:
-            fwd = start >= 0
-        
+    def pac_to_pos(self, pac):
+        if hasattr("__len__", pac):
+            c = pac[0]
+        else:
+            c = pac
+        i = np.searchsorted(self.offsets, c, side="right")-1
+        if i not in range(len(self.offsets)):
+            raise ValueError(f"Packed sequence coordinate out of range: {c}")
+        return pac - self.offsets[i]
 
+    def pos_to_mpos(self, pos, fwd):
+        if fwd == self.model.reverse:
+            return -pos-1
+        return pos
+
+    def mpos_to_pos(self, mpos):
+        if hasattr("__len__", pac):
+            c = pac[0]
+        else:
+            c = pac
+        if c < 0:
+            return -mpos-1;
+        return mpos
+
+    def query(self, coord):
+        seqs = list()
+        bounds = coord.bounds
+        for i in range(0,len(bounds),2):
+            seqs.append(self.infile.fetch(coord.name, bounds[i], bounds[i+1]))
+        return self.SeqInst(self.model.instance, coord, "".join(seqs))
+
+    def get_ref_name(self, rid):
+        return self.anno[rid].name
+
+    def get_pac_offset(self, rid):
+        return self.anno[rid].offset
 
 class CoordSpace:
 
@@ -435,7 +475,8 @@ _index_cache = dict()
 def load_index(model, prefix, load_pacseq=True, load_bwt=False, cache=True):
     idx = _index_cache.get(prefix, None)
     if idx is None:
-        idx = BwaIndex(model, prefix, load_pacseq, load_bwt)
+#        idx = BwaIndex(model, prefix, load_pacseq, load_bwt)
+        idx = FastaIndex(model, prefix)
         if cache: _index_cache[prefix] = idx
     else:
         if load_pacseq and not idx.pacseq_loaded():

@@ -108,18 +108,18 @@ class Sequence:
     CONST_LAYERS = {"name", "fwd", "strand"}
     DEFAULT_LAYERS = ["pos", "kmer"]
 
-    def __init__(self, seq, name, offset):
+    def __init__(self, seq, offset):
         self.instance = seq
-        self.name = name
         self.offset = offset
+        self.index = self.instance.mpos
 
     @property
     def is_flipped(self):
-        return self.coords.start < 0
+        return self.index.start < 0
 
     @property
     def mpos(self):
-        return self.coords.expand().to_numpy()
+        return self.index.expand().to_numpy()
 
     @property
     def pos(self):
@@ -155,7 +155,7 @@ class Sequence:
             if name in self.CONST_LAYERS:
                 val = np.full(len(self), val)
             cols[name] = val
-        cols["index"] = self.coords.expand()
+        cols["index"] = self.mpos
         return pd.DataFrame(cols).set_index("index")
 
     def __getattr__(self, name):
@@ -185,7 +185,7 @@ class AlnDF:
             if current_sd is None:
                 current_sd = np.zeros(0, np.float32)
 
-            self.instance = _uncalled._AlnDF(self.seq.coords, start, length, current, current_sd)
+            self.instance = _uncalled._AlnDF(self.seq.index, start, length, current, current_sd)
 
         self.instance.mask(self.na_mask)
         self._extra = dict()
@@ -362,7 +362,7 @@ class Alignment:
             index = parse_layers(index)
             layers = layers.union(index)
 
-        idx = self.seq.coords.expand().to_numpy()
+        idx = self.seq.mpos#.expand().to_numpy()
 
         for name in layers.unique(0):
             _,group_layers = layers.get_loc_level(name)
@@ -387,7 +387,7 @@ class Alignment:
 
     Attrs = namedtuple("Attrs", [
         "id", "read_id", "ref_name", "ref_start", "ref_end", 
-        "fwd", "sample_start", "sample_end", "coords"
+        "fwd", "sample_start", "sample_end", "coord"
     ])
 
     #@property
@@ -400,7 +400,7 @@ class Alignment:
                 samp_end = max(samp_end, df.samples.end)
 
         return self.Attrs(
-            self.id, self.read_id, self.seq.name, self.seq.coords.start, self.seq.coords.end,
-            self.seq.fwd, samp_start, samp_end, self.seq.coords
+            self.id, self.read_id, self.seq.coord.name, self.seq.coord.start, self.seq.coord.end,
+            self.seq.fwd, samp_start, samp_end, self.seq.coord
         )
 

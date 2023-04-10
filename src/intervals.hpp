@@ -145,6 +145,15 @@ class IntervalIndex {
         }
     }
 
+    IntervalIndex<T> mirror() const {
+        IntervalIndex<T> ret;
+        ret.reserve(interval_count());
+        for (auto b = coords.rbegin(); b != coords.rend(); b++) {
+            ret.append(-(b->end), -(b->start));
+        }
+        return ret;
+    }
+
     IntervalIndex<T> intersect(IntervalIndex<T> other) const {
         IntervalIndex<T> ret;
         auto a = coords.begin(),
@@ -278,6 +287,10 @@ class IntervalIndex {
         return ret;
     }
 
+    size_t get_length() const {
+        return length;
+    }
+
     ValArray<T> get_lengths() const {
         ValArray<T> ret(coords.size());
         for (size_t i = 0; i < coords.size(); i++) {
@@ -399,7 +412,7 @@ class IntervalIndex {
         py::class_<IntervalIndex>(m, ("IntervalIndex"+suffix).c_str())
             .def(py::init<std::vector<std::pair<T,T>>>())
             .def("__getitem__", py::vectorize(&IntervalIndex::operator[]))
-            //.def("__len__", &IntervalIndex::size)
+            .def("__len__", &IntervalIndex::get_length)
             .def("interval_count", &IntervalIndex::interval_count)
             .def_readonly("length", &IntervalIndex::length)//TODO bind to __len__
             .def("__repr__", &IntervalIndex<T>::to_string)
@@ -407,6 +420,7 @@ class IntervalIndex {
             .def("shift", &IntervalIndex::shift)
             .def("slice", &IntervalIndex::slice)
             .def("islice", &IntervalIndex::islice)
+            .def("mirror", &IntervalIndex::mirror)
             .def("intersect", &IntervalIndex::intersect)
             .def("get_union", &IntervalIndex::get_union)
             .def("get_interval", py::vectorize(&IntervalIndex::get_interval))

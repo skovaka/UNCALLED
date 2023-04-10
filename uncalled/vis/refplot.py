@@ -34,10 +34,10 @@ class Refplot:
             mid_plot = len(self.refs)//2
         else:
             st = en = self.prms.kmer_coord 
-            st -= self.tracks.index.trim[0]
-            en += self.tracks.index.trim[1] + 1
+            st -= self.tracks.model.shift #index.trim[0]
+            en += self.tracks.model.K - self.tracks.model.shift #index.trim[1] + 1
             self.refs = pd.RangeIndex(st, en)
-            mid_plot = self.tracks.index.trim[0]
+            mid_plot = self.tracks.model.shift
 
         self.layer, = parse_layer(self.prms.layer)
 

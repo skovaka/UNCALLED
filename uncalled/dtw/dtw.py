@@ -163,7 +163,6 @@ class GuidedDTW:
         if self.dtw_fn is None:
             raise ValueError(f"Unknown PoreModel type: {model.instance}")
 
-
         self.samp_min = self.moves.samples.starts[0]
         self.samp_max = self.moves.samples.ends[len(self.moves)-1]
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
@@ -195,10 +194,8 @@ class GuidedDTW:
             signal.normalize_mom(*tgt)
         else:
             signal.normalize_mom(*tgt, self.evt_start, self.evt_end)
-        
-        tracks.set_read(signal)
 
-        
+        tracks.set_read(signal)
 
         if self.prms.iterations > 0:
             success = self._calc_dtw(signal)

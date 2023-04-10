@@ -433,8 +433,9 @@ class Tracks:
         #TODO make model name paramter, initialize with track specific model
         track = self._track_or_default(track_name)
         model = track.model.instance
-        seq = self.index.instance.get_kmers(model, ref_id, coords, self.conf.is_rna)
-        seq = Sequence(seq, self.index.get_ref_name(ref_id), self.index.get_pac_offset(ref_id))
+        #seq = self.index.instance.get_kmers(model, ref_id, coords, self.conf.is_rna)
+        seq = self.index.query(coords)
+        seq = Sequence(seq, self.index.get_pac_offset(ref_id))
         return Alignment(aln_id, read, seq, sam)
 
     def write_alignment(self, aln):
@@ -713,39 +714,11 @@ class Tracks:
         return refstats
 
     def iter_refs(self, ref_bounds=None):
-        if ref_bounds is not None:
-            coords = self._ref_bounds_to_coords(ref_bounds)
-        else:
-            coords = self.coords
-
-        def get_full_coords(pac):
-            rid = self.index.pac_to_pos_id(pac)
-            ref_len = self.index.get_ref_len(rid)
-            ref_name = self.index.get_ref_name(rid)
-            seq_refs = RefCoord(ref_name, 0, ref_len)
-            return self.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=False)
-
-        def next_coords(seq_coords, pac, fwd, chunk_hasnext):
-            if len(pac) > 1 and chunk_hasnext:
-                pac = pac[:-1]
-
-            idx = pd.MultiIndex.from_product([[int(fwd)], pac])
-
-            coords = seq_coords.pac_intersect(idx)
-            if coords is None:
-                seq_coords = get_full_coords(pac[0])
-                coords = seq_coords.pac_intersect(idx)
-
-            return seq_coords, coords
-
-
-        #NEW CODE START 
-
         layer_iters = [
             io.iter_refs(
                 self.db_layers, 
                 self._aln_track_ids, 
-                coords=coords, 
+                #coords=coords, 
                 chunksize=self.prms.io.ref_chunksize)
             for io in self.inputs]
 
@@ -971,15 +944,6 @@ class Tracks:
 
         return tracks
 
-    def _alns_to_coords(self, alns):
-        ref_coord = RefCoord(
-            alns["ref_name"].iloc[0],
-            alns["ref_start"].min(),
-            alns["ref_end"].max())
-        return self.index.get_coord_space(
-            ref_coord, self.conf.is_rna, load_kmers=True, kmer_trim=True)
-
-    
     def close(self):
         for io in self.inputs:
             io.close()
