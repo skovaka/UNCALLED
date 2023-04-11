@@ -57,6 +57,7 @@ def dtw_pool(conf):
     t = time()
     tracks = Tracks(conf=conf)
     assert(tracks.output is not None)
+    sys.stderr.write(f"Using model {tracks.model.name}\n")
     #tracks.output.set_model(tracks.model)
     i = 0
     _ = tracks.read_index.default_model #load property
