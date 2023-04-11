@@ -243,8 +243,10 @@ class PoreModel:
             dname = "_"+name
             if dname in d:
                 v = getattr(prms, name)
-                if not isinstance(v, int) or v < 0:
+                if typ != np.int32 or v < 0:
                     setattr(prms, name, typ(d[dname]))
+                else:
+                    print("no", name, d[dname], v, isinstance(v, int))
                 del d[dname]
 
         for k,v in d.items():
@@ -340,6 +342,7 @@ class PoreModel:
             val = getattr(self.PRMS, name)
             if not isinstance(val, str) or len(val) > 0:
                 d[f"{prefix}{name}"] = val 
+                print("write", name, val)
         return d
 
     def to_df(self, kmer_str=True):
@@ -379,7 +382,6 @@ class PoreModel:
         means = self.current.mean.to_numpy() * scale + shift
         vals = np.ravel(np.dstack([means,self.stdvs]))
         return PoreModel(self.ModelType(vals), name=self.name)
-    
     
     def __setstate__(self, d):
         self.__init__(model=d)

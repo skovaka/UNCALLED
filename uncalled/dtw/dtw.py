@@ -57,7 +57,7 @@ def dtw_pool(conf):
     t = time()
     tracks = Tracks(conf=conf)
     assert(tracks.output is not None)
-    sys.stderr.write(f"Using model {tracks.model.name}\n")
+    sys.stderr.write(f"Using model {tracks.model.reverse}\n")
     #tracks.output.set_model(tracks.model)
     i = 0
     _ = tracks.read_index.default_model #load property
@@ -91,7 +91,12 @@ def dtw_worker(p):
 
     header = pysam.AlignmentHeader.from_dict(header)
 
+    print(model.reverse)
+
     tracks = Tracks(model=model, read_index=reads, conf=conf)
+    sys.stderr.write(f"Used model {tracks.model.reverse}\n")
+    print([a.model.name for a in tracks.alns])
+
 
     i = 0
     for bam in bams:
