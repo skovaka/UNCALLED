@@ -24,22 +24,6 @@ def parse_read_ids(reads):
 
 CONFIG_OPT = Opt(("-C", "--config"), type=str, default=None, required=False, help="Configuration file in TOML format", dest = CONFIG_PARAM)
 
-INDEX_OPTS = (
-        Opt("fasta_filename", "index"),
-        Opt(("-o", "--index-prefix"), "index"),
-        Opt("--no-bwt", "index", action="store_true"),
-        Opt(("-s", "--max-sample-dist"), "index"),
-        Opt("--min-samples", "index"),
-        Opt("--max-samples", "index"),
-        Opt(("-1", "--matchpr1"), "index"),
-        Opt(("-2", "--matchpr2"), "index"),
-        Opt(("-f", "--pathlen-percentile"), "index"),
-        Opt(("-m", "--max-replen"), "index"),
-        Opt("--probs", "index"),
-        Opt("--speeds", "index"),
-        CONFIG_OPT,
-     )
-
 FAST5_OPTS = (
     Opt(FAST5_PARAM, "read_index", nargs="+", type=str),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),
@@ -334,8 +318,6 @@ TRACKPLOT_PANEL_OPTS = (
 
 
 CMDS = {
-    "index" : ("index", 
-        "Build an index from a FASTA reference", INDEX_OPTS), 
     "dtw" : ("dtw.dtw", 
         "Perform DTW alignment guided by basecalled alignments", DTW_CMD_OPTS), 
     "convert" : ("dtw.io", "Convert between signal alignment file formats", CONVERT_OPTS),
@@ -372,8 +354,6 @@ CMDS = {
 _help_lines = [
     "Utility for Nanopore Current ALignment to Large Expanses of DNA", "",
     "subcommand options:",
-    "General:",
-    "\tindex      Build an index from a FASTA reference",
     "Dynamic Time Warping (DTW) Alignment:",
     "\tdtw        Perform DTW alignment guided by basecalled alignments",
     "\ttrain      Train new k-mer pore models",

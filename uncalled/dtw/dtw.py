@@ -17,7 +17,7 @@ import _uncalled
 
 from ..signal_processor import ProcessedRead
 
-from . import Bcaln, Tracks
+from . import Tracks
 from ..aln import AlnDF
 
 import multiprocessing as mp

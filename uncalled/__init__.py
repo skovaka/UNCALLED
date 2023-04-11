@@ -61,4 +61,4 @@ config._DEFAULTS = Config()
 config.rc = Config()
 
 from .pore_model import PoreModel
-from .index import BwaIndex, load_index
+from .index import load_index

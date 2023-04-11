@@ -14,7 +14,6 @@ from .. import config
 from ..dtw.layers import LAYER_META, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
-from ..dtw.moves import Bcaln
 from ..argparse import Opt, comma_split
 
 class Dotplot:

@@ -108,7 +108,6 @@ AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::a
 
     ref_seg.end = refs[refs.size()-1]+1;
     ref_index.append(ref_seg);
-    //samples.append(samps);
 
     return AlnDF(ref_index, samples, {}, {});
 }

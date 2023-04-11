@@ -16,7 +16,6 @@ from ..pore_model import PoreModel, WORKFLOW_PRESETS
 from ..read_index import ReadIndex, Fast5Reader, Slow5Reader
 #from ..fast5 import Fast5Reader
 from .. import config
-from . import Bcaln
 
 from time import time
 

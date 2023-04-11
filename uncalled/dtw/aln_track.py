@@ -13,7 +13,6 @@ from ..pore_model import PoreModel
 from ..argparse import Opt, ref_coords
 from .. import config, index 
 from ..index import load_index, RefCoord
-from .moves import Bcaln
 
 from .layers import LAYER_META
 

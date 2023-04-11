@@ -72,8 +72,8 @@ def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
         qrys = ar[:,0]
         qrys[qrys == None] = INT32_NA
 
-    refs = ref_index.pos_to_mpos(ar[:,1], is_fwd)
-    qrys = qrys.astype(np.int64)
+    refs = np.array(ref_index.pos_to_mpos(ar[:,1], is_fwd))
+    qrys = np.array(qrys, dtype=np.int64)
 
     ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, True)
 
@@ -89,32 +89,3 @@ def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
     
     return ref_moves.slice(-shift+model.shift, len(ref_moves)-model.K+model.shift+1)
 
-
-class Bcaln:
-
-    def __init__(self, conf, ref_index, read, sam, clip_coords=None, model_name=None):
-            
-        self.aln = sam_to_ref_moves(conf, ref_index, read, sam, model_name)
-
-        if self.aln is None:
-            return
-
-        df = pd.DataFrame({
-            "mpos"   : (self.aln.index.expand()),
-            "start"  : (self.aln.samples.starts),
-            "length" : (self.aln.samples.lengths)
-        }).set_index("mpos")
-        isna = df["start"] == INT32_NA
-        df[isna] = pd.NA
-        self.df = df.fillna(method="backfill")
-
-        self.df.index.name = "mpos"
-
-        ref_coord = RefCoord(sam.reference_name, sam.reference_start, sam.reference_end, not sam.is_reverse)
-        sam_coords = ref_index.get_coord_space(ref_coord, conf.is_rna, load_kmers=False)
-        self.coords = sam_coords.mpos_intersect(mposs=self.df.index)
-        self.K  = conf.pore_model.k
-
-    @property
-    def empty(self):
-        return not hasattr(self, "df") or len(self.df) <= self.K
