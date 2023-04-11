@@ -93,6 +93,7 @@ class IntervalIndex {
     size_t length = 0;
 
     static constexpr size_t MAX_IDX = -1;//std::numeric_limits<size_t>::max();
+    static constexpr size_t MAX_LEN_I16 = std::numeric_limits<i16>::max();
 
     IntervalIndex() {}
 
@@ -113,8 +114,15 @@ class IntervalIndex {
         coords.reserve(starts_.size());
         starts.reserve(starts_.size());
         length = 0;
+        auto prev = 0;
         for (size_t i = 0; i < starts_.size(); i++) {
-            append(starts_[i], starts_[i]+lengths_[i]);
+            auto len = lengths_[i];
+            if (len == 0 && i > 0) {
+                append(starts_[prev], starts_[prev]+lengths_[prev]);
+            } else {
+                append(starts_[i], starts_[i]+lengths_[i]);
+                prev = i;
+            }
         }
     }
 
@@ -310,6 +318,10 @@ class IntervalIndex {
             if (prev.is_valid() && coords[i].is_valid()) {
                 gaps += prev.end < coords[i].start;
                 prev = coords[i];
+
+                if (coords[i].length() > MAX_LEN_I16) {
+                    gaps += (coords[i].length()-1) / MAX_LEN_I16;
+                }
             }
         }
         return gaps;
@@ -332,7 +344,12 @@ class IntervalIndex {
                     }
                     prev = coords[i];
                 }
-                ret[j++] = coords[i].length();
+                auto len = coords[i].length();
+                while (len > MAX_LEN_I16) {
+                    ret[j++] = -MAX_LEN_I16;
+                    len -= MAX_LEN_I16;
+                }
+                ret[j++] = len;
             } else {
                 ret[j++] = 0;
             }

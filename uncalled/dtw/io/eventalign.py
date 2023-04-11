@@ -110,7 +110,7 @@ class Eventalign(TrackIO):
 
         eventalign = self.writer(
             self.conf, model.instance, read_id, aln.seq.fwd, read,
-            aln.seq.name, events.index-2, 
+            aln.seq.coord.name, events.index-2, 
             self.write_signal_index, kmers, 
             event_index, #TODO properly rep skips?
             std_level, signal) #TODO compute internally?

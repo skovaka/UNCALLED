@@ -209,6 +209,7 @@ class BAM(TrackIO):
             start -= self.MIN_I16
         if start < 0:
             start_pad.append(start)
+
         lens = np.concatenate([start_pad, aln.dtw.samples.to_runlen()]).astype(np.int16)
 
         self.bam.set_tag(REF_TAG, array.array("i", refs))

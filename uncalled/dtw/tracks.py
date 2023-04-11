@@ -185,8 +185,8 @@ class Tracks:
             self._add_track(name, track)
 
     def _add_track(self, name, track):
-        if name in self._tracks:
-            raise KeyError(f"Duplicate track name: {name}")
+        #if name in self._tracks:
+        #    raise KeyError(f"Duplicate track name: {name}")
         self._tracks[name] = track
         
         if name in BUILTIN_TRACKS:

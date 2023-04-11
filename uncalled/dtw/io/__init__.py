@@ -191,8 +191,8 @@ def convert(conf):
     else:
         ignore_bam = False
         
-    for aln in tracks.iter_reads(ignore_bam=True):
-        sys.stderr.write(f"{aln.read_id}\n")
+    for aln in tracks.iter_reads(ignore_bam=ignore_bam):
+        #sys.stderr.write(f"{aln.read_id}\n")
         
         tracks.write_alignment(aln)
 
