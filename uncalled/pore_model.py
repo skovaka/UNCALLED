@@ -245,8 +245,6 @@ class PoreModel:
                 v = getattr(prms, name)
                 if typ != np.int32 or v < 0:
                     setattr(prms, name, typ(d[dname]))
-                else:
-                    print("no", name, d[dname], v, isinstance(v, int))
                 del d[dname]
 
         for k,v in d.items():
@@ -342,7 +340,6 @@ class PoreModel:
             val = getattr(self.PRMS, name)
             if not isinstance(val, str) or len(val) > 0:
                 d[f"{prefix}{name}"] = val 
-                print("write", name, val)
         return d
 
     def to_df(self, kmer_str=True):
