@@ -1,3 +1,0 @@
-[submodule "submods/read_until_api"]
-	path = submods/read_until_api
-	url = https://github.com/nanoporetech/read_until_api.git
