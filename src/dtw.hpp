@@ -5,7 +5,7 @@
 #include <iostream>
 #include <cfloat>
 #include "util.hpp"
-#include "pore_model.hpp"
+#include "seq.hpp"
 #include "aln.hpp"
 
 enum class DTWSubSeq {NONE, ROW, COL};

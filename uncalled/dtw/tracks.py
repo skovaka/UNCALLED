@@ -127,12 +127,12 @@ class Tracks:
 
         self.set_layers(self.prms.layers)
 
-        if self.prms.index_prefix is None:
+        if self.prms.ref_index is None:
             raise RuntimeError("Failed to load reference index")
 
         self._aln_track_ids = [t.id for t in self.alns]
 
-        self.index = load_index(self.model, self.prms.index_prefix)
+        self.index = load_index(self.model, self.prms.ref_index)
         self.refstats = None
 
         #self.coords = self._ref_bounds_to_coords(self.prms.ref_bounds)

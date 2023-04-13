@@ -69,7 +69,7 @@ class BAM(TrackIO):
                 if not line.startswith("UNC:"): continue
                 prms = json.loads(line[4:])
                 
-                self.conf.tracks.index_prefix = prms["reference"]
+                self.conf.tracks.ref_index = prms["reference"]
 
                 for name,vals in prms["tracks"].items():
                     c = self.conf.to_dict()
@@ -152,7 +152,7 @@ class BAM(TrackIO):
             "models" : {
                 self.track_out.model.name : self.track_out.model.params_to_dict()
             },
-            "reference" : self.conf.tracks.index_prefix
+            "reference" : self.conf.tracks.ref_index
         }
 
         if not "CO" in self.header:

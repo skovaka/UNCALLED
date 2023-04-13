@@ -1,36 +1,11 @@
 from . import config
 from . import RefCoord
 
-#Index parameter group
-class IndexParams(config.ParamGroup):
-    _name = "index"
-IndexParams._def_params(
-    ("fasta_filename", None, str, "FASTA file to index"),
-    ("index_prefix", None, str, "Index output prefix. Will use input fasta filename by default"),
-    ("no_bwt", False, bool, "Will only generate the pacseq if specified, which is much faster to build. Can only be used with DTW subcommands (NOT map, sim, or realtime)"),
-    ("max_sample_dist", 100, int, "Maximum average sampling distance between reference alignments."),
-    ("min_samples", 50000, int, "Minimum number of alignments to produce (approximate, due to deterministically random start locations),"),
-    ("max_samples", 1000000, int, "Maximum number of alignments to produce (approximate, due to deterministically random start locations),"),
-    ("kmer_len", 5, int, "Model k-mer length"),
-    ("matchpr1", 0.6334, float, "Minimum event match probability"),
-    ("matchpr2", 0.9838, float, "Maximum event match probability"),
-    ("pathlen_percentile", 0.05, float, ""),
-    ("max_replen", 100, int, ""),
-    ("probs", None, str, "Find parameters with specified target probabilites (comma separated)"),
-    ("speeds", None, str, "Find parameters with specified speed coefficents (comma separated)"),
-)
-
 eventalign_flags = "\", \"".join(["print-read-names", "signal-index", "samples"])#, "scale-events"]
 
 class IOParams(config.ParamGroup):
     _name = "io"
 IOParams._def_params(
-    #("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
-    #("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
-
-    #("db_in", None, str, "Input track database"),
-    #("db_out", None, str, "Output track database"),
-
     ("processes", 1, int, "Number of parallel processes"),
     ("bam_chunksize", 100, int, "Per-process alignment bam_chunksize"),
 
@@ -96,7 +71,7 @@ TracksParams._def_params(
     ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
     ("refstats_layers", None, None, "Layers to compute refstats"),
 
-    ("index_prefix", None, str, "BWA index prefix"),
+    ("ref_index", None, str, "BWA index prefix"),
     ("load_fast5s", False, bool, "Load fast5 files"),
 
     ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter", "load_fast5s"}

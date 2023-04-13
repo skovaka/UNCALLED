@@ -8,7 +8,7 @@ A toolkit for nanopore signal alignment, analysis, and visualization
 
 Features an alignment algorithm guided by Guppy metadata, methods for comparing Tombo and Nanopolish alignments, epigenetic modification detection statistics, and interactive alignment visualizations
 
-Uncalled4 is under active development, and things like command line arguments and file formats may change in future versions. It has primarily been developed on r9.4 RNA data, and certain functionalities may not work for DNA yet.
+Uncalled4 is under active development, and things like command line arguments and file formats may change in future versions.
 
 For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0731), see the [main branch](https://github.com/skovaka/UNCALLED)
 
@@ -19,14 +19,11 @@ For [real-time targeted sequencing](https://www.nature.com/articles/s41587-020-0
   - [`dtw`: Perform DTW alignment guided by basecalled alignments](#dtw)
   - [`train`: Train new k-mer pore models](#train)
   - [`convert`: Import DTW alignments produced by Nanopolish or Tombo](#convert)
-  - [`db`: Edit, merge, and ls alignment databases](#db)
 - [DTW Visualization](#dtw-visualization)
-  - [`dotplot`: Plot signal-to-reference alignment dotplots](#dotplot)
   - [`trackplot`: Plot alignment tracks and per-reference statistics](#trackplot)
   - [`browser`: Interactive signal alignment genome browser](#browser)
 - [DTW Analysis](#dtw-analysis)
   - [`refstats`: Calculate per-reference-coordinate statistics](#refstats)
-  - [`layerstats`: Compute, compare, and query alignment layers](#layerstats)
 - [Alignment Layers](#alignment-layers)
 - [Future Work](#future-work)
 - [Release Notes](#release-notes)
@@ -68,6 +65,8 @@ Below are summaries for each subcommand. See `uncalled <subcommand> -h` for more
 
 Perform DTW alignment guided by basecalled alignments
 
+`ref_index` must be a FASTA file indexed via `samtools faidx`. `read_files` must contain at least one FAST5, SLOW5, BLOW5, or POD5 file, optionally recursively with the `--recursive` option.
+
 Currently the fast5 files must contain basecalling information output by Guppy via the `--fast5_out` option, or basecaller moves should be in the BAM input file with the Guppy `--moves_out` option.
 
 
@@ -81,7 +80,7 @@ usage: uncalled dtw [-h] --bam-in [BAM_IN] [-r] [-l READ_FILTER] [-x READ_INDEX]
                     [-c {abs_diff,z_score,norm_pdf}] [--skip-cost SKIP_COST]                     
                     [--stay-cost STAY_COST] [--move-cost MOVE_COST] [-b BAND_WIDTH]        
                     [-s BAND_SHIFT] [-N {ref_mom,model_mom}] [--bc-group BC_GROUP]               
-                    index_prefix read_files [read_files ...]                  
+                    ref_index read_files [read_files ...]                  
 ```
 
 ### `train`
@@ -100,7 +99,7 @@ usage: uncalled train [-h] [-i ITERATIONS] [--kmer-samples KMER_SAMPLES] [--buff
                       [-R REF_BOUNDS] [-c {abs_diff,z_score,norm_pdf}] [--skip-cost SKIP_COST]                
                       [--stay-cost STAY_COST] [--move-cost MOVE_COST] [-b BAND_WIDTH] [-s BAND_SHIFT]         
                       [-N {ref_mom,model_mom}] [--norm-median] [--norm-seg] [--bc-group BC_GROUP] [-C CONFIG] 
-                      index_prefix read_files [read_files ...]                                              
+                      ref_index read_files [read_files ...]                                              
 ```
 
 ### convert
@@ -114,7 +113,7 @@ usage: uncalled convert [-h] [--bam-in BAM_IN | --eventalign-in [EVENTALIGN_IN]
                         [TSV_OUT]] [--tsv-cols TSV_COLS] [--eventalign-flags EVENTALIGN_FLAGS]
                         [--mask-skips [MASK_SKIPS]] [--reads READS [READS ...]]          
                         [-l READ_FILTER] [-x READ_INDEX] [-r] [--rna] [-R REF_BOUNDS] [-f] [-a]
-                        index_prefix       
+                        ref_index       
 ```
                                                                                               
 ## DTW Visualization

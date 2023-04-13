@@ -37,7 +37,7 @@ DTW_OPTS = (
     Opt("--bam-chunksize", "tracks.io"),
     Opt("--bam-in", "tracks.io", nargs="?", const="-", required=True),
     Opt(("--out-name", "-o"), "tracks.io"),
-    Opt("index_prefix", "tracks"), #+ FAST5_OPTS + (
+    Opt("ref_index", "tracks"), #+ FAST5_OPTS + (
     
     Opt("--flowcell", "pore_model"),
     Opt("--kit", "pore_model"),
@@ -75,7 +75,7 @@ DTW_OPTS = (
 )
 
 CONVERT_OPTS = (
-    Opt("index_prefix", "tracks", nargs="?"),
+    Opt("ref_index", "tracks", nargs="?"),
     MutexOpts("input", [
         Opt("--eventalign-in", "tracks.io", type=comma_split, nargs="?", const="-"),
         Opt("--tombo-in", "tracks.io", type=comma_split, action="extend"),
@@ -192,7 +192,7 @@ DOTPLOT_OPTS = (
 
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
 
-    Opt("--ref", "tracks", "index_prefix"), 
+    Opt("--ref", "tracks", "ref_index"), 
     Opt("--reads", "read_index", "paths", nargs="+", type=str),
     Opt(("-x", "--read-index"), "read_index"),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),
@@ -219,7 +219,7 @@ TRACKPLOT_OPTS = (
 		Opt("--bam-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
 	]),
 
-    Opt("--ref", "tracks", "index_prefix"), 
+    Opt("--ref", "tracks", "ref_index"), 
     Opt("--reads", "read_index", "paths", nargs="+", type=str),
     Opt(("-x", "--read-index"), "read_index"),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),
@@ -244,7 +244,7 @@ BROWSER_OPTS = (
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
 	#]),
 
-    Opt("--ref", "tracks", "index_prefix"), 
+    Opt("--ref-index", "tracks", "ref_index"), 
     Opt("--reads", "read_index", "paths", nargs="+", type=str),
     Opt(("-x", "--read-index"), "read_index"),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),

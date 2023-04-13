@@ -7,7 +7,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
 #include <pybind11/numpy.h>
-#include "pore_model.hpp"
+#include "seq.hpp"
 #include "event_detector.hpp"
 namespace py = pybind11;
 

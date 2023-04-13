@@ -2,9 +2,9 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
-#include "ref_index.hpp"
 #include "read_buffer.hpp"
 #include "signal_processor.hpp"
+#include "seq.hpp"
 #include "dtw.hpp"
 #include "intervals.hpp"
 #include "eventalign.hpp"
@@ -19,7 +19,7 @@ template<typename KmerType>
 size_t pybind_model(py::module_ &m, std::string suffix) {
     using Model = PoreModel<KmerType>;
     Model::pybind(m, suffix);
-    BwaIndex<Model>::pybind_defs(m, suffix);//ref_index);
+    //BwaIndex<Model>::pybind_defs(m, suffix);//ref_index);
     BandedDTW<Model>::pybind_defs(m, suffix);
     GlobalDTW<Model>::pybind_defs(m, suffix);
     SignalProcessor<Model>::pybind(m, suffix);
