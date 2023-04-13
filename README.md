@@ -214,6 +214,7 @@ All tracks must be written to the same database for multi-track visualization an
 Uncalled4 (v3.4.0) is a work in progress. Many additional features and optimizations are planned, which may require changes to the command line interface or database format. We also plan to provide a Python API in the future.
 
 ## Release Notes
+- v3.4: generalized BAM signal alignment format, support for SLOW5 and POD5, zero-mean normalizing pore models by default, major refactoring to remove UNCALLED v1 related dependencies
 - v3.3: added BAM input/output, generalized TSV output, and started accepting non-SQL input (BAM, eventalign) for some commands. Changed all alignment input/outputs to optional arguments (not positional), and refactored `convert` command structure. DTW now must be guided by BAM files **no longer supporting PAF files for `dtw`**
 - v3.2: expanded k-mer model to begin supporting R10 alignment
 - v3.1: introduced Plotly visualizations and sqlite3 database
