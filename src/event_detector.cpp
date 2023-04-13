@@ -14,19 +14,47 @@
 #include <cassert>
 #include "event_detector.hpp"
 
-const EventDetector::Params EventDetector::PRMS_DEF = {
-    window_length1 : 3,
-    window_length2 : 6,
-    threshold1     : 1.4,
-    threshold2     : 9.0,
-    peak_height    : 0.2,
+const EventDetector::Params 
+    EventDetector::PRMS_DEF = {
+        window_length1 : 0,
+        window_length2 : 0,
+        threshold1     : -1,
+        threshold2     : -1,
+        peak_height    : -1,
+        min_mean       : -1,
+        max_mean       : -1
+    }, PRMS_450BPS = {
+        window_length1 : 3,
+        window_length2 : 6,
+        threshold1     : 1.4,
+        threshold2     : 9.0,
+        peak_height    : 0.2,
+        min_mean       : -200,
+        max_mean       : 200
+    }, PRMS_70BPS = {
+        window_length1 : 7,
+        window_length2 : 12,
+        threshold1     : 2.8,
+        threshold2     : 18.0,
+        peak_height    : 0.2,
+        min_mean       : -200,
+        max_mean       : 200
+    };
 
-    min_mean       : -200,
-    max_mean       : 200
-};
+EventDetector::Params init_params(EventDetector::Params prms, const EventDetector::Params &defs=PRMS_450BPS) {
+    #define SET_DEFAULT(N) if (prms.N == EventDetector::PRMS_DEF.N) prms.N = defs.N;
+    SET_DEFAULT(window_length1)
+    SET_DEFAULT(window_length2)
+    SET_DEFAULT(threshold1)
+    SET_DEFAULT(threshold2)
+    SET_DEFAULT(peak_height)
+    SET_DEFAULT(min_mean)
+    SET_DEFAULT(max_mean)
+    return prms;
+}
 
 EventDetector::EventDetector(Params prms) :
-    PRMS(prms),
+    PRMS(init_params(prms)),
     BUF_LEN (1 + PRMS.window_length2 * 2),
     cal_offset_(0),
     cal_coef_(1) {

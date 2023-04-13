@@ -212,7 +212,7 @@ class EventDetector {
         float max_mean;
     } Params;
 
-    static const Params PRMS_DEF;
+    static const Params PRMS_DEF, PRMS_400BPS, PRMS_70BPS;
 
     Params PRMS;
 

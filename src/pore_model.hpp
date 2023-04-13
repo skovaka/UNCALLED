@@ -629,7 +629,7 @@ class PoreModel {
 		return ret;
     }
 
-    KmerType str_to_kmer(KmerTypePy kmer, u32 offs) {
+    KmerType str_to_kmer(const KmerTypePy &kmer, u32 offs=0) {
 		auto s = std::string(kmer.data(), KMER_LEN);
 		return str_to_kmer(s, offs);
 	}
@@ -665,7 +665,7 @@ class PoreModel {
         c.def_readonly("KMER_COUNT", &Class::KMER_COUNT);
 
         c.def("str_to_kmer",
-              py::vectorize(static_cast< KmerType (PoreModel::*) (KmerTypePy, u32)>(&Class::str_to_kmer)), 
+              py::vectorize(static_cast< KmerType (PoreModel::*) (const KmerTypePy &, u32)>(&Class::str_to_kmer)), 
               py::arg("kmer"), py::arg("offs") = 0);
 
         c.def("str_to_kmers", 

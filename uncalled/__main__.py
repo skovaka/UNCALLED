@@ -339,13 +339,13 @@ CMDS = {
     }),
     "refstats" : ("stats.refstats", "Calculate per-reference-coordinate statistics", REFSTATS_OPTS),
     "readstats" : ("stats.readstats", "", READSTATS_OPTS),
-    "layerstats" : (None, 
-            """Compute distance between alignments of the same reads\n"""
-            """subcommand options:\n""" 
-            """compare  Compute distance between alignments of the same reads\n""", {
-        "compare" : ("stats.layerstats", "Compute distance between alignments of the same reads", COMPARE_OPTS),
-    }),
-    "dotplot" : ("vis.dotplot", "Plot signal-to-reference alignment dotplots", DOTPLOT_OPTS),
+    #"layerstats" : (None, 
+    #        """Compute distance between alignments of the same reads\n"""
+    #        """subcommand options:\n""" 
+    #        """compare  Compute distance between alignments of the same reads\n""", {
+    #    "compare" : ("stats.layerstats", "Compute distance between alignments of the same reads", COMPARE_OPTS),
+    #}),
+    #"dotplot" : ("vis.dotplot", "Plot signal-to-reference alignment dotplots", DOTPLOT_OPTS),
     "refplot" : ("vis.refplot", "Plot alignment tracks and per-reference statistics", REFPLOT_OPTS),
     "trackplot" : ("vis.trackplot", "Plot alignment tracks and per-reference statistics", TRACKPLOT_OPTS+TRACKPLOT_PANEL_OPTS),
     "browser" : ("vis.browser", "Interactive signal alignment genome browser", BROWSER_OPTS),
@@ -362,9 +362,9 @@ _help_lines = [
     "DTW Analysis:",
     "\trefstats   Calculate per-reference-coordinate statistics",
     "\treadstats  Perform per-read analyses of DTW alignments",
-    "\tlayerstats Compute, compare, and query alignment layers", "",
+    #"\tlayerstats Compute, compare, and query alignment layers", "",
     "DTW Visualization:",
-    "\tdotplot    Plot signal-to-reference alignment dotplots",
+    #"\tdotplot    Plot signal-to-reference alignment dotplots",
     "\ttrackplot  Plot alignment tracks and per-reference statistics",
     "\tbrowser    Interactive signal alignment genome browser",
     #"\tsigplot    " + sigplot.main.__doc__,
