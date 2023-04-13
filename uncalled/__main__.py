@@ -77,7 +77,6 @@ DTW_OPTS = (
 CONVERT_OPTS = (
     Opt("index_prefix", "tracks", nargs="?"),
     MutexOpts("input", [
-        Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
         Opt("--eventalign-in", "tracks.io", type=comma_split, nargs="?", const="-"),
         Opt("--tombo-in", "tracks.io", type=comma_split, action="extend"),
     ]),
@@ -86,7 +85,6 @@ CONVERT_OPTS = (
     Opt(("-m", "--pore-model"), "pore_model", "name"),
 
     MutexOpts("output", [
-        Opt("--sql-out", "tracks.io"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
         Opt("--bam-out", "tracks.io", nargs="?", const="-"),
@@ -109,28 +107,6 @@ CONVERT_OPTS = (
     CONFIG_OPT,
 )
 
-DB_OPT = Opt("sql_in", "tracks.io", help="Track database file")
-
-LS_OPTS = (DB_OPT,)
-DELETE_OPTS = (
-    DB_OPT,
-    Opt("track_name", help="Name of the track to delete"),
-)
-EDIT_OPTS = (
-    DB_OPT,
-    Opt("track_name", help="Current track name"),
-    Opt(("-N", "--new-name"), default=None, help="New track name"),
-    Opt(("-D", "--description"), default=None, help="New track description"),
-    Opt(("-F", "--paths"), "read_index", type=comma_split),
-    Opt(("-r", "--recursive"), "read_index", action="store_true"),
-)
-
-MERGE_OPTS = (
-    Opt("dbs", nargs="+", type=str, help="Database files to merge. Will write to the first file if \"-o\" is not specified. "),
-    #Opt(("-n", "--track_names"), nargs="+", help="Names of tracks to merge. Will merge all tracks if not specified"),
-    Opt("--sql-out", "tracks.io", type=str, default=None, help="Output database file. Will output to the first input file if not specified"),
-)
-
 COMPARE_OPTS = (
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
     Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
@@ -145,21 +121,12 @@ COMPARE_OPTS = (
     #Opt(("-o", "--output"), choices=["db", "tsv"], help="If \"db\" will output into the track database. If \"tsv\" will output a tab-delimited file to stdout."),
 )
 
-DUMP_OPTS = (
-    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
-    Opt("layers", nargs="+",  help="Layers to retrieve or compute"),
-    Opt(("-R", "--ref-bounds"), "tracks", type=ref_coords),
-    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
-)
-
 ALL_REFSTATS = {"min", "max", "mean", "median", "stdv", "var", "skew", "kurt", "q25", "q75", "q5", "q95", "KS"}
 REFSTATS_OPTS = (
     Opt("layers", "tracks", type=comma_split,
         help="Comma-separated list of layers over which to compute summary statistics"),# {%s}" % ",".join(LAYERS.keys())),
     Opt("refstats", type=comma_split,
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
-    #Opt("--sql-in", "tracks.io"),
-    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
     Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
@@ -171,7 +138,6 @@ REFSTATS_OPTS = (
 
 DTW_CMD_OPTS = DTW_OPTS + (
     MutexOpts("output", [
-        Opt("--sql-out", "tracks.io"),
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
         Opt("--bam-out", "tracks.io", nargs="?", const="-"),
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
@@ -199,7 +165,6 @@ TRAIN_OPTS = (
 
 
 READSTATS_OPTS = (
-    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
     Opt("stats", "readstats", type=comma_split),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     #Opt(("-p", "--pca-components"), "readstats"),
@@ -209,7 +174,7 @@ READSTATS_OPTS = (
 )
 
 REFPLOT_OPTS = (
-    Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
+    Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
     Opt("ref_bounds", "tracks", type=str_to_coord),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
@@ -323,22 +288,8 @@ CMDS = {
     "convert" : ("dtw.io", "Convert between signal alignment file formats", CONVERT_OPTS),
     "train" : ("dtw.train", 
         "Iteratively train a new k-mer pore model", TRAIN_OPTS), 
-    "db" : (None, 
-        """Edit, merge, and ls alignment databases
-
-        subcommand options:
-        ls       List all tracks in a database
-        delete   Delete a track from a database
-        merge    Merge databases into a single file
-        edit     Rename, change fast5 paths, or set description""", {
-
-        "ls"     : ("dtw.io.sqlite", "", LS_OPTS), 
-        "delete" : ("dtw.io.sqlite", "", DELETE_OPTS), 
-        "merge"  : ("dtw.io.sqlite", "", MERGE_OPTS), 
-        "edit"   : ("dtw.io.sqlite", "", EDIT_OPTS), 
-    }),
     "refstats" : ("stats.refstats", "Calculate per-reference-coordinate statistics", REFSTATS_OPTS),
-    "readstats" : ("stats.readstats", "", READSTATS_OPTS),
+    #"readstats" : ("stats.readstats", "", READSTATS_OPTS),
     #"layerstats" : (None, 
     #        """Compute distance between alignments of the same reads\n"""
     #        """subcommand options:\n""" 
@@ -358,7 +309,6 @@ _help_lines = [
     "\tdtw        Perform DTW alignment guided by basecalled alignments",
     "\ttrain      Train new k-mer pore models",
     "\tconvert    Convert between signal alignment file formats",
-    "\tdb         Edit, merge, and ls alignment databases", "",
     "DTW Analysis:",
     "\trefstats   Calculate per-reference-coordinate statistics",
     "\treadstats  Perform per-read analyses of DTW alignments",

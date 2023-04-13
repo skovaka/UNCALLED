@@ -277,8 +277,6 @@ class PoreModel:
         return itertools.chain(self._base.keys(), self._extra.keys())
 
     def __getitem__(self, idx):
-        #TODO store master self._fields = {"mean" : self.means, ..., extra...}
-        #no, maybe just wrap in series
         if isinstance(idx, str):
             return self._base[idx]
         return self.mean.current[self.kmer_array(idx)]

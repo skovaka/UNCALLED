@@ -23,7 +23,7 @@ const EventDetector::Params
         peak_height    : -1,
         min_mean       : -1,
         max_mean       : -1
-    }, PRMS_450BPS = {
+    }, EventDetector::PRMS_450BPS = {
         window_length1 : 3,
         window_length2 : 6,
         threshold1     : 1.4,
@@ -31,7 +31,7 @@ const EventDetector::Params
         peak_height    : 0.2,
         min_mean       : -200,
         max_mean       : 200
-    }, PRMS_70BPS = {
+    }, EventDetector::PRMS_70BPS = {
         window_length1 : 7,
         window_length2 : 12,
         threshold1     : 2.8,
@@ -41,7 +41,7 @@ const EventDetector::Params
         max_mean       : 200
     };
 
-EventDetector::Params init_params(EventDetector::Params prms, const EventDetector::Params &defs=PRMS_450BPS) {
+EventDetector::Params init_params(EventDetector::Params prms, const EventDetector::Params &defs=EventDetector::PRMS_450BPS) {
     #define SET_DEFAULT(N) if (prms.N == EventDetector::PRMS_DEF.N) prms.N = defs.N;
     SET_DEFAULT(window_length1)
     SET_DEFAULT(window_length2)

@@ -56,8 +56,10 @@ def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
     if read_moves is None:
         return None
 
+    model = ref_index.model
+
     is_fwd = not sam.is_reverse
-    flip_ref = is_fwd == conf.is_rna
+    flip_ref = is_fwd == model.reverse
 
     ar = np.array(sam.get_aligned_pairs())
     ar = ar[ar[:,1] != None] #TODO keep track of insertion counts
@@ -82,10 +84,8 @@ def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
 
     mkl = MOVE_KMER_LENS[PoreModel.PRESET_MAP.loc[workflow, "ont_model"]]
 
-    model = ref_index.model
-
     shift = model.K - mkl - model.shift
     ref_moves.index.shift(shift)
-    
+
     return ref_moves.slice(-shift+model.shift, len(ref_moves)-model.K+model.shift+1)
 

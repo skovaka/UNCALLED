@@ -120,6 +120,7 @@ class Tracks:
 
             if len(pm.name) == 0 and pm.has_workflow():
                 pm.name = PoreModel.PRESET_MAP.loc[pm.get_workflow(), "preset_model"]
+                sys.stderr.write(f"Auto-detected flowcell='{pm.flowcell}' kit='{pm.kit}'\n")
             self.model = None
 
         self._init_io()

@@ -14,6 +14,7 @@ from ..argparse import ArgParser
 from ..index import str_to_coord
 
 import _uncalled
+from _uncalled import EventDetector
 
 from ..signal_processor import ProcessedRead
 
@@ -83,6 +84,21 @@ def dtw_pool_iter(tracks):
     except Exception as e:
         raise ExceptionWrapper(e).re_raise()
 
+EVDT_PRESETS = {
+    450.0 : EventDetector.PRMS_450BPS,
+    70.0 : EventDetector.PRMS_70BPS,
+}
+
+def init_model(tracks):
+    if tracks.model is None:
+        raise RuntimeError("Failed to auto-detect pore model. Please specify --pore-model flag (and add --rna if aligning RNA reads)")
+    sys.stderr.write(f"Using model '{tracks.model.name}'\n")
+
+    evdt = EVDT_PRESETS.get(tracks.model.bases_per_sec, None)
+    if evdt is not None:
+        tracks.conf.event_detector = evdt
+
+
 def dtw_worker(p):
     conf,model,bams,reads,aln_start,header = p
 
@@ -91,12 +107,8 @@ def dtw_worker(p):
 
     header = pysam.AlignmentHeader.from_dict(header)
 
-    print(model.reverse)
-
     tracks = Tracks(model=model, read_index=reads, conf=conf)
-    sys.stderr.write(f"Used model {tracks.model.reverse}\n")
-    print([a.model.name for a in tracks.alns])
-
+    init_model(tracks)
 
     i = 0
     for bam in bams:
@@ -116,16 +128,13 @@ def dtw_worker(p):
 
     return tracks.output.out_buffer
 
-
 def dtw_single(conf):
     """Perform DTW alignment guided by basecalled alignments"""
 
     tracks = Tracks(conf=conf)
+    init_model(tracks)
 
     assert(tracks.output is not None)
-
-    #for bam in tracks.bam_in.iter_sam():
-    #    dtw = GuidedDTW(tracks, bam)
 
     for aln in tracks.bam_in.iter_alns():
         dtw = GuidedDTW(tracks, aln)
@@ -135,7 +144,7 @@ def dtw_single(conf):
 class GuidedDTW:
 
     def process(self, read):
-        evdt = _uncalled.EventDetector(self.conf.event_detector)
+        evdt = EventDetector(self.conf.event_detector)
         return ProcessedRead(evdt.process_read(read))
 
     #def __init__(self, tracks, bam, **kwargs):
