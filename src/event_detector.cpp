@@ -14,19 +14,47 @@
 #include <cassert>
 #include "event_detector.hpp"
 
-const EventDetector::Params EventDetector::PRMS_DEF = {
-    window_length1 : 3,
-    window_length2 : 6,
-    threshold1     : 1.4,
-    threshold2     : 9.0,
-    peak_height    : 0.2,
+const EventDetector::Params 
+    EventDetector::PRMS_DEF = {
+        window_length1 : 0,
+        window_length2 : 0,
+        threshold1     : -1,
+        threshold2     : -1,
+        peak_height    : -1,
+        min_mean       : -1,
+        max_mean       : -1
+    }, EventDetector::PRMS_450BPS = {
+        window_length1 : 3,
+        window_length2 : 6,
+        threshold1     : 1.4,
+        threshold2     : 9.0,
+        peak_height    : 0.2,
+        min_mean       : -200,
+        max_mean       : 200
+    }, EventDetector::PRMS_70BPS = {
+        window_length1 : 7,
+        window_length2 : 12,
+        threshold1     : 2.8,
+        threshold2     : 18.0,
+        peak_height    : 0.2,
+        min_mean       : -200,
+        max_mean       : 200
+    };
 
-    min_mean       : 0,
-    max_mean       : 200
-};
+EventDetector::Params init_params(EventDetector::Params prms, const EventDetector::Params &defs=EventDetector::PRMS_450BPS) {
+    #define SET_DEFAULT(N) if (prms.N == EventDetector::PRMS_DEF.N) prms.N = defs.N;
+    SET_DEFAULT(window_length1)
+    SET_DEFAULT(window_length2)
+    SET_DEFAULT(threshold1)
+    SET_DEFAULT(threshold2)
+    SET_DEFAULT(peak_height)
+    SET_DEFAULT(min_mean)
+    SET_DEFAULT(max_mean)
+    return prms;
+}
 
 EventDetector::EventDetector(Params prms) :
-    PRMS(prms),
+    PRMS(init_params(prms)),
     BUF_LEN (1 + PRMS.window_length2 * 2),
     cal_offset_(0),
     cal_coef_(1) {
@@ -131,7 +159,7 @@ bool EventDetector::add_sample(float s) {
     return false;
 }
 
-std::vector<Event> EventDetector::get_events(const std::vector<float> &raw) {
+std::vector<Event> EventDetector::get_events(const ValArray<float> &raw) {
     std::vector<Event> events;
     events.reserve(raw.size() / PRMS.window_length2);
     reset();
@@ -145,10 +173,64 @@ std::vector<Event> EventDetector::get_events(const std::vector<float> &raw) {
     return events;
 }
 
+std::vector<Event> EventDetector::get_events2(const ValArray<float> &raw) {
+    std::vector<Event> events;
+    events.reserve(raw.size() / PRMS.window_length2);
+    reset();
+
+    float mean = 0, stdv = 0;
+
+    for (u32 i = 0; i < raw.size(); i++) {
+        if (add_sample(raw[i])) {
+            events.push_back(event_);
+            mean += event_.mean;
+        }
+    }
+    
+    mean /= events.size();
+
+    for (auto &e : events) {
+        auto delta = e.mean - mean;
+        stdv += delta*delta;
+    }
+
+    stdv = sqrt(stdv / events.size());
+
+    auto win = stdv * 2,
+         min_mean = mean - win, 
+         max_mean = mean + win;
+
+    //std::cout << min_mean << " " << max_mean << " BLAH\n";
+    size_t i = 0, j = 0;
+    for (; i < events.size(); i++) {
+        if (events[i].mean >= min_mean && events[i].mean <= max_mean) {
+            events[j++] = events[i];
+        }
+    }
+    events.resize(j);
+
+    //IntervalArray<i32> coords;
+    //coords.reserve(events.size();
+    //for (auto &e : events) {
+    //    if (e.mean >= min_mean && e.mean <= max_mean) {
+    //        coords.append(e.start, e.start+e.length);
+    //    }
+    //}
+
+    return events;
+}
+
 ProcessedRead EventDetector::process_read(const ReadBuffer &read) {
     ProcessedRead ret;
-    ret.events = get_events(read.signal_);
-    ret.set_signal(read.signal_);
+    ret.events = get_events(read.signal);
+    ret.set_signal(read.signal);
+    return ret;
+}
+
+ProcessedRead EventDetector::process_read_new(const ReadBuffer &read) {
+    ProcessedRead ret;
+    ret.events = get_events2(read.signal);
+    ret.set_signal(read.signal);
     return ret;
 }
 
@@ -156,20 +238,17 @@ Event EventDetector::get_event() const {
     return event_;
 }
 
-//TODO: template with float, double, Event?
-std::vector<float> EventDetector::get_means(const std::vector<float> &raw) {
-    std::vector<float> events;
-    events.reserve(raw.size() / PRMS.window_length2);
-    reset();
-
-    for (u32 i = 0; i < raw.size(); i++) {
-        if (add_sample(raw[i])) {
-            events.push_back(event_.mean);
-        }
-    }
-
-    return events;
+ValArray<float> EventDetector::get_means_py(py::array_t<float> raw_py) {
+    PyArray<float> raw(raw_py);
+    auto events = get_means(raw);
+    ValArray<float> ret(events.data(), events.size());
+    return ret;
 }
+
+//TODO: template with float, double, Event?
+//template <typename Container>
+//std::vector<float> EventDetector::get_means(const Container &raw) {
+//}
 
 float EventDetector::kmer_current() const {
     return event_.mean;
@@ -337,12 +416,12 @@ Event EventDetector::create_event(u32 evt_en) {
     event_.start = evt_st;
     event_.length = (float)(evt_en - evt_st);
     event_.mean = (sum[evt_en_buf] - evt_st_sum) / event_.length;
-    const float deltasqr = (sumsq[evt_en_buf] - evt_st_sumsq);
-    const float var = deltasqr / event_.length - event_.mean * event_.mean;
-    event_.stdv = sqrtf(fmaxf(var, 0.0f));
+    //const float deltasqr = (sumsq[evt_en_buf] - evt_st_sumsq);
+    //const float var = deltasqr / event_.length - event_.mean * event_.mean;
+    //event_.stdv = sqrtf(fmaxf(var, 0.0f));
 
     event_.mean = calibrate(event_.mean);
-    event_.stdv = calibrate(event_.stdv);
+    //event_.stdv = calibrate(event_.stdv);
 
     evt_st = evt_en;
     evt_st_sum = sum[evt_en_buf];

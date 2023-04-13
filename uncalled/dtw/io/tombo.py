@@ -5,10 +5,10 @@ from ..aln_track import AlnTrack
 from ...signal_processor import ProcessedRead
 from ...index import str_to_coord, RefCoord
 from ...pore_model import PoreModel
-from ...fast5 import Fast5Reader
 from ont_fast5_api.fast5_interface import get_fast5_file
 from . import TrackIO
 import _uncalled
+from ...aln import AlnDF
 
 class Tombo(TrackIO):
     FORMAT = "tombo"
@@ -33,12 +33,11 @@ class Tombo(TrackIO):
     def init_read_mode(self):
         name = self.filename
         
-        if self.conf.pore_model.name == "r94_rna":
-            self.conf.pore_model.name = "r94_rna_tombo"
+        self.conf.pore_model.name = os.path.join("tombo", self.conf.pore_model.name)
 
-        self.conf.fast5_reader.fast5_files = self.prms.tombo_in
+        self.conf.read_index.paths = self.prms.tombo_in
 
-        self.in_id = self.init_track(name, name, self.conf)
+        self.track_in = self.init_track(name, name, self.conf)
 
     #def init_fast5(self, fast5):
     #    self.
@@ -47,16 +46,15 @@ class Tombo(TrackIO):
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
         
-        #f5reader = self.fast5_in #Fast5Reader(conf=self.conf)
         read_filter = self.read_index.read_filter #f5reader.get_read_filter()
-        fast5_files = self.read_index.file_paths #f5reader.prms.fast5_files
+        paths = self.read_index.file_info.values() #f5reader.prms.paths
 
-        if self.conf.fast5_reader.max_reads > 0 and len(fast5_files) > self.conf.fast5_reader.max_reads:
-            fast5_files = fast5_files[:self.conf.fast5_reader.max_reads]
+        if self.conf.read_index.read_count is not None and len(paths) > self.conf.read_index.read_count:
+            paths = paths[:self.conf.read_index.read_count]
 
         aln_id = 1
 
-        for fast5_fname in fast5_files:
+        for _,fast5_fname in paths:
             fast5_basename = os.path.basename(fast5_fname)
 
             try:
@@ -80,15 +78,16 @@ class Tombo(TrackIO):
                 #TODO debug logs
                 continue
 
-
             is_rna = handle.attrs["rna"]
             if is_rna != self.conf.is_rna:
                 raise RuntimeError("Reads appear to be RNA but --rna not specified")
 
             self.fast5_in = fast5_fname
-            self.read_id_in = read.read_id
+            read_id = read.read_id
 
             aln_attrs = dict(handle["Alignment"].attrs)
+
+            chrom = aln_attrs["mapped_chrom"]
 
             fwd = aln_attrs["mapped_strand"] == "+"
             if fwd:
@@ -104,18 +103,25 @@ class Tombo(TrackIO):
             else:
                 clip = 0
 
-            ref_bounds = RefCoord(aln_attrs["mapped_chrom"],start, end,fwd)
+            sam = None
+            for read_sam in self.tracks.bam_in.iter_read(read_id):
+                if read_sam.reference_name == chrom and start >= read_sam.reference_start and end < read_sam.reference_end:
+                    sam = read_sam
+                    break
 
-            sig_fwd = ref_bounds.fwd != is_rna
+            #ref_bounds = RefCoord(aln_attrs["mapped_chrom"],start, end,fwd)
 
-            coords = ref_index.get_coord_space(ref_bounds, is_rna=is_rna, load_kmers=True, kmer_trim=True)
-            #aln_id,_ = tracks.init_alignment(read.read_id, fast5_fname, coords)
+            sig_fwd = fwd != is_rna
+
+            if sig_fwd:
+                mpos = pd.RangeIndex(start+2, end-2)
+                step = 1
+            else:
+                mpos = pd.RangeIndex(-end+2, -start-2)
+                step = -1
 
             tombo_events = np.array(handle["Events"])[clip:]
 
-            #if not ref_bounds.fwd:
-            #    tombo_events = tombo_events[::-1]
-                
             tombo_start = handle["Events"].attrs["read_start_rel_to_raw"]
             
             raw_len = len(read.get_raw_data())
@@ -123,48 +129,31 @@ class Tombo(TrackIO):
 
 
             lengths = tombo_events["length"]
-            currents = tombo_events["norm_mean"]
+            currents = self.track_in.model.pa_to_norm(tombo_events["norm_mean"])
 
             if is_rna:
                 starts = raw_len - tombo_start - starts - tombo_events["length"]
 
-            #if is_rna == ref_bounds.fwd:
-            refs = coords.refs[2:-2]
-            pacs = coords.pacs[2:-2] #ref_to_pac(df["position"].to_numpy()+kmer_trim[0])
+            df = pd.DataFrame({
+                    "mpos" : mpos,#[2:-2]
+                    "start"  : starts[::step],
+                    "length" : lengths[::step],
+                    "current"   : currents[::step],
+                    #"kmer" : kmers.to_numpy()
+                 })#, index=idx)
 
-            kmers = coords.ref_kmers.droplevel(0).loc[refs]
+            coords = RefCoord(read_sam.reference_name, start, end, fwd)
 
-            idx = pd.MultiIndex.from_product(
-                    [[self.in_id], [fwd], pacs, [aln_id]], names=("track_id","fwd","pac","aln_id"))
+            #lengths.fillna(-1, inplace=True)
+            aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read_id, read_sam.reference_id, coords, read_sam)
 
-            layers = pd.DataFrame({
-                    "start"  : starts,
-                    "length" : lengths,
-                    "current"   : currents,
-                    "kmer" : kmers.to_numpy()
-                 }, index=idx)
+            dtw = AlnDF(aln.seq, np.array(starts[::step]), np.array(lengths[::step]), np.array(currents[::step])) #df["stdv"])
 
-            samp_start = layers["start"].min()
-            e = layers["start"].argmax()
-            samp_end = layers["start"].iloc[e] + layers["length"].iloc[e]
-
-            layers = pd.concat({"dtw" : layers}, names=("group","layer"), axis=1).sort_index()
-
-            alns = pd.DataFrame({
-                    "id" : [aln_id],
-                    "track_id" : [self.in_id],
-                    "read_id" : [read.read_id],
-                    "ref_name" : [coords.ref_name],
-                    "ref_start" : [coords.refs.start],
-                    "ref_end" : [coords.refs.stop],
-                    "fwd" :     [coords.fwd],
-                    "samp_start" : [samp_start],
-                    "samp_end" : [samp_end],
-                    "tags" : [""]}).set_index(["track_id", "id"])
+            aln.set_dtw(dtw)
 
             aln_id += 1
 
-            yield alns,layers
+            yield aln#s,layers
             
     def write_alignment(self, alns):
         pass

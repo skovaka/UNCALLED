@@ -7,7 +7,6 @@ import time
 import sys
 
 from .. import config
-from ..fast5 import parse_read_ids
 from ..dtw.layers import LAYER_META, parse_layer, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks, REFSTAT_LABELS, COMPARE_REFSTATS
@@ -31,14 +30,14 @@ class Refplot:
         names = [t.name for t in self.tracks.alns]
 
         if self.prms.kmer_coord is None:
-            self.refs = self.tracks.coords.refs
+            self.refs = pd.RangeIndex(self.tracks.coords.start, self.tracks.coords.end)
             mid_plot = len(self.refs)//2
         else:
             st = en = self.prms.kmer_coord 
-            st -= self.tracks.index.trim[0]
-            en += self.tracks.index.trim[1] + 1
+            st -= self.tracks.model.shift #index.trim[0]
+            en += self.tracks.model.K - self.tracks.model.shift #index.trim[1] + 1
             self.refs = pd.RangeIndex(st, en)
-            mid_plot = self.tracks.index.trim[0]
+            mid_plot = self.tracks.model.shift
 
         self.layer, = parse_layer(self.prms.layer)
 
@@ -68,8 +67,7 @@ class Refplot:
             showlegend=False,
         )
 
-        self.fig.update_xaxes(title=self.tracks.coords.ref_name, row=1, col=mid_plot+1)
-            #title=self.tracks.coords.ref_name, title_x=0.5, title_y=0.05,
+        self.fig.update_xaxes(title=self.tracks.coords.name, row=1, col=mid_plot+1)
 
         #if self.prms.share_reads:
         self.fig.update_yaxes(
@@ -82,7 +80,7 @@ class Refplot:
 
         for r,ref in enumerate(self.refs):
             for i,track in enumerate(self.tracks.alns):
-                vals = track.layers.loc[ref,self.layer].dropna()
+                vals = self.tracks.layers.loc[(track.name,slice(None),ref),self.layer].dropna()
                 counts, bins = np.histogram(vals, bins=25)
                 dens = counts / counts.sum()
                 if len(self.tracks.alns) == 2 and i == 1:

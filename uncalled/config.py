@@ -32,7 +32,6 @@ from _uncalled import _Conf
 
 TOML_TYPES = {int, float, str, list, bool}
 
-#TODO make this a factory function or whatever
 Param = namedtuple("Param", ["name", "default", "type", "doc"])
 class ParamGroup:
     _name = None
@@ -110,7 +109,10 @@ class Config(_Conf):
             setattr(self, name, cls())
 
         if conf is not None:
-            self.load_config(conf)
+            if isinstance(conf, _Conf):
+                self.load_config(conf)
+            elif isinstance(conf, dict):
+                self.load_dict(conf)
         
         if toml is not None:
             self.load_toml(text=toml)
@@ -124,7 +126,7 @@ class Config(_Conf):
         return (not self.is_default(name, group) and
                 not name.startswith("_") and
                 type(val) in TOML_TYPES and
-                (not hasattr(val, "__len__") or len(val) > 0))
+                (not hasattr(val, "__len__") or len(val) > 0 or isinstance(val, str)))
 
     def load_config(self, other, ignore_defaults=True):
         for param in self._GLOBAL_PARAMS:
@@ -143,10 +145,11 @@ class Config(_Conf):
             for param in dir(ogroup):
                 if not (param.startswith("_") or (ignore_defaults and other.is_default(param, group))):
                     val = getattr(ogroup, param)
-                    if isinstance(val, ParamGroup):
-                        _load_group(".".join([group,param]))
-                    else:
-                        setattr(sgroup, param, val)
+                    if not callable(val):
+                        if isinstance(val, ParamGroup):
+                            _load_group(".".join([group,param]))
+                        else:
+                            setattr(sgroup, param, val)
 
         for group_name in groups:
             ogroup = getattr(other, group_name)
@@ -160,26 +163,34 @@ class Config(_Conf):
 
 
     def to_toml(self, filename=None, force_all=False):
+        ret = self.to_dict(force_all)
+        if filename is None:
+            return toml.dumps(ret)
+        else:
+            with open(filename, "w") as fout:
+                toml.dump(ret, fout)
 
+
+    def to_dict(self, force_all=False):
         def fmt(val):
             if isinstance(val, str) and os.path.exists(val):
                 return os.path.abspath(val)
             return val
         
-        out = dict()
+        ret = dict()
 
         for param in self._GLOBAL_PARAMS:
             val = getattr(self,param)
             if self._param_writable(param, val, ignore=not force_all):
-                out[param] = fmt(val)
+                ret[param] = fmt(val)
 
         for param, val in vars(self).items():
             if self._param_writable(param, val, ignore=not force_all):
-                out[param] = fmt(val)
+                ret[param] = fmt(val)
 
         groups = self._PARAM_GROUPS + list(self._EXTRA_GROUPS.keys())
 
-        def write_group(group_name, out):
+        def write_group(group_name, ret):
             group = self.get_group(group_name)
 
             vals = dict()
@@ -188,28 +199,18 @@ class Config(_Conf):
                 if self._param_writable(param, val, group_name, ignore=not force_all):
                     vals[param] = fmt(val)
                 elif isinstance(val, ParamGroup):
-                    #out[param] = dict()
+                    #ret[param] = dict()
                     write_group(f"{group_name}.{param}", vals)
 
             if len(vals) > 0:
-                out[group_name.split(".")[-1]] = fmt(vals)
+                ret[group_name.split(".")[-1]] = fmt(vals)
 
         for group_name in groups:
-            write_group(group_name, out)
+            write_group(group_name, ret)
 
-        if filename is None:
-            return toml.dumps(out)
-        else:
-            with open(filename, "w") as fout:
-                toml.dump(out, fout)
+        return ret
 
-    def load_toml(self, filename=None, text=None):
-        if filename is not None:
-            toml_dict = toml.load(filename)
-        elif text is not None:
-            toml_dict = toml.loads(text)
-
-
+    def load_dict(self, d):
         def load_group(name, vals):
             group = self.get_group(name)
             if group is None:
@@ -225,12 +226,20 @@ class Config(_Conf):
                     elif self.is_default(param, name):
                         setattr(group, param, value)
 
-        for name, val in toml_dict.items():
+        for name, val in d.items():
             if isinstance(val, dict):
                 load_group(name, val)
             else:
                 if self.is_default(name):
                     setattr(self, name, val)
+
+    def load_toml(self, filename=None, text=None):
+        if filename is not None:
+            toml_dict = toml.load(filename)
+        elif text is not None:
+            toml_dict = toml.loads(text)
+        self.load_dict(toml_dict)
+
 
     #support pickling via toml
     def __setstate__(self, toml):
@@ -260,7 +269,7 @@ class Config(_Conf):
     
     @property
     def is_rna(self):
-        return not self.read_buffer.seq_fwd
+        return self.pore_model.reverse
 
     def is_default(self, param, group=None):
         sg = self.get_group(group)
@@ -285,37 +294,46 @@ class Config(_Conf):
         return getattr(sg, param, None) == getattr(dg, param, None)
 
 CONF_KW = "conf"
+PARAM_KW = "params"
 
-def _init_group(name, *args, copy_conf=True, **kwargs):
+def _init_group(group_name, *args, _param_names=None, copy_conf=True, **kwargs):
     if not copy_conf and CONF_KW in kwargs:
         conf = kwargs[CONF_KW]
     else:
         conf = Config(kwargs.get(CONF_KW, rc))
 
-    if not hasattr(conf, name):
-        raise ValueError("Invalid parameter group: " + str(name))
+    if PARAM_KW in kwargs:
+        setattr(conf, group_name, kwargs[PARAM_KW])
 
-    params = getattr(conf, name)
+    if not hasattr(conf, group_name):
+        raise ValueError("Invalid parameter group: " + str(group_name))
 
-    if len(args) > params.count:
-        raise ValueError("Too many arguments for " + name)
+    group = getattr(conf, group_name)
+
+    if _param_names is None:
+        _param_names = group._order
+    elif not isinstance(_param_names, list):
+        raise ValueError(f"Unknown parameters: {_param_names}")
+
+    if len(args) > len(_param_names):
+        raise ValueError("Too many arguments for " + group_name)
 
     arg_params = set()
     
     for i,val in enumerate(args):
-        arg = params._order[i]
+        arg = _param_names[i]
         arg_params.add(arg)
-        setattr(params, arg, val)
+        setattr(group, arg, val)
 
     for arg, val in kwargs.items():
         if arg in arg_params:
             raise ValueError("Conflicting *arg and **kwarg values for %s.%s" % (name, param))
 
-        if hasattr(params, arg):
-            setattr(params, arg, val)
+        if hasattr(group, arg):
+            setattr(group, arg, val)
 
-        elif arg != CONF_KW:
+        elif arg not in [CONF_KW, PARAM_KW]:
             raise ValueError("Unknown kwarg \"%s\" for %s parameters" % (arg, name))
 
-    return conf, params
+    return conf, group
 

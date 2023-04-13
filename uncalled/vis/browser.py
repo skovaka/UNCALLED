@@ -16,7 +16,6 @@ from ..dtw.tracks import Tracks
 from ..dtw.layers import LAYER_META, parse_layer
 from ..argparse import Opt, comma_split
 from ..config import Config
-from ..fast5 import parse_read_ids
 
 from time import time
 
@@ -24,8 +23,9 @@ def browser(conf):
     """Interactive signal alignment genome browser"""
     conf.tracks.load_mat = True
     conf.tracks.load_fast5s = True
-    #conf.tracks.refstats_layers = ["cmp.mean_ref_dist"]
-    conf.tracks.layers=["dtw","dtw.dwell","dtw.model_diff","dtw.middle","bcaln.middle","bcaln","cmp","bc_cmp"]
+    #conf.tracks.refstats_layers = ["cmp.dist"]
+    conf.tracks.layers=["dtw","dtw.dwell","dtw.model_diff","dtw.middle_sec","moves.middle_sec","cmp","mvcmp", "dtw.start_sec", "dtw.length_sec", "moves.start_sec", "moves.length_sec", "seq.pos", "seq.fwd", "seq.kmer", "seq.current"]
+    
     sys.stderr.write("Loading tracks...\n")
 
     t = time()
@@ -214,20 +214,22 @@ def new_browser(tracks, conf):
         if len(track_names) == 0:
             track_names = None
 
-        chunk = chunk.slice(tracks=track_names, shared_reads=shared_reads, full_overlap=full_overlap)
+        chunk = tracks.slice(tracks=track_names, shared_reads=shared_reads, full_overlap=full_overlap)
 
         if click is not None:
             coord = click["points"][0]
             ref = coord["x"]
+            track_idx = coord["curveNumber"]
 
-            if coord["curveNumber"] < len(chunk):
-                track = chunk.alns[coord["curveNumber"]]
-                aln = track.alignments.iloc[coord["y"]]
-                read = aln["read_id"]
+            if track_idx < len(chunk):
+                track_id = chunk.mat.index.levels[0][track_idx]
 
-                layers = track.layers.loc[(ref, aln.name)]["dtw"]
+                aln_id = chunk.mat.loc[track_id].iloc[coord["y"]].name
+                read = chunk.alignments.loc[(track_id,aln_id), "read_id"]
 
-                table.append(html.Tr(html.Td(html.B("%s:%d" % (chunk.coords.ref_name, ref)), colSpan=2)))
+                layers = chunk.layers.loc[(track_id, aln_id, ref)]["dtw"]
+
+                table.append(html.Tr(html.Td(html.B("%s:%d" % (chunk.coords.name, ref)), colSpan=2)))
                 table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
                 for l in ["current", "dwell", "model_diff", "events"]:
                     if not l in layers: continue

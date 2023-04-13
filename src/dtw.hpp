@@ -5,8 +5,8 @@
 #include <iostream>
 #include <cfloat>
 #include "util.hpp"
-#include "pore_model.hpp"
-#include "dataframe.hpp"
+#include "seq.hpp"
+#include "aln.hpp"
 
 enum class DTWSubSeq {NONE, ROW, COL};
 enum class DTWCostFn {ABS_DIFF, NORM_PDF, Z_SCORE};
@@ -16,7 +16,7 @@ struct DtwParams {
     float move_cost, stay_cost, skip_cost,
           band_shift;
     i32 del_max, ins_max, band_width, iterations;
-    std::string norm_mode, band_mode, cost_fn, mm2_paf;
+    std::string norm_mode, band_mode, cost_fn;
     bool save_bands;
 };
 
@@ -243,15 +243,6 @@ struct Coord {
 #endif
 
 
-//TODO 
-// redo dataframes so it's
-//create ReadAln, contains DtwDF, BcalnDF, and aln info:
-//store coordinates (list of ref bound pairs), use to index DFs
-//aln_id, read_id, ref_name, ref_start, ref_end, ref_fwd, samp_start, samp_en
-//Eventually construct AlnTrack in C++ by concating ReadAlns
-//   contains alignments and layers DFs, probably distinct from ReadAln
-//   sortable and indexable by aln_id, ref
-
 struct DtwDF : public DataFrame<int, int, float, float> {
     static constexpr NameArray names = {"start", "length", "current", "stdv"}; 
     ColType<0> &start = std::get<0>(data_);  
@@ -268,14 +259,14 @@ struct DtwDF : public DataFrame<int, int, float, float> {
             if (itr->ref > prev_ref) {
                 if (prev_ref >= 0) {
                     auto evt = read.merge_events(qry_st, itr->qry);
+                    //std::cout << i << " " << evt.start << " " << evt.mean << " ";
                     start[i] = evt.start;
                     length[i] = evt.length;
                     current[i] = evt.mean;
                     stdv[i] = evt.stdv;
-                    //std::cout << "DONE " << length[i] << " " << current[i] << " " << stdv[i] << "\n";
-                    //std::cout.flush();
                     i++;
                 }
+                //std::cout << ((itr->ref)-prev_ref) << "\n"; 
                 prev_ref = itr->ref;
                 qry_st = itr->qry;
             }
@@ -285,35 +276,32 @@ struct DtwDF : public DataFrame<int, int, float, float> {
         length[i] = evt.length;
         current[i] = evt.mean;
         stdv[i] = evt.stdv;
+
+        //std::cout.flush();
     }
 
-    //using DataFrame::data_;
+    void set_signal(const ProcessedRead &read) {
+        if (current.size() == 0) {
+            current = ValArray<float>(height);
+            stdv = ValArray<float>(height);
+        }
 
-    //int aln_id;
-    //std::string read_id, ref_name;
-    //int ref_start, ref_end;
-    //bool ref_fwd;
-    //int samp_start, samp_end;
+        for (size_t i = 0; i < height; i++) {
+            auto seg = static_cast<std::valarray<float>>(read.signal[std::slice(start[i], length[i], 1)]);
+            current[i] = seg.sum() / seg.size();
+            auto deltas = seg - current[i];
+            stdv[i] = sqrt((deltas*deltas).sum() / seg.size());
+        }
+    }
 
-    //ReadAln(int aln_id_, std::string read_id_, std::string ref_name_, int ref_start_, int ref_end_, bool ref_fwd_, int samp_start_, int samp_end_) : ReadAln(ref_end_-ref_start_) {
-    //    aln_id = aln_id_;
-    //    read_id = read_id_;
-    //    ref_name = ref_name_;
-    //    ref_start = ref_start_;
-    //    ref_end = ref_end_;
-    //    ref_fwd = ref_fwd_;
-    //    samp_start = samp_start_;
-    //    samp_end = samp_end_;
-    //}
-
-    //#define ALN_ATTR(A) c.def_readwrite(#A, &ReadAln::A);
-    //static py::class_<ReadAln> pybind(py::module_ &m) {
-    //    auto c = DataFrame::pybind<ReadAln>(m, "_ReadAln");
-    //    c.def(py::init<const std::vector<Coords> &, const ProcessedRead &, size_t>());
-    //    
-    //    return c;
-    //}
+    static py::class_<DtwDF> pybind(py::module_ &m) {
+        auto c = DataFrame::pybind<DtwDF>(m, "_DtwDF");
+        c.def("set_signal", &DtwDF::set_signal);
+        return c;
+    }
 };
+
+
 
 template <typename ModelType>
 class BandedDTW {
@@ -555,8 +543,15 @@ class BandedDTW {
             path_k -= shift;
         }
 
+        auto c = path_.back();
+        c.qry = event_start_;
+        while (c.ref > 0) {
+            c.ref -= 1;
+            path_.push_back(c);
+        }
+
         //std::cout << "\n";
-        path_.push_back({event_start_,0});
+        //path_.push_back({event_start_,0});
     }
 
     std::vector<Coord> get_path() {
@@ -565,6 +560,33 @@ class BandedDTW {
 
     DtwDF get_aln() {
         return DtwDF(path_, qry_vals_, ref_size());
+    }
+
+    void fill_aln(Alignment<ModelType> &aln) {
+        aln.dtw = AlnDF(aln.seq.mpos);
+        auto &dtw = aln.dtw;
+
+        i32 i = 0, prev_ref = -1, qry_st = -1;
+        //Event evt{-1,-1,-1,-1};
+        for (auto itr = path_.rbegin(); itr != path_.rend(); itr++) {
+            if (itr->ref > prev_ref) {
+                if (prev_ref >= 0) {
+                    auto evt = qry_vals_.merge_events(qry_st, itr->qry);
+                    dtw.samples.append(evt.start, evt.start+evt.length);
+                    dtw.current[i] = evt.mean;
+                    dtw.current_sd[i] = evt.stdv;
+                    i++;
+                }
+                //std::cout << ((itr->ref)-prev_ref) << "\n"; 
+                prev_ref = itr->ref;
+                qry_st = itr->qry;
+            }
+        }
+        auto evt = qry_vals_.merge_events(qry_st, path_.front().qry);
+        dtw.samples.append(evt.start, evt.start+evt.length);
+        dtw.current[i] = evt.mean;
+        dtw.current_sd[i] = evt.stdv;
+
     }
 
     float score() {
@@ -680,6 +702,7 @@ class BandedDTW {
         //c.def_readonly("ll", BandedDTW<ModelType>::ll_);
         PY_BANDED_DTW_METH(mean_score)
         PY_BANDED_DTW_METH(get_flat_mat)
+        PY_BANDED_DTW_METH(fill_aln)
 
         c.def_property_readonly("ll", [](BandedDTW<ModelType> &d) -> pybind11::array_t<Coord> {
              return pybind11::array_t<Coord>(d.ll_.size(), d.ll_.data);

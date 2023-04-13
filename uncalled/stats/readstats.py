@@ -75,7 +75,7 @@ class Readstats:
                 row.append(Readstats._DESC_FNS[stat](desc))
             rows.append(row)
             
-        return pd.DataFrame(rows, columns=["aln_id", "read_id"] + summary_stats)
+        return pd.DataFrame(rows, columns=["aln.id", "read_id"] + summary_stats)
 
     @staticmethod
     def pca(track, layer=None, components=True, prms=None):

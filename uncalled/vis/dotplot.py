@@ -14,9 +14,7 @@ from .. import config
 from ..dtw.layers import LAYER_META, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
-from ..dtw.bcaln import Bcaln
 from ..argparse import Opt, comma_split
-from ..fast5 import parse_read_ids
 
 class Dotplot:
 
@@ -26,17 +24,18 @@ class Dotplot:
     #plot_read(read_id) -> fig
 
     REQ_LAYERS = [
-        "start", "length", "middle", 
-        "current", "dwell", "kmer", "base", 
-        "bcaln.middle"
+        "start", "length", "middle_sec", 
+        "current", "dwell", "seq.kmer",  
+        "moves.middle_sec", "seq.current",
+        "start_sec", "length_sec"
     ]
 
     def __init__(self, *args, **kwargs):
         self.conf, self.prms = config._init_group("dotplot", *args, **kwargs)
 
         req_layers = self.REQ_LAYERS.copy()
-        if self.prms.show_bands:
-            req_layers.append("band")
+        #if self.prms.show_bands:
+        #    req_layers.append("band")
 
         self.conf.tracks.layers = req_layers + self.prms.layers
 
@@ -93,16 +92,16 @@ class Dotplot:
             shared_xaxes=True,
             shared_yaxes=True)
 
-        tracks_filter,colors_filter = zip(*[(t,c) for t,c in zip(tracks.alns,self.conf.vis.track_colors) if t.name != self.prms.bcaln_track])
-        #colors_filter = [t for t in tracks if t.name != self.prms.bcaln_track]
+        tracks_filter,colors_filter = zip(*[(t,c) for t,c in zip(tracks.alns,self.conf.vis.track_colors) if t.name != self.prms.moves_track])
+        #colors_filter = [t for t in tracks if t.name != self.prms.moves_track]
 
         Sigplot(tracks, conf=self.conf).plot(fig)
 
-        hover_layers = [("dtw", "middle"),("dtw","kmer"),("dtw","current"),("dtw","dwell")] + self.layers
+        hover_layers = [("dtw", "middle_sec"),("seq","kmer"),("dtw","current"),("dtw","dwell")] + self.layers
         #hover_layers += (l for l in self.prms.layers if l not in {"current","dwell"})
         hover_data = dict()
 
-        coords = None
+        coords = tracks.coords
 
         flipped = True
         fwd = True
@@ -111,27 +110,15 @@ class Dotplot:
 
             track_hover = list()
 
-            if track.coords is not None:
-                coords = track.coords
-
-            has_bcaln = "bcaln" in track.layers.columns.get_level_values("group")
-            only_bcaln = self.prms.bcaln_track == track.name
+            has_moves = "moves" in self.tracks.layers.columns.get_level_values("group")
+            only_moves = self.prms.moves_track == track.name
             model = track.model
 
-
             first_aln = True
-            for aln_id, aln in track.alignments.iterrows():
-                layers = track.layers \
-                              .loc[(slice(None),aln_id), slice(None)] \
-                              .droplevel("aln_id")
-
-                layers["dtw","start"] /=    float(self.conf.read_buffer.sample_rate)
-                layers["dtw","length"] /=   float(self.conf.read_buffer.sample_rate)
-                #layers["bcaln","start"] /=  float(self.conf.read_buffer.sample_rate)
-                #layers["bcaln","length"] /= float(self.conf.read_buffer.sample_rate)
-                if has_bcaln:
-                    layers["bcaln","middle"] /= float(self.conf.read_buffer.sample_rate)
-                layers["dtw","middle"] /=   float(self.conf.read_buffer.sample_rate)
+            for aln_id, aln in tracks.alignments.loc[track.name].iterrows():
+                layers = self.tracks.layers \
+                              .loc[(track.name,aln_id), slice(None)]#,slice(None)), slice(None)] \
+                              #.droplevel("aln.id")
 
                 
                 fwd = fwd and aln["fwd"]
@@ -160,21 +147,21 @@ class Dotplot:
                         showlegend=False
                     ), row=2, col=1)
                 
-                if has_bcaln:
-                    self._plot_bcaln(fig, legend, layers)
+                if has_moves:
+                    self._plot_moves(fig, legend, layers)
 
-                if not only_bcaln: 
+                if not only_moves: 
                     fig.add_trace(go.Scattergl(
-                        x=layers["dtw","start"], y=layers.index,
+                        x=layers["dtw","start_sec"], y=layers.index,
                         name=track.desc,
                         legendgroup=track.name,
                         line={
                             "color":self.conf.vis.track_colors[i], 
-                            "width":2, "shape" : "vh"  },
+                            "width":2, "shape" : "hv" if flipped else "vh" },
                         hoverinfo="skip",
                         showlegend=first_aln
                     ), row=2, col=1)
-                if only_bcaln: continue
+                if only_moves: continue
 
                 track_hover.append(layers[hover_layers])
                     
@@ -213,27 +200,27 @@ class Dotplot:
                 hover_data[track.name] = pd.concat(track_hover)#.reset_index()
                 hover_data[track.name] = track_hover[0]#.reset_index()
 
-        #if self.prms.bcaln_error:
+        #if self.prms.moves_error:
         #    for i,track in enumerate(tracks):
-        #        if not ("bcaln","error") in track.layers.columns: 
+        #        if not ("moves","error") in track.layers.columns: 
         #            continue
         #        for aln_id, aln in track.alignments.iterrows():
-        #            layers = track.layers.loc[(slice(None),aln_id)].droplevel("aln_id")
+        #            layers = track.layers.loc[(slice(None),aln_id)].droplevel("aln.id")
         #            self._plot_errors(fig, legend, layers)
 
         if len(hover_data) > 0:
             hover_data = pd.concat(hover_data, axis=1)
-            hover_coords = hover_data.xs("middle", axis=1, level=2).mean(axis=1)
+            hover_coords = hover_data.xs("middle_sec", axis=1, level=2).mean(axis=1)
 
             hover_kmers = model.kmer_to_str(
                 hover_data.xs("kmer", 1, 2)
                           .fillna(method="pad", axis=1)
                           .iloc[:,-1])
 
-            customdata = hover_data.drop(["kmer","middle"], axis=1, level=2).to_numpy()
+            customdata = hover_data.drop(["kmer","middle_sec"], axis=1, level=2).to_numpy()
 
             hover_rows = [
-                "<b>" + coords.ref_name + ":%{y:,d} [%{text}]</b>"
+                "<b>" + coords.name + ":%{y:,d} [%{text}]</b>"
             ]
             labels = [LAYER_META.loc[(g,l),"label"] for g,l in hover_layers[2:]]
 
@@ -270,7 +257,7 @@ class Dotplot:
 
         strand = "+" if fwd else "-"
         fig.update_yaxes(row=2, col=1,
-            title_text=tracks.coords.ref_name + f" ({strand})")
+            title_text=tracks.coords.name + f" ({strand})")
 
         for i,(group,layer) in enumerate(self.layers):
             fig.update_xaxes(row=2, col=i+2,
@@ -310,25 +297,25 @@ class Dotplot:
 
         return fig
 
-    def _plot_bcaln(self, fig, legend, layers):
+    def _plot_moves(self, fig, legend, layers):
         fig.add_trace(go.Scattergl(
-            x=layers["bcaln","middle"], y=layers.index,#-2, #-1
-            #x=layers["bcaln","start"], y=layers.index,#+2, #-1
+            x=layers["moves","middle_sec"], y=layers.index,#-2, #-1
+            #x=layers["moves","start_sec"], y=layers.index,#+2, #-1
             name="Basecalled Alignment",
             mode="markers", marker={"size":5,"color":"orange"},
             #line={"color":"orange", "width":2, "shape" : "vh"},
-            legendgroup="bcaln",
+            legendgroup="moves",
             hoverinfo="skip",
-            showlegend="bcaln_starts" not in legend
+            showlegend="moves_starts" not in legend
         ), row=2, col=1)
-        legend.add("bcaln_starts")
+        legend.add("moves_starts")
 
 
     #def _plot_errors(self, fig, legend, layers):
-    #    if ("bcaln","error") not in layers.columns:
+    #    if ("moves","error") not in layers.columns:
     #        return 
 
-    #    errors = layers["bcaln","error"].dropna()
+    #    errors = layers["moves","error"].dropna()
     #    sub = errors[errors.str.startswith("*")].str.slice(2)
 
     #    ins = errors[errors.str.startswith("+")]\
@@ -347,7 +334,7 @@ class Dotplot:
     #        refs = sub.index[sub.str.match(base)]
     #        if len(refs) > 0:
     #            fig.add_trace(go.Scattergl(
-    #                x=layers.loc[refs, ("bcaln","start")],
+    #                x=layers.loc[refs, ("moves","start")],
     #                y=refs+2,
     #                mode="markers",
     #                marker_line_color=self.conf.vis.base_colors[b],
@@ -357,15 +344,15 @@ class Dotplot:
     #                #hoverinfo="skip",
     #                legendgroup="Bcaln Error",
     #                name="SUB",
-    #                showlegend="bcaln_sub" not in legend,
+    #                showlegend="moves_sub" not in legend,
     #                legendrank=3
     #            ), row=2, col=1)
-    #            legend.add("bcaln_sub")
+    #            legend.add("moves_sub")
 
     #        refs = ins.index[ins.str.match(base)]
     #        if len(refs) > 0:
     #            fig.add_trace(go.Scattergl(
-    #                x=layers.loc[refs, ("bcaln","start")],
+    #                x=layers.loc[refs, ("moves","start")],
     #                y=refs+2,
     #                mode="markers",
     #                marker_line_color=self.conf.vis.base_colors[b],
@@ -375,14 +362,14 @@ class Dotplot:
     #                #hoverinfo="skip",
     #                legendgroup="Bcaln Error",
     #                name="INS",
-    #                showlegend="bcaln_ins" not in legend,
+    #                showlegend="moves_ins" not in legend,
     #                legendrank=4
     #            ), row=2, col=1)
-    #            legend.add("bcaln_ins")
+    #            legend.add("moves_ins")
 
     #        refs = del_.index[del_.str.match(base)]
     #        if len(refs) > 0:
-    #            starts = layers[("bcaln","start")].dropna()
+    #            starts = layers[("moves","start")].dropna()
     #            idxs = starts.index.get_indexer(refs,method="nearest")
     #            samps = starts.iloc[idxs]
 
@@ -397,10 +384,10 @@ class Dotplot:
     #                #hoverinfo="skip",
     #                name="DEL",
     #                legendgroup="Bcaln Error",
-    #                showlegend="bcaln_del" not in legend,
+    #                showlegend="moves_del" not in legend,
     #                legendrank=5
     #            ), row=2, col=1)
-    #            legend.add("bcaln_del")
+    #            legend.add("moves_del")
 
 
 

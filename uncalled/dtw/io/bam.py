@@ -6,27 +6,41 @@ import array
 import os
 import re
 import time
+import json
 from collections import defaultdict, deque
+from ..moves import sam_to_ref_moves, INT32_NA
 from ..aln_track import AlnTrack
 from ..layers import LAYER_META, parse_layers
 from ...index import RefCoord
 from ... import PoreModel
 from ... import Config
+from ...aln import Alignment, AlnDF
 from . import TrackIO
-import _uncalled 
+from _uncalled import IntervalIndexI64, ValArrayI16, _RefCoord
+
 
 REF_TAG  = "ur"
 SAMP_TAG = "us"
-NORM_TAG = "un"
 LENS_TAG = "ul"
 CURS_TAG = "uc"
 STDS_TAG = "ud"
+
+#BamLayer = namedtuple("BamLayer", ["name","dtype","shift","scale"], defaults=[None,None,None,None])
+LAYER_TAGS = {
+    "dtw.length"     : LENS_TAG,
+    "dtw.current"    : CURS_TAG,
+    "dtw.current_sd" : STDS_TAG,
+}
+LAYER_PREFIXES = ["u","v","w","x","y","z"]
+
+REQ_ALN_TAGS = [REF_TAG, LENS_TAG, CURS_TAG]
 
 class BAM(TrackIO):
     FORMAT = "bam"
 
     def __init__(self, filename, write, tracks, track_count):
         TrackIO.__init__(self, filename, write, tracks, track_count)
+        self.layer_tags = None
 
         if write:
             if not self.prms.buffered:
@@ -49,40 +63,70 @@ class BAM(TrackIO):
         self.header = self.input.header.to_dict()
 
         conf = None
+        self.track_in = None
         if "CO" in self.header:
             for line in self.header["CO"]:
                 if not line.startswith("UNC:"): continue
-                toml = re.sub(r"(?<!\\);", "\n", line[4:]).replace("\\;",";")
-                conf = Config(toml=toml)
+                prms = json.loads(line[4:])
+                
+                self.conf.tracks.ref_index = prms["reference"]
 
-        if conf is None:
-            conf = self.conf
-            #toml = self.conf.to_toml()
+                for name,vals in prms["tracks"].items():
+                    c = self.conf.to_dict()
+                    if not "pore_model" in c:
+                        c["pore_model"] = {}
+                    c["pore_model"].update(prms["models"][vals["model"]])
+                    conf = Config(c)
+                    conf.read_index.paths = vals["read"]["paths"]
+                    conf.read_index.read_index = vals["read"]["index"]
 
-        name = os.path.basename(self.filename)
-        self.in_id = self.init_track(name, name, conf)
+                    #TODO handle multiple tracks
+                    self.track_in = self.init_track(name, vals["desc"], conf)
+                    self.layer_tags = vals["layers"]
+
+        if self.track_in is None:
+            name = os.path.basename(self.filename)
+            self.track_in = self.init_track(name, name, self.conf)
+
+        #if conf is None:
+        #    conf = self.conf
+        #self._init_tags(conf.tracks.io.bam_tags)
+        #name = os.path.basename(self.filename)
+        #self.track_in = self.init_track(name, name, conf)
+
+        self.read_id_index = None
 
         self.in_alns = None
 
-        self.aln_id_in = 1
-
     def reset(self):
         self.input.reset()
-        self.aln_id_in = 1
+
+    def iter_read(self, read_id):
+        if self.read_id_index is None:
+            sys.stderr.write("Indexing BAM file by-read...\n")
+            self.read_id_index = pysam.IndexedReads(self.input)
+            self.read_id_index.build()
+        ret = self.read_id_index.find(read_id)
+        return ret
+
+    #def _init_tags(self, tags):
+    #    self.tags = dict()
+    #    for t in tags:
+    #        label, tag = t.split(":")
+    #        self.tags[label] = tag
 
     def init_write_mode(self):
         if self.conf.tracks.io.bam_out is None:
             self.output = None
             return
 
+        #self._init_tags(self.prms.bam_tags)
+
         TrackIO.init_write_mode(self)
 
-        if len(self.conf.fast5_reader.fast5_index) == 0:
-            sys.stderr.write("Warning: no fast5 index specified\n")
-
         #TODO load from AlnTrack instance (initialized by Tracks)
-        self.model = PoreModel(self.conf.pore_model)
-        self.kmer_trim = self.model.kmer_trim
+        self.model = PoreModel(params=self.conf.pore_model)
+        #self.kmer_trim = self.model.kmer_trim
 
         if self.prms.buffered:
             self.out_buffer = list()
@@ -93,10 +137,28 @@ class BAM(TrackIO):
         conf_line = self.conf.to_toml() \
                         .replace(";", "\\;") \
                         .replace("\n", ";")   
-        #header = self.input.header.to_dict()
+
+        params = {
+            "tracks" : {
+                self.track_out.name : {
+                    "desc" : self.track_out.desc,
+                    "model" : self.track_out.model.name,
+                    "read" : {"paths" : self.conf.read_index.paths, "index" : self.conf.read_index.read_index},
+                    "layers" : {                                                                 
+                        LENS_TAG : {"name" : "dtw.length"},                                      
+                        CURS_TAG : {"name" : "dtw.current", "scale" : self.track_out.model.inorm_scale},   
+                        STDS_TAG : {"name" : "dtw.current_sd", "scale" : self.track_out.model.inorm_scale},
+            }}},
+            "models" : {
+                self.track_out.model.name : self.track_out.model.params_to_dict()
+            },
+            "reference" : self.conf.tracks.ref_index
+        }
+
         if not "CO" in self.header:
             self.header["CO"] = list()
-        self.header["CO"].append("UNC:" + conf_line)
+        #self.header["CO"].append("UNC:" + conf_line)
+        self.header["CO"].append("UNC:" + json.dumps(params))
 
         self.output = pysam.AlignmentFile(self.conf.tracks.io.bam_out, "wb", header=self.header)#template=self.input)
 
@@ -111,7 +173,9 @@ class BAM(TrackIO):
                 return aln
         return None
 
-    INF_U16 = np.iinfo(np.uint16).max
+    MIN_I16 = np.iinfo(np.int16).min+1
+    MAX_I16 = np.iinfo(np.int16).max
+    NA_I16 = ValArrayI16.NA
 
     def _init_alns(self):
         if self.in_alns is None:
@@ -120,51 +184,37 @@ class BAM(TrackIO):
                 self.in_alns[aln.query_name].append(aln)
             self.input.reset()
 
-    def write_layers(self, track, groups):
-        aln = track.alignments.iloc[0]
-        #sam = self.get_aln(aln["read_id"], aln["ref_name"], aln["ref_start"]-self.kmer_trim[0])
-        if self.bam is None: 
-            return
-        
-        #refs = track.layer_refs
-        #if aln["fwd"]:
-        refs = track.coords.refs[self.kmer_trim[0]:-self.kmer_trim[1]]
-        #else:
-        #    refs = track.coords.refs[self.kmer_trim[1]:-self.kmer_trim[0]]
+    def write_alignment(self, aln):
+        self.bam = aln.sam
 
-        dtw = track.layers["dtw"].reset_index(level=1).reindex(refs)
+        refs = aln.seq.coord.bounds
 
-        lens = dtw["length"]
-        lens[dtw["start"].duplicated()] = 0 #skips
+        cmin = np.min(aln.dtw.current)
+        cmax = np.max(aln.dtw.current)
+        scale = self.model.current.INORM_SCALE
 
-        cmin = 0
-        cmax = dtw["current"].max()
-        scale = (self.INF_U16 - 1) / (cmax - cmin)
-        shift = -cmin
+        dc = np.round(aln.dtw.current.to_numpy() * scale)#.astype(np.int16)
+        na = np.isnan(dc)
+        dc[na] = self.NA_I16
 
-        dc = np.round((dtw["current"]+ shift) * scale)#.astype("uint16")
-        ds = np.round((dtw["stdv"]+ shift) * scale)#.astype("uint16")
+        if len(aln.dtw.current_sd) > 0:
+            ds = np.round(aln.dtw.current_sd.to_numpy() * scale)#.astype(np.int16)
+            ds[na] = self.NA_I16
+            self.bam.set_tag(STDS_TAG, array.array("h", ds.astype(np.int16)))
 
-        dc = dc.fillna(self.INF_U16).to_numpy(np.uint16)
-        ds = ds.fillna(self.INF_U16).to_numpy(np.uint16)
-        lens = dtw["length"].reindex(refs).to_numpy(np.uint16, na_value=0)
+        start_pad = list()
+        start = -aln.dtw.samples.start
+        while start < self.MIN_I16:
+            start_pad.append(self.MIN_I16)
+            start -= self.MIN_I16
+        if start < 0:
+            start_pad.append(start)
 
-        if dtw["start"].iloc[0] < dtw["start"].iloc[-1]:
-            sample_start = dtw["start"].iloc[0]
-            sample_end = dtw["start"].iloc[-1] + dtw["length"].iloc[-1]
-        else:
-            sample_start = dtw["start"].iloc[0] + dtw["length"].iloc[0]
-            sample_end = dtw["start"].iloc[-1] 
+        lens = np.concatenate([start_pad, aln.dtw.samples.to_runlen()]).astype(np.int16)
 
-        self.bam.set_tag(REF_TAG, array.array("I", (refs[0], refs[-1]+1)))
-        self.bam.set_tag(SAMP_TAG, array.array("I", (sample_start, sample_end)))
-        self.bam.set_tag(NORM_TAG, array.array("f", (scale,shift)))
-        self.bam.set_tag(LENS_TAG, array.array("H", lens))
-        self.bam.set_tag(CURS_TAG, array.array("H", dc))
-        self.bam.set_tag(STDS_TAG, array.array("H", ds))
-
-        if not self.bam.has_tag("f5"):
-            self.bam.set_tag("f5", os.path.basename(self.prev_fast5[0]))
+        self.bam.set_tag(REF_TAG, array.array("i", refs))
+        self.bam.set_tag(LENS_TAG, array.array("h", lens))
+        self.bam.set_tag(CURS_TAG, array.array("h", dc.astype(np.int16)))
 
         if self.prms.buffered:
             self.out_buffer.append(self.bam.to_string())
@@ -225,113 +275,121 @@ class BAM(TrackIO):
                     n += 1
                 if n == self.conf.tracks.max_reads:
                     break
-            
 
-    def _parse_sam(self, sam, coords=None):
-        samp_bounds = sam.get_tag(SAMP_TAG)
+    def iter_alns(self, layers=None, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
+        for sam in self.iter_sam():
+            aln = self.sam_to_aln(sam)
+            yield aln
 
-        norm_scale, norm_shift = sam.get_tag(NORM_TAG)
+    def _tag_to_layer(self, sam, tag):
+        if sam.has_tag(tag):
+            return None
+        if not tag in self.layer_tags:
+            raise ValueError(f"Unknown layer tag: {tag}")
+        l = self.layer_tags[tag]
+        vals = np.array(sam.get_tag(tag))
+        na = vals == self.NA_I16
+        vals = (vals - l["shift"]) / l["scale"]
+        vals[na] = pd.nan
+        return (l["name"], vals)
 
-        dac = np.array(sam.get_tag(CURS_TAG))
-        current = (dac/norm_scale)-norm_shift
-        current[dac == self.INF_U16] = np.nan
+    def sam_to_aln(self, sam, load_moves=True):
+        has_dtw = True
+        for tag in REQ_ALN_TAGS:
+            if not sam.has_tag(tag):
+                has_dtw = False
+                break
 
-        das = np.array(sam.get_tag(STDS_TAG))
-        stdv = (das/norm_scale)-norm_shift
-        stdv[das == self.INF_U16] = np.nan
+        aln = None
 
-        
-        length = sam.get_tag(LENS_TAG)
+        #try:
+        read = self.tracks.read_index[sam.query_name]# None)
+        #except:
+        #    sys.stderr.write(f"Warning: failed to open read {sam.query_name}\n")
+        #    read = None
+
+        if not has_dtw and read is None:
+            return None
 
         fwd = int(not sam.is_reverse)
-        ref_start, ref_end = sam.get_tag(REF_TAG)
 
+        if has_dtw:
+            layers = dict()
 
-        if coords is None:
-            refs = pd.RangeIndex(ref_start, ref_end)
-            seq_refs = RefCoord(sam.reference_name, ref_start, ref_end, fwd)
-            coords = self.tracks.index.get_coord_space(seq_refs, self.conf.is_rna, load_kmers=True)
-            start_shift = end_shift = 0
-        else:
-            start_clip = (coords.refs.min() - ref_start) if coords.refs.min() > ref_start else 0
-            end_clip = (ref_end - coords.refs.max()) if coords.refs.max() < ref_end else 0
+            for tag, meta in self.layer_tags.items():
+                if not sam.has_tag(tag):
+                    continue
+                vals = np.array(sam.get_tag(tag))
+                na = vals == self.NA_I16
+                vals = (vals - meta.get("shift",0)) / meta.get("scale", 1)
+                vals[na] = np.nan
+                layers[meta["name"]] = vals
 
-            new_end = len(current) - end_clip
-            current = current[start_clip:new_end]
-            stdv = stdv[start_clip:new_end]
+            refs = sam.get_tag(REF_TAG)
 
+            coords = RefCoord(sam.reference_name, refs, fwd)
+            #coords = IntervalIndexI64([(refs[i], refs[i+1]) for i in range(0, len(refs), 2)])
 
-            start_shift = np.sum(length[:start_clip])
-            end_shift = np.sum(length[new_end:])
-            length = length[start_clip:new_end]
+            aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
 
-            ref_start += start_clip
-            ref_end -= end_clip
-            refs = pd.RangeIndex(ref_start, ref_end)
+            length = layers["dtw.length"]
+            mask = length >= 0
+            layers["dtw.start"] = np.pad(np.cumsum(np.abs(length)), (1,0))[:-1][mask]
 
-        pacs = coords.ref_to_pac(refs)
-            
-        kmers = coords.ref_kmers.loc[fwd].loc[refs].to_numpy()
+            length = length[mask]
+            lna = (length == 0) & np.isnan(layers["dtw.current"])
+            length[lna] = -1
+            layers["dtw.length"] = length.astype(np.int32)
 
-        dtw = pd.DataFrame({
-            "track_id" : self.in_id, "fwd" : fwd, "pac" : pacs, "aln_id" : self.aln_id_in,
-            "current" : current, "stdv" : stdv, "length" : length, "kmer" : kmers
-        }).set_index(["track_id", "fwd", "pac","aln_id"])
+            dtw = AlnDF(aln.seq, layers["dtw.start"], layers["dtw.length"], layers.get("dtw.current", None), layers.get("dtw.current_sd", None))#start, length, current, stdv)
 
-        dtw.loc[dtw["current"].isnull(), "kmer"] = pd.NA
-        dtw["kmer"] = dtw["kmer"].astype("Int32", copy=False)
+            aln.set_dtw(dtw)
 
+        moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
+        has_moves = moves is not None
+        if has_moves and load_moves:
+            if aln is None:
+                coords = RefCoord(sam.reference_name, moves.index, fwd)
+                aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
+            else:
+                i = max(0, moves.index.start - aln.seq.index.start)
+                j = min(len(moves), len(moves) + moves.index.end -  aln.seq.index.end)
+                moves = moves.slice(i,j)
+                
+            aln.set_moves(moves)
 
-        flip = samp_bounds[0] > samp_bounds[1]
-        if flip:
-            samp_end, samp_start = samp_bounds
-            samp_start += end_shift
-            samp_end -= start_shift
-            dtw = dtw.iloc[::-1]
-        else:
-            samp_start, samp_end = samp_bounds
-            samp_start += start_shift
-            samp_end -= end_shift
+        if has_moves and has_dtw:
+            aln.calc_mvcmp()
+        elif aln is None:
+            coords = RefCoord(sam.reference_name, sam.reference_start, sam.reference_end, fwd)
+            #if fwd == self.conf.is_rna:
+            #    coords = IntervalIndexI64([(-sam.reference_end, -sam.reference_start)])
+            #else:
+            #    coords = IntervalIndexI64([(sam.reference_start, sam.reference_end)])
+            aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
+        
+        return aln
 
-        start = np.full(len(dtw), samp_start, dtype="int32")
-        start[1:] += dtw["length"].cumsum().iloc[:-1].to_numpy("int32")
-        dtw["start"] = start
+    def _parse_sam(self, sam, layer_names):
+        aln = self.sam_to_aln(sam)
 
-        if flip:
-            dtw = dtw[::-1]
+        layers = aln.to_pandas(layer_names, index=["seq.fwd", "seq.pos", "aln.id"])
+        layers["track.name"] = self.track_in.name
+        layers = layers.set_index("track.name", append=True)\
+                       .reorder_levels(["track.name", "seq.fwd", "seq.pos", "aln.id"])
 
-        layers = pd.concat({"dtw" : dtw}, names=("group","layer"), axis=1)#.sort_index()
+        attr = aln.attrs()
+        aln_df = pd.DataFrame([attr], columns=attr._fields)
+        aln_df["track.name"] = self.track_in.name
+        aln_df.set_index(["track.name","id"], inplace=True)
 
-        layers.loc[layers["dtw", "length"] == 0, ("dtw", "length")] = pd.NA
-        layers = layers[~(layers["dtw","current"].isnull() & layers["dtw","length"].isnull())]
+        return aln_df, layers
 
-        layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("Int32")
+    def query(self, layers, coords, index=["aln.id","seq.pos"], read_id=None, full_overlap=False):
+        itr = self.input.fetch(coords.name, coords.start, coords.end)
 
-        #Note should use below, but too buggy: https://github.com/pandas-dev/pandas/issues/45725
-        #layers["dtw", "length"] = layers["dtw", "length"].replace(0, pd.NA)
-        #layers["dtw", "length"] = layers["dtw", "length"].fillna(method="pad").astype("int32")
-
-        aln = pd.DataFrame({
-                "id" : [self.aln_id_in],
-                "track_id" : [self.in_id],
-                "read_id" : [sam.query_name],
-                "ref_name" : [coords.ref_name],
-                "ref_start" : [ref_start],
-                "ref_end" : [ref_end],
-                "fwd" :     [fwd],
-                "samp_start" : [samp_start],
-                "samp_end" : [samp_end],
-                "tags" : [""]}).set_index(["track_id", "id"])
-
-        self.aln_id_in += 1
-
-        return aln, layers
-
-    def query(self, layers, track_id, coords, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
-        itr = self.input.fetch(coords.ref_name, coords.refs.min(), coords.refs.max())
-
-        alignments = list()
-        layers = list()
+        track_alns = defaultdict(list)
+        track_layers = defaultdict(list)
 
         if read_id is not None and len(read_id) > 0:
             read_ids = set(read_id)
@@ -341,12 +399,20 @@ class BAM(TrackIO):
         for sam in itr:
             if read_ids is not None and sam.query_name is not read_ids:
                 continue
-            a,l = self._parse_sam(sam, coords)
-            alignments.append(a)
-            layers.append(l)
+            aln = self.sam_to_aln(sam)
 
-        return pd.concat(alignments), pd.concat(layers)
-        #self.fill_tracks(coords, pd.concat(alignments), pd.concat(layers))
+            track_alns[self.track_in.name].append(aln.attrs())
+
+            l = aln.to_pandas(layers, index=index)
+            track_layers[self.track_in.name].append(l)
+
+        track_alns = {
+            t : pd.DataFrame(l, columns=Alignment.Attrs._fields)\
+                  .set_index("id")
+            for t,l in track_alns.items()}
+        track_layers = {t : pd.concat(l) for t,l in track_layers.items()}
+            
+        return track_alns, track_layers
 
     def iter_refs(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, chunksize=None, full_overlap=False):
 
@@ -372,21 +438,18 @@ class BAM(TrackIO):
 
         t = time.time()
         for sam in itr:
-            next_alns,next_layers = self._parse_sam(sam)
+            aln = self.sam_to_aln(sam)
 
-            next_aln = next_alns.iloc[0]
-            next_ref = next_aln["ref_name"]
-            next_start = next_layers.index.get_level_values("pac").min()
+            next_aln = aln.attrs()
+            next_layers = aln.to_pandas(layers, index=["seq.fwd", "seq.pac", "aln.id"])
+            next_ref = next_aln.ref_name
 
-            #we're losing alignments somewhere. getting out of sync
-            #maybe right below
-            #but also, not sure if I'm syncing inputs in "Tracks"
-            #probably need to always advance the minimum ref pos/ID
+            next_start = next_layers.index.get_level_values("seq.pac").min()
 
             ret_layer_count = 0
 
             if prev_ref is not None and (next_ref != prev_ref or next_start - prev_start > 0) and len(new_alns) > self.prms.aln_chunksize:
-                #pac = self.tracks.index.ref_to_pac(a["ref_name"], prev_start)
+                #pac = self.tracks.index.pos_to_pac(a["ref_name"], prev_start)
 
                 aln_df = pd.concat([aln_df] + new_alns)#.sort_index()
                 layer_df = pd.concat([layer_df] + new_layers).sort_index()
@@ -394,10 +457,10 @@ class BAM(TrackIO):
                 new_layers = list()
                 
                 ret_layers = layer_df.loc[slice(None),slice(None),prev_start:next_start-1]
-                ret_alns = aln_df.loc[ret_layers.index.droplevel(["fwd", "pac"]).unique()]
+                ret_alns = aln_df.loc[ret_layers.index.droplevel(["seq.fwd", "seq.pac"]).unique()]
 
                 layer_df = layer_df.loc[slice(None),slice(None),next_start:]
-                aln_df = aln_df.loc[layer_df.index.droplevel(["fwd", "pac"]).unique()]
+                aln_df = aln_df.loc[layer_df.index.droplevel(["seq.fwd", "seq.pac"]).unique()]
                 #ret_layer_count = 0
 
                 t = time.time()
@@ -413,36 +476,20 @@ class BAM(TrackIO):
                 prev_start = next_start
 
 
-            new_alns.append(next_alns)
+            new_alns.append(next_aln)
             new_layers.append(next_layers)
 
-        aln_df = pd.concat([aln_df] + new_alns).sort_index()
+        
+        new_alns = pd.DataFrame(new_alns, columns=new_alns[0]._fields).set_index("id")
+        aln_df = pd.concat([aln_df] + [new_alns]).sort_index()
         layer_df = pd.concat([layer_df] + new_layers).sort_index()
         
         ret_layers = layer_df.loc[slice(None),slice(None),prev_start:]
-        ret_alns = aln_df.loc[ret_layers.index.droplevel(["fwd", "pac"]).unique()]
+        ret_alns = aln_df.loc[ret_layers.index.droplevel(["seq.fwd", "seq.pac"]).unique()]
 
         if len(ret_alns) > 0:
             yield (ret_alns, ret_layers)
 
-    def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
-        aln_id = 0
-
-        if read_id is not None and len(read_id) > 0:
-            read_ids = set(read_id)
-        else:
-            read_ids = None
-
-        for sam in self.iter_sam():
-            if read_ids is not None and sam.query_name not in read_ids:
-                continue
-            ref_start, ref_end = sam.get_tag(REF_TAG)
-            ref_bounds = RefCoord(sam.reference_name, ref_start, ref_end, not sam.is_reverse)
-            coords = ref_index.get_coord_space(ref_bounds, is_rna=self.conf.is_rna, load_kmers=True, kmer_trim=False)
-
-            yield self._parse_sam(sam, coords)
-
-            aln_id += 1
 
 
     def close(self):

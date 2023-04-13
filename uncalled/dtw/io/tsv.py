@@ -2,15 +2,16 @@ import numpy as np
 import pandas as pd
 import sys
 from ..aln_track import AlnTrack
-from ..layers import LAYER_META, parse_layers
+from ...aln import LAYER_META, parse_layers
 from . import TrackIO
 import _uncalled
 
 EXTRA_FNS = {
-    "read_id" : lambda track,df: track.alignments.loc[df.index.get_level_values("aln_id"), "read_id"].to_numpy()
+    "read_id" : lambda aln: aln.read_id
 }
 
 EXTRA_COLS = pd.Index(EXTRA_FNS.keys())
+INDEX_COLS = [("seq","name"),("seq","pos"),("seq","strand")]
 
 class TSV(TrackIO):
     FORMAT = "tsv"
@@ -26,12 +27,12 @@ class TSV(TrackIO):
     def init_write_mode(self):
         TrackIO.init_write_mode(self)
 
-        layer_cols = pd.Index(self.prms.tsv_cols).difference(EXTRA_COLS)
+        #layer_cols = pd.Index().difference(EXTRA_COLS)
         self.extras = EXTRA_COLS.intersection(self.prms.tsv_cols)
 
-        layers = list(parse_layers(layer_cols, add_deps=False))
-        self.columns = pd.MultiIndex.from_tuples(layers)
-        self.conf.tracks.layers += layers
+        self.layers = INDEX_COLS+self.prms.tsv_cols+["seq.kmer"]
+        self.columns = pd.MultiIndex.from_tuples(self.layers)
+        self.conf.tracks.layers += self.layers
         self._header = True
 
         TrackIO._init_output(self, self.prms.buffered)
@@ -39,19 +40,15 @@ class TSV(TrackIO):
     def init_read_mode(self):
         raise RuntimeError("Reading from TSV not yet supported")
 
-    def write_layers(self, track, groups):
-        track.calc_layers(self.columns)
-        df = track.layers_desc_index#.reset_index()
+    def write_alignment(self, aln):
+        df = aln.to_pandas(self.layers, INDEX_COLS).sort_index()
         
-        df = df[self.columns.intersection(df.columns)].dropna(how="all", axis=0)
-
         for col in df.columns[df.columns.get_level_values(-1).str.endswith("kmer")]:
             kmers = df[col].dropna()
-            df[col] = track.model.kmer_to_str(kmers)
-
+            df[col] = self.tracks.model.kmer_to_str(kmers)
 
         for col in self.extras:
-            df[col] = EXTRA_FNS[col](track,df)
+            df[col] = EXTRA_FNS[col](aln)
 
         df.reset_index(inplace=True, drop=self.prms.tsv_noref)
 

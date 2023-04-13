@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import sys
 from ..aln_track import AlnTrack
+from ...aln import AlnDF
 from ...signal_processor import ProcessedRead
 from ...index import str_to_coord, RefCoord
 from ...pore_model import PoreModel
@@ -17,10 +18,8 @@ class Eventalign(TrackIO):
         self._header = True
 
         if self.write_mode:
-            print("WRITE MODE")
             self.init_write_mode()
         else:
-            print("READ MODE")
             self.init_read_mode()
 
     def init_write_mode(self):
@@ -46,7 +45,6 @@ class Eventalign(TrackIO):
         if self.write_samples:
             self.header += ["samples"]
 
-        print("init_out")
         TrackIO._init_output(self, self.prms.buffered)
 
         if not self.prms.buffered:
@@ -60,18 +58,15 @@ class Eventalign(TrackIO):
         if self.conf.pore_model.name == "r94_dna":
             self.conf.pore_model.name = "r9.4_dna_450bps_6mer_npl"
 
-        self.in_id = self.init_track(name, name, self.conf)
+        self.model = None
 
-    def write_layers(self, track, groups):
-        if "dtw" not in groups: 
-            return
+        self.track_in = self.init_track(name, name, self.conf)
 
-        df = track.layers["dtw"].dropna(how="all").sort_index()
+    #def write_layers(self, track, groups):
+    def write_alignment(self, aln):
+        events = aln.to_pandas(["seq.kmer", "dtw"], ["seq.pos"]).sort_index().droplevel(0, axis=1)
 
-        pacs = df.index.get_level_values(0)
-        events = df.droplevel(1)#.set_index(track.coords.pac_to_ref(pacs))
-
-        model = track.model
+        model = self.tracks.model
         kmers = events["kmer"]
 
         std_level = (events["current"] - model.model_mean) / model.model_stdv
@@ -79,13 +74,13 @@ class Eventalign(TrackIO):
         if "events" in events:
             event_counts = events["events"]
             event_index = (event_counts.cumsum() - event_counts.iloc[0]).astype(int)
-            if track.all_rev: #TODO check for flipped ref
+            if not aln.fwd: #TODO check for flipped ref
                 event_index = event_index.max() - event_index
             event_index += 1
         else:
             event_index = np.arange(len(events))
 
-        evts = events.rename(columns={"current" : "mean", "current_stdv" : "stdv"})
+        evts = events.rename(columns={"current" : "mean", "current_sd" : "stdv"})
         if self.read is not None:
             self.read.set_events(evts)
             read = self.read
@@ -100,17 +95,23 @@ class Eventalign(TrackIO):
             signal = []
 
         if self.write_read_name:
-            read_id = track.alignments["read_id"].iloc[0]
+            read_id = aln.read_id #track.alignments["read_id"].iloc[0]
         else:
-            read_id = str(self.prev_aln_id)
+            read_id = str(aln.id)
+        self.next_aln_id()
         
-        writer = self.writer = getattr(_uncalled, f"write_eventalign_K{model.K}")
+        #self.writer = getattr(_uncalled, f"write_eventalign_K{model.K}")
+        if isinstance(model.instance, _uncalled.PoreModelU16):
+            self.writer = _uncalled.write_eventalign_U16
+        elif isinstance(model.instance, _uncalled.PoreModelU32):
+            self.writer = _uncalled.write_eventalign_U32
+        else:
+            raise ValueError(f"Unknown PoreModel type: {model.instance}")
 
-        eventalign = writer(
-            self.conf, model.instance, read_id, track.coords.fwd, read,
-            track.coords.ref_name, events.index-2, 
-            self.write_signal_index,
-            kmers, 
+        eventalign = self.writer(
+            self.conf, model.instance, read_id, aln.seq.fwd, read,
+            aln.seq.coord.name, events.index-2, 
+            self.write_signal_index, kmers, 
             event_index, #TODO properly rep skips?
             std_level, signal) #TODO compute internally?
 
@@ -118,19 +119,16 @@ class Eventalign(TrackIO):
 
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
-        #read_filter = set(self.conf.fast5_reader.read_filter)
-
-        sample_rate = self.conf.read_buffer.sample_rate
+        #read_filter = set(self.conf.read_index.read_filter)
 
         csv_iter = pd.read_csv(
             self.filename, sep="\t", chunksize=10000,
             usecols=["read_name","contig","position", "event_index",
-                     "start_idx","event_level_mean","model_mean",
+                     "start_idx","event_level_mean","event_stdv","model_mean",
                      "event_length","strand","model_kmer"])
 
-        model = PoreModel(self.conf.pore_model)
-
-        kmer_trim = ref_index.trim
+        if self.model is None:
+            self.model = self.tracks.model
 
         aln_id = 1
 
@@ -142,60 +140,48 @@ class Eventalign(TrackIO):
 
                     continue
 
-                df.drop(df.index[df["model_mean"] == 0], inplace=True)
+                #df.drop(df.index[df["model_mean"] == 0], inplace=True)
 
                 start = df["position"].min()
-                end = df["position"].max()+1
+                end = df["position"].max()
+                
+                sam = None
+                for read_sam in self.tracks.bam_in.iter_read(read_id):
+                    if read_sam.reference_name == contig and start >= read_sam.reference_start and end < read_sam.reference_end:
+                        sam = read_sam
+                        break
+
+                aln = self.tracks.bam_in.sam_to_aln(sam, load_moves=False)
                 
                 fwd = int( (df["event_index"].iloc[0] < df["event_index"].iloc[-1]) == (df["position"].iloc[0] < df["position"].iloc[-1]))
 
-                kmers = model.str_to_kmer(df["model_kmer"])
-                if self.conf.is_rna:
-                    kmers = model.kmer_rev(kmers)
-                else:
-                    fwd = int(df["event_index"].iloc[0] < df["event_index"].iloc[-1])
+                pos = df["position"].to_numpy()
+                df["mpos"] = self.tracks.index.pos_to_mpos(pos, fwd)-self.model.shift
+                df["mean_cml"]  = df["event_length"] * df["event_level_mean"]
+                df["stdv_cml"]  = df["event_length"] * df["event_stdv"]
 
-                ref_coord = RefCoord(contig, start, end, fwd)
-                coords = ref_index.get_coord_space(ref_coord, self.conf.is_rna, kmer_trim=True)
+                grp = df.groupby("mpos")
 
+                lengths = grp["event_length"].sum()
+                df = pd.DataFrame({
+                    "start" : grp["start_idx"].min(),
+                    "length" : lengths,
+                    "mean" : self.model.pa_to_norm(grp["mean_cml"].sum() / lengths),
+                    "stdv" : self.model.pa_sd_to_norm(grp["stdv_cml"].sum() / lengths)
+                }).set_index(grp["mpos"].min())
 
-                df["kmer"] = kmers
-
-                pacs = coords.ref_to_pac(df["position"].to_numpy()+kmer_trim[0])
-
-                layers = df.rename(columns={
-                        "start_idx" : "start",
-                        "event_length" : "length",
-                        "event_level_mean" : "current",
-                     }).set_index(pd.MultiIndex.from_product(
-                        [[self.in_id], [fwd], pacs, [aln_id]], names=("track_id","fwd","pac","aln_id")))
-
-                samp_start = layers["start"].min()
-                e = layers["start"].argmax()
-                samp_end = layers["start"].iloc[e] + layers["length"].iloc[e]
-
-                layers = pd.concat({"dtw" : layers}, names=("group","layer"), axis=1).sort_index()
-
-                alns = pd.DataFrame({
-                        "id" : [aln_id],
-                        "track_id" : [self.in_id],
-                        "read_id" : [read_id],
-                        "ref_name" : [coords.ref_name],
-                        "ref_start" : [coords.refs.start],
-                        "ref_end" : [coords.refs.stop],
-                        "fwd" :     [coords.fwd],
-                        "samp_start" : [samp_start],
-                        "samp_end" : [samp_end],
-                        "tags" : [""]}).set_index(["track_id", "id"])
-
-                aln_id += 1
-
-                yield alns,layers
+                coords = RefCoord(sam.reference_name, start, end+self.model.K, fwd)#_uncalled.IntervalIndexI64([(df.index.min(), df.index.max()+1)])
+                df = df.reindex(pd.RangeIndex(df.index.min(), df.index.max()+1))
+                df["length"].fillna(-1, inplace=True)
+                aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read_id, sam.reference_id, coords, sam)
+                dtw = AlnDF(aln.seq, df["start"], df["length"], df["mean"], df["stdv"])
+                aln.set_dtw(dtw)
+                yield aln
 
         leftover = pd.DataFrame()
 
         for events in csv_iter:
-            events['event_length'] = np.round(events['event_length'] * sample_rate).astype(int)
+            events['event_length'] = np.round(events['event_length'] * self.model.sample_rate).astype(int)
             events['sum'] = events['event_level_mean'] * events['event_length']
 
             events = pd.concat([leftover, events])
@@ -204,16 +190,13 @@ class Eventalign(TrackIO):
             leftover = events[i]
             events = events[~i]
 
-            for alns,layers in iter_layers(events, aln_id):
-                yield alns,layers
+            for aln in iter_layers(events, aln_id):
+                yield aln#s,layers
 
         if len(leftover) > 0:
             for alns,layers in iter_layers(leftover, aln_id):
-                yield alns,layers
+                yield aln#s,layers
 
-
-    def write_alignment(self, alns):
-        pass
 
     def init_fast5(self, fast5):
         pass

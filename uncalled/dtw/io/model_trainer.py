@@ -8,10 +8,11 @@ from time import time
 
 from ...pore_model import PoreModel
 from ..aln_track import AlnTrack
-from ..layers import LAYER_META, parse_layers
+from ...aln import LAYER_META, parse_layers
 from . import TrackIO
 
-LAYERS = [("dtw",l) for l in ("kmer", "current", "stdv", "dwell")]
+#LAYERS = [("dtw",l) for l in ("kmer", "current", "stdv", "dwell")]
+LAYERS = [("seq","kmer"), ("dtw","current"), ("dtw","current_sd"), ("dtw","dwell")]
 
 class ModelTrainer(TrackIO):
     FORMAT = "model"
@@ -65,7 +66,7 @@ class ModelTrainer(TrackIO):
 
             self.iter = max_itr + int(not self.tprms.skip_dtw)
             self.conf.pore_model.name = fname
-            self.set_model(PoreModel(self.conf.pore_model))
+            self.set_model(PoreModel(params=self.conf.pore_model))
 
         elif self.tprms.skip_dtw:
             self.iter = self.tprms.iterations
@@ -90,15 +91,21 @@ class ModelTrainer(TrackIO):
         self.kmer_index = None #pd.DataFrame({"start" : 0}, index=self.model.KMERS)
         self.full_kmers = set()
 
-    def write_layers(self, track, groups):
-        if self.model is None:
-            self.set_model(track.model)
 
-        track.calc_layers(LAYERS)
-        dtw = track.layers.loc[
-            track.layers[("cmp", "mean_ref_dist")] <= 1, LAYERS
-        ]["dtw"].set_index("kmer", drop=True) #\
+    #def write_layers(self, track, groups):
+        #if self.model is None:
+        #    self.set_model(track.model)
+
+        #track.calc_layers(LAYERS)
+    def write_alignment(self, aln):
+        
+        #mask = track.layers[("cmp", "dist")] <= 1
+        #dtw = track.layers.loc[mask, LAYERS]["dtw"].set_index("kmer", drop=True) #\
          #.sort_index() 
+
+        df = aln.to_pandas(LAYERS+["mvcmp"])
+        mask = df["mvcmp","dist"] <= 1
+        dtw = df[mask][LAYERS].droplevel(0,axis=1).set_index("kmer") #[LAYERS]#.set_index("seq.kmer", drop=True) #\
 
         if self.prms.buffered:
             self.out_buffer.append(dtw)
@@ -190,32 +197,42 @@ class ModelTrainer(TrackIO):
             else:
                 avg = np.mean
 
+            def filt(a):
+                #mn,mx = np.percentile(a, [25,75])
+                return a#[(a >= mn) & (a <= mx)]
+
+            #print(len(rows))
+            current = filt(rows["current"])
+            #print(len(current))
+            current_sd = filt(rows["current_sd"])
+            dwell = filt(rows["dwell"])
+
             k = self.model.kmer_to_str(kmer)
 
             model_rows.append((
                 kmer,
-                avg(rows["current"]),
-                avg(rows["stdv"]),
-                avg(rows["dwell"]),
+                avg(current),
+                avg(current_sd),
+                avg(dwell),
                 np.std(rows["current"]),
-                np.std(rows["stdv"]),
+                np.std(rows["current_sd"]),
                 np.std(rows["dwell"]),
                 len(rows)
             ))
 
-        df = pd.DataFrame(model_rows, columns=["kmer", "mean", "stdv_mean", "dwell_mean", "stdv", "stdv_stdv", "dwell_stdv", "count"]).set_index("kmer").reindex(self.model.KMERS)
+        df = pd.DataFrame(model_rows, columns=["kmer", "current.mean", "current_sd.mean", "dwell.mean", "current.stdv", "current_sd.stdv", "dwell.stdv", "count"]).set_index("kmer").reindex(self.model.KMERS)
 
         subs_locs = np.array([0,self.model.K-1])
 
         #TODO plot pA change for each possible substitution for every kmer
 
-        for kmer in df.index[df["mean"].isna()]:
+        for kmer in df.index[df["current.mean"].isna()]:
             subs = list()
             for i in subs_locs:
                 old = self.model.kmer_base(kmer, i)
                 subs.append(self.model.set_kmer_base(kmer, i, [b for b in range(4) if b != old]))
             subs = np.unique(np.concatenate(subs))
-            means = df.loc[subs, "mean"].dropna().sort_values()
+            means = df.loc[subs, "current.mean"].dropna().sort_values()
             if len(means) > 0:
                 mid = means.index[len(means)//2]
                 df.loc[kmer] = df.loc[mid]
@@ -225,28 +242,19 @@ class ModelTrainer(TrackIO):
 
         df["count"] = df["count"].astype(int)
             
+        #print(df)
+        outfile = self._filename("model.npz")
+        self.model.PRMS.name = outfile
+        model_out = PoreModel(model=df, params=self.model.PRMS, extra_cols=True)#k=self.model.PRMS.k, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True)
+        model_out.to_npz(outfile)
 
-        #if self.model.PRMS.reverse:
-        #    #df.reset_index(inplace=True)
-        #    print(df)
-        #    print(self.model.KMERS)
-        #    print(self.model.kmer_rev(self.model.KMERS))
-        #    df["kmer"] = self.model.kmer_rev(self.model.KMERS)
-        #    df.set_index("kmer", inplace=True)
-        #    df.sort_index(inplace=True)
-        #    print(df)
-
-
-        model_out = PoreModel(df=df, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True)
-        outfile = self._filename("model.tsv")
-        model_out.to_tsv(outfile)
-
-        self.set_model(PoreModel(outfile, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True))
-
-        #self.model.to_tsv(self._filename("model.tsv"))
+        #self.set_model(PoreModel(outfile, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True))
+        self.set_model(PoreModel(params=self.model.PRMS, extra_cols=True))
 
         self.iter += 1
-        return outfile#self._filename("model.tsv")
+        #print("write", self.model.PRMS.shift, self.model.PRMS.reverse, self.model.PRMS.complement)
+        return self.model #outfile#self._filename("model.tsv")
+        #return outfile
         
 
     def close(self):

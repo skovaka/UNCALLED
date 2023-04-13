@@ -10,7 +10,7 @@
 #include <vector>
 #include <unordered_map>
 //#include "signal_processor.hpp"
-#include "dataframe.hpp"
+#include "intervals.hpp"
 #include "read_buffer.hpp"
 #include "normalizer.hpp"
 #include "util.hpp"
@@ -46,12 +46,12 @@ struct ProcessedRead {
     NormalizerParams norm_prms;
     std::vector<Event> events;
     std::vector<NormVals> norm;
-    std::valarray<float> signal;
+    ValArray<float> signal;
     //std::vector<bool> mask;
 
     template <typename Container>
     void set_signal(Container signal_) {
-        signal = std::valarray<float>(&signal_[0], signal_.size());
+        signal = ValArray<float>(&signal_[0], signal_.size());
     }
 
     u32 sample_start() const {
@@ -66,7 +66,7 @@ struct ProcessedRead {
 
     std::pair<float,float> get_moments(size_t event_start, size_t event_end) {
         size_t n = event_end - event_start;
-        std::valarray<float> event_means(n);
+        ValArray<float> event_means(n);
 
         size_t i = 0;
         for (size_t j = event_start; j < event_end; j++) {
@@ -77,23 +77,23 @@ struct ProcessedRead {
 
         float avg, dev;
 
-        if (norm_prms.median) {
-            std::sort(std::begin(event_means), std::end(event_means));
-            avg = event_means[n / 2];
-            //mean = event_means.sum() / n;
-        } else {
+        //if (norm_prms.median) {
+        //    std::sort(std::begin(event_means), std::end(event_means));
+        //    avg = event_means[n / 2];
+        //    //mean = event_means.sum() / n;
+        //} else {
             avg = event_means.sum() / n;
-        }
+        //}
 
         auto deltas = event_means - avg;
 
-        if (norm_prms.median) {
-            auto delta_abs = std::valarray<float>(std::abs(deltas));
-            std::sort(std::begin(delta_abs), std::end(delta_abs));
-            dev = delta_abs[n / 2];
-        } else {
+        //if (norm_prms.median) {
+        //    auto delta_abs = std::valarray<float>(std::abs(deltas));
+        //    std::sort(std::begin(delta_abs), std::end(delta_abs));
+        //    dev = delta_abs[n / 2];
+        //} else {
             dev = sqrt((deltas*deltas).sum() / n);
-        }
+        //}
 
         return {avg, dev};
     }
@@ -212,7 +212,7 @@ class EventDetector {
         float max_mean;
     } Params;
 
-    static const Params PRMS_DEF;
+    static const Params PRMS_DEF, PRMS_450BPS, PRMS_70BPS;
 
     Params PRMS;
 
@@ -224,12 +224,30 @@ class EventDetector {
     void reset();
     bool add_sample(float s);
     Event get_event() const;
-    std::vector<Event> get_events(const std::vector<float> &raw);
+    std::vector<Event> get_events(const ValArray<float> &raw);
+    std::vector<Event> get_events2(const ValArray<float> &raw);
 
     ProcessedRead process_read(const ReadBuffer &read);
+    ProcessedRead process_read_new(const ReadBuffer &read);
 
     float kmer_current() const;
-    std::vector<float> get_means(const std::vector<float> &raw);
+
+    template <typename Container>
+    std::vector<float> get_means(const Container &raw) {
+        std::vector<float> events;
+        events.reserve(raw.size() / PRMS.window_length2);
+        reset();
+
+        for (u32 i = 0; i < raw.size(); i++) {
+            if (add_sample(raw[i])) {
+                events.push_back(event_.mean);
+            }
+        }
+
+        return events;
+    }
+
+    ValArray<float> get_means_py(py::array_t<float> raw);
 
     float mean_event_len() const;
     u32 event_to_bp(u32 evt_i, bool last=false) const;
@@ -278,11 +296,16 @@ class EventDetector {
         //:PY_EVTD_METH(get_event, "");
         PY_EVTD_METH(get_events, "");
         PY_EVTD_METH(process_read, "");
+        PY_EVTD_METH(process_read_new, "");
         PY_EVTD_METH(kmer_current, "");
-        PY_EVTD_METH(get_means, "");
+        
+        evdt.def("get_means", &EventDetector::get_means_py);
+        //PY_EVTD_METH(get_means, "");
         PY_EVTD_METH(mean_event_len, "");
 
         evdt.def_readonly_static("PRMS_DEF", &EventDetector::PRMS_DEF, "");
+        evdt.def_readonly_static("PRMS_450BPS", &EventDetector::PRMS_450BPS, "");
+        evdt.def_readonly_static("PRMS_70BPS", &EventDetector::PRMS_70BPS, "");
 
         pybind11::class_<Params> prms(evdt, "Params", "");
         prms.def(pybind11::init(), "");

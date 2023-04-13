@@ -3,7 +3,7 @@
 
 #include "config.hpp"
 #include "pore_model.hpp"
-#include "dataframe.hpp"
+#include "intervals.hpp"
 
 //template <KmerLen K, typename KmerType=typename std::conditional<(K < 8), u16, u32>::type>
 //struct Eventalign : public DataFrame<i64, KmerType, i32, i32, float> {
@@ -42,14 +42,14 @@ std::string write_eventalign(
     auto std_level = PyArray<float>(std_level_np);
     auto signal = PyArray<float>(signal_np);
 
-    float sample_rate = conf.read_buffer.sample_rate;
+    float sample_rate = conf.pore_model.sample_rate;
 
     std::stringstream ss;
 
     for (size_t i = 0; i < ref.size(); i++) {
         auto &evt = read.events[i];
         auto kmer = kmers[i], model_kmer = kmer;
-        if (!conf.read_buffer.seq_fwd) model_kmer = model.kmer_rev(kmer);
+        if (conf.pore_model.reverse) model_kmer = model.kmer_rev(kmer);
         auto ref_kmer = model_kmer;
         if (!fwd) ref_kmer = model.kmer_comp(ref_kmer);
 
@@ -59,12 +59,12 @@ std::string write_eventalign(
            << read_id << "\t"
            << "t" << "\t"
            << event_index[i] << "\t"
-           << evt.mean << "\t"
-           << evt.stdv << "\t"
+           << model.current.norm_to_pa(evt.mean) << "\t"
+           << (model.current.norm_to_pa_sd(evt.stdv)) << "\t"
            << (evt.length / sample_rate) << "\t"
-           << ModelType::kmer_to_str(model_kmer) << "\t"
-           << model.kmer_means_[kmer] << "\t"
-           << model.kmer_stdvs_[kmer] << "\t"
+           << model.kmer_to_str(model_kmer) << "\t"
+           << model.current.norm_to_pa(model.current.mean[kmer]) << "\t"
+           << model.current.norm_to_pa_sd(model.current.stdv[kmer]) << "\t"
            << std_level[i];
 
         if (signal_index) {
@@ -83,21 +83,5 @@ std::string write_eventalign(
     }
     return ss.str();
 }
-
-//"contig" : track.coords.ref_name,
-//"position" : events.index-2,
-//"reference_kmer" : ref_kmers,
-//"read_index" : self.prev_aln_id,
-//"strand" : "t",
-//"event_index" : pd.RangeIndex(0,len(events))[::-1]+1,
-//"event_level_mean" : events["current"],
-//"event_stdv" : stdvs,
-//"event_length" : events["length"] / track.conf.read_buffer.sample_rate,
-//"model_kmer" : model_kmers,
-//"model_mean" : model.means[kmers],
-//"model_stdv" : model.stdvs[kmers],
-//"standardized_level" : std_level,
-//"start_idx" : events["start"],
-//"end_idx" : events["start"] + events["length"],
 
 #endif

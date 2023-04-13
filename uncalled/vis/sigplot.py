@@ -9,7 +9,6 @@ from .. import config
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
 from ..argparse import Opt, comma_split
-from ..fast5 import parse_read_ids
 from ..signal_processor import SignalProcessor
 
 class Sigplot:
@@ -17,7 +16,9 @@ class Sigplot:
         self.conf, self.prms = config._init_group("sigplot", *args, **kwargs)
         self.tracks = self.prms.tracks #TODO do this better
 
-        self.sigproc = SignalProcessor(self.tracks.alns[0].model, self.conf)
+        self.conf.normalizer.tgt_mean = 0
+        self.conf.normalizer.tgt_stdv = 1
+        self.sigproc = SignalProcessor(self.tracks.model, self.conf)
 
         self._legend = set()
 
@@ -45,11 +46,11 @@ class Sigplot:
 
             
     def _plot_bases(self, fig, dtw, model, ymin, ymax, row, col):
-        bases = model.kmer_base(dtw["kmer"], 2)
+        bases = model.kmer_base(dtw["seq","kmer"], 2)
         for base, color in enumerate(self.conf.vis.base_colors):
             base_dtw = dtw[bases == base]
-            starts = base_dtw['start']
-            ends = starts + base_dtw['length'] - (1.0 / self.conf.read_buffer.sample_rate)
+            starts = base_dtw["dtw", "start_sec"]
+            ends = starts + base_dtw["dtw", "length_sec"] - (1.0 / model.sample_rate)
             nones = [None]*len(base_dtw)
 
             ys = [ymax,ymax,ymin,ymin,None]*len(base_dtw)
@@ -74,47 +75,39 @@ class Sigplot:
         
         current_min = samp_min = np.inf
         current_max = samp_max = 0
-        fast5_file = None
         for i,track in enumerate(self.tracks.alns):
             #track_color = self.prms.track_colors[i]
             colors = self.conf.vis.track_colors[i]
 
-            alns = track.alignments.query("@read_id == read_id")
+            alns = self.tracks.alignments.loc[track.name].query("@read_id == read_id")
             aln_ids = alns.index
 
-
             dtws = list()
+            seqs = list()
             
             for aln_id,aln in alns.iterrows():
-                if "fast5" in aln.index:
-                    fast5_file = aln.loc["fast5"]
+                #dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln.id")
+                #seq = track.layers.loc[(slice(None),aln_id),"seq"].droplevel("aln.id")
+                layers = self.tracks.layers.loc[track.name].loc[aln_id]
+                dtw = layers["dtw"]#.droplevel("aln.id")
+                seq = layers["seq"]
 
-                dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln_id")
-                dtw["model_current"] = track.model[dtw["kmer"]]
+                #dtws.append(dtw)
+                seqs.append(layers)
 
-
-                dtws.append(dtw)
-
-                max_i = dtw["start"].argmax()
                 samp_min = min(samp_min, dtw["start"].min())
-                samp_max = max(samp_max, dtw["start"].iloc[max_i] + dtw["length"].iloc[max_i])
+                samp_max = max(samp_max, dtw["start"].iloc[-1] + dtw["length"].iloc[-1])
 
-                current_min = min(current_min, dtw["model_current"].min())
-                current_max = max(current_max, dtw["model_current"].max())
+                current_min = min(current_min, seq["current"].min())
+                current_max = max(current_max, seq["current"].max())
 
-                dtw["start"] /=  self.conf.read_buffer.sample_rate
-                dtw["length"] /=  self.conf.read_buffer.sample_rate
+            if len(seqs) > 0:
+                track_dtws.append(pd.concat(seqs).sort_index())
 
-            if len(dtws) > 0:
-                track_dtws.append(pd.concat(dtws).sort_index())
+        read = self.tracks.read_index[read_id]
+        read = self.sigproc.process(read, True)
 
-        if fast5_file is None:
-            fast5 = self.tracks.fast5s[read_id]
-        else:
-            fast5 = self.tracks.fast5s.get_read(read_id, os.path.basename(fast5_file))
-        
-        read = self.sigproc.process(fast5, True)
-        signal = read.get_norm_signal(samp_min, samp_max)
+        signal = read.get_norm_signal(int(samp_min), int(samp_max))
 
         sig_med = np.median(signal)
         sig_win = signal.std()*3 #, signal.min(), signal.max())
@@ -123,15 +116,15 @@ class Sigplot:
         mask = ((signal >= sig_med - sig_win) &
                 (signal <= sig_med + sig_win))
         
-        samples = np.arange(samp_min, samp_max)[mask]
-        samp_time = samples / self.conf.read_buffer.sample_rate
-        signal = signal[mask]
+        samples = np.arange(samp_min, samp_max)#[mask]
+        samp_time = samples / self.tracks.model.sample_rate
+        signal = signal#[mask]
 
         current_min = min(current_min, signal.min())
         current_max = max(current_max, signal.max())
 
         if len(self.tracks) == 1:
-            self._plot_bases(fig, track_dtws[0], track.model, current_min, current_max, row, col)
+            self._plot_bases(fig, track_dtws[0], self.tracks.model, current_min, current_max, row, col)
             colors = ["white"]
             dtw_kws = [{}]
         else:
@@ -140,7 +133,7 @@ class Sigplot:
                 ys = np.linspace(current_min, current_max, len(self.tracks)+1)
                 dy = (ys[1]-ys[0])*0.01
                 for dtw,ymin,ymax in zip(track_dtws, ys[:-1], ys[1:]):
-                    self._plot_bases(fig, dtw, track.model, ymin+dy, ymax-dy, row, col)
+                    self._plot_bases(fig, dtw, self.tracks.model, ymin+dy, ymax-dy, row, col)
 
             colors = self.conf.vis.track_colors
             dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks.alns]
@@ -158,17 +151,17 @@ class Sigplot:
             fig.add_trace(go.Scattergl(
                 name = "Event Means",
                 mode = "lines",
-                x=read.df["start"], y=read.df["norm_sig"],
+                x=read.df["start_sec"], y=read.df["norm_sig"],
                 line={"color":"black", "width":2, "shape" : "hv"},
             ), row=row, col=col)
 
         if not self.prms.no_model:
             for dtw,color,kw in zip(track_dtws, colors, dtw_kws):
-                dtw = dtw.sort_values("start")
+                dtw = dtw.sort_values(("dtw","start_sec"))
                 fig.add_trace(go.Scattergl(
                     name = "Model Current",
                     mode = "lines",
-                    x=dtw["start"], y=dtw["model_current"],
+                    x=dtw["dtw", "start_sec"], y=dtw["seq", "current"],
                     line={"color":color, "width":2.5, "shape" : "hv"},
                     **kw
                 ), row=row, col=col)
@@ -177,15 +170,6 @@ class Sigplot:
         fig.update_yaxes(fixedrange=self.prms.yaxis_fixed, row=row, col=col)
 
         return fig
-
-OPTS = (
-    Opt("ref_bounds", "tracks", type=str_to_coord),
-    Opt("db_in", "tracks.io"),
-    Opt(("-o", "--outfile"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
-    Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
-    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
-    Opt(("-n", "--max-reads"), "sigplot"),
-)
 
 def main(conf):
     """plot a dotplot"""

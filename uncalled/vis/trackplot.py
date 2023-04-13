@@ -7,7 +7,6 @@ import time
 import sys
 
 from .. import config
-from ..fast5 import parse_read_ids
 from ..dtw.layers import LAYER_META, parse_layer, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks, REFSTAT_LABELS, COMPARE_REFSTATS
@@ -16,13 +15,13 @@ from ..argparse import Opt, comma_split
 _CMP_COLOR = {"colorscale" : "RdYlGn", "cmin" : 0, "cmid" :5, "cmax" : 10, "reversescale":True}
 
 LAYER_COLORS = {
-    ("dtw", "model_diff") : {"colorscale" : "RdBu", "cmid" : 0, "cmax" : 20, "cmin" : -20, "reversescale":True},
-    ("bcaln", "indel") : {"colorscale" : "Picnic", "cmid" : 0, "cmax" : 1, "cmin" : -1, "reversescale":False},
+    ("dtw", "model_diff") : {"colorscale" : "RdBu", "cmid" : 0, "cmax" : 2.5, "cmin" : -2.5, "reversescale":True},
+    ("moves", "indel") : {"colorscale" : "Picnic", "cmid" : 0, "cmax" : 1, "cmin" : -1, "reversescale":False},
     ("dtw", "events_log2") : {"colorscale" : "Picnic", "cmid" : 0, "cmax" : 2, "cmin" : -2, "reversescale":True},
     ("dtw", "current") : {"colorscale" : "viridis"},
     ("dtw", "dwell") : {"colorscale" : "viridis", "cmin" : 0, "cmax" : 25},
-    ("cmp", "mean_ref_dist") : _CMP_COLOR,
-    ("bc_cmp", "mean_ref_dist") : _CMP_COLOR,
+    ("cmp", "dist") : _CMP_COLOR,
+    ("mvcmp", "dist") : _CMP_COLOR,
 }
 
 LAYER_PANELS = {"mat", "box"}
@@ -38,9 +37,9 @@ DEFAULT_HEIGHTS = {
 
 PLOT_LAYERS = {
     ("dtw", "current"), ("dtw", "dwell"), ("dtw", "model_diff"), ("dtw", "events_log2"),
-    ("bcaln", "indel"),
-    ("cmp", "mean_ref_dist"), ("bc_cmp", "mean_ref_dist"),
-    ("cmp", "jaccard"), ("bc_cmp", "jaccard"), #("bcaln", "error"), 
+    ("moves", "indel"),
+    ("cmp", "dist"), ("mvcmp", "dist"),
+    ("cmp", "jaccard"), ("mvcmp", "jaccard"), #("moves", "error"), 
 }
 
 class Trackplot:
@@ -78,8 +77,8 @@ class Trackplot:
             self.tracks.conf.load_config(self.conf)
             self.conf = self.tracks.conf
 
-        if self.tracks.all_empty:       
-            self.tracks.load()
+        #if self.tracks.all_empty:       
+        #    self.tracks.load()
 
         if self.tracks.refstats is None:
             self.tracks.calc_refstats()
@@ -103,7 +102,7 @@ class Trackplot:
         n_rows = len(panel_heights)
 
         t0 = time.time()
-        ref_title = "Reference (%s)" % self.tracks.coords.ref_name
+        ref_title = "Reference (%s)" % self.tracks.coords.name
         self.fig = make_subplots(
             rows=n_rows, cols=1, 
             row_heights=panel_heights,
@@ -155,47 +154,46 @@ class Trackplot:
         layer_label = LAYER_META.loc[(group,layer),"label"]
 
         t0 = time.time()
-        for i,track in enumerate(self.tracks.alns):
+        #for i,track in enumerate(self.tracks.alns):
+        #for i in np.arange(self.tracks.track_count)+1:
+        for track_name in self.tracks.alignments.index.levels[0]:
             self.fig.update_yaxes(
-                title_text=f"{track.desc}", 
+                title_text=track_name,#f"{track.desc}", 
                 showticklabels=False,
                 row=row, col=1)
 
-            if track.empty: 
-                sys.stderr.write("Warning: no alignments loaded from track \"%s\"\n" % track.desc)
+            if track_name not in self.tracks.layers.index.get_level_values(0):
+                sys.stderr.write("Warning: no alignments loaded from track \"%d\"\n" % track_name)
                 row += 1
                 continue
 
-            if track.mat is None:
-                track.load_mat()
+            mat = self.tracks.mat.loc[(track_name,slice(None)),(group,layer)]#.dropna(how="all")
 
-            mat = track.mat[(group,layer)]#.dropna(how="all")
-            
+            read_ids = self.tracks.alignments.loc[mat.index, "read_id"].to_numpy()
 
-
-            hover_lines = [track.coords.ref_name + ":%{x}"]
+            hover_lines = [self.tracks.coords.name + ":%{x}"]
             if self.prms.hover_read:
                 hover_lines.append("%{text}")
-                read_ids = np.tile(track.alignments.loc[mat.index, "read_id"].to_numpy(), (mat.shape[1], 1)).T
+                hover_read = np.tile(read_ids, (mat.shape[1], 1)).T
             else:
-                read_ids = None
+                hover_read = None
             hover_lines.append(layer_label + ": %{z}<extra></extra>")
             hover = "<br>".join(hover_lines)
 
             self.fig.add_trace(go.Heatmap(
-                name=track.desc,
+                name=track_name, #track.desc,
                 x=mat.columns,
                 #y=track.alignments["read_id"],
                 z=mat,
                 zsmooth=False,
                 hoverinfo="text",
                 hovertemplate=hover,
-                text = read_ids,
+                text = hover_read,
                 coloraxis="coloraxis",
             ), row=row, col=1)
 
             if self.prms.select_read is not None:
-                ys = np.where((self.prms.select_read == track.alignments["read_id"]).to_numpy())[0]
+                ys = np.where(self.prms.select_read == read_ids)[0]
                 for y in ys:
                     self.fig.add_hline(y=y, line_color="red", row=row, col=1)
             row += 1
@@ -217,19 +215,21 @@ class Trackplot:
         layer_label = LAYER_META.loc[(group,layer),"label"]
 
         self.fig.update_yaxes(title_text=layer_label, row=row, col=1)
-        for j,track in enumerate(self.tracks.alns):
-            stats = self.tracks.refstats[track.name,group,layer]
+        #for j,track in enumerate(self.tracks.alns):
+        for i in np.arange(self.tracks.track_count)+1:
+            #stats = self.tracks.refstats[track.name,group,layer]
+            stats = self.tracks.refstats[i,group,layer]
             for idx in stats.index[:-1]:
                 self.fig.add_vline(x=idx+0.5, line_color="black", row=row, col=1)
             self.fig.add_trace(go.Box(
-                x=stats.index - 0.25 + j*0.5,
+                x=stats.index - 0.25 + i*0.5,
                 median=stats["median"],
                 lowerfence=stats["q5"],
                 q1=stats["q25"],
                 q3=stats["q75"],
                 upperfence=stats["q95"],
-                name=track.desc,
-                line_color=self.conf.vis.track_colors[j]
+                name=str(i),#track.desc,
+                line_color=self.conf.vis.track_colors[i]
             ), row=row, col=1)
 
     def _line(self, row, layer):

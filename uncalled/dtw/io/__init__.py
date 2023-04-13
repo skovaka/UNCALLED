@@ -1,4 +1,5 @@
 """Edit, merge, and ls alignment databases
+        print(d)
 
 subcommand options:
 ls       List all tracks in a database
@@ -12,6 +13,7 @@ import collections
 import numpy as np
 import pandas as pd
 import sys
+from collections import namedtuple
 
 from ..aln_track import AlnTrack
 from ...config import Config
@@ -25,6 +27,8 @@ OUT_EXT = {
     "eventalign_out" : "txt", 
     "bam_out" : "bam"
 }
+
+#AlnTrack = namedtuple("AlnTrack", ["id", "name", "desc", "conf"])
 
 class TrackIO:
     def __init__(self, filename, write, tracks, track_count):
@@ -42,8 +46,8 @@ class TrackIO:
 
         self.aln_tracks = list()
 
-        if not hasattr(self, "prev_aln_id"):
-            self.prev_aln_id = 1
+        if not hasattr(self, "aln.id"):
+            self.aln_id = 1
 
         if filename is None:
             self.filename = None
@@ -55,53 +59,22 @@ class TrackIO:
         else:
             self.in_tracks = None
 
-            #spl = filename.split(":")
-
-            #if len(spl) == 1:
-            #    self.filename = filename
-            #    self.track_names = None
-
-            #elif len(spl) == 2:
-            #    self.filename = spl[0]
-            #    self.track_names = spl[1].split(",")
-            #else:
-            #    raise ValueError("Invalid database specifier format: " + filename)
-
-        #self.track_names = None
         self.write_mode = write
 
     @property
     def read_filter(self):
         return self.tracks.read_index.read_filter
 
-    def init_alignment(self, read_id, fast5, read, bam):
-        self.read = read
-        self.bam = bam
-
-        if fast5 == self.prev_fast5[0]:
-            fast5_id = self.prev_fast5[1]
-        else:
-            fast5_id = self.init_fast5(fast5)
-            self.prev_fast5 = (fast5, fast5_id)
-
-        if self.prev_read != read_id:
-            self.init_read(read_id, fast5_id)
-            self.prev_read = read_id
-
-        self.prev_aln_id += 1
-
-        return self.prev_aln_id
-
     def init_write_mode(self):
         if self.prms.out_name is not None:
-            self.out_track = self.prms.out_name
+            track_name = self.prms.out_name
         else:
-            self.out_track = os.path.splitext(os.path.basename(self.filename))[0]
+            track_name = os.path.splitext(os.path.basename(self.filename))[0]
 
         self.prev_fast5 = (None, None)
         self.prev_read = None
 
-        self.out_id = self.init_track(self.out_track, self.out_track, self.conf)
+        self.track_out = self.init_track(track_name, track_name, self.conf)
 
         self.out_buffer = None
 
@@ -110,17 +83,18 @@ class TrackIO:
             id = self.next_id
         self.next_id = id + 1
 
-        self.aln_tracks.append(AlnTrack(id, name, desc, conf))
+        t = AlnTrack(id, name, desc, conf)
+        self.aln_tracks.append(t)
         self.conf.load_config(conf)
 
-        return id
+        return t
 
     def fill_tracks(self, coords, alignments, layers):
         layers = layers.droplevel(0)
 
         for track in self.aln_tracks:
-            track_alns = alignments[alignments["track_id"] == track.id]
-            i = layers.index.get_level_values("aln_id").isin(track_alns.index)
+            track_alns = alignments[alignments["track.name"] == track.name]
+            i = layers.index.get_level_values("aln.id").isin(track_alns.index)
             track_layers = layers.iloc[i]
 
             track.set_data(coords, track_alns, track_layers)
@@ -148,8 +122,9 @@ class TrackIO:
         for out in buf:
             self.output.write(out)
             
-    def write_alignment(self, alns):
-        pass
+    def next_aln_id(self):
+        self.aln_id += 1
+        return self.aln_id
 
     def init_fast5(self, fast5):
         pass
@@ -167,7 +142,6 @@ from .tsv import TSV
 from .bam import BAM
 from .eventalign import Eventalign
 from .tombo import Tombo
-from .guppy import Guppy
 from .model_trainer import ModelTrainer
 
 INPUTS = {
@@ -204,15 +178,23 @@ def convert(conf):
 
     conf.tracks.layers = ["dtw"]
     conf.tracks.load_fast5s = True
+    
+    if conf.tracks.io.tombo_in is not None:
+        conf.read_index.paths = conf.tracks.io.tombo_in
+
     tracks = Tracks(conf=conf)
 
-    for read_id, read in tracks.iter_reads():
-        sys.stderr.write(f"{read_id}\n")
-        aln = read.alns[0]
-        dtw = aln.layers["dtw"].droplevel(1)
-        read.init_alignment(read_id, read.get_read_fast5(read_id), aln.coords, {"dtw" : dtw})
+    if len(tracks.inputs) == 2:
+        if tracks.bam_in is None:
+            raise ValueError("Only one non-BAM input can be specified")
+        ignore_bam = True
+    else:
+        ignore_bam = False
         
-        read.write_alignment()
+    for aln in tracks.iter_reads(ignore_bam=ignore_bam):
+        #sys.stderr.write(f"{aln.read_id}\n")
+        
+        tracks.write_alignment(aln)
 
     tracks.close()
 

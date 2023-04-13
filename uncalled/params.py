@@ -1,36 +1,11 @@
 from . import config
 from . import RefCoord
 
-#Index parameter group
-class IndexParams(config.ParamGroup):
-    _name = "index"
-IndexParams._def_params(
-    ("fasta_filename", None, str, "FASTA file to index"),
-    ("index_prefix", None, str, "Index output prefix. Will use input fasta filename by default"),
-    ("no_bwt", False, bool, "Will only generate the pacseq if specified, which is much faster to build. Can only be used with DTW subcommands (NOT map, sim, or realtime)"),
-    ("max_sample_dist", 100, int, "Maximum average sampling distance between reference alignments."),
-    ("min_samples", 50000, int, "Minimum number of alignments to produce (approximate, due to deterministically random start locations),"),
-    ("max_samples", 1000000, int, "Maximum number of alignments to produce (approximate, due to deterministically random start locations),"),
-    ("kmer_len", 5, int, "Model k-mer length"),
-    ("matchpr1", 0.6334, float, "Minimum event match probability"),
-    ("matchpr2", 0.9838, float, "Maximum event match probability"),
-    ("pathlen_percentile", 0.05, float, ""),
-    ("max_replen", 100, int, ""),
-    ("probs", None, str, "Find parameters with specified target probabilites (comma separated)"),
-    ("speeds", None, str, "Find parameters with specified speed coefficents (comma separated)"),
-)
-
 eventalign_flags = "\", \"".join(["print-read-names", "signal-index", "samples"])#, "scale-events"]
 
 class IOParams(config.ParamGroup):
     _name = "io"
 IOParams._def_params(
-    #("input", None, None, "Input tracks specifier. Should be in the format <file.db>[:<track1>[,<track2>...]]. If no track names are specified, all tracks will be loaded from the database."),
-    #("output", None, None,  "Output track specifier. Should be in the format <file.db>[:<track_name>], where file.db is the output sqlite database. If <track_name> is not specified, will be same as filename (without extension)"),
-
-    #("db_in", None, str, "Input track database"),
-    #("db_out", None, str, "Output track database"),
-
     ("processes", 1, int, "Number of parallel processes"),
     ("bam_chunksize", 100, int, "Per-process alignment bam_chunksize"),
 
@@ -38,7 +13,7 @@ IOParams._def_params(
     ("sql_out", None, str, "Output track database"),
 
     ("tsv_out", None, str, "TSV output file (or \"-\"/no argument for stdout)"),
-    ("tsv_cols", None, list, "TSV file output alignment layers (comma-separated, can also include \"read_id\""),
+    ("tsv_cols", ["dtw"], list, "TSV file output alignment layers (comma-separated, can also include \"read_id\""),
     ("tsv_na", "*", str, "Missing value representation for TSV output"),
     ("tsv_noref", False, bool, "Will NOT output reference coordinates to TSV if True"),
 
@@ -96,7 +71,7 @@ TracksParams._def_params(
     ("refstats", None, None, "Per-reference summary statistics to compute for each layer"),
     ("refstats_layers", None, None, "Layers to compute refstats"),
 
-    ("index_prefix", None, str, "BWA index prefix"),
+    ("ref_index", None, str, "BWA index prefix"),
     ("load_fast5s", False, bool, "Load fast5 files"),
 
     ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter", "load_fast5s"}
@@ -106,12 +81,25 @@ class TrainParams(config.ParamGroup):
     _name = "train"
 TrainParams._def_params(
     ("kmer_samples", 1000, int, "Maximum number of instances of each k-mer to use per training iteration"),
+    ("init_model", None, str, "Initial pore model. If not specified, iteration will be based on basecaller move alignments"),
+    ("init_events", 1000000, int, "Number of events to use for computing picoamp scaling parameters for new pore model"),
+    ("kmer_len", None, int, "Output model k-mer length. Required if init_model is not specified"),
     ("iterations", 1, int, "Number of model training iterations"),
     ("buffer_size", 256, int, "Size of sorted chunk buffer (MB)"),
-    ("max_bcaln_dist", 1, float, "Maximum mean_refi_dist from basecalled alignment to use for model trainer"),
+    ("max_moves_dist", 1, float, "Maximum mean_refi_dist from basecalled alignment to use for model trainer"),
     ("use_median", False, bool, ""),
     ("skip_dtw", None, bool, "Will use previous training data to re-compute the model. '--out-dir' must be a previous model training directory with at least the specified number of iterations"),
     ("append", False, bool, "If output directory exists and contains a file 'it[N].model.tsv', will use the file with the highest N to initialize training and generate additional training iterations"),
+)
+
+class ReadIndexParams(config.ParamGroup):
+    _name = "read_index"
+ReadIndexParams._def_params(
+    ("paths", None, list, "Paths to fast5, slow5, or pod5 files, or to directories containing those files (optionally recursive)"),
+    ("read_filter", None, list, "List of read IDs to load, or file containing one read ID per line"),
+    ("read_index", None, str, "File containing a mapping of read IDs to filenames"),
+    ("read_count", None, int, "Maximum number of reads to load"),
+    ("recursive", None, bool, "Recursively search 'paths' for fast5, slow5, or pod5 files"),
 )
 
 class VisParams(config.ParamGroup):
@@ -125,8 +113,8 @@ class DotplotParams(config.ParamGroup):
     _name = "dotplot"
 DotplotParams._def_params(
     ("tracks", None, None, "DTW aligment tracks"),
-    ("bcaln_track", None, str, "Only display basecalled alignments from this track"),
-    ("bcaln_error", False, bool, "Display basecalled alignment errors"),
+    ("moves_track", None, str, "Only display basecalled alignments from this track"),
+    ("moves_error", False, bool, "Display basecalled alignment errors"),
     ("show_legend", True, bool, "Display legend"),
     ("show_bands", True, bool, "Display DTW bands (if present in DB)"),
     ("select_ref", None, int, "Display a horizontal line at specified reference coordinate"),

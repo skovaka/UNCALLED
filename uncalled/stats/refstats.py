@@ -13,7 +13,6 @@ from ..dtw.tracks import RefstatsSplit, ALL_REFSTATS
 from ..dtw.layers import parse_layers
 from ..argparse import Opt, comma_split
 from ..index import str_to_coord
-from ..fast5 import Fast5Reader
 
 
 def refstats(conf):
@@ -49,7 +48,7 @@ def refstats(conf):
             columns.append(".".join([stat, group, layer, "stat"]))
             columns.append(".".join([stat, group, layer, "pval"]))
 
-    columns.append("kmer")
+    #columns.append("kmer")
 
     print("\t".join(columns))
 
@@ -59,10 +58,15 @@ def refstats(conf):
 
         stats = chunk.calc_refstats(conf.cov)
         if stats is None: continue
-        stats["kmer"] = tracks.model.kmer_to_str(chunk.coords.ref_kmers.loc[(chunk.coords.strands, stats.index)])
+        #stats["kmer"] = tracks.model.kmer_to_str(chunk.coords.ref_kmers.loc[(chunk.coords.strands, stats.index)])
 
         #if conf.verbose_refs:
-        stats.index = pd.MultiIndex.from_product([
-            [chunk.coords.ref_name], stats.index, ["+" if chunk.coords.fwd else "-"]
-        ])
+        stats = pd.concat({chunk.coords.name : stats}, axis=0)\
+                  .reset_index(level="seq.fwd")
+        stats["seq.strand"] = stats["seq.fwd"].replace({True:"+",False:"-"})
+        stats.set_index("seq.strand",append=True,inplace=True)
+        del stats["seq.fwd"]
+        #stats.index = pd.MultiIndex.from_product([
+        #    [chunk.coords.name], stats.index.get_level_values(0), stats.index.get_level_values(1)
+        #])
         sys.stdout.write(stats.to_csv(sep="\t",header=False,na_rep=0))

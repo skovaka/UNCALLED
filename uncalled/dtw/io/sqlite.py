@@ -9,7 +9,6 @@ from ..aln_track import AlnTrack
 from ..layers import LAYER_META, LAYER_DB_GROUPS
 from ... import config
 from . import TrackIO
-from _uncalled import _Fast5Reader
 
 class TrackSQL(TrackIO):
     FORMAT = "db"
@@ -43,8 +42,8 @@ class TrackSQL(TrackIO):
             self.cur.execute("CREATE INDEX IF NOT EXISTS aln_fwd_idx ON alignment (fwd);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_idx ON dtw (pac, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS dtw_aln_idx ON dtw (aln_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_idx ON bcaln (pac, aln_id);")
-            self.cur.execute("CREATE INDEX IF NOT EXISTS bcaln_aln_idx ON bcaln (aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS moves_idx ON moves (pac, aln_id);")
+            self.cur.execute("CREATE INDEX IF NOT EXISTS moves_aln_idx ON moves (aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS band_idx ON band (pac, aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS band_aln_idx ON band (aln_id);")
             self.cur.execute("CREATE INDEX IF NOT EXISTS cmp_idx ON cmp (pac, aln_a, aln_b, group_b);")
@@ -100,7 +99,7 @@ class TrackSQL(TrackIO):
                 FOREIGN KEY (aln_id) REFERENCES alignment (id) ON DELETE CASCADE
             );""")
         self.cur.execute("""
-            CREATE TABLE IF NOT EXISTS bcaln (
+            CREATE TABLE IF NOT EXISTS moves (
                 pac INTEGER,
                 aln_id INTEGER,
                 start INTEGER,
@@ -115,7 +114,7 @@ class TrackSQL(TrackIO):
                 aln_a INTEGER,
                 aln_b INTEGER,
                 group_b TEXT DEFAULT "dtw",
-                mean_ref_dist REAL, 
+                dist REAL, 
                 jaccard REAL, 
                 FOREIGN KEY (aln_a) REFERENCES alignment (id) ON DELETE CASCADE,
                 FOREIGN KEY (aln_b) REFERENCES alignment (id) ON DELETE CASCADE
@@ -134,7 +133,7 @@ class TrackSQL(TrackIO):
     def init_write_mode(self):
         TrackIO.init_write_mode(self)
 
-        for table in ["dtw", "bcaln", "cmp", "band"]:
+        for table in ["dtw", "moves", "cmp", "band"]:
             self.cur.execute("DROP INDEX IF EXISTS %s_idx" % table)
 
         track = self.aln_tracks[0]
@@ -218,7 +217,7 @@ class TrackSQL(TrackIO):
 
 
     def write_alignment(self, aln_df):
-        aln_df["track_id"] = self.write_id
+        aln_df["track.id"] = self.write_id
         aln_df.to_sql(
             "alignment", self.con, 
             if_exists="append", 
@@ -248,9 +247,9 @@ class TrackSQL(TrackIO):
             self.write_layer_group(group, df[base_layers])
 
     def write_layer_group(self, group, df):
-        if group == "bc_cmp": group = "cmp"
+        if group == "mvcmp": group = "cmp"
         if group == "cmp":
-            df = df.droplevel("aln_id")
+            df = df.droplevel("aln.id")
         df.to_sql(
             group, self.con, 
             if_exists="append", 
@@ -266,7 +265,7 @@ class TrackSQL(TrackIO):
 
         if track_id is not None:
             query += " JOIN alignment ON read.id = alignment.read_id"
-            self._add_where(wheres, params, "track_id", track_id)
+            self._add_where(wheres, params, "track.id", track_id)
         
         query = self._join_query(query, wheres)
         return pd.read_sql_query(query, self.con, params=params)
@@ -296,7 +295,7 @@ class TrackSQL(TrackIO):
         params = list()
 
         self._add_where(wheres, params, "alignment.id", aln_id)
-        self._add_where(wheres, params, "track_id", track_id)
+        self._add_where(wheres, params, "track.id", track_id)
         self._add_where(wheres, params, "read_id", read_id)
 
         if coords is not None:
@@ -312,8 +311,8 @@ class TrackSQL(TrackIO):
         query = self._join_query(select, wheres, order)
 
         df = pd.read_sql_query(query, self.con, params=params, chunksize=chunksize)
-        df["track_id"] += self.track_shift #self.next_id+1
-        return df.set_index(["track_id","id"])
+        df["track.id"] += self.track_shift #self.next_id+1
+        return df.set_index(["track.id","id"])
         
     def _join_query(self, select, wheres, order=None):
         query = select
@@ -325,11 +324,11 @@ class TrackSQL(TrackIO):
 
     def query_compare(self, layers, track_id=None, coords=None, aln_id=None):
         dtw = False
-        bcaln = False
-        fields = {"pac", "aln_a", "aln_b", "group_b"}
+        moves = False
+        fields = {"seq.pac", "aln_a", "aln_b", "group_b"}
         for group,layer in layers:
             if group == "cmp": dtw = True
-            if group == "bc_cmp": bcaln = True
+            if group == "mvcmp": moves = True
             fields.add(layer)
 
         fields = ", ".join(fields)
@@ -340,12 +339,12 @@ class TrackSQL(TrackIO):
 
         if track_id is not None:
             select += " JOIN alignment ON id = cmp.aln_a"
-            self._add_where(wheres, params, "track_id", track_id)
+            self._add_where(wheres, params, "track.id", track_id)
 
-        if dtw and not bcaln:
+        if dtw and not moves:
             self._add_where(wheres, params, "group_b", "dtw")
-        elif bcaln and not dtw:
-            self._add_where(wheres, params, "group_b", "bcaln")
+        elif moves and not dtw:
+            self._add_where(wheres, params, "group_b", "moves")
 
         self._add_where(wheres, params, "aln_a", aln_id)
 
@@ -356,7 +355,7 @@ class TrackSQL(TrackIO):
         query = self._join_query(select, wheres)
         return pd.read_sql_query(
             query, self.con, 
-            index_col=["pac", "aln_a", "aln_b", "group_b"], 
+            index_col=["seq.pac", "aln_a", "aln_b", "group_b"], 
             params=params)
 
     def iter_refs(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, chunksize=None, full_overlap=False):
@@ -366,7 +365,7 @@ class TrackSQL(TrackIO):
             strands = [1, 0]
 
         for fwd in strands:
-            itr = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, ["pac"], chunksize, full_overlap)
+            itr = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, ["seq.pac"], chunksize, full_overlap)
 
             ret_alns = pd.DataFrame()
             chunks = list()
@@ -374,7 +373,7 @@ class TrackSQL(TrackIO):
 
             for layers in itr:
                 layers.sort_index(inplace=True)
-                next_pac = layers.index.get_level_values("pac")[-1]
+                next_pac = layers.index.get_level_values("seq.pac")[-1]
                 #if next_pac 
 
                 if prev_pac is None or prev_pac == next_pac:
@@ -384,7 +383,7 @@ class TrackSQL(TrackIO):
                     ret_layers = pd.concat(chunks)
                     chunks = [layers.loc[slice(None),fwd,next_pac:]]
 
-                    aln_ids = ret_layers.index.get_level_values("aln_id").unique()
+                    aln_ids = ret_layers.index.get_level_values("aln.id").unique()
                     if len(ret_alns) > 0:
                         aln_ids = aln_ids.difference(ret_alns.index)
 
@@ -398,7 +397,7 @@ class TrackSQL(TrackIO):
                 ret_layers = pd.concat(chunks)
                 chunks = [layers.loc[slice(None),fwd,next_pac]]
 
-                aln_ids = ret_layers.index.get_level_values("aln_id").unique()
+                aln_ids = ret_layers.index.get_level_values("aln.id").unique()
                 if len(ret_alns) > 0:
                     aln_ids = aln_ids.difference(ret_alns.index)
 
@@ -406,20 +405,20 @@ class TrackSQL(TrackIO):
 
                 yield ret_alns, ret_layers
 
-    def query(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], full_overlap=False):
+    def query(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "seq.pac"], full_overlap=False):
         
         if track_id is not None:
             track_id = np.array(track_id)-self.track_shift
 
         layers = self.query_layers(layers, track_id, coords, aln_id, read_id, fwd, order, None, full_overlap)
 
-        aln_ids = layers.index.unique("aln_id").to_numpy()
+        aln_ids = layers.index.unique("aln.id").to_numpy()
         alignments = self.query_alignments(aln_id=aln_ids)
 
         #self.fill_tracks(coords, alignments, layers)
         return alignments, layers
 
-    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "pac"], chunksize=None, full_overlap=False):
+    def query_layers(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, order=["read_id", "seq.pac"], chunksize=None, full_overlap=False):
 
         group_layers = collections.defaultdict(list)
         renames = dict()
@@ -428,7 +427,7 @@ class TrackSQL(TrackIO):
         for group,layer in layers:
             if not layer in self.table_columns[group]: 
                 continue
-            if group == "bc_cmp":
+            if group == "mvcmp":
                 group = "cmp"
             field = group + "." + layer
             name = group + "_" + layer
@@ -438,9 +437,9 @@ class TrackSQL(TrackIO):
             if group not in tables:
                 tables.append(group)
 
-        fields += ["%s.%s AS idx_%s" % (tables[0],idx,idx) for idx in ("pac", "aln_id")]
-        fields.append("fwd")
-        fields.append("track_id")
+        fields += ["%s.%s AS idx_%s" % (tables[0],idx,idx) for idx in ("seq.pac", "aln.id")]
+        fields.append("seq.fwd")
+        fields.append("track.id")
 
         select = "SELECT " + ", ".join(fields) + " FROM " + tables[0]
         for table in tables[1:]:
@@ -449,17 +448,17 @@ class TrackSQL(TrackIO):
         wheres = list()
         params = list()
 
-        #if track_id is not None or read_id is not None or "fwd" in order:
+        #if track_id is not None or read_id is not None or "seq.fwd" in order:
         select += " JOIN alignment ON id = idx_aln_id"
         if track_id is not None:
-            self._add_where(wheres, params, "track_id", track_id)
+            self._add_where(wheres, params, "track.id", track_id)
         if read_id is not None:
             self._add_where(wheres, params, "read_id", read_id)
         if fwd is not None:
-            self._add_where(wheres, params, "fwd", fwd)
+            self._add_where(wheres, params, "seq.fwd", fwd)
 
         if "cmp" in group_layers:
-            self._add_where(wheres, params, "group_b", "bcaln")
+            self._add_where(wheres, params, "group_b", "moves")
 
         if coords is not None:
             wheres.append("(idx_pac >= ? AND idx_pac <= ?)")
@@ -472,18 +471,18 @@ class TrackSQL(TrackIO):
 
         self._add_where(wheres, params, "idx_aln_id", aln_id)
 
-        query = self._join_query(select, wheres, ["idx_"+o if o in {"aln_id","pac"} else o for o in order])
+        query = self._join_query(select, wheres, ["idx_"+o if o in {"aln.id","seq.pac"} else o for o in order])
 
         ret = pd.read_sql_query(
             query, self.con, 
-            #index_col=["track_id", "fwd", "idx_pac", "idx_aln_id"], 
+            #index_col=["track.id", "seq.fwd", "idx_pac", "idx_aln_id"], 
             params=params, chunksize=chunksize)
 
         def make_groups(df):
             grouped = dict()
-            df["track_id"] += self.track_shift #self.next_id+1
-            df.set_index(["track_id", "fwd", "idx_pac", "idx_aln_id"], inplace=True)
-            df.index.names = ("track_id", "fwd", "pac", "aln_id")
+            df["track.id"] += self.track_shift #self.next_id+1
+            df.set_index(["track.id", "seq.fwd", "idx_pac", "idx_aln_id"], inplace=True)
+            df.index.names = ("track.id", "seq.fwd", "seq.pac", "aln.id")
             for group, layers in group_layers.items():
                 gdf = df[layers]
                 grouped[group] = df[layers].rename(columns=renames)
@@ -498,14 +497,14 @@ class TrackSQL(TrackIO):
     def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
         layer_iter = self.query_layers(
             layers, track_id, coords, aln_id, read_id, fwd,
-            ["read_id", "pac"], self.prms.ref_chunksize, full_overlap) 
+            ["read_id", "seq.pac"], self.prms.ref_chunksize, full_overlap) 
 
         layer_leftovers = pd.DataFrame()
 
         for layers in layer_iter:
             layers = pd.concat([layer_leftovers, layers])
 
-            ids = layers.index.unique("aln_id").to_numpy()
+            ids = layers.index.unique("aln.id").to_numpy()
             alignments = self.query_alignments(aln_id=ids, order=["read_id"])
 
             #print("HERE")
@@ -517,7 +516,7 @@ class TrackSQL(TrackIO):
             #print(last_alns)
             #print(layers)
 
-            layer_leftovers = layers.loc[layers.index.get_level_values("aln_id").isin(last_alns)]
+            layer_leftovers = layers.loc[layers.index.get_level_values("aln.id").isin(last_alns)]
             #layer_leftovers = layers.loc[last_layers]
 
             layers = layers.drop(index=layer_leftovers.index)
@@ -525,7 +524,7 @@ class TrackSQL(TrackIO):
             yield alignments, layers
 
         if len(layer_leftovers) > 0:
-            ids = layer_leftovers.index.unique("aln_id").to_numpy()
+            ids = layer_leftovers.index.unique("aln.id").to_numpy()
             alignments = self.query_alignments(aln_id=ids, order=["read_id"])
             yield alignments, layer_leftovers
     
@@ -565,8 +564,7 @@ def delete(track_name=None, db=None, conf=None):
     print("Deleted track \"%s\"" % track_name)
 
 def edit(conf, db=None):
-    fast5s = _Fast5Reader.Params(conf.fast5_reader)
-    fast5_change = len(conf.fast5_files) > 0
+    fast5_change = len(conf.paths) > 0
     track_name = conf.track_name
     if db is None:
         #db = TrackSQL(conf, "r")
@@ -583,7 +581,7 @@ def edit(conf, db=None):
         params.append(conf.description)
     if fast5_change:
         updates.append("config = ?")
-        conf.fast5_reader = fast5s
+        conf.read_index = fast5s
         del conf.track_name
         del conf.new_name
         del conf.description
@@ -603,7 +601,7 @@ def edit(conf, db=None):
     db.con.commit()
     db.con.close()
 
-def _set_fast5s(track_id, fast5_files, db):
+def _set_fast5s(track_id, paths, db):
     fast5s = pd.read_sql_query(
         "SELECT fast5.id, filename FROM fast5 " \
         "JOIN read ON fast5.id = fast5_id " \
@@ -613,7 +611,7 @@ def _set_fast5s(track_id, fast5_files, db):
 
     basenames = fast5s["filename"].map(os.path.basename)
 
-    new_paths = {os.path.basename(path) : path for path in parse_fast5_paths(fast5_files, True)}
+    new_paths = {os.path.basename(path) : path for path in parse_fast5_paths(paths, True)}
 
     fast5s["filename"] = basenames.map(new_paths)
 
@@ -685,9 +683,9 @@ def merge(conf):
                 "FROM input.dtw"
         db.cur.execute(query)
 
-        query = "INSERT INTO bcaln "\
+        query = "INSERT INTO moves "\
                f"SELECT pac,aln_id+{aln_shift},start,length,indel "\
-                "FROM input.bcaln"
+                "FROM input.moves"
         db.cur.execute(query)
 
         query = "INSERT INTO band "\
@@ -696,7 +694,7 @@ def merge(conf):
         db.cur.execute(query)
 
         query = "INSERT INTO cmp "\
-               f"SELECT pac,aln_a+{aln_shift},aln_b+{aln_shift},group_b,mean_ref_dist,jaccard "\
+               f"SELECT pac,aln_a+{aln_shift},aln_b+{aln_shift},group_b,dist,jaccard "\
                 "FROM input.cmp"
         db.cur.execute(query)
 

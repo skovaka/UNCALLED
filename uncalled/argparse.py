@@ -29,7 +29,7 @@ from .config import Config
 
 from . import __title__, __version__, __summary__
 
-FAST5_PARAM = "fast5_files"
+FAST5_PARAM = "paths"
 CONFIG_PARAM = "config"
 SPECIAL_PARAMS = {FAST5_PARAM, CONFIG_PARAM}
 
@@ -170,7 +170,7 @@ class ArgParser:
 
         #fast5s = getattr(args, FAST5_PARAM, None)
         #if fast5s is not None:
-        #    self.config.fast5_reader.fast5_files = unc.fast5.parse_fast5_paths(fast5s, self.config.fast5_reader.recursive)
+        #    self.config.read_index.paths = unc.fast5.parse_fast5_paths(fast5s, self.config.read_index.recursive)
 
         return module, cmd, self.config
     

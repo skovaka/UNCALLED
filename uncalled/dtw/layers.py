@@ -6,19 +6,25 @@ _Layer = namedtuple("_Layer", ["dtype", "label", "fn", "deps"], defaults=[None,N
 
 #TODO probably move this to AlnTrack
 LAYERS = {
-    "ref" : {
+    "seq" : {
         "name" : _Layer(str, "Reference Name",
             lambda track: [track.coords.ref_name]*len(track.layers)),
-        "coord" : _Layer("Int64", "Reference Coordinate", 
-            lambda track: track.coords.pac_to_ref(track.layer_pacs)),
+        "seq.pos" : _Layer("Int64", "Reference Coordinate", 
+            lambda track: track.coords.pac_to_pos(track.layer_pacs)),
         "strand" : _Layer(str, "Strand",
             lambda track: track.layer_strands),
+        "kmer" : _Layer(str, "Kmer",
+            lambda track: track.layer_strands),
+        "current" : _Layer(np.float32, "Model Current",
+            lambda track: track.layer_strands),
     }, "dtw" : {
-        "current" : _Layer(np.float32, "Current (pA)"),
-        "stdv" : _Layer(np.float32, "Stdv (pA)"),
-        "kmer" : _Layer("UInt32", "Reference k-mer"),
         "start" : _Layer("Int32", "Sample Start"),
         "length" : _Layer("Int32", "Sample Length"),
+        "start_sec" : _Layer(np.float32, "Time (s)"),
+        "length_sec" : _Layer(np.float32, "Dwell (s)"),
+        "current" : _Layer(np.float32, "Current (pA)"),
+        "current_sd" : _Layer(np.float32, "Stdv (pA)"),
+        "kmer" : _Layer("UInt32", "Reference k-mer"),
         "events" : _Layer(np.float32, "Event Count"),
         #"kmer_id" : _Layer(np.uint32, "Binary k-mer ID", 
         #                   lambda track: track.
@@ -35,32 +41,34 @@ LAYERS = {
             lambda track: 1000 * track.layers["dtw","length"] / track.conf.read_buffer.sample_rate,
             [("dtw", "length")]),
         "model" : _Layer(np.float32, "Model Current",
-            lambda track: track.model[track.layers["dtw","kmer"]],
+            lambda track: track.model[track.layers["seq","kmer"]],
             [("dtw", "kmer")]),
         "model_diff" : _Layer(np.float32, "Model pA Diff.",
-            lambda track: track.layers["dtw","current"].dropna() - track.model[track.layers["dtw","kmer"].dropna()],
-            [("dtw", "current"),("dtw","kmer")]),
+            lambda track: track.layers["dtw","current"].dropna() - track.model[track.layers["seq","kmer"].dropna()],
+            [("dtw", "current"),("seq","kmer")]),
         "abs_diff" : _Layer(np.float32, "Abs. Model Diff.",
-            lambda track: (track.layers["dtw","current"] - track.model[track.layers["dtw","kmer"]]).abs(),
+            lambda track: (track.layers["dtw","current"] - track.model[track.layers["seq","kmer"]]).abs(),
             [("dtw", "current"),("dtw","kmer")]),
         "base" : _Layer(str, "Reference base",
             lambda track: track.model.kmer_base(track.layers["dtw","kmer"], 2)),
-    }, "bcaln" : {
+    }, "moves" : {
         "start" : _Layer("Int32", "BC Sample Start"),
         "length" : _Layer("Int32", "BC Sample Length"),
+        "start_sec" : _Layer(np.float32, "Time (s)"),
+        "length_sec" : _Layer(np.float32, "Dwell (s)"),
         "end" : _Layer("Int32", "Sample End",  
-            lambda track: track.layers["bcaln","start"] + track.layers["bcaln","length"],
-            [("bcaln", "start"), ("bcaln", "length")]),
+            lambda track: track.layers["moves","start"] + track.layers["moves","length"],
+            [("moves", "start"), ("moves", "length")]),
         "middle" : _Layer(np.float32, "Sample Middle",  
-            lambda track: track.layers["bcaln","start"] + (track.layers["bcaln","length"] / 2),
-            [("bcaln", "start"), ("bcaln", "length")]),
+            lambda track: track.layers["moves","start"] + (track.layers["moves","length"] / 2),
+            [("moves", "start"), ("moves", "length")]),
         #"bp" : _Layer("Int32", "Basecaller Base Index"),
         #"error" : _Layer(str, "Basecalled Alignment Error"),
         "indel" : _Layer("Int32", "Basecalled Alignment Indel"),
     }, "band" : {
         "pac_end" : _Layer("Int32", "Mirror Ref. End"),
         "ref_end" : _Layer("Int32", "Mirror Ref. End",
-            lambda track: track.coords.pac_to_ref(track.layers["band","pac_end"]),
+            lambda track: track.coords.pac_to_pos(track.layers["band","pac_end"]),
             [("band", "pac_end")]),
         "sample_start" : _Layer("Int32", "Raw Sample Start"),
         "sample_end" : _Layer("Int32", "Raw Sample End"),
@@ -70,16 +78,16 @@ LAYERS = {
         "group_b" : _Layer(str, "Compare type"),
         "jaccard" : _Layer(np.float32, "Jaccard Distance", None, 
             [("dtw", "start"), ("dtw", "end"), ("dtw", "length")]),
-        "mean_ref_dist" : _Layer(np.float32, "Mean Ref. Distance", None,
+        "dist" : _Layer(np.float32, "Mean Ref. Distance", None,
             [("dtw", "start"), ("dtw", "end"), ("dtw", "length")]),
-    }, "bc_cmp" : {
+    }, "mvcmp" : {
         "aln_a" : _Layer("Int32", "Compare alignment V"),
         "aln_b" : _Layer("Int32", "Compare alignment A"),
         "group_b" : _Layer(str, "Compare type"),
         "jaccard" : _Layer(np.float32, "Jaccard Distance", None, 
-            [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end"), ("bcaln", "length")]),
-        "mean_ref_dist" : _Layer(np.float32, "Mean Ref. Distance", None,                   
-            [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("bcaln", "start"), ("bcaln", "end"), ("bcaln", "length")]),
+            [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("moves", "start"), ("moves", "end"), ("moves", "length")]),
+        "dist" : _Layer(np.float32, "Mean Ref. Distance", None,                   
+            [("dtw", "start"), ("dtw", "end"), ("dtw", "length"), ("moves", "start"), ("moves", "end"), ("moves", "length")]),
     }
 }
 
@@ -92,7 +100,7 @@ LAYER_META = pd.concat([
 
 LAYER_META["base"] = LAYER_META["fn"].isna()
 
-LAYER_DB_GROUPS = ["dtw", "bcaln", "cmp", "band"]
+LAYER_DB_GROUPS = ["dtw", "moves", "cmp", "band"]
 
 def parse_layer(layer):
     
