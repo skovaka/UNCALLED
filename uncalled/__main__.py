@@ -70,7 +70,8 @@ DTW_OPTS = (
     Opt(("-s", "--band-shift"), "dtw"),
     Opt(("-N", "--norm-mode"), "normalizer", "mode", choices=["ref_mom", "model_mom"]),
     Opt("--norm-median", "normalizer", "median", action="store_true"),
-    Opt("--norm-seg", "normalizer", "full_read", action="store_false"),
+    Opt("--norm-full", "normalizer", "full_read", action="store_true"),
+    Opt("--unmask-splice", "dtw", action="store_true"),
     CONFIG_OPT,
 )
 

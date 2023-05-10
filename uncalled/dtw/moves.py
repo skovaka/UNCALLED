@@ -64,18 +64,21 @@ def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
     ar = np.array(sam.get_aligned_pairs())
     ar = ar[ar[:,1] != None] #TODO keep track of insertion counts
 
+
     if flip_ref:
         ar = ar[::-1]
         qrys = ar[:,0]
         #silly trick to make null reverse into REF_NA
-        qrys[qrys == None] = sam.query_length - INT32_NA - 1
-        qrys = sam.query_length - qrys - 1
+        read_len = sam.infer_read_length()
+        qrys[qrys == None] = read_len - INT32_NA - 1
+        qrys = read_len - qrys - 1
     else:
         qrys = ar[:,0]
         qrys[qrys == None] = INT32_NA
 
     refs = np.array(ref_index.pos_to_mpos(ar[:,1], is_fwd))
     qrys = np.array(qrys, dtype=np.int64)
+
 
     ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, True)
 

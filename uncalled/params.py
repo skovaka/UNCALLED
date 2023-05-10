@@ -7,7 +7,7 @@ class IOParams(config.ParamGroup):
     _name = "io"
 IOParams._def_params(
     ("processes", 1, int, "Number of parallel processes"),
-    ("bam_chunksize", 100, int, "Per-process alignment bam_chunksize"),
+    ("bam_chunksize", 500, int, "Per-process alignment bam_chunksize"),
 
     ("sql_in", None, None, "Input track database"),
     ("sql_out", None, str, "Output track database"),

@@ -23,6 +23,67 @@
 
 //void write_eventalign(Eventalign<K> df, ProcessedRead read, i32 read_idx, bool fwd) {
 template <typename ModelType>
+std::string write_eventalign_new(Alignment<ModelType> &aln, bool write_name, bool signal_index, py::array_t<float> signal_np) {
+
+    auto signal = PyArray<float>(signal_np);
+    std::stringstream ss;
+
+    auto coord = aln.seq.coord;
+    auto &model = aln.seq.model;
+    auto sample_rate = model.PRMS.sample_rate;
+
+    for (size_t i = 0; i < aln.dtw.size(); i++) {
+        auto &samps = aln.dtw.samples.coords[i];
+        if (!samps.is_valid()) {
+            continue;
+        }
+        //if (aln.dtw.current[i] == ValArray<float>::NA) continue;
+        //auto &evt = read.events[i];
+        auto kmer = aln.seq.kmer[i], model_kmer = kmer;
+        if (model.PRMS.reverse) model_kmer = model.kmer_rev(kmer);
+        auto ref_kmer = model_kmer;
+        if (!coord.fwd()) ref_kmer = model.kmer_revcomp(ref_kmer);
+
+        auto ref = aln.seq.mpos[i];
+        if (ref < 0) ref = -ref-1;
+
+
+        ss << coord.name << "\t"
+           << ref - model.PRMS.shift << "\t"
+           << model.kmer_to_str(ref_kmer) << "\t";
+
+        if (write_name) {
+           ss << aln.read_id;
+        } else {
+           ss << aln.id;
+        }
+        ss << "\tt" << "\t"
+           << i << "\t"
+           << model.current.norm_to_pa(aln.dtw.current[i]) << "\t"
+           << (model.current.norm_to_pa_sd(aln.dtw.current_sd[i])) << "\t"
+           << (samps.length() / sample_rate) << "\t"
+           << model.kmer_to_str(model_kmer) << "\t"
+           << model.current.norm_to_pa(model.current.mean[kmer]) << "\t"
+           << model.current.norm_to_pa_sd(model.current.stdv[kmer]) << "\t"
+           << aln.dtw.current[i];
+
+        if (signal_index) {
+           ss << "\t" << samps.start << "\t" << samps.end; //<< "\n";
+        }
+
+        if (signal.size() > 0) {
+            ss << "\t" << signal[samps.start];
+            for (size_t j = samps.start+1; j < samps.end; j++) {
+                ss << "," << signal[j];
+            }
+        }
+
+        ss << "\n";
+    }
+    return ss.str();
+}
+
+template <typename ModelType>
 std::string write_eventalign(
         Config &conf,
         ModelType &model,
