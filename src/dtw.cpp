@@ -2,9 +2,9 @@
 
 const DtwParams
     DTW_PRMS_DEF = {
-        DTWSubSeq::NONE, 1, 1, 1, 0.5, 100, 100, 100, 1, "ref_mom", "guided", "abs_diff", false,
+        DTWSubSeq::NONE, 1, 1, 1, 0.5, 50, 100, 100, 1, "ref_mom", "guided", "abs_diff", false, false,
     }, DTW_PRMS_EVT_GLOB = {
-        DTWSubSeq::NONE, 2, 1, 100, 100, 100, 0, 0, 1, "", "ref_mom", "abs_diff", false,
+        DTWSubSeq::NONE, 2, 1, 100, 0.5, 50, 100, 0, 1, "", "ref_mom", "abs_diff", false, false,
     };
 
 #ifdef PYBIND
@@ -130,6 +130,7 @@ void pybind_dtw(py::module_ &m) {
     PY_DTW_PARAM(band_width, "DTW band width");
     PY_DTW_PARAM(iterations, "Number of DTW iterations to perform");
     PY_DTW_PARAM(band_shift, "DTW band shift");
+    PY_DTW_PARAM(unmask_splice, "Save DTW band coordinates to database");
     PY_DTW_PARAM(save_bands, "Save DTW band coordinates to database");
 
     m.def("get_guided_bands", &get_guided_bands);

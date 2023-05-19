@@ -80,7 +80,7 @@ class Eventalign(TrackIO):
         else:
             event_index = np.arange(len(events))
 
-        evts = events.rename(columns={"current" : "mean", "current_sd" : "stdv"})
+        evts = events.rename(columns={"current" : "mean", "current_sd" : "stdv"}).dropna()
         if self.read is not None:
             self.read.set_events(evts)
             read = self.read
@@ -102,18 +102,21 @@ class Eventalign(TrackIO):
         
         #self.writer = getattr(_uncalled, f"write_eventalign_K{model.K}")
         if isinstance(model.instance, _uncalled.PoreModelU16):
-            self.writer = _uncalled.write_eventalign_U16
+            #self.writer = _uncalled.write_eventalign_U16
+            self.writer = _uncalled.write_eventalign_new_U16
         elif isinstance(model.instance, _uncalled.PoreModelU32):
-            self.writer = _uncalled.write_eventalign_U32
+            #self.writer = _uncalled.write_eventalign_U32
+            self.writer = _uncalled.write_eventalign_new_U32
         else:
             raise ValueError(f"Unknown PoreModel type: {model.instance}")
 
-        eventalign = self.writer(
-            self.conf, model.instance, read_id, aln.seq.fwd, read,
-            aln.seq.coord.name, events.index-2, 
-            self.write_signal_index, kmers, 
-            event_index, #TODO properly rep skips?
-            std_level, signal) #TODO compute internally?
+        #eventalign = self.writer(
+        #    self.conf, model.instance, read_id, aln.seq.fwd, read,
+        #    aln.seq.coord.name, events.index-2, 
+        #    self.write_signal_index, kmers, 
+        #    event_index, #TODO properly rep skips?
+        #    std_level, signal) #TODO compute internally?
+        eventalign = self.writer(aln.instance, self.write_read_name, self.write_signal_index, signal) #TODO compute internally?
 
         self._set_output(eventalign)
 

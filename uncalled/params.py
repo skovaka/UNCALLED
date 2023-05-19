@@ -7,7 +7,7 @@ class IOParams(config.ParamGroup):
     _name = "io"
 IOParams._def_params(
     ("processes", 1, int, "Number of parallel processes"),
-    ("bam_chunksize", 100, int, "Per-process alignment bam_chunksize"),
+    ("bam_chunksize", 500, int, "Per-process alignment bam_chunksize"),
 
     ("sql_in", None, None, "Input track database"),
     ("sql_out", None, str, "Output track database"),
@@ -38,7 +38,7 @@ IOParams._def_params(
 
     ("init_track", True, bool, "If true will initialze track"),
 
-    ("output_format", "db", str,  "Output format (db, eventalign)"),
+    ("ordered_out", False, bool,  "Output alignments in the same order as BAM input (default if processes=1)"),
     ("overwrite", False, bool, "Overwrite existing tracks"),
     ("append", False, bool, "Append reads to existing tracks"),
     ("aln_chunksize", 500, int, "Number of alignments to query for iteration"),

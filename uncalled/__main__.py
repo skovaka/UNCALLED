@@ -53,6 +53,7 @@ DTW_OPTS = (
     Opt("--mask-indels", "tracks"),
 
     #Opt("eventalign_tsv", type=str, default=None, help="Nanopolish eventalign output (should include"),
+    Opt("--ordered-out", "tracks.io", action="store_true"),
     Opt(("-f", "--overwrite"), "tracks.io", action="store_true"),
     Opt(("--kmer-shift"), "pore_model", "shift", default=None),
     Opt("--save-bands", "dtw", action="store_true"),
@@ -70,7 +71,8 @@ DTW_OPTS = (
     Opt(("-s", "--band-shift"), "dtw"),
     Opt(("-N", "--norm-mode"), "normalizer", "mode", choices=["ref_mom", "model_mom"]),
     Opt("--norm-median", "normalizer", "median", action="store_true"),
-    Opt("--norm-seg", "normalizer", "full_read", action="store_false"),
+    Opt("--norm-full", "normalizer", "full_read", action="store_true"),
+    Opt("--unmask-splice", "dtw", action="store_true"),
     CONFIG_OPT,
 )
 

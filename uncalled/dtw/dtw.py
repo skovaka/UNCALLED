@@ -22,6 +22,11 @@ from . import Tracks
 from ..aln import AlnDF
 
 import multiprocessing as mp
+
+
+import memray
+
+
 #from concurrent.futures import ProcessPoolExecutor as Pool
 
 #from https://stackoverflow.com/questions/6126007/python-getting-a-traceback-from-a-multiprocessing-process
@@ -55,10 +60,10 @@ def dtw(conf):
         dtw_pool(conf)
 
 def dtw_pool(conf):
+    #mp.set_start_method("spawn")
     t = time()
     tracks = Tracks(conf=conf)
     assert(tracks.output is not None)
-    sys.stderr.write(f"Using model {tracks.model.reverse}\n")
     #tracks.output.set_model(tracks.model)
     i = 0
     _ = tracks.read_index.default_model #load property
@@ -75,12 +80,18 @@ def dtw_pool_iter(tracks):
             yield (tracks.conf, tracks.model, bams, reads, aln_count, tracks.bam_in.header)
             aln_count += len(bams)
     try:
-        with mp.Pool(processes=tracks.conf.tracks.io.processes) as pool:
+        ctx = mp.get_context("spawn")
+        with ctx.Pool(processes=tracks.conf.tracks.io.processes, maxtasksperchild=4) as pool:
             i = 0
-            for out in pool.imap(dtw_worker, iter_args(), chunksize=1):
-            #for out in pool.imap(dtw_worker, iter_args(), chunksize=1):
+            if tracks.conf.tracks.io.ordered_out:
+                itr = pool.imap
+            else:
+                itr = pool.imap_unordered
+
+            for out in itr(dtw_worker, iter_args(), chunksize=1):
                 i += len(out)
                 yield out 
+
     except Exception as e:
         raise ExceptionWrapper(e).re_raise()
 
@@ -92,7 +103,6 @@ EVDT_PRESETS = {
 def init_model(tracks):
     if tracks.model is None:
         raise RuntimeError("Failed to auto-detect pore model. Please specify --pore-model flag (and add --rna if aligning RNA reads)")
-    sys.stderr.write(f"Using model '{tracks.model.name}'\n")
 
     evdt = EVDT_PRESETS.get(tracks.model.bases_per_sec, None)
     if evdt is not None:
@@ -114,9 +124,7 @@ def dtw_worker(p):
     for bam in bams:
         bam = pysam.AlignedSegment.fromstring(bam, header)
         aln = tracks.bam_in.sam_to_aln(bam)
-        #sys.stderr.write(f"a {aln.id}\n")
-        aln.id += aln_start
-        #sys.stderr.write(f"b {aln.id}\n")
+        aln.instance.id += aln_start
         if aln is not None:
             dtw = GuidedDTW(tracks, aln)
         else:
@@ -133,6 +141,7 @@ def dtw_single(conf):
 
     tracks = Tracks(conf=conf)
     init_model(tracks)
+    sys.stderr.write(f"Using model '{tracks.model.name}'\n")
 
     assert(tracks.output is not None)
 
@@ -232,6 +241,11 @@ class GuidedDTW:
             #try:
             if self.conf.mvcmp:
                 self.aln.calc_mvcmp()
+
+            if (not self.prms.unmask_splice) and aln.seq.is_spliced():
+                self.aln.dtw.mask(aln.seq.splice_mask)
+
+            sys.stdout.flush()
             tracks.write_alignment(self.aln)
             self.empty = False
             return
@@ -259,9 +273,16 @@ class GuidedDTW:
 
         bands = _uncalled.get_guided_bands(np.arange(len(self.seq)), mv_starts, read_block['start'], band_count, shift)
 
+
         dtw = self.dtw_fn(self.prms, signal, self.evt_start, self.evt_end, self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
-        if np.any(dtw.path["qry"] < 0) or np.any(dtw.path["ref"] < 0):
+        #print(dtw.path["qry"] - self.evt_start)
+        #print(len(bands), bands)
+        #print(dtw.score())
+        if np.any(dtw.path["qry"] < self.evt_start) or np.any(dtw.path["ref"] < 0):
+            #:w
+            #print(self.evt_start, self.evt_end)
+            #print(dtw.path[dtw.path["qry"] < self.evt_start])
             return False
 
         dtw.fill_aln(self.aln.instance)

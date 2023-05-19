@@ -114,6 +114,10 @@ class Sequence:
         self.index = self.instance.mpos
 
     @property
+    def name(self):
+        return self.coord.name
+
+    @property
     def is_flipped(self):
         return self.index.start < 0
 
@@ -312,7 +316,7 @@ class CmpDF:
 
 class Alignment:
     def __init__(self, aln_id, read, seq, sam=None):
-        self.id = aln_id
+        #self.id = aln_id
         self.seq = seq
         self.sam = sam
 
@@ -333,7 +337,7 @@ class Alignment:
         #Super = getattr(_uncalled, f"_AlignmentK{seq.K}", None)
         #if Super is None:
         #    raise ValueError(f"Invalid k-mer length {seq.K}")
-        self.instance = Super(read_id, seq.instance)
+        self.instance = Super(aln_id, read_id, seq.instance)
 
         self.dtw = AlnDF(seq, self.instance._dtw)
         self.moves = AlnDF(seq, self.instance._moves)

@@ -21,7 +21,7 @@ struct NormalizerParams {
 const NormalizerParams NORMALIZER_PRMS_DEF = {
     mode : "ref_mom",
     median : false,
-    full_read : true,
+    full_read : false,
     len : 6000,
     tgt_mean : 90.20827,
     tgt_stdv : 12.83266

@@ -197,7 +197,6 @@ struct CmpDF {
                 assert(len > 0);
                 c.dist += len * std::abs(a.index[i] - b.index[j]);
                 c.length += len;
-                //std::cout << i << " " << j << " " << c.dist << " " << c.length << "\n";
                 j++;
             } while (j < b.index.length && bcs[j].start < ac.end);
 
@@ -233,13 +232,14 @@ struct CmpDF {
 
 template <typename ModelType>
 struct Alignment {
+    int id;
     std::string read_id;
     Sequence<ModelType> seq;
     AlnDF dtw, moves;
     CmpDF mvcmp;
 
-    Alignment(const std::string &read_id_, Sequence<ModelType> seq_) :
-        read_id(read_id_), seq(seq_) {
+    Alignment(int id_, const std::string &read_id_, Sequence<ModelType> seq_) :
+        id(id_), read_id(read_id_), seq(seq_) {
     }
 
     void set_dtw(AlnDF df) {
@@ -258,11 +258,12 @@ struct Alignment {
 
     static void pybind(py::module_ &m, std::string suffix) {
         py::class_<Alignment> c(m, ("_Alignment"+suffix).c_str());
-        c.def(py::init<const std::string &, Sequence<ModelType>>());
+        c.def(py::init<int, const std::string &, Sequence<ModelType>>());
         c.def("set_dtw", &Alignment::set_dtw);
         c.def("set_moves", &Alignment::set_moves);
         c.def("calc_mvcmp", &Alignment::calc_mvcmp);
-        c.def_readonly("read_id", &Alignment::read_id);
+        c.def_readwrite("id", &Alignment::id);
+        c.def_readwrite("read_id", &Alignment::read_id);
         c.def_readonly("seq", &Alignment::seq);
         c.def_readonly("_mvcmp", &Alignment::mvcmp);
         c.def_readonly("_dtw", &Alignment::dtw);

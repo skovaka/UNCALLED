@@ -90,7 +90,7 @@ class FastaIndex:
         bounds = coord.bounds
         for i in range(0,len(bounds),2):
             seqs.append(self.infile.fetch(coord.name, bounds[i], bounds[i+1]))
-        return self.SeqInst(self.model.instance, coord, "".join(seqs))
+        return self.SeqInst(self.model.instance, "".join(seqs), coord)
 
     def get_ref_name(self, rid):
         return self.anno[rid].name
