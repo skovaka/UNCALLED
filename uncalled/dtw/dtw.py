@@ -83,10 +83,15 @@ def dtw_pool_iter(tracks):
         ctx = mp.get_context("spawn")
         with ctx.Pool(processes=tracks.conf.tracks.io.processes, maxtasksperchild=4) as pool:
             i = 0
-            for out in pool.imap(dtw_worker, iter_args(), chunksize=1):
-            #for out in pool.imap(dtw_worker, iter_args(), chunksize=1):
+            if tracks.conf.tracks.io.ordered_out:
+                itr = pool.imap
+            else:
+                itr = pool.imap_unordered
+
+            for out in itr(dtw_worker, iter_args(), chunksize=1):
                 i += len(out)
                 yield out 
+
     except Exception as e:
         raise ExceptionWrapper(e).re_raise()
 

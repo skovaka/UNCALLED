@@ -38,7 +38,7 @@ IOParams._def_params(
 
     ("init_track", True, bool, "If true will initialze track"),
 
-    ("output_format", "db", str,  "Output format (db, eventalign)"),
+    ("ordered_out", False, bool,  "Output alignments in the same order as BAM input (default if processes=1)"),
     ("overwrite", False, bool, "Overwrite existing tracks"),
     ("append", False, bool, "Append reads to existing tracks"),
     ("aln_chunksize", 500, int, "Number of alignments to query for iteration"),
