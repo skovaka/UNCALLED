@@ -44,11 +44,12 @@ namespace py = pybind11;
 
 struct SeqRecord {
     std::string name;
-    i32 id, length, offset;
+    i32 id;
+    i64 length, offset;
 
     static void pybind(py::module_ &m) {
         py::class_<SeqRecord> c(m, "SeqRecord");
-        c.def(py::init<std::string, i32, i32, i32>());
+        c.def(py::init<std::string, i32, i64, i64>());
         c.def_readwrite("name", &SeqRecord::name);
         c.def_readwrite("id", &SeqRecord::id);
         c.def_readwrite("length", &SeqRecord::length);
