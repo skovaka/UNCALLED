@@ -69,6 +69,8 @@ class Sigplot:
             ), row=row, col=col)
             self._legend.add(color)
 
+    #def plot_signal(self, fig, read_id, row, col):
+
     def plot_read(self, fig, read_id, row=1, col=1):
 
         track_dtws  = list()
@@ -98,30 +100,39 @@ class Sigplot:
                 samp_min = min(samp_min, dtw["start"].min())
                 samp_max = max(samp_max, dtw["start"].iloc[-1] + dtw["length"].iloc[-1])
 
-                current_min = min(current_min, seq["current"].min())
-                current_max = max(current_max, seq["current"].max())
+                current_min = min(current_min, (dtw["current"]-dtw["current_sd"]).min())
+                current_max = max(current_max, (dtw["current"]+dtw["current_sd"]).max())
 
             if len(seqs) > 0:
                 track_dtws.append(pd.concat(seqs).sort_index())
 
         read = self.tracks.read_index[read_id]
-        read = self.sigproc.process(read, True)
 
-        signal = read.get_norm_signal(int(samp_min), int(samp_max))
+        if read.empty():        
+            pass
+            signal = None
 
-        sig_med = np.median(signal)
-        sig_win = signal.std()*3 #, signal.min(), signal.max())
+        else:
+            print("signal", read.signal)
 
-        #TODO set global signal min/max
-        mask = ((signal >= sig_med - sig_win) &
-                (signal <= sig_med + sig_win))
-        
-        samples = np.arange(samp_min, samp_max)#[mask]
-        samp_time = samples / self.tracks.model.sample_rate
-        signal = signal#[mask]
+            read = self.sigproc.process(read, True)
+            print("process")
 
-        current_min = min(current_min, signal.min())
-        current_max = max(current_max, signal.max())
+            signal = read.get_norm_signal(int(samp_min), int(samp_max))
+
+            sig_med = np.median(signal)
+            sig_win = signal.std()*3 #, signal.min(), signal.max())
+
+            #TODO set global signal min/max
+            mask = ((signal >= sig_med - sig_win) &
+                    (signal <= sig_med + sig_win))
+            
+            samples = np.arange(samp_min, samp_max)#[mask]
+            samp_time = samples / self.tracks.model.sample_rate
+            signal = signal#[mask]
+
+            current_min = min(current_min, signal.min())
+            current_max = max(current_max, signal.max())
 
         if len(self.tracks) == 1:
             self._plot_bases(fig, track_dtws[0], self.tracks.model, current_min, current_max, row, col)
@@ -138,14 +149,42 @@ class Sigplot:
             colors = self.conf.vis.track_colors
             dtw_kws = [{"legendgroup" : t.name, "showlegend" : False} for t in self.tracks.alns]
 
-        fig.add_trace(go.Scattergl(
-            x=samp_time, y=signal,
-            hoverinfo="skip",
-            name="Raw Signal",
-            mode="markers",
-            marker={"size":3, "color":"black", "opacity" : 0.75},
-            legendrank=0
-        ), row=row, col=col)
+        if signal is not None:
+            fig.add_trace(go.Scattergl(
+                x=samp_time, y=signal,
+                hoverinfo="skip",
+                name="Raw Signal",
+                mode="markers",
+                marker={"size":3, "color":"black", "opacity" : 0.75},
+                legendrank=0
+            ), row=row, col=col)
+        else:
+            #for dtw,color,kw in zip(track_dtws, colors, dtw_kws):
+            for dtw,color in zip(track_dtws, colors):
+                dtw = dtw.sort_values(("dtw","start_sec"))
+                ymin = dtw["dtw", "current"] - dtw["dtw","current_sd"]
+                ymax = dtw["dtw", "current"] + dtw["dtw","current_sd"]
+                fig.add_trace(go.Scattergl(
+                    name = "Signal (+/-1 stdv)",
+                    mode = "lines",
+                    fill="tonexty",
+                    fillcolor="black",
+                    opacity=0.75,
+                    legendgroup="signal",
+                    x=dtw["dtw", "start_sec"], y=ymin,
+                    line={"color":"black", "width":2.5, "shape" : "hv"},
+                ), row=row, col=col)
+
+                fig.add_trace(go.Scattergl(
+                    name = "Model Current",
+                    mode = "lines",
+                    x=dtw["dtw", "start_sec"], y=ymax,
+                    fill="tonexty",
+                    fillcolor="black",
+                    legendgroup="signal",
+                    showlegend=False,
+                    line={"color":"black", "width":2.5, "shape" : "hv"},
+                ), row=row, col=col)
 
         if self.prms.show_events:
             fig.add_trace(go.Scattergl(
