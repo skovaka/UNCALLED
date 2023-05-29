@@ -124,35 +124,45 @@ class Eventalign(TrackIO):
 
         #read_filter = set(self.conf.read_index.read_filter)
 
-        csv_iter = pd.read_csv(
-            self.filename, sep="\t", chunksize=10000,
-            usecols=["read_name","contig","position", "event_index",
-                     "start_idx","event_level_mean","event_stdv","model_mean",
-                     "event_length","strand","model_kmer"])
-
         if self.model is None:
             self.model = self.tracks.model
 
-        aln_id = 1
+        class SamCache:
+            def __init__(self, tracks):
+                self.iter = tracks.bam_in.iter_sam()
+                self.cache = dict()
+                self.next_aln = 0
 
-        def iter_layers(events, aln_id):
-            groups = events.groupby(["contig", "read_name"])
-            for (contig,read_id), df in groups:
+            def get(self, aln_id):
+                while self.next_aln <= aln_id:
+                    try:
+                        self.cache[self.next_aln] = next(self.iter)
+                    except StopIteration:
+                        raise RuntimeError(f"Eventalign read_index is greater than BAM file length: {aln_id}")
+                    self.next_aln += 1
+
+                ret = self.cache[aln_id]
+                del self.cache[aln_id]
+                return ret
+
+        sam_cache = SamCache(self.tracks)
+
+        def iter_layers(events):
+            groups = events.groupby(["contig", "read_index"])
+            for (contig,aln_id), df in groups:
+
+                sam = sam_cache.get(aln_id)
+
+                read_id = sam.query_name
 
                 if self.read_filter is not None and read_id not in self.read_filter:
-
                     continue
-
-                #df.drop(df.index[df["model_mean"] == 0], inplace=True)
 
                 start = df["position"].min()
                 end = df["position"].max()
                 
-                sam = None
-                for read_sam in self.tracks.bam_in.iter_read(read_id):
-                    if read_sam.reference_name == contig and start >= read_sam.reference_start and end < read_sam.reference_end:
-                        sam = read_sam
-                        break
+                if sam.reference_name != contig or start < sam.reference_start or end > sam.reference_end:
+                    raise ValueError(f"Eventalign coordinates ({contig}:{start}-{end}) not contained in corresponding SAM coordinates ({sam.reference_name}:{sam.reference_start}-{sam.reference_end}) for read_index {aln_id}")
 
                 aln = self.tracks.bam_in.sam_to_aln(sam, load_moves=False)
                 
@@ -183,21 +193,28 @@ class Eventalign(TrackIO):
 
         leftover = pd.DataFrame()
 
+        csv_iter = pd.read_csv(
+            self.filename, sep="\t", chunksize=10000,
+            usecols=["read_index","contig","position", "event_index",
+                     "start_idx","event_level_mean","event_stdv","model_mean",
+                     "event_length","strand","model_kmer"])
+
         for events in csv_iter:
             events['event_length'] = np.round(events['event_length'] * self.model.sample_rate).astype(int)
             events['sum'] = events['event_level_mean'] * events['event_length']
 
             events = pd.concat([leftover, events])
 
-            i = events["read_name"] == events["read_name"].iloc[-1]
+            #i = events["read_name"] == events["read_name"].iloc[-1]
+            i = events["read_index"] == events["read_index"].iloc[-1]
             leftover = events[i]
             events = events[~i]
 
-            for aln in iter_layers(events, aln_id):
+            for aln in iter_layers(events):
                 yield aln#s,layers
 
         if len(leftover) > 0:
-            for alns,layers in iter_layers(leftover, aln_id):
+            for aln in iter_layers(leftover):
                 yield aln#s,layers
 
 

@@ -82,6 +82,8 @@ def dtw_pool_iter(tracks):
     try:
         ctx = mp.get_context("spawn")
         with ctx.Pool(processes=tracks.conf.tracks.io.processes, maxtasksperchild=4) as pool:
+
+
             i = 0
             if tracks.conf.tracks.io.ordered_out:
                 itr = pool.imap

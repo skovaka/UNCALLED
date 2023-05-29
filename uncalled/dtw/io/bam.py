@@ -142,7 +142,7 @@ class BAM(TrackIO):
             "tracks" : {
                 self.track_out.name : {
                     "desc" : self.track_out.desc,
-                    "model" : self.track_out.model.name,
+                    "model" : self.track_out.model.name, #self.model.name, #
                     "read" : {"paths" : self.conf.read_index.paths, "index" : self.conf.read_index.read_index},
                     "layers" : {                                                                 
                         LENS_TAG : {"name" : "dtw.length"},                                      
@@ -217,14 +217,16 @@ class BAM(TrackIO):
         self.bam.set_tag(CURS_TAG, array.array("h", dc.astype(np.int16)))
 
         if self.prms.buffered:
-            self.out_buffer.append(self.bam.to_string())
+            #self.out_buffer.append(self.bam.to_string())
+            self.out_buffer.append(self.bam.to_dict())
         else:
             self.output.write(self.bam)
 
     def write_buffer(self, bams):
         header = pysam.AlignmentHeader.from_dict(self.header)
         for b in bams:
-            bam = pysam.AlignedSegment.fromstring(b, header)
+            bam = pysam.AlignedSegment.from_dict(b, header)
+            #bam = pysam.AlignedSegment.fromstring(b, header)
             self.output.write(bam)
 
     def iter_str_chunks(self):

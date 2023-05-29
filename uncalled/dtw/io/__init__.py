@@ -47,7 +47,7 @@ class TrackIO:
         self.aln_tracks = list()
 
         if not hasattr(self, "aln.id"):
-            self.aln_id = 1
+            self.aln_id = 0
 
         if filename is None:
             self.filename = None
@@ -123,8 +123,9 @@ class TrackIO:
             self.output.write(out)
             
     def next_aln_id(self):
+        ret = self.aln_id
         self.aln_id += 1
-        return self.aln_id
+        return ret
 
     def init_fast5(self, fast5):
         pass
