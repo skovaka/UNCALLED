@@ -12,6 +12,7 @@ from sklearn.linear_model import TheilSenRegressor
 from ..config import Config
 from ..argparse import ArgParser
 from ..index import str_to_coord
+from .. import ExceptionWrapper
 
 import _uncalled
 from _uncalled import EventDetector
@@ -30,14 +31,6 @@ import memray
 #from concurrent.futures import ProcessPoolExecutor as Pool
 
 #from https://stackoverflow.com/questions/6126007/python-getting-a-traceback-from-a-multiprocessing-process
-import tblib.pickling_support
-tblib.pickling_support.install()
-class ExceptionWrapper(object):
-    def __init__(self, ee):
-        self.ee = ee
-        __, __, self.tb = sys.exc_info()
-    def re_raise(self):
-        raise self.ee.with_traceback(self.tb)
 
 
 METHODS = {

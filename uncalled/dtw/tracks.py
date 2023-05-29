@@ -90,6 +90,8 @@ class Tracks:
 
     def _init_new(self, *args, model=None, **kwargs):
 
+        t = time()
+
         self.conf, self.prms = config._init_group("tracks", copy_conf=True, *args, **kwargs)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers))
 
@@ -108,6 +110,7 @@ class Tracks:
         if self.read_index is None:
             self.read_index = ReadIndex(self.conf.read_index.paths, self.prms.read_filter, self.conf.read_index.read_index, self.conf.read_index.recursive)
 
+
         if model is not None:
             self.set_model(model)
         else:
@@ -123,6 +126,8 @@ class Tracks:
                 sys.stderr.write(f"Auto-detected flowcell='{pm.flowcell}' kit='{pm.kit}'\n")
             self.model = None
 
+
+
         self._init_io()
 
         self.set_layers(self.prms.layers)
@@ -131,6 +136,7 @@ class Tracks:
             raise RuntimeError("Failed to load reference index")
 
         self._aln_track_ids = [t.id for t in self.alns]
+        t = time()
 
         self.index = load_index(self.model, self.prms.ref_index)
         self.refstats = None
@@ -254,6 +260,7 @@ class Tracks:
 
     def _init_io(self):
 
+        t = time()
         self.inputs = list()
         self.bam_in = None
 
@@ -267,12 +274,15 @@ class Tracks:
             assert isinstance(fnames, list)
                 
             for filename in fnames:
+                t = time()
                 io = Cls(filename, False, self, track_count)
 
                 p = io.conf.read_index
-                if p.paths is not None:
-                    self.read_index.load_paths(p.paths, p.recursive)
-                self.read_index.load_index_file(p.read_index)
+                if not self.prms.io.buffered:
+                    if p.paths is not None:
+                        self.read_index.load_paths(p.paths, p.recursive)
+                    self.read_index.load_index_file(p.read_index)
+                t = time()
 
                 self.conf.load_config(io.conf)
                 self.inputs.append(io)

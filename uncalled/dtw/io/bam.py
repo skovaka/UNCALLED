@@ -251,7 +251,10 @@ class BAM(TrackIO):
             itr = self.input
         else:
             b = self.conf.tracks.ref_bounds
-            itr = self.input.fetch(b.name, b.start, b.end)
+            if b.has_bounds:
+                itr = self.input.fetch(b.name, b.start, b.end)
+            else:
+                itr = self.input.fetch(b.name)
 
         if unmapped:
             mapped = lambda a: True
