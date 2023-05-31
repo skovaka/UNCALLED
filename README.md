@@ -89,6 +89,8 @@ See [example/](example/) for a simple read and reference example.
 
 ## Real-Time ReadUntil
 
+**Warning:** in the latest MinKNOW version, an API bug may prevent UNCALLED from properly ejecting reads. You can identify this bug if you do not see a peak of small "adaptive sampling" reads in read length histogram. If this occurs you should stop your sequencing run, briefly start a new sequencing run with MinKNOW's builtin version of adaptive sampling enabled, then stop that run and restart your UNCALLED run. We have found that this may initialize something in MinKNOW which allows UNCALLED to function properly.  
+
 **Example:**
 
 ```
