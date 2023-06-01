@@ -78,6 +78,7 @@ DTW_OPTS = (
 
 CONVERT_OPTS = (
     Opt("ref_index", "tracks", nargs="?"),
+    Opt(("-p", "--processes"), "tracks.io"),
     MutexOpts("input", [
         Opt("--eventalign-in", "tracks.io", type=comma_split, nargs="?", const="-"),
         Opt("--tombo-in", "tracks.io", type=comma_split, action="extend"),
@@ -85,6 +86,7 @@ CONVERT_OPTS = (
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
     Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
     Opt(("-m", "--pore-model"), "pore_model", "name"),
+    Opt("--bam-chunksize", "tracks.io"),
 
     MutexOpts("output", [
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),

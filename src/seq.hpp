@@ -44,11 +44,12 @@ namespace py = pybind11;
 
 struct SeqRecord {
     std::string name;
-    i32 id, length, offset;
+    i32 id;
+    i64 length, offset;
 
     static void pybind(py::module_ &m) {
         py::class_<SeqRecord> c(m, "SeqRecord");
-        c.def(py::init<std::string, i32, i32, i32>());
+        c.def(py::init<std::string, i32, i64, i64>());
         c.def_readwrite("name", &SeqRecord::name);
         c.def_readwrite("id", &SeqRecord::id);
         c.def_readwrite("length", &SeqRecord::length);
@@ -76,6 +77,8 @@ class RefCoord {
             throw std::runtime_error("RefCoord.bounds length must be divisible by 2 and greater than 0");
         }
     }
+
+    RefCoord(std::string _name) : name(_name), bounds{}, strand(Strand::na), ref_id(-1) {}
 
     RefCoord(std::string _name, IntervalIndex<i64> mpos, bool fwd) :
         name(_name),
@@ -119,12 +122,27 @@ class RefCoord {
     }
 
     void set_start(i64 v) {
+        if (!has_bounds()) {
+            bounds.resize(2);
+        }
         bounds[0] = v;
     }
 
     void set_end(i64 v) {
+        if (!has_bounds()) {
+            bounds.resize(2);
+        }
         bounds[bounds.size()-1] = v;
     }
+
+    bool has_bounds() const {
+        return bounds.size() > 0;
+    }
+
+    void check_bounds() const {
+        if (!has_bounds()) 
+            throw std::runtime_error("RefCoords object has no boundaries, only reference name '" + name + "'");
+    }   
 
     bool fwd() const {
         return strand == Strand::fwd;
@@ -139,6 +157,7 @@ class RefCoord {
     }
 
     i64 length() const {
+        check_bounds();
         return end()-start();
     }
 
@@ -147,6 +166,7 @@ class RefCoord {
     static void pybind_defs(pybind11::module_ m) {
         py::class_<RefCoord> c(m, "_RefCoord");
 
+        c.def(py::init<std::string>());        
         c.def(py::init<std::string, IntervalIndex<i64>, bool>());        
         c.def(py::init<std::string, std::vector<i64>>());
         c.def(py::init<std::string, std::vector<i64>, bool>());
@@ -159,7 +179,7 @@ class RefCoord {
             [](RefCoord &c) -> std::string {
                 std::stringstream ss;
                 ss << c.name;
-                if (c.start() >= 0) {
+                if (c.has_bounds()) {
                     ss << ":" << c.bounds[0] << "-" << c.bounds[1];
                     for (size_t i = 2; i < c.bounds.size(); i += 2) {
                         ss << ";" << c.bounds[i] << "-" << c.bounds[i+1];
@@ -185,6 +205,7 @@ class RefCoord {
                 c.strand = Strand::rev;
                 return false;
         });
+        c.def_property_readonly("has_bounds", &RefCoord::has_bounds);
         c.def_property_readonly("rev", &RefCoord::rev);
         c.def_property_readonly("stranded", &RefCoord::stranded);
     }
