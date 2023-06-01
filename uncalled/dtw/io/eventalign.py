@@ -158,6 +158,9 @@ class Eventalign(TrackIO):
                 if self.read_filter is not None and read_id not in self.read_filter:
                     continue
 
+                #filter out skipped positions
+                df = df[df["model_mean"] > 0].copy()
+
                 start = df["position"].min()
                 end = df["position"].max()
                 
@@ -172,6 +175,7 @@ class Eventalign(TrackIO):
                 df["mpos"] = self.tracks.index.pos_to_mpos(pos, fwd)-self.model.shift
                 df["mean_cml"]  = df["event_length"] * df["event_level_mean"]
                 df["stdv_cml"]  = df["event_length"] * df["event_stdv"]
+
 
                 grp = df.groupby("mpos")
 
