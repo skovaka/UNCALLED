@@ -41,7 +41,7 @@ LAYERS = {
     #    "end" : _Layer("Int32", "Sample End", False),
     #    "middle" : _Layer(np.float32, "Sample Middle", False),
     #    "indel" : _Layer("Int32", "Basecalled Alignment Indel", False),
-    "cmp" : {
+    "dtwcmp" : {
         "aln_a" : _Layer("Int32", "Compare alignment V", True),
         "aln_b" : _Layer("Int32", "Compare alignment A", True),
         "group_b" : _Layer(str, "Compare type", False),
@@ -342,6 +342,7 @@ class Alignment:
         self.dtw = AlnDF(seq, self.instance._dtw)
         self.moves = AlnDF(seq, self.instance._moves)
         self.mvcmp = CmpDF(seq, self.instance._mvcmp)
+        self.dtwcmp = CmpDF(seq, self.instance._dtwcmp)
 
     def __getattr__(self, name):
         if not hasattr(self.instance, name):

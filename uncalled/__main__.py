@@ -117,10 +117,15 @@ COMPARE_OPTS = (
     #Opt(("-l", "--read-filter"), "tracks", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-R", "--ref-bounds"), "tracks"),
-    Opt(("-b", "--moves"), action="store_true", help="Compare against basecalled alignment. If two tracks input will look for \"moves\" group in second track, otherwise will look in the first track."),
-    Opt(("-s", "--save"), action="store_true", help="Will save in database if included, otherwise will output to TSV. Will be associated with the first track listed."),
-    Opt(("-j", "--jaccard"), action="store_true", help="Will compute per-reference raw sample jaccard distances. Output by default if no other statistics are specified."),
-    Opt(("-d", "--mean-ref-dist"), action="store_true", help="Will compute mean reference coordinate distances between raw samples of alignments of the same read. Output by default if no other statistics are specified."),
+    Opt(("-m", "--moves"), action="store_true", help="Compare against basecalled alignment. If two tracks input will look for \"moves\" group in second track, otherwise will look in the first track."),
+    Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw,dtwcmp,mvcmp"),
+    MutexOpts("output", [
+        Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
+        Opt("--bam-out", "tracks.io", nargs="?", const="-"),
+    ]),
+    #Opt(("-s", "--save"), action="store_true", help="Will save in database if included, otherwise will output to TSV. Will be associated with the first track listed."),
+    #Opt(("-j", "--jaccard"), action="store_true", help="Will compute per-reference raw sample jaccard distances. Output by default if no other statistics are specified."),
+    #Opt(("-d", "--mean-ref-dist"), action="store_true", help="Will compute mean reference coordinate distances between raw samples of alignments of the same read. Output by default if no other statistics are specified."),
     CONFIG_OPT,
     #Opt(("-o", "--output"), choices=["db", "tsv"], help="If \"db\" will output into the track database. If \"tsv\" will output a tab-delimited file to stdout."),
 )
@@ -293,14 +298,9 @@ CMDS = {
     "train" : ("dtw.train", 
         "Iteratively train a new k-mer pore model", TRAIN_OPTS), 
     "refstats" : ("stats.refstats", "Calculate per-reference-coordinate statistics", REFSTATS_OPTS),
-    #"readstats" : ("stats.readstats", "", READSTATS_OPTS),
-    #"layerstats" : (None, 
-    #        """Compute distance between alignments of the same reads\n"""
-    #        """subcommand options:\n""" 
-    #        """compare  Compute distance between alignments of the same reads\n""", {
-    #    "compare" : ("stats.layerstats", "Compute distance between alignments of the same reads", COMPARE_OPTS),
-    #}),
-    #"dotplot" : ("vis.dotplot", "Plot signal-to-reference alignment dotplots", DOTPLOT_OPTS),
+    "readstats" : ("stats.readstats", "", READSTATS_OPTS),
+    "compare" : ("stats.layerstats", "Compute distance between alignments of the same reads", COMPARE_OPTS),
+    "dotplot" : ("vis.dotplot", "Plot signal-to-reference alignment dotplots", DOTPLOT_OPTS),
     "refplot" : ("vis.refplot", "Plot alignment tracks and per-reference statistics", REFPLOT_OPTS),
     "trackplot" : ("vis.trackplot", "Plot alignment tracks and per-reference statistics", TRACKPLOT_OPTS+TRACKPLOT_PANEL_OPTS),
     "browser" : ("vis.browser", "Interactive signal alignment genome browser", BROWSER_OPTS),

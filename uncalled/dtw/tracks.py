@@ -878,21 +878,70 @@ class Tracks:
         if max_reads is None:
             max_reads = self.prms.max_reads
 
-        #TODO handle multiple inputs properly
+        main_io = None #list()
+        cmp_iters = list()
+
         for io in self.inputs:
-            if ignore_bam and io == self.bam_in:
+            if not isinstance(io, BAM):
+                if main_io is not None:
+                    raise RuntimeError("Tracks.iter_reads() only supports multiple inputs for BAM files")
+            elif ignore_bam:
                 continue
+            if main_io is None:
+                main_io = io
+            else:
+                cmp_iters.append(io.iter_sam())
 
-            aln_iter = io.iter_alns(
-                self.db_layers, 
-                self._aln_track_ids,
-                self.coords,
-                read_id=reads,
-                full_overlap=full_overlap,
-                ref_index=self.index)
+        if len(cmp_iters) == 0:
+            for aln in main_io.iter_alns():
+                yield read_id, aln
+            return
 
-            for aln in aln_iter:
-                yield aln
+        cmp_starts = [None for _ in cmp_iters]
+        sam_cache = [defaultdict(list) for _ in cmp_iters]
+
+        for aln in main_io.iter_alns():
+            aln_start = aln.sam.reference_start
+            aln_end = aln.sam.reference_end
+            aln_coord = (aln.sam.reference_id, aln.sam.reference_end, aln.sam.is_reverse)
+            sams = [list() for _ in sam_cache]
+            alns_out = [aln]
+            for i in range(len(sam_cache)):
+                while cmp_starts[i] is None or cmp_starts[i] < aln_coord:
+                    sam = next(cmp_iters[i], None)
+                    if sam is None:
+                        break
+                    sam_cache[i][sam.query_name].append(sam)
+                    cmp_starts[i] = (sam.reference_id, sam.reference_start, sam.is_reverse)
+
+                best = None
+                for sam in sam_cache[i][aln.read_id]:
+                    ovl = sam.get_overlap(aln_start, aln_end)
+                    if ovl > 0 and (best is None or best[0] < ovl):
+                        best = (ovl, sam)
+                
+                if best is None:
+                    alns_out.append(None)
+                else:
+                    alns_out.append(main_io.sam_to_aln(best[1],  load_moves=False))
+
+            yield aln.read_id, alns_out
+
+        #TODO handle multiple inputs properly
+        #for io in self.inputs:
+        #    if ignore_bam and io == self.bam_in:
+        #        continue
+
+        #    aln_iter = io.iter_alns(
+        #        self.db_layers, 
+        #        self._aln_track_ids,
+        #        self.coords,
+        #        read_id=reads,
+        #        full_overlap=full_overlap,
+        #        ref_index=self.index)
+
+        #    for aln in aln_iter:
+        #        yield aln
         
     def _tables_to_tracks(self, coords, alignments, layers):
         tracks = dict()

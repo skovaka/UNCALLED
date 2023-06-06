@@ -27,11 +27,11 @@ def compare(conf):
     if conf.moves:
         conf.tracks.layers += [("mvcmp", "dist")] 
     else:
-        conf.tracks.layers += [("cmp", "dist")] 
+        conf.tracks.layers += [("dtwcmp", "dist")] 
 
-    all_layers = not (conf.jaccard or conf.dist)
-    calc_jaccard = all_layers or conf.jaccard
-    calc_dist = all_layers or conf.dist
+    #all_layers = not (conf.jaccard or conf.dist)
+    #calc_jaccard = all_layers or conf.jaccard
+    #calc_dist = all_layers or conf.dist
 
     tracks = Tracks(conf=conf)
 
@@ -40,14 +40,22 @@ def compare(conf):
 
     t = time.time()
 
-    for read_id,chunk in tracks.iter_reads():
-        if chunk.any_empty:
-            sys.stderr.write(f"Skipping {read_id}\n")
-        else:
-            #if conf.save:
-            #    print(read_id)
-            chunk.calc_compare(group_b, False, conf.save)
-            chunk.write_alignment()
+    for read_id,alns in tracks.iter_reads():
+        if not isinstance(alns, list) or len(alns) != 2:
+            raise RuntimeError("compare must be run on two BAM files")
+        a,b = alns
+        if a is None or b is None: continue
+        a.calc_dtwcmp(b.instance)
+        tracks.write_alignment(a)
+
+
+        #if chunk.any_empty:
+        #    sys.stderr.write(f"Skipping {read_id}\n")
+        #else:
+        #    #if conf.save:
+        #    #    print(read_id)
+        #    chunk.calc_compare(group_b, False, conf.save)
+        #    chunk.write_alignment()
 
         print(f"{read_id}\t{time.time()-t:.4f}")
         sys.stdout.flush()

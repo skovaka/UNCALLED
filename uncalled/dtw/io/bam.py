@@ -281,7 +281,7 @@ class BAM(TrackIO):
                 if n == self.conf.tracks.max_reads:
                     break
 
-    def iter_alns(self, layers=None, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
+    def iter_alns(self):#, layers=None, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
         for sam in self.iter_sam():
             aln = self.sam_to_aln(sam)
             yield aln
