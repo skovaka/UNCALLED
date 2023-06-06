@@ -11,13 +11,13 @@ ALN_LAYERS = {
     "length" : _Layer("Int32", "Sample Length", True),
     "current" : _Layer(np.float32, "Current (pA)", True),
     "current_sd" : _Layer(np.float32, "Stdv (pA)", True),
-    "start_sec" : _Layer(np.float32, "Time (s)", True),
-    "length_sec" : _Layer(np.float32, "Dwell (s)", True),
-    "dwell" : _Layer(np.float32, "Dwell (ms)", True),
+    "start_sec" : _Layer(np.float32, "Time (s)", False),
+    "length_sec" : _Layer(np.float32, "Dwell (s)", False),
+    "dwell" : _Layer(np.float32, "Dwell (ms)", False),
     "end" : _Layer("Int32", "Sample End", False),
     "middle" : _Layer(np.float32, "Sample Middle", False),
     "middle_sec" : _Layer(np.float32, "Sample Middle", False),
-    "model_diff" : _Layer(np.float32, "Model pA Diff.", True),
+    "model_diff" : _Layer(np.float32, "Model pA Diff.", False),
     "abs_diff" : _Layer(np.float32, "Abs. Model Diff.", False),
 }
 
@@ -34,6 +34,7 @@ LAYERS = {
         "base" : _Layer(str, "Base", False),
     }, "aln" : {
         "id" : _Layer("Int64", "Aln. ID"),
+        "read_id" : _Layer(str, "Read ID"),
     }, "dtw" : ALN_LAYERS, "moves" : ALN_LAYERS,
     #}, "moves" : {
     #    "start" : _Layer("Int32", "BC Sample Start", True),
@@ -79,6 +80,15 @@ def parse_layer(layer):
             for layer in layers:
                 yield (group, layer)
             return
+        
+        matches = layer == LAYER_META.index.get_level_values(1)
+        if np.sum(matches) > 1:
+            raise ValueError("Ambiguous layer: {layer}. Please specify layer group.")
+        elif np.sum(matches) == 1:
+            for group,layer in LAYER_META.index[matches]:
+                yield (group,layer)
+            return
+
         group = "dtw"
     else:
         raise ValueError("Invalid layer: \"{layer}\"")
@@ -371,9 +381,15 @@ class Alignment:
 
         for name in layers.unique(0):
             _,group_layers = layers.get_loc_level(name)
-            group = getattr(self, name, [])
-            if len(group) > 0:
-                vals[name] = group.to_pandas(group_layers).reindex(idx)#.reset_index(drop=True)
+
+            if name == "aln":
+                vals[name] = pd.DataFrame({
+                    l : getattr(self, l) for l in group_layers
+                }, index=idx)
+            else:
+                group = getattr(self, name, [])
+                if len(group) > 0:
+                    vals[name] = group.to_pandas(group_layers).reindex(idx)#.reset_index(drop=True)
                 #if idx is None:
                 #    idx = vals[name].index
                 #else:
@@ -381,7 +397,7 @@ class Alignment:
 
         df = pd.concat(vals, axis=1, names=["group", "layer"]).reset_index(drop=True)
 
-        df["aln","id"] = self.id
+        #df["aln","id"] = self.id
         
         if index is not None:
             df.set_index(list(index), inplace=True)

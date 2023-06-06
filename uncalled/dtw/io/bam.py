@@ -350,7 +350,7 @@ class BAM(TrackIO):
 
             aln.set_dtw(dtw)
 
-        moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam, self.tracks.read_index.default_model)
+        moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam)
         has_moves = moves is not None
         if has_moves and load_moves:
             if aln is None:

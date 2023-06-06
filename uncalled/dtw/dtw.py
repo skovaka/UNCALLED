@@ -157,6 +157,9 @@ class GuidedDTW:
         self.prms = self.conf.dtw
 
         self.aln = aln
+        self.moves = self.aln.moves #moves.aln
+        if self.moves.empty():
+            return
 
         read = self.aln.read
 
@@ -164,7 +167,6 @@ class GuidedDTW:
 
         self.model = tracks.model
 
-        self.moves = self.aln.moves #moves.aln
         self.seq = self.aln.seq
 
         self.method = self.prms.band_mode

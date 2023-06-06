@@ -126,8 +126,6 @@ class Tracks:
                 sys.stderr.write(f"Auto-detected flowcell='{pm.flowcell}' kit='{pm.kit}'\n")
             self.model = None
 
-
-
         self._init_io()
 
         self.set_layers(self.prms.layers)

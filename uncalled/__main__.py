@@ -96,6 +96,8 @@ CONVERT_OPTS = (
     Opt(("--out-name", "-o"), "tracks.io"),
 
     Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
+    Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
+    Opt("--tsv-noref", "tracks.io", action="store_true"),
 
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
@@ -118,7 +120,9 @@ COMPARE_OPTS = (
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-R", "--ref-bounds"), "tracks"),
     Opt(("-m", "--moves"), action="store_true", help="Compare against basecalled alignment. If two tracks input will look for \"moves\" group in second track, otherwise will look in the first track."),
-    Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw,dtwcmp,mvcmp"),
+    Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtwcmp,mvcmp"),
+    Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
+    Opt("--tsv-noref", "tracks.io", action="store_true"),
     MutexOpts("output", [
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
         Opt("--bam-out", "tracks.io", nargs="?", const="-"),

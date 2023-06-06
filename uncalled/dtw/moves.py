@@ -49,7 +49,7 @@ def sam_to_read_moves(read, sam):
         
     return moves_to_aln(moves, template_start, mv_stride)
 
-def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
+def sam_to_ref_moves(conf, ref_index, read, sam):
     if read is None or read.empty(): 
         return None
     read_moves = sam_to_read_moves(read, sam)
@@ -82,10 +82,10 @@ def sam_to_ref_moves(conf, ref_index, read, sam, workflow=None):
 
     ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, True)
 
-    if workflow is None:
-        workflow = (conf.read_buffer.flowcell, conf.read_buffer.kit)
+    #if workflow is None:
+    #    workflow = (conf.read_buffer.flowcell, conf.read_buffer.kit)
 
-    mkl = MOVE_KMER_LENS[PoreModel.PRESET_MAP.loc[workflow, "ont_model"]]
+    mkl = MOVE_KMER_LENS[PoreModel.PRESET_MAP.loc[conf.pore_model.get_workflow(), "ont_model"]]
 
     shift = model.K - mkl - model.shift
     ref_moves.index.shift(shift)
