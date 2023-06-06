@@ -14,9 +14,14 @@ import numpy as np
 import pandas as pd
 import sys
 from collections import namedtuple
+import multiprocessing as mp
+import pysam
+from time import time
 
 from ..aln_track import AlnTrack
 from ...config import Config
+from ... import RefCoord, ExceptionWrapper
+from ...read_index import ReadIndex
 
 INPUT_PARAMS = np.array(["sql_in", "eventalign_in", "tombo_in", "bam_in"])
 OUTPUT_PARAMS = np.array(["sql_out", "tsv_out", "eventalign_out", "bam_out", "model_dir"])
@@ -47,7 +52,7 @@ class TrackIO:
         self.aln_tracks = list()
 
         if not hasattr(self, "aln.id"):
-            self.aln_id = 1
+            self.aln_id = 0
 
         if filename is None:
             self.filename = None
@@ -123,8 +128,9 @@ class TrackIO:
             self.output.write(out)
             
     def next_aln_id(self):
+        ret = self.aln_id
         self.aln_id += 1
-        return self.aln_id
+        return ret
 
     def init_fast5(self, fast5):
         pass
@@ -171,16 +177,23 @@ def _db_track_split(db_str):
         raise ValueError("Invalid database specifier format: " + db_str)
     return os.path.abspath(filename), track_names
 
-
 def convert(conf):
     """Convert between signal alignment file formats"""
-    from .. import Tracks
-
     conf.tracks.layers = ["dtw"]
-    conf.tracks.load_fast5s = True
     
     if conf.tracks.io.tombo_in is not None:
         conf.read_index.paths = conf.tracks.io.tombo_in
+
+    if conf.tracks.io.processes == 1:
+        convert_single(conf)
+    elif conf.tracks.io.bam_in is not None:
+        convert_pool(conf)
+    else:
+        raise ValueError("Parallel convert is only supported for BAM input") 
+
+
+def _init_tracks(conf):
+    from .. import Tracks
 
     tracks = Tracks(conf=conf)
 
@@ -190,10 +203,59 @@ def convert(conf):
         ignore_bam = True
     else:
         ignore_bam = False
+
+    return tracks, ignore_bam
+
+def convert_pool(conf):
+    tracks,ignore_bam = _init_tracks(conf)
+
+    def iter_args(): 
+        i = 0
+        aln_count = 0
+        for read_ids, sam_strs in tracks.bam_in.iter_str_chunks():
+            reads = ReadIndex()#tracks.read_index.subset(read_ids)
+            yield (tracks.conf, tracks.model, sam_strs, reads, aln_count, tracks.bam_in.header)
+            aln_count += len(sam_strs)
+
+    try:
+        ctx = mp.get_context("spawn")
+        with ctx.Pool(processes=conf.tracks.io.processes, maxtasksperchild=4) as pool:
+
+            i = 0
+            if conf.tracks.io.ordered_out:
+                itr = pool.imap
+            else:
+                itr = pool.imap_unordered
+
+            for out in itr(convert_worker, iter_args(), chunksize=1):
+                tracks.output.write_buffer(out)
+
+    except Exception as e:
+        raise ExceptionWrapper(e).re_raise()
+
+def convert_worker(args):
+    from .. import Tracks
+    conf,model,sam_strs,reads,aln_start,header = args
+
+    conf.tracks.io.buffered = True
+    #conf.tracks.io.bam_in = None
+
+    header = pysam.AlignmentHeader.from_dict(header)
+
+    tracks = Tracks(model=model, read_index=reads, conf=conf)
+    for s in sam_strs:
+        sam = pysam.AlignedSegment.fromstring(s, header)
+        aln = tracks.bam_in.sam_to_aln(sam, load_moves=False)
+        aln.instance.id += aln_start
+        tracks.write_alignment(aln)
+
+    tracks.close()
+    return tracks.output.out_buffer
         
+
+def convert_single(conf):
+    tracks, ignore_bam = _init_tracks(conf)
     for aln in tracks.iter_reads(ignore_bam=ignore_bam):
-        #sys.stderr.write(f"{aln.read_id}\n")
-        
         tracks.write_alignment(aln)
 
     tracks.close()

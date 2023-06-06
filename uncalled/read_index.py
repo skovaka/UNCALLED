@@ -270,13 +270,15 @@ class Fast5Reader:
         bc_group = f5.get_latest_analysis("Basecall_1D")
         seg_group = f5.get_latest_analysis("Segmentation")
         if bc_group is not None and seg_group is not None:
-            moves = np.array(f5.get_analysis_dataset(bc_group, "BaseCalled_template")["Move"])
-            move_attr = f5.get_analysis_dataset(bc_group, "Summary")["basecall_1d_template"].attrs
-            stride = move_attr["block_stride"]
-            seg_attr = f5.get_analysis_dataset(seg_group, "Summary")["segmentation"].attrs
-            template_start = seg_attr["first_sample_template"]
-
-            read.set_moves(moves, template_start, stride)
+            try:
+                moves = np.array(f5.get_analysis_dataset(bc_group, "BaseCalled_template")["Move"])
+                move_attr = f5.get_analysis_dataset(bc_group, "Summary")["basecall_1d_template"].attrs
+                stride = move_attr["block_stride"]
+                seg_attr = f5.get_analysis_dataset(seg_group, "Summary")["segmentation"].attrs
+                template_start = seg_attr["first_sample_template"]
+                read.set_moves(moves, template_start, stride)
+            except:
+                pass
 
         return read
 

@@ -199,6 +199,8 @@ def new_browser(tracks, conf):
         Input("trackplot", "clickData"),
         State("selected-read", "children"))
     def update_trackplot(track_names, checklist, layer, click, prev_read):
+        t = time()
+
         table = list()
         ref = aln = read = None
         card_style = {"display" : "none"}
@@ -214,7 +216,12 @@ def new_browser(tracks, conf):
         if len(track_names) == 0:
             track_names = None
 
+        t = time()
+        print("trackplot", time()-t)
         chunk = tracks.slice(tracks=track_names, shared_reads=shared_reads, full_overlap=full_overlap)
+        chunk.init_mat()
+        print("tslice", time()-t)
+        t = time()
 
         if click is not None:
             coord = click["points"][0]
@@ -239,7 +246,9 @@ def new_browser(tracks, conf):
 
                 card_style = {"display" : "block"}
 
-        layer, = parse_layer(layer)
+            layer, = parse_layer(layer)
+            print("click", time()-t)
+            t = time()
 
         fig = Trackplot(
             chunk, [("mat", layer)], 
@@ -248,6 +257,8 @@ def new_browser(tracks, conf):
             show_legend="show_legend" in checklist,
             conf=conf).fig
         fig.update_layout(uirevision=uirev)
+        print("tplot", time()-t)
+        t = time()
 
         return fig, table, card_style, ref, read, (read != prev_read)
 
@@ -263,6 +274,7 @@ def new_browser(tracks, conf):
         Input("selected-read", "children"),
         Input("read-changed", "children"))
     def update_dotplot(track_names, flags, layer, ref, read, read_changed):
+        t = time()
         if read is None:
             return {}, {"display" : "hidden"}
 
@@ -272,7 +284,13 @@ def new_browser(tracks, conf):
         conf.sigplot.multi_background="multi_background" in flags
         conf.sigplot.no_model="show_model" not in flags
 
-        chunk = tracks.slice(tracks=track_names if len(track_names) > 0 else None)
+        print("dotplot", time()-t)
+        t = time()
+
+        chunk = tracks.slice(reads=[read], tracks=track_names if len(track_names) > 0 else None)
+
+        print("dslice", time()-t)
+        t = time()
 
         fig = Dotplot(
             chunk, 
@@ -280,7 +298,9 @@ def new_browser(tracks, conf):
             show_legend="show_legend" in flags,
             layers=list(parse_layer(layer)),
             conf=conf).plot(read)
-        #fig.update_layout(uirevision=read_changed)
+
+        print("dplot", time()-t)
+        t = time()
 
         return fig, {"display" : "block"}
 
@@ -297,24 +317,30 @@ def new_browser(tracks, conf):
         Input("selected-read", "children"),
         Input("read-changed", "children"))
     def update_refplot(track_names, flags, layer, ref, read, read_changed):
+        t = time()
         if read is None:
             return {}, {"display" : "hidden"}
 
         flags = set(flags)
 
         conf = Config(conf=tracks.conf)
-        conf.sigplot.multi_background="multi_background" in flags
-        conf.sigplot.no_model="show_model" not in flags
+        conf.sigplot.multi_background = "multi_background" in flags
+        conf.sigplot.no_model = "show_model" not in flags
+        print("refplot", time()-t)
+        t = time()
 
         chunk = tracks.slice(tracks=track_names if len(track_names) > 0 else None)
+        print("rslice", time()-t)
+        t = time()
 
         fig = Refplot(
             chunk, 
             layer=layer,
             kmer_coord=ref,
             conf=conf).fig
-        #fig.update_layout(uirevision=read_changed)
 
+        print("rplot", time()-t)
+        t = time()
         return fig, {"display" : "block"}
 
     app.run_server(port=conf.browser_port, debug=True)

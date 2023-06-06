@@ -141,14 +141,8 @@ class ValArray: public std::valarray<T> {
     }
 
     T mean() const {
-        //std::cout << to_string() << " a\n";
-        //std::cout.flush();
         auto sum = super::sum();
-        //std::cout << sum << " b\n";
-        //std::cout.flush();
         auto len = super::size();
-        //std::cout << len << " c\n";
-        //std::cout.flush();
         return super::sum() / super::size();
     }
 

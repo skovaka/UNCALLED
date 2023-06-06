@@ -90,6 +90,8 @@ class Tracks:
 
     def _init_new(self, *args, model=None, **kwargs):
 
+        t = time()
+
         self.conf, self.prms = config._init_group("tracks", copy_conf=True, *args, **kwargs)
         self.prms.refstats_layers = list(parse_layers(self.prms.refstats_layers))
 
@@ -108,6 +110,7 @@ class Tracks:
         if self.read_index is None:
             self.read_index = ReadIndex(self.conf.read_index.paths, self.prms.read_filter, self.conf.read_index.read_index, self.conf.read_index.recursive)
 
+
         if model is not None:
             self.set_model(model)
         else:
@@ -123,6 +126,8 @@ class Tracks:
                 sys.stderr.write(f"Auto-detected flowcell='{pm.flowcell}' kit='{pm.kit}'\n")
             self.model = None
 
+
+
         self._init_io()
 
         self.set_layers(self.prms.layers)
@@ -131,6 +136,7 @@ class Tracks:
             raise RuntimeError("Failed to load reference index")
 
         self._aln_track_ids = [t.id for t in self.alns]
+        t = time()
 
         self.index = load_index(self.model, self.prms.ref_index)
         self.refstats = None
@@ -167,19 +173,21 @@ class Tracks:
         self._add_tracks(parent._tracks)
 
         if parent.alignments is not None:
-            mask = np.minimum(parent.alignments["ref_start"], coords.start) < np.maximum(parent.alignments["ref_end"], coords.end)
-            if reads is not None:
-                mask &= parent.alignments["read_id"].isin(reads)
-            self.alignments = parent.alignments[mask] #pd.concat(track_alns, axis=0, names=["track", "id"])
-            self.layers = parent.layers.reset_index(level="seq.pos").loc[self.alignments.index].set_index("seq.pos",append=True)
+            if coords != parent.coords or reads is not None:
+                mask = np.minimum(parent.alignments["ref_start"], coords.start) < np.maximum(parent.alignments["ref_end"], coords.end)
+                if reads is not None:
+                    mask &= parent.alignments["read_id"].isin(reads)
+                self.alignments = parent.alignments[mask] #pd.concat(track_alns, axis=0, names=["track", "id"])
+                self.layers = parent.layers.reset_index(level="seq.pos").loc[self.alignments.index].set_index("seq.pos",append=True)
+            else:
+                self.alignments = parent.alignments
+                self.layers = parent.layers
         else:
             self.alignments = None
             self.layers = None
-
-        #.reorder_levels(["track.name","aln.id","seq.pos"]).loc[self.alignments.index].reorder_levels(["track.name","seq.pos","aln.id"]) #pd.concat(track_layers, axis=0, names=["track.name", "seq.pos", "aln.id"])
     
-        if self.alignments is not None:
-            self._init_mat()
+        #if self.alignments is not None:
+        #    self.init_mat()
 
     def _add_tracks(self, tracks):
         for name,track in tracks.items():
@@ -252,6 +260,7 @@ class Tracks:
 
     def _init_io(self):
 
+        t = time()
         self.inputs = list()
         self.bam_in = None
 
@@ -265,12 +274,15 @@ class Tracks:
             assert isinstance(fnames, list)
                 
             for filename in fnames:
+                t = time()
                 io = Cls(filename, False, self, track_count)
 
                 p = io.conf.read_index
-                if p.paths is not None:
-                    self.read_index.load_paths(p.paths, p.recursive)
-                self.read_index.load_index_file(p.read_index)
+                if not self.prms.io.buffered:
+                    if p.paths is not None:
+                        self.read_index.load_paths(p.paths, p.recursive)
+                    self.read_index.load_index_file(p.read_index)
+                t = time()
 
                 self.conf.load_config(io.conf)
                 self.inputs.append(io)
@@ -483,18 +495,18 @@ class Tracks:
                 reads = self.get_shared_reads().intersection(reads)
             order = "read_id"
                 
-        if tracks is None:
-            track_names = set(self.track_names)
-        else:
-            track_names = set(tracks)
-        tracks = dict()
-        for name,track in self._tracks.items():
-            if name not in track_names: continue
-            if isinstance(track, pd.DataFrame):
-                tracks[name] = track.loc[coords.refs]
+        #if tracks is None:
+        #    track_names = set(self.track_names)
+        #else:
+        #    track_names = set(tracks)
+        #tracks = dict()
+        #for name,track in self._tracks.items():
+        #    if name not in track_names: continue
+        #    if isinstance(track, pd.DataFrame):
+        #        tracks[name] = track.loc[coords.refs]
 
-            elif isinstance(track, AlnTrack):
-                tracks[name] = track #.slice(coords, reads=reads, order=order)
+        #    elif isinstance(track, AlnTrack):
+        #        tracks[name] = track #.slice(coords, reads=reads, order=order)
 
         return Tracks(self, coords, reads)
 
@@ -561,7 +573,7 @@ class Tracks:
         self.layers = pd.concat(track_layers, axis=0, names=["track.name", "aln.id", "seq.pos"])
         self.alignments = pd.concat(track_alns, axis=0, names=["track", "id"]).sort_index()#.sort_values(["fwd","ref_start"])
     
-        self._init_mat()
+        #self.init_mat()
             
         #self.load_compare(alignments.index.droplevel(0).to_numpy())
         self.calc_refstats()
@@ -573,7 +585,7 @@ class Tracks:
 
         return self.alns
 
-    def _init_mat(self):
+    def init_mat(self):
         df = self.layers.reset_index()
 
         self.mat = df.pivot(index=["track.name","aln.id"], columns=["seq.pos"]) 

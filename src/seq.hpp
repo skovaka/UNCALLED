@@ -44,11 +44,12 @@ namespace py = pybind11;
 
 struct SeqRecord {
     std::string name;
-    i32 id, length, offset;
+    i32 id;
+    i64 length, offset;
 
     static void pybind(py::module_ &m) {
         py::class_<SeqRecord> c(m, "SeqRecord");
-        c.def(py::init<std::string, i32, i32, i32>());
+        c.def(py::init<std::string, i32, i64, i64>());
         c.def_readwrite("name", &SeqRecord::name);
         c.def_readwrite("id", &SeqRecord::id);
         c.def_readwrite("length", &SeqRecord::length);
@@ -76,6 +77,8 @@ class RefCoord {
             throw std::runtime_error("RefCoord.bounds length must be divisible by 2 and greater than 0");
         }
     }
+
+    RefCoord(std::string _name) : name(_name), bounds{}, strand(Strand::na), ref_id(-1) {}
 
     RefCoord(std::string _name, IntervalIndex<i64> mpos, bool fwd) :
         name(_name),
@@ -119,12 +122,27 @@ class RefCoord {
     }
 
     void set_start(i64 v) {
+        if (!has_bounds()) {
+            bounds.resize(2);
+        }
         bounds[0] = v;
     }
 
     void set_end(i64 v) {
+        if (!has_bounds()) {
+            bounds.resize(2);
+        }
         bounds[bounds.size()-1] = v;
     }
+
+    bool has_bounds() const {
+        return bounds.size() > 0;
+    }
+
+    void check_bounds() const {
+        if (!has_bounds()) 
+            throw std::runtime_error("RefCoords object has no boundaries, only reference name '" + name + "'");
+    }   
 
     bool fwd() const {
         return strand == Strand::fwd;
@@ -139,6 +157,7 @@ class RefCoord {
     }
 
     i64 length() const {
+        check_bounds();
         return end()-start();
     }
 
@@ -147,6 +166,7 @@ class RefCoord {
     static void pybind_defs(pybind11::module_ m) {
         py::class_<RefCoord> c(m, "_RefCoord");
 
+        c.def(py::init<std::string>());        
         c.def(py::init<std::string, IntervalIndex<i64>, bool>());        
         c.def(py::init<std::string, std::vector<i64>>());
         c.def(py::init<std::string, std::vector<i64>, bool>());
@@ -159,7 +179,7 @@ class RefCoord {
             [](RefCoord &c) -> std::string {
                 std::stringstream ss;
                 ss << c.name;
-                if (c.start() >= 0) {
+                if (c.has_bounds()) {
                     ss << ":" << c.bounds[0] << "-" << c.bounds[1];
                     for (size_t i = 2; i < c.bounds.size(); i += 2) {
                         ss << ";" << c.bounds[i] << "-" << c.bounds[i+1];
@@ -185,6 +205,7 @@ class RefCoord {
                 c.strand = Strand::rev;
                 return false;
         });
+        c.def_property_readonly("has_bounds", &RefCoord::has_bounds);
         c.def_property_readonly("rev", &RefCoord::rev);
         c.def_property_readonly("stranded", &RefCoord::stranded);
     }
@@ -201,7 +222,6 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
     const ModelType &model;
     const RefCoord coord;
     const KmerType KMER_LEN; //= ModelType::KMER_LEN;
-    std::string name;
     IntervalIndex<i64> mpos;
     bool is_fwd; //TODO infer from mpos mpos
 
@@ -213,6 +233,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
 
     ValArray<KmerType> kmer; 
     ValArray<float> current;   
+    ValArray<bool> splice_mask;   
 
     Sequence(const ModelType &model_, size_t length) : 
         model(model_), 
@@ -222,18 +243,18 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         is_fwd(true),
         kmer(length), current(length) {}
 
-    Sequence(const ModelType &model_, IntervalIndex<i64> coords_, bool is_fwd_) : 
-        model(model_), 
-        coord("", coords_.get_start(), coords_.get_end(), is_fwd_),
-        KMER_LEN(model_.KMER_LEN),
-        mpos(coords_),
-        is_fwd(is_fwd_), 
-        kmer(mpos.length), 
-        current(mpos.length) {
-        init_current();
-        }
+    //Sequence(const ModelType &model_, IntervalIndex<i64> coords_, bool is_fwd_) : 
+    //    model(model_), 
+    //    coord("", coords_.get_start(), coords_.get_end(), is_fwd_),
+    //    KMER_LEN(model_.KMER_LEN),
+    //    mpos(coords_),
+    //    is_fwd(is_fwd_), 
+    //    kmer(mpos.length), 
+    //    current(mpos.length) {
+    //    init_current();
+    //}
 
-    Sequence(const ModelType &model_, RefCoord &coords_, const std::string &seq) : 
+    Sequence(const ModelType &model_, const std::string &seq, RefCoord &coords_) : 
             model(model_), 
             coord(coords_),
             KMER_LEN(model_.KMER_LEN),
@@ -246,7 +267,6 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
             auto start = coords_.bounds[0] + model_.PRMS.shift;
             for (size_t i = 1; i < coords_.bounds.size()-1; i += 2) {
                 auto end = coords_.bounds[i];
-                //mpos.append(coords_.bounds[i], coords_.bounds[i+1]);
                 mpos.append(start, end);
                 start = coords_.bounds[i+1];
             }
@@ -263,6 +283,17 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
             mpos.append(start, end);
         }
 
+        if (mpos.coords.size() > 1) {
+            splice_mask = ValArray<bool>(true, mpos.length);
+            size_t i = 0;
+            for (size_t j = 0; j < mpos.coords.size()-1; j++) {
+                i += mpos.coords[j].length();
+                for (int sh = -model_.PRMS.shift; sh < model_.PRMS.shift; sh++) {
+                    splice_mask[i+sh] = false;
+                }
+            }
+        }
+
         if (mpos.length != seq.size() - KMER_LEN + 1) {
             throw std::runtime_error("Size mismatch");
         }
@@ -277,15 +308,15 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         init_current();
     }
 
-    Sequence(const ModelType &model_, u8 *seq, size_t start, size_t end) :
-            Sequence(model_, end-start-KMER_LEN+1) {
-        kmer = model.pacseq_to_kmers(seq, start, end);
-        init_current();
-    }
-
-    //typename ModelType::KmerTypePy kmer_to_str(size_t i) const {
-    //    return model.kmer_to_arr(i);
+    //Sequence(const ModelType &model_, u8 *seq, size_t start, size_t end) :
+    //        Sequence(model_, end-start-KMER_LEN+1) {
+    //    kmer = model.pacseq_to_kmers(seq, start, end);
+    //    init_current();
     //}
+    //
+    bool is_spliced() const {
+        return splice_mask.size() > 0;
+    }
 
     KmerType get_kmer(i64 r) const {
         auto i = mpos.get_index(r);
@@ -316,8 +347,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         //auto c = super::template pybind<Sequence>(m, ("Sequence"+suffix).c_str(), false);
 
         c.def(py::init<const ModelType &, const std::string &>());
-        c.def(py::init<const ModelType &, RefCoord &, const std::string &>());
-        //Sequence(const ModelType &model_, RefCoord &coords_, std::string &seq) : 
+        c.def(py::init<const ModelType &, const std::string &, RefCoord &>());
         c.def("__len__", &Sequence::size);
         c.def_property_readonly("model", &Sequence::get_model);
         c.def_readonly("K", &Sequence::KMER_LEN);
@@ -327,7 +357,9 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         c.def_readonly("current", &Sequence::current);
         c.def_readonly("is_fwd", &Sequence::is_fwd);
         c.def_readonly("coord", &Sequence::coord);
+        c.def_readonly("splice_mask", &Sequence::splice_mask);
         //c.def("kmer_to_str", py::vectorize(&Sequence::kmer_to_str));
+        c.def("is_spliced", &Sequence::is_spliced);
         c.def("get_kmer", py::vectorize(&Sequence::get_kmer));
         c.def("get_current", py::vectorize(&Sequence::get_current));
     }

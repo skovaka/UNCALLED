@@ -13,11 +13,10 @@ enum class DTWCostFn {ABS_DIFF, NORM_PDF, Z_SCORE};
 
 struct DtwParams {
     DTWSubSeq subseq;
-    float move_cost, stay_cost, skip_cost,
-          band_shift;
+    float move_cost, stay_cost, skip_cost, band_shift;
     i32 del_max, ins_max, band_width, iterations;
     std::string norm_mode, band_mode, cost_fn;
-    bool save_bands;
+    bool unmask_splice, save_bands;
 };
 
 extern const DtwParams DTW_PRMS_DEF, DTW_PRMS_EVT_GLOB;
@@ -259,14 +258,12 @@ struct DtwDF : public DataFrame<int, int, float, float> {
             if (itr->ref > prev_ref) {
                 if (prev_ref >= 0) {
                     auto evt = read.merge_events(qry_st, itr->qry);
-                    //std::cout << i << " " << evt.start << " " << evt.mean << " ";
                     start[i] = evt.start;
                     length[i] = evt.length;
                     current[i] = evt.mean;
                     stdv[i] = evt.stdv;
                     i++;
                 }
-                //std::cout << ((itr->ref)-prev_ref) << "\n"; 
                 prev_ref = itr->ref;
                 qry_st = itr->qry;
             }
@@ -277,7 +274,6 @@ struct DtwDF : public DataFrame<int, int, float, float> {
         current[i] = evt.mean;
         stdv[i] = evt.stdv;
 
-        //std::cout.flush();
     }
 
     void set_signal(const ProcessedRead &read) {
@@ -440,16 +436,11 @@ class BandedDTW {
                 dend   = dstart + PRMS.band_width,
                 dk     = dstart + (r - ll_[dband].ref - 1);
 
-            //std::cout << mat_.size() << " "
-            //          << q << " " 
-            //          << r << " " 
-            //          << ak << " " 
-            //          << dk << "\n";
 
             for (size_t k = band_start; k < band_end; k++) {
 
                 //TODO can I compute starting locaiton from ll_?
-                if (q >= 0 & q < qry_size() && in_range(r, ref_vals_)) {
+                if (q >= 0 && q < qry_size() && in_range(r, ref_vals_)) {
                     float cost = costfn(qry_vals_.events[event_start_+q].mean, ref_vals_[r]);
                     float ds,hs,vs;
 
@@ -495,7 +486,6 @@ class BandedDTW {
     //}
 
     //i32 diag_k(u32 k0) {
-
     //}
 
     void traceback() {
@@ -510,48 +500,42 @@ class BandedDTW {
             auto path_ll = ll_[path_band];
             auto next_ll = path_ll;
 
+            if (mat_[path_k] >= MAX_COST) break;
+
             auto offs = path_k - band_start(path_band);
-            //std::cout << path_band << " " << path_k << " " << offs << "\n";
+
             path_.push_back({path_ll.qry-offs+event_start_, path_ll.ref+offs});
 
             i32 shift = 0;
 
             switch(bcrumbs_[path_k]) {
             case Move::D:
-                //std::cout << "D";
                 path_band -= 2;
                 next_ll = ll_[path_band];
                 shift = 2 * PRMS.band_width + (next_ll.ref - path_ll.ref + 1);
                 break;
 
             case Move::H:
-                //std::cout << "H";
                 path_band -= 1;
                 next_ll = ll_[path_band];
                 shift = PRMS.band_width + (next_ll.ref - path_ll.ref + 1);
                 break;
             case Move::V:
-                //std::cout << "V";
                 path_band -= 1;
                 next_ll = ll_[path_band];
                 shift = PRMS.band_width + (next_ll.ref - path_ll.ref);
                 break;
             }
-            //std::cout << path_band << "\t"
-            //          << path_k << "\t"
-            //          << shift << "\n";
             path_k -= shift;
         }
 
         auto c = path_.back();
-        c.qry = event_start_;
+        c.qry--; //= event_start_;
         while (c.ref > 0) {
             c.ref -= 1;
             path_.push_back(c);
         }
 
-        //std::cout << "\n";
-        //path_.push_back({event_start_,0});
     }
 
     std::vector<Coord> get_path() {
@@ -577,7 +561,6 @@ class BandedDTW {
                     dtw.current_sd[i] = evt.stdv;
                     i++;
                 }
-                //std::cout << ((itr->ref)-prev_ref) << "\n"; 
                 prev_ref = itr->ref;
                 qry_st = itr->qry;
             }

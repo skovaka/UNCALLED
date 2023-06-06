@@ -142,7 +142,7 @@ class BAM(TrackIO):
             "tracks" : {
                 self.track_out.name : {
                     "desc" : self.track_out.desc,
-                    "model" : self.track_out.model.name,
+                    "model" : self.track_out.model.name, #self.model.name, #
                     "read" : {"paths" : self.conf.read_index.paths, "index" : self.conf.read_index.read_index},
                     "layers" : {                                                                 
                         LENS_TAG : {"name" : "dtw.length"},                                      
@@ -217,14 +217,16 @@ class BAM(TrackIO):
         self.bam.set_tag(CURS_TAG, array.array("h", dc.astype(np.int16)))
 
         if self.prms.buffered:
-            self.out_buffer.append(self.bam.to_string())
+            #self.out_buffer.append(self.bam.to_string())
+            self.out_buffer.append(self.bam.to_dict())
         else:
             self.output.write(self.bam)
 
     def write_buffer(self, bams):
         header = pysam.AlignmentHeader.from_dict(self.header)
         for b in bams:
-            bam = pysam.AlignedSegment.fromstring(b, header)
+            bam = pysam.AlignedSegment.from_dict(b, header)
+            #bam = pysam.AlignedSegment.fromstring(b, header)
             self.output.write(bam)
 
     def iter_str_chunks(self):
@@ -249,7 +251,10 @@ class BAM(TrackIO):
             itr = self.input
         else:
             b = self.conf.tracks.ref_bounds
-            itr = self.input.fetch(b.name, b.start, b.end)
+            if b.has_bounds:
+                itr = self.input.fetch(b.name, b.start, b.end)
+            else:
+                itr = self.input.fetch(b.name)
 
         if unmapped:
             mapped = lambda a: True
@@ -302,11 +307,11 @@ class BAM(TrackIO):
 
         aln = None
 
-        #try:
-        read = self.tracks.read_index[sam.query_name]# None)
-        #except:
-        #    sys.stderr.write(f"Warning: failed to open read {sam.query_name}\n")
-        #    read = None
+        try:
+            read = self.tracks.read_index[sam.query_name]# None)
+        except Exception as e:
+            sys.stderr.write(f"Warning: failed to open read {sam.query_name} ({e})\n")
+            read = None
 
         if not has_dtw and read is None:
             return None

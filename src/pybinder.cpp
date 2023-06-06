@@ -30,6 +30,9 @@ size_t pybind_model(py::module_ &m, std::string suffix) {
     //m.def(("write_eventalign_"+suffix).c_str(), write_eventalign<PoreModel<K>>);
     auto fn = write_eventalign<Model>;
     m.def(("write_eventalign_"+suffix).c_str(), fn);
+
+    auto fn_new = write_eventalign_new<Model>;
+    m.def(("write_eventalign_new_"+suffix).c_str(), fn_new);
     return 0;
 }
 
