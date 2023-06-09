@@ -6,9 +6,9 @@ A **U**tility for **N**anopore **C**urrent **Al**ignment to **L**arge **E**xpans
 
 A read mapper which rapidly aligns raw nanopore signal to DNA references
 
-Enables software-based targeted sequenceing on Oxford Nanopore (ONT) MinION or GridION [via ReadUntil](https://nanoporetech.com/about-us/news/towards-real-time-targeting-enrichment-or-other-sampling-nanopore-sequencing-devices)
+Enables software-based targeted sequenceing on Oxford Nanopore (ONT) MinION or GridION [via adaptive sampling](https://nanoporetech.com/about-us/news/towards-real-time-targeting-enrichment-or-other-sampling-nanopore-sequencing-devices)
 
-Also includes a simulator which can be used to predict how much enrichment could be achieved on a given reference using raw signal data from previous nanopore runs.
+Note that UNCALLED can only be applied to legacy r9.4.1 data. For r10.4.1 data try [ReadFish](https://github.com/LooseLab/readfish) or ONT's builtin adaptive sampling option.
 
 [
 **Targeted nanopore sequencing by real-time mapping of raw electrical signal with UNCALLED** \
