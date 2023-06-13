@@ -11,6 +11,7 @@ ALN_LAYERS = {
     "length" : _Layer("Int32", "Sample Length", True),
     "current" : _Layer(np.float32, "Current (pA)", True),
     "current_sd" : _Layer(np.float32, "Stdv (pA)", True),
+    "events" : _Layer(np.float32, "Event Count", True),
     "start_sec" : _Layer(np.float32, "Time (s)", False),
     "length_sec" : _Layer(np.float32, "Dwell (s)", False),
     "dwell" : _Layer(np.float32, "Dwell (ms)", False),
@@ -191,6 +192,8 @@ class AlnDF:
 
     def __init__(self, seq, start=None, length=None, current=None, current_sd=None):
         self.seq = seq
+        self._extra = dict()
+
         if isinstance(start, _uncalled._AlnDF):
             self.instance = start
         else:
@@ -202,8 +205,11 @@ class AlnDF:
             self.instance = _uncalled._AlnDF(self.seq.index, start, length, current, current_sd)
 
         self.instance.mask(self.na_mask)
-        self._extra = dict()
 
+    def set_layer(self, name, vals):
+        if not len(vals) == len(self): 
+            raise ValueError(f"'{name}' values not same length as alignment")
+        self._extra[name] = np.array(vals)
         
     @property
     def na_mask(self):
@@ -248,7 +254,7 @@ class AlnDF:
     @property
     def dwell(self):
         return 1000 * self.length / self.seq.model.PRMS.sample_rate
-
+    
     def _get_series(self, name):
         vals = getattr(self, name, None)
         if vals is None or len(vals) == 0:
@@ -267,11 +273,13 @@ class AlnDF:
         if layers is None:
             layers = ["start", "length", "current", "current_sd"]
 
-        df = pd.DataFrame({
-            name : self._get_series(name) 
-            for name in layers if hasattr(self,name)
-        })
-        df["index"] = self.index.expand()
+        cols = dict()
+        for name in layers:
+            vals = self._get_series(name)
+            if vals is not None:
+                cols[name] = vals
+        cols["index"] = self.index.expand()
+        df = pd.DataFrame(cols)
         
         #idx = self.index.expand().to_numpy()
         #if index == "ref" and idx[0] < 0:
@@ -288,6 +296,8 @@ class AlnDF:
     def __getattr__(self, name):
         if not hasattr(self.instance, name):
             raise AttributeError(f"AlnDF has no attribute '{name}'")
+        #if name in self._extra:
+        #    return self._extra[name]
         return self.instance.__getattribute__(name)
 
 class CmpDF:

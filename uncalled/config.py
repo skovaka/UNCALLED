@@ -55,6 +55,8 @@ class ParamGroup:
             elif val is not None and not isinstance(val, type_):
                 val = type_(val)
 
+        if isinstance(val, list):
+            return val.copy()
         return val
     
     @property
@@ -127,6 +129,15 @@ class Config(_Conf):
                 not name.startswith("_") and
                 type(val) in TOML_TYPES and
                 (not hasattr(val, "__len__") or len(val) > 0 or isinstance(val, str)))
+
+    def load_group(self, name, vals, ignore_defaults=True):
+        dest = getattr(self, name)
+        defaults = _DEFAULTS.get_group(name)
+        for param in dir(vals):
+            if not param.startswith("_"):
+                val = getattr(vals, param)
+                if not (callable(val) or (ignore_defaults and val == getattr(defaults, param))):
+                    setattr(dest, param, val)
 
     def load_config(self, other, ignore_defaults=True):
         for param in self._GLOBAL_PARAMS:

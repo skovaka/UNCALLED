@@ -42,6 +42,7 @@ METHODS = {
 
 def dtw(conf):
     conf.tracks.load_fast5s = True
+    conf.tracks.layers.append("moves")
     #conf.export_static()
 
     #if len(conf.read_index.read_index) == 0:
@@ -274,16 +275,11 @@ class GuidedDTW:
 
         dtw = self.dtw_fn(self.prms, signal, self.evt_start, self.evt_end, self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
-        #print(dtw.path["qry"] - self.evt_start)
-        #print(len(bands), bands)
-        #print(dtw.score())
         if np.any(dtw.path["qry"] < self.evt_start) or np.any(dtw.path["ref"] < 0):
-            #:w
-            #print(self.evt_start, self.evt_end)
-            #print(dtw.path[dtw.path["qry"] < self.evt_start])
             return False
 
-        dtw.fill_aln(self.aln.instance)
+        dtw.fill_aln(self.aln.instance, self.conf.tracks.count_events)
+
         return True
 
 

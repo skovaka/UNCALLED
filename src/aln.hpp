@@ -14,7 +14,7 @@ namespace py = pybind11;
 struct AlnDF {
     IntervalIndex<i64> index;
     IntervalIndex<i32> samples;
-    ValArray<float> current, current_sd; 
+    ValArray<float> current, current_sd, events; 
 
     AlnDF() {}
 
@@ -104,6 +104,7 @@ struct AlnDF {
         c.def_readwrite("samples", &AlnDF::samples);
         c.def_readwrite("current", &AlnDF::current);
         c.def_readwrite("current_sd", &AlnDF::current_sd);
+        c.def_readwrite("events", &AlnDF::events);
         return c;
     }
 };

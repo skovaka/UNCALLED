@@ -120,7 +120,7 @@ class Eventalign(TrackIO):
 
         self._set_output(eventalign)
 
-    def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
+    def iter_alns(self, layers=None, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
         #read_filter = set(self.conf.read_index.read_filter)
 

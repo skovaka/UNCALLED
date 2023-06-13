@@ -19,6 +19,7 @@ IOParams._def_params(
 
     ("bam_in", None, None, "BAM input file (or \"-\"/no argument for stdin)"),
     ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
+    #("bam_extra", None, None, ""),
 
     ("model_dir", None, str, "Pore model training output directory"),
 
@@ -56,6 +57,7 @@ TracksParams._def_params(
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),
     ("max_reads", None, int, "Maximum number of reads to load"),
 
+    ("count_events", False, bool, "Compute and output per-reference event counts, where N > 1 indicates N-1 stays and N < 1 indicates 1/N skips"),
     ("mask_skips", None, None, "Either \"all\" to mask all skips, or \"keep_best\" to mask all but the closest to the model"),
     ("mask_indels", None, int, "Mask positions which overlap basecalled alignment insertions or deletions of this length or longer"),
 
@@ -74,7 +76,7 @@ TracksParams._def_params(
     ("ref_index", None, str, "BWA index prefix"),
     ("load_fast5s", False, bool, "Load fast5 files"),
 
-    ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter", "load_fast5s"}
+    ignore_toml={"ref_bounds", "full_overlap", "refstats", "refstats_layers", "read_filter", "load_fast5s"}
 )
 
 class TrainParams(config.ParamGroup):

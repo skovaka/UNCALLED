@@ -67,7 +67,7 @@ class TSV(TrackIO):
 
         df = df.loc[:,self.columns]
 
-        out = df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False, float_format="%.6f")
+        out = df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False, float_format="%.6g")
 
         self._set_output(out)
 

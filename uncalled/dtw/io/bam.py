@@ -10,11 +10,10 @@ import json
 from collections import defaultdict, deque
 from ..moves import sam_to_ref_moves, INT32_NA
 from ..aln_track import AlnTrack
-from ..layers import LAYER_META, parse_layers
 from ...index import RefCoord
 from ... import PoreModel
 from ... import Config
-from ...aln import Alignment, AlnDF
+from ...aln import Alignment, AlnDF, LAYER_META, parse_layers
 from . import TrackIO
 from _uncalled import IntervalIndexI64, ValArrayI16, _RefCoord
 
@@ -25,14 +24,7 @@ LENS_TAG = "ul"
 CURS_TAG = "uc"
 STDS_TAG = "ud"
 
-#BamLayer = namedtuple("BamLayer", ["name","dtype","shift","scale"], defaults=[None,None,None,None])
-LAYER_TAGS = {
-    "dtw.length"     : LENS_TAG,
-    "dtw.current"    : CURS_TAG,
-    "dtw.current_sd" : STDS_TAG,
-}
 LAYER_PREFIXES = ["u","v","w","x","y","z"]
-
 REQ_ALN_TAGS = [REF_TAG, LENS_TAG, CURS_TAG]
 
 class BAM(TrackIO):
@@ -87,6 +79,11 @@ class BAM(TrackIO):
         if self.track_in is None:
             name = os.path.basename(self.filename)
             self.track_in = self.init_track(name, name, self.conf)
+
+        self.load_moves = False
+        for group,layer in parse_layers(self.conf.tracks.layers):
+            if group == "moves":
+                self.load_moves = True
 
         #if conf is None:
         #    conf = self.conf
@@ -184,23 +181,42 @@ class BAM(TrackIO):
                 self.in_alns[aln.query_name].append(aln)
             self.input.reset()
 
+    LAYER_TAGS = {
+        "dtw.length"     : (LENS_TAG, "h"),
+        "dtw.current"    : (CURS_TAG, "h"),
+        "dtw.current_sd" : (STDS_TAG, "h"),
+        "dtwcmp.dist"    : (None, "f"),
+    }
+
+    def _current_to_tag(self, tag, vals):
+        if len(vals) == 0:
+            return False
+
+        ints = np.round(np.array(vals) * self.model.current.INORM_SCALE)
+        ints[np.isnan(vals)] = self.NA_I16
+        arr = array.array("h", ints.astype(np.int16))
+        self.bam.set_tag(tag, arr)
+
+        return True
+
     def write_alignment(self, aln):
         self.bam = aln.sam
 
         refs = aln.seq.coord.bounds
 
-        cmin = np.min(aln.dtw.current)
-        cmax = np.max(aln.dtw.current)
         scale = self.model.current.INORM_SCALE
 
-        dc = np.round(aln.dtw.current.to_numpy() * scale)#.astype(np.int16)
-        na = np.isnan(dc)
-        dc[na] = self.NA_I16
+        #dc = np.round(aln.dtw.current.to_numpy() * scale)#.astype(np.int16)
+        #na = np.isnan(dc)
+        #dc[na] = self.NA_I16
 
-        if len(aln.dtw.current_sd) > 0:
-            ds = np.round(aln.dtw.current_sd.to_numpy() * scale)#.astype(np.int16)
-            ds[na] = self.NA_I16
-            self.bam.set_tag(STDS_TAG, array.array("h", ds.astype(np.int16)))
+        self._current_to_tag(CURS_TAG, aln.dtw.current)
+        self._current_to_tag(STDS_TAG, aln.dtw.current_sd)
+
+        #if len(aln.dtw.current_sd) > 0:
+            #ds = np.round(aln.dtw.current_sd.to_numpy() * scale)#.astype(np.int16)
+            #ds[na] = self.NA_I16
+            #self.bam.set_tag(STDS_TAG, array.array("h", ds.astype(np.int16)))
 
         start_pad = list()
         start = -aln.dtw.samples.start
@@ -214,10 +230,9 @@ class BAM(TrackIO):
 
         self.bam.set_tag(REF_TAG, array.array("i", refs))
         self.bam.set_tag(LENS_TAG, array.array("h", lens))
-        self.bam.set_tag(CURS_TAG, array.array("h", dc.astype(np.int16)))
+        #self.bam.set_tag(CURS_TAG, array.array("h", dc.astype(np.int16)))
 
         if self.prms.buffered:
-            #self.out_buffer.append(self.bam.to_string())
             self.out_buffer.append(self.bam.to_dict())
         else:
             self.output.write(self.bam)
@@ -298,7 +313,10 @@ class BAM(TrackIO):
         vals[na] = pd.nan
         return (l["name"], vals)
 
-    def sam_to_aln(self, sam, load_moves=True):
+    def sam_to_aln(self, sam, load_moves=None):
+        if load_moves is None: load_moves = self.load_moves
+
+        sys.stdout.flush()
         has_dtw = True
         for tag in REQ_ALN_TAGS:
             if not sam.has_tag(tag):
@@ -350,20 +368,21 @@ class BAM(TrackIO):
 
             aln.set_dtw(dtw)
 
-        moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam)
-        has_moves = moves is not None
-        if has_moves and load_moves:
-            if aln is None:
-                coords = RefCoord(sam.reference_name, moves.index, fwd)
-                aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
-            else:
-                i = max(0, moves.index.start - aln.seq.index.start)
-                j = min(len(moves), len(moves) + moves.index.end -  aln.seq.index.end)
-                moves = moves.slice(i,j)
-                
-            aln.set_moves(moves)
+        moves = None
+        if load_moves:
+            moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam)
+            if moves is not None:
+                if aln is None:
+                    coords = RefCoord(sam.reference_name, moves.index, fwd)
+                    aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
+                else:
+                    i = max(0, moves.index.start - aln.seq.index.start)
+                    j = min(len(moves), len(moves) + moves.index.end -  aln.seq.index.end)
+                    moves = moves.slice(i,j)
+                    
+                aln.set_moves(moves)
 
-        if has_moves and has_dtw:
+        if moves is not None and has_dtw:
             aln.calc_mvcmp()
         elif aln is None:
             coords = RefCoord(sam.reference_name, sam.reference_start, sam.reference_end, fwd)

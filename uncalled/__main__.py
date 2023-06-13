@@ -48,6 +48,7 @@ DTW_OPTS = (
     Opt(("-x", "--read-index"), "read_index"),
     Opt(("-n", "--max-reads"), "tracks"),
 
+    Opt("--count-events", "tracks", action="store_true"),
     Opt("--del-max", "dtw"),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
     Opt("--mask-indels", "tracks"),
@@ -102,6 +103,8 @@ CONVERT_OPTS = (
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
 
+    Opt("--flowcell", "pore_model"),
+    Opt("--kit", "pore_model"),
     Opt("--reads", "read_index", "paths", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks"),
     Opt(("-x", "--read-index"), "read_index", required=False),

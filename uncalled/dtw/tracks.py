@@ -110,7 +110,6 @@ class Tracks:
         if self.read_index is None:
             self.read_index = ReadIndex(self.conf.read_index.paths, self.prms.read_filter, self.conf.read_index.read_index, self.conf.read_index.recursive)
 
-
         if model is not None:
             self.set_model(model)
         else:
@@ -356,7 +355,7 @@ class Tracks:
         #        track.model = self.model
 
     def set_model(self, model):
-        self.conf.pore_model = model.PRMS
+        self.conf.load_group("pore_model", model.PRMS)
         self.model = model
         for track in self.alns:
             track.model = model
@@ -892,7 +891,7 @@ class Tracks:
 
         if len(cmp_iters) == 0:
             for aln in main_io.iter_alns():
-                yield read_id, aln
+                yield aln.read_id, aln
             return
 
         cmp_starts = [None for _ in cmp_iters]
