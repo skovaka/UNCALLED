@@ -130,14 +130,19 @@ class Config(_Conf):
                 type(val) in TOML_TYPES and
                 (not hasattr(val, "__len__") or len(val) > 0 or isinstance(val, str)))
 
-    def load_group(self, name, vals, ignore_defaults=True):
+    def load_group(self, name, vals, ignore_defaults=True, keep_nondefaults=False):
         dest = getattr(self, name)
         defaults = _DEFAULTS.get_group(name)
         for param in dir(vals):
             if not param.startswith("_"):
                 val = getattr(vals, param)
-                if not (callable(val) or (ignore_defaults and val == getattr(defaults, param))):
-                    setattr(dest, param, val)
+                default = getattr(defaults, param)
+                if not (
+                        callable(val) or 
+                        (ignore_defaults and val == default) or 
+                        (keep_nondefaults and getattr(dest, param) != default)
+                    ):
+                        setattr(dest, param, val)
 
     def load_config(self, other, ignore_defaults=True):
         for param in self._GLOBAL_PARAMS:
@@ -252,13 +257,11 @@ class Config(_Conf):
         self.load_dict(toml_dict)
 
 
-    #support pickling via toml
-    def __setstate__(self, toml):
-        self.__init__(toml=toml)
-        #self.load_toml(text=toml)
+    def __setstate__(self, vals):
+        self.__init__(vals)
 
     def __getstate__(self):
-        return self.to_toml(force_all=True)
+        return self.to_dict(force_all=True)
 
     def get_group(self, group_name):
         """Returns the group based on the group name"""

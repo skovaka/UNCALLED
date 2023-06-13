@@ -101,8 +101,7 @@ def init_model(tracks):
         raise RuntimeError("Failed to auto-detect pore model. Please specify --pore-model flag (and add --rna if aligning RNA reads)")
 
     evdt = EVDT_PRESETS.get(tracks.model.bases_per_sec, None)
-    if evdt is not None:
-        tracks.conf.event_detector = evdt
+    tracks.conf.load_group("event_detector", evdt, keep_nondefaults=True)
 
 
 def dtw_worker(p):
