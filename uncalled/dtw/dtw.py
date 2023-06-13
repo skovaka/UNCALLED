@@ -42,6 +42,7 @@ METHODS = {
 
 def dtw(conf):
     conf.tracks.load_fast5s = True
+    conf.tracks.layers.append("moves")
     #conf.export_static()
 
     #if len(conf.read_index.read_index) == 0:
@@ -100,8 +101,7 @@ def init_model(tracks):
         raise RuntimeError("Failed to auto-detect pore model. Please specify --pore-model flag (and add --rna if aligning RNA reads)")
 
     evdt = EVDT_PRESETS.get(tracks.model.bases_per_sec, None)
-    if evdt is not None:
-        tracks.conf.event_detector = evdt
+    tracks.conf.load_group("event_detector", evdt, keep_nondefaults=True)
 
 
 def dtw_worker(p):
@@ -157,6 +157,10 @@ class GuidedDTW:
         self.prms = self.conf.dtw
 
         self.aln = aln
+        self.moves = self.aln.moves #moves.aln
+        if self.moves.empty():
+            sys.stderr.write(f"Warning: moves missing for read {aln.read_id}\n")
+            return
 
         read = self.aln.read
 
@@ -164,7 +168,6 @@ class GuidedDTW:
 
         self.model = tracks.model
 
-        self.moves = self.aln.moves #moves.aln
         self.seq = self.aln.seq
 
         self.method = self.prms.band_mode
@@ -271,16 +274,11 @@ class GuidedDTW:
 
         dtw = self.dtw_fn(self.prms, signal, self.evt_start, self.evt_end, self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
-        #print(dtw.path["qry"] - self.evt_start)
-        #print(len(bands), bands)
-        #print(dtw.score())
         if np.any(dtw.path["qry"] < self.evt_start) or np.any(dtw.path["ref"] < 0):
-            #:w
-            #print(self.evt_start, self.evt_end)
-            #print(dtw.path[dtw.path["qry"] < self.evt_start])
             return False
 
-        dtw.fill_aln(self.aln.instance)
+        dtw.fill_aln(self.aln.instance, self.conf.tracks.count_events)
+
         return True
 
 

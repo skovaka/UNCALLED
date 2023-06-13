@@ -255,7 +255,7 @@ def convert_worker(args):
 
 def convert_single(conf):
     tracks, ignore_bam = _init_tracks(conf)
-    for aln in tracks.iter_reads(ignore_bam=ignore_bam):
+    for read_id, aln in tracks.iter_reads(ignore_bam=ignore_bam):
         tracks.write_alignment(aln)
 
     tracks.close()

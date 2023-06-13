@@ -14,7 +14,7 @@ namespace py = pybind11;
 struct AlnDF {
     IntervalIndex<i64> index;
     IntervalIndex<i32> samples;
-    ValArray<float> current, current_sd; 
+    ValArray<float> current, current_sd, events; 
 
     AlnDF() {}
 
@@ -104,6 +104,7 @@ struct AlnDF {
         c.def_readwrite("samples", &AlnDF::samples);
         c.def_readwrite("current", &AlnDF::current);
         c.def_readwrite("current_sd", &AlnDF::current_sd);
+        c.def_readwrite("events", &AlnDF::events);
         return c;
     }
 };
@@ -236,7 +237,7 @@ struct Alignment {
     std::string read_id;
     Sequence<ModelType> seq;
     AlnDF dtw, moves;
-    CmpDF mvcmp;
+    CmpDF mvcmp, dtwcmp;
 
     Alignment(int id_, const std::string &read_id_, Sequence<ModelType> seq_) :
         id(id_), read_id(read_id_), seq(seq_) {
@@ -250,6 +251,12 @@ struct Alignment {
         moves = df;
     }
 
+    void calc_dtwcmp(Alignment &aln) {
+        if (!(dtw.empty() || aln.dtw.empty())) {
+            dtwcmp = CmpDF(dtw, aln.dtw);
+        }
+    }
+
     void calc_mvcmp() {
         if (!(dtw.empty() || moves.empty())) {
             mvcmp = CmpDF(dtw, moves);
@@ -261,10 +268,12 @@ struct Alignment {
         c.def(py::init<int, const std::string &, Sequence<ModelType>>());
         c.def("set_dtw", &Alignment::set_dtw);
         c.def("set_moves", &Alignment::set_moves);
+        c.def("calc_dtwcmp", &Alignment::calc_dtwcmp);
         c.def("calc_mvcmp", &Alignment::calc_mvcmp);
         c.def_readwrite("id", &Alignment::id);
         c.def_readwrite("read_id", &Alignment::read_id);
         c.def_readonly("seq", &Alignment::seq);
+        c.def_readonly("_dtwcmp", &Alignment::dtwcmp);
         c.def_readonly("_mvcmp", &Alignment::mvcmp);
         c.def_readonly("_dtw", &Alignment::dtw);
         c.def_readonly("_moves", &Alignment::moves);

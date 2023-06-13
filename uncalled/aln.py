@@ -11,13 +11,14 @@ ALN_LAYERS = {
     "length" : _Layer("Int32", "Sample Length", True),
     "current" : _Layer(np.float32, "Current (pA)", True),
     "current_sd" : _Layer(np.float32, "Stdv (pA)", True),
-    "start_sec" : _Layer(np.float32, "Time (s)", True),
-    "length_sec" : _Layer(np.float32, "Dwell (s)", True),
-    "dwell" : _Layer(np.float32, "Dwell (ms)", True),
+    "events" : _Layer(np.float32, "Event Count", True),
+    "start_sec" : _Layer(np.float32, "Time (s)", False),
+    "length_sec" : _Layer(np.float32, "Dwell (s)", False),
+    "dwell" : _Layer(np.float32, "Dwell (ms)", False),
     "end" : _Layer("Int32", "Sample End", False),
     "middle" : _Layer(np.float32, "Sample Middle", False),
     "middle_sec" : _Layer(np.float32, "Sample Middle", False),
-    "model_diff" : _Layer(np.float32, "Model pA Diff.", True),
+    "model_diff" : _Layer(np.float32, "Model pA Diff.", False),
     "abs_diff" : _Layer(np.float32, "Abs. Model Diff.", False),
 }
 
@@ -34,6 +35,7 @@ LAYERS = {
         "base" : _Layer(str, "Base", False),
     }, "aln" : {
         "id" : _Layer("Int64", "Aln. ID"),
+        "read_id" : _Layer(str, "Read ID"),
     }, "dtw" : ALN_LAYERS, "moves" : ALN_LAYERS,
     #}, "moves" : {
     #    "start" : _Layer("Int32", "BC Sample Start", True),
@@ -41,7 +43,7 @@ LAYERS = {
     #    "end" : _Layer("Int32", "Sample End", False),
     #    "middle" : _Layer(np.float32, "Sample Middle", False),
     #    "indel" : _Layer("Int32", "Basecalled Alignment Indel", False),
-    "cmp" : {
+    "dtwcmp" : {
         "aln_a" : _Layer("Int32", "Compare alignment V", True),
         "aln_b" : _Layer("Int32", "Compare alignment A", True),
         "group_b" : _Layer(str, "Compare type", False),
@@ -79,6 +81,15 @@ def parse_layer(layer):
             for layer in layers:
                 yield (group, layer)
             return
+        
+        matches = layer == LAYER_META.index.get_level_values(1)
+        if np.sum(matches) > 1:
+            raise ValueError("Ambiguous layer: {layer}. Please specify layer group.")
+        elif np.sum(matches) == 1:
+            for group,layer in LAYER_META.index[matches]:
+                yield (group,layer)
+            return
+
         group = "dtw"
     else:
         raise ValueError("Invalid layer: \"{layer}\"")
@@ -181,6 +192,8 @@ class AlnDF:
 
     def __init__(self, seq, start=None, length=None, current=None, current_sd=None):
         self.seq = seq
+        self._extra = dict()
+
         if isinstance(start, _uncalled._AlnDF):
             self.instance = start
         else:
@@ -192,8 +205,11 @@ class AlnDF:
             self.instance = _uncalled._AlnDF(self.seq.index, start, length, current, current_sd)
 
         self.instance.mask(self.na_mask)
-        self._extra = dict()
 
+    def set_layer(self, name, vals):
+        if not len(vals) == len(self): 
+            raise ValueError(f"'{name}' values not same length as alignment")
+        self._extra[name] = np.array(vals)
         
     @property
     def na_mask(self):
@@ -238,7 +254,7 @@ class AlnDF:
     @property
     def dwell(self):
         return 1000 * self.length / self.seq.model.PRMS.sample_rate
-
+    
     def _get_series(self, name):
         vals = getattr(self, name, None)
         if vals is None or len(vals) == 0:
@@ -257,11 +273,13 @@ class AlnDF:
         if layers is None:
             layers = ["start", "length", "current", "current_sd"]
 
-        df = pd.DataFrame({
-            name : self._get_series(name) 
-            for name in layers if hasattr(self,name)
-        })
-        df["index"] = self.index.expand()
+        cols = dict()
+        for name in layers:
+            vals = self._get_series(name)
+            if vals is not None:
+                cols[name] = vals
+        cols["index"] = self.index.expand()
+        df = pd.DataFrame(cols)
         
         #idx = self.index.expand().to_numpy()
         #if index == "ref" and idx[0] < 0:
@@ -278,6 +296,8 @@ class AlnDF:
     def __getattr__(self, name):
         if not hasattr(self.instance, name):
             raise AttributeError(f"AlnDF has no attribute '{name}'")
+        #if name in self._extra:
+        #    return self._extra[name]
         return self.instance.__getattribute__(name)
 
 class CmpDF:
@@ -342,6 +362,7 @@ class Alignment:
         self.dtw = AlnDF(seq, self.instance._dtw)
         self.moves = AlnDF(seq, self.instance._moves)
         self.mvcmp = CmpDF(seq, self.instance._mvcmp)
+        self.dtwcmp = CmpDF(seq, self.instance._dtwcmp)
 
     def __getattr__(self, name):
         if not hasattr(self.instance, name):
@@ -370,9 +391,15 @@ class Alignment:
 
         for name in layers.unique(0):
             _,group_layers = layers.get_loc_level(name)
-            group = getattr(self, name, [])
-            if len(group) > 0:
-                vals[name] = group.to_pandas(group_layers).reindex(idx)#.reset_index(drop=True)
+
+            if name == "aln":
+                vals[name] = pd.DataFrame({
+                    l : getattr(self, l) for l in group_layers
+                }, index=idx)
+            else:
+                group = getattr(self, name, [])
+                if len(group) > 0:
+                    vals[name] = group.to_pandas(group_layers).reindex(idx)#.reset_index(drop=True)
                 #if idx is None:
                 #    idx = vals[name].index
                 #else:
@@ -380,7 +407,7 @@ class Alignment:
 
         df = pd.concat(vals, axis=1, names=["group", "layer"]).reset_index(drop=True)
 
-        df["aln","id"] = self.id
+        #df["aln","id"] = self.id
         
         if index is not None:
             df.set_index(list(index), inplace=True)

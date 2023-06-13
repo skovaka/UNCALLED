@@ -96,7 +96,6 @@ class PoreModel:
 
         vals = None
 
-
         is_preset = False
 
         if model is not None: 
@@ -242,9 +241,11 @@ class PoreModel:
         for name,typ in PARAM_TYPES.items():
             dname = "_"+name
             if dname in d:
-                v = getattr(prms, name)
-                if typ != np.int32 or v < 0:
-                    setattr(prms, name, typ(d[dname]))
+                old_val = getattr(prms, name)
+                new_val = typ(d[dname])
+                if ((typ != np.int32 or old_val < 0) and 
+                    (not hasattr(new_val, "__len__") or len(new_val) > 0)):
+                    setattr(prms, name, new_val)
                 del d[dname]
 
         for k,v in d.items():
@@ -279,7 +280,7 @@ class PoreModel:
     def __getitem__(self, idx):
         if isinstance(idx, str):
             return self._base[idx]
-        return self.mean.current[self.kmer_array(idx)]
+        return self.current.mean[self.kmer_array(idx)]
 
     def __getattr__(self, name):
         if not hasattr(self.instance, name):
