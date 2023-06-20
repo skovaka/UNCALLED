@@ -5,6 +5,7 @@ import pandas as pd
 import os
 import re
 from _uncalled import ReadBuffer
+from . import config
 from uuid import UUID
 from types import SimpleNamespace
 
@@ -17,25 +18,33 @@ ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 def is_read_id(read_id):
     return re.match("[a-z0-9]+(-[a-z0-9])+", read_id) is not None
 
+#("paths", None, list, "Paths to fast5, slow5, or pod5 files, or to directories containing those files (optionally recursive)"),
+#("read_filter", None, list, "List of read IDs to load, or file containing one read ID per line"),
+#("read_index", None, str, "File containing a mapping of read IDs to filenames"),
+#("recursive", None, bool, "Recursively search 'paths' for fast5, slow5, or pod5 files"),
+#("read_count", None, int, "Maximum number of reads to load"),
+#("load_signal", False, bool, "Must be set to true to load signal from FAST5/SLOW5/POD5"),
+
 class ReadIndex:
-    def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False):
+    #def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False):
+    def __init__(self, *args, **kwargs):
+        self.conf, self.prms = config._init_group("read_index", *args, **kwargs)
         #self.suffix_re = re.compile(suffix_regex)
-        self.index_filename = index_filename
         self.file_info = dict()
         self.read_files = None
         self.index_files = set()
         self.base_paths = set()
 
-        if file_paths is not None:
-            self.load_paths(file_paths, recursive)
-
-        self._load_filter(read_filter)
-        self.load_index_file(index_filename)
-
         self._default_model = None
         self.infile = None
         self.infile_name = None
         self.prev_read = None
+        self._load_filter(self.prms.read_filter)
+
+        if self.prms.paths is not None and self.prms.load_signal:
+            self.load_paths(self.prms.paths, self.prms.recursive)
+
+        self.load_index_file(self.prms.read_index)
 
     @property
     def default_model(self):
@@ -55,7 +64,7 @@ class ReadIndex:
         return len(self.file_info) > 0
     
     def subset(self, read_ids):
-        ret = ReadIndex(read_filter=read_ids)
+        ret = ReadIndex(conf=self.conf, read_filter=read_ids)
         if self.read_files is not None:
             ret.load_index_df(self.read_files.reset_index())
         ret.file_info = self.file_info
@@ -64,9 +73,9 @@ class ReadIndex:
 
     def load_index_file(self, fname=None):
         if fname is None or len(fname) == 0:
-            if self.index_filename is None or len(self.index_filename) == 0:
+            if self.prms.read_index is None or len(self.prms.read_index) == 0:
                 return
-            fname = self.index_filename
+            fname = self.prms.read_index
 
         if fname in self.index_files:
             return
@@ -215,11 +224,18 @@ class ReadIndex:
     def __getitem__(self, read_id):
         if self.prev_read is not None and self.prev_read.id == read_id: 
             return self.prev_read
+        read = None
+
         if self.has_signal:
-            filename = self.get_read_file(read_id)
-            self._open(filename)
-            read = self.infile[read_id]
-        else:
+            try:
+                filename = self.get_read_file(read_id)
+                self._open(filename)
+                read = self.infile[read_id]
+            except Exception as e:
+                sys.stderr.write(f"Warning: failed to open read {read_id} ({e})\n")
+                read = None
+
+        if read is None:
             read = ReadBuffer(read_id, 0, 0, 0, [])
 
         self.prev_read = read
@@ -227,7 +243,7 @@ class ReadIndex:
 
     @property
     def has_signal(self):
-        return len(self.file_info) > 0
+        return self.prms.load_signal and len(self.file_info) > 0
         #return self.read_files is not None
     
     def __iter__(self):
@@ -308,6 +324,11 @@ class Pod5Reader:
 
     def __contains__(self, read_id):
         return read_id in self.read_ids
+
+    def get_run_info(self):
+        info = self.infile.run_info_table.read_pandas().iloc[0]
+        print(info["flow_cell_product_code"], info["sequencing_kit"])
+        return info["sequencing_kit"], info["flow_cell_product_code"]
 
     @property
     def read_ids(self):

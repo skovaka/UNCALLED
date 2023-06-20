@@ -61,7 +61,8 @@ class BAM(TrackIO):
                 if not line.startswith("UNC:"): continue
                 prms = json.loads(line[4:])
                 
-                self.conf.tracks.ref_index = prms["reference"]
+                if self.conf.tracks.ref_index is None:
+                    self.conf.tracks.ref_index = prms["reference"]
 
                 for name,vals in prms["tracks"].items():
                     c = self.conf.to_dict()
@@ -228,6 +229,8 @@ class BAM(TrackIO):
 
         lens = np.concatenate([start_pad, aln.dtw.samples.to_runlen()]).astype(np.int16)
 
+        #print(aln.read_id, aln.dtw.samples.start, list(lens))
+
         self.bam.set_tag(REF_TAG, array.array("i", refs))
         self.bam.set_tag(LENS_TAG, array.array("h", lens))
         #self.bam.set_tag(CURS_TAG, array.array("h", dc.astype(np.int16)))
@@ -325,11 +328,7 @@ class BAM(TrackIO):
 
         aln = None
 
-        try:
-            read = self.tracks.read_index[sam.query_name]# None)
-        except Exception as e:
-            sys.stderr.write(f"Warning: failed to open read {sam.query_name} ({e})\n")
-            read = None
+        read = self.tracks.read_index[sam.query_name]# None)
 
         if not has_dtw and read is None:
             return None
@@ -438,7 +437,7 @@ class BAM(TrackIO):
             
         return track_alns, track_layers
 
-    def iter_refs(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, chunksize=None, full_overlap=False):
+    def iter_refs(self, layers, coords=None, aln_id=None, read_id=None, fwd=None, chunksize=None, full_overlap=False):
 
         if coords is not None:
             itr = self.input.fetch(coords.ref_name, coords.refs.min(), coords.refs.max())
@@ -465,27 +464,36 @@ class BAM(TrackIO):
             aln = self.sam_to_aln(sam)
 
             next_aln = aln.attrs()
-            next_layers = aln.to_pandas(layers, index=["seq.fwd", "seq.pac", "aln.id"])
+            next_layers = aln.to_pandas(layers, index=["seq.pac", "seq.fwd", "aln.id"])
             next_ref = next_aln.ref_name
 
-            next_start = next_layers.index.get_level_values("seq.pac").min()
+            next_start = sam.reference_start #next_layers.index.get_level_values("seq.pac").min()
 
-            ret_layer_count = 0
+            first = prev_ref is not None
+            new = next_ref != prev_ref
+            loong = next_start - prev_start > 0
+            big = len(new_alns) > self.prms.aln_chunksize
+            if first and (new or (loong and big)):
+            #if prev_ref is not None and (next_ref != prev_ref or (next_start - prev_start > 0 and len(new_alns) > self.prms.aln_chunksize)):
 
-            if prev_ref is not None and (next_ref != prev_ref or next_start - prev_start > 0) and len(new_alns) > self.prms.aln_chunksize:
-                #pac = self.tracks.index.pos_to_pac(a["ref_name"], prev_start)
-
-                aln_df = pd.concat([aln_df] + new_alns)#.sort_index()
+                aln_df = pd.concat([aln_df, pd.DataFrame(new_alns, columns=new_alns[0]._fields).set_index("id")])
                 layer_df = pd.concat([layer_df] + new_layers).sort_index()
                 new_alns = list()
                 new_layers = list()
                 
-                ret_layers = layer_df.loc[slice(None),slice(None),prev_start:next_start-1]
-                ret_alns = aln_df.loc[ret_layers.index.droplevel(["seq.fwd", "seq.pac"]).unique()]
+                #ret_layers = layer_df.loc[(slice(None),slice(prev_start,next_start-1)), :]
+                #ret_alns = aln_df.loc[ret_layers.index.droplevel(["seq.fwd", "seq.pac"]).unique()]
+                if next_ref == prev_ref:
+                    ret_layers = layer_df.loc[prev_start:next_start-1]
+                    ret_alns = aln_df.loc[ret_layers.index.unique("aln.id")]
 
-                layer_df = layer_df.loc[slice(None),slice(None),next_start:]
-                aln_df = aln_df.loc[layer_df.index.droplevel(["seq.fwd", "seq.pac"]).unique()]
-                #ret_layer_count = 0
+                    layer_df = layer_df.loc[next_start:]
+                    aln_df = aln_df.loc[layer_df.index.unique("aln.id")]
+                else:
+                    ret_layers = layer_df#.loc[prev_start:]
+                    ret_alns = aln_df#.loc[ret_layers.index.unique("aln.id")]
+                    layer_df = layer_df.iloc[:0]
+                    aln_df = aln_df.iloc[:0]
 
                 t = time.time()
 
@@ -495,15 +503,13 @@ class BAM(TrackIO):
                 prev_ref = next_ref
                 prev_start = next_start
 
-            elif prev_ref is None:
+            elif prev_ref != next_ref:
                 prev_ref = next_ref
                 prev_start = next_start
-
 
             new_alns.append(next_aln)
             new_layers.append(next_layers)
 
-        
         new_alns = pd.DataFrame(new_alns, columns=new_alns[0]._fields).set_index("id")
         aln_df = pd.concat([aln_df] + [new_alns]).sort_index()
         layer_df = pd.concat([layer_df] + new_layers).sort_index()

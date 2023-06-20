@@ -126,6 +126,8 @@ struct ProcessedRead {
 
 		signal = (signal * prms.scale) + prms.shift;
 
+        //std::cout << "Normalizing " << prms.start << " " << prms.end << " " << prms.scale << " " << prms.shift << "\n";
+
         for (size_t i = prms.start; i < prms.end; i++) {
             auto &evt = events[i];
             evt.mean = evt.mean * prms.scale + prms.shift;

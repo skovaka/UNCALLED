@@ -238,7 +238,7 @@ def new_browser(tracks, conf):
 
                 table.append(html.Tr(html.Td(html.B("%s:%d" % (chunk.coords.name, ref)), colSpan=2)))
                 table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
-                for l in ["current", "dwell", "model_diff", "events"]:
+                for l in ["dtw.current", "dtw.dwell", "dtw.model_diff", "dtw.events"]:
                     if not l in layers: continue
                     table.append(html.Tr([
                         html.Td(html.B(LAYER_META.loc[("dtw",l), "label"])), 

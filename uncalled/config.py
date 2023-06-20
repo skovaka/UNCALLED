@@ -341,13 +341,13 @@ def _init_group(group_name, *args, _param_names=None, copy_conf=True, **kwargs):
 
     for arg, val in kwargs.items():
         if arg in arg_params:
-            raise ValueError("Conflicting *arg and **kwarg values for %s.%s" % (name, param))
+            raise ValueError("Conflicting *arg and **kwarg values for %s.%s" % (arg, param))
 
         if hasattr(group, arg):
             setattr(group, arg, val)
 
         elif arg not in [CONF_KW, PARAM_KW]:
-            raise ValueError("Unknown kwarg \"%s\" for %s parameters" % (arg, name))
+            raise ValueError("Unknown kwarg \"%s\" for %s parameters" % (arg, arg))
 
     return conf, group
 

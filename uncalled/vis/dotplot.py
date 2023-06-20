@@ -24,10 +24,10 @@ class Dotplot:
     #plot_read(read_id) -> fig
 
     REQ_LAYERS = [
-        "start", "length", "middle_sec", 
-        "current", "dwell", "seq.kmer",  
+        "dtw.start", "dtw.length", "dtw.middle_sec", 
+        "dtw.current", "dtw.dwell", "seq.kmer",  
         "moves.middle_sec", "seq.current",
-        "start_sec", "length_sec"
+        "dtw.start_sec", "dtw.length_sec"
     ]
 
     def __init__(self, *args, **kwargs):

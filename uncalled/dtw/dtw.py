@@ -9,6 +9,7 @@ from time import time
 import os
 
 from sklearn.linear_model import TheilSenRegressor
+from scipy.stats import linregress
 from ..config import Config
 from ..argparse import ArgParser
 from ..index import str_to_coord
@@ -21,6 +22,8 @@ from ..signal_processor import ProcessedRead
 
 from . import Tracks
 from ..aln import AlnDF
+
+from _uncalled import ReadBuffer
 
 import multiprocessing as mp
 
@@ -41,7 +44,7 @@ METHODS = {
 
 
 def dtw(conf):
-    conf.tracks.load_fast5s = True
+    conf.read_index.load_signal = True
     conf.tracks.layers.append("moves")
     #conf.export_static()
 
@@ -115,6 +118,10 @@ def dtw_worker(p):
     tracks = Tracks(model=model, read_index=reads, conf=conf)
     init_model(tracks)
 
+    #tracks.norm_params = pd.read_csv("/scratch1/skovaka/curlcakes/unm/nanopolish/eventalign/npl_unm_cov100_smry.txt", sep="\t").set_index("read_name").sort_index()
+    #tracks.norm_params = pd.read_csv("/scratch1/skovaka/curlcakes/m6a/nanopolish/eventalign/npl_m6a_cov100_smry.txt", sep="\t").set_index("read_name").sort_index()
+    #print(tracks.norm_params)
+
     i = 0
     for bam in bams:
         bam = pysam.AlignedSegment.fromstring(bam, header)
@@ -163,6 +170,8 @@ class GuidedDTW:
             return
 
         read = self.aln.read
+        #read = ReadBuffer(read.id,read.channel,read.number,read.start,read.signal)
+
 
         signal = self.process(read)
 
@@ -197,12 +206,10 @@ class GuidedDTW:
             
             if self.conf.normalizer.median:
                 med = np.median(ref_means)
-                #tgt = (med, np.median(np.abs(med-ref_means)))
                 tgt = (med, np.median(np.abs(med-ref_means)))
             else:
                 tgt = (ref_means.mean(), ref_means.std())
 
-            #signal.normalize_mom(ref_means.mean(), ref_means.std())#, self.evt_start, self.evt_end)
         elif self.conf.normalizer.mode == "model_mom":
             if self.conf.normalizer.median:
                 med = self.model.means.median()
@@ -211,11 +218,34 @@ class GuidedDTW:
                 tgt = (self.model.model_mean, self.model.model_stdv)
         else:
             raise ValueError(f"Unknown normalization mode: {self.prms.norm_mode}")
+
+        #scale = 1/self.aln.sam.get_tag("sd")
+        #shift = -self.aln.sam.get_tag("sm") * scale
+        ##print(signal.events["mean"][self.evt_start:self.evt_end])
+        #signal.normalize(scale, shift)
+
+        #if not aln.read_id in tracks.norm_params.index:
+        #    print("NO", aln.read_id)
+        #    return
+        #scale, shift = tracks.norm_params.loc[aln.read_id, ["scale","shift"]]
+        #signal.normalize(scale, shift/scale)
+        #signal.normalize(scale, shift)
+
+        #print(npl)
+        #signal.normalize(1/self.model.pa_stdv, -self.model.pa_mean/self.model.pa_stdv)
+        #npl = signal.events["mean"][self.evt_start:self.evt_end]
+        #print(scale, shift)
         
         if self.conf.normalizer.full_read:
             signal.normalize_mom(*tgt)
         else:
             signal.normalize_mom(*tgt, self.evt_start, self.evt_end)
+
+        #unc = signal.events["mean"][self.evt_start:self.evt_end]
+        #print((unc - npl), np.abs(unc - npl).mean())
+
+        #_,_,scale,shift = signal.norm[0]
+        #print(f"{read.id}\t{scale}\t{shift}")
 
         tracks.set_read(signal)
 
@@ -223,13 +253,14 @@ class GuidedDTW:
             success = self._calc_dtw(signal)
 
             for i in range(self.prms.iterations-1):
-                reg = self.renormalize(signal, df)
-                signal.normalize(reg.coef_, reg.intercept_)
+                scale, shift = self.renormalize(signal, self.aln)
+                #print(scale, shift)
+                signal.normalize(scale, shift)
+                #print("renorm", reg.coef_, reg.intercept_)
                 success = self._calc_dtw(signal)
         else:
             starts = self.moves.samples.starts.to_numpy()
             lengths = self.moves.samples.lengths.to_numpy()
-            cur = std = np.array([])
             dtw = AlnDF(self.seq, starts, lengths)
             dtw.set_signal(signal)
             self.aln.set_dtw(dtw)
@@ -239,6 +270,11 @@ class GuidedDTW:
             #try:
             if self.conf.mvcmp:
                 self.aln.calc_mvcmp()
+            #mask = self.aln.mvcmp.dist.to_numpy() <= 3
+            #if np.mean(mask) > 0.5:
+            #    self.aln.dtw.mask(mask)
+            #else:
+            #    return
 
             if (not self.prms.unmask_splice) and aln.seq.is_spliced():
                 self.aln.dtw.mask(aln.seq.splice_mask)
@@ -253,10 +289,16 @@ class GuidedDTW:
 
 
     def renormalize(self, signal, aln):
-        kmers = self.seq.get_kmer(aln["mpos"]) #self.ref_kmers[aln["mpos"]]
-        model_current = self.model[kmers]
-        reg = TheilSenRegressor(random_state=0)
-        return reg.fit(aln[["current"]], model_current)
+        #kmers = self.aln.seq.kmer #self.ref_kmers[aln["mpos"]]
+        #model_current = self.model[kmers]
+        mask = self.aln.dtw.na_mask
+        model_current = self.aln.seq.current.to_numpy()[mask] #self.ref_kmers[aln["mpos"]]
+        #reg = TheilSenRegressor(random_state=0)
+        #fit = reg.fit(aln.dtw.current.to_numpy().reshape((-1,1)), model_current)
+        #return (fit.coef_[0], fit.intercept_)
+        lr = linregress(aln.dtw.current.to_numpy()[mask], model_current)
+        return (lr.slope, lr.intercept)
+        #print(fit.coef_, reg.intercept_, linregress(aln.dtw.current.to_numpy(), model_current))
 
     #TODO refactor inner loop to call function per-block
     def _calc_dtw(self, signal):
@@ -278,6 +320,9 @@ class GuidedDTW:
             return False
 
         dtw.fill_aln(self.aln.instance, self.conf.tracks.count_events)
+
+        if self.conf.tracks.mask_skips is not None:
+            self.aln.mask_skips(self.conf.tracks.mask_skips == "keep_best")
 
         return True
 

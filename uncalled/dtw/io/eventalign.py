@@ -171,15 +171,16 @@ class Eventalign(TrackIO):
                 
                 fwd = int( (df["event_index"].iloc[0] < df["event_index"].iloc[-1]) == (df["position"].iloc[0] < df["position"].iloc[-1]))
 
+                df['length'] = (df['event_length'] * self.model.sample_rate).round().astype(int)
+
                 pos = df["position"].to_numpy()
                 df["mpos"] = self.tracks.index.pos_to_mpos(pos, fwd)-self.model.shift
-                df["mean_cml"]  = df["event_length"] * df["event_level_mean"]
-                df["stdv_cml"]  = df["event_length"] * df["event_stdv"]
-
+                df["mean_cml"]  = df["length"] * df["event_level_mean"]
+                df["stdv_cml"]  = df["length"] * df["event_stdv"]
 
                 grp = df.groupby("mpos")
 
-                lengths = grp["event_length"].sum()
+                lengths = grp["length"].sum()
                 df = pd.DataFrame({
                     "start" : grp["start_idx"].min(),
                     "length" : lengths,
@@ -200,13 +201,10 @@ class Eventalign(TrackIO):
         csv_iter = pd.read_csv(
             self.filename, sep="\t", chunksize=10000,
             usecols=["read_index","contig","position", "event_index",
-                     "start_idx","event_level_mean","event_stdv","model_mean",
+                     "start_idx","end_idx","event_level_mean","event_stdv","model_mean",
                      "event_length","strand","model_kmer"])
 
         for events in csv_iter:
-            events['event_length'] = np.round(events['event_length'] * self.model.sample_rate).astype(int)
-            events['sum'] = events['event_level_mean'] * events['event_length']
-
             events = pd.concat([leftover, events])
 
             #i = events["read_name"] == events["read_name"].iloc[-1]

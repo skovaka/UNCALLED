@@ -50,7 +50,7 @@ def sam_to_read_moves(read, sam):
     return moves_to_aln(moves, template_start, mv_stride)
 
 def sam_to_ref_moves(conf, ref_index, read, sam):
-    if read is None or read.empty(): 
+    if read is None:# or read.empty(): 
         return None
     read_moves = sam_to_read_moves(read, sam)
     if read_moves is None:

@@ -62,7 +62,7 @@ class FastaIndex:
             offs += size
 
     def pac_to_pos(self, pac):
-        if hasattr("__len__", pac):
+        if hasattr(pac, "__len__"):
             c = pac[0]
         else:
             c = pac

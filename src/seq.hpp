@@ -323,7 +323,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         return kmer[i];
     }
 
-    KmerType get_current(i64 r) const {
+    float get_current(i64 r) const {
         auto i = mpos.get_index(r);
         return current[i];
     }

@@ -13,21 +13,6 @@ from . import config
 
 PORE_MODEL_PRESETS = {}
 
-WORKFLOW_PRESETS = {
-   "dna_r10.3_450bps" : "",
-   "dna_r10.3_450bps" : "",
-   "dna_r10.4.1_e8.2_260bps" : "",
-   "dna_r10.4.1_e8.2_400bps" : "",
-   "dna_r10_450bps" : "",
-   "dna_r10.4_e8.1" : "",
-   "dna_r10.4_e8.1m" : "",
-   "dna_r9.4.1_450bps" : "r94_dna",
-   "dna_r9.4.1_e8.1" : "r94_dna",
-   "dna_r9.4.1_e8.1m" : "r94_dna",
-   "dna_r9.5_450bps" : "r94_dna",
-   "rna_r9.4.1_70bps" : "r94_rna"
-}
-
 CACHE = dict()
 
 PARAM_TYPES = {
@@ -132,7 +117,7 @@ class PoreModel:
 
             else:
                 models = ", ".join(PORE_MODEL_PRESETS.keys())
-                raise FileNotFoundError(f"PoreModel file not found: {filename}")
+                raise FileNotFoundError(f"PoreModel file not found: {filename}. Choose one of: {models}")
 
         else:
             self._init_new(prms)

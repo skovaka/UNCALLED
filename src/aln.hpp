@@ -62,6 +62,13 @@ struct AlnDF {
         }
     }
 
+
+    void mask_i(size_t i) {
+        if (current.size() > 0) current[i] = current.NA;         
+        if (current_sd.size() > 0) current_sd[i] = current_sd.NA;
+        samples.coords[i].clear();                               
+    }
+
     void mask(py::array_t<bool> mask_py) {
         PyArray<bool> mask(mask_py);
         if (mask.size() != size()) {
@@ -69,9 +76,10 @@ struct AlnDF {
         }
         for (size_t i = 0; i < size(); i++) {
             if (!mask[i]) {
-                if (current.size() > 0) current[i] = current.NA;
-                if (current_sd.size() > 0) current_sd[i] = current_sd.NA;
-                samples.coords[i].clear();
+                mask_i(i);
+                //if (current.size() > 0) current[i] = current.NA;
+                //if (current_sd.size() > 0) current_sd[i] = current_sd.NA;
+                //samples.coords[i].clear();
             }
         }
     }
@@ -112,7 +120,7 @@ struct AlnDF {
 struct CmpDF {
     
     IntervalIndex<i64> index;
-    ValArray<float> dist, jaccard;
+    ValArray<float> dist, jaccard, current, current_sd;
 
     CmpDF() {}
 
@@ -122,6 +130,8 @@ struct CmpDF {
 
         dist.resize(index.length);
         jaccard.resize(index.length);
+        current.resize(index.length);
+        current_sd.resize(index.length);
 
         i64 ref;
 
@@ -137,6 +147,8 @@ struct CmpDF {
             } else {
                 jaccard[i] = jaccard.NA;
             }
+            current[i] = a.current[i] - b.current[i];
+            current_sd[i] = a.current_sd[i] - b.current_sd[i];
         }
 
         DistIter ab(a,b), ba(b,a);
@@ -228,6 +240,8 @@ struct CmpDF {
         c.def_readonly("index", &CmpDF::index);
         c.def_readonly("dist", &CmpDF::dist);
         c.def_readonly("jaccard", &CmpDF::jaccard);
+        c.def_readonly("current", &CmpDF::current);
+        c.def_readonly("current_sd", &CmpDF::current_sd);
     }
 };
 
@@ -263,6 +277,59 @@ struct Alignment {
         }
     }
 
+    void mask_skips(bool keep_best) {
+        if (keep_best) mask_skips<true>();
+        else mask_skips<false>();
+    }
+
+    template<bool keep_best>
+    void mask_skips() {
+        auto prev_start = dtw.samples.coords[0].start;
+        int nskips = 0;
+        for (size_t i = 1; i < dtw.size(); i++) {
+            auto start = dtw.samples.coords[i].start;
+            if (start == prev_start) {
+                nskips++;
+            } else if (nskips > 0) {
+                mask_skip<keep_best>(i-nskips-1, i);
+                nskips = 0;
+            }
+            prev_start = start;
+        }
+
+        if (nskips > 0) {
+            mask_skip<keep_best>(dtw.size()-nskips-1, dtw.size());
+        }
+    }
+
+    template <bool keep_best> 
+    typename std::enable_if<keep_best, void>::type
+    mask_skip(size_t start, size_t end) {
+        float best = INFINITY;
+        size_t best_i = -1;
+        for (size_t i = start; i < end; i++) {
+            auto abs_diff = abs(dtw.current[i] - seq.current[i]);
+            if (abs_diff < best) {
+                best_i = i;
+                best = abs_diff;
+            }
+        }
+        for (size_t i = start; i < end; i++) {
+            if (i != best_i) {
+                dtw.mask_i(i);
+            }
+        }
+    }
+
+    template <bool keep_best> 
+    typename std::enable_if<!keep_best, void>::type
+    mask_skip(size_t start, size_t end) {
+        for (size_t i = start; i < end; i++) {
+            dtw.mask_i(i);
+        }
+    }
+
+
     static void pybind(py::module_ &m, std::string suffix) {
         py::class_<Alignment> c(m, ("_Alignment"+suffix).c_str());
         c.def(py::init<int, const std::string &, Sequence<ModelType>>());
@@ -270,6 +337,7 @@ struct Alignment {
         c.def("set_moves", &Alignment::set_moves);
         c.def("calc_dtwcmp", &Alignment::calc_dtwcmp);
         c.def("calc_mvcmp", &Alignment::calc_mvcmp);
+        c.def("mask_skips", static_cast<void (Alignment::*)(bool)>(&Alignment::mask_skips));
         c.def_readwrite("id", &Alignment::id);
         c.def_readwrite("read_id", &Alignment::read_id);
         c.def_readonly("seq", &Alignment::seq);

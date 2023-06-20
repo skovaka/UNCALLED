@@ -585,20 +585,13 @@ class BandedDTW {
                 if (itr->qry == prev_evt) {
                     skip_count += 1;
                 } else if (skip_count == 0) {
-                    if (i >= ref_size()) {
-                        std::cout << "BAD HERE\n";
-                        std::cout.flush();
-                    }
+                    assert(i < ref_size());
 
                     ret[i++] = evt_count;
                 } else {
                     float count = evt_count / (skip_count + 1);
                     for (auto j = 0; j < skip_count+1; j++) {
-                        //std::cout << i << " * " << evt_count << "\n";
-                        if (i >= ref_size()) {
-                            std::cout << "BAD tHERE\n";
-                        std::cout.flush();
-                        }
+                        assert(i < ref_size());
                         ret[i++] = count;
                     }
                     skip_count = 0;
@@ -615,21 +608,16 @@ class BandedDTW {
         if (path_.front().qry == prev_evt) {
             float count = evt_count / (skip_count + 1);
             for (auto j = 0; j < skip_count+1; j++) {
-                if (i >= ref_size()) {
-                    std::cout << "BAD wHERE\n";
-                    std::cout.flush();
-                }
+                assert(i < ref_size());
                 ret[i++] = count;                    
             }                                        
         } else {
-                    if (i >= ref_size()) {
-                        std::cout << "BAD gHERE\n";
-                        std::cout.flush();
-                    }
+            assert(i < ref_size());
             ret[i] = evt_count;
         }
         return ret;
     }
+
 
     float score() {
         return score_sum_;

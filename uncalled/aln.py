@@ -49,9 +49,13 @@ LAYERS = {
         "group_b" : _Layer(str, "Compare type", False),
         "jaccard" : _Layer(np.float32, "Jaccard Distance", True),
         "dist" : _Layer(np.float32, "Mean Ref. Distance", True),
+        "current" : _Layer(np.float32, "Current Cmp (pA)", True),
+        "current_sd" : _Layer(np.float32, "Stdv Cmp (pA)", True),
     }, "mvcmp" : {
         "jaccard" : _Layer(np.float32, "Jaccard Distance", True),
         "dist" : _Layer(np.float32, "Mean Ref. Distance", True),
+        "current" : _Layer(np.float32, "Current Cmp (pA)", True),
+        "current_sd" : _Layer(np.float32, "Stdv Cmp (pA)", True),
     }
 }
 
@@ -84,7 +88,7 @@ def parse_layer(layer):
         
         matches = layer == LAYER_META.index.get_level_values(1)
         if np.sum(matches) > 1:
-            raise ValueError("Ambiguous layer: {layer}. Please specify layer group.")
+            raise ValueError(f"Ambiguous layer: {layer}. Please specify layer group.")
         elif np.sum(matches) == 1:
             for group,layer in LAYER_META.index[matches]:
                 yield (group,layer)
@@ -310,6 +314,8 @@ class CmpDF:
             df = pd.DataFrame({
                 "dist" : self.instance.dist, 
                 "jaccard" : self.instance.jaccard,
+                "current" : self.instance.current,
+                "current_sd" : self.instance.current_sd,
             })
         else:
             df = pd.DataFrame({
@@ -385,7 +391,8 @@ class Alignment:
         layers = parse_layers(layers)
         if index is not None:
             index = parse_layers(index)
-            layers = layers.union(index)
+            #layers = layers.union(index)
+            layers = layers.append(index)
 
         idx = self.seq.mpos#.expand().to_numpy()
 

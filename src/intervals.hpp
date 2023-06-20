@@ -337,15 +337,17 @@ class IntervalIndex {
         size_t j = 1;
         for (size_t i = 1; i < coords.size(); i++) {
             if (coords[i] != prev) {
-                if (coords[i].is_valid() && prev.is_valid()) {
-                    auto gap = coords[i].start - prev.end;
-                    if (gap > 0) {
-                        ret[j++] = -gap;
+                if (coords[i].is_valid()) {
+                    if (prev.is_valid()) {
+                        auto gap = coords[i].start - prev.end;
+                        if (gap > 0) {
+                            ret[j++] = -gap;
+                        }
                     }
                     prev = coords[i];
                 }
                 auto len = coords[i].length();
-                while (len > MAX_LEN_I16) {
+                while (len >= MAX_LEN_I16) {
                     ret[j++] = -MAX_LEN_I16;
                     len -= MAX_LEN_I16;
                 }

@@ -44,7 +44,7 @@ DTW_OPTS = (
 
     Opt(FAST5_PARAM, "read_index", nargs="+", type=str),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),
-    Opt(("-l", "--read-filter"), "tracks"),
+    Opt(("-l", "--read-filter"), "read_index"),
     Opt(("-x", "--read-index"), "read_index"),
     Opt(("-n", "--max-reads"), "tracks"),
 

@@ -26,6 +26,7 @@ def refstats(conf):
     tracks = Tracks(conf=conf)
     conf = tracks.conf
     conf.shared_refs_only = True
+    conf.tracks.load_fast5s = False
 
     stats = RefstatsSplit(conf.refstats, len(tracks.alns))
     layers = list(parse_layers(conf.tracks.layers, False))
