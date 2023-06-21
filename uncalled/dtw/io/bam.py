@@ -227,9 +227,12 @@ class BAM(TrackIO):
         if start < 0:
             start_pad.append(start)
 
-        lens = np.concatenate([start_pad, aln.dtw.samples.to_runlen()]).astype(np.int16)
+        lens = np.concatenate([start_pad, aln.dtw.samples.to_runlen()])#.astype(np.int16)
+        old = lens
+        lens = lens.astype(np.int16)
 
-        #print(aln.read_id, aln.dtw.samples.start, list(lens))
+        mis = old != lens
+
 
         self.bam.set_tag(REF_TAG, array.array("i", refs))
         self.bam.set_tag(LENS_TAG, array.array("h", lens))
@@ -359,6 +362,7 @@ class BAM(TrackIO):
             layers["dtw.start"] = np.pad(np.cumsum(np.abs(length)), (1,0))[:-1][mask]
 
             length = length[mask]
+
             lna = (length == 0) & np.isnan(layers["dtw.current"])
             length[lna] = -1
             layers["dtw.length"] = length.astype(np.int32)

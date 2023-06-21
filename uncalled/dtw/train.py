@@ -9,6 +9,7 @@ import numpy as np
 from ..pore_model import PoreModel, PoreModelParams
 
 def init_model(tracks, k):
+    print("INIT")
     p = tracks.conf.event_detector
     p.min_mean = 0
     p.max_mean = 1000000
@@ -18,6 +19,7 @@ def init_model(tracks, k):
     length = 0
 
     for read in tracks.read_index:
+        print(read.id, read.moves)
         st = read.template_start
         en = st + np.sum(read.moves)*5
         c = evdt.get_means(read.signal.to_numpy()[st:en])
@@ -46,7 +48,9 @@ def init_model(tracks, k):
     tracks.conf.pore_model.pa_mean = np.mean(currents)
     tracks.conf.pore_model.pa_stdv = np.std(currents)
     #tracks.set_model(PoreModel((tracks.conf.pore_model, tracks.conf.normalizer.tgt_mean, tracks.conf.normalizer.tgt_stdv)))
-    tracks.set_model(PoreModel(params=tracks.conf.pore_model))
+    model = PoreModel(params=tracks.conf.pore_model)
+    print(model.to_df())
+    tracks.set_model(model)
 
 def train(conf):
     conf.tracks.load_fast5s = True

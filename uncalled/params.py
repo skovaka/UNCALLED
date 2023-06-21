@@ -83,7 +83,7 @@ class TrainParams(config.ParamGroup):
     _name = "train"
 TrainParams._def_params(
     ("kmer_samples", 1000, int, "Maximum number of instances of each k-mer to use per training iteration"),
-    ("init_model", None, str, "Initial pore model. If not specified, iteration will be based on basecaller move alignments"),
+    ("init_model", "", str, "Initial pore model. If not specified, iteration will be based on basecaller move alignments"),
     ("init_events", 1000000, int, "Number of events to use for computing picoamp scaling parameters for new pore model"),
     ("kmer_len", None, int, "Output model k-mer length. Required if init_model is not specified"),
     ("iterations", 1, int, "Number of model training iterations"),

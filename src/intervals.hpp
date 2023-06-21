@@ -316,7 +316,10 @@ class IntervalIndex {
         auto prev = coords[0];
         for (size_t i = 1; i < coords.size(); i++) {
             if (prev.is_valid() && coords[i].is_valid()) {
-                gaps += prev.end < coords[i].start;
+                auto dist = coords[i].start - prev.end;
+                if (dist > 0) {
+                    gaps += (dist / MAX_LEN_I16) + 1; //prev.end < coords[i].start;
+                }
                 prev = coords[i];
 
                 if (coords[i].length() > MAX_LEN_I16) {
@@ -326,6 +329,7 @@ class IntervalIndex {
         }
         return gaps;
     }
+
 
     ValArray<T> to_runlen() const { 
         auto gap_count = count_gaps(), ret_size = coords.size() + gap_count;
@@ -341,6 +345,10 @@ class IntervalIndex {
                     if (prev.is_valid()) {
                         auto gap = coords[i].start - prev.end;
                         if (gap > 0) {
+                            while (gap >= MAX_LEN_I16) {
+                                ret[j++] = -MAX_LEN_I16;
+                                gap -= MAX_LEN_I16;
+                            }
                             ret[j++] = -gap;
                         }
                     }

@@ -253,11 +253,12 @@ class GuidedDTW:
             success = self._calc_dtw(signal)
 
             for i in range(self.prms.iterations-1):
-                scale, shift = self.renormalize(signal, self.aln)
-                #print(scale, shift)
-                signal.normalize(scale, shift)
-                #print("renorm", reg.coef_, reg.intercept_)
-                success = self._calc_dtw(signal)
+                if self.renormalize(signal, self.aln):
+                    success = self._calc_dtw(signal)
+                else:
+                    success = False
+                    break
+
         else:
             starts = self.moves.samples.starts.to_numpy()
             lengths = self.moves.samples.lengths.to_numpy()
@@ -268,18 +269,24 @@ class GuidedDTW:
 
         if success:
             #try:
-            if self.conf.mvcmp:
+            #if self.conf.mvcmp and self.aln.mvcmp.empty():
+            if self.aln.mvcmp.empty():
                 self.aln.calc_mvcmp()
-            #mask = self.aln.mvcmp.dist.to_numpy() <= 3
-            #if np.mean(mask) > 0.5:
-            #    self.aln.dtw.mask(mask)
-            #else:
-            #    return
+
+            mask = self.aln.dtw.na_mask
+
+            #mask &= np.array(self.aln.mvcmp.dist) < 5
 
             if (not self.prms.unmask_splice) and aln.seq.is_spliced():
-                self.aln.dtw.mask(aln.seq.splice_mask)
+                mask &= np.array(aln.seq.splice_mask)
 
-            sys.stdout.flush()
+            if np.sum(mask) < 100:
+                return
+
+            mask[0] = mask[-1] = True
+
+            self.aln.dtw.mask(mask)
+
             tracks.write_alignment(self.aln)
             self.empty = False
             return
@@ -291,14 +298,29 @@ class GuidedDTW:
     def renormalize(self, signal, aln):
         #kmers = self.aln.seq.kmer #self.ref_kmers[aln["mpos"]]
         #model_current = self.model[kmers]
-        mask = self.aln.dtw.na_mask
-        model_current = self.aln.seq.current.to_numpy()[mask] #self.ref_kmers[aln["mpos"]]
+        if aln.mvcmp.empty():
+            aln.calc_mvcmp()
+
+        na_mask = np.array(aln.dtw.na_mask)
+        dist_mask = np.array(aln.mvcmp.dist) <= 1
+
+        mask = na_mask & dist_mask
+        if np.sum(mask) < 100:
+            if np.sum(na_mask) < 100:
+                return False
+            sys.stderr.write(f"{aln.read_id}\tnofilter\t{np.sum(mask)}\t{len(mask)}\n")
+            mask = na_mask
+        
+        ref_current = aln.seq.current.to_numpy()[mask] #self.ref_kmers[aln["mpos"]]
+        read_current = aln.dtw.current.to_numpy()[mask]
+        lr = linregress(read_current, ref_current)
         #reg = TheilSenRegressor(random_state=0)
-        #fit = reg.fit(aln.dtw.current.to_numpy().reshape((-1,1)), model_current)
-        #return (fit.coef_[0], fit.intercept_)
-        lr = linregress(aln.dtw.current.to_numpy()[mask], model_current)
-        return (lr.slope, lr.intercept)
-        #print(fit.coef_, reg.intercept_, linregress(aln.dtw.current.to_numpy(), model_current))
+        #fit = reg.fit(read_current.reshape((-1,1)), ref_current)
+        scale, shift = (lr.slope, lr.intercept)
+        signal.normalize(scale, shift)
+        return True
+
+        #return(fit.coef_[0], fit.intercept_)
 
     #TODO refactor inner loop to call function per-block
     def _calc_dtw(self, signal):

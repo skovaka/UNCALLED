@@ -394,6 +394,7 @@ class Alignment:
             #layers = layers.union(index)
             layers = layers.append(index)
 
+
         idx = self.seq.mpos#.expand().to_numpy()
 
         for name in layers.unique(0):

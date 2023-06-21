@@ -47,6 +47,19 @@ struct AlnDF {
         return ret;
     }
 
+    AlnDF trim_na() {
+        size_t start_na = 0, end_na = 0;
+        for (size_t i = 0; i < size(); i++) {
+            if (index.coords[i].is_valid()) break;
+            start_na += 1;
+        }
+        for (size_t i = size()-1; i < size(); i--) {
+            if (index.coords[i].is_valid()) break;
+            end_na += 1;
+        }
+        return slice(start_na, size()-end_na);
+    }
+
     void set_signal(const ProcessedRead &read) {
         if (current.size() == 0) {
             current = ValArray<float>(size());
@@ -104,6 +117,7 @@ struct AlnDF {
         c.def(py::init<IntervalIndex<i64>&, IntervalIndex<i32>&, py::array_t<float>, py::array_t<float>>());
         c.def(py::init<IntervalIndex<i64>&, py::array_t<i32>, py::array_t<i32>, py::array_t<float>, py::array_t<float>>());
         c.def("slice", &AlnDF::slice);
+        c.def("trim_na", &AlnDF::trim_na);
         c.def("empty", &AlnDF::empty);
         c.def("mask", &AlnDF::mask);
         c.def("set_signal", &AlnDF::set_signal);
