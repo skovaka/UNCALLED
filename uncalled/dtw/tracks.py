@@ -449,7 +449,6 @@ class Tracks:
     def init_alignment(self, track_name, aln_id, read, ref_id, coords, sam=None):
         #TODO make model name paramter, initialize with track specific model
         track = self._track_or_default(track_name)
-        model = track.model.instance
         #seq = self.index.instance.get_kmers(model, ref_id, coords, self.conf.is_rna)
         seq = self.index.query(coords)
         seq = Sequence(seq, self.index.get_pac_offset(ref_id))

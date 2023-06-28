@@ -60,6 +60,8 @@ TracksParams._def_params(
     ("count_events", False, bool, "Compute and output per-reference event counts, where N > 1 indicates N-1 stays and N < 1 indicates 1/N skips"),
     ("mask_skips", None, None, "Either \"all\" to mask all skips, or \"keep_best\" to mask all but the closest to the model"),
     ("mask_indels", None, int, "Mask positions which overlap basecalled alignment insertions or deletions of this length or longer"),
+    ("min_norm_dist", 1, int, "Minimum mvcmp.dist for posititions to be used for iterative normalization"),
+    ("min_aln_length", 100, int, "Minimum number of aligned bases"),
 
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("min_coverage", 1, int, "Reference positions with less than this coverage will be excluded from each track (or all tracks if shared_refs_only is true)"),
@@ -102,7 +104,7 @@ ReadIndexParams._def_params(
     ("read_index", None, str, "File containing a mapping of read IDs to filenames"),
     ("recursive", None, bool, "Recursively search 'paths' for fast5, slow5, or pod5 files"),
     ("read_count", None, int, "Maximum number of reads to load"),
-    ("load_signal", False, bool, "Must be set to true to load signal from FAST5/SLOW5/POD5"),
+    ("load_signal", True, bool, "Must be set to true to load signal from FAST5/SLOW5/POD5"),
 )
 
 class VisParams(config.ParamGroup):

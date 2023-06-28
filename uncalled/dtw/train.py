@@ -18,12 +18,19 @@ def init_model(tracks, k):
     currents = list()
     length = 0
 
-    for read in tracks.read_index:
-        print(read.id, read.moves)
-        st = read.template_start
-        en = st + np.sum(read.moves)*5
+    for sam in tracks.bam_in.iter_sam():
+
+        mv = np.array(sam.get_tag("mv"))
+        mv_stride = mv[0]
+        st = sam.get_tag("ts")
+        moves = mv[1:]
+
+        en = st + (np.sum(moves) * mv_stride)
+
+        read = tracks.read_index[sam.query_name]
         c = evdt.get_means(read.signal.to_numpy()[st:en])
-        #currents.append(read.signal[st:en])
+        print(read.id, moves, read.signal)
+
         currents.append(c)
         length += len(c)
         if length >= tracks.conf.train.init_events:
@@ -49,16 +56,18 @@ def init_model(tracks, k):
     tracks.conf.pore_model.pa_stdv = np.std(currents)
     #tracks.set_model(PoreModel((tracks.conf.pore_model, tracks.conf.normalizer.tgt_mean, tracks.conf.normalizer.tgt_stdv)))
     model = PoreModel(params=tracks.conf.pore_model)
+    print("DONE")
     print(model.to_df())
     tracks.set_model(model)
 
 def train(conf):
-    conf.tracks.load_fast5s = True
+    #conf.tracks.load_signal = True
+    conf.tracks.layers.append("moves")
     conf.mvcmp = True
 
     prms = conf.train
 
-    if prms.init_model is not None:
+    if len(prms.init_model) > 0:
         conf.pore_model.name = prms.init_model
     elif not prms.append and prms.kmer_len is not None:
         #conf.pore_model.name = ""

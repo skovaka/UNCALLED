@@ -9,8 +9,10 @@ import time
 import pandas as pd
 import scipy.stats
 import copy
+import pysam
 
 from _uncalled import _AlnDF, IntervalIndexI64, IntervalIndexI32, moves_to_aln, read_to_ref_moves
+from ..aln import AlnDF
 from ..pore_model import PoreModel
 from ..config import Config
 from ..argparse import Opt
@@ -61,29 +63,31 @@ def sam_to_ref_moves(conf, ref_index, read, sam):
     is_fwd = not sam.is_reverse
     flip_ref = is_fwd == model.reverse
 
+    cig = sam.cigartuples
+    start_shift = cig[0][1] if cig[0][0] == pysam.CHARD_CLIP else 0
+    end_shift = cig[-1][1] if cig[-1][0] == pysam.CHARD_CLIP else 0
+
     ar = np.array(sam.get_aligned_pairs())
     ar = ar[ar[:,1] != None] #TODO keep track of insertion counts
 
-
     if flip_ref:
         ar = ar[::-1]
-        qrys = ar[:,0]
-        #silly trick to make null reverse into REF_NA
+        qrys = ar[:,0] 
         read_len = sam.infer_read_length()
-        qrys[qrys == None] = read_len - INT32_NA - 1
-        qrys = read_len - qrys - 1
+        na = qrys == None
+        qrys[na] = 0
+        qrys = read_len - qrys - 1# + end_shift
+        qrys[na] = INT32_NA
     else:
         qrys = ar[:,0]
-        qrys[qrys == None] = INT32_NA
+        na = qrys == None
+        qrys[na] = 0
+        qrys[na] = INT32_NA
 
     refs = np.array(ref_index.pos_to_mpos(ar[:,1], is_fwd))
     qrys = np.array(qrys, dtype=np.int64)
 
-
     ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, True)
-
-    #if workflow is None:
-    #    workflow = (conf.read_buffer.flowcell, conf.read_buffer.kit)
 
     mkl = MOVE_KMER_LENS[PoreModel.PRESET_MAP.loc[conf.pore_model.get_workflow(), "ont_model"]]
 

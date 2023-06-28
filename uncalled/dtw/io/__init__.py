@@ -1,5 +1,4 @@
 """Edit, merge, and ls alignment databases
-        print(d)
 
 subcommand options:
 ls       List all tracks in a database
@@ -254,8 +253,11 @@ def convert_worker(args):
         
 
 def convert_single(conf):
+    conf.tracks.layers.append("moves")
     tracks, ignore_bam = _init_tracks(conf)
     for read_id, aln in tracks.iter_reads(ignore_bam=ignore_bam):
+        aln.calc_mvcmp()
+        dist = np.array(aln.mvcmp.dist)
         tracks.write_alignment(aln)
 
     tracks.close()

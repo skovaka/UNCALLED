@@ -70,6 +70,8 @@ DTW_OPTS = (
     Opt("--move-cost", "dtw"),
     Opt(("-b", "--band-width"), "dtw"),
     Opt(("-s", "--band-shift"), "dtw"),
+    Opt("--min-norm-dist", "tracks"),
+    Opt("--min-aln-length", "tracks"),
     Opt(("-N", "--norm-mode"), "normalizer", "mode", choices=["ref_mom", "model_mom"]),
     Opt("--norm-median", "normalizer", "median", action="store_true"),
     Opt("--norm-full", "normalizer", "full_read", action="store_true"),

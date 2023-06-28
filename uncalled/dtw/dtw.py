@@ -120,7 +120,6 @@ def dtw_worker(p):
 
     #tracks.norm_params = pd.read_csv("/scratch1/skovaka/curlcakes/unm/nanopolish/eventalign/npl_unm_cov100_smry.txt", sep="\t").set_index("read_name").sort_index()
     #tracks.norm_params = pd.read_csv("/scratch1/skovaka/curlcakes/m6a/nanopolish/eventalign/npl_m6a_cov100_smry.txt", sep="\t").set_index("read_name").sort_index()
-    #print(tracks.norm_params)
 
     i = 0
     for bam in bams:
@@ -165,6 +164,7 @@ class GuidedDTW:
 
         self.aln = aln
         self.moves = self.aln.moves #moves.aln
+        #print(self.moves.to_pandas())
         if self.moves.empty():
             sys.stderr.write(f"Warning: moves missing for read {aln.read_id}\n")
             return
@@ -267,7 +267,9 @@ class GuidedDTW:
             self.aln.set_dtw(dtw)
             success = True
 
+        
         if success:
+            #print("ERE")
             #try:
             #if self.conf.mvcmp and self.aln.mvcmp.empty():
             if self.aln.mvcmp.empty():
@@ -280,7 +282,7 @@ class GuidedDTW:
             if (not self.prms.unmask_splice) and aln.seq.is_spliced():
                 mask &= np.array(aln.seq.splice_mask)
 
-            if np.sum(mask) < 100:
+            if np.sum(mask) < self.conf.tracks.min_aln_length:
                 return
 
             mask[0] = mask[-1] = True
@@ -292,6 +294,8 @@ class GuidedDTW:
             return
             #except:
             #    pass
+        #else:
+        #    print("FAIL")
         sys.stderr.write(f"Failed to write alignment for {read.id}\n")
 
 
@@ -302,13 +306,15 @@ class GuidedDTW:
             aln.calc_mvcmp()
 
         na_mask = np.array(aln.dtw.na_mask)
-        dist_mask = np.array(aln.mvcmp.dist) <= 1
+        dist_mask = np.array(aln.mvcmp.dist) <= self.conf.tracks.min_norm_dist
+
+        #print(np.array(aln.mvcmp.dist))
 
         mask = na_mask & dist_mask
-        if np.sum(mask) < 100:
-            if np.sum(na_mask) < 100:
+        if np.sum(mask) < self.conf.tracks.min_aln_length:
+            if np.sum(na_mask) < self.conf.tracks.min_aln_length:
                 return False
-            sys.stderr.write(f"{aln.read_id}\tnofilter\t{np.sum(mask)}\t{len(mask)}\n")
+            #sys.stderr.write(f"{aln.read_id}\tnofilter\t{np.sum(mask)}\t{len(mask)}\n")
             mask = na_mask
         
         ref_current = aln.seq.current.to_numpy()[mask] #self.ref_kmers[aln["mpos"]]
@@ -339,12 +345,15 @@ class GuidedDTW:
         dtw = self.dtw_fn(self.prms, signal, self.evt_start, self.evt_end, self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         if np.any(dtw.path["qry"] < self.evt_start) or np.any(dtw.path["ref"] < 0):
+            #print("FAAAIIL", dtw.path)
             return False
 
         dtw.fill_aln(self.aln.instance, self.conf.tracks.count_events)
 
         if self.conf.tracks.mask_skips is not None:
             self.aln.mask_skips(self.conf.tracks.mask_skips == "keep_best")
+        
+        #print("HRERE")
 
         return True
 
