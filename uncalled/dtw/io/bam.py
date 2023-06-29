@@ -376,9 +376,14 @@ class BAM(TrackIO):
             moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam)
             if moves is not None:
                 if aln is None:
+                    #print("INIT MOVES")
                     coords = RefCoord(sam.reference_name, moves.index, fwd)
+                    ##print(sam.reference_start, sam.reference_end)
+                    #print(coords)
                     aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
+                    #print(aln.seq.index)
                 else:
+                    #print("INoT")
                     i = max(0, moves.index.start - aln.seq.index.start)
                     j = min(len(moves), len(moves) + moves.index.end -  aln.seq.index.end)
                     moves = moves.slice(i,j)

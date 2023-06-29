@@ -210,6 +210,10 @@ class AlnDF:
 
         #print(self.na_mask, len(self))
 
+        #print(len(self.seq.index))
+        #if start is not None and length is not None:
+        #    print(len(start), len(length))
+        #print(len(self.na_mask), len(self))
         self.instance.mask(self.na_mask)
 
     def set_layer(self, name, vals):

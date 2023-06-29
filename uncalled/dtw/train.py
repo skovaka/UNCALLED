@@ -29,7 +29,6 @@ def init_model(tracks, k):
 
         read = tracks.read_index[sam.query_name]
         c = evdt.get_means(read.signal.to_numpy()[st:en])
-        print(read.id, moves, read.signal)
 
         currents.append(c)
         length += len(c)

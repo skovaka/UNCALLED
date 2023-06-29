@@ -178,6 +178,8 @@ class GuidedDTW:
         self.model = tracks.model
 
         self.seq = self.aln.seq
+        #print(len(self.aln.moves))
+        #print(len(self.seq))
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
@@ -221,31 +223,18 @@ class GuidedDTW:
 
         #scale = 1/self.aln.sam.get_tag("sd")
         #shift = -self.aln.sam.get_tag("sm") * scale
-        ##print(signal.events["mean"][self.evt_start:self.evt_end])
         #signal.normalize(scale, shift)
 
         #if not aln.read_id in tracks.norm_params.index:
-        #    print("NO", aln.read_id)
         #    return
         #scale, shift = tracks.norm_params.loc[aln.read_id, ["scale","shift"]]
         #signal.normalize(scale, shift/scale)
         #signal.normalize(scale, shift)
 
-        #print(npl)
-        #signal.normalize(1/self.model.pa_stdv, -self.model.pa_mean/self.model.pa_stdv)
-        #npl = signal.events["mean"][self.evt_start:self.evt_end]
-        #print(scale, shift)
-        
         if self.conf.normalizer.full_read:
             signal.normalize_mom(*tgt)
         else:
             signal.normalize_mom(*tgt, self.evt_start, self.evt_end)
-
-        #unc = signal.events["mean"][self.evt_start:self.evt_end]
-        #print((unc - npl), np.abs(unc - npl).mean())
-
-        #_,_,scale,shift = signal.norm[0]
-        #print(f"{read.id}\t{scale}\t{shift}")
 
         tracks.set_read(signal)
 
@@ -262,6 +251,7 @@ class GuidedDTW:
         else:
             starts = self.moves.samples.starts.to_numpy()
             lengths = self.moves.samples.lengths.to_numpy()
+            #print(self.aln.read_id)
             dtw = AlnDF(self.seq, starts, lengths)
             dtw.set_signal(signal)
             self.aln.set_dtw(dtw)
