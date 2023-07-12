@@ -64,35 +64,10 @@ def dtw_pool(conf):
     #tracks.output.set_model(tracks.model)
     i = 0
     _ = tracks.read_index.default_model #load property
-    for chunk in dtw_pool_iter(tracks):
+    pool = DtwPool(tracks)
+    for chunk in pool: #dtw_pool_iter(tracks):
         i += len(chunk)
         tracks.output.write_buffer(chunk)
-
-def dtw_pool_iter(tracks):
-    def iter_args(): 
-        i = 0
-        aln_count = 0
-        for read_ids, bams in tracks.bam_in.iter_str_chunks():
-            reads = tracks.read_index.subset(read_ids)
-            yield (tracks.conf, tracks.model, bams, reads, aln_count, tracks.bam_in.header)
-            aln_count += len(bams)
-    try:
-        ctx = mp.get_context("spawn")
-        with ctx.Pool(processes=tracks.conf.tracks.io.processes, maxtasksperchild=4) as pool:
-
-
-            i = 0
-            if tracks.conf.tracks.io.ordered_out:
-                itr = pool.imap
-            else:
-                itr = pool.imap_unordered
-
-            for out in itr(dtw_worker, iter_args(), chunksize=1):
-                i += len(out)
-                yield out 
-
-    except Exception as e:
-        raise ExceptionWrapper(e).re_raise()
 
 EVDT_PRESETS = {
     450.0 : EventDetector.PRMS_450BPS,
@@ -105,6 +80,44 @@ def init_model(tracks):
 
     evdt = EVDT_PRESETS.get(tracks.model.bases_per_sec, None)
     tracks.conf.load_group("event_detector", evdt, keep_nondefaults=True)
+
+class DtwPool:
+    def __init__(self, tracks):
+        self.tracks = tracks
+        self.closed = False
+
+        ctx = mp.get_context("spawn")
+        self.pool = ctx.Pool(processes=self.tracks.conf.tracks.io.processes, maxtasksperchild=4)
+        if self.tracks.conf.tracks.io.ordered_out:
+            self.iter = self.pool.imap
+        else:
+            self.iter = self.pool.imap_unordered
+
+    def _iter_args(self): 
+        i = 0
+        aln_count = 0
+        for read_ids, bams in self.tracks.bam_in.iter_str_chunks():
+            reads = self.tracks.read_index.subset(read_ids)
+            yield (self.tracks.conf, self.tracks.model, bams, reads, aln_count, self.tracks.bam_in.header)
+            aln_count += len(bams)
+
+    def __iter__(self):
+        try:
+            i = 0
+            for out in self.iter(dtw_worker, self._iter_args(), chunksize=1):
+                i += len(out)
+                yield out 
+
+                if self.closed:
+                    break
+
+        except Exception as e:
+            raise ExceptionWrapper(e).re_raise()
+
+    def close(self):
+        if not self.closed:
+            self.pool.terminate()
+            self.closed = True
 
 
 def dtw_worker(p):
@@ -170,8 +183,6 @@ class GuidedDTW:
             return
 
         read = self.aln.read
-        #read = ReadBuffer(read.id,read.channel,read.number,read.start,read.signal)
-
 
         signal = self.process(read)
 
@@ -196,8 +207,8 @@ class GuidedDTW:
         if self.dtw_fn is None:
             raise ValueError(f"Unknown PoreModel type: {model.instance}")
 
-        self.samp_min = self.moves.samples.starts[0]
-        self.samp_max = self.moves.samples.ends[len(self.moves)-1]
+        self.samp_min = self.moves.samples.start#s[0]
+        self.samp_max = self.moves.samples.end#s[len(self.moves)-1]
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
         if self.prms.iterations == 0:
@@ -249,9 +260,10 @@ class GuidedDTW:
                     break
 
         else:
-            starts = self.moves.samples.starts.to_numpy()
-            lengths = self.moves.samples.lengths.to_numpy()
-            #print(self.aln.read_id)
+            st = self.model.shift
+            en = -(self.model.K - st - 1)
+            starts = self.moves.samples.starts.to_numpy()[st:en]
+            lengths = self.moves.samples.lengths.to_numpy()[st:en]
             dtw = AlnDF(self.seq, starts, lengths)
             dtw.set_signal(signal)
             self.aln.set_dtw(dtw)
@@ -282,10 +294,6 @@ class GuidedDTW:
             tracks.write_alignment(self.aln)
             self.empty = False
             return
-            #except:
-            #    pass
-        #else:
-        #    print("FAIL")
         sys.stderr.write(f"Failed to write alignment for {read.id}\n")
 
 

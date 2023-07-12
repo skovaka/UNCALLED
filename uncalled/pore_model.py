@@ -201,15 +201,17 @@ class PoreModel:
 
     def _vals_from_df(self, prms, df, preprocess):
         df = df.rename(columns=self.TSV_RENAME)
-        extra = df.columns.difference(self.COLUMNS)
-        for col in extra:
-            #self._cols[col] = df[col].to_numpy()
-            self._extra[col] = df[col].to_numpy()
+        if self._extra is not None:
+            extra = df.columns.difference(self.COLUMNS)
+            for col in extra:
+                #self._cols[col] = df[col].to_numpy()
+                self._extra[col] = df[col].to_numpy()
 
         if preprocess:
             df = df.reset_index().sort_values("kmer")
 
         if prms.k < 0:
+            print(df["kmer"])
             kmer_lens = df["kmer"].str.len().value_counts()
             if len(kmer_lens) > 1:
                 raise ValueError("All kmer lengths must be the same, found lengths: " + ", ".join(map(str, kmer_lens.index)))

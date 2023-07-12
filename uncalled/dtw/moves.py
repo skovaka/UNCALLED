@@ -93,7 +93,13 @@ def sam_to_ref_moves(conf, ref_index, read, sam):
 
     shift = model.K - mkl - model.shift
     ref_moves.index.shift(shift)
+    #print("be")
+    #print(ref_moves.samples)
 
-    return ref_moves.slice(-shift, len(ref_moves)+shift)
+
+    ret = ref_moves.slice(-shift, len(ref_moves)+shift)
+    #print("sea")
+    #print(ret.samples)
     #return ref_moves.slice(-shift+model.shift, len(ref_moves)-model.K+model.shift+1)
 
+    return ret

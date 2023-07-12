@@ -113,17 +113,17 @@ class Tracks:
         
         if self.read_index is None:
             self.read_index = ReadIndex(conf=self.conf) #(self.conf.read_index.paths, self.prms.read_filter, self.conf.read_index.read_index, self.conf.read_index.recursive)
+        
+        pm = self.conf.pore_model
+        if not pm.has_workflow():
+            flowcell, kit = self.read_index.default_model
+            if flowcell is not None and kit is not None:
+                pm.flowcell = flowcell
+                pm.kit = kit
 
         if model is not None:
             self.set_model(model)
         else:
-            pm = self.conf.pore_model
-            if not pm.has_workflow():
-                flowcell, kit = self.read_index.default_model
-                if flowcell is not None and kit is not None:
-                    pm.flowcell = flowcell
-                    pm.kit = kit
-
             if len(pm.name) == 0 and pm.has_workflow():
                 pm.name = PoreModel.PRESET_MAP.loc[pm.get_workflow(), "preset_model"]
                 sys.stderr.write(f"Auto-detected flowcell='{pm.flowcell}' kit='{pm.kit}'\n")
@@ -285,7 +285,7 @@ class Tracks:
                 p = io.conf.read_index
                 if not self.prms.io.buffered:
                     if p.paths is not None:
-                        self.read_index.load_paths(p.paths, p.recursive)
+                        self.read_index.load_paths(p.paths)
                     self.read_index.load_index_file(p.read_index)
                 t = time()
 

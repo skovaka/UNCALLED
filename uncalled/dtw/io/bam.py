@@ -50,32 +50,37 @@ class BAM(TrackIO):
     def init_read_mode(self):
         if self.conf.tracks.io.bam_in is None:
             raise ValueError("BAM output is only available if BAM input provided")
-        self.input = pysam.AlignmentFile(self.filename, "rb")
 
-        self.header = self.input.header.to_dict()
-
-        conf = None
         self.track_in = None
-        if "CO" in self.header:
-            for line in self.header["CO"]:
-                if not line.startswith("UNC:"): continue
-                prms = json.loads(line[4:])
-                
-                if self.conf.tracks.ref_index is None:
-                    self.conf.tracks.ref_index = prms["reference"]
 
-                for name,vals in prms["tracks"].items():
-                    c = self.conf.to_dict()
-                    if not "pore_model" in c:
-                        c["pore_model"] = {}
-                    c["pore_model"].update(prms["models"][vals["model"]])
-                    conf = Config(c)
-                    conf.read_index.paths = vals["read"]["paths"]
-                    conf.read_index.read_index = vals["read"]["index"]
+        if self.prms.buffered:
+            self.input = None
+        else:
+            self.input = pysam.AlignmentFile(self.filename, "rb")
 
-                    #TODO handle multiple tracks
-                    self.track_in = self.init_track(name, vals["desc"], conf)
-                    self.layer_tags = vals["layers"]
+            self.header = self.input.header.to_dict()
+
+            conf = None
+            if "CO" in self.header:
+                for line in self.header["CO"]:
+                    if not line.startswith("UNC:"): continue
+                    prms = json.loads(line[4:])
+                    
+                    if self.conf.tracks.ref_index is None:
+                        self.conf.tracks.ref_index = prms["reference"]
+
+                    for name,vals in prms["tracks"].items():
+                        c = self.conf.to_dict()
+                        if not "pore_model" in c:
+                            c["pore_model"] = {}
+                        c["pore_model"].update(prms["models"][vals["model"]])
+                        conf = Config(c)
+                        conf.read_index.paths = vals["read"]["paths"]
+                        conf.read_index.read_index = vals["read"]["index"]
+
+                        #TODO handle multiple tracks
+                        self.track_in = self.init_track(name, vals["desc"], conf)
+                        self.layer_tags = vals["layers"]
 
         if self.track_in is None:
             name = os.path.basename(self.filename)

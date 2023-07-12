@@ -102,6 +102,7 @@ ReadIndexParams._def_params(
     ("paths", None, list, "Paths to fast5, slow5, or pod5 files, or to directories containing those files (optionally recursive)"),
     ("read_filter", None, None, "List of read IDs to load, or file containing one read ID per line"),
     ("read_index", None, str, "File containing a mapping of read IDs to filenames"),
+    ("default_read_index", "read_index.txt", str, "Filename for auto-generated read-to-file index"),
     ("recursive", None, bool, "Recursively search 'paths' for fast5, slow5, or pod5 files"),
     ("read_count", None, int, "Maximum number of reads to load"),
     ("load_signal", True, bool, "Must be set to true to load signal from FAST5/SLOW5/POD5"),
