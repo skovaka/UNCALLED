@@ -2,7 +2,7 @@ import sys
 import re
 import numpy as np
 import pandas as pd
-from collections import defaultdict
+from collections import defaultdict, Counter
 import progressbar as progbar
 import pysam
 from time import time
@@ -56,19 +56,6 @@ def dtw(conf):
     else:
         dtw_pool(conf)
 
-def dtw_pool(conf):
-    #mp.set_start_method("spawn")
-    t = time()
-    tracks = Tracks(conf=conf)
-    assert(tracks.output is not None)
-    #tracks.output.set_model(tracks.model)
-    i = 0
-    _ = tracks.read_index.default_model #load property
-    pool = DtwPool(tracks)
-    for chunk in pool: #dtw_pool_iter(tracks):
-        i += len(chunk)
-        tracks.output.write_buffer(chunk)
-
 EVDT_PRESETS = {
     450.0 : EventDetector.PRMS_450BPS,
     70.0 : EventDetector.PRMS_70BPS,
@@ -119,9 +106,26 @@ class DtwPool:
             self.pool.terminate()
             self.closed = True
 
+def dtw_pool(conf):
+    #mp.set_start_method("spawn")
+    t = time()
+    tracks = Tracks(conf=conf)
+    assert(tracks.output is not None)
+    #tracks.output.set_model(tracks.model)
+    i = 0
+    _ = tracks.read_index.default_model #load property
+    pool = DtwPool(tracks)
+    status_counts = Counter()
+    for chunk,counts in pool: #dtw_pool_iter(tracks):
+        i += len(chunk)
+        tracks.output.write_buffer(chunk)
+        status_counts.update(counts)
+    sys.stderr.write(str(status_counts) + "\n")
 
 def dtw_worker(p):
     conf,model,bams,reads,aln_start,header = p
+
+    status_counts = Counter()
 
     conf.tracks.io.buffered = True
     #conf.tracks.io.bam_in = None
@@ -141,17 +145,21 @@ def dtw_worker(p):
         aln.instance.id += aln_start
         if aln is not None:
             dtw = GuidedDTW(tracks, aln)
+            status_counts[dtw.status] += 1
         else:
             sys.stderr.write(f"Warning: {aln.read_id} BAM parse failed\n")
+            status_counts["BAM parse error"] += 1
 
         i += 1
 
     tracks.close()
 
-    return tracks.output.out_buffer
+    return tracks.output.out_buffer, status_counts
 
 def dtw_single(conf):
     """Perform DTW alignment guided by basecalled alignments"""
+
+    status_counts = Counter()
 
     tracks = Tracks(conf=conf)
     init_model(tracks)
@@ -161,8 +169,11 @@ def dtw_single(conf):
 
     for aln in tracks.bam_in.iter_alns():
         dtw = GuidedDTW(tracks, aln)
+        status_counts[dtw.status] += 1
 
     tracks.close()
+
+    sys.stderr.write(str(status_counts) + "\n")
 
 class GuidedDTW:
 
@@ -174,12 +185,13 @@ class GuidedDTW:
     def __init__(self, tracks, aln):
         self.conf = tracks.conf
         self.prms = self.conf.dtw
+        self.status = None
 
         self.aln = aln
         self.moves = self.aln.moves #moves.aln
-        #print(self.moves.to_pandas())
         if self.moves.empty():
             sys.stderr.write(f"Warning: moves missing for read {aln.read_id}\n")
+            self.status = "Missing moves"
             return
 
         read = self.aln.read
@@ -189,8 +201,6 @@ class GuidedDTW:
         self.model = tracks.model
 
         self.seq = self.aln.seq
-        #print(len(self.aln.moves))
-        #print(len(self.seq))
 
         self.method = self.prms.band_mode
         if not self.method in METHODS:
@@ -256,8 +266,8 @@ class GuidedDTW:
                 if self.renormalize(signal, self.aln):
                     success = self._calc_dtw(signal)
                 else:
-                    success = False
-                    break
+                    self.status = "Alignment too short"
+                    return
 
         else:
             st = self.model.shift
@@ -271,9 +281,6 @@ class GuidedDTW:
 
         
         if success:
-            #print("ERE")
-            #try:
-            #if self.conf.mvcmp and self.aln.mvcmp.empty():
             if self.aln.mvcmp.empty():
                 self.aln.calc_mvcmp()
 
@@ -285,6 +292,7 @@ class GuidedDTW:
                 mask &= np.array(aln.seq.splice_mask)
 
             if np.sum(mask) < self.conf.tracks.min_aln_length:
+                self.status = "Alignment too short"
                 return
 
             mask[0] = mask[-1] = True
@@ -293,7 +301,9 @@ class GuidedDTW:
 
             tracks.write_alignment(self.aln)
             self.empty = False
+            self.status = "Success"
             return
+        self.status = "DTW failed"
         sys.stderr.write(f"Failed to write alignment for {read.id}\n")
 
 
@@ -305,8 +315,6 @@ class GuidedDTW:
 
         na_mask = np.array(aln.dtw.na_mask)
         dist_mask = np.array(aln.mvcmp.dist) <= self.conf.tracks.min_norm_dist
-
-        #print(np.array(aln.mvcmp.dist))
 
         mask = na_mask & dist_mask
         if np.sum(mask) < self.conf.tracks.min_aln_length:
@@ -343,7 +351,6 @@ class GuidedDTW:
         dtw = self.dtw_fn(self.prms, signal, self.evt_start, self.evt_end, self.model.kmer_array(self.seq.kmer.to_numpy()), self.model.instance, _uncalled.PyArrayCoord(bands))
 
         if np.any(dtw.path["qry"] < self.evt_start) or np.any(dtw.path["ref"] < 0):
-            #print("FAAAIIL", dtw.path)
             return False
 
         dtw.fill_aln(self.aln.instance, self.conf.tracks.count_events)
@@ -351,7 +358,6 @@ class GuidedDTW:
         if self.conf.tracks.mask_skips is not None:
             self.aln.mask_skips(self.conf.tracks.mask_skips == "keep_best")
         
-        #print("HRERE")
 
         return True
 

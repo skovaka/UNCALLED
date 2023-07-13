@@ -5,6 +5,7 @@ from time import time
 from _uncalled import EventDetector
 import numpy as np
 import pandas as pd
+from collections import Counter
 
 
 from ..pore_model import PoreModel, PoreModelParams
@@ -98,7 +99,6 @@ def train(conf):
     t = time()
     for i in range(prms.iterations):
         print("iter", i+1, "of", prms.iterations)
-        count = 0
         bam_start = bam_in.tell()
 
         #if i > 2:
@@ -107,8 +107,9 @@ def train(conf):
         #    tracks.conf.dtw.iterations = 2
 
         pool = DtwPool(tracks)
-        for chunk in pool: #dtw_pool_iter(tracks):
-            count += len(chunk)
+        status_counts = Counter()
+        for chunk,counts in pool: #dtw_pool_iter(tracks):
+            status_counts.update(counts)
             trainer.write_buffer(chunk)
             if trainer.is_full():
                 pool.close()
@@ -119,8 +120,8 @@ def train(conf):
         if not trainer.is_full():
             bam_in.reset()
             pool = DtwPool(tracks)
-            for chunk in pool: #dtw_pool_iter(tracks):
-                count += len(chunk)
+            for chunk,counts in pool: #dtw_pool_iter(tracks):
+                status_counts.update(counts)
                 trainer.write_buffer(chunk)
                 if bam_in.tell() >= bam_start or trainer.is_full():
                     break
@@ -132,6 +133,8 @@ def train(conf):
             tracks.conf.dtw.iterations = orig_dtw_iters
 
         tracks.set_model(model)
+
+        sys.stderr.write(str(status_counts)+"\n")
 
     tracks.close()
 
