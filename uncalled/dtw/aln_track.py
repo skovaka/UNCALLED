@@ -44,7 +44,12 @@ class AlnTrack:
         if model is not None:
             self.model = model 
         elif len(conf.pore_model.name) > 0:
-            self.model = PoreModel(params=conf.pore_model)
+            try:
+                self.model = PoreModel(params=conf.pore_model)
+            except FileNotFoundError:
+                sys.stderr.write(f"Warning: pore model not found '{conf.pore_model.name}'\n")
+                conf.pore_model.name = ""
+                self.model = PoreModel(params=conf.pore_model)
         else:
             self.model = None
 

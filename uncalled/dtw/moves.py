@@ -73,10 +73,10 @@ def sam_to_ref_moves(conf, ref_index, read, sam):
     if flip_ref:
         ar = ar[::-1]
         qrys = ar[:,0] 
-        read_len = sam.infer_read_length()
+        read_len = sam.infer_query_length()
         na = qrys == None
         qrys[na] = 0
-        qrys = read_len - qrys - 1# + end_shift
+        qrys = read_len - qrys - 1 + end_shift
         qrys[na] = INT32_NA
     else:
         qrys = ar[:,0]
@@ -93,13 +93,9 @@ def sam_to_ref_moves(conf, ref_index, read, sam):
 
     shift = model.K - mkl - model.shift
     ref_moves.index.shift(shift)
-    #print("be")
-    #print(ref_moves.samples)
 
 
     ret = ref_moves.slice(-shift, len(ref_moves)+shift)
-    #print("sea")
-    #print(ret.samples)
     #return ref_moves.slice(-shift+model.shift, len(ref_moves)-model.K+model.shift+1)
 
     return ret

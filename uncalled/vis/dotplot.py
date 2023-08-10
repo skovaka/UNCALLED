@@ -11,7 +11,7 @@ import sys
 from .sigplot import Sigplot
 
 from .. import config
-from ..dtw.layers import LAYER_META, parse_layers
+from ..aln import LAYER_META, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
 from ..argparse import Opt, comma_split
@@ -25,7 +25,7 @@ class Dotplot:
 
     REQ_LAYERS = [
         "dtw.start", "dtw.length", "dtw.middle_sec", 
-        "dtw.current", "dtw.dwell", "seq.kmer",  
+        "dtw.current", "dtw.current_sd", "dtw.dwell", "seq.kmer",  
         "moves.middle_sec", "seq.current",
         "dtw.start_sec", "dtw.length_sec"
     ]
@@ -46,7 +46,7 @@ class Dotplot:
         else:
             raise ValueError("Dotplot tracks parameter must be string or Tracks instance")
 
-        self.layers = list(parse_layers(self.prms.layers, False))
+        self.layers = list(parse_layers(self.prms.layers))
 
         self.tracks.set_layers(req_layers + self.layers)
 
@@ -59,7 +59,11 @@ class Dotplot:
 
     def iter_plots(self):
         t0 = time.time()
-        for read_id, tracks in self.tracks.iter_reads():
+        #for read_id, aln in self.tracks.iter_reads(return_tracks=True):
+        for read_id, tracks in self.tracks.iter_reads(return_tracks=True):
+            #print([a for a in aln])
+            #print(aln.to_pandas(["dtw"]))
+            #print(read_id, aln)
             yield read_id, self._plot(read_id, tracks)
             t0 = time.time()
 
@@ -106,20 +110,26 @@ class Dotplot:
         flipped = True
         fwd = True
 
+        active_tracks = tracks.alignments.index.unique("track")
+
         for i,track in enumerate(tracks.alns):
+            if track.name not in active_tracks: continue
 
             track_hover = list()
 
-            has_moves = "moves" in self.tracks.layers.columns.get_level_values("group")
+            has_moves = "moves" in tracks.layers.columns.get_level_values("group")
             only_moves = self.prms.moves_track == track.name
             model = track.model
 
             first_aln = True
             for aln_id, aln in tracks.alignments.loc[track.name].iterrows():
-                layers = self.tracks.layers \
-                              .loc[(track.name,aln_id), slice(None)]#,slice(None)), slice(None)] \
+                layers = tracks.layers \
+                              .loc[(track.name,aln_id)] \
+                              .reset_index() \
+                              .set_index("seq.pos") \
+                              .sort_values(("dtw","start_sec"))
+                              #droplevel("seq.fwd") #,slice(None)), slice(None)] \
                               #.droplevel("aln.id")
-
                 
                 fwd = fwd and aln["fwd"]
                 flipped = flipped and aln["fwd"] == self.conf.is_rna
@@ -151,13 +161,14 @@ class Dotplot:
                     self._plot_moves(fig, legend, layers)
 
                 if not only_moves: 
+                    print(layers["dtw","start_sec"])
                     fig.add_trace(go.Scattergl(
                         x=layers["dtw","start_sec"], y=layers.index,
                         name=track.desc,
                         legendgroup=track.name,
                         line={
                             "color":self.conf.vis.track_colors[i], 
-                            "width":2, "shape" : "hv" if flipped else "vh" },
+                            "width":2, "shape" : "hv" }, #if not flipped else "vh" },
                         hoverinfo="skip",
                         showlegend=first_aln
                     ), row=2, col=1)

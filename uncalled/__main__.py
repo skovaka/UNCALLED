@@ -1,10 +1,11 @@
 import sys
 import textwrap
 import importlib
+import os
 
 from .argparse import ArgParser, Opt, MutexOpts, CONFIG_PARAM, FAST5_PARAM, comma_split, ref_coords
 
-from .index import str_to_coord
+from .index import RefCoord, str_to_coord
 import pandas as pd
 
 import cProfile
@@ -152,6 +153,8 @@ REFSTATS_OPTS = (
     Opt(("--ref-chunksize"), "tracks.io"),
     Opt(("--aln-chunksize"), "tracks.io"),
     Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
+    Opt("--ref-index", "tracks", "ref_index"), 
+    Opt(("-m", "--pore-model"), "pore_model", "name", default=None),
 )
 
 DTW_CMD_OPTS = DTW_OPTS + (
@@ -171,6 +174,7 @@ DTW_CMD_OPTS = DTW_OPTS + (
 TRAIN_OPTS = (
     Opt(("-i", "--train-iterations"), "train", "iterations"), 
     Opt(("-m", "--init-model"), "train"),
+    Opt("--init-mode", "train"),
     Opt(("-k", "--kmer-len"), "train"),
     Opt("--kmer-samples", "train"), 
     Opt("--buffer-size", "train"), 
@@ -195,7 +199,7 @@ REFPLOT_OPTS = (
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
     Opt("ref_bounds", "tracks", type=str_to_coord),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
-    Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
+    Opt(("-l", "--read-filter"), "read_index", type=parse_read_ids),
     Opt(("-L", "--layer"), "refplot"),
     CONFIG_OPT,
     #Opt(("-o", "--outfile"), "vis"),
@@ -218,7 +222,8 @@ DOTPLOT_OPTS = (
 
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
+    #Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
+    Opt(("-l", "--read-filter"), "read_index", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
     Opt(("-b", "--moves-track"), "dotplot"),
     Opt(("-p", "--pore-model"), "pore_model", "name", default=None),
@@ -245,7 +250,8 @@ TRACKPLOT_OPTS = (
     Opt("--pore-model", "pore_model", "name"),
 
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
-    Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
+    #Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
+    Opt(("-l", "--read-filter"), "read_index", type=parse_read_ids),
     Opt(("-H", "--panel-heights"), "trackplot", nargs="+", type=int),
     Opt(("--shared-refs-only"), "tracks", action="store_true"),
     Opt(("--shared-reads-only"), "tracks", action="store_true"),
@@ -256,7 +262,7 @@ TRACKPLOT_OPTS = (
 )
 
 BROWSER_OPTS = (
-    Opt("ref_bounds", "tracks", type=str_to_coord),
+    Opt("ref_bounds", "tracks", type=RefCoord),
     #MutexOpts("input", [
     Opt("--sql-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"),
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
@@ -273,7 +279,7 @@ BROWSER_OPTS = (
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt("--pore-model", "pore_model", "name"),
-    Opt(("-p", "--browser-port"), help="Browser port", default=8000),
+    Opt(("-p", "--port"), help="Browser port", default=8000),
     Opt(("-o", "--outfile"), "trackplot"),
     CONFIG_OPT,
 )
@@ -327,7 +333,7 @@ _help_lines = [
     "\treadstats  Perform per-read analyses of DTW alignments",
     #"\tlayerstats Compute, compare, and query alignment layers", "",
     "DTW Visualization:",
-    #"\tdotplot    Plot signal-to-reference alignment dotplots",
+    "\tdotplot    Plot signal-to-reference alignment dotplots",
     "\ttrackplot  Plot alignment tracks and per-reference statistics",
     "\tbrowser    Interactive signal alignment genome browser",
     #"\tsigplot    " + sigplot.main.__doc__,

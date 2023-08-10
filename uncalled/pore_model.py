@@ -137,6 +137,9 @@ class PoreModel:
 
         self._init(prms, ModelType(prms, *args))
 
+        if prms.shift > 0 and self.PRMS.shift != prms.shift:
+            self.PRMS.shift = prms.shift,
+
     def _init(self, prms, model):
 
         if isinstance(model, PoreModel):
@@ -211,7 +214,6 @@ class PoreModel:
             df = df.reset_index().sort_values("kmer")
 
         if prms.k < 0:
-            print(df["kmer"])
             kmer_lens = df["kmer"].str.len().value_counts()
             if len(kmer_lens) > 1:
                 raise ValueError("All kmer lengths must be the same, found lengths: " + ", ".join(map(str, kmer_lens.index)))
@@ -230,7 +232,7 @@ class PoreModel:
             if dname in d:
                 old_val = getattr(prms, name)
                 new_val = typ(d[dname])
-                if ((typ != np.int32 or old_val < 0) and 
+                if ((typ != np.int32 or new_val >= 0) and 
                     (not hasattr(new_val, "__len__") or len(new_val) > 0)):
                     setattr(prms, name, new_val)
                 del d[dname]

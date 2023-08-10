@@ -28,6 +28,7 @@ def compare(conf):
         conf.tracks.layers += [("mvcmp", "dist")] 
     else:
         conf.tracks.layers += [("dtwcmp", "dist")] 
+    conf.read_index.load_signal = False
 
     #all_layers = not (conf.jaccard or conf.dist)
     #calc_jaccard = all_layers or conf.jaccard

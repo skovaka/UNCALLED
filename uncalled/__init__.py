@@ -49,6 +49,7 @@ class RefCoord(_RefCoord):
                 args = self._str_to_tuple(args)
             if not isinstance(args, tuple):
                 raise ValueError(f"Invalid RefCoord: {args}")
+
         _RefCoord.__init__(self, *args)
 
     def __setstate__(self, s):
@@ -56,6 +57,26 @@ class RefCoord(_RefCoord):
 
     def __getstate__(self):
         return str(self)
+    
+    @property
+    def start(self):
+        if not self.has_bounds:
+            return None
+        return self.get_start()
+    
+    @start.setter
+    def start(self, val):
+        self.set_start(val)
+    
+    @property
+    def end(self):
+        if not self.has_bounds:
+            return None
+        return self.get_end()
+    
+    @end.setter
+    def end(self, val):
+        self.set_end(val)
 
     def _str_to_tuple(self, coord_str):
         spl = coord_str.split(":")         

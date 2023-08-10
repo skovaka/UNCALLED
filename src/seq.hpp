@@ -113,11 +113,11 @@ class RefCoord {
     //    return RefCoord(name, std::max(start, other.start), std::min(end, other.end), strand, ref_id);
     //}
 
-    i64 start() const {
+    i64 get_start() const {
         return bounds.front();
     }
 
-    i64 end() const {
+    i64 get_end() const {
         return bounds.back();
     }
 
@@ -158,7 +158,7 @@ class RefCoord {
 
     i64 length() const {
         check_bounds();
-        return end()-start();
+        return get_end()-get_start();
     }
 
     #ifdef PYBIND
@@ -193,8 +193,10 @@ class RefCoord {
         c.def("__len__", &RefCoord::length);
         c.def_readwrite("name", &RefCoord::name);
         c.def_readonly("bounds", &RefCoord::bounds);
-        c.def_property("start", &RefCoord::start, &RefCoord::set_start);
-        c.def_property("end", &RefCoord::end, &RefCoord::set_end);
+        c.def("get_start", &RefCoord::get_start);
+        c.def("get_end", &RefCoord::get_end);
+        c.def("set_start", &RefCoord::set_start);
+        c.def("set_end", &RefCoord::set_end);
         //c.def_readwrite("ref_len", &RefCoord::ref_len);
         c.def_property("fwd", &RefCoord::fwd, 
             [](RefCoord &c, bool fwd) -> bool {
@@ -262,10 +264,17 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
 
         auto rev = is_fwd == model.PRMS.reverse;
         auto comp = !is_fwd;
+        auto shift = model_.PRMS.shift;
 
         if (!rev) {
-            auto start = coords_.bounds[0] + model_.PRMS.shift;
-            for (size_t i = 1; i < coords_.bounds.size()-1; i += 2) {
+            auto start = coords_.bounds[0] + shift;
+            size_t i = 1;
+            while (start >= coords_.bounds[i]) {
+                shift -= coords_.bounds[i] - coords_.bounds[i-1];
+                start = coords_.bounds[i+1] + shift;
+                i += 2;
+            }
+            for (; i < coords_.bounds.size()-1; i += 2) {
                 auto end = coords_.bounds[i];
                 mpos.append(start, end);
                 start = coords_.bounds[i+1];
@@ -273,8 +282,14 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
             auto end = coords_.bounds.back() - KMER_LEN + model_.PRMS.shift + 1;
             mpos.append(start, end);
         } else {
-            auto start = -coords_.bounds.back() + model_.PRMS.shift;
-            for (size_t i = coords_.bounds.size()-2; i > 0; i -= 2) {
+            auto start = -coords_.bounds.back() + shift;
+            size_t i = coords_.bounds.size()-2;
+            while (start >= -coords_.bounds[i]) {
+                shift -= coords_.bounds[i+1] - coords_.bounds[i];
+                start = -coords_.bounds[i] + shift;
+                i -= 2;
+            }
+            for (; i > 0; i -= 2) {
                 auto end = -coords_.bounds[i];
                 mpos.append(start, end);
                 start = -coords_.bounds[i-1];

@@ -127,10 +127,13 @@ class ReadIndex:
             self.read_files = pd.concat([self.read_files, filenames]).sort_index()
 
     def build_index(self, root, out_fname):
+        files = list(self.iter_dir(root))
+        if len(files) == 1: return
+
         sys.stderr.write(f"Writing read index to '{out_fname}'\n")
         index_dfs = list()
 
-        for fname in self.iter_dir(root):
+        for fname in files:
             infile = self._get_reader(fname)(fname)
             sys.stderr.write(f"Indexing '{fname}'\n")
             index_dfs.append(pd.DataFrame({
@@ -154,6 +157,10 @@ class ReadIndex:
                     yield os.path.join(path, fname)
 
     def load_paths(self, paths):
+        if self.prms.paths is None or not self.prms.load_signal:
+            return
+
+
         if isinstance(paths, str):
             paths = [paths]
 
@@ -235,12 +242,12 @@ class ReadIndex:
         Reader = self._get_reader(fname)
         self.file_info[fname] = (Reader, path)
 
-        if Reader != Fast5Reader:
-            self._open(fname)
-            self.load_index_df(pd.DataFrame({
-                "read_id"  : self.infile.read_ids,
-                "filename" : fname
-            }))
+        #if Reader != Fast5Reader:
+        #    self._open(fname)
+        #    self.load_index_df(pd.DataFrame({
+        #        "read_id"  : self.infile.read_ids,
+        #        "filename" : fname
+        #    }))
 
         return True
 
@@ -378,9 +385,9 @@ class Pod5Reader(ReaderBase):
         return read_id in self.read_ids
 
     def get_run_info(self):
-        info = self.infile.run_info_table.read_pandas().iloc[0]
-        print(info["flow_cell_product_code"], info["sequencing_kit"])
-        return info["sequencing_kit"], info["flow_cell_product_code"]
+        info = self.infile.run_info_table.read_pandas()
+        info = info.iloc[0]
+        return info["flow_cell_product_code"].upper(), info["sequencing_kit"].upper()
 
     def get_read_ids(self):
         read_ids = self.infile.read_table.read_pandas()["read_id"]
@@ -407,6 +414,11 @@ class Slow5Reader(ReaderBase):
 
     def __contains__(self, read_id):
         return read_id in self.read_ids
+
+    def get_run_info(self):
+        flowcell = self.infile.get_header_value("flow_cell_product_code")
+        kit = self.infile.get_header_value("sequencing_kit")
+        return flowcell.upper(), kit.upper()
 
     def get_read_ids(self):
         return self.infile.get_read_ids()[0]

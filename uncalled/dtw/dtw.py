@@ -304,7 +304,7 @@ class GuidedDTW:
             self.status = "Success"
             return
         self.status = "DTW failed"
-        sys.stderr.write(f"Failed to write alignment for {read.id}\n")
+        #sys.stderr.write(f"Failed to write alignment for {read.id}\n")
 
 
     def renormalize(self, signal, aln):
