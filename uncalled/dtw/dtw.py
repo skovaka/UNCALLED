@@ -198,6 +198,9 @@ class GuidedDTW:
 
         signal = self.process(read)
 
+        #print(self.moves.sample_bounds)
+        signal.hard_mask(self.moves.sample_bounds)
+
         self.model = tracks.model
 
         self.seq = self.aln.seq
@@ -286,7 +289,8 @@ class GuidedDTW:
 
             mask = self.aln.dtw.na_mask
 
-            #mask &= np.array(self.aln.mvcmp.dist) < 5
+            if self.conf.tracks.mvcmp_mask is not None:
+                mask &= np.array(self.aln.mvcmp.dist) < self.conf.tracks.mvcmp_mask
 
             if (not self.prms.unmask_splice) and aln.seq.is_spliced():
                 mask &= np.array(aln.seq.splice_mask)
@@ -304,7 +308,7 @@ class GuidedDTW:
             self.status = "Success"
             return
         self.status = "DTW failed"
-        sys.stderr.write(f"Failed to write alignment for {read.id}\n")
+        #sys.stderr.write(f"Failed to write alignment for {read.id}\n")
 
 
     def renormalize(self, signal, aln):

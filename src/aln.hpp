@@ -14,13 +14,12 @@ namespace py = pybind11;
 struct AlnDF {
     IntervalIndex<i64> index;
     IntervalIndex<i32> samples;
+    IntervalIndex<i32> sample_bounds;
     ValArray<float> current, current_sd, events; 
 
     AlnDF() {}
 
     AlnDF(IntervalIndex<i64> index_) : index(index_) {
-        //current(index.length),
-        //current_sd(index.length)
         current = ValArray<float>(index_.length);
         current_sd = ValArray<float>(index_.length);
     }
@@ -29,21 +28,53 @@ struct AlnDF {
         index(index_),
         samples(start_, length_),
         current(init_arr(current_)),
-        current_sd(init_arr(current_sd_)) {}
+        current_sd(init_arr(current_sd_)) {
+        init_sample_bounds();
+    }
 
     AlnDF(IntervalIndex<i64> index_, IntervalIndex<i32> &samples_, py::array_t<float> current_, py::array_t<float> current_sd_) : 
         index(index_),
         samples(samples_),
         current(init_arr(current_)),
-        current_sd(init_arr(current_sd_)) {}
+        current_sd(init_arr(current_sd_)) {
+        init_sample_bounds();
+    }
+    
+    void init_sample_bounds() {
+        sample_bounds = IntervalIndex<i32>();
+        sample_bounds.append(samples.get_start(), samples.get_end());
+    }
+
+    void set_hard_gaps(const std::vector<size_t> idxs) {
+        sample_bounds = {};
+        auto start = samples.get_start(), end = start;
+        for (auto i : idxs) {
+            end = samples.coords[i-1].end;
+            assert(start < end);
+            sample_bounds.append(start, end);
+            start = samples.coords[i].start;
+        }
+        end = samples.get_end();
+        sample_bounds.append(start, end);
+    }
 
     AlnDF slice(size_t i, size_t j) {
+        //std::cout << "in\n";
+        //std::cout.flush();
         AlnDF ret(index.islice(i, j));
+        //std::cout << "it\n";
+        //std::cout.flush();
         for (size_t k = i; k < j; k++) {
             ret.samples.append(samples.coords[k]);
             ret.current[k-i] = current[k];
             ret.current_sd[k-i] = current_sd[k];
         }
+        //std::cout << sample_bounds.to_string() << "\n";
+        //std::cout << "SL" << ret.samples.get_start() << " " << ret.samples.get_end() << "\n";
+        //std::cout.flush();
+        ret.sample_bounds = sample_bounds.slice(ret.samples.get_start(), ret.samples.get_end());
+        //std::cout << "rt\n";
+        //std::cout.flush();
         return ret;
     }
 
@@ -127,6 +158,7 @@ struct AlnDF {
         c.def_readwrite("current", &AlnDF::current);
         c.def_readwrite("current_sd", &AlnDF::current_sd);
         c.def_readwrite("events", &AlnDF::events);
+        c.def_readwrite("sample_bounds", &AlnDF::sample_bounds);
         return c;
     }
 };
@@ -138,7 +170,7 @@ struct CmpDF {
 
     CmpDF() {}
 
-    CmpDF(AlnDF &a, AlnDF &b) {
+    CmpDF(AlnDF &a, AlnDF &b, bool symetric) {
 
         index = a.index.intersect(b.index);
 
@@ -165,20 +197,37 @@ struct CmpDF {
             current_sd[i] = a.current_sd[i] - b.current_sd[i];
         }
 
-        DistIter ab(a,b), ba(b,a);
+        if (symetric) {
+            DistIter ab(a,b), ba(b,a);
 
-        //for (auto &r : rec) {
-        for (size_t i = 0; i < index.length; i++) {
-            auto ref = index[i];
-            auto d0 = ab.next_dist(ref);
-            auto d1 = ba.next_dist(ref);
-            auto denom = d0.length + d1.length;
-            if (denom > 0) {
-                dist[i] = (d0.dist + d1.dist) / denom;
-            } else {
-                dist[i] = dist.NA;
-                if (ab.ended() && ba.ended()) break;
+            //for (auto &r : rec) {
+            for (size_t i = 0; i < index.length; i++) {
+                auto ref = index[i];
+                auto d0 = ab.next_dist(ref);
+                auto d1 = ba.next_dist(ref);
+                auto denom = d0.length + d1.length;
+                if (denom > 0) {
+                    dist[i] = (d0.dist + d1.dist) / denom;
+                } else {
+                    dist[i] = dist.NA;
+                    if (ab.ended() && ba.ended()) break;
+                }
             }
+        } else {
+            DistIter ab(a,b);
+
+            //for (auto &r : rec) {
+            for (size_t i = 0; i < index.length; i++) {
+                auto ref = index[i];
+                auto d = ab.next_dist(ref);
+                if (d.length > 0) {
+                    dist[i] = d.dist / d.length;
+                } else {
+                    dist[i] = dist.NA;
+                    if (ab.ended()) break;
+                }
+            }
+
         }
     }
 
@@ -248,7 +297,7 @@ struct CmpDF {
 
     static void pybind(py::module_ &m) {
         auto c = py::class_<CmpDF>(m, "_CmpDF");
-        c.def(py::init<AlnDF&, AlnDF&>());
+        c.def(py::init<AlnDF&, AlnDF&, bool>());
         c.def("empty", &CmpDF::empty);
         c.def("__len__", &CmpDF::size);
         c.def_readonly("index", &CmpDF::index);
@@ -281,13 +330,14 @@ struct Alignment {
 
     void calc_dtwcmp(Alignment &aln) {
         if (!(dtw.empty() || aln.dtw.empty())) {
-            dtwcmp = CmpDF(dtw, aln.dtw);
+            dtwcmp = CmpDF(dtw, aln.dtw, true);
         }
     }
 
     void calc_mvcmp() {
         if (!(dtw.empty() || moves.empty())) {
-            mvcmp = CmpDF(dtw, moves);
+            mvcmp = CmpDF(dtw, moves, false);
+            //mvcmp = CmpDF(dtw, moves, true);
         }
     }
 

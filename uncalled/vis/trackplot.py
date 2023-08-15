@@ -7,7 +7,7 @@ import time
 import sys
 
 from .. import config
-from ..dtw.layers import LAYER_META, parse_layer, parse_layers
+from ..aln import LAYER_META, parse_layer, parse_layers
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks, REFSTAT_LABELS, COMPARE_REFSTATS
 from ..argparse import Opt, comma_split
@@ -33,7 +33,11 @@ MULTIROW_PANEL = {
 }
 
 DEFAULT_HEIGHTS = {
+<<<<<<< HEAD
     "mat" : 2, "box" : 1, "line" : 1, "scatter" : 1, "bases" : 1
+=======
+    "mat" : 2, "box" : 1, "line" : 1, "scatter" : 1, "bases" : 0.15
+>>>>>>> 3d28254091490b97386ba310783d462c4e958420
 }
 
 PLOT_LAYERS = {
@@ -59,10 +63,12 @@ class Trackplot:
                 spl = layer.split(".")
                 ref_layers.append(".".join(spl[:-1]))
                 ref_stats.add(spl[-1])
+            elif panel == "bases":
+                layers.append("seq.base")
         
         prms = self.conf.tracks
         prms.layers = list(parse_layers(layers))
-        prms.refstats_layers = list(parse_layers(ref_layers,add_deps=False))
+        prms.refstats_layers = list(parse_layers(ref_layers))
         prms.refstats = list(ref_stats)
 
     def __init__(self, *args, **kwargs):
@@ -148,6 +154,39 @@ class Trackplot:
             #hovermode="x unified",
         )
         #self.fig.update_traces(xaxis="x3")
+
+    def _bases(self, row, layer):
+        bases = self.tracks.layers["seq","base"].droplevel(["aln.track", "aln.id"]).sort_index()
+        bases = bases.loc[~bases.index.duplicated()]
+        coords = bases.index
+        bases = bases.to_numpy().reshape((1,len(bases)))
+
+        self.fig.add_trace(go.Heatmap(
+            #name=track_name, #track.desc,
+            x=coords,
+            #y=track.alignments["read_id"],
+            z=bases,
+            zsmooth=False,
+            hoverinfo="text",
+            #hovertemplate=hover,
+            text=np.array(list("ACGT"))[bases],
+            hovertemplate=self.tracks.coords.name + ":%{x} (%{text})",
+            name="",
+            coloraxis=None,
+            showlegend=False,
+            colorscale=self.conf.vis.base_colors,
+            showscale=False,
+            #color_discrete_map=self.conf.vis.base_colors,
+        ), row=row, col=1)
+
+        self.fig.update_yaxes(
+            #title_text="Base",#f"{track.desc}", 
+            fixedrange=True,
+            showticklabels=False,
+            row=row, col=1)
+
+        
+        return
         
     def _mat(self, row, layer):
         (group,layer), = parse_layer(layer)

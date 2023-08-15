@@ -212,13 +212,7 @@ class ModelTrainer(TrackIO):
         #TODO plot pA change for each possible substitution for every kmer
         prms = PoreModelParams(self.model.PRMS)
 
-        if self.conf.dtw.iterations == 0:
-            #model_df = pd.DataFrame({
-            #    "moves_current" : model.current.mean,
-            #    "kmer" : model.KMERS,
-            #    "base" : model.kmer_base(model.KMERS, model.shift)
-            #}).set_index("base")#.sort_index()
-
+        if self.conf.train.init_mode == "moves_avg" and self.conf.dtw.iterations == 0:
             df["base"] = self.model.kmer_base(self.model.KMERS, self.model.shift)
             df = df.set_index("base")
 
@@ -226,6 +220,8 @@ class ModelTrainer(TrackIO):
 
             df["current.mean"] = grp.mean()
             df["current.stdv"] = grp.std()
+        else:
+            print("NOT OVERAGERS")
             
         df = df.set_index("kmer", drop=True).sort_index()
 

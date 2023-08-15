@@ -77,9 +77,12 @@ class Sigplot:
         
         current_min = samp_min = np.inf
         current_max = samp_max = 0
+        active_tracks = self.tracks.alignments.index.unique("track")
         for i,track in enumerate(self.tracks.alns):
             #track_color = self.prms.track_colors[i]
             colors = self.conf.vis.track_colors[i]
+
+            if track.name not in active_tracks: continue
 
             alns = self.tracks.alignments.loc[track.name].query("@read_id == read_id")
             aln_ids = alns.index
@@ -90,7 +93,7 @@ class Sigplot:
             for aln_id,aln in alns.iterrows():
                 #dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln.id")
                 #seq = track.layers.loc[(slice(None),aln_id),"seq"].droplevel("aln.id")
-                layers = self.tracks.layers.loc[track.name].loc[aln_id]
+                layers = self.tracks.layers.loc[track.name].loc[aln_id].sort_values(("dtw","start"))
                 dtw = layers["dtw"]#.droplevel("aln.id")
                 seq = layers["seq"]
 
@@ -100,8 +103,9 @@ class Sigplot:
                 samp_min = min(samp_min, dtw["start"].min())
                 samp_max = max(samp_max, dtw["start"].iloc[-1] + dtw["length"].iloc[-1])
 
-                current_min = min(current_min, (dtw["current"]-dtw["current_sd"]).min())
-                current_max = max(current_max, (dtw["current"]+dtw["current_sd"]).max())
+                current_min = min(current_min, (dtw["current"]-dtw["current_sd"]*2).min())
+                current_max = max(current_max, (dtw["current"]+dtw["current_sd"]*2).max())
+
 
             if len(seqs) > 0:
                 track_dtws.append(pd.concat(seqs).sort_index())
@@ -113,10 +117,8 @@ class Sigplot:
             signal = None
 
         else:
-            print("signal", read.signal)
 
             read = self.sigproc.process(read, True)
-            print("process")
 
             signal = read.get_norm_signal(int(samp_min), int(samp_max))
 
@@ -134,7 +136,7 @@ class Sigplot:
             current_min = min(current_min, signal.min())
             current_max = max(current_max, signal.max())
 
-        if len(self.tracks) == 1:
+        if len(active_tracks) == 1:
             self._plot_bases(fig, track_dtws[0], self.tracks.model, current_min, current_max, row, col)
             colors = ["white"]
             dtw_kws = [{}]

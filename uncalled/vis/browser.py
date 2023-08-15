@@ -13,7 +13,7 @@ from .refplot import Refplot
 from .. import config
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
-from ..dtw.layers import LAYER_META, parse_layer
+from ..aln import LAYER_META, parse_layer
 from ..argparse import Opt, comma_split
 from ..config import Config
 
@@ -24,7 +24,7 @@ def browser(conf):
     conf.tracks.load_mat = True
     conf.tracks.load_fast5s = True
     #conf.tracks.refstats_layers = ["cmp.dist"]
-    conf.tracks.layers=["dtw","dtw.dwell","dtw.model_diff","dtw.middle_sec","moves.middle_sec","dtwcmp","mvcmp", "dtw.start_sec", "dtw.length_sec", "moves.start_sec", "moves.length_sec", "seq.pos", "seq.fwd", "seq.kmer", "seq.current"]
+    conf.tracks.layers=["dtw","dtw.dwell","dtw.model_diff","dtw.middle_sec","moves.middle_sec","dtwcmp","mvcmp", "dtw.start_sec", "dtw.length_sec", "moves.start_sec", "moves.length_sec", "seq.pos", "seq.fwd", "seq.kmer", "seq.current", "seq.base"]
     
     sys.stderr.write("Loading tracks...\n")
 
@@ -98,6 +98,12 @@ def new_browser(tracks, conf):
     track_opts = [
         {"label" : t.desc, "value" : t.name}
         for t in tracks.alns]
+    
+    fig_config = {  
+        "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None},
+        "scrollZoom" : True, "displayModeBar" : True 
+    }                                                                                
+
 
     fig_config = {
         "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None},
@@ -231,9 +237,9 @@ def new_browser(tracks, conf):
         if click is not None:
             coord = click["points"][0]
             ref = coord["x"]
-            track_idx = coord["curveNumber"]
+            track_idx = coord["curveNumber"]-1
 
-            if track_idx < len(chunk):
+            if track_idx >= 0 and track_idx < len(chunk):
                 track_id = chunk.mat.index.levels[0][track_idx]
 
                 aln_id = chunk.mat.loc[track_id].iloc[coord["y"]].name
@@ -256,7 +262,7 @@ def new_browser(tracks, conf):
             t = time()
 
         fig = Trackplot(
-            chunk, [("mat", layer)], 
+            chunk, [("bases",None), ("mat", layer)], 
             select_ref=ref, select_read=read, 
             share_reads="share_reads" in checklist,
             show_legend="show_legend" in checklist,
@@ -348,4 +354,4 @@ def new_browser(tracks, conf):
         t = time()
         return fig, {"display" : "block"}
 
-    app.run_server(port=conf.browser_port, debug=True)
+    app.run_server(port=conf.port, debug=True)

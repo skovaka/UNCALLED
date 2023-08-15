@@ -410,15 +410,15 @@ class BAM(TrackIO):
     def _parse_sam(self, sam, layer_names):
         aln = self.sam_to_aln(sam)
 
-        layers = aln.to_pandas(layer_names, index=["seq.fwd", "seq.pos", "aln.id"])
-        layers["track.name"] = self.track_in.name
-        layers = layers.set_index("track.name", append=True)\
-                       .reorder_levels(["track.name", "seq.fwd", "seq.pos", "aln.id"])
+        layers = aln.to_pandas(layer_names, index=["aln.track", "seq.fwd", "seq.pos", "aln.id"])
+        #layers["track.name"] = self.track_in.name
+        #layers = layers.set_index("track.name", append=True)\
+        #               .reorder_levels(["track.name", "seq.fwd", "seq.pos", "aln.id"])
 
         attr = aln.attrs()
         aln_df = pd.DataFrame([attr], columns=attr._fields)
-        aln_df["track.name"] = self.track_in.name
-        aln_df.set_index(["track.name","id"], inplace=True)
+        #aln_df["track.name"] = self.track_in.name
+        aln_df.set_index(["aln.track","id"], inplace=True)
 
         return aln_df, layers
 

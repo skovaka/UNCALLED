@@ -89,6 +89,8 @@ def train(conf):
     else:
         trainer.set_model(tracks.model)
 
+    print(conf.train.init_mode)
+
     if prms.skip_dtw:
         model_file = trainer.next_model(True)
         return

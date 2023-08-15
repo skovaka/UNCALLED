@@ -9,8 +9,8 @@ _Layer = namedtuple("_Layer", ["dtype", "label", "default"], defaults=[None,None
 ALN_LAYERS = {
     "start" : _Layer("Int32", "Sample Start", True),
     "length" : _Layer("Int32", "Sample Length", True),
-    "current" : _Layer(np.float32, "Current (pA)", True),
-    "current_sd" : _Layer(np.float32, "Stdv (pA)", True),
+    "current" : _Layer(np.float32, "Current (norm)", True),
+    "current_sd" : _Layer(np.float32, "Stdv (norm)", True),
     "events" : _Layer(np.float32, "Event Count", True),
     "start_sec" : _Layer(np.float32, "Time (s)", False),
     "length_sec" : _Layer(np.float32, "Dwell (s)", False),
@@ -18,7 +18,7 @@ ALN_LAYERS = {
     "end" : _Layer("Int32", "Sample End", False),
     "middle" : _Layer(np.float32, "Sample Middle", False),
     "middle_sec" : _Layer(np.float32, "Sample Middle", False),
-    "model_diff" : _Layer(np.float32, "Model pA Diff.", False),
+    "model_diff" : _Layer(np.float32, "Model Norm. Diff.", False),
     "abs_diff" : _Layer(np.float32, "Abs. Model Diff.", False),
 }
 
@@ -28,12 +28,13 @@ LAYERS = {
         "pos" : _Layer("Int64", "Reference Coord.", False),
         "pac" : _Layer("Int64", "Packed Ref. Coord.", False),
         "kmer" : _Layer("Int32", "Kmer", True),
-        "current" : _Layer(str, "Model Mean (pA)", False),
+        "current" : _Layer(str, "Model Mean (norm)", False),
         "name" : _Layer(str, "Reference Name", False),
         "fwd" : _Layer(bool, "Forward", False),
         "strand" : _Layer(str, "Strand", False),
         "base" : _Layer(str, "Base", False),
     }, "aln" : {
+        "track" : _Layer(str, "Track ID"),
         "id" : _Layer("Int64", "Aln. ID"),
         "read_id" : _Layer(str, "Read ID"),
     }, "dtw" : ALN_LAYERS, "moves" : ALN_LAYERS,
@@ -49,13 +50,13 @@ LAYERS = {
         "group_b" : _Layer(str, "Compare type", False),
         "jaccard" : _Layer(np.float32, "Jaccard Distance", True),
         "dist" : _Layer(np.float32, "Mean Ref. Distance", True),
-        "current" : _Layer(np.float32, "Current Cmp (pA)", True),
-        "current_sd" : _Layer(np.float32, "Stdv Cmp (pA)", True),
+        "current" : _Layer(np.float32, "Current Cmp (norm)", True),
+        "current_sd" : _Layer(np.float32, "Stdv Cmp (norm)", True),
     }, "mvcmp" : {
         "jaccard" : _Layer(np.float32, "Jaccard Distance", True),
         "dist" : _Layer(np.float32, "Mean Ref. Distance", True),
-        "current" : _Layer(np.float32, "Current Cmp (pA)", True),
-        "current_sd" : _Layer(np.float32, "Stdv Cmp (pA)", True),
+        "current" : _Layer(np.float32, "Current Cmp (norm)", True),
+        "current_sd" : _Layer(np.float32, "Stdv Cmp (norm)", True),
     }
 }
 
@@ -119,7 +120,7 @@ def parse_layers(layers):
     return pd.Index(ret).unique()
 
 class Sequence:
-    LAYERS = {"pos", "mpos", "pac", "name", "fwd", "strand", "kmer", "current"}
+    LAYERS = {"pos", "mpos", "pac", "name", "fwd", "strand", "kmer", "current", "base"}
     CONST_LAYERS = {"name", "fwd", "strand"}
     DEFAULT_LAYERS = ["pos", "kmer"]
 
@@ -153,6 +154,10 @@ class Sequence:
     @property
     def strand(self):
         return "+" if self.fwd else "-"
+
+    @property
+    def base(self):
+        return self.model.kmer_base(self.kmer, self.model.PRMS.shift)
 
     @property
     def fwd(self):
@@ -208,12 +213,6 @@ class AlnDF:
 
             self.instance = _uncalled._AlnDF(self.seq.index, start, length, current, current_sd)
 
-        #print(self.na_mask, len(self))
-
-        #print(len(self.seq.index))
-        #if start is not None and length is not None:
-        #    print(len(start), len(length))
-        #print(len(self.na_mask), len(self))
         self.instance.mask(self.na_mask)
 
     def set_layer(self, name, vals):
@@ -347,10 +346,11 @@ class CmpDF:
         return self.instance.__getattribute__(name)
 
 class Alignment:
-    def __init__(self, aln_id, read, seq, sam=None):
+    def __init__(self, aln_id, read, seq, sam, track_name):
         #self.id = aln_id
         self.seq = seq
         self.sam = sam
+        self.track = track_name
 
         if isinstance(read, str):
             read_id = read
@@ -431,7 +431,7 @@ class Alignment:
         return df#.set_index(index)
 
     Attrs = namedtuple("Attrs", [
-        "id", "read_id", "ref_name", "ref_start", "ref_end", 
+        "track", "id", "read_id", "ref_name", "ref_start", "ref_end", 
         "fwd", "sample_start", "sample_end", "coord"
     ])
 
@@ -445,7 +445,7 @@ class Alignment:
                 samp_end = max(samp_end, df.samples.end)
 
         return self.Attrs(
-            self.id, self.read_id, self.seq.coord.name, self.seq.coord.start, self.seq.coord.end,
+            self.track, self.id, self.read_id, self.seq.coord.name, self.seq.coord.get_start(), self.seq.coord.get_end(),
             self.seq.fwd, samp_start, samp_end, self.seq.coord
         )
 

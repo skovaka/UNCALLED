@@ -60,6 +60,7 @@ TracksParams._def_params(
     ("count_events", False, bool, "Compute and output per-reference event counts, where N > 1 indicates N-1 stays and N < 1 indicates 1/N skips"),
     ("mask_skips", None, None, "Either \"all\" to mask all skips, or \"keep_best\" to mask all but the closest to the model"),
     ("mask_indels", None, int, "Mask positions which overlap basecalled alignment insertions or deletions of this length or longer"),
+    ("mvcmp_mask", None, float, "Will filter out positions with mvcmp.dist >= mvcmp_mask if specified"),
     ("min_norm_dist", 1, float, "Minimum mvcmp.dist for posititions to be used for iterative normalization"),
     ("min_aln_length", 100, int, "Minimum number of aligned bases"),
 
@@ -86,6 +87,7 @@ class TrainParams(config.ParamGroup):
 TrainParams._def_params(
     ("kmer_samples", 1000, int, "Maximum number of instances of each k-mer to use per training iteration"),
     ("init_model", "", str, "Initial pore model. If not specified, iteration will be based on basecaller move alignments"),
+    ("init_mode", "moves_avg", str, "How to initialize pore model if --init-model not specified ('moves_avg', 'moves')"),
     ("init_events", 1000000, int, "Number of events to use for computing picoamp scaling parameters for new pore model"),
     ("kmer_len", None, int, "Output model k-mer length. Required if init_model is not specified"),
     ("iterations", 1, int, "Number of model training iterations"),
