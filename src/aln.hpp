@@ -138,7 +138,7 @@ struct CmpDF {
 
     CmpDF() {}
 
-    CmpDF(AlnDF &a, AlnDF &b) {
+    CmpDF(AlnDF &a, AlnDF &b, bool symetric) {
 
         index = a.index.intersect(b.index);
 
@@ -165,20 +165,37 @@ struct CmpDF {
             current_sd[i] = a.current_sd[i] - b.current_sd[i];
         }
 
-        DistIter ab(a,b), ba(b,a);
+        if (symetric) {
+            DistIter ab(a,b), ba(b,a);
 
-        //for (auto &r : rec) {
-        for (size_t i = 0; i < index.length; i++) {
-            auto ref = index[i];
-            auto d0 = ab.next_dist(ref);
-            auto d1 = ba.next_dist(ref);
-            auto denom = d0.length + d1.length;
-            if (denom > 0) {
-                dist[i] = (d0.dist + d1.dist) / denom;
-            } else {
-                dist[i] = dist.NA;
-                if (ab.ended() && ba.ended()) break;
+            //for (auto &r : rec) {
+            for (size_t i = 0; i < index.length; i++) {
+                auto ref = index[i];
+                auto d0 = ab.next_dist(ref);
+                auto d1 = ba.next_dist(ref);
+                auto denom = d0.length + d1.length;
+                if (denom > 0) {
+                    dist[i] = (d0.dist + d1.dist) / denom;
+                } else {
+                    dist[i] = dist.NA;
+                    if (ab.ended() && ba.ended()) break;
+                }
             }
+        } else {
+            DistIter ab(a,b);
+
+            //for (auto &r : rec) {
+            for (size_t i = 0; i < index.length; i++) {
+                auto ref = index[i];
+                auto d = ab.next_dist(ref);
+                if (d.length > 0) {
+                    dist[i] = d.dist / d.length;
+                } else {
+                    dist[i] = dist.NA;
+                    if (ab.ended()) break;
+                }
+            }
+
         }
     }
 
@@ -248,7 +265,7 @@ struct CmpDF {
 
     static void pybind(py::module_ &m) {
         auto c = py::class_<CmpDF>(m, "_CmpDF");
-        c.def(py::init<AlnDF&, AlnDF&>());
+        c.def(py::init<AlnDF&, AlnDF&, bool>());
         c.def("empty", &CmpDF::empty);
         c.def("__len__", &CmpDF::size);
         c.def_readonly("index", &CmpDF::index);
@@ -281,13 +298,14 @@ struct Alignment {
 
     void calc_dtwcmp(Alignment &aln) {
         if (!(dtw.empty() || aln.dtw.empty())) {
-            dtwcmp = CmpDF(dtw, aln.dtw);
+            dtwcmp = CmpDF(dtw, aln.dtw, true);
         }
     }
 
     void calc_mvcmp() {
         if (!(dtw.empty() || moves.empty())) {
-            mvcmp = CmpDF(dtw, moves);
+            mvcmp = CmpDF(dtw, moves, false);
+            //mvcmp = CmpDF(dtw, moves, true);
         }
     }
 

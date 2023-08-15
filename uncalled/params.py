@@ -60,6 +60,7 @@ TracksParams._def_params(
     ("count_events", False, bool, "Compute and output per-reference event counts, where N > 1 indicates N-1 stays and N < 1 indicates 1/N skips"),
     ("mask_skips", None, None, "Either \"all\" to mask all skips, or \"keep_best\" to mask all but the closest to the model"),
     ("mask_indels", None, int, "Mask positions which overlap basecalled alignment insertions or deletions of this length or longer"),
+    ("mvcmp_mask", None, float, "Will filter out positions with mvcmp.dist >= mvcmp_mask if specified"),
     ("min_norm_dist", 1, float, "Minimum mvcmp.dist for posititions to be used for iterative normalization"),
     ("min_aln_length", 100, int, "Minimum number of aligned bases"),
 

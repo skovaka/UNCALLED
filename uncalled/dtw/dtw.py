@@ -286,7 +286,8 @@ class GuidedDTW:
 
             mask = self.aln.dtw.na_mask
 
-            #mask &= np.array(self.aln.mvcmp.dist) < 5
+            if self.conf.tracks.mvcmp_mask is not None:
+                mask &= np.array(self.aln.mvcmp.dist) < self.conf.tracks.mvcmp_mask
 
             if (not self.prms.unmask_splice) and aln.seq.is_spliced():
                 mask &= np.array(aln.seq.splice_mask)
