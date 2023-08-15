@@ -33,11 +33,7 @@ MULTIROW_PANEL = {
 }
 
 DEFAULT_HEIGHTS = {
-<<<<<<< HEAD
-    "mat" : 2, "box" : 1, "line" : 1, "scatter" : 1, "bases" : 1
-=======
     "mat" : 2, "box" : 1, "line" : 1, "scatter" : 1, "bases" : 0.15
->>>>>>> 3d28254091490b97386ba310783d462c4e958420
 }
 
 PLOT_LAYERS = {
@@ -54,12 +50,14 @@ class Trackplot:
         ref_layers = list()
         ref_stats = set()
         for panel, layer in self.prms.panels:
+            if layer is None: continue
             if panel in LAYER_PANELS:
                 layers.append(layer)
                 if panel == "box":
                     ref_layers.append(layer)
                     ref_stats.update(["median","stdv","q5","q25","q75","q95"])
             elif panel in REFSTAT_PANELS:
+                print(layer)
                 spl = layer.split(".")
                 ref_layers.append(".".join(spl[:-1]))
                 ref_stats.add(spl[-1])

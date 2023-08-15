@@ -54,17 +54,20 @@ struct ProcessedRead {
         signal = ValArray<float>(&signal_[0], signal_.size());
     }
 
-    size_t hard_mask(const IntervalIndex<i32> &sample_bounds) {
+    size_t hard_mask(IntervalIndex<i32> sample_bounds) {
         std::vector<Event> masked;
         masked.reserve(events.size());
         size_t i = 0;
-        for (auto c : sample_bounds.coords) {
+        for (size_t j = 0; j < sample_bounds.coords.size(); j++) {
+        //for (auto &c : sample_bounds.coords) {
+            auto &c = sample_bounds.coords[j];
             while (i < events.size() && (events[i].start + events[i].length) < c.start) i++;
             while (i < events.size() && events[i].start < c.end) {
                 masked.push_back(events[i++]);
             }
         }
         events.swap(masked);
+        return masked.size();
     }
 
     u32 sample_start() const {
