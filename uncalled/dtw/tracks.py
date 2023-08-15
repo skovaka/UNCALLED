@@ -458,11 +458,11 @@ class Tracks:
         #TODO make model name paramter, initialize with track specific model
         track = self._track_or_default(track_name)
         #seq = self.index.instance.get_kmers(model, ref_id, coords, self.conf.is_rna)
-        try:
-            seq = self.index.query(coords)
-            seq = Sequence(seq, self.index.get_pac_offset(ref_id))
-        except:
-            raise RuntimeError(f"Read {read.id} fiale")
+        #try:
+        seq = self.index.query(coords)
+        seq = Sequence(seq, self.index.get_pac_offset(ref_id))
+        #except:
+        #    raise RuntimeError(f"Read {read.id} fiale")
         return Alignment(aln_id, read, seq, sam, track_name)
 
     def write_alignment(self, aln):

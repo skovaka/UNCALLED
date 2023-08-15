@@ -376,11 +376,22 @@ class IntervalIndex {
     }
 
     T get_start() const {
-        return coords.front().start;
+        auto i = 0;
+        T ret; // = coords[i].start;
+        do { 
+            ret = coords[i].start;
+        } while (!coords[i++].is_valid());
+        return ret;
     }
 
     T get_end() const {
-        return coords.back().end;
+        //return coords.back().end;
+        auto i = coords.size()-1;
+        T ret; // = coords[i].start;
+        do { 
+            ret = coords[i].end;
+        } while (!coords[i--].is_valid());
+        return ret;
     }
 
     ValArray<T> get_ends() const {

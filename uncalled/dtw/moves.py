@@ -68,6 +68,7 @@ def sam_to_ref_moves(conf, ref_index, read, sam):
     end_shift = cig[-1][1] if cig[-1][0] == pysam.CHARD_CLIP else 0
 
     ar = np.array(sam.get_aligned_pairs())
+    ins = ar[:,1] == None
     ar = ar[ar[:,1] != None] #TODO keep track of insertion counts
 
     if flip_ref:
@@ -87,13 +88,15 @@ def sam_to_ref_moves(conf, ref_index, read, sam):
     refs = np.array(ref_index.pos_to_mpos(ar[:,1], is_fwd))
     qrys = np.array(qrys, dtype=np.int64)
 
-    ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, True)
+    ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, conf.dtw.ins_max, True)
+    #gaps = np.array(ref_moves.samples.gaps)
+    #print(gaps[gaps > 0])
+    #print(ref_moves.samples)
 
     mkl = MOVE_KMER_LENS[PoreModel.PRESET_MAP.loc[conf.pore_model.get_workflow(), "ont_model"]]
 
     shift = model.K - mkl - model.shift
     ref_moves.index.shift(shift)
-
 
     ret = ref_moves.slice(-shift, len(ref_moves)+shift)
     #return ref_moves.slice(-shift+model.shift, len(ref_moves)-model.K+model.shift+1)

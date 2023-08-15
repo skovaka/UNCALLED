@@ -14,13 +14,12 @@ namespace py = pybind11;
 struct AlnDF {
     IntervalIndex<i64> index;
     IntervalIndex<i32> samples;
+    IntervalIndex<i32> sample_bounds;
     ValArray<float> current, current_sd, events; 
 
     AlnDF() {}
 
     AlnDF(IntervalIndex<i64> index_) : index(index_) {
-        //current(index.length),
-        //current_sd(index.length)
         current = ValArray<float>(index_.length);
         current_sd = ValArray<float>(index_.length);
     }
@@ -29,21 +28,53 @@ struct AlnDF {
         index(index_),
         samples(start_, length_),
         current(init_arr(current_)),
-        current_sd(init_arr(current_sd_)) {}
+        current_sd(init_arr(current_sd_)) {
+        init_sample_bounds();
+    }
 
     AlnDF(IntervalIndex<i64> index_, IntervalIndex<i32> &samples_, py::array_t<float> current_, py::array_t<float> current_sd_) : 
         index(index_),
         samples(samples_),
         current(init_arr(current_)),
-        current_sd(init_arr(current_sd_)) {}
+        current_sd(init_arr(current_sd_)) {
+        init_sample_bounds();
+    }
+    
+    void init_sample_bounds() {
+        sample_bounds = IntervalIndex<i32>();
+        sample_bounds.append(samples.get_start(), samples.get_end());
+    }
+
+    void set_hard_gaps(const std::vector<size_t> idxs) {
+        sample_bounds = {};
+        auto start = samples.get_start(), end = start;
+        for (auto i : idxs) {
+            end = samples.coords[i-1].end;
+            assert(start < end);
+            sample_bounds.append(start, end);
+            start = samples.coords[i].start;
+        }
+        end = samples.get_end();
+        sample_bounds.append(start, end);
+    }
 
     AlnDF slice(size_t i, size_t j) {
+        //std::cout << "in\n";
+        //std::cout.flush();
         AlnDF ret(index.islice(i, j));
+        //std::cout << "it\n";
+        //std::cout.flush();
         for (size_t k = i; k < j; k++) {
             ret.samples.append(samples.coords[k]);
             ret.current[k-i] = current[k];
             ret.current_sd[k-i] = current_sd[k];
         }
+        //std::cout << sample_bounds.to_string() << "\n";
+        //std::cout << "SL" << ret.samples.get_start() << " " << ret.samples.get_end() << "\n";
+        //std::cout.flush();
+        ret.sample_bounds = sample_bounds.slice(ret.samples.get_start(), ret.samples.get_end());
+        //std::cout << "rt\n";
+        //std::cout.flush();
         return ret;
     }
 
@@ -127,6 +158,7 @@ struct AlnDF {
         c.def_readwrite("current", &AlnDF::current);
         c.def_readwrite("current_sd", &AlnDF::current_sd);
         c.def_readwrite("events", &AlnDF::events);
+        c.def_readwrite("sample_bounds", &AlnDF::sample_bounds);
         return c;
     }
 };

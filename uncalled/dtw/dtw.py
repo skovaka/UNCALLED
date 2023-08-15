@@ -198,6 +198,9 @@ class GuidedDTW:
 
         signal = self.process(read)
 
+        #print(self.moves.sample_bounds)
+        signal.hard_mask(self.moves.sample_bounds)
+
         self.model = tracks.model
 
         self.seq = self.aln.seq

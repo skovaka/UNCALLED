@@ -51,6 +51,7 @@ DTW_OPTS = (
 
     Opt("--count-events", "tracks", action="store_true"),
     Opt("--del-max", "dtw"),
+    Opt("--ins-max", "dtw"),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
     Opt("--mask-indels", "tracks"),
 

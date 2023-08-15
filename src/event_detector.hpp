@@ -54,6 +54,19 @@ struct ProcessedRead {
         signal = ValArray<float>(&signal_[0], signal_.size());
     }
 
+    size_t hard_mask(const IntervalIndex<i32> &sample_bounds) {
+        std::vector<Event> masked;
+        masked.reserve(events.size());
+        size_t i = 0;
+        for (auto c : sample_bounds.coords) {
+            while (i < events.size() && (events[i].start + events[i].length) < c.start) i++;
+            while (i < events.size() && events[i].start < c.end) {
+                masked.push_back(events[i++]);
+            }
+        }
+        events.swap(masked);
+    }
+
     u32 sample_start() const {
         return events[0].start;
     }
@@ -183,6 +196,7 @@ struct ProcessedRead {
 		p.def_property_readonly("sample_start", &ProcessedRead::sample_start);
 		p.def_property_readonly("sample_end", &ProcessedRead::sample_end);
 		p.def("set_events", &ProcessedRead::set_events);
+		p.def("hard_mask", &ProcessedRead::hard_mask);
 		p.def_readonly("signal", &ProcessedRead::signal);
 		PY_PROC_ARR(Event, events, "Un-normalized events");        
 		PY_PROC_ARR(NormVals, norm, "Normalizer values and read coordinates");    
