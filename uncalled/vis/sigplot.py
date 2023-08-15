@@ -205,7 +205,7 @@ class Sigplot:
                     **kw
                 ), row=row, col=col)
 
-        fig.update_yaxes(title_text="Current (pA)", row=row, col=col)
+        fig.update_yaxes(title_text="Current (norm)", row=row, col=col)
         fig.update_yaxes(fixedrange=self.prms.yaxis_fixed, row=row, col=col)
 
         return fig

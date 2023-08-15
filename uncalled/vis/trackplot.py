@@ -26,14 +26,14 @@ LAYER_COLORS = {
 }
 
 LAYER_PANELS = {"mat", "box"}
-REFSTAT_PANELS = {"line", "scatter"}
+REFSTAT_PANELS = {"bases", "line", "scatter"}
 
 MULTIROW_PANEL = {
-    "mat" : True, "box" : False, "line" : False, "scatter" : False
+    "mat" : True, "box" : False, "line" : False, "scatter" : False, "bases" : False
 }
 
 DEFAULT_HEIGHTS = {
-    "mat" : 2, "box" : 1, "line" : 1, "scatter" : 1
+    "mat" : 2, "box" : 1, "line" : 1, "scatter" : 1, "bases" : 1
 }
 
 PLOT_LAYERS = {

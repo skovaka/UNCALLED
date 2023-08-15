@@ -99,6 +99,11 @@ def new_browser(tracks, conf):
         {"label" : t.desc, "value" : t.name}
         for t in tracks.alns]
 
+    fig_config = {
+        "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None},
+        "scrollZoom" : True, "displayModeBar" : True
+    }
+
     app.layout = html.Div(children=[
         html.Div(
             html.H3(html.B("Uncalled4 Genome Browser")), 
@@ -117,7 +122,7 @@ def new_browser(tracks, conf):
 
                         dcc.Graph(#[dcc.Loading(type="circle"),
                             id="trackplot",
-                            config = {"scrollZoom" : True, "displayModeBar" : True})
+                            config = fig_config)
 
                     ], settings=[
                         dcc.Dropdown(
@@ -146,7 +151,7 @@ def new_browser(tracks, conf):
                 _panel("Refplot", "refplot",
                     content=dcc.Graph(
                         id="refplot",
-                        config = {"scrollZoom" : True, "displayModeBar" : True}
+                        config = fig_config
                     ), settings=[
                         dcc.Checklist(
                             id="refplot-checklist",
@@ -163,7 +168,7 @@ def new_browser(tracks, conf):
                 _panel("Dotplot", "dotplot",
                     content=dcc.Graph(
                         id="dotplot",
-                        config = {"scrollZoom" : True, "displayModeBar" : True}
+                        config =  fig_config,
                     ), settings=[
                         dcc.Checklist(
                             id="dotplot-checklist",
