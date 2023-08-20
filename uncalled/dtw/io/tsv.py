@@ -63,7 +63,8 @@ class TSV(TrackIO):
                 for col in self.columns]
             self._header = False
             if not self.prms.buffered:
-                self.output.write("\t".join(labels) + "\n")
+                #self.output.write("\t".join(labels) + "\n")
+                self._set_output("\t".join(labels) + "\n")
 
         df = df.loc[:,self.columns]
 

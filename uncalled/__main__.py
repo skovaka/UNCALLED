@@ -73,7 +73,7 @@ DTW_OPTS = (
     Opt(("-b", "--band-width"), "dtw"),
     Opt(("-s", "--band-shift"), "dtw"),
     Opt("--mvcmp-mask", "tracks"),
-    Opt("--min-norm-dist", "tracks"),
+    Opt("--max-norm-dist", "tracks"),
     Opt("--min-aln-length", "tracks"),
     Opt(("-N", "--norm-mode"), "normalizer", "mode", choices=["ref_mom", "model_mom"]),
     Opt("--norm-median", "normalizer", "median", action="store_true"),

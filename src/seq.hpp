@@ -234,7 +234,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
     //ValArray<u8> base;
 
     ValArray<KmerType> kmer; 
-    ValArray<float> current;   
+    ValArray<float> current, current_sd;   
     ValArray<bool> splice_mask;   
 
     Sequence(const ModelType &model_, size_t length) : 
@@ -243,7 +243,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         KMER_LEN(model_.KMER_LEN),
         mpos({{0,static_cast<i64>(length)}}), 
         is_fwd(true),
-        kmer(length), current(length) {}
+        kmer(length), current(length), current_sd(length) {}
 
     //Sequence(const ModelType &model_, IntervalIndex<i64> coords_, bool is_fwd_) : 
     //    model(model_), 
@@ -313,6 +313,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
             throw std::runtime_error("Size mismatch");
         }
         current = ValArray<float>(mpos.length);
+        current_sd = ValArray<float>(mpos.length);
         kmer = model.str_to_kmers(seq, rev, comp); 
         init_current();
     }
@@ -343,9 +344,15 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         return current[i];
     }
 
+    float get_current_sd(i64 r) const {
+        auto i = mpos.get_index(r);
+        return current_sd[i];
+    }
+
     void init_current() {
         for (size_t i = 0; i < size(); i++) {
-            current[i] = model.kmer_current(kmer[i]);
+            current[i] = model.current.mean[kmer[i]];
+            current_sd[i] = model.current.stdv[kmer[i]];
         }
     }
 
@@ -370,6 +377,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         //c.def_readonly("ref_id", &Sequence::ref_id);
         c.def_readonly("kmer", &Sequence::kmer);
         c.def_readonly("current", &Sequence::current);
+        c.def_readonly("current_sd", &Sequence::current_sd);
         c.def_readonly("is_fwd", &Sequence::is_fwd);
         c.def_readonly("coord", &Sequence::coord);
         c.def_readonly("splice_mask", &Sequence::splice_mask);
@@ -377,6 +385,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         c.def("is_spliced", &Sequence::is_spliced);
         c.def("get_kmer", py::vectorize(&Sequence::get_kmer));
         c.def("get_current", py::vectorize(&Sequence::get_current));
+        c.def("get_current_sd", py::vectorize(&Sequence::get_current_sd));
     }
 };
 

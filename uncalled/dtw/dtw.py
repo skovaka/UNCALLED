@@ -319,7 +319,7 @@ class GuidedDTW:
             aln.calc_mvcmp()
 
         na_mask = np.array(aln.dtw.na_mask)
-        dist_mask = np.array(aln.mvcmp.dist) <= self.conf.tracks.min_norm_dist
+        dist_mask = np.array(aln.mvcmp.dist) <= self.conf.tracks.max_norm_dist
 
         mask = na_mask & dist_mask
         if np.sum(mask) < self.conf.tracks.min_aln_length:
@@ -361,6 +361,10 @@ class GuidedDTW:
         dtw.fill_aln(self.aln.instance, self.conf.tracks.count_events)
 
         if self.conf.tracks.mask_skips is not None:
+            #if self.aln.mvcmp.empty():
+            #    self.aln.calc_mvcmp()
+            #print(self.aln.mvcmp.dist)
+            #self.aln.mask_skips(False)
             self.aln.mask_skips(self.conf.tracks.mask_skips == "keep_best")
         
 

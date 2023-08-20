@@ -346,6 +346,43 @@ struct Alignment {
         else mask_skips<false>();
     }
 
+    void mask_skips(py::array_t<float> cost_py) {
+        PyArray<float> costs(cost_py);
+        
+        auto prev_start = dtw.samples.coords[0].start;
+        int nskips = 0;
+        for (size_t i = 1; i < dtw.size(); i++) {
+            auto start = dtw.samples.coords[i].start;
+            if (start == prev_start) {
+                nskips++;
+            } else if (nskips > 0) {
+                mask_skip(i-nskips-1, i, costs);
+                nskips = 0;
+            }
+            prev_start = start;
+        }
+
+        if (nskips > 0) {
+            mask_skip(dtw.size()-nskips-1, dtw.size(), costs);
+        }
+    }
+
+    void mask_skip(size_t start, size_t end, const PyArray<float> &cost) {
+        float best = INFINITY;
+        size_t best_i = -1;
+        for (size_t i = start; i < end; i++) {
+            if (cost[i] < best) {
+                best_i = i;
+                best = cost[i];
+            }
+        }
+        for (size_t i = start; i < end; i++) {
+            if (i != best_i) {
+                dtw.mask_i(i);
+            }
+        }
+    }
+
     template<bool keep_best>
     void mask_skips() {
         auto prev_start = dtw.samples.coords[0].start;
@@ -379,7 +416,7 @@ struct Alignment {
             }
         }
         for (size_t i = start; i < end; i++) {
-            if (i != best_i) {
+            if (i != best_i && abs(dtw.current[i] - seq.current[i]) > 2*dtw.current_sd[i]) {
                 dtw.mask_i(i);
             }
         }
@@ -389,7 +426,11 @@ struct Alignment {
     typename std::enable_if<!keep_best, void>::type
     mask_skip(size_t start, size_t end) {
         for (size_t i = start; i < end; i++) {
-            dtw.mask_i(i);
+            auto abs_diff = abs(dtw.current[i] - seq.current[i]);
+            //if (abs_diff >= seq.current_sd[i]) {
+            if (abs_diff >= 2*dtw.current_sd[i]) {
+                dtw.mask_i(i);
+            }
         }
     }
 
@@ -402,6 +443,7 @@ struct Alignment {
         c.def("calc_dtwcmp", &Alignment::calc_dtwcmp);
         c.def("calc_mvcmp", &Alignment::calc_mvcmp);
         c.def("mask_skips", static_cast<void (Alignment::*)(bool)>(&Alignment::mask_skips));
+        c.def("mask_skips", static_cast<void (Alignment::*)(py::array_t<float>)>(&Alignment::mask_skips));
         c.def_readwrite("id", &Alignment::id);
         c.def_readwrite("read_id", &Alignment::read_id);
         c.def_readonly("seq", &Alignment::seq);
