@@ -107,7 +107,7 @@ class DtwPool:
             self.closed = True
 
 def dtw_pool(conf):
-    #mp.set_start_method("spawn")
+    mp.set_start_method("spawn")
     t = time()
     tracks = Tracks(conf=conf)
     assert(tracks.output is not None)
