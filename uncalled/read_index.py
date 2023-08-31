@@ -157,8 +157,12 @@ class ReadIndex:
                     yield os.path.join(path, fname)
 
     def load_paths(self, paths):
-        if self.prms.paths is None or not self.prms.load_signal:
-            return
+        if paths is None:                             
+            paths = self.prms.paths                   
+                                              
+        if paths is None or not self.prms.load_signal:
+            return                                    
+
 
 
         if isinstance(paths, str):

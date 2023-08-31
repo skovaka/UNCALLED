@@ -94,8 +94,8 @@ class Sigplot:
                 #dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln.id")
                 #seq = track.layers.loc[(slice(None),aln_id),"seq"].droplevel("aln.id")
                 layers = self.tracks.layers.loc[track.name].loc[aln_id].sort_values(("dtw","start"))
-                dtw = layers["dtw"]#.droplevel("aln.id")
-                seq = layers["seq"]
+                dtw = layers["dtw"].dropna()#.droplevel("aln.id")
+                seq = layers["seq"].dropna()
 
                 #dtws.append(dtw)
                 seqs.append(layers)

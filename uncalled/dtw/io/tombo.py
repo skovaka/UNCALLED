@@ -6,9 +6,12 @@ from ...signal_processor import ProcessedRead
 from ...index import str_to_coord, RefCoord
 from ...pore_model import PoreModel
 from ont_fast5_api.fast5_interface import get_fast5_file
+from ..moves import sam_to_ref_moves
 from . import TrackIO
 import _uncalled
 from ...aln import AlnDF
+
+from ...read_index import Fast5Reader
 
 class Tombo(TrackIO):
     FORMAT = "tombo"
@@ -43,7 +46,7 @@ class Tombo(TrackIO):
     #    self.
     #    pass
 
-    def iter_alns(self, layers, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
+    def iter_alns(self, track_id=None, coords=None, aln_id=None, read_id=None, fwd=None, full_overlap=None, ref_index=None):
 
         
         read_filter = self.read_index.read_filter #f5reader.get_read_filter()
@@ -58,21 +61,25 @@ class Tombo(TrackIO):
             fast5_basename = os.path.basename(fast5_fname)
 
             try:
-                fast5 = get_fast5_file(fast5_fname, mode="r")
+                reader = Fast5Reader(fast5_fname)
+                fast5 = reader.infile #get_fast5_file(fast5_fname, mode="r")
             except:
                 sys.stderr.write(f"Unable to open \"{fast5_fname}\". Skipping.\n")
                 continue
 
             read, = fast5.get_reads()
+            handle = read.handle
+            read = reader[read.read_id]
 
-            if not (read_filter is None or read.read_id in read_filter): 
+            #if not (read_filter is None or read.read_id in read_filter): 
+            if not (read_filter is None or read.id in read_filter): 
                 continue
 
-            if not 'BaseCalled_template' in read.handle['Analyses']['RawGenomeCorrected_000']:
+            if not 'BaseCalled_template' in handle['Analyses']['RawGenomeCorrected_000']:
                 #TODO debug logs
                 continue
 
-            handle = read.handle['Analyses']['RawGenomeCorrected_000']['BaseCalled_template']
+            handle = handle['Analyses']['RawGenomeCorrected_000']['BaseCalled_template']
             attrs = handle.attrs
             if attrs["status"] != "success":
                 #TODO debug logs
@@ -83,7 +90,7 @@ class Tombo(TrackIO):
                 raise RuntimeError("Reads appear to be RNA but --rna not specified")
 
             self.fast5_in = fast5_fname
-            read_id = read.read_id
+            read_id = read.id
 
             aln_attrs = dict(handle["Alignment"].attrs)
 
@@ -104,10 +111,20 @@ class Tombo(TrackIO):
                 clip = 0
 
             sam = None
+            best = 0
             for read_sam in self.tracks.bam_in.iter_read(read_id):
-                if read_sam.reference_name == chrom and start >= read_sam.reference_start and end < read_sam.reference_end:
-                    sam = read_sam
-                    break
+                if read_sam.reference_name == chrom:
+                    overlap = max(read_sam.reference_start, start) < min(read_sam.reference_end, end)
+                    if best < overlap:
+                        best = overlap
+                        sam = read_sam
+                #if read_sam.reference_name == chrom and start >= read_sam.reference_start and end < read_sam.reference_end:
+                #    sam = read_sam
+                #    print("MATCH")
+
+            if sam is None:
+                sys.stderr.write(f"Failed to convert {read_id}\n")
+                continue
 
             #ref_bounds = RefCoord(aln_attrs["mapped_chrom"],start, end,fwd)
 
@@ -124,7 +141,7 @@ class Tombo(TrackIO):
 
             tombo_start = handle["Events"].attrs["read_start_rel_to_raw"]
             
-            raw_len = len(read.get_raw_data())
+            raw_len = len(read.signal)
             starts = tombo_events["start"]
 
 
@@ -142,14 +159,24 @@ class Tombo(TrackIO):
                     #"kmer" : kmers.to_numpy()
                  })#, index=idx)
 
-            coords = RefCoord(read_sam.reference_name, start, end, fwd)
+            coords = RefCoord(sam.reference_name, start, end, fwd)
 
             #lengths.fillna(-1, inplace=True)
-            aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read_id, read_sam.reference_id, coords, read_sam)
+            aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
 
             dtw = AlnDF(aln.seq, np.array(starts[::step]), np.array(lengths[::step]), np.array(currents[::step])) #df["stdv"])
 
             aln.set_dtw(dtw)
+
+
+            moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam)
+            if moves is not None:
+                i = max(0, moves.index.start - aln.seq.index.start)
+                j = min(len(moves), len(moves) + moves.index.end -  aln.seq.index.end)
+                #moves = moves.slice(i,j)
+                    
+                aln.set_moves(moves)
+            
 
             aln_id += 1
 

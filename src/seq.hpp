@@ -352,7 +352,9 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
     void init_current() {
         for (size_t i = 0; i < size(); i++) {
             current[i] = model.current.mean[kmer[i]];
-            current_sd[i] = model.current.stdv[kmer[i]];
+            if (!model.current.stdv.empty()) {
+                current_sd[i] = model.current.stdv[kmer[i]];
+            }
         }
     }
 

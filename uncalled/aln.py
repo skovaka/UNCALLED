@@ -324,7 +324,7 @@ class CmpDF:
             })
         else:
             df = pd.DataFrame({
-                l : getattr(self, l) for l in layers if hasattr(self,l)
+                l : getattr(self, l) for l in layers if len(getattr(self,l,[])) > 0
             })
         
         #idx = self.index.expand().to_numpy()

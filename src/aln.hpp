@@ -176,8 +176,13 @@ struct CmpDF {
 
         dist.resize(index.length);
         jaccard.resize(index.length);
-        current.resize(index.length);
-        current_sd.resize(index.length);
+
+        if (!a.current.empty() && !b.current.empty()) {
+            current.resize(index.length);
+        }
+        if (!a.current_sd.empty() && !b.current_sd.empty()) {
+            current_sd.resize(index.length);
+        }
 
         i64 ref;
 
@@ -193,8 +198,12 @@ struct CmpDF {
             } else {
                 jaccard[i] = jaccard.NA;
             }
-            current[i] = a.current[i] - b.current[i];
-            current_sd[i] = a.current_sd[i] - b.current_sd[i];
+            if (!a.current.empty() && !b.current.empty()) {
+                current[i] = a.current[ai] - b.current[bi];
+            }
+            if (!a.current_sd.empty() && !b.current_sd.empty()) {
+                current_sd[i] = a.current_sd[ai] - b.current_sd[bi];
+            }
         }
 
         if (symetric) {
