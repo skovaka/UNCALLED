@@ -193,6 +193,8 @@ class GuidedDTW:
             sys.stderr.write(f"Warning: moves missing for read {aln.read_id}\n")
             self.status = "Missing moves"
             return
+        
+        #print(self.aln.to_pandas(["moves"], index=["seq.pos"]))
 
         read = self.aln.read
 
@@ -221,8 +223,12 @@ class GuidedDTW:
         if self.dtw_fn is None:
             raise ValueError(f"Unknown PoreModel type: {model.instance}")
 
-        self.samp_min = self.moves.samples.start#s[0]
+        self.samp_min = self.moves.samples.start #s[0]
         self.samp_max = self.moves.samples.end#s[len(self.moves)-1]
+
+       # print(self.model.shift, self.model.K - self.model.shift)
+        self.samp_min = self.moves.samples.get_interval(self.model.shift).start #.start #s[0]
+        self.samp_max = self.moves.samples.get_interval(len(self.moves)-(self.model.K - self.model.shift)).end #.end#s[len(self.moves)-1]
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
 
         if self.prms.iterations == 0:

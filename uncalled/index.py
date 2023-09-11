@@ -91,7 +91,10 @@ class FastaIndex:
         bounds = coord.bounds
         for i in range(0,len(bounds),2):
             seqs.append(self.infile.fetch(coord.name, bounds[i], bounds[i+1]))
+            if bounds[i+1]-bounds[i] != len(seqs[-1]):
+                print(coord, len(seqs[-1]))
         #print(len(seqs), len("".join(seqs)), coord)
+        sys.stdout.flush()
         return self.SeqInst(self.model.instance, "".join(seqs), coord)
 
     def get_ref_len(self, ref):

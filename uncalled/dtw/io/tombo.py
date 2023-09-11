@@ -36,7 +36,7 @@ class Tombo(TrackIO):
     def init_read_mode(self):
         name = self.filename
         
-        self.conf.pore_model.name = os.path.join("tombo", self.conf.pore_model.name)
+        #self.conf.pore_model.name = os.path.join("tombo", self.conf.pore_model.name)
 
         self.conf.read_index.paths = self.prms.tombo_in
 
@@ -95,14 +95,20 @@ class Tombo(TrackIO):
             aln_attrs = dict(handle["Alignment"].attrs)
 
             chrom = aln_attrs["mapped_chrom"]
+            model = self.track_in.model
+
+            shift_st = model.shift
+            shift_en = model.K - model.shift - 1
+
 
             fwd = aln_attrs["mapped_strand"] == "+"
-            if fwd:
-                start = aln_attrs["mapped_start"]-1
-                end = aln_attrs["mapped_end"]+3
+            sig_fwd = fwd != is_rna
+            if sig_fwd:
+                start = aln_attrs["mapped_start"]-shift_st#-1
+                end = aln_attrs["mapped_end"]+shift_en#-1
             else:
-                start = aln_attrs["mapped_start"]-3
-                end = aln_attrs["mapped_end"]+1
+                start = aln_attrs["mapped_start"]-shift_st+1
+                end = aln_attrs["mapped_end"]+shift_en+1
 
             if start < 0:
                 clip = -start
@@ -127,15 +133,12 @@ class Tombo(TrackIO):
                 continue
 
             #ref_bounds = RefCoord(aln_attrs["mapped_chrom"],start, end,fwd)
-
-            sig_fwd = fwd != is_rna
-
             if sig_fwd:
-                mpos = pd.RangeIndex(start+2, end-2)
-                step = 1
+                mpos = pd.RangeIndex(start+shift_st, end-shift_en)
+                #step = 1
             else:
-                mpos = pd.RangeIndex(-end+2, -start-2)
-                step = -1
+                mpos = pd.RangeIndex(-end+shift_st, -start-shift_en)
+                #step = -1
 
             tombo_events = np.array(handle["Events"])[clip:]
 
@@ -150,14 +153,18 @@ class Tombo(TrackIO):
 
             if is_rna:
                 starts = raw_len - tombo_start - starts - tombo_events["length"]
+                step = -1
+            else:
+                starts = tombo_start + starts
+                step = 1
 
-            df = pd.DataFrame({
-                    "mpos" : mpos,#[2:-2]
-                    "start"  : starts[::step],
-                    "length" : lengths[::step],
-                    "current"   : currents[::step],
-                    #"kmer" : kmers.to_numpy()
-                 })#, index=idx)
+            #df = pd.DataFrame({
+            #        "mpos" : mpos,#[2:-2]
+            #        "start"  : starts[::step],
+            #        "length" : lengths[::step],
+            #        "current"   : currents[::step],
+            #        #"kmer" : kmers.to_numpy()
+            #     })#, index=idx)
 
             coords = RefCoord(sam.reference_name, start, end, fwd)
 
@@ -176,6 +183,7 @@ class Tombo(TrackIO):
                 #moves = moves.slice(i,j)
                     
                 aln.set_moves(moves)
+
             
 
             aln_id += 1

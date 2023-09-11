@@ -62,16 +62,28 @@ class TSV(TrackIO):
                 ".".join([c for c in col if len(c) > 0]) 
                 for col in self.columns]
             self._header = False
-            if not self.prms.buffered:
-                #self.output.write("\t".join(labels) + "\n")
+            if self.prms.buffered:
+                self._set_output(tuple(labels))
+            else:
                 self._set_output("\t".join(labels) + "\n")
 
-        df = df.loc[:,self.columns]
+        df = df.reindex(columns=self.columns)#.loc[:,self.columns]
 
         out = df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False, float_format="%.6g")
 
         self._set_output(out)
 
+    def write_buffer(self, buf=None):
+        if buf is None:
+            buf = [self.out_buffer]
+
+        for out in buf:
+            if isinstance(out, tuple):
+                if self._header:
+                    self._header = False
+                    self.output.write("\t".join(out) + "\n")
+            else:
+                self.output.write(out)
 
     def close(self):
         if not self.prms.buffered:

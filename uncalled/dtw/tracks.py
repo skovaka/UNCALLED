@@ -459,7 +459,11 @@ class Tracks:
         track = self._track_or_default(track_name)
         #seq = self.index.instance.get_kmers(model, ref_id, coords, self.conf.is_rna)
         #try:
-        seq = self.index.query(coords)
+        try:
+            seq = self.index.query(coords)
+        except:
+            print(sam.reference_start, sam.reference_end)
+            sys.exit(1)
         seq = Sequence(seq, self.index.get_pac_offset(ref_id))
         #except:
         #    raise RuntimeError(f"Read {read.id} fiale")

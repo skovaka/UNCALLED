@@ -92,6 +92,7 @@ CONVERT_OPTS = (
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
     Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
     Opt(("-m", "--pore-model"), "pore_model", "name"),
+    Opt("--kmer-shift", "pore_model", "shift"),
     Opt("--bam-chunksize", "tracks.io"),
 
     MutexOpts("output", [

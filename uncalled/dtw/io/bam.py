@@ -210,8 +210,6 @@ class BAM(TrackIO):
 
         refs = aln.seq.coord.bounds
 
-        scale = self.model.current.INORM_SCALE
-
         #dc = np.round(aln.dtw.current.to_numpy() * scale)#.astype(np.int16)
         #na = np.isnan(dc)
         #dc[na] = self.NA_I16
