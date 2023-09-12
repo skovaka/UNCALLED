@@ -299,8 +299,8 @@ class GuidedDTW:
             if self.conf.tracks.mvcmp_mask is not None:
                 mask &= np.array(self.aln.mvcmp.dist) < self.conf.tracks.mvcmp_mask
 
-            if (not self.prms.unmask_splice) and aln.seq.is_spliced():
-                mask &= np.array(aln.seq.splice_mask)
+            if (not self.prms.unmask_splice) and self.aln.seq.is_spliced():
+                mask &= np.array(self.aln.seq.splice_mask)
 
             if np.sum(mask) < self.conf.tracks.min_aln_length:
                 self.status = "Alignment too short"
@@ -309,6 +309,8 @@ class GuidedDTW:
             mask[0] = mask[-1] = True
 
             self.aln.dtw.mask(mask)
+            a = np.array(aln.mvcmp.dist)
+            print(np.mean(a[~np.isnan(a)]))
 
             tracks.write_alignment(self.aln)
             self.empty = False

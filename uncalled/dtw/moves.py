@@ -19,18 +19,18 @@ from ..argparse import Opt
 from ..index import RefCoord
 
 MOVE_KMER_LENS = {
-   "dna_r10.3_450bps" : 10,
-   "dna_r10.3_450bpsm" : 10,
-   "dna_r10.4.1_e8.2_260bps" : 10,
-   "dna_r10.4.1_e8.2_400bps" : 10,
-   "dna_r10_450bps" : 10,
-   "dna_r10.4_e8.1" : 10,
-   "dna_r10.4_e8.1m" : 10,
-   "dna_r9.4.1_450bps" : 6,
-   "dna_r9.4.1_e8.1" : 6,
-   "dna_r9.4.1_e8.1m" : 6,
-   "dna_r9.5_450bps" : 6,
-   "rna_r9.4.1_70bps" : 5,
+   "dna_r10.3_450bps" : 12,
+   "dna_r10.3_450bpsm" : 12,
+   "dna_r10.4.1_e8.2_260bps" : 12,
+   "dna_r10.4.1_e8.2_400bps" : 12,
+   "dna_r10_450bps" : 12,
+   "dna_r10.4_e8.1" : 12,
+   "dna_r10.4_e8.1m" : 12,
+   "dna_r9.4.1_450bps" : 8,
+   "dna_r9.4.1_e8.1" : 8,
+   "dna_r9.4.1_e8.1m" : 8,
+   "dna_r9.5_450bps" : 8,
+   "rna_r9.4.1_70bps" : 7,
 }
 INT32_NA = np.iinfo(np.int32).max
 
@@ -95,9 +95,9 @@ def sam_to_ref_moves(conf, ref_index, read, sam):
 
     mkl = MOVE_KMER_LENS[PoreModel.PRESET_MAP.loc[conf.pore_model.get_workflow(), "ont_model"]]
 
-    shift = model.K - mkl - model.shift
+    shift = model.K - mkl # - model.shift+1
     ref_moves.index.shift(shift)
-    #print(shift)
+    print(model.K, model.shift, mkl, shift)
 
     ret = ref_moves.slice(-shift, len(ref_moves)+shift)
     #ret = ref_moves.slice(-shift, len(ref_moves))

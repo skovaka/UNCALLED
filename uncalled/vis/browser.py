@@ -22,7 +22,7 @@ from time import time
 def browser(conf):
     """Interactive signal alignment genome browser"""
     conf.tracks.load_mat = True
-    conf.tracks.load_fast5s = True
+    conf.read_index.load_signal = True
     #conf.tracks.refstats_layers = ["cmp.dist"]
     conf.tracks.layers=["dtw","dtw.dwell","dtw.model_diff","dtw.middle_sec","moves.middle_sec","dtwcmp","mvcmp.dist", "dtw.start_sec", "dtw.length_sec", "moves.start_sec", "moves.length_sec", "seq.pos", "seq.fwd", "seq.kmer", "seq.current", "seq.base"]
     
@@ -228,10 +228,8 @@ def new_browser(tracks, conf):
             track_names = None
 
         t = time()
-        print("trackplot", time()-t)
         chunk = tracks.slice(tracks=track_names, shared_reads=shared_reads, full_overlap=full_overlap)
         chunk.init_mat()
-        print("tslice", time()-t)
         t = time()
 
         if click is not None:
@@ -258,7 +256,6 @@ def new_browser(tracks, conf):
                 card_style = {"display" : "block"}
 
             layer, = parse_layer(layer)
-            print("click", time()-t)
             t = time()
 
         fig = Trackplot(
@@ -268,7 +265,6 @@ def new_browser(tracks, conf):
             show_legend="show_legend" in checklist,
             conf=conf).fig
         fig.update_layout(uirevision=uirev)
-        print("tplot", time()-t)
         t = time()
 
         return fig, table, card_style, ref, read, (read != prev_read)
@@ -295,13 +291,8 @@ def new_browser(tracks, conf):
         conf.sigplot.multi_background="multi_background" in flags
         conf.sigplot.no_model="show_model" not in flags
 
-        print("dotplot", time()-t)
-        t = time()
-
         chunk = tracks.slice(reads=[read], tracks=track_names if len(track_names) > 0 else None)
 
-        print("dslice", time()-t)
-        t = time()
 
         fig = Dotplot(
             chunk, 
@@ -310,8 +301,6 @@ def new_browser(tracks, conf):
             layers=list(parse_layer(layer)),
             conf=conf).plot(read)
 
-        print("dplot", time()-t)
-        t = time()
 
         return fig, {"display" : "block"}
 
@@ -337,12 +326,8 @@ def new_browser(tracks, conf):
         conf = Config(conf=tracks.conf)
         conf.sigplot.multi_background = "multi_background" in flags
         conf.sigplot.no_model = "show_model" not in flags
-        print("refplot", time()-t)
-        t = time()
 
         chunk = tracks.slice(tracks=track_names if len(track_names) > 0 else None)
-        print("rslice", time()-t)
-        t = time()
 
         fig = Refplot(
             chunk, 
@@ -350,8 +335,6 @@ def new_browser(tracks, conf):
             kmer_coord=ref,
             conf=conf).fig
 
-        print("rplot", time()-t)
-        t = time()
         return fig, {"display" : "block"}
 
     app.run_server(port=conf.port, debug=True)
