@@ -2,7 +2,7 @@
 
 const DtwParams
     DTW_PRMS_DEF = {
-        DTWSubSeq::NONE, 1, 1, 1, 0.5, 50, 100, 100, 1, "ref_mom", "guided", "abs_diff", false, false,
+        DTWSubSeq::NONE, 1, 1, 2, 0.5, 10, 10, 50, 2, "ref_mom", "guided", "abs_diff", false, false,
     }, DTW_PRMS_EVT_GLOB = {
         DTWSubSeq::NONE, 2, 1, 100, 0.5, 50, 100, 0, 1, "", "ref_mom", "abs_diff", false, false,
     };

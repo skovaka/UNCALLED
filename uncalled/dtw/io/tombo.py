@@ -100,6 +100,7 @@ class Tombo(TrackIO):
             shift_st = model.shift
             shift_en = model.K - model.shift - 1
 
+            print(shift_st, shift_en)
 
             fwd = aln_attrs["mapped_strand"] == "+"
             sig_fwd = fwd != is_rna
@@ -108,7 +109,7 @@ class Tombo(TrackIO):
                 end = aln_attrs["mapped_end"]+shift_en#-1
             else:
                 start = aln_attrs["mapped_start"]-shift_st+1
-                end = aln_attrs["mapped_end"]+shift_en+1
+                end = aln_attrs["mapped_end"]+shift_en#+1
 
             if start < 0:
                 clip = -start

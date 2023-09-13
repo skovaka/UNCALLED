@@ -90,7 +90,7 @@ CONVERT_OPTS = (
         Opt("--tombo-in", "tracks.io", type=comma_split, action="extend"),
     ]),
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
-    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
+    Opt(("-t", "--tracks"), "tracks.io", "input_names", type=comma_split),
     Opt(("-m", "--pore-model"), "pore_model", "name"),
     Opt("--kmer-shift", "pore_model", "shift"),
     Opt("--bam-chunksize", "tracks.io"),
@@ -124,7 +124,7 @@ CONVERT_OPTS = (
 
 COMPARE_OPTS = (
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
-    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
+    Opt(("-t", "--tracks"), "tracks.io", "input_names", type=comma_split),
     #Opt(("-l", "--read-filter"), "tracks", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-R", "--ref-bounds"), "tracks"),
@@ -150,7 +150,7 @@ REFSTATS_OPTS = (
     Opt("refstats", type=comma_split,
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
-    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
+    Opt(("-t", "--tracks"), "tracks.io", "input_names", type=comma_split),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt("--min-coverage", "tracks"),
     Opt(("--ref-chunksize"), "tracks.io"),
@@ -218,6 +218,7 @@ DOTPLOT_OPTS = (
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
 
     Opt("--ref", "tracks", "ref_index"), 
+    Opt("--names", "tracks.io", "input_names", type=comma_split), 
     Opt("--reads", "read_index", "paths", nargs="+", type=str),
     Opt(("-x", "--read-index"), "read_index"),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),

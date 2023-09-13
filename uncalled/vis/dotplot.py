@@ -109,10 +109,13 @@ class Dotplot:
 
         flipped = True
         fwd = True
+        moves_plotted = False
 
         active_tracks = tracks.alignments.index.unique("track")
+        print(tracks.alignments)
 
         for i,track in enumerate(tracks.alns):
+            print(track.name)
             if track.name not in active_tracks: continue
 
             track_hover = list()
@@ -157,11 +160,11 @@ class Dotplot:
                         showlegend=False
                     ), row=2, col=1)
                 
-                if has_moves:
+                if has_moves and not moves_plotted:
+                    moves_plotted = True
                     self._plot_moves(fig, legend, layers)
 
                 if not only_moves: 
-                    print(layers["dtw","start_sec"])
                     fig.add_trace(go.Scattergl(
                         x=layers["dtw","start_sec"], y=layers.index,
                         name=track.desc,

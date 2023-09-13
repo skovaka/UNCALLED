@@ -45,6 +45,11 @@ class TrackIO:
         self.prms = self.conf.tracks.io
         self.next_id = track_count+1
 
+        if self.prms.input_names is not None and len(self.prms.input_names) > track_count:
+            self.input_name = self.prms.input_names[track_count]
+        else:
+            self.input_name = os.path.basename(filename)
+
         self.read = None
         self.bam = None
 
@@ -57,11 +62,6 @@ class TrackIO:
             self.filename = None
         elif isinstance(filename, str):
             self.filename = filename
-
-        if self.prms.in_names is not None:
-            self.in_tracks = self.prms.in_names
-        else:
-            self.in_tracks = None
 
         self.write_mode = write
 

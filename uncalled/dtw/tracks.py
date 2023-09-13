@@ -279,6 +279,8 @@ class Tracks:
 
         track_count = 0
 
+        #if names is not None:
+
         for name,Cls in INPUTS.items():
             fnames = getattr(self.prms.io, name, None)
             if fnames is None: continue
@@ -347,8 +349,8 @@ class Tracks:
         for track in self.alns:
             if self.model is None:
                 self.model = track.model
-            elif track.model is not None and self.model.K != track.model.K:
-                raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
+            #elif track.model is not None and self.model.K != track.model.K:
+                #raise ValueError("Cannot load tracks with multiple k-mer lengths (found K={self.model.K} and K={track.model.K}")
 
         #pm = self.conf.pore_model
         #has_flowkit = not (len(pm.flowcell) == 0 or len(pm.kit) == 0)
@@ -459,11 +461,10 @@ class Tracks:
         track = self._track_or_default(track_name)
         #seq = self.index.instance.get_kmers(model, ref_id, coords, self.conf.is_rna)
         #try:
-        try:
-            seq = self.index.query(coords)
-        except:
-            print(sam.reference_start, sam.reference_end)
-            sys.exit(1)
+        #try:
+        seq = self.index.query(coords)
+        #except:
+        #    sys.exit(1)
         seq = Sequence(seq, self.index.get_pac_offset(ref_id))
         #except:
         #    raise RuntimeError(f"Read {read.id} fiale")
@@ -539,7 +540,6 @@ class Tracks:
     def get_all_reads(self):
         #all_ids = self.alignments["read_id"]
         #read_ids = pd.Index(all_ids.loc[self.alns[0].name])
-        #print(all_ids)
         #for track in self.alns[1:]:
         #    if track.name in all_ids.index:
         #        read_ids = read_ids.union(all_ids.loc[track.name])
@@ -907,6 +907,7 @@ class Tracks:
 
         main_io = None #list()
         cmp_iters = list()
+        cmp_ios = list()
 
         for io in self.inputs:
             if not isinstance(io, BAM):
@@ -918,6 +919,7 @@ class Tracks:
                 main_io = io
             else:
                 cmp_iters.append(io.iter_sam())
+                cmp_ios.append(io)
 
         if len(cmp_iters) == 0:
             for aln in main_io.iter_alns():
@@ -955,7 +957,9 @@ class Tracks:
                 if best is None:
                     alns_out.append(None)
                 else:
-                    alns_out.append(main_io.sam_to_aln(best[1],  load_moves=False))
+                    #alns_out.append(main_io.sam_to_aln(best[1],  load_moves=False))
+                    print(i, self.inputs[i].track_in.name)
+                    alns_out.append(cmp_ios[i].sam_to_aln(best[1],  load_moves=False))
 
             if return_tracks:
                 yield aln.read_id, self._alns_to_tracks(alns_out)
@@ -994,6 +998,7 @@ class Tracks:
             min_pos = min(min_pos, a.seq.coord.get_start())
             max_pos = max(max_pos, a.seq.coord.get_end())
             aln_rows.append(a.attrs())
+            print(a.attrs())
             layer_rows.append(a.to_pandas(self.prms.layers, index=["aln.track", "aln.id", "seq.pos", "seq.fwd"]))
 
         aln_df = pd.DataFrame(aln_rows, columns=aln_rows[0]._fields).set_index(["track", "id"]).sort_index()

@@ -35,7 +35,7 @@ IOParams._def_params(
     ("guppy_in", None, str, "Guppy directory containing sequencing summary, BAM files, and FAST5s"),
 
     ("out_name", None, str, "Output track name (defaults to file basename)"),
-    ("in_names", None, list, "Names of tracks to read from input(s)"),
+    ("input_names", None, list, "Names of tracks to read from input(s)"),
 
     ("init_track", True, bool, "If true will initialze track"),
 

@@ -97,7 +97,6 @@ def sam_to_ref_moves(conf, ref_index, read, sam):
 
     shift = model.K - mkl # - model.shift+1
     ref_moves.index.shift(shift)
-    print(model.K, model.shift, mkl, shift)
 
     ret = ref_moves.slice(-shift, len(ref_moves)+shift)
     #ret = ref_moves.slice(-shift, len(ref_moves))

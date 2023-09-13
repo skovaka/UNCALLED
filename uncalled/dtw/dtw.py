@@ -310,7 +310,7 @@ class GuidedDTW:
 
             self.aln.dtw.mask(mask)
             a = np.array(aln.mvcmp.dist)
-            print(np.mean(a[~np.isnan(a)]))
+            #print(np.mean(a[~np.isnan(a)]))
 
             tracks.write_alignment(self.aln)
             self.empty = False

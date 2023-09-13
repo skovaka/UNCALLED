@@ -79,12 +79,11 @@ class BAM(TrackIO):
                         conf.read_index.read_index = vals["read"]["index"]
 
                         #TODO handle multiple tracks
-                        self.track_in = self.init_track(name, vals["desc"], conf)
+                        self.track_in = self.init_track(self.input_name, vals["desc"], conf)
                         self.layer_tags = vals["layers"]
 
         if self.track_in is None:
-            name = os.path.basename(self.filename)
-            self.track_in = self.init_track(name, name, self.conf)
+            self.track_in = self.init_track(self.input_name, self.input_name, self.conf)
 
         self.load_moves = False
         for group,layer in parse_layers(self.conf.tracks.layers):
@@ -358,6 +357,7 @@ class BAM(TrackIO):
             coords = RefCoord(sam.reference_name, refs, fwd)
             #coords = IntervalIndexI64([(refs[i], refs[i+1]) for i in range(0, len(refs), 2)])
 
+            print(self.track_in.name, "HA")
             aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
 
             length = layers["dtw.length"]

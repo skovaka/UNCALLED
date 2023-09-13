@@ -213,7 +213,6 @@ class AlnDF:
 
             self.instance = _uncalled._AlnDF(self.seq.index, start, length, current, current_sd)
 
-        #print(len(self.na_mask), len(self), self.seq.model.PRMS.k)
         self.instance.mask(self.na_mask)
 
     def set_layer(self, name, vals):
