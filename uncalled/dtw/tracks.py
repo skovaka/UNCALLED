@@ -462,7 +462,10 @@ class Tracks:
         #seq = self.index.instance.get_kmers(model, ref_id, coords, self.conf.is_rna)
         #try:
         #try:
-        seq = self.index.query(coords)
+        try:
+            seq = self.index.query(coords)
+        except RuntimeError:
+            raise RuntimeError(f"Invalid coordinate for {read.id}: {coords}")
         #except:
         #    sys.exit(1)
         seq = Sequence(seq, self.index.get_pac_offset(ref_id))
@@ -741,6 +744,8 @@ class Tracks:
 
         self.refstats = refstats.dropna()
 
+        #self.refstats["seq.kmer"] = self.index.get
+
         self._tracks["_refstats"] = self.refstats
 
         return refstats
@@ -958,8 +963,7 @@ class Tracks:
                     alns_out.append(None)
                 else:
                     #alns_out.append(main_io.sam_to_aln(best[1],  load_moves=False))
-                    print(i, self.inputs[i].track_in.name)
-                    alns_out.append(cmp_ios[i].sam_to_aln(best[1],  load_moves=False))
+                    alns_out.append(cmp_ios[i].sam_to_aln(best[1]))
 
             if return_tracks:
                 yield aln.read_id, self._alns_to_tracks(alns_out)
@@ -998,7 +1002,6 @@ class Tracks:
             min_pos = min(min_pos, a.seq.coord.get_start())
             max_pos = max(max_pos, a.seq.coord.get_end())
             aln_rows.append(a.attrs())
-            print(a.attrs())
             layer_rows.append(a.to_pandas(self.prms.layers, index=["aln.track", "aln.id", "seq.pos", "seq.fwd"]))
 
         aln_df = pd.DataFrame(aln_rows, columns=aln_rows[0]._fields).set_index(["track", "id"]).sort_index()

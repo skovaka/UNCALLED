@@ -158,6 +158,7 @@ REFSTATS_OPTS = (
     Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
     Opt("--ref-index", "tracks", "ref_index"), 
     Opt(("-m", "--pore-model"), "pore_model", "name", default=None),
+    Opt(("-p", "--processes"), "tracks.io"),
 )
 
 DTW_CMD_OPTS = DTW_OPTS + (

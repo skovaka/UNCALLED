@@ -14,6 +14,8 @@ from ..dtw.layers import parse_layers
 from ..argparse import Opt, comma_split
 from ..index import str_to_coord
 
+def defstats_single(tracks):
+    pass
 
 def refstats(conf):
     """Calculate per-reference-coordinate statistics"""
@@ -27,6 +29,8 @@ def refstats(conf):
     conf = tracks.conf
     conf.shared_refs_only = True
     conf.tracks.load_fast5s = False
+
+    #if conf.tracks.io.processes == 1
 
     stats = RefstatsSplit(conf.refstats, len(tracks.alns))
     layers = list(parse_layers(conf.tracks.layers, False))
@@ -59,15 +63,10 @@ def refstats(conf):
 
         stats = chunk.calc_refstats(conf.cov)
         if stats is None: continue
-        #stats["kmer"] = tracks.model.kmer_to_str(chunk.coords.ref_kmers.loc[(chunk.coords.strands, stats.index)])
 
-        #if conf.verbose_refs:
         stats = pd.concat({chunk.coords.name : stats}, axis=0)\
                   .reset_index(level="seq.fwd")
         stats["seq.strand"] = stats["seq.fwd"].replace({True:"+",False:"-"})
         stats.set_index("seq.strand",append=True,inplace=True)
         del stats["seq.fwd"]
-        #stats.index = pd.MultiIndex.from_product([
-        #    [chunk.coords.name], stats.index.get_level_values(0), stats.index.get_level_values(1)
-        #])
         sys.stdout.write(stats.to_csv(sep="\t",header=False,na_rep=0))

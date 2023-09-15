@@ -256,7 +256,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
     //    init_current();
     //}
 
-    Sequence(const ModelType &model_, const std::string &seq, RefCoord &coords_) : 
+    Sequence(const ModelType &model_, const std::string &seq, RefCoord coords_) : 
             model(model_), 
             coord(coords_),
             KMER_LEN(model_.KMER_LEN),
@@ -264,38 +264,37 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
 
         auto rev = is_fwd == model.PRMS.reverse;
         auto comp = !is_fwd;
-        auto shift = model_.PRMS.shift;
+        i32 start_shift = model_.PRMS.shift;
+        i32 end_shift = KMER_LEN - model_.PRMS.shift - 1;
+
+        if (rev) std::swap(start_shift, end_shift);
+
+        size_t i = 0;
+        do {
+            coords_.bounds[i] += start_shift;
+            start_shift = coords_.bounds[i] - coords_.bounds[i+1];
+            i += 2;
+        } while (start_shift > 0);
+
+        i = coords_.bounds.size()-1;
+        do {
+            coords_.bounds[i] -= end_shift;
+            end_shift = coords_.bounds[i-1] - coords_.bounds[i];
+            i -= 2;
+        } while (end_shift > 0);
 
         if (!rev) {
-            auto start = coords_.bounds[0] + shift;
-            size_t i = 1;
-            while (start >= coords_.bounds[i]) {
-                shift -= coords_.bounds[i] - coords_.bounds[i-1];
-                start = coords_.bounds[i+1] + shift;
-                i += 2;
+            for (i = 0; i < coords_.bounds.size(); i += 2) {
+                if (coords_.bounds[i] < coords_.bounds[i+1]) {
+                    mpos.append(coords_.bounds[i], coords_.bounds[i+1]);
+                }
             }
-            for (; i < coords_.bounds.size()-1; i += 2) {
-                auto end = coords_.bounds[i];
-                mpos.append(start, end);
-                start = coords_.bounds[i+1];
-            }
-            auto end = coords_.bounds.back() - KMER_LEN + model_.PRMS.shift + 1;
-            mpos.append(start, end);
         } else {
-            auto start = -coords_.bounds.back() + shift;
-            size_t i = coords_.bounds.size()-2;
-            while (start >= -coords_.bounds[i]) {
-                shift -= coords_.bounds[i+1] - coords_.bounds[i];
-                start = -coords_.bounds[i] + shift;
-                i -= 2;
+            for (i = coords_.bounds.size()-1; i < coords_.bounds.size(); i -= 2) {
+                if (coords_.bounds[i-1] < coords_.bounds[i]) {
+                    mpos.append(-coords_.bounds[i], -coords_.bounds[i-1]);
+                }
             }
-            for (; i > 0; i -= 2) {
-                auto end = -coords_.bounds[i];
-                mpos.append(start, end);
-                start = -coords_.bounds[i-1];
-            }
-            auto end = -coords_.bounds[0] - KMER_LEN + model_.PRMS.shift + 1;
-            mpos.append(start, end);
         }
 
         if (mpos.coords.size() > 1) {
@@ -310,6 +309,8 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         }
 
         if (mpos.length != seq.size() - KMER_LEN + 1) {
+            std::cerr << "Coord length: " << mpos.length 
+                      << ", Seq length: " << (seq.size() - KMER_LEN + 1) << "\n";
             throw std::runtime_error("Size mismatch");
         }
         current = ValArray<float>(mpos.length);
@@ -371,7 +372,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         //auto c = super::template pybind<Sequence>(m, ("Sequence"+suffix).c_str(), false);
 
         c.def(py::init<const ModelType &, const std::string &>());
-        c.def(py::init<const ModelType &, const std::string &, RefCoord &>());
+        c.def(py::init<const ModelType &, const std::string &, RefCoord>());
         c.def("__len__", &Sequence::size);
         c.def_property_readonly("model", &Sequence::get_model);
         c.def_readonly("K", &Sequence::KMER_LEN);

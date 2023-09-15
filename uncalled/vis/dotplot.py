@@ -167,7 +167,7 @@ class Dotplot:
                 if not only_moves: 
                     fig.add_trace(go.Scattergl(
                         x=layers["dtw","start_sec"], y=layers.index,
-                        name=track.desc,
+                        name=track.name,
                         legendgroup=track.name,
                         line={
                             "color":self.conf.vis.track_colors[i], 
@@ -186,7 +186,7 @@ class Dotplot:
                     if layer[0] != "cmp":
                         fig.add_trace(go.Scattergl(
                             x=layers[layer], y=layers.index+0.5,
-                            name=track.desc, 
+                            name=track.name, 
                             line={
                                 "color" : self.conf.vis.track_colors[i], 
                                 "width":2, "shape" : "hv"},
