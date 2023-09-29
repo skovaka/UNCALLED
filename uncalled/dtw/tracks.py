@@ -460,8 +460,6 @@ class Tracks:
         #TODO make model name paramter, initialize with track specific model
         track = self._track_or_default(track_name)
         #seq = self.index.instance.get_kmers(model, ref_id, coords, self.conf.is_rna)
-        #try:
-        #try:
         try:
             seq = self.index.query(coords)
         except RuntimeError:

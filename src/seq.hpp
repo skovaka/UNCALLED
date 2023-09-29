@@ -269,6 +269,8 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
 
         if (rev) std::swap(start_shift, end_shift);
 
+        auto start_trim = start_shift, end_trim = end_shift;
+
         size_t i = 0;
         do {
             coords_.bounds[i] += start_shift;
@@ -302,8 +304,10 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
             size_t i = 0;
             for (size_t j = 0; j < mpos.coords.size()-1; j++) {
                 i += mpos.coords[j].length();
-                for (int sh = -model_.PRMS.shift; sh < model_.PRMS.shift; sh++) {
-                    splice_mask[i+sh] = false;
+                for (int sh = -start_trim; sh < end_trim; sh++) {
+                    if (i+sh > 0 && i+sh < splice_mask.size()) {
+                        splice_mask[i+sh] = false;
+                    }
                 }
             }
         }

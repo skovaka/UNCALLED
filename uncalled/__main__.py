@@ -284,6 +284,7 @@ BROWSER_OPTS = (
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt("--pore-model", "pore_model", "name"),
+    Opt("--names", "tracks.io", "input_names", type=comma_split), 
     Opt(("-p", "--port"), help="Browser port", default=8000),
     Opt(("-o", "--outfile"), "trackplot"),
     CONFIG_OPT,
