@@ -204,10 +204,12 @@ def _init_tracks(conf):
 def convert_pool(conf):
     tracks,ignore_bam = _init_tracks(conf)
 
+    group_seqs = conf.tracks.io.m6anet_out != None
+
     def iter_args(): 
         i = 0
         aln_count = 0
-        for read_ids, sam_strs in tracks.bam_in.iter_str_chunks():
+        for read_ids, sam_strs in tracks.bam_in.iter_str_chunks(group_seqs):
             reads = ReadIndex()#tracks.read_index.subset(read_ids)
             yield (tracks.conf, tracks.model, sam_strs, reads, aln_count, tracks.bam_in.header)
             aln_count += len(sam_strs)

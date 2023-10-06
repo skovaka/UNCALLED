@@ -253,17 +253,20 @@ class BAM(TrackIO):
             #bam = pysam.AlignedSegment.fromstring(b, header)
             self.output.write(bam)
 
-    def iter_str_chunks(self):
+    def iter_str_chunks(self, group_seqs=False):
         read_ids = set()
         bams = list()
+        prev_seq = None
         for bam in self.iter_sam():
             read_ids.add(bam.query_name)
             bams.append(bam.to_string())
 
-            if len(bams) == self.prms.bam_chunksize:
+            if len(bams) >= self.prms.bam_chunksize and (not group_seqs or bam.reference_name != prev_seq):
                 yield(read_ids, bams)
                 read_ids = set()
                 bams = list()
+
+            prev_seq = bam.reference_name
 
         if len(bams) > 0:
             yield(read_ids, bams)

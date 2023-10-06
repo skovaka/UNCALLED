@@ -40,9 +40,12 @@ class M6anet(TrackIO):
         except FileExistsError:
             pass
 
-        self.json_out = open(self.json_file, "w")
-        self.info_out = open(self.info_file, "w")
-        self.info_out.write("transcript_id,transcript_position,start,end,n_reads\n")
+        if not self.prms.buffered:
+            self.json_out = open(self.json_file, "w")
+            self.info_out = open(self.info_file, "w")
+            self.info_out.write("transcript_id,transcript_position,start,end,n_reads\n")
+        else:
+            self.out_buffer = list()
         self.offset = 0 
 
         self.init_stats()
@@ -54,7 +57,6 @@ class M6anet(TrackIO):
         self.prev_pos = None
         self.ref_stats = dict()
         self.ref_kmers = dict()
-        self.n_reads = 0 
 
     def write_transcript(self):
         for pos in sorted(self.ref_stats.keys()):
@@ -63,12 +65,25 @@ class M6anet(TrackIO):
             n_reads = len(vals)
             if n_reads < 20: continue
             d = {self.transcript_id : {str(pos) : data}}
-            line = json.dumps(d,separators=(',',':')) + "\n"
-            end = self.offset + len(line)
-            self.json_out.write(line)
-            self.info_out.write(f"{self.transcript_id},{pos},{self.offset},{end},{n_reads}\n")
+            json_line = json.dumps(d,separators=(',',':')) + "\n"
+            end = self.offset + len(json_line)
+
+            if self.prms.buffered:
+                self.out_buffer.append((self.transcript_id, pos, n_reads, json_line))
+            else:
+                self.json_out.write(json_line)
+                self.info_out.write(f"{self.transcript_id},{pos},{self.offset},{end},{n_reads}\n")
+
             self.offset = end
         self.init_stats()
+
+    def write_buffer(self, lines):
+        for tid,pos,n_reads,json_line in lines:
+            self.json_out.write(json_line)
+            start = self.offset
+            end = self.offset + len(json_line)
+            self.info_out.write(f"{tid},{pos},{self.offset},{end},{n_reads}\n")
+            self.offset = end
 
     def write_alignment(self, aln):
         if self.transcript_id != aln.seq.name and self.transcript_id != None:
@@ -77,11 +92,14 @@ class M6anet(TrackIO):
         drach_mask = self.model.pattern_mask("HCARD", aln.seq.kmer)
         drach_idx = np.flatnonzero(drach_mask)
 
+        na_mask = aln.dtw.na_mask
+
         coords = aln.seq.pos
 
         for i in drach_idx:
-            if i == 0 or i == len(aln.seq)-1: continue
+            if i == 0 or i == len(aln.seq)-1 or not np.all(na_mask[i-1:i+2]): continue
             pos = coords[i]
+
 
             if pos in self.ref_stats:
                 (kmer,pos_stats), = self.ref_stats[pos].items()
@@ -108,10 +126,13 @@ class M6anet(TrackIO):
             pos_stats.append(data.tolist())
         
         self.transcript_id = aln.seq.name
-        self.n_reads += 1
         #print(drach_mask)
 
 
     def close(self):
-        self.json_out.close()
-        self.info_out.close()
+        if len(self.ref_stats) > 0:
+            self.write_transcript()
+
+        if not self.prms.buffered:
+            self.json_out.close()
+            self.info_out.close()
