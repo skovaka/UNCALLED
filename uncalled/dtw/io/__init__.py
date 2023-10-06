@@ -22,11 +22,10 @@ from ...config import Config
 from ... import RefCoord, ExceptionWrapper
 from ...read_index import ReadIndex
 
-INPUT_PARAMS = np.array(["sql_in", "eventalign_in", "tombo_in", "bam_in"])
-OUTPUT_PARAMS = np.array(["sql_out", "tsv_out", "eventalign_out", "bam_out", "model_dir"])
+INPUT_PARAMS = np.array(["eventalign_in", "tombo_in", "bam_in"])
+OUTPUT_PARAMS = np.array(["tsv_out", "eventalign_out", "bam_out", "model_dir", "m6anet_out"])
 
 OUT_EXT = {
-    "sql_out" : "db", 
     "tsv_out" : "tsv", 
     "eventalign_out" : "txt", 
     "bam_out" : "bam"
@@ -74,9 +73,6 @@ class TrackIO:
             track_name = self.prms.out_name
         else:
             track_name = os.path.splitext(os.path.basename(self.filename))[0]
-
-        self.prev_fast5 = (None, None)
-        self.prev_read = None
 
         self.track_out = self.init_track(track_name, track_name, self.conf)
 
@@ -142,26 +138,25 @@ class TrackIO:
 
 
 
-from .sqlite import TrackSQL as SQL
 from .tsv import TSV
 from .bam import BAM
 from .eventalign import Eventalign
 from .tombo import Tombo
 from .model_trainer import ModelTrainer
+from .m6anet import M6anet
 
 INPUTS = {
-    "sql_in" : SQL, 
     "bam_in" : BAM,
     "eventalign_in" : Eventalign, 
     "tombo_in" : Tombo, 
 }
 
 OUTPUTS = {
-    "sql_out" : SQL,
     "bam_out" : BAM,
     "eventalign_out" : Eventalign,
     "tsv_out" : TSV,
     "model_dir" : ModelTrainer,
+    "m6anet_out" : M6anet,
 }
 
 def _db_track_split(db_str):
@@ -180,6 +175,7 @@ def convert(conf):
     """Convert between signal alignment file formats"""
     conf.tracks.layers = ["dtw"]
     
+    conf.read_index.load_signal = False
     if conf.tracks.io.tombo_in is not None:
         conf.read_index.paths = conf.tracks.io.tombo_in
 
@@ -239,6 +235,7 @@ def convert_worker(args):
     conf.tracks.io.buffered = True
     #conf.tracks.io.bam_in = None
 
+    conf.tracks.io.bam_header = header
     header = pysam.AlignmentHeader.from_dict(header)
 
     tracks = Tracks(model=model, read_index=reads, conf=conf)
@@ -253,7 +250,7 @@ def convert_worker(args):
         
 
 def convert_single(conf):
-    conf.tracks.layers.append("moves")
+    #conf.tracks.layers.append("moves")
     tracks, ignore_bam = _init_tracks(conf)
     for read_id, aln in tracks.iter_reads(ignore_bam=ignore_bam):
         aln.calc_mvcmp()

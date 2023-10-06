@@ -1,13 +1,12 @@
 
 import sys, os
-import sqlite3
 import numpy as np
 import pandas as pd
 import collections
 from collections import defaultdict, namedtuple
 import scipy
 
-from .io import SQL, TSV, Eventalign, Tombo, BAM, ModelTrainer, INPUTS, OUTPUTS, INPUT_PARAMS, OUTPUT_PARAMS
+from .io import M6anet, TSV, Eventalign, Tombo, BAM, ModelTrainer, INPUTS, OUTPUTS, INPUT_PARAMS, OUTPUT_PARAMS
 from .aln_track import AlnTrack
 #from .layers import LAYER_META#, parse_layers
 from ..aln import Alignment, Sequence, AlnDF, parse_layers, LAYER_META
@@ -320,8 +319,8 @@ class Tracks:
             out_format = OUTPUT_PARAMS[out_prms][0]
             filename = getattr(self.prms.io, out_format)
             new_track = True
-            if out_format == "sql_out":
-                self.output = SQL(filename, True, self, track_count)
+            if out_format == "m6anet_out":
+                self.output = M6anet(filename, True, self, track_count)
             elif out_format == "tsv_out":
                 self.output = TSV(filename, True, self, track_count)
             elif out_format == "eventalign_out":

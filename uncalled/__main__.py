@@ -99,6 +99,7 @@ CONVERT_OPTS = (
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
         Opt("--bam-out", "tracks.io", nargs="?", const="-"),
+        Opt("--m6anet-out", "tracks.io"),
     ]),
     Opt(("--out-name", "-o"), "tracks.io"),
 
@@ -211,7 +212,6 @@ REFPLOT_OPTS = (
 
 DOTPLOT_OPTS = (
     MutexOpts("input", [
-        Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
         Opt("--bam-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
         Opt("--eventalign-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
     ]),
@@ -243,7 +243,6 @@ DOTPLOT_OPTS = (
 TRACKPLOT_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
     MutexOpts("input", [
-		Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
 		Opt("--bam-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
 	]),
 
@@ -269,7 +268,6 @@ TRACKPLOT_OPTS = (
 BROWSER_OPTS = (
     Opt("ref_bounds", "tracks", type=RefCoord),
     #MutexOpts("input", [
-    Opt("--sql-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"),
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
 	#]),
 

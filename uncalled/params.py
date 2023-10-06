@@ -9,8 +9,6 @@ IOParams._def_params(
     ("processes", 1, int, "Number of parallel processes"),
     ("bam_chunksize", 500, int, "Per-process alignment bam_chunksize"),
 
-    ("sql_in", None, None, "Input track database"),
-    ("sql_out", None, str, "Output track database"),
 
     ("tsv_out", None, str, "TSV output file (or \"-\"/no argument for stdout)"),
     ("tsv_cols", ["dtw"], list, "TSV file output alignment layers (comma-separated, can also include \"read_id\""),
@@ -20,6 +18,8 @@ IOParams._def_params(
     ("bam_in", None, None, "BAM input file (or \"-\"/no argument for stdin)"),
     ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
     #("bam_extra", None, None, ""),
+
+    ("m6anet_out", None, str, "Output m6anet dataprep directory"),
 
     ("model_dir", None, str, "Pore model training output directory"),
 

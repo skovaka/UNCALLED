@@ -130,6 +130,7 @@ def dtw_worker(p):
     conf.tracks.io.buffered = True
     #conf.tracks.io.bam_in = None
 
+    conf.tracks.io.bam_header = header
     header = pysam.AlignmentHeader.from_dict(header)
 
     tracks = Tracks(model=model, read_index=reads, conf=conf)

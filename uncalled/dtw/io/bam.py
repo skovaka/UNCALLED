@@ -55,32 +55,33 @@ class BAM(TrackIO):
 
         if self.prms.buffered:
             self.input = None
+            self.header = self.prms.bam_header
         else:
             self.input = pysam.AlignmentFile(self.filename, "rb")
 
             self.header = self.input.header.to_dict()
 
-            conf = None
-            if "CO" in self.header:
-                for line in self.header["CO"]:
-                    if not line.startswith("UNC:"): continue
-                    prms = json.loads(line[4:])
-                    
-                    if self.conf.tracks.ref_index is None:
-                        self.conf.tracks.ref_index = prms["reference"]
+        conf = None
+        if "CO" in self.header:
+            for line in self.header["CO"]:
+                if not line.startswith("UNC:"): continue
+                prms = json.loads(line[4:])
+                
+                if self.conf.tracks.ref_index is None:
+                    self.conf.tracks.ref_index = prms["reference"]
 
-                    for name,vals in prms["tracks"].items():
-                        c = self.conf.to_dict()
-                        if not "pore_model" in c:
-                            c["pore_model"] = {}
-                        c["pore_model"].update(prms["models"][vals["model"]])
-                        conf = Config(c)
-                        conf.read_index.paths = vals["read"]["paths"]
-                        conf.read_index.read_index = vals["read"]["index"]
+                for name,vals in prms["tracks"].items():
+                    c = self.conf.to_dict()
+                    if not "pore_model" in c:
+                        c["pore_model"] = {}
+                    c["pore_model"].update(prms["models"][vals["model"]])
+                    conf = Config(c)
+                    conf.read_index.paths = vals["read"]["paths"]
+                    conf.read_index.read_index = vals["read"]["index"]
 
-                        #TODO handle multiple tracks
-                        self.track_in = self.init_track(self.input_name, vals["desc"], conf)
-                        self.layer_tags = vals["layers"]
+                    #TODO handle multiple tracks
+                    self.track_in = self.init_track(self.input_name, vals["desc"], conf)
+                    self.layer_tags = vals["layers"]
 
         if self.track_in is None:
             self.track_in = self.init_track(self.input_name, self.input_name, self.conf)
@@ -333,7 +334,7 @@ class BAM(TrackIO):
 
         aln = None
 
-        read = self.tracks.read_index[sam.query_name]# None)
+        read = self.tracks.read_index[sam.query_name] #None)
 
         if not has_dtw and read is None:
             return None

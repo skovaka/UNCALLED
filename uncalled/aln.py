@@ -303,11 +303,10 @@ class AlnDF:
         return len(self.instance)
 
     def __getattr__(self, name):
-        if not hasattr(self.instance, name):
+        ret = getattr(self.instance, name, None)
+        if ret is None:
             raise AttributeError(f"AlnDF has no attribute '{name}'")
-        #if name in self._extra:
-        #    return self._extra[name]
-        return self.instance.__getattribute__(name)
+        return ret
 
 class CmpDF:
     def __init__(self, seq, instance):

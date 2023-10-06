@@ -262,6 +262,7 @@ class ReadIndex:
             self.infile.close()
         self.infile_name = filename
 
+        print("OPEN")
         Reader,path = self.file_info[filename]
         self.infile = Reader(path)
         return self.infile

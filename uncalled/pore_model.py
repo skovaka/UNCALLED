@@ -30,10 +30,31 @@ PARAM_TYPES = {
     "kit" : str
 }
 
+#https://droog.gs.washington.edu/parc/images/iupac.html
+NT_CODES = {
+    "A" : [0],
+    "C" : [1],
+    "G" : [2],
+    "T" : [3],
+    "M" : [0, 1],
+    "R" : [0, 2],
+    "W" : [0, 3],
+    "S" : [1, 2],
+    "Y" : [1, 3],
+    "K" : [2, 3],
+    "V" : [0, 1, 2],
+    "H" : [0, 1, 3],
+    "D" : [0, 2, 3],
+    "B" : [1, 2, 3],
+    "N" : None
+}
+
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class PoreModel:
+
+    BASES = np.array(["A","C","G","T"])
 
     PRESET_DIR = os.path.join(ROOT_DIR, "models")
     PRESET_EXT = ".npz"
@@ -272,11 +293,12 @@ class PoreModel:
         return self.current.mean[self.kmer_array(idx)]
 
     def __getattr__(self, name):
-        if not hasattr(self.instance, name):
-            if hasattr(self.PRMS, name):
-                return getattr(self.PRMS, name)
-            raise ValueError(f"PoreModel has no attribute '{name}'")
-        return self.instance.__getattribute__(name)
+        ret = getattr(self.instance, name, None)
+        if ret is None:
+            ret = getattr(self.PRMS, name, None)
+            if ret is None:
+                raise ValueError(f"PoreModel has no attribute '{name}'")
+        return ret #self.instance.__getattribute__(name)
 
     def kmer_array(self, kmer):
         arr = np.array(kmer)
@@ -367,6 +389,23 @@ class PoreModel:
         means = self.current.mean.to_numpy() * scale + shift
         vals = np.ravel(np.dstack([means,self.stdvs]))
         return PoreModel(self.ModelType(vals), name=self.name)
+
+    def pattern_mask(self, pattern, kmers):
+        mask = np.ones(len(kmers), bool)
+        for i in range(self.instance.K):
+            nucs = NT_CODES[pattern[i]]
+            if nucs is None:
+                continue
+            pos_mask = np.zeros(len(kmers), bool)
+            for n in nucs:
+                pos_mask |= (self.instance.kmer_base(kmers, i) == n)
+            mask &= pos_mask
+        return mask
+
+    def pattern_filter(self, pattern, kmers=None):
+        if kmers is None:
+            kmers = self.KMERS
+        return kmers[self.pattern_mask(pattern, kmers)]
     
     def __setstate__(self, d):
         self.__init__(model=d)
