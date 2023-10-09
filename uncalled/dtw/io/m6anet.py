@@ -123,7 +123,8 @@ class M6anet(TrackIO):
                 j += 3
             data[j] = aln.id
 
-            pos_stats.append(data.tolist())
+            if not pd.isnull(data).any():
+                pos_stats.append(data.tolist())
         
         self.transcript_id = aln.seq.name
         #print(drach_mask)
