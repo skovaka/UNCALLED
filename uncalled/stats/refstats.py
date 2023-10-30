@@ -14,7 +14,7 @@ from ..dtw.layers import parse_layers
 from ..argparse import Opt, comma_split
 from ..index import str_to_coord
 
-def defstats_single(tracks):
+def refstats_single(tracks):
     pass
 
 def refstats(conf):
@@ -24,11 +24,11 @@ def refstats(conf):
     t0 = time.time()
 
     conf.tracks.shared_refs_only = True
+    conf.shared_refs_only = True
+    conf.read_index.load_signal = False
 
     tracks = Tracks(conf=conf)
     conf = tracks.conf
-    conf.shared_refs_only = True
-    conf.tracks.load_fast5s = False
 
     #if conf.tracks.io.processes == 1
 
@@ -42,8 +42,8 @@ def refstats(conf):
 
     for track in tracks.alns:
         name = track.name
-        if conf.cov:
-            columns.append(".".join([track.name, "cov"]))
+        #if conf.cov:
+        #    columns.append(".".join([track.name, "cov"]))
         for group, layer in layers:
             for stat in stats.layer:
                 columns.append(".".join([track.name, group, layer, stat]))
@@ -60,9 +60,9 @@ def refstats(conf):
     for chunk in tracks.iter_refs():
         chunk.prms.refstats = conf.refstats
         chunk.prms.refstats_layers = layers
-
-        stats = chunk.calc_refstats(conf.cov)
-        if stats is None: continue
+        stats = chunk.refstats#
+        if stats is None: 
+            stats = chunk.calc_refstats(conf.cov)
 
         stats = pd.concat({chunk.coords.name : stats}, axis=0)\
                   .reset_index(level="seq.fwd")

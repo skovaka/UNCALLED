@@ -105,7 +105,7 @@ class ModelTrainer(TrackIO):
          #.sort_index() 
 
         df = aln.to_pandas(LAYERS+["mvcmp"]).dropna()
-        mask = df["mvcmp","dist"] <= 1
+        mask = df["mvcmp","dist"] <= self.conf.train.max_moves_dist
         dtw = df[mask][LAYERS].droplevel(0,axis=1).set_index("kmer") #[LAYERS]#.set_index("seq.kmer", drop=True) #\
 
         if self.prms.buffered:
@@ -213,13 +213,26 @@ class ModelTrainer(TrackIO):
         prms = PoreModelParams(self.model.PRMS)
 
         if self.conf.train.init_mode == "moves_avg" and self.conf.dtw.iterations == 0:
-            df["base"] = self.model.kmer_base(self.model.KMERS, self.model.shift)
-            df = df.set_index("base")
+            bases = self.conf.train.moves_avg
+            if bases is None:
+                bases = [self.model.shift]
 
-            grp = df["current.mean"].groupby(level=0)
+            for b in bases:
+                df[b] = self.model.kmer_base(self.model.KMERS, b)
+            #grp = df.groupby(bases) 
+            #df = df.set_index("base")
 
-            df["current.mean"] = grp.mean()
-            df["current.stdv"] = grp.std()
+            print(df)
+            grp = df.groupby(bases)["current.mean"]
+
+            df = pd.DataFrame(df.set_index(bases)["kmer"])
+            df["current.mean"] = grp.median().loc[df.index]
+            df["current.stdv"] = grp.std().loc[df.index]
+            df["count"] = grp.count().loc[df.index]
+            print(df)
+
+            #df["current.mean"] = grp.mean()
+            #df["current.stdv"] = grp.std()
         else:
             print("NOT OVERAGERS")
             

@@ -108,7 +108,7 @@ class Tombo(TrackIO):
                 start = aln_attrs["mapped_start"]-shift_st#-1
                 end = aln_attrs["mapped_end"]+shift_en#-1
             else:
-                start = aln_attrs["mapped_start"]-shift_st+1
+                start = aln_attrs["mapped_start"]-shift_st#+1
                 end = aln_attrs["mapped_end"]+shift_en#+1
 
             if start < 0:

@@ -106,7 +106,6 @@ class BAM(TrackIO):
 
     def iter_read(self, read_id):
         if self.read_id_index is None:
-            sys.stderr.write("Indexing BAM file by-read...\n")
             self.read_id_index = pysam.IndexedReads(self.input)
             self.read_id_index.build()
         ret = self.read_id_index.find(read_id)
@@ -369,7 +368,11 @@ class BAM(TrackIO):
 
             length = length[mask]
 
-            lna = (length == 0) & np.isnan(layers["dtw.current"])
+            try:
+                lna = (length == 0) & np.isnan(layers["dtw.current"])
+            except ValueError:
+                return None
+
             length[lna] = -1
             layers["dtw.length"] = length.astype(np.int32)
 
@@ -389,7 +392,6 @@ class BAM(TrackIO):
                     aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
                     #print(aln.seq.index)
                 else:
-                    #print("INoT")
                     i = max(0, moves.index.start - aln.seq.index.start)
                     j = min(len(moves), len(moves) + moves.index.end -  aln.seq.index.end)
                     moves = moves.slice(i,j)
@@ -451,11 +453,22 @@ class BAM(TrackIO):
         track_layers = {t : pd.concat(l) for t,l in track_layers.items()}
             
         return track_alns, track_layers
+    
+    def iter_bed(self, fname):
+        coords = pd.read_csv(fname, sep="\t", names=["name","start","end"])
+        coords["pac_start"] = [self.tracks.index.get_pac_offset(r) for r in coords["name"]]
+        coords = coords.sort_values("pac_start")
+        #for chunk in pd.read_csv(fname, sep="\t", names=["name","start","end"], chunksize=100):
+        for i,b in coords.iterrows():
+            for aln in self.input.fetch(b["name"], b["start"], b["end"]):
+                yield aln
 
     def iter_refs(self, layers, coords=None, aln_id=None, read_id=None, fwd=None, chunksize=None, full_overlap=False):
 
         if coords is not None:
             itr = self.input.fetch(coords.ref_name, coords.refs.min(), coords.refs.max())
+        elif self.prms.bed_filter is not None:
+            itr = self.iter_bed(self.prms.bed_filter)
         else:
             itr = self.input.fetch()
 
@@ -512,6 +525,7 @@ class BAM(TrackIO):
 
                 t = time.time()
 
+                #print("yield", len(ret_alns), len(ret_layers))
                 if len(ret_alns) > 0:
                     yield (ret_alns, ret_layers)
 
@@ -528,8 +542,8 @@ class BAM(TrackIO):
         new_alns = pd.DataFrame(new_alns, columns=new_alns[0]._fields).set_index("id")
         aln_df = pd.concat([aln_df] + [new_alns]).sort_index()
         layer_df = pd.concat([layer_df] + new_layers).sort_index()
-        
-        ret_layers = layer_df.loc[slice(None),slice(None),prev_start:]
+
+        ret_layers = layer_df.loc[prev_start:]
         ret_alns = aln_df.loc[ret_layers.index.droplevel(["seq.fwd", "seq.pac"]).unique()]
 
         if len(ret_alns) > 0:

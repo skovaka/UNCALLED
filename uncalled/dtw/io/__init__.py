@@ -175,9 +175,11 @@ def convert(conf):
     """Convert between signal alignment file formats"""
     conf.tracks.layers = ["dtw"]
     
-    conf.read_index.load_signal = False
     if conf.tracks.io.tombo_in is not None:
         conf.read_index.paths = conf.tracks.io.tombo_in
+        conf.read_index.load_signal = True
+    else:
+        conf.read_index.load_signal = False
 
     if conf.tracks.io.processes == 1:
         convert_single(conf)
@@ -244,6 +246,9 @@ def convert_worker(args):
     for s in sam_strs:
         sam = pysam.AlignedSegment.fromstring(s, header)
         aln = tracks.bam_in.sam_to_aln(sam, load_moves=False)
+        if aln is None: 
+            sys.stderr.write(f"Failed to write read {sam.query_name}\n")
+            continue
         aln.instance.id += aln_start
         tracks.write_alignment(aln)
 

@@ -46,19 +46,19 @@ class M6anet(TrackIO):
             self.info_out.write("transcript_id,transcript_position,start,end,n_reads\n")
         else:
             self.out_buffer = list()
-        self.offset = 0 
 
+        self.offset = 0 
+        self.prev_start = (0,0)
         self.init_stats()
 
         self.model = self.track_out.model
 
     def init_stats(self):
         self.transcript_id = None
-        self.prev_pos = None
         self.ref_stats = dict()
-        self.ref_kmers = dict()
 
     def write_transcript(self):
+        #sys.stderr.write(str(list(self.ref_stats.keys()))+"\n")
         for pos in sorted(self.ref_stats.keys()):
             data = self.ref_stats[pos]
             vals, = data.values()
@@ -75,7 +75,7 @@ class M6anet(TrackIO):
                 self.info_out.write(f"{self.transcript_id},{pos},{self.offset},{end},{n_reads}\n")
 
             self.offset = end
-        self.init_stats()
+        self.ref_stats = dict()
 
     def write_buffer(self, lines):
         for tid,pos,n_reads,json_line in lines:
@@ -86,14 +86,21 @@ class M6anet(TrackIO):
             self.offset = end
 
     def write_alignment(self, aln):
+        sam_start = (aln.sam.reference_id, aln.sam.reference_start)
+
         if self.transcript_id != aln.seq.name and self.transcript_id != None:
             self.write_transcript()
+
+        elif sam_start < self.prev_start:
+            raise RuntimeError(f"BAM file must be sorted for m6anet conversion ({aln.read_id} {aln.seq.coord})")
+
+        self.transcript_id = aln.seq.name
+        self.prev_start = sam_start
 
         drach_mask = self.model.pattern_mask("HCARD", aln.seq.kmer)
         drach_idx = np.flatnonzero(drach_mask)
 
         na_mask = aln.dtw.na_mask
-
         coords = aln.seq.pos
 
         for i in drach_idx:

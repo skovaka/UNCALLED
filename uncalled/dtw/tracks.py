@@ -292,7 +292,7 @@ class Tracks:
                 io = Cls(filename, False, self, track_count)
 
                 p = io.conf.read_index
-                if not self.prms.io.buffered:
+                if not self.prms.io.buffered and self.conf.read_index.load_signal:
                     if p.paths is not None:
                         self.read_index.load_paths(p.paths)
                     self.read_index.load_index_file(p.read_index)
@@ -728,12 +728,13 @@ class Tracks:
             
             else:
                 def ks(df):
-                    idx = df.index.levels[0]
+                    tids = df.index.levels[0]
                     d = dict()
                     for col in df.columns:
-                        vals = scipy.stats.stats.ks_2samp(df.loc[idx[0],col],df.loc[idx[1],col],mode="asymp")
+                        vals = scipy.stats.stats.ks_2samp(df.loc[tids[0],col],df.loc[tids[1],col],mode="asymp")
                         d[col+("ks",)] = pd.Series(vals, index=["stat","pval"], name=df.name)
-                    return pd.concat(d, axis=0)
+                    df = pd.concat(d, axis=0)
+                    return df
 
             cmp_groups = self.layers[self.prms.refstats_layers].groupby(level=["seq.pos","seq.fwd"])
             df = cmp_groups.apply(ks)
@@ -782,6 +783,7 @@ class Tracks:
             for i in range(len(chunks)):
                 if not chunk_hasnext[i]: continue 
                 if len(chunks[i][1]) == 0:
+                    #print("QIERY", i)
                     chunks[i] = next(layer_iters[i], (None, None))
                     if chunks[i][0] is None:
                         chunk_hasnext[i] = False
@@ -789,6 +791,10 @@ class Tracks:
                 alns,layers = chunks[i]
                 pac_end = min(pac_end, layers.index.get_level_values("seq.pac").max())
                 all_done = False
+
+            #print("hi")
+            #print(chunk_hasnext)
+            #print([a for a,l in chunks])
 
             if all_done: break
 
@@ -798,13 +804,20 @@ class Tracks:
             ret_alns = dict()
 
             for i,(alns,layers) in enumerate(chunks):
+                if layers is None: 
+                    #print("SKIP", i, pac_end)
+                    continue
                 ret_layers[i] = layers.loc[:pac_end]
                 ret_alns[i] = alns.loc[ret_layers[i].index.unique("aln.id")]
                 #chunks[i] = (alns.query(f"ref_start < {pos_end}"), layers.drop(index=ret_layers[i].index))
                 #leftover_layers = layers.drop(index=ret_layers[i].index)
                 leftover_layers = layers.loc[pac_end+1:] #drop(index=ret_layers[i].index)
+                #print("HAHAHA", i, pac_end, leftover_layers)
                 leftover_alns = alns.loc[leftover_layers.index.unique("aln.id")]
                 chunks[i] = (leftover_alns, leftover_layers)
+
+            #print("BLAHB")
+            #print(pac_end, ret_layers)
 
             alns = pd.concat(ret_alns, names=["track","id"])
             layers = pd.concat(ret_layers, names=["aln.track","seq.pos","seq.fwd","aln.id"])
