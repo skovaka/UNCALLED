@@ -18,19 +18,19 @@ from ..config import Config
 from ..argparse import Opt
 from ..index import RefCoord
 
-MOVE_KMER_LENS = {
-   "dna_r10.3_450bps" : 12,
-   "dna_r10.3_450bpsm" : 12,
-   "dna_r10.4.1_e8.2_260bps" : 12,
-   "dna_r10.4.1_e8.2_400bps" : 12,
-   "dna_r10_450bps" : 12,
-   "dna_r10.4_e8.1" : 12,
-   "dna_r10.4_e8.1m" : 12,
-   "dna_r9.4.1_450bps" : 8,
-   "dna_r9.4.1_e8.1" : 8,
-   "dna_r9.4.1_e8.1m" : 8,
-   "dna_r9.5_450bps" : 8,
-   "rna_r9.4.1_70bps" : 7,
+MOVE_SHIFTS = {
+   "dna_r10.3_450bps" : 3,
+   "dna_r10.3_450bpsm" : 3,
+   "dna_r10.4.1_e8.2_260bps" : 3,
+   "dna_r10.4.1_e8.2_400bps" : 3,
+   "dna_r10_450bps" : 3,
+   "dna_r10.4_e8.1" : 3,
+   "dna_r10.4_e8.1m" : 3,
+   "dna_r9.4.1_450bps" : 3,
+   "dna_r9.4.1_e8.1" : 3,
+   "dna_r9.4.1_e8.1m" : 3,
+   "dna_r9.5_450bps" : 3,
+   "rna_r9.4.1_70bps" : 2,
 }
 INT32_NA = np.iinfo(np.int32).max
 
@@ -91,12 +91,12 @@ def sam_to_ref_moves(conf, ref_index, read, sam):
     ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, conf.dtw.ins_max, True)
     #gaps = np.array(ref_moves.samples.gaps)
 
-    mkl = MOVE_KMER_LENS[PoreModel.PRESET_MAP.loc[conf.pore_model.get_workflow(), "ont_model"]]
+    shift = MOVE_SHIFTS[PoreModel.PRESET_MAP.loc[conf.pore_model.get_workflow(), "ont_model"]]
 
-    shift = model.K - mkl # - model.shift+1
-    ref_moves.index.shift(shift)
+    #shift = -3#model.K - mkl - model.shift#+1
+    ref_moves.index.shift(-shift)
 
-    ret = ref_moves.slice(-shift, len(ref_moves)+shift)
+    ret = ref_moves.slice(shift, len(ref_moves)-shift)
     #ret = ref_moves.slice(-shift, len(ref_moves))
     #return ref_moves.slice(-shift+model.shift, len(ref_moves)-model.K+model.shift+1)
 
