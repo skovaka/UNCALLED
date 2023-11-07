@@ -425,9 +425,9 @@ struct Alignment {
             }
         }
         for (size_t i = start; i < end; i++) {
-            //if (i != best_i && abs(dtw.current[i] - seq.current[i]) > 2*dtw.current_sd[i]) {
+            if (i != best_i) {// && abs(dtw.current[i] - seq.current[i]) > 2*dtw.current_sd[i]) {
             dtw.mask_i(i);
-            //}
+            }
         }
     }
 

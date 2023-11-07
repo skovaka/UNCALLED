@@ -116,7 +116,7 @@ ReadIndexParams._def_params(
 class VisParams(config.ParamGroup):
     _name = "vis"
 VisParams._def_params(
-    ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF", "#d90000"], list, "Track Colors"),
+    ("track_colors", ["#721ea9", "#4DA91E", "#cc114f", "#4676FF"], list, "Track Colors"),
     ("base_colors", ["#80ff80", "#6b93ff", "#ffe543", "#ff8080"], list, "Colors for each base (A,C,G,T/U)"), 
 )
 

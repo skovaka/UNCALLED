@@ -261,6 +261,7 @@ class BAM(TrackIO):
             bams.append(bam.to_string())
 
             if len(bams) >= self.prms.bam_chunksize and (not group_seqs or bam.reference_name != prev_seq):
+                print("CHUNK", len(bams))
                 yield(read_ids, bams)
                 read_ids = set()
                 bams = list()
@@ -385,12 +386,8 @@ class BAM(TrackIO):
             moves = sam_to_ref_moves(self.conf, self.tracks.index, read, sam)
             if moves is not None:
                 if aln is None:
-                    #print("INIT MOVES")
                     coords = RefCoord(sam.reference_name, moves.index, fwd)
-                    ##print(sam.reference_start, sam.reference_end)
-                    #print(coords)
                     aln = self.tracks.init_alignment(self.track_in.name, self.next_aln_id(), read, sam.reference_id, coords, sam)
-                    #print(aln.seq.index)
                 else:
                     i = max(0, moves.index.start - aln.seq.index.start)
                     j = min(len(moves), len(moves) + moves.index.end -  aln.seq.index.end)
@@ -525,7 +522,6 @@ class BAM(TrackIO):
 
                 t = time.time()
 
-                #print("yield", len(ret_alns), len(ret_layers))
                 if len(ret_alns) > 0:
                     yield (ret_alns, ret_layers)
 

@@ -1,11 +1,12 @@
 from . import Tracks
-from .dtw import DtwPool
+from .dtw import DtwPool, GuidedDTW
 import sys
 from time import time
 from _uncalled import EventDetector
 import numpy as np
 import pandas as pd
 from collections import Counter
+import multiprocessing as mp
 
 
 from ..pore_model import PoreModel, PoreModelParams
@@ -56,9 +57,11 @@ def init_model(tracks, k):
     tracks.conf.pore_model.pa_stdv = np.std(currents)
     #tracks.set_model(PoreModel((tracks.conf.pore_model, tracks.conf.normalizer.tgt_mean, tracks.conf.normalizer.tgt_stdv)))
     model = PoreModel(params=tracks.conf.pore_model)
+    print(model.K, "INIITNTITITITs")
     tracks.set_model(model)
 
 def train(conf):
+    mp.set_start_method("spawn")
     #conf.tracks.load_signal = True
     conf.tracks.layers.append("moves")
     conf.mvcmp = True
@@ -67,6 +70,7 @@ def train(conf):
 
     if len(prms.init_model) > 0:
         conf.pore_model.name = prms.init_model
+        #conf.pore_model.k = prms.
     elif not prms.append and prms.kmer_len is not None:
         conf.pore_model.k = prms.kmer_len
         orig_dtw_iters = conf.dtw.iterations
@@ -74,9 +78,9 @@ def train(conf):
     elif not prms.append:
         raise ValueError(f"Must define kmer_length, init_model, or run in append mode")
 
-    tracks = Tracks(model=PoreModel(prms.init_model), conf=conf)
+    #tracks = Tracks(model=PoreModel(prms.init_model), conf=conf)
+    tracks = Tracks(model=PoreModel(params=conf.pore_model), conf=conf)
     _ = tracks.read_index.default_model
-
 
     if conf.dtw.iterations == 0:
         init_model(tracks, prms.kmer_len)
@@ -97,10 +101,11 @@ def train(conf):
         #itr = range(prms.iterations, prms.iterations+1)
 
     bam_in = tracks.bam_in.input
+    bam_in.reset()
     
     t = time()
     for i in range(prms.iterations):
-        print("iter", i+1, "of", prms.iterations)
+        print("iter", i+1, "of", prms.iterations, tracks.index.model.K)
         bam_start = bam_in.tell()
 
         #if i > 2:
@@ -108,19 +113,30 @@ def train(conf):
         #    tracks.conf.tracks.mask_skips = None
         #    tracks.conf.dtw.iterations = 2
 
-        pool = DtwPool(tracks)
         status_counts = Counter()
+        #for aln in tracks.bam_in.iter_alns():
+        #    dtw = GuidedDTW(tracks, aln)
+        #    status_counts[dtw.status] += 1
+        pool = DtwPool(tracks)
         for chunk,counts in pool: #dtw_pool_iter(tracks):
             status_counts.update(counts)
+            print("LOOP")
             trainer.write_buffer(chunk)
+
             if trainer.is_full():
-                pool.close()
                 break
+
+        print("hereo")
+
         pool.close()
 
         #If EOF reached, reset BAM and read until full or entire file was read
         if not trainer.is_full():
             bam_in.reset()
+
+            #for aln in tracks.bam_in.iter_alns():
+            #    dtw = GuidedDTW(tracks, aln)
+            #    status_counts[dtw.status] += 1
             pool = DtwPool(tracks)
             for chunk,counts in pool: #dtw_pool_iter(tracks):
                 status_counts.update(counts)

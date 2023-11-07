@@ -90,8 +90,6 @@ def sam_to_ref_moves(conf, ref_index, read, sam):
 
     ref_moves = read_to_ref_moves(read_moves, refs, qrys, conf.dtw.del_max, conf.dtw.ins_max, True)
     #gaps = np.array(ref_moves.samples.gaps)
-    #print(gaps[gaps > 0])
-    #print(ref_moves.samples)
 
     mkl = MOVE_KMER_LENS[PoreModel.PRESET_MAP.loc[conf.pore_model.get_workflow(), "ont_model"]]
 

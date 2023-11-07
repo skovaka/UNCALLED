@@ -257,7 +257,7 @@ def convert_worker(args):
         
 
 def convert_single(conf):
-    #conf.tracks.layers.append("moves")
+    conf.tracks.layers.append("moves")
     tracks, ignore_bam = _init_tracks(conf)
     for read_id, aln in tracks.iter_reads(ignore_bam=ignore_bam):
         aln.calc_mvcmp()

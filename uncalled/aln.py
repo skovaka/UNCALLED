@@ -49,12 +49,12 @@ LAYERS = {
         "aln_b" : _Layer("Int32", "Compare alignment A", True),
         "group_b" : _Layer(str, "Compare type", False),
         "jaccard" : _Layer(np.float32, "Jaccard Distance", True),
-        "dist" : _Layer(np.float32, "Mean Ref. Distance", True),
+        "dist" : _Layer(np.float32, "Sig-to-Ref Dist", True),
         "current" : _Layer(np.float32, "Current Cmp (norm)", True),
         "current_sd" : _Layer(np.float32, "Stdv Cmp (norm)", True),
     }, "mvcmp" : {
         "jaccard" : _Layer(np.float32, "Jaccard Distance", True),
-        "dist" : _Layer(np.float32, "Mean Ref. Distance", True),
+        "dist" : _Layer(np.float32, "Sig-to-Ref Dist", True),
         "current" : _Layer(np.float32, "Current Cmp (norm)", True),
         "current_sd" : _Layer(np.float32, "Stdv Cmp (norm)", True),
     }

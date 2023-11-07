@@ -105,8 +105,8 @@ class Tombo(TrackIO):
             fwd = aln_attrs["mapped_strand"] == "+"
             sig_fwd = fwd != is_rna
             if sig_fwd:
-                start = aln_attrs["mapped_start"]-shift_st#-1
-                end = aln_attrs["mapped_end"]+shift_en#-1
+                start = aln_attrs["mapped_start"]-shift_st+1
+                end = aln_attrs["mapped_end"]+shift_en+1
             else:
                 start = aln_attrs["mapped_start"]-shift_st#+1
                 end = aln_attrs["mapped_end"]+shift_en#+1

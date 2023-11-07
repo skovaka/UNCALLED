@@ -85,6 +85,7 @@ class Sigplot:
             if track.name not in active_tracks: continue
 
             alns = self.tracks.alignments.loc[track.name].query("@read_id == read_id")
+            if len(alns) == 0: continue
             aln_ids = alns.index
 
             dtws = list()
@@ -94,14 +95,17 @@ class Sigplot:
                 #dtw = track.layers.loc[(slice(None),aln_id),"dtw"].droplevel("aln.id")
                 #seq = track.layers.loc[(slice(None),aln_id),"seq"].droplevel("aln.id")
                 layers = self.tracks.layers.loc[track.name].loc[aln_id].sort_values(("dtw","start"))
-                dtw = layers["dtw"].dropna()#.droplevel("aln.id")
-                seq = layers["seq"].dropna()
+                dtw = layers["dtw"].dropna(how="all")#.droplevel("aln.id")
+                seq = layers["seq"].dropna(how="all")
 
                 #dtws.append(dtw)
                 seqs.append(layers)
 
                 samp_min = min(samp_min, dtw["start"].min())
                 samp_max = max(samp_max, dtw["start"].iloc[-1] + dtw["length"].iloc[-1])
+
+                if not "current_sd" in dtw:
+                    dtw["current_sd"] = 0
 
                 current_min = min(current_min, (dtw["current"]-dtw["current_sd"]*2).min())
                 current_max = max(current_max, (dtw["current"]+dtw["current_sd"]*2).max())

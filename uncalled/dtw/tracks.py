@@ -1008,6 +1008,7 @@ class Tracks:
         min_pos = np.inf
         max_pos = -np.inf
         for a in alns:
+            if a is None: continue
             assert(a.seq.name == ref_name)
             min_pos = min(min_pos, a.seq.coord.get_start())
             max_pos = max(max_pos, a.seq.coord.get_end())

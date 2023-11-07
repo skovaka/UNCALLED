@@ -58,8 +58,7 @@ def compare(conf):
         #    chunk.calc_compare(group_b, False, conf.save)
         #    chunk.write_alignment()
 
-        print(f"{read_id}\t{time.time()-t:.4f}")
-        sys.stdout.flush()
+        sys.stderr.write(f"{read_id}\t{time.time()-t:.4f}\n")
         t = time.time()
 
 def dump(conf):

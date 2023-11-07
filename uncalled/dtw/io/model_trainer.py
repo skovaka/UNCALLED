@@ -130,6 +130,8 @@ class ModelTrainer(TrackIO):
             self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
             self.buff_len += len(df)
 
+        print(self.kmer_counts.sort_values())
+
         if self.buff_len == 0 or (self.buff_len * self.itemsize < self.tprms.buffer_size*10**6 and not force):
             return
 
@@ -168,6 +170,7 @@ class ModelTrainer(TrackIO):
 
         t = time()
         model_rows = list()
+        print(self.kmer_index.sort_values("length"))
         for kmer in self.kmer_index.index.unique():
             chunks = self.kmer_index.loc[[kmer]]
             rows = np.zeros(chunks["length"].sum(), dtype=self.row_dtype)
@@ -190,7 +193,6 @@ class ModelTrainer(TrackIO):
             current = filt(rows["current"])
             current_sd = filt(rows["current_sd"])
             dwell = filt(rows["dwell"])
-
 
             k = self.model.kmer_to_str(kmer)
 
@@ -222,21 +224,19 @@ class ModelTrainer(TrackIO):
             #grp = df.groupby(bases) 
             #df = df.set_index("base")
 
-            print(df)
             grp = df.groupby(bases)["current.mean"]
 
             df = pd.DataFrame(df.set_index(bases)["kmer"])
             df["current.mean"] = grp.median().loc[df.index]
             df["current.stdv"] = grp.std().loc[df.index]
             df["count"] = grp.count().loc[df.index]
-            print(df)
 
             #df["current.mean"] = grp.mean()
             #df["current.stdv"] = grp.std()
         else:
             print("NOT OVERAGERS")
             
-        df = df.set_index("kmer", drop=True).sort_index()
+        df = df.set_index("kmer", drop=True).reindex(self.model.KMERS)
 
         for kmer in df.index[df["current.mean"].isna()]:
             subs = list()

@@ -224,21 +224,28 @@ class PoreModel:
     }
 
     def _vals_from_df(self, prms, df, preprocess):
-        df = df.rename(columns=self.TSV_RENAME)
+        df = df.rename(columns=self.TSV_RENAME).copy()
         if self._extra is not None:
             extra = df.columns.difference(self.COLUMNS)
             for col in extra:
                 #self._cols[col] = df[col].to_numpy()
                 self._extra[col] = df[col].to_numpy()
 
-        if preprocess:
-            df = df.reset_index().sort_values("kmer")
+        if "kmer" in df.columns:
+            if preprocess:
+                df = df.reset_index().sort_values("kmer")
 
-        if prms.k < 0:
-            kmer_lens = df["kmer"].str.len().value_counts()
-            if len(kmer_lens) > 1:
-                raise ValueError("All kmer lengths must be the same, found lengths: " + ", ".join(map(str, kmer_lens.index)))
-            prms.k = kmer_lens.index[0]
+            if prms.k < 0:
+                kmer_lens = df["kmer"].str.len().value_counts()
+                if len(kmer_lens) > 1:
+                    raise ValueError("All kmer lengths must be the same, found lengths: " + ", ".join(map(str, kmer_lens.index)))
+                prms.k = kmer_lens.index[0]
+        else:
+            k = np.log2(len(df))/2.0
+            if k != np.round(k):
+                raise ValueError("DataFrame length must be power of 4 or include 'kmer' column")
+            prms.k = int(k)
+
 
         get = lambda c: df[c] if c in df else []
 
@@ -352,11 +359,33 @@ class PoreModel:
                 d[f"{prefix}{name}"] = val 
         return d
 
-    def to_df(self, kmer_str=True):
-        return pd.DataFrame({
+    def to_df(self, kmer_str=True, bases=False):
+        df = pd.DataFrame({
             key : vals for key,vals in self.to_dict(kmer_str).items()
             if len(vals) > 0
         })
+        if bases:
+            for b in range(self.K):
+                df[b] = self.kmer_base(self.KMERS, b)
+        return df
+    
+    def reduce(self,st,en):
+        if st == 0 and en == self.K:
+            return self
+        elif st < 0 or en > self.K: 
+            return None
+        bases = list(np.arange(st, en))
+        k = len(bases)
+        df = self.to_df(bases=True)
+        #df = df.set_index(bases)
+        grp = df.groupby(by=bases)
+        df = pd.DataFrame({
+            "mean" : grp["current.mean"].mean()#.reset_index(drop=True)
+        })
+        df["kmer"] = np.arange(len(df))
+        m = PoreModel(model=df,k=k)
+        return m
+
 
     def to_tsv(self, out=None):
         return self.to_df().to_csv(out, sep="\t", index=False)

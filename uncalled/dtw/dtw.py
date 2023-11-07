@@ -104,6 +104,7 @@ class DtwPool:
     def close(self):
         if not self.closed:
             self.pool.terminate()
+            self.pool.join()
             self.closed = True
 
 def dtw_pool(conf):
@@ -195,7 +196,6 @@ class GuidedDTW:
             self.status = "Missing moves"
             return
         
-        #print(self.aln.to_pandas(["moves"], index=["seq.pos"]))
 
         read = self.aln.read
 
@@ -227,7 +227,6 @@ class GuidedDTW:
         self.samp_min = self.moves.samples.start #s[0]
         self.samp_max = self.moves.samples.end#s[len(self.moves)-1]
 
-       # print(self.model.shift, self.model.K - self.model.shift)
         self.samp_min = self.moves.samples.get_interval(self.model.shift).start #.start #s[0]
         self.samp_max = self.moves.samples.get_interval(len(self.moves)-(self.model.K - self.model.shift)).end #.end#s[len(self.moves)-1]
         self.evt_start, self.evt_end = signal.event_bounds(self.samp_min, self.samp_max)
@@ -235,7 +234,6 @@ class GuidedDTW:
         if self.prms.iterations == 0:
             tgt = (0, 1)
         elif self.conf.normalizer.mode == "ref_mom":
-
             ref_means = self.seq.current.to_numpy()  #self.model[self.ref_kmers]
             
             if self.conf.normalizer.median:
@@ -282,7 +280,8 @@ class GuidedDTW:
 
         else:
             st = self.model.shift
-            en = -(self.model.K - st - 1)
+            en = len(self.moves) - (self.model.K-st-1)#-(self.model.K - st - 1) if self.model.K > 1 else len(self.moves)
+
             starts = self.moves.samples.starts.to_numpy()[st:en]
             lengths = self.moves.samples.lengths.to_numpy()[st:en]
             dtw = AlnDF(self.seq, starts, lengths)
@@ -290,7 +289,6 @@ class GuidedDTW:
             self.aln.set_dtw(dtw)
             success = True
 
-        
         if success:
             if self.aln.mvcmp.empty():
                 self.aln.calc_mvcmp()
@@ -311,7 +309,6 @@ class GuidedDTW:
 
             self.aln.dtw.mask(mask)
             a = np.array(aln.mvcmp.dist)
-            #print(np.mean(a[~np.isnan(a)]))
 
             tracks.write_alignment(self.aln)
             self.empty = False
@@ -372,7 +369,6 @@ class GuidedDTW:
         if self.conf.tracks.mask_skips is not None:
             #if self.aln.mvcmp.empty():
             #    self.aln.calc_mvcmp()
-            #print(self.aln.mvcmp.dist)
             #self.aln.mask_skips(False)
             self.aln.mask_skips(self.conf.tracks.mask_skips == "keep_best")
         
