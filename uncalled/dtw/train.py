@@ -57,7 +57,6 @@ def init_model(tracks, k):
     tracks.conf.pore_model.pa_stdv = np.std(currents)
     #tracks.set_model(PoreModel((tracks.conf.pore_model, tracks.conf.normalizer.tgt_mean, tracks.conf.normalizer.tgt_stdv)))
     model = PoreModel(params=tracks.conf.pore_model)
-    print(model.K, "INIITNTITITITs")
     tracks.set_model(model)
 
 def train(conf):
@@ -68,8 +67,22 @@ def train(conf):
 
     prms = conf.train
 
+    model = None
+
     if len(prms.init_model) > 0:
-        conf.pore_model.name = prms.init_model
+        p = conf.pore_model
+        print(p.k,p.shift)
+        p.name = prms.init_model
+        model = PoreModel(params=p)
+        if model.K != prms.kmer_len:
+            dk = prms.kmer_len - model.k
+            ds = p.shift - model.shift 
+            print(model.k,model.shift)
+            print(p.k,p.shift)
+            if dk < 0 or ds < 0:
+                raise RuntimeError("Cannot reduce k-mer length or k-mer shift")
+            model = model.expand(ds,dk-ds)
+
         #conf.pore_model.k = prms.
     elif not prms.append and prms.kmer_len is not None:
         conf.pore_model.k = prms.kmer_len
@@ -77,23 +90,25 @@ def train(conf):
         conf.dtw.iterations = 0
     elif not prms.append:
         raise ValueError(f"Must define kmer_length, init_model, or run in append mode")
+    
+    if model is None:
+        model=PoreModel(params=conf.pore_model)
 
-    #tracks = Tracks(model=PoreModel(prms.init_model), conf=conf)
-    tracks = Tracks(model=PoreModel(params=conf.pore_model), conf=conf)
+    tracks = Tracks(model=model, conf=conf)
+
     _ = tracks.read_index.default_model
 
     if conf.dtw.iterations == 0:
         init_model(tracks, prms.kmer_len)
 
     trainer = tracks.output
-    trainer.model = tracks.model
+    #trainer.model = tracks.model
 
     if prms.append:
-        conf.pore_model.name = trainer.model.name
+        conf.pore_model = trainer.model.PRMS
+        tracks.set_model(trainer.model)
     else:
         trainer.set_model(tracks.model)
-
-    print(conf.train.init_mode)
 
     if prms.skip_dtw:
         model_file = trainer.next_model(True)
@@ -120,13 +135,11 @@ def train(conf):
         pool = DtwPool(tracks)
         for chunk,counts in pool: #dtw_pool_iter(tracks):
             status_counts.update(counts)
-            print("LOOP")
             trainer.write_buffer(chunk)
 
             if trainer.is_full():
                 break
 
-        print("hereo")
 
         pool.close()
 

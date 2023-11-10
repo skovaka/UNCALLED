@@ -105,6 +105,7 @@ class PoreModel:
         is_preset = False
 
         if model is not None: 
+            #Initialize from another PoreModel
             if isinstance(getattr(model, "PRMS", None), PoreModelParams):
                 self._init(model.PRMS, model)
             
@@ -148,7 +149,7 @@ class PoreModel:
             CACHE[cache_key] = self
 
     def _init_new(self, prms, *args):
-        if prms.k <= 8:
+        if prms.k < 8:
             ModelType = _uncalled.PoreModelU16
         else:
             ModelType = _uncalled.PoreModelU32
@@ -183,7 +184,7 @@ class PoreModel:
         if prms.shift >= 0:
             self.PRMS.shift = prms.shift
 
-        if self.K > 8:
+        if self.K >= 8:
             self.kmer_dtype = "uint32"
             self.array_type = ArrayU32
         else:
@@ -386,6 +387,40 @@ class PoreModel:
         m = PoreModel(model=df,k=k)
         return m
 
+    def expand_old(self, start):
+        k = self.k+1
+        kmers = np.arange(4**k)
+        if start:
+            old_kmers = kmers & ((1 << (2*self.k)) - 1)
+        else:
+            old_kmers = kmers >> 2
+
+        df = pd.DataFrame({
+            "mean" : self.current.mean.to_numpy()[old_kmers],
+            "stdv" : self.current.stdv.to_numpy()[old_kmers],
+        })
+        return PoreModel(model=df,k=5,shift=self.shift+start)
+
+
+    def expand(self, start=0, end=0):
+        k = self.k+start+end
+        kmers = np.arange(4**k)
+        for i in range(end):
+            kmers >>= 2
+        kmers &= ((1 << (2*self.k)) - 1)
+
+        df = pd.DataFrame({
+            "mean" : self.current.mean.to_numpy()[kmers],
+        })
+        if len(self.current.stdv) > 0:
+            df["stdv"] = self.current.stdv.to_numpy()[kmers]
+
+        p = PoreModelParams(self.PRMS)
+        p.k = k
+        p.shift += start
+        m = PoreModel(model=df)
+        m.PRMS = p
+        return m
 
     def to_tsv(self, out=None):
         return self.to_df().to_csv(out, sep="\t", index=False)

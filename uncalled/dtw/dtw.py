@@ -8,7 +8,6 @@ import pysam
 from time import time
 import os
 
-from sklearn.linear_model import TheilSenRegressor
 from scipy.stats import linregress
 from ..config import Config
 from ..argparse import ArgParser
@@ -139,6 +138,7 @@ def dtw_worker(p):
 
     #tracks.norm_params = pd.read_csv("/scratch1/skovaka/curlcakes/unm/nanopolish/eventalign/npl_unm_cov100_smry.txt", sep="\t").set_index("read_name").sort_index()
     #tracks.norm_params = pd.read_csv("/scratch1/skovaka/curlcakes/m6a/nanopolish/eventalign/npl_m6a_cov100_smry.txt", sep="\t").set_index("read_name").sort_index()
+
 
     i = 0
     for bam in bams:

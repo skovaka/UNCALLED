@@ -53,7 +53,7 @@ class ModelTrainer(TrackIO):
         self.model = None
 
         if self.tprms.append and not self.prms.buffered:
-            prev_models = glob(f"{self.filename}/it*.model.tsv")
+            prev_models = glob(f"{self.filename}/it*.model.npz")
             if len(prev_models) == 0:
                 raise ValueError("--append can only be used with existing model training directory")
 
@@ -130,7 +130,6 @@ class ModelTrainer(TrackIO):
             self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
             self.buff_len += len(df)
 
-        print(self.kmer_counts.sort_values())
 
         if self.buff_len == 0 or (self.buff_len * self.itemsize < self.tprms.buffer_size*10**6 and not force):
             return
@@ -170,7 +169,6 @@ class ModelTrainer(TrackIO):
 
         t = time()
         model_rows = list()
-        print(self.kmer_index.sort_values("length"))
         for kmer in self.kmer_index.index.unique():
             chunks = self.kmer_index.loc[[kmer]]
             rows = np.zeros(chunks["length"].sum(), dtype=self.row_dtype)
