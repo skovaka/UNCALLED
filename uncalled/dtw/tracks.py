@@ -476,6 +476,10 @@ class Tracks:
         else:
             out = self.inputs[0]
 
+        sd = aln.dtw.current_sd.to_numpy()
+        mask = (sd >= 0) & (sd <= self.prms.max_sd)
+        aln.dtw.mask(mask)
+
         out.write_alignment(aln)
 
     def set_read(self, read):

@@ -63,7 +63,8 @@ TracksParams._def_params(
     ("skip_stdv_thresh", None, float, "Either \"all\" to mask all skips, or \"keep_best\" to mask all but the closest to the model"),
     ("mask_indels", None, int, "Mask positions which overlap basecalled alignment insertions or deletions of this length or longer"),
     ("mvcmp_mask", None, float, "Will filter out positions with mvcmp.dist >= mvcmp_mask if specified"),
-    ("max_norm_dist", 2, float, "Minimum mvcmp.dist for posititions to be used for iterative normalization"),
+    ("max_norm_dist", 2, float, "Maximum mvcmp.dist for posititions to be used for iterative normalization"),
+    ("max_sd", 1, float, "Maximum current standard deviation"),
     ("min_aln_length", 100, int, "Minimum number of aligned bases"),
 
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),

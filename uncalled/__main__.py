@@ -74,6 +74,7 @@ DTW_OPTS = (
     Opt(("-s", "--band-shift"), "dtw"),
     Opt("--mvcmp-mask", "tracks"),
     Opt("--max-norm-dist", "tracks"),
+    Opt("--max-sd", "tracks"),
     Opt("--min-aln-length", "tracks"),
     Opt(("-N", "--norm-mode"), "normalizer", "mode", choices=["ref_mom", "model_mom"]),
     Opt("--norm-median", "normalizer", "median", action="store_true"),
@@ -94,6 +95,7 @@ CONVERT_OPTS = (
     Opt(("-m", "--pore-model"), "pore_model", "name"),
     Opt("--kmer-shift", "pore_model", "shift"),
     Opt("--bam-chunksize", "tracks.io"),
+    Opt("--max-sd", "tracks"),
 
     MutexOpts("output", [
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),

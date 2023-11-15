@@ -261,7 +261,6 @@ class BAM(TrackIO):
             bams.append(bam.to_string())
 
             if len(bams) >= self.prms.bam_chunksize and (not group_seqs or bam.reference_name != prev_seq):
-                print("CHUNK", len(bams))
                 yield(read_ids, bams)
                 read_ids = set()
                 bams = list()

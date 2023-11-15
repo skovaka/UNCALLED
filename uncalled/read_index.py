@@ -176,7 +176,8 @@ class ReadIndex:
             self.base_paths.add(path)
 
             if not os.path.exists(path):
-                raise ValueError("Error: \"%s\" does not exist\n" % path)
+                sys.stderr.write("Error: \"%s\" does not exist\n" % path)
+                continue
 
             isdir = os.path.isdir(path)
 

@@ -22,7 +22,7 @@ from time import time
 def browser(conf):
     """Interactive signal alignment genome browser"""
     conf.tracks.load_mat = True
-    conf.read_index.load_signal = True
+    conf.read_index.load_signal = False
     #conf.tracks.refstats_layers = ["cmp.dist"]
     conf.tracks.layers=["dtw","dtw.dwell","dtw.model_diff","dtw.middle_sec","moves.middle_sec","dtwcmp","mvcmp.dist", "dtw.start_sec", "dtw.length_sec", "moves.start_sec", "moves.length_sec", "seq.pos", "seq.fwd", "seq.kmer", "seq.current", "seq.base"]
     
