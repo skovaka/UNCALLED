@@ -13,7 +13,7 @@ from .refplot import Refplot
 from .. import config
 from ..index import str_to_coord
 from ..dtw.tracks import Tracks
-from ..dtw.layers import LAYER_META, parse_layer
+from ..aln import LAYER_META, parse_layer
 from ..argparse import Opt, comma_split
 from ..config import Config
 
@@ -22,9 +22,9 @@ from time import time
 def browser(conf):
     """Interactive signal alignment genome browser"""
     conf.tracks.load_mat = True
-    conf.tracks.load_fast5s = True
+    conf.read_index.load_signal = False
     #conf.tracks.refstats_layers = ["cmp.dist"]
-    conf.tracks.layers=["dtw","dtw.dwell","dtw.model_diff","dtw.middle_sec","moves.middle_sec","cmp","mvcmp", "dtw.start_sec", "dtw.length_sec", "moves.start_sec", "moves.length_sec", "seq.pos", "seq.fwd", "seq.kmer", "seq.current"]
+    conf.tracks.layers=["dtw","dtw.dwell","dtw.model_diff","dtw.middle_sec","moves.middle_sec","dtwcmp","mvcmp.dist", "dtw.start_sec", "dtw.length_sec", "moves.start_sec", "moves.length_sec", "seq.pos", "seq.fwd", "seq.kmer", "seq.current", "seq.base"]
     
     sys.stderr.write("Loading tracks...\n")
 
@@ -98,6 +98,17 @@ def new_browser(tracks, conf):
     track_opts = [
         {"label" : t.desc, "value" : t.name}
         for t in tracks.alns]
+    
+    fig_config = {  
+        "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None},
+        "scrollZoom" : True, "displayModeBar" : True 
+    }                                                                                
+
+
+    fig_config = {
+        "toImageButtonOptions" : {"format" : "svg", "width" : None, "height" : None},
+        "scrollZoom" : True, "displayModeBar" : True
+    }
 
     app.layout = html.Div(children=[
         html.Div(
@@ -117,7 +128,7 @@ def new_browser(tracks, conf):
 
                         dcc.Graph(#[dcc.Loading(type="circle"),
                             id="trackplot",
-                            config = {"scrollZoom" : True, "displayModeBar" : True})
+                            config = fig_config)
 
                     ], settings=[
                         dcc.Dropdown(
@@ -146,7 +157,7 @@ def new_browser(tracks, conf):
                 _panel("Refplot", "refplot",
                     content=dcc.Graph(
                         id="refplot",
-                        config = {"scrollZoom" : True, "displayModeBar" : True}
+                        config = fig_config
                     ), settings=[
                         dcc.Checklist(
                             id="refplot-checklist",
@@ -163,7 +174,7 @@ def new_browser(tracks, conf):
                 _panel("Dotplot", "dotplot",
                     content=dcc.Graph(
                         id="dotplot",
-                        config = {"scrollZoom" : True, "displayModeBar" : True}
+                        config =  fig_config,
                     ), settings=[
                         dcc.Checklist(
                             id="dotplot-checklist",
@@ -217,18 +228,16 @@ def new_browser(tracks, conf):
             track_names = None
 
         t = time()
-        print("trackplot", time()-t)
         chunk = tracks.slice(tracks=track_names, shared_reads=shared_reads, full_overlap=full_overlap)
         chunk.init_mat()
-        print("tslice", time()-t)
         t = time()
 
         if click is not None:
             coord = click["points"][0]
             ref = coord["x"]
-            track_idx = coord["curveNumber"]
+            track_idx = coord["curveNumber"]-1
 
-            if track_idx < len(chunk):
+            if track_idx >= 0 and track_idx < len(chunk):
                 track_id = chunk.mat.index.levels[0][track_idx]
 
                 aln_id = chunk.mat.loc[track_id].iloc[coord["y"]].name
@@ -238,7 +247,7 @@ def new_browser(tracks, conf):
 
                 table.append(html.Tr(html.Td(html.B("%s:%d" % (chunk.coords.name, ref)), colSpan=2)))
                 table.append(html.Tr(html.Td([html.B("Read "), read], colSpan=2)))
-                for l in ["current", "dwell", "model_diff", "events"]:
+                for l in ["dtw.current", "dtw.dwell", "dtw.model_diff", "dtw.events"]:
                     if not l in layers: continue
                     table.append(html.Tr([
                         html.Td(html.B(LAYER_META.loc[("dtw",l), "label"])), 
@@ -247,17 +256,15 @@ def new_browser(tracks, conf):
                 card_style = {"display" : "block"}
 
             layer, = parse_layer(layer)
-            print("click", time()-t)
             t = time()
 
         fig = Trackplot(
-            chunk, [("mat", layer)], 
+            chunk, [("bases",None), ("mat", layer)], 
             select_ref=ref, select_read=read, 
             share_reads="share_reads" in checklist,
             show_legend="show_legend" in checklist,
             conf=conf).fig
         fig.update_layout(uirevision=uirev)
-        print("tplot", time()-t)
         t = time()
 
         return fig, table, card_style, ref, read, (read != prev_read)
@@ -284,13 +291,8 @@ def new_browser(tracks, conf):
         conf.sigplot.multi_background="multi_background" in flags
         conf.sigplot.no_model="show_model" not in flags
 
-        print("dotplot", time()-t)
-        t = time()
-
         chunk = tracks.slice(reads=[read], tracks=track_names if len(track_names) > 0 else None)
 
-        print("dslice", time()-t)
-        t = time()
 
         fig = Dotplot(
             chunk, 
@@ -299,8 +301,6 @@ def new_browser(tracks, conf):
             layers=list(parse_layer(layer)),
             conf=conf).plot(read)
 
-        print("dplot", time()-t)
-        t = time()
 
         return fig, {"display" : "block"}
 
@@ -326,12 +326,8 @@ def new_browser(tracks, conf):
         conf = Config(conf=tracks.conf)
         conf.sigplot.multi_background = "multi_background" in flags
         conf.sigplot.no_model = "show_model" not in flags
-        print("refplot", time()-t)
-        t = time()
 
         chunk = tracks.slice(tracks=track_names if len(track_names) > 0 else None)
-        print("rslice", time()-t)
-        t = time()
 
         fig = Refplot(
             chunk, 
@@ -339,8 +335,6 @@ def new_browser(tracks, conf):
             kmer_coord=ref,
             conf=conf).fig
 
-        print("rplot", time()-t)
-        t = time()
         return fig, {"display" : "block"}
 
-    app.run_server(port=conf.browser_port, debug=True)
+    app.run_server(port=conf.port, debug=True)

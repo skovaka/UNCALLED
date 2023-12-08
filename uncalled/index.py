@@ -57,12 +57,13 @@ class FastaIndex:
         for i in range(self.infile.nreferences):
             name = self.infile.references[i]
             size = self.infile.lengths[i]
+            self.ref_ids[name] = i
             self.anno.append(SeqRecord(name, i, size, offs))
             self.offsets.append(offs)
             offs += size
 
     def pac_to_pos(self, pac):
-        if hasattr("__len__", pac):
+        if hasattr(pac, "__len__"):
             c = pac[0]
         else:
             c = pac
@@ -92,11 +93,20 @@ class FastaIndex:
             seqs.append(self.infile.fetch(coord.name, bounds[i], bounds[i+1]))
         return self.SeqInst(self.model.instance, "".join(seqs), coord)
 
-    def get_ref_name(self, rid):
-        return self.anno[rid].name
+    def get_ref_len(self, ref):
+        if isinstance(ref, str):
+            ref = self.ref_ids[ref]
+        return self.anno[ref].length
 
-    def get_pac_offset(self, rid):
-        return self.anno[rid].offset
+    def get_ref_name(self, ref):
+        if isinstance(ref, str):
+            ref = self.ref_ids[ref]
+        return self.anno[ref].name
+
+    def get_pac_offset(self, ref):
+        if isinstance(ref, str):
+            ref = self.ref_ids[ref]
+        return self.anno[ref].offset
 
 _index_cache = dict()
 

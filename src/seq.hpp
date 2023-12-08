@@ -113,11 +113,11 @@ class RefCoord {
     //    return RefCoord(name, std::max(start, other.start), std::min(end, other.end), strand, ref_id);
     //}
 
-    i64 start() const {
+    i64 get_start() const {
         return bounds.front();
     }
 
-    i64 end() const {
+    i64 get_end() const {
         return bounds.back();
     }
 
@@ -158,7 +158,7 @@ class RefCoord {
 
     i64 length() const {
         check_bounds();
-        return end()-start();
+        return get_end()-get_start();
     }
 
     #ifdef PYBIND
@@ -193,8 +193,10 @@ class RefCoord {
         c.def("__len__", &RefCoord::length);
         c.def_readwrite("name", &RefCoord::name);
         c.def_readonly("bounds", &RefCoord::bounds);
-        c.def_property("start", &RefCoord::start, &RefCoord::set_start);
-        c.def_property("end", &RefCoord::end, &RefCoord::set_end);
+        c.def("get_start", &RefCoord::get_start);
+        c.def("get_end", &RefCoord::get_end);
+        c.def("set_start", &RefCoord::set_start);
+        c.def("set_end", &RefCoord::set_end);
         //c.def_readwrite("ref_len", &RefCoord::ref_len);
         c.def_property("fwd", &RefCoord::fwd, 
             [](RefCoord &c, bool fwd) -> bool {
@@ -232,7 +234,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
     //ValArray<u8> base;
 
     ValArray<KmerType> kmer; 
-    ValArray<float> current;   
+    ValArray<float> current, current_sd;   
     ValArray<bool> splice_mask;   
 
     Sequence(const ModelType &model_, size_t length) : 
@@ -241,7 +243,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         KMER_LEN(model_.KMER_LEN),
         mpos({{0,static_cast<i64>(length)}}), 
         is_fwd(true),
-        kmer(length), current(length) {}
+        kmer(length), current(length), current_sd(length) {}
 
     //Sequence(const ModelType &model_, IntervalIndex<i64> coords_, bool is_fwd_) : 
     //    model(model_), 
@@ -254,7 +256,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
     //    init_current();
     //}
 
-    Sequence(const ModelType &model_, const std::string &seq, RefCoord &coords_) : 
+    Sequence(const ModelType &model_, const std::string &seq, RefCoord coords_) : 
             model(model_), 
             coord(coords_),
             KMER_LEN(model_.KMER_LEN),
@@ -262,25 +264,39 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
 
         auto rev = is_fwd == model.PRMS.reverse;
         auto comp = !is_fwd;
+        i32 start_shift = model_.PRMS.shift;
+        i32 end_shift = KMER_LEN - model_.PRMS.shift - 1;
+
+        if (rev) std::swap(start_shift, end_shift);
+
+        auto start_trim = start_shift, end_trim = end_shift;
+
+        size_t i = 0;
+        do {
+            coords_.bounds[i] += start_shift;
+            start_shift = coords_.bounds[i] - coords_.bounds[i+1];
+            i += 2;
+        } while (start_shift > 0);
+
+        i = coords_.bounds.size()-1;
+        do {
+            coords_.bounds[i] -= end_shift;
+            end_shift = coords_.bounds[i-1] - coords_.bounds[i];
+            i -= 2;
+        } while (end_shift > 0);
 
         if (!rev) {
-            auto start = coords_.bounds[0] + model_.PRMS.shift;
-            for (size_t i = 1; i < coords_.bounds.size()-1; i += 2) {
-                auto end = coords_.bounds[i];
-                mpos.append(start, end);
-                start = coords_.bounds[i+1];
+            for (i = 0; i < coords_.bounds.size(); i += 2) {
+                if (coords_.bounds[i] < coords_.bounds[i+1]) {
+                    mpos.append(coords_.bounds[i], coords_.bounds[i+1]);
+                }
             }
-            auto end = coords_.bounds.back() - KMER_LEN + model_.PRMS.shift + 1;
-            mpos.append(start, end);
         } else {
-            auto start = -coords_.bounds.back() + model_.PRMS.shift;
-            for (size_t i = coords_.bounds.size()-2; i > 0; i -= 2) {
-                auto end = -coords_.bounds[i];
-                mpos.append(start, end);
-                start = -coords_.bounds[i-1];
+            for (i = coords_.bounds.size()-1; i < coords_.bounds.size(); i -= 2) {
+                if (coords_.bounds[i-1] < coords_.bounds[i]) {
+                    mpos.append(-coords_.bounds[i], -coords_.bounds[i-1]);
+                }
             }
-            auto end = -coords_.bounds[0] - KMER_LEN + model_.PRMS.shift + 1;
-            mpos.append(start, end);
         }
 
         if (mpos.coords.size() > 1) {
@@ -288,16 +304,21 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
             size_t i = 0;
             for (size_t j = 0; j < mpos.coords.size()-1; j++) {
                 i += mpos.coords[j].length();
-                for (int sh = -model_.PRMS.shift; sh < model_.PRMS.shift; sh++) {
-                    splice_mask[i+sh] = false;
+                for (int sh = -start_trim; sh < end_trim; sh++) {
+                    if (i+sh > 0 && i+sh < splice_mask.size()) {
+                        splice_mask[i+sh] = false;
+                    }
                 }
             }
         }
 
         if (mpos.length != seq.size() - KMER_LEN + 1) {
+            std::cerr << "Coord length: " << mpos.length 
+                      << ", Seq length: " << (seq.size() - KMER_LEN + 1) << "\n";
             throw std::runtime_error("Size mismatch");
         }
         current = ValArray<float>(mpos.length);
+        current_sd = ValArray<float>(mpos.length);
         kmer = model.str_to_kmers(seq, rev, comp); 
         init_current();
     }
@@ -323,14 +344,22 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         return kmer[i];
     }
 
-    KmerType get_current(i64 r) const {
+    float get_current(i64 r) const {
         auto i = mpos.get_index(r);
         return current[i];
     }
 
+    float get_current_sd(i64 r) const {
+        auto i = mpos.get_index(r);
+        return current_sd[i];
+    }
+
     void init_current() {
         for (size_t i = 0; i < size(); i++) {
-            current[i] = model.kmer_current(kmer[i]);
+            current[i] = model.current.mean[kmer[i]];
+            if (!model.current.stdv.empty()) {
+                current_sd[i] = model.current.stdv[kmer[i]];
+            }
         }
     }
 
@@ -347,7 +376,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         //auto c = super::template pybind<Sequence>(m, ("Sequence"+suffix).c_str(), false);
 
         c.def(py::init<const ModelType &, const std::string &>());
-        c.def(py::init<const ModelType &, const std::string &, RefCoord &>());
+        c.def(py::init<const ModelType &, const std::string &, RefCoord>());
         c.def("__len__", &Sequence::size);
         c.def_property_readonly("model", &Sequence::get_model);
         c.def_readonly("K", &Sequence::KMER_LEN);
@@ -355,6 +384,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         //c.def_readonly("ref_id", &Sequence::ref_id);
         c.def_readonly("kmer", &Sequence::kmer);
         c.def_readonly("current", &Sequence::current);
+        c.def_readonly("current_sd", &Sequence::current_sd);
         c.def_readonly("is_fwd", &Sequence::is_fwd);
         c.def_readonly("coord", &Sequence::coord);
         c.def_readonly("splice_mask", &Sequence::splice_mask);
@@ -362,6 +392,7 @@ struct Sequence {//: public DataFrame<typename ModelType::kmer_t, float, u8> {
         c.def("is_spliced", &Sequence::is_spliced);
         c.def("get_kmer", py::vectorize(&Sequence::get_kmer));
         c.def("get_current", py::vectorize(&Sequence::get_current));
+        c.def("get_current_sd", py::vectorize(&Sequence::get_current_sd));
     }
 };
 

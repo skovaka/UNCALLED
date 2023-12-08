@@ -1,10 +1,11 @@
 import sys
 import textwrap
 import importlib
+import os
 
 from .argparse import ArgParser, Opt, MutexOpts, CONFIG_PARAM, FAST5_PARAM, comma_split, ref_coords
 
-from .index import str_to_coord
+from .index import RefCoord, str_to_coord
 import pandas as pd
 
 import cProfile
@@ -44,11 +45,13 @@ DTW_OPTS = (
 
     Opt(FAST5_PARAM, "read_index", nargs="+", type=str),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),
-    Opt(("-l", "--read-filter"), "tracks"),
+    Opt(("-l", "--read-filter"), "read_index"),
     Opt(("-x", "--read-index"), "read_index"),
     Opt(("-n", "--max-reads"), "tracks"),
 
+    Opt("--count-events", "tracks", action="store_true"),
     Opt("--del-max", "dtw"),
+    Opt("--ins-max", "dtw"),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
     Opt("--mask-indels", "tracks"),
 
@@ -69,6 +72,10 @@ DTW_OPTS = (
     Opt("--move-cost", "dtw"),
     Opt(("-b", "--band-width"), "dtw"),
     Opt(("-s", "--band-shift"), "dtw"),
+    Opt("--mvcmp-mask", "tracks"),
+    Opt("--max-norm-dist", "tracks"),
+    Opt("--max-sd", "tracks"),
+    Opt("--min-aln-length", "tracks"),
     Opt(("-N", "--norm-mode"), "normalizer", "mode", choices=["ref_mom", "model_mom"]),
     Opt("--norm-median", "normalizer", "median", action="store_true"),
     Opt("--norm-full", "normalizer", "full_read", action="store_true"),
@@ -84,22 +91,29 @@ CONVERT_OPTS = (
         Opt("--tombo-in", "tracks.io", type=comma_split, action="extend"),
     ]),
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
-    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
+    Opt(("-t", "--tracks"), "tracks.io", "input_names", type=comma_split),
     Opt(("-m", "--pore-model"), "pore_model", "name"),
+    Opt("--kmer-shift", "pore_model", "shift"),
     Opt("--bam-chunksize", "tracks.io"),
+    Opt("--max-sd", "tracks"),
 
     MutexOpts("output", [
         Opt("--eventalign-out", "tracks.io", nargs="?", const="-"),
         Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
         Opt("--bam-out", "tracks.io", nargs="?", const="-"),
+        Opt("--m6anet-out", "tracks.io"),
     ]),
     Opt(("--out-name", "-o"), "tracks.io"),
 
     Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtw"),
+    Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
+    Opt("--tsv-noref", "tracks.io", action="store_true"),
 
     Opt("--eventalign-flags", "tracks.io", type=comma_split),
     Opt("--mask-skips", "tracks", nargs="?", const="all"),
 
+    Opt("--flowcell", "pore_model"),
+    Opt("--kit", "pore_model"),
     Opt("--reads", "read_index", "paths", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks"),
     Opt(("-x", "--read-index"), "read_index", required=False),
@@ -113,14 +127,21 @@ CONVERT_OPTS = (
 
 COMPARE_OPTS = (
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
-    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
+    Opt(("-t", "--tracks"), "tracks.io", "input_names", type=comma_split),
     #Opt(("-l", "--read-filter"), "tracks", nargs="+", type=str),
     Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
     Opt(("-R", "--ref-bounds"), "tracks"),
-    Opt(("-b", "--moves"), action="store_true", help="Compare against basecalled alignment. If two tracks input will look for \"moves\" group in second track, otherwise will look in the first track."),
-    Opt(("-s", "--save"), action="store_true", help="Will save in database if included, otherwise will output to TSV. Will be associated with the first track listed."),
-    Opt(("-j", "--jaccard"), action="store_true", help="Will compute per-reference raw sample jaccard distances. Output by default if no other statistics are specified."),
-    Opt(("-d", "--mean-ref-dist"), action="store_true", help="Will compute mean reference coordinate distances between raw samples of alignments of the same read. Output by default if no other statistics are specified."),
+    Opt(("-m", "--moves"), action="store_true", help="Compare against basecalled alignment. If two tracks input will look for \"moves\" group in second track, otherwise will look in the first track."),
+    Opt("--tsv-cols", "tracks.io", type=comma_split, default="dtwcmp,mvcmp"),
+    Opt("--tsv-na", "tracks.io", nargs="?", const="-"),
+    Opt("--tsv-noref", "tracks.io", action="store_true"),
+    MutexOpts("output", [
+        Opt("--tsv-out", "tracks.io", nargs="?", const="-"),
+        Opt("--bam-out", "tracks.io", nargs="?", const="-"),
+    ]),
+    #Opt(("-s", "--save"), action="store_true", help="Will save in database if included, otherwise will output to TSV. Will be associated with the first track listed."),
+    #Opt(("-j", "--jaccard"), action="store_true", help="Will compute per-reference raw sample jaccard distances. Output by default if no other statistics are specified."),
+    #Opt(("-d", "--mean-ref-dist"), action="store_true", help="Will compute mean reference coordinate distances between raw samples of alignments of the same read. Output by default if no other statistics are specified."),
     CONFIG_OPT,
     #Opt(("-o", "--output"), choices=["db", "tsv"], help="If \"db\" will output into the track database. If \"tsv\" will output a tab-delimited file to stdout."),
 )
@@ -132,12 +153,16 @@ REFSTATS_OPTS = (
     Opt("refstats", type=comma_split,
         help="Comma-separated list of summary statistics to compute. Some statisitcs (ks) can only be used if exactly two tracks are provided {%s}" % ",".join(ALL_REFSTATS)),
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
-    Opt(("-t", "--tracks"), "tracks.io", "in_names", type=comma_split),
+    Opt(("-t", "--tracks"), "tracks.io", "input_names", type=comma_split),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
     Opt("--min-coverage", "tracks"),
+    Opt("--bed-filter", "tracks.io"),
     Opt(("--ref-chunksize"), "tracks.io"),
     Opt(("--aln-chunksize"), "tracks.io"),
     Opt(("-c", "--cov"), action="store_true", help="Output track coverage for each reference position"),
+    Opt("--ref-index", "tracks", "ref_index"), 
+    Opt(("-m", "--pore-model"), "pore_model", "name", default=None),
+    Opt(("-p", "--processes"), "tracks.io"),
 )
 
 DTW_CMD_OPTS = DTW_OPTS + (
@@ -157,6 +182,8 @@ DTW_CMD_OPTS = DTW_OPTS + (
 TRAIN_OPTS = (
     Opt(("-i", "--train-iterations"), "train", "iterations"), 
     Opt(("-m", "--init-model"), "train"),
+    Opt("--init-mode", "train"),
+    Opt("--moves-avg", "train", type=comma_split),
     Opt(("-k", "--kmer-len"), "train"),
     Opt("--kmer-samples", "train"), 
     Opt("--buffer-size", "train"), 
@@ -181,7 +208,7 @@ REFPLOT_OPTS = (
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend"),
     Opt("ref_bounds", "tracks", type=str_to_coord),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
-    Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
+    Opt(("-l", "--read-filter"), "read_index", type=parse_read_ids),
     Opt(("-L", "--layer"), "refplot"),
     CONFIG_OPT,
     #Opt(("-o", "--outfile"), "vis"),
@@ -189,7 +216,6 @@ REFPLOT_OPTS = (
 
 DOTPLOT_OPTS = (
     MutexOpts("input", [
-        Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
         Opt("--bam-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
         Opt("--eventalign-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
     ]),
@@ -197,6 +223,7 @@ DOTPLOT_OPTS = (
     Opt(("-o", "--out-prefix"), type=str, default=None, help="If included will output images with specified prefix, otherwise will display interactive plot."),
 
     Opt("--ref", "tracks", "ref_index"), 
+    Opt("--names", "tracks.io", "input_names", type=comma_split), 
     Opt("--reads", "read_index", "paths", nargs="+", type=str),
     Opt(("-x", "--read-index"), "read_index"),
     Opt(("-r", "--recursive"), "read_index", action="store_true"),
@@ -204,7 +231,8 @@ DOTPLOT_OPTS = (
 
     Opt(("-f", "--out-format"), default="svg", help="Image output format. Only has an effect with -o option.", choices={"pdf", "svg", "png"}),
     Opt(("-R", "--ref-bounds"), "tracks", type=str_to_coord),
-    Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
+    #Opt(("-l", "--read-filter"), "tracks", type=parse_read_ids),
+    Opt(("-l", "--read-filter"), "read_index", type=parse_read_ids),
     Opt(("-L", "--layers"), "dotplot", "layers", type=comma_split),
     Opt(("-b", "--moves-track"), "dotplot"),
     Opt(("-p", "--pore-model"), "pore_model", "name", default=None),
@@ -219,7 +247,6 @@ DOTPLOT_OPTS = (
 TRACKPLOT_OPTS = (
     Opt("ref_bounds", "tracks", type=str_to_coord),
     MutexOpts("input", [
-		Opt("--sql-in", "tracks.io", type=comma_split, action="extend"),
 		Opt("--bam-in", "tracks.io", nargs="?", const="-", type=comma_split, action="extend"),
 	]),
 
@@ -231,7 +258,8 @@ TRACKPLOT_OPTS = (
     Opt("--pore-model", "pore_model", "name"),
 
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
-    Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
+    #Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
+    Opt(("-l", "--read-filter"), "read_index", type=parse_read_ids),
     Opt(("-H", "--panel-heights"), "trackplot", nargs="+", type=int),
     Opt(("--shared-refs-only"), "tracks", action="store_true"),
     Opt(("--shared-reads-only"), "tracks", action="store_true"),
@@ -242,9 +270,8 @@ TRACKPLOT_OPTS = (
 )
 
 BROWSER_OPTS = (
-    Opt("ref_bounds", "tracks", type=str_to_coord),
+    Opt("ref_bounds", "tracks", type=RefCoord),
     #MutexOpts("input", [
-    Opt("--sql-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"),
     Opt("--bam-in", "tracks.io", type=comma_split, action="extend", nargs="?", const="-"), #, required=True
 	#]),
 
@@ -259,7 +286,8 @@ BROWSER_OPTS = (
     Opt(("-l", "--read_filter"), "tracks", type=parse_read_ids),
     Opt(("-f", "--full-overlap"), "tracks", action="store_true"),
     Opt("--pore-model", "pore_model", "name"),
-    Opt(("-p", "--browser-port"), help="Browser port", default=8000),
+    Opt("--names", "tracks.io", "input_names", type=comma_split), 
+    Opt(("-p", "--port"), help="Browser port", default=8000),
     Opt(("-o", "--outfile"), "trackplot"),
     CONFIG_OPT,
 )
@@ -293,14 +321,9 @@ CMDS = {
     "train" : ("dtw.train", 
         "Iteratively train a new k-mer pore model", TRAIN_OPTS), 
     "refstats" : ("stats.refstats", "Calculate per-reference-coordinate statistics", REFSTATS_OPTS),
-    #"readstats" : ("stats.readstats", "", READSTATS_OPTS),
-    #"layerstats" : (None, 
-    #        """Compute distance between alignments of the same reads\n"""
-    #        """subcommand options:\n""" 
-    #        """compare  Compute distance between alignments of the same reads\n""", {
-    #    "compare" : ("stats.layerstats", "Compute distance between alignments of the same reads", COMPARE_OPTS),
-    #}),
-    #"dotplot" : ("vis.dotplot", "Plot signal-to-reference alignment dotplots", DOTPLOT_OPTS),
+    "readstats" : ("stats.readstats", "", READSTATS_OPTS),
+    "compare" : ("stats.layerstats", "Compute distance between alignments of the same reads", COMPARE_OPTS),
+    "dotplot" : ("vis.dotplot", "Plot signal-to-reference alignment dotplots", DOTPLOT_OPTS),
     "refplot" : ("vis.refplot", "Plot alignment tracks and per-reference statistics", REFPLOT_OPTS),
     "trackplot" : ("vis.trackplot", "Plot alignment tracks and per-reference statistics", TRACKPLOT_OPTS+TRACKPLOT_PANEL_OPTS),
     "browser" : ("vis.browser", "Interactive signal alignment genome browser", BROWSER_OPTS),
@@ -318,7 +341,7 @@ _help_lines = [
     "\treadstats  Perform per-read analyses of DTW alignments",
     #"\tlayerstats Compute, compare, and query alignment layers", "",
     "DTW Visualization:",
-    #"\tdotplot    Plot signal-to-reference alignment dotplots",
+    "\tdotplot    Plot signal-to-reference alignment dotplots",
     "\ttrackplot  Plot alignment tracks and per-reference statistics",
     "\tbrowser    Interactive signal alignment genome browser",
     #"\tsigplot    " + sigplot.main.__doc__,

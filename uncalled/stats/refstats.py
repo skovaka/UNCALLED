@@ -14,6 +14,8 @@ from ..dtw.layers import parse_layers
 from ..argparse import Opt, comma_split
 from ..index import str_to_coord
 
+def refstats_single(tracks):
+    pass
 
 def refstats(conf):
     """Calculate per-reference-coordinate statistics"""
@@ -22,10 +24,13 @@ def refstats(conf):
     t0 = time.time()
 
     conf.tracks.shared_refs_only = True
+    conf.shared_refs_only = True
+    conf.read_index.load_signal = False
 
     tracks = Tracks(conf=conf)
     conf = tracks.conf
-    conf.shared_refs_only = True
+
+    #if conf.tracks.io.processes == 1
 
     stats = RefstatsSplit(conf.refstats, len(tracks.alns))
     layers = list(parse_layers(conf.tracks.layers, False))
@@ -37,8 +42,8 @@ def refstats(conf):
 
     for track in tracks.alns:
         name = track.name
-        if conf.cov:
-            columns.append(".".join([track.name, "cov"]))
+        #if conf.cov:
+        #    columns.append(".".join([track.name, "cov"]))
         for group, layer in layers:
             for stat in stats.layer:
                 columns.append(".".join([track.name, group, layer, stat]))
@@ -55,18 +60,13 @@ def refstats(conf):
     for chunk in tracks.iter_refs():
         chunk.prms.refstats = conf.refstats
         chunk.prms.refstats_layers = layers
+        stats = chunk.refstats#
+        if stats is None: 
+            stats = chunk.calc_refstats(conf.cov)
 
-        stats = chunk.calc_refstats(conf.cov)
-        if stats is None: continue
-        #stats["kmer"] = tracks.model.kmer_to_str(chunk.coords.ref_kmers.loc[(chunk.coords.strands, stats.index)])
-
-        #if conf.verbose_refs:
         stats = pd.concat({chunk.coords.name : stats}, axis=0)\
                   .reset_index(level="seq.fwd")
         stats["seq.strand"] = stats["seq.fwd"].replace({True:"+",False:"-"})
         stats.set_index("seq.strand",append=True,inplace=True)
         del stats["seq.fwd"]
-        #stats.index = pd.MultiIndex.from_product([
-        #    [chunk.coords.name], stats.index.get_level_values(0), stats.index.get_level_values(1)
-        #])
         sys.stdout.write(stats.to_csv(sep="\t",header=False,na_rep=0))

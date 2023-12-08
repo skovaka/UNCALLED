@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from time import time
 
+from _uncalled import PoreModelParams
 from ...pore_model import PoreModel
 from ..aln_track import AlnTrack
 from ...aln import LAYER_META, parse_layers
@@ -52,7 +53,7 @@ class ModelTrainer(TrackIO):
         self.model = None
 
         if self.tprms.append and not self.prms.buffered:
-            prev_models = glob(f"{self.filename}/it*.model.tsv")
+            prev_models = glob(f"{self.filename}/it*.model.npz")
             if len(prev_models) == 0:
                 raise ValueError("--append can only be used with existing model training directory")
 
@@ -103,8 +104,8 @@ class ModelTrainer(TrackIO):
         #dtw = track.layers.loc[mask, LAYERS]["dtw"].set_index("kmer", drop=True) #\
          #.sort_index() 
 
-        df = aln.to_pandas(LAYERS+["mvcmp"])
-        mask = df["mvcmp","dist"] <= 1
+        df = aln.to_pandas(LAYERS+["mvcmp"]).dropna()
+        mask = df["mvcmp","dist"] <= self.conf.train.max_moves_dist
         dtw = df[mask][LAYERS].droplevel(0,axis=1).set_index("kmer") #[LAYERS]#.set_index("seq.kmer", drop=True) #\
 
         if self.prms.buffered:
@@ -113,25 +114,10 @@ class ModelTrainer(TrackIO):
             self.write_buffer([dtw])
 
     def write_buffer(self, out=[], force=False):
-        #t = time()
-        #for df in out:
-        #    df = df.drop(self.full_kmers, errors="ignore")
-        #    kc = df.index.value_counts()
-        #    self.kmer_counts[kc.index] += kc.to_numpy()
-
-        #    full = self.kmer_counts >= self.tprms.kmer_samples
-        #    if np.any(full):
-        #        self.full_kmers.update(self.kmer_counts.index[full])
-        #        #self.kmer_counts = self.kmer_counts[~full]
-
-        #    self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
-        #    self.buff_len += len(df)
-
         if len(out) > 0:
             df = pd.concat(out) \
                    .sort_index() \
                    .drop(self.full_kmers, errors="ignore") 
-
 
             kc = df.index.value_counts()
             self.kmer_counts[kc.index] += kc.to_numpy()
@@ -143,6 +129,7 @@ class ModelTrainer(TrackIO):
 
             self.out_buffer.append(df.reset_index().to_records(index=False,column_dtypes=dict(self.row_dtype)))
             self.buff_len += len(df)
+
 
         if self.buff_len == 0 or (self.buff_len * self.itemsize < self.tprms.buffer_size*10**6 and not force):
             return
@@ -201,9 +188,7 @@ class ModelTrainer(TrackIO):
                 #mn,mx = np.percentile(a, [25,75])
                 return a#[(a >= mn) & (a <= mx)]
 
-            #print(len(rows))
             current = filt(rows["current"])
-            #print(len(current))
             current_sd = filt(rows["current_sd"])
             dwell = filt(rows["dwell"])
 
@@ -220,11 +205,36 @@ class ModelTrainer(TrackIO):
                 len(rows)
             ))
 
-        df = pd.DataFrame(model_rows, columns=["kmer", "current.mean", "current_sd.mean", "dwell.mean", "current.stdv", "current_sd.stdv", "dwell.stdv", "count"]).set_index("kmer").reindex(self.model.KMERS)
+        df = pd.DataFrame(model_rows, columns=["kmer", "current.mean", "current_sd.mean", "dwell.mean", "current.stdv", "current_sd.stdv", "dwell.stdv", "count"])#.set_index("kmer").reindex(self.model.KMERS)
 
         subs_locs = np.array([0,self.model.K-1])
 
         #TODO plot pA change for each possible substitution for every kmer
+        prms = PoreModelParams(self.model.PRMS)
+
+        if self.conf.train.init_mode == "moves_avg" and self.conf.dtw.iterations == 0:
+            bases = self.conf.train.moves_avg
+            if bases is None:
+                bases = [self.model.shift]
+
+            for b in bases:
+                df[b] = self.model.kmer_base(self.model.KMERS, b)
+            #grp = df.groupby(bases) 
+            #df = df.set_index("base")
+
+            grp = df.groupby(bases)["current.mean"]
+
+            df = pd.DataFrame(df.set_index(bases)["kmer"])
+            df["current.mean"] = grp.median().loc[df.index]
+            df["current.stdv"] = grp.std().loc[df.index]
+            df["count"] = grp.count().loc[df.index]
+
+            #df["current.mean"] = grp.mean()
+            #df["current.stdv"] = grp.std()
+        else:
+            print("NOT OVERAGERS")
+            
+        df = df.set_index("kmer", drop=True).reindex(self.model.KMERS)
 
         for kmer in df.index[df["current.mean"].isna()]:
             subs = list()
@@ -242,17 +252,17 @@ class ModelTrainer(TrackIO):
 
         df["count"] = df["count"].astype(int)
             
-        #print(df)
         outfile = self._filename("model.npz")
         self.model.PRMS.name = outfile
-        model_out = PoreModel(model=df, params=self.model.PRMS, extra_cols=True)#k=self.model.PRMS.k, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True)
+        rev = prms.reverse
+        model_out = PoreModel(model=df, k=prms.k, extra_cols=True) #params=prms #k=self.model.PRMS.k, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True)
+        model_out.PRMS = self.model.PRMS
         model_out.to_npz(outfile)
 
         #self.set_model(PoreModel(outfile, reverse=self.model.PRMS.reverse, complement=self.model.PRMS.complement, extra_cols=True))
         self.set_model(PoreModel(params=self.model.PRMS, extra_cols=True))
 
         self.iter += 1
-        #print("write", self.model.PRMS.shift, self.model.PRMS.reverse, self.model.PRMS.complement)
         return self.model #outfile#self._filename("model.tsv")
         #return outfile
         

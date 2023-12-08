@@ -14,13 +14,12 @@ namespace py = pybind11;
 struct AlnDF {
     IntervalIndex<i64> index;
     IntervalIndex<i32> samples;
-    ValArray<float> current, current_sd; 
+    IntervalIndex<i32> sample_bounds;
+    ValArray<float> current, current_sd, events; 
 
     AlnDF() {}
 
     AlnDF(IntervalIndex<i64> index_) : index(index_) {
-        //current(index.length),
-        //current_sd(index.length)
         current = ValArray<float>(index_.length);
         current_sd = ValArray<float>(index_.length);
     }
@@ -29,22 +28,67 @@ struct AlnDF {
         index(index_),
         samples(start_, length_),
         current(init_arr(current_)),
-        current_sd(init_arr(current_sd_)) {}
+        current_sd(init_arr(current_sd_)) {
+        init_sample_bounds();
+    }
 
     AlnDF(IntervalIndex<i64> index_, IntervalIndex<i32> &samples_, py::array_t<float> current_, py::array_t<float> current_sd_) : 
         index(index_),
         samples(samples_),
         current(init_arr(current_)),
-        current_sd(init_arr(current_sd_)) {}
+        current_sd(init_arr(current_sd_)) {
+        init_sample_bounds();
+    }
+    
+    void init_sample_bounds() {
+        sample_bounds = IntervalIndex<i32>();
+        sample_bounds.append(samples.get_start(), samples.get_end());
+    }
+
+    void set_hard_gaps(const std::vector<size_t> idxs) {
+        sample_bounds = {};
+        auto start = samples.get_start(), end = start;
+        for (auto i : idxs) {
+            end = samples.coords[i-1].end;
+            assert(start < end);
+            sample_bounds.append(start, end);
+            start = samples.coords[i].start;
+        }
+        end = samples.get_end();
+        sample_bounds.append(start, end);
+    }
 
     AlnDF slice(size_t i, size_t j) {
+        //std::cout << "in\n";
+        //std::cout.flush();
         AlnDF ret(index.islice(i, j));
+        //std::cout << "it\n";
+        //std::cout.flush();
         for (size_t k = i; k < j; k++) {
             ret.samples.append(samples.coords[k]);
             ret.current[k-i] = current[k];
             ret.current_sd[k-i] = current_sd[k];
         }
+        //std::cout << sample_bounds.to_string() << "\n";
+        //std::cout << "SL" << ret.samples.get_start() << " " << ret.samples.get_end() << "\n";
+        //std::cout.flush();
+        ret.sample_bounds = sample_bounds.slice(ret.samples.get_start(), ret.samples.get_end());
+        //std::cout << "rt\n";
+        //std::cout.flush();
         return ret;
+    }
+
+    AlnDF trim_na() {
+        size_t start_na = 0, end_na = 0;
+        for (size_t i = 0; i < size(); i++) {
+            if (index.coords[i].is_valid()) break;
+            start_na += 1;
+        }
+        for (size_t i = size()-1; i < size(); i--) {
+            if (index.coords[i].is_valid()) break;
+            end_na += 1;
+        }
+        return slice(start_na, size()-end_na);
     }
 
     void set_signal(const ProcessedRead &read) {
@@ -62,6 +106,13 @@ struct AlnDF {
         }
     }
 
+
+    void mask_i(size_t i) {
+        if (current.size() > 0) current[i] = current.NA;         
+        if (current_sd.size() > 0) current_sd[i] = current_sd.NA;
+        samples.coords[i].clear();                               
+    }
+
     void mask(py::array_t<bool> mask_py) {
         PyArray<bool> mask(mask_py);
         if (mask.size() != size()) {
@@ -69,9 +120,10 @@ struct AlnDF {
         }
         for (size_t i = 0; i < size(); i++) {
             if (!mask[i]) {
-                if (current.size() > 0) current[i] = current.NA;
-                if (current_sd.size() > 0) current_sd[i] = current_sd.NA;
-                samples.coords[i].clear();
+                mask_i(i);
+                //if (current.size() > 0) current[i] = current.NA;
+                //if (current_sd.size() > 0) current_sd[i] = current_sd.NA;
+                //samples.coords[i].clear();
             }
         }
     }
@@ -96,6 +148,7 @@ struct AlnDF {
         c.def(py::init<IntervalIndex<i64>&, IntervalIndex<i32>&, py::array_t<float>, py::array_t<float>>());
         c.def(py::init<IntervalIndex<i64>&, py::array_t<i32>, py::array_t<i32>, py::array_t<float>, py::array_t<float>>());
         c.def("slice", &AlnDF::slice);
+        c.def("trim_na", &AlnDF::trim_na);
         c.def("empty", &AlnDF::empty);
         c.def("mask", &AlnDF::mask);
         c.def("set_signal", &AlnDF::set_signal);
@@ -104,6 +157,8 @@ struct AlnDF {
         c.def_readwrite("samples", &AlnDF::samples);
         c.def_readwrite("current", &AlnDF::current);
         c.def_readwrite("current_sd", &AlnDF::current_sd);
+        c.def_readwrite("events", &AlnDF::events);
+        c.def_readwrite("sample_bounds", &AlnDF::sample_bounds);
         return c;
     }
 };
@@ -111,16 +166,23 @@ struct AlnDF {
 struct CmpDF {
     
     IntervalIndex<i64> index;
-    ValArray<float> dist, jaccard;
+    ValArray<float> dist, jaccard, current, current_sd;
 
     CmpDF() {}
 
-    CmpDF(AlnDF &a, AlnDF &b) {
+    CmpDF(AlnDF &a, AlnDF &b, bool symetric) {
 
         index = a.index.intersect(b.index);
 
         dist.resize(index.length);
         jaccard.resize(index.length);
+
+        if (!a.current.empty() && !b.current.empty()) {
+            current.resize(index.length);
+        }
+        if (!a.current_sd.empty() && !b.current_sd.empty()) {
+            current_sd.resize(index.length);
+        }
 
         i64 ref;
 
@@ -136,22 +198,45 @@ struct CmpDF {
             } else {
                 jaccard[i] = jaccard.NA;
             }
+            if (!a.current.empty() && !b.current.empty()) {
+                current[i] = a.current[ai] - b.current[bi];
+            }
+            if (!a.current_sd.empty() && !b.current_sd.empty()) {
+                current_sd[i] = a.current_sd[ai] - b.current_sd[bi];
+            }
         }
 
-        DistIter ab(a,b), ba(b,a);
+        if (symetric) {
+            DistIter ab(a,b), ba(b,a);
 
-        //for (auto &r : rec) {
-        for (size_t i = 0; i < index.length; i++) {
-            auto ref = index[i];
-            auto d0 = ab.next_dist(ref);
-            auto d1 = ba.next_dist(ref);
-            auto denom = d0.length + d1.length;
-            if (denom > 0) {
-                dist[i] = (d0.dist + d1.dist) / denom;
-            } else {
-                dist[i] = dist.NA;
-                if (ab.ended() && ba.ended()) break;
+            //for (auto &r : rec) {
+            for (size_t i = 0; i < index.length; i++) {
+                auto ref = index[i];
+                auto d0 = ab.next_dist(ref);
+                auto d1 = ba.next_dist(ref);
+                auto denom = d0.length + d1.length;
+                if (denom > 0) {
+                    dist[i] = (d0.dist + d1.dist) / denom;
+                } else {
+                    dist[i] = dist.NA;
+                    if (ab.ended() && ba.ended()) break;
+                }
             }
+        } else {
+            DistIter ab(a,b);
+
+            //for (auto &r : rec) {
+            for (size_t i = 0; i < index.length; i++) {
+                auto ref = index[i];
+                auto d = ab.next_dist(ref);
+                if (d.length > 0) {
+                    dist[i] = d.dist / d.length;
+                } else {
+                    dist[i] = dist.NA;
+                    if (ab.ended()) break;
+                }
+            }
+
         }
     }
 
@@ -221,12 +306,14 @@ struct CmpDF {
 
     static void pybind(py::module_ &m) {
         auto c = py::class_<CmpDF>(m, "_CmpDF");
-        c.def(py::init<AlnDF&, AlnDF&>());
+        c.def(py::init<AlnDF&, AlnDF&, bool>());
         c.def("empty", &CmpDF::empty);
         c.def("__len__", &CmpDF::size);
         c.def_readonly("index", &CmpDF::index);
         c.def_readonly("dist", &CmpDF::dist);
         c.def_readonly("jaccard", &CmpDF::jaccard);
+        c.def_readonly("current", &CmpDF::current);
+        c.def_readonly("current_sd", &CmpDF::current_sd);
     }
 };
 
@@ -236,7 +323,7 @@ struct Alignment {
     std::string read_id;
     Sequence<ModelType> seq;
     AlnDF dtw, moves;
-    CmpDF mvcmp;
+    CmpDF mvcmp, dtwcmp;
 
     Alignment(int id_, const std::string &read_id_, Sequence<ModelType> seq_) :
         id(id_), read_id(read_id_), seq(seq_) {
@@ -250,21 +337,126 @@ struct Alignment {
         moves = df;
     }
 
-    void calc_mvcmp() {
-        if (!(dtw.empty() || moves.empty())) {
-            mvcmp = CmpDF(dtw, moves);
+    void calc_dtwcmp(Alignment &aln) {
+        if (!(dtw.empty() || aln.dtw.empty())) {
+            dtwcmp = CmpDF(dtw, aln.dtw, true);
         }
     }
+
+    void calc_mvcmp() {
+        if (!(dtw.empty() || moves.empty())) {
+            mvcmp = CmpDF(dtw, moves, false);
+            //mvcmp = CmpDF(dtw, moves, true);
+        }
+    }
+
+    void mask_skips(bool keep_best) {
+        if (keep_best) mask_skips<true>();
+        else mask_skips<false>();
+    }
+
+    void mask_skips(py::array_t<float> cost_py) {
+        PyArray<float> costs(cost_py);
+        
+        auto prev_start = dtw.samples.coords[0].start;
+        int nskips = 0;
+        for (size_t i = 1; i < dtw.size(); i++) {
+            auto start = dtw.samples.coords[i].start;
+            if (start == prev_start) {
+                nskips++;
+            } else if (nskips > 0) {
+                mask_skip(i-nskips-1, i, costs);
+                nskips = 0;
+            }
+            prev_start = start;
+        }
+
+        if (nskips > 0) {
+            mask_skip(dtw.size()-nskips-1, dtw.size(), costs);
+        }
+    }
+
+    void mask_skip(size_t start, size_t end, const PyArray<float> &cost) {
+        float best = INFINITY;
+        size_t best_i = -1;
+        for (size_t i = start; i < end; i++) {
+            if (cost[i] < best) {
+                best_i = i;
+                best = cost[i];
+            }
+        }
+        for (size_t i = start; i < end; i++) {
+            if (i != best_i) {
+                dtw.mask_i(i);
+            }
+        }
+    }
+
+    template<bool keep_best>
+    void mask_skips() {
+        auto prev_start = dtw.samples.coords[0].start;
+        int nskips = 0;
+        for (size_t i = 1; i < dtw.size(); i++) {
+            auto start = dtw.samples.coords[i].start;
+            if (start == prev_start) {
+                nskips++;
+            } else if (nskips > 0) {
+                mask_skip<keep_best>(i-nskips-1, i);
+                nskips = 0;
+            }
+            prev_start = start;
+        }
+
+        if (nskips > 0) {
+            mask_skip<keep_best>(dtw.size()-nskips-1, dtw.size());
+        }
+    }
+
+    template <bool keep_best> 
+    typename std::enable_if<keep_best, void>::type
+    mask_skip(size_t start, size_t end) {
+        float best = INFINITY;
+        size_t best_i = -1;
+        for (size_t i = start; i < end; i++) {
+            auto abs_diff = abs(dtw.current[i] - seq.current[i]);
+            if (abs_diff < best) {
+                best_i = i;
+                best = abs_diff;
+            }
+        }
+        for (size_t i = start; i < end; i++) {
+            if (i != best_i) {// && abs(dtw.current[i] - seq.current[i]) > 2*dtw.current_sd[i]) {
+            dtw.mask_i(i);
+            }
+        }
+    }
+
+    template <bool keep_best> 
+    typename std::enable_if<!keep_best, void>::type
+    mask_skip(size_t start, size_t end) {
+        for (size_t i = start; i < end; i++) {
+            auto abs_diff = abs(dtw.current[i] - seq.current[i]);
+            //if (abs_diff >= seq.current_sd[i]) {
+            if (abs_diff >= 2*dtw.current_sd[i]) {
+                dtw.mask_i(i);
+            }
+        }
+    }
+
 
     static void pybind(py::module_ &m, std::string suffix) {
         py::class_<Alignment> c(m, ("_Alignment"+suffix).c_str());
         c.def(py::init<int, const std::string &, Sequence<ModelType>>());
         c.def("set_dtw", &Alignment::set_dtw);
         c.def("set_moves", &Alignment::set_moves);
+        c.def("calc_dtwcmp", &Alignment::calc_dtwcmp);
         c.def("calc_mvcmp", &Alignment::calc_mvcmp);
+        c.def("mask_skips", static_cast<void (Alignment::*)(bool)>(&Alignment::mask_skips));
+        c.def("mask_skips", static_cast<void (Alignment::*)(py::array_t<float>)>(&Alignment::mask_skips));
         c.def_readwrite("id", &Alignment::id);
         c.def_readwrite("read_id", &Alignment::read_id);
         c.def_readonly("seq", &Alignment::seq);
+        c.def_readonly("_dtwcmp", &Alignment::dtwcmp);
         c.def_readonly("_mvcmp", &Alignment::mvcmp);
         c.def_readonly("_dtw", &Alignment::dtw);
         c.def_readonly("_moves", &Alignment::moves);

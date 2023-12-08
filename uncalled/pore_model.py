@@ -13,21 +13,6 @@ from . import config
 
 PORE_MODEL_PRESETS = {}
 
-WORKFLOW_PRESETS = {
-   "dna_r10.3_450bps" : "",
-   "dna_r10.3_450bps" : "",
-   "dna_r10.4.1_e8.2_260bps" : "",
-   "dna_r10.4.1_e8.2_400bps" : "",
-   "dna_r10_450bps" : "",
-   "dna_r10.4_e8.1" : "",
-   "dna_r10.4_e8.1m" : "",
-   "dna_r9.4.1_450bps" : "r94_dna",
-   "dna_r9.4.1_e8.1" : "r94_dna",
-   "dna_r9.4.1_e8.1m" : "r94_dna",
-   "dna_r9.5_450bps" : "r94_dna",
-   "rna_r9.4.1_70bps" : "r94_rna"
-}
-
 CACHE = dict()
 
 PARAM_TYPES = {
@@ -45,10 +30,31 @@ PARAM_TYPES = {
     "kit" : str
 }
 
+#https://droog.gs.washington.edu/parc/images/iupac.html
+NT_CODES = {
+    "A" : [0],
+    "C" : [1],
+    "G" : [2],
+    "T" : [3],
+    "M" : [0, 1],
+    "R" : [0, 2],
+    "W" : [0, 3],
+    "S" : [1, 2],
+    "Y" : [1, 3],
+    "K" : [2, 3],
+    "V" : [0, 1, 2],
+    "H" : [0, 1, 3],
+    "D" : [0, 2, 3],
+    "B" : [1, 2, 3],
+    "N" : None
+}
+
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class PoreModel:
+
+    BASES = np.array(["A","C","G","T"])
 
     PRESET_DIR = os.path.join(ROOT_DIR, "models")
     PRESET_EXT = ".npz"
@@ -96,10 +102,10 @@ class PoreModel:
 
         vals = None
 
-
         is_preset = False
 
         if model is not None: 
+            #Initialize from another PoreModel
             if isinstance(getattr(model, "PRMS", None), PoreModelParams):
                 self._init(model.PRMS, model)
             
@@ -133,7 +139,7 @@ class PoreModel:
 
             else:
                 models = ", ".join(PORE_MODEL_PRESETS.keys())
-                raise FileNotFoundError(f"PoreModel file not found: {filename}")
+                raise FileNotFoundError(f"PoreModel file not found: {filename}. Choose one of: {models}")
 
         else:
             self._init_new(prms)
@@ -143,7 +149,7 @@ class PoreModel:
             CACHE[cache_key] = self
 
     def _init_new(self, prms, *args):
-        if prms.k <= 8:
+        if prms.k < 8:
             ModelType = _uncalled.PoreModelU16
         else:
             ModelType = _uncalled.PoreModelU32
@@ -152,6 +158,9 @@ class PoreModel:
             prms.shift = PoreModel.get_kmer_shift(prms.k)
 
         self._init(prms, ModelType(prms, *args))
+
+        if prms.shift > 0 and self.PRMS.shift != prms.shift:
+            self.PRMS.shift = prms.shift,
 
     def _init(self, prms, model):
 
@@ -175,7 +184,7 @@ class PoreModel:
         if prms.shift >= 0:
             self.PRMS.shift = prms.shift
 
-        if self.K > 8:
+        if self.K >= 8:
             self.kmer_dtype = "uint32"
             self.array_type = ArrayU32
         else:
@@ -216,20 +225,28 @@ class PoreModel:
     }
 
     def _vals_from_df(self, prms, df, preprocess):
-        df = df.rename(columns=self.TSV_RENAME)
-        extra = df.columns.difference(self.COLUMNS)
-        for col in extra:
-            #self._cols[col] = df[col].to_numpy()
-            self._extra[col] = df[col].to_numpy()
+        df = df.rename(columns=self.TSV_RENAME).copy()
+        if self._extra is not None:
+            extra = df.columns.difference(self.COLUMNS)
+            for col in extra:
+                #self._cols[col] = df[col].to_numpy()
+                self._extra[col] = df[col].to_numpy()
 
-        if preprocess:
-            df = df.reset_index().sort_values("kmer")
+        if "kmer" in df.columns:
+            if preprocess:
+                df = df.reset_index().sort_values("kmer")
 
-        if prms.k < 0:
-            kmer_lens = df["kmer"].str.len().value_counts()
-            if len(kmer_lens) > 1:
-                raise ValueError("All kmer lengths must be the same, found lengths: " + ", ".join(map(str, kmer_lens.index)))
-            prms.k = kmer_lens.index[0]
+            if prms.k < 0:
+                kmer_lens = df["kmer"].str.len().value_counts()
+                if len(kmer_lens) > 1:
+                    raise ValueError("All kmer lengths must be the same, found lengths: " + ", ".join(map(str, kmer_lens.index)))
+                prms.k = kmer_lens.index[0]
+        else:
+            k = np.log2(len(df))/2.0
+            if k != np.round(k):
+                raise ValueError("DataFrame length must be power of 4 or include 'kmer' column")
+            prms.k = int(k)
+
 
         get = lambda c: df[c] if c in df else []
 
@@ -242,9 +259,11 @@ class PoreModel:
         for name,typ in PARAM_TYPES.items():
             dname = "_"+name
             if dname in d:
-                v = getattr(prms, name)
-                if typ != np.int32 or v < 0:
-                    setattr(prms, name, typ(d[dname]))
+                old_val = getattr(prms, name)
+                new_val = typ(d[dname])
+                if ((typ != np.int32 or new_val >= 0) and 
+                    (not hasattr(new_val, "__len__") or len(new_val) > 0)):
+                    setattr(prms, name, new_val)
                 del d[dname]
 
         for k,v in d.items():
@@ -279,14 +298,15 @@ class PoreModel:
     def __getitem__(self, idx):
         if isinstance(idx, str):
             return self._base[idx]
-        return self.mean.current[self.kmer_array(idx)]
+        return self.current.mean[self.kmer_array(idx)]
 
     def __getattr__(self, name):
-        if not hasattr(self.instance, name):
-            if hasattr(self.PRMS, name):
-                return getattr(self.PRMS, name)
-            raise ValueError(f"PoreModel has no attribute '{name}'")
-        return self.instance.__getattribute__(name)
+        ret = getattr(self.instance, name, None)
+        if ret is None:
+            ret = getattr(self.PRMS, name, None)
+            if ret is None:
+                raise ValueError(f"PoreModel has no attribute '{name}'")
+        return ret #self.instance.__getattribute__(name)
 
     def kmer_array(self, kmer):
         arr = np.array(kmer)
@@ -340,11 +360,67 @@ class PoreModel:
                 d[f"{prefix}{name}"] = val 
         return d
 
-    def to_df(self, kmer_str=True):
-        return pd.DataFrame({
+    def to_df(self, kmer_str=True, bases=False):
+        df = pd.DataFrame({
             key : vals for key,vals in self.to_dict(kmer_str).items()
             if len(vals) > 0
         })
+        if bases:
+            for b in range(self.K):
+                df[b] = self.kmer_base(self.KMERS, b)
+        return df
+    
+    def reduce(self,st,en):
+        if st == 0 and en == self.K:
+            return self
+        elif st < 0 or en > self.K: 
+            return None
+        bases = list(np.arange(st, en))
+        k = len(bases)
+        df = self.to_df(bases=True)
+        #df = df.set_index(bases)
+        grp = df.groupby(by=bases)
+        df = pd.DataFrame({
+            "mean" : grp["current.mean"].mean()#.reset_index(drop=True)
+        })
+        df["kmer"] = np.arange(len(df))
+        m = PoreModel(model=df,k=k)
+        return m
+
+    def expand_old(self, start):
+        k = self.k+1
+        kmers = np.arange(4**k)
+        if start:
+            old_kmers = kmers & ((1 << (2*self.k)) - 1)
+        else:
+            old_kmers = kmers >> 2
+
+        df = pd.DataFrame({
+            "mean" : self.current.mean.to_numpy()[old_kmers],
+            "stdv" : self.current.stdv.to_numpy()[old_kmers],
+        })
+        return PoreModel(model=df,k=5,shift=self.shift+start)
+
+
+    def expand(self, start=0, end=0):
+        k = self.k+start+end
+        kmers = np.arange(4**k)
+        for i in range(end):
+            kmers >>= 2
+        kmers &= ((1 << (2*self.k)) - 1)
+
+        df = pd.DataFrame({
+            "mean" : self.current.mean.to_numpy()[kmers],
+        })
+        if len(self.current.stdv) > 0:
+            df["stdv"] = self.current.stdv.to_numpy()[kmers]
+
+        p = PoreModelParams(self.PRMS)
+        p.k = k
+        p.shift += start
+        m = PoreModel(model=df)
+        m.PRMS = p
+        return m
 
     def to_tsv(self, out=None):
         return self.to_df().to_csv(out, sep="\t", index=False)
@@ -377,6 +453,23 @@ class PoreModel:
         means = self.current.mean.to_numpy() * scale + shift
         vals = np.ravel(np.dstack([means,self.stdvs]))
         return PoreModel(self.ModelType(vals), name=self.name)
+
+    def pattern_mask(self, pattern, kmers):
+        mask = np.ones(len(kmers), bool)
+        for i in range(self.instance.K):
+            nucs = NT_CODES[pattern[i]]
+            if nucs is None:
+                continue
+            pos_mask = np.zeros(len(kmers), bool)
+            for n in nucs:
+                pos_mask |= (self.instance.kmer_base(kmers, i) == n)
+            mask &= pos_mask
+        return mask
+
+    def pattern_filter(self, pattern, kmers=None):
+        if kmers is None:
+            kmers = self.KMERS
+        return kmers[self.pattern_mask(pattern, kmers)]
     
     def __setstate__(self, d):
         self.__init__(model=d)

@@ -9,8 +9,7 @@ IOParams._def_params(
     ("processes", 1, int, "Number of parallel processes"),
     ("bam_chunksize", 500, int, "Per-process alignment bam_chunksize"),
 
-    ("sql_in", None, None, "Input track database"),
-    ("sql_out", None, str, "Output track database"),
+    ("bed_filter", None, str, "Only parse regions in BED file"),
 
     ("tsv_out", None, str, "TSV output file (or \"-\"/no argument for stdout)"),
     ("tsv_cols", ["dtw"], list, "TSV file output alignment layers (comma-separated, can also include \"read_id\""),
@@ -19,6 +18,9 @@ IOParams._def_params(
 
     ("bam_in", None, None, "BAM input file (or \"-\"/no argument for stdin)"),
     ("bam_out", None, str, "BAM output file (or \"-\"/no argument for stdout)"),
+    #("bam_extra", None, None, ""),
+
+    ("m6anet_out", None, str, "Output m6anet dataprep directory"),
 
     ("model_dir", None, str, "Pore model training output directory"),
 
@@ -34,7 +36,7 @@ IOParams._def_params(
     ("guppy_in", None, str, "Guppy directory containing sequencing summary, BAM files, and FAST5s"),
 
     ("out_name", None, str, "Output track name (defaults to file basename)"),
-    ("in_names", None, list, "Names of tracks to read from input(s)"),
+    ("input_names", None, list, "Names of tracks to read from input(s)"),
 
     ("init_track", True, bool, "If true will initialze track"),
 
@@ -56,8 +58,14 @@ TracksParams._def_params(
     ("read_filter", None, None, "Only load reads which overlap these coordinates"),
     ("max_reads", None, int, "Maximum number of reads to load"),
 
+    ("count_events", False, bool, "Compute and output per-reference event counts, where N > 1 indicates N-1 stays and N < 1 indicates 1/N skips"),
     ("mask_skips", None, None, "Either \"all\" to mask all skips, or \"keep_best\" to mask all but the closest to the model"),
+    ("skip_stdv_thresh", None, float, "Either \"all\" to mask all skips, or \"keep_best\" to mask all but the closest to the model"),
     ("mask_indels", None, int, "Mask positions which overlap basecalled alignment insertions or deletions of this length or longer"),
+    ("mvcmp_mask", None, float, "Will filter out positions with mvcmp.dist >= mvcmp_mask if specified"),
+    ("max_norm_dist", 2, float, "Maximum mvcmp.dist for posititions to be used for iterative normalization"),
+    ("max_sd", 1, float, "Maximum current standard deviation"),
+    ("min_aln_length", 100, int, "Minimum number of aligned bases"),
 
     ("full_overlap", False, bool, "If true will only include reads which fully cover reference bounds"),
     ("min_coverage", 1, int, "Reference positions with less than this coverage will be excluded from each track (or all tracks if shared_refs_only is true)"),
@@ -74,14 +82,16 @@ TracksParams._def_params(
     ("ref_index", None, str, "BWA index prefix"),
     ("load_fast5s", False, bool, "Load fast5 files"),
 
-    ignore_toml={"ref_bounds", "layers", "full_overlap", "refstats", "refstats_layers", "read_filter", "load_fast5s"}
+    ignore_toml={"ref_bounds", "full_overlap", "refstats", "refstats_layers", "read_filter", "load_fast5s"}
 )
 
 class TrainParams(config.ParamGroup):
     _name = "train"
 TrainParams._def_params(
     ("kmer_samples", 1000, int, "Maximum number of instances of each k-mer to use per training iteration"),
-    ("init_model", None, str, "Initial pore model. If not specified, iteration will be based on basecaller move alignments"),
+    ("init_model", "", str, "Initial pore model. If not specified, iteration will be based on basecaller move alignments"),
+    ("init_mode", "moves_avg", str, "How to initialize pore model if --init-model not specified ('moves_avg', 'moves')"),
+    ("moves_avg", None, None, "K-mer base offset(s) to average for initial moves-based model (comma seperated)"),
     ("init_events", 1000000, int, "Number of events to use for computing picoamp scaling parameters for new pore model"),
     ("kmer_len", None, int, "Output model k-mer length. Required if init_model is not specified"),
     ("iterations", 1, int, "Number of model training iterations"),
@@ -96,16 +106,18 @@ class ReadIndexParams(config.ParamGroup):
     _name = "read_index"
 ReadIndexParams._def_params(
     ("paths", None, list, "Paths to fast5, slow5, or pod5 files, or to directories containing those files (optionally recursive)"),
-    ("read_filter", None, list, "List of read IDs to load, or file containing one read ID per line"),
+    ("read_filter", None, None, "List of read IDs to load, or file containing one read ID per line"),
     ("read_index", None, str, "File containing a mapping of read IDs to filenames"),
-    ("read_count", None, int, "Maximum number of reads to load"),
+    ("default_read_index", "read_index.txt", str, "Filename for auto-generated read-to-file index"),
     ("recursive", None, bool, "Recursively search 'paths' for fast5, slow5, or pod5 files"),
+    ("read_count", None, int, "Maximum number of reads to load"),
+    ("load_signal", True, bool, "Must be set to true to load signal from FAST5/SLOW5/POD5"),
 )
 
 class VisParams(config.ParamGroup):
     _name = "vis"
 VisParams._def_params(
-    ("track_colors", ["#AA0DFE", "#1CA71C", "#4676FF", "#d90000"], list, "Track Colors"),
+    ("track_colors", ["#721ea9", "#4DA91E", "#cc114f", "#4676FF"], list, "Track Colors"),
     ("base_colors", ["#80ff80", "#6b93ff", "#ffe543", "#ff8080"], list, "Colors for each base (A,C,G,T/U)"), 
 )
 

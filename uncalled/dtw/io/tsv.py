@@ -11,7 +11,7 @@ EXTRA_FNS = {
 }
 
 EXTRA_COLS = pd.Index(EXTRA_FNS.keys())
-INDEX_COLS = [("seq","name"),("seq","pos"),("seq","strand")]
+INDEX_COLS = [("seq","name"),("seq","pos"),("seq","strand"),("aln","id")]
 
 class TSV(TrackIO):
     FORMAT = "tsv"
@@ -28,7 +28,11 @@ class TSV(TrackIO):
         TrackIO.init_write_mode(self)
 
         #layer_cols = pd.Index().difference(EXTRA_COLS)
-        self.extras = EXTRA_COLS.intersection(self.prms.tsv_cols)
+
+        #if "read_id" in self.prms.tsv_cols:
+        #    self.index_cols
+
+        #self.extras = EXTRA_COLS.intersection(self.prms.tsv_cols)
 
         self.layers = INDEX_COLS+self.prms.tsv_cols+["seq.kmer"]
         self.columns = pd.MultiIndex.from_tuples(self.layers)
@@ -47,8 +51,8 @@ class TSV(TrackIO):
             kmers = df[col].dropna()
             df[col] = self.tracks.model.kmer_to_str(kmers)
 
-        for col in self.extras:
-            df[col] = EXTRA_FNS[col](aln)
+        #for col in self.extras:
+        #    df[col] = EXTRA_FNS[col](aln)
 
         df.reset_index(inplace=True, drop=self.prms.tsv_noref)
 
@@ -58,15 +62,28 @@ class TSV(TrackIO):
                 ".".join([c for c in col if len(c) > 0]) 
                 for col in self.columns]
             self._header = False
-            if not self.prms.buffered:
-                self.output.write("\t".join(labels) + "\n")
+            if self.prms.buffered:
+                self._set_output(tuple(labels))
+            else:
+                self._set_output("\t".join(labels) + "\n")
 
-        df = df.loc[:,self.columns]
+        df = df.reindex(columns=self.columns)#.loc[:,self.columns]
 
-        out = df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False)
+        out = df.to_csv(sep="\t", header=False, na_rep=self.prms.tsv_na, index=False, float_format="%.6g")
 
         self._set_output(out)
 
+    def write_buffer(self, buf=None):
+        if buf is None:
+            buf = [self.out_buffer]
+
+        for out in buf:
+            if isinstance(out, tuple):
+                if self._header:
+                    self._header = False
+                    self.output.write("\t".join(out) + "\n")
+            else:
+                self.output.write(out)
 
     def close(self):
         if not self.prms.buffered:

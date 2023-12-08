@@ -1,5 +1,4 @@
 """Edit, merge, and ls alignment databases
-        print(d)
 
 subcommand options:
 ls       List all tracks in a database
@@ -23,11 +22,10 @@ from ...config import Config
 from ... import RefCoord, ExceptionWrapper
 from ...read_index import ReadIndex
 
-INPUT_PARAMS = np.array(["sql_in", "eventalign_in", "tombo_in", "bam_in"])
-OUTPUT_PARAMS = np.array(["sql_out", "tsv_out", "eventalign_out", "bam_out", "model_dir"])
+INPUT_PARAMS = np.array(["eventalign_in", "tombo_in", "bam_in"])
+OUTPUT_PARAMS = np.array(["tsv_out", "eventalign_out", "bam_out", "model_dir", "m6anet_out"])
 
 OUT_EXT = {
-    "sql_out" : "db", 
     "tsv_out" : "tsv", 
     "eventalign_out" : "txt", 
     "bam_out" : "bam"
@@ -46,6 +44,11 @@ class TrackIO:
         self.prms = self.conf.tracks.io
         self.next_id = track_count+1
 
+        if self.prms.input_names is not None and len(self.prms.input_names) > track_count:
+            self.input_name = self.prms.input_names[track_count]
+        else:
+            self.input_name = os.path.basename(filename)
+
         self.read = None
         self.bam = None
 
@@ -59,11 +62,6 @@ class TrackIO:
         elif isinstance(filename, str):
             self.filename = filename
 
-        if self.prms.in_names is not None:
-            self.in_tracks = self.prms.in_names
-        else:
-            self.in_tracks = None
-
         self.write_mode = write
 
     @property
@@ -75,9 +73,6 @@ class TrackIO:
             track_name = self.prms.out_name
         else:
             track_name = os.path.splitext(os.path.basename(self.filename))[0]
-
-        self.prev_fast5 = (None, None)
-        self.prev_read = None
 
         self.track_out = self.init_track(track_name, track_name, self.conf)
 
@@ -143,26 +138,25 @@ class TrackIO:
 
 
 
-from .sqlite import TrackSQL as SQL
 from .tsv import TSV
 from .bam import BAM
 from .eventalign import Eventalign
 from .tombo import Tombo
 from .model_trainer import ModelTrainer
+from .m6anet import M6anet
 
 INPUTS = {
-    "sql_in" : SQL, 
     "bam_in" : BAM,
     "eventalign_in" : Eventalign, 
     "tombo_in" : Tombo, 
 }
 
 OUTPUTS = {
-    "sql_out" : SQL,
     "bam_out" : BAM,
     "eventalign_out" : Eventalign,
     "tsv_out" : TSV,
     "model_dir" : ModelTrainer,
+    "m6anet_out" : M6anet,
 }
 
 def _db_track_split(db_str):
@@ -183,6 +177,9 @@ def convert(conf):
     
     if conf.tracks.io.tombo_in is not None:
         conf.read_index.paths = conf.tracks.io.tombo_in
+        conf.read_index.load_signal = True
+    else:
+        conf.read_index.load_signal = False
 
     if conf.tracks.io.processes == 1:
         convert_single(conf)
@@ -209,10 +206,12 @@ def _init_tracks(conf):
 def convert_pool(conf):
     tracks,ignore_bam = _init_tracks(conf)
 
+    group_seqs = conf.tracks.io.m6anet_out != None
+
     def iter_args(): 
         i = 0
         aln_count = 0
-        for read_ids, sam_strs in tracks.bam_in.iter_str_chunks():
+        for read_ids, sam_strs in tracks.bam_in.iter_str_chunks(group_seqs):
             reads = ReadIndex()#tracks.read_index.subset(read_ids)
             yield (tracks.conf, tracks.model, sam_strs, reads, aln_count, tracks.bam_in.header)
             aln_count += len(sam_strs)
@@ -240,12 +239,16 @@ def convert_worker(args):
     conf.tracks.io.buffered = True
     #conf.tracks.io.bam_in = None
 
+    conf.tracks.io.bam_header = header
     header = pysam.AlignmentHeader.from_dict(header)
 
     tracks = Tracks(model=model, read_index=reads, conf=conf)
     for s in sam_strs:
         sam = pysam.AlignedSegment.fromstring(s, header)
         aln = tracks.bam_in.sam_to_aln(sam, load_moves=False)
+        if aln is None: 
+            sys.stderr.write(f"Failed to write read {sam.query_name}\n")
+            continue
         aln.instance.id += aln_start
         tracks.write_alignment(aln)
 
@@ -254,8 +257,10 @@ def convert_worker(args):
         
 
 def convert_single(conf):
+    conf.tracks.layers.append("moves")
     tracks, ignore_bam = _init_tracks(conf)
-    for aln in tracks.iter_reads(ignore_bam=ignore_bam):
+    for read_id, aln in tracks.iter_reads(ignore_bam=ignore_bam):
+        aln.calc_mvcmp()
         tracks.write_alignment(aln)
 
     tracks.close()

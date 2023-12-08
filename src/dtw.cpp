@@ -2,7 +2,7 @@
 
 const DtwParams
     DTW_PRMS_DEF = {
-        DTWSubSeq::NONE, 1, 1, 1, 0.5, 50, 100, 100, 1, "ref_mom", "guided", "abs_diff", false, false,
+        DTWSubSeq::NONE, 1, 1, 2, 0.5, 10, 10, 50, 2, "ref_mom", "guided", "abs_diff", false, false,
     }, DTW_PRMS_EVT_GLOB = {
         DTWSubSeq::NONE, 2, 1, 100, 0.5, 50, 100, 0, 1, "", "ref_mom", "abs_diff", false, false,
     };
@@ -60,7 +60,7 @@ AlnDF moves_to_aln(py::array_t<bool> moves_py, i32 start, i32 stride) {
     return AlnDF(index, samples, {}, {});
 }
 
-AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::array_t<i64> qrys_py, i32 del_max, bool backfill_na=true) {
+AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::array_t<i64> qrys_py, i32 del_max, i32 ins_max, bool backfill_na=true) {
     PyArray<i64> refs(refs_py), qrys(qrys_py);
     if (refs.size() != qrys.size() || refs.size() == 0) {
         throw std::length_error("reference and query coordinates must be the same non-zero length");
@@ -73,10 +73,12 @@ AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::a
     Interval<i32> samps;
 
     auto ref = refs[0], 
-         prev_ref = ref-1;
+         prev_ref = ref-1,
+         prev_qry = qrys[0]-1;
 
     ref_seg.start = ref;
     //indel = 0;
+    std::vector<size_t> qry_hard_gaps;
 
     for (size_t i = 0; i < qrys.size(); i++) {
         ref = refs[i];
@@ -85,19 +87,28 @@ AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::a
         if (j >= read_moves.samples.interval_count()) {
             continue;
         }
-        auto gap = ref - prev_ref;
-        if (gap > del_max) {
+        auto ref_gap = ref - prev_ref;
+        auto qry_gap = qrys[i] - prev_qry;
+        if (ref_gap > del_max) {
             ref_seg.end = prev_ref+1;
             ref_index.append(ref_seg);
             ref_seg.start = prev_ref = ref;
             ref_seg.end = ref_seg.NA;
-        } else if (gap > 1) {
+        } else if (ref_gap > 1) {
             auto fill = backfill_na ? samps : Interval<i32>();
             for (auto k = prev_ref+1; k < ref; k++) {
                 samples.append(samps);
             }
+        } else if (qry_gap > ins_max) {
+            qry_hard_gaps.push_back(samples.coords.size());
+            //std::cout << "INS " << ref << " " 
+            //          << qrys[i] << " " 
+            //          << prev_qry << " " 
+            //          << samps.to_string() << "\n";
+            //std::cout.flush();
         }
         prev_ref = ref;
+        prev_qry = qrys[i];
         samps = read_moves.samples.coords[j];
         samples.append(samps);
     }
@@ -109,7 +120,9 @@ AlnDF read_to_ref_moves(const AlnDF &read_moves, py::array_t<i64> refs_py, py::a
     ref_seg.end = refs[refs.size()-1]+1;
     ref_index.append(ref_seg);
 
-    return AlnDF(ref_index, samples, {}, {});
+    auto ret = AlnDF(ref_index, samples, {}, {});
+    ret.set_hard_gaps(qry_hard_gaps);
+    return ret;
 }
 
 #define PY_DTW_PARAM(P, D) p.def_readwrite(#P, &DtwParams::P, D);

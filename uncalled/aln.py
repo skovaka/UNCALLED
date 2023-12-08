@@ -9,15 +9,16 @@ _Layer = namedtuple("_Layer", ["dtype", "label", "default"], defaults=[None,None
 ALN_LAYERS = {
     "start" : _Layer("Int32", "Sample Start", True),
     "length" : _Layer("Int32", "Sample Length", True),
-    "current" : _Layer(np.float32, "Current (pA)", True),
-    "current_sd" : _Layer(np.float32, "Stdv (pA)", True),
-    "start_sec" : _Layer(np.float32, "Time (s)", True),
-    "length_sec" : _Layer(np.float32, "Dwell (s)", True),
-    "dwell" : _Layer(np.float32, "Dwell (ms)", True),
+    "current" : _Layer(np.float32, "Current (norm)", True),
+    "current_sd" : _Layer(np.float32, "Stdv (norm)", True),
+    "events" : _Layer(np.float32, "Event Count", True),
+    "start_sec" : _Layer(np.float32, "Time (s)", False),
+    "length_sec" : _Layer(np.float32, "Dwell (s)", False),
+    "dwell" : _Layer(np.float32, "Dwell (ms)", False),
     "end" : _Layer("Int32", "Sample End", False),
     "middle" : _Layer(np.float32, "Sample Middle", False),
     "middle_sec" : _Layer(np.float32, "Sample Middle", False),
-    "model_diff" : _Layer(np.float32, "Model pA Diff.", True),
+    "model_diff" : _Layer(np.float32, "Model Norm. Diff.", False),
     "abs_diff" : _Layer(np.float32, "Abs. Model Diff.", False),
 }
 
@@ -27,13 +28,15 @@ LAYERS = {
         "pos" : _Layer("Int64", "Reference Coord.", False),
         "pac" : _Layer("Int64", "Packed Ref. Coord.", False),
         "kmer" : _Layer("Int32", "Kmer", True),
-        "current" : _Layer(str, "Model Mean (pA)", False),
+        "current" : _Layer(str, "Model Mean (norm)", False),
         "name" : _Layer(str, "Reference Name", False),
         "fwd" : _Layer(bool, "Forward", False),
         "strand" : _Layer(str, "Strand", False),
         "base" : _Layer(str, "Base", False),
     }, "aln" : {
+        "track" : _Layer(str, "Track ID"),
         "id" : _Layer("Int64", "Aln. ID"),
+        "read_id" : _Layer(str, "Read ID"),
     }, "dtw" : ALN_LAYERS, "moves" : ALN_LAYERS,
     #}, "moves" : {
     #    "start" : _Layer("Int32", "BC Sample Start", True),
@@ -41,15 +44,19 @@ LAYERS = {
     #    "end" : _Layer("Int32", "Sample End", False),
     #    "middle" : _Layer(np.float32, "Sample Middle", False),
     #    "indel" : _Layer("Int32", "Basecalled Alignment Indel", False),
-    "cmp" : {
+    "dtwcmp" : {
         "aln_a" : _Layer("Int32", "Compare alignment V", True),
         "aln_b" : _Layer("Int32", "Compare alignment A", True),
         "group_b" : _Layer(str, "Compare type", False),
         "jaccard" : _Layer(np.float32, "Jaccard Distance", True),
-        "dist" : _Layer(np.float32, "Mean Ref. Distance", True),
+        "dist" : _Layer(np.float32, "Sig-to-Ref Dist", True),
+        "current" : _Layer(np.float32, "Current Cmp (norm)", True),
+        "current_sd" : _Layer(np.float32, "Stdv Cmp (norm)", True),
     }, "mvcmp" : {
         "jaccard" : _Layer(np.float32, "Jaccard Distance", True),
-        "dist" : _Layer(np.float32, "Mean Ref. Distance", True),
+        "dist" : _Layer(np.float32, "Sig-to-Ref Dist", True),
+        "current" : _Layer(np.float32, "Current Cmp (norm)", True),
+        "current_sd" : _Layer(np.float32, "Stdv Cmp (norm)", True),
     }
 }
 
@@ -79,6 +86,15 @@ def parse_layer(layer):
             for layer in layers:
                 yield (group, layer)
             return
+        
+        matches = layer == LAYER_META.index.get_level_values(1)
+        if np.sum(matches) > 1:
+            raise ValueError(f"Ambiguous layer: {layer}. Please specify layer group.")
+        elif np.sum(matches) == 1:
+            for group,layer in LAYER_META.index[matches]:
+                yield (group,layer)
+            return
+
         group = "dtw"
     else:
         raise ValueError("Invalid layer: \"{layer}\"")
@@ -104,7 +120,7 @@ def parse_layers(layers):
     return pd.Index(ret).unique()
 
 class Sequence:
-    LAYERS = {"pos", "mpos", "pac", "name", "fwd", "strand", "kmer", "current"}
+    LAYERS = {"pos", "mpos", "pac", "name", "fwd", "strand", "kmer", "current", "base"}
     CONST_LAYERS = {"name", "fwd", "strand"}
     DEFAULT_LAYERS = ["pos", "kmer"]
 
@@ -138,6 +154,10 @@ class Sequence:
     @property
     def strand(self):
         return "+" if self.fwd else "-"
+
+    @property
+    def base(self):
+        return self.model.kmer_base(self.kmer, self.model.PRMS.shift)
 
     @property
     def fwd(self):
@@ -181,6 +201,8 @@ class AlnDF:
 
     def __init__(self, seq, start=None, length=None, current=None, current_sd=None):
         self.seq = seq
+        self._extra = dict()
+
         if isinstance(start, _uncalled._AlnDF):
             self.instance = start
         else:
@@ -192,8 +214,11 @@ class AlnDF:
             self.instance = _uncalled._AlnDF(self.seq.index, start, length, current, current_sd)
 
         self.instance.mask(self.na_mask)
-        self._extra = dict()
 
+    def set_layer(self, name, vals):
+        if not len(vals) == len(self): 
+            raise ValueError(f"'{name}' values not same length as alignment")
+        self._extra[name] = np.array(vals)
         
     @property
     def na_mask(self):
@@ -238,7 +263,7 @@ class AlnDF:
     @property
     def dwell(self):
         return 1000 * self.length / self.seq.model.PRMS.sample_rate
-
+    
     def _get_series(self, name):
         vals = getattr(self, name, None)
         if vals is None or len(vals) == 0:
@@ -257,11 +282,13 @@ class AlnDF:
         if layers is None:
             layers = ["start", "length", "current", "current_sd"]
 
-        df = pd.DataFrame({
-            name : self._get_series(name) 
-            for name in layers if hasattr(self,name)
-        })
-        df["index"] = self.index.expand()
+        cols = dict()
+        for name in layers:
+            vals = self._get_series(name)
+            if vals is not None:
+                cols[name] = vals
+        cols["index"] = self.index.expand()
+        df = pd.DataFrame(cols)
         
         #idx = self.index.expand().to_numpy()
         #if index == "ref" and idx[0] < 0:
@@ -276,9 +303,10 @@ class AlnDF:
         return len(self.instance)
 
     def __getattr__(self, name):
-        if not hasattr(self.instance, name):
+        ret = getattr(self.instance, name, None)
+        if ret is None:
             raise AttributeError(f"AlnDF has no attribute '{name}'")
-        return self.instance.__getattribute__(name)
+        return ret
 
 class CmpDF:
     def __init__(self, seq, instance):
@@ -290,10 +318,12 @@ class CmpDF:
             df = pd.DataFrame({
                 "dist" : self.instance.dist, 
                 "jaccard" : self.instance.jaccard,
+                "current" : self.instance.current,
+                "current_sd" : self.instance.current_sd,
             })
         else:
             df = pd.DataFrame({
-                l : getattr(self, l) for l in layers if hasattr(self,l)
+                l : getattr(self, l) for l in layers if len(getattr(self,l,[])) > 0
             })
         
         #idx = self.index.expand().to_numpy()
@@ -315,10 +345,11 @@ class CmpDF:
         return self.instance.__getattribute__(name)
 
 class Alignment:
-    def __init__(self, aln_id, read, seq, sam=None):
+    def __init__(self, aln_id, read, seq, sam, track_name):
         #self.id = aln_id
         self.seq = seq
         self.sam = sam
+        self.track = track_name
 
         if isinstance(read, str):
             read_id = read
@@ -342,6 +373,7 @@ class Alignment:
         self.dtw = AlnDF(seq, self.instance._dtw)
         self.moves = AlnDF(seq, self.instance._moves)
         self.mvcmp = CmpDF(seq, self.instance._mvcmp)
+        self.dtwcmp = CmpDF(seq, self.instance._dtwcmp)
 
     def __getattr__(self, name):
         if not hasattr(self.instance, name):
@@ -358,21 +390,31 @@ class Alignment:
             df = df.instance
         self.instance.set_moves(df)
 
-    def to_pandas(self, layers=None, index=None, join_index=True):
+    def to_pandas(self, layers=None, index=None, join_index=True, bounds=None):
         vals = dict()
 
         layers = parse_layers(layers)
         if index is not None:
             index = parse_layers(index)
-            layers = layers.union(index)
+            #layers = layers.union(index)
+            layers = layers.append(index)
 
         idx = self.seq.mpos#.expand().to_numpy()
+        if bounds is not None:
+            pos = self.seq.pos
+            idx = idx[(pos >= bounds.start) & (pos < bounds.end)]
 
         for name in layers.unique(0):
             _,group_layers = layers.get_loc_level(name)
-            group = getattr(self, name, [])
-            if len(group) > 0:
-                vals[name] = group.to_pandas(group_layers).reindex(idx)#.reset_index(drop=True)
+
+            if name == "aln":
+                vals[name] = pd.DataFrame({
+                    l : getattr(self, l) for l in group_layers
+                }, index=idx)
+            else:
+                group = getattr(self, name, [])
+                if len(group) > 0:
+                    vals[name] = group.to_pandas(group_layers).reindex(idx)#.reset_index(drop=True)
                 #if idx is None:
                 #    idx = vals[name].index
                 #else:
@@ -380,7 +422,7 @@ class Alignment:
 
         df = pd.concat(vals, axis=1, names=["group", "layer"]).reset_index(drop=True)
 
-        df["aln","id"] = self.id
+        #df["aln","id"] = self.id
         
         if index is not None:
             df.set_index(list(index), inplace=True)
@@ -390,7 +432,7 @@ class Alignment:
         return df#.set_index(index)
 
     Attrs = namedtuple("Attrs", [
-        "id", "read_id", "ref_name", "ref_start", "ref_end", 
+        "track", "id", "read_id", "ref_name", "ref_start", "ref_end", 
         "fwd", "sample_start", "sample_end", "coord"
     ])
 
@@ -404,7 +446,7 @@ class Alignment:
                 samp_end = max(samp_end, df.samples.end)
 
         return self.Attrs(
-            self.id, self.read_id, self.seq.coord.name, self.seq.coord.start, self.seq.coord.end,
+            self.track, self.id, self.read_id, self.seq.coord.name, self.seq.coord.get_start(), self.seq.coord.get_end(),
             self.seq.fwd, samp_start, samp_end, self.seq.coord
         )
 

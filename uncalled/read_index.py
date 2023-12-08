@@ -5,6 +5,7 @@ import pandas as pd
 import os
 import re
 from _uncalled import ReadBuffer
+from . import config
 from uuid import UUID
 from types import SimpleNamespace
 
@@ -17,25 +18,33 @@ ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 def is_read_id(read_id):
     return re.match("[a-z0-9]+(-[a-z0-9])+", read_id) is not None
 
+#("paths", None, list, "Paths to fast5, slow5, or pod5 files, or to directories containing those files (optionally recursive)"),
+#("read_filter", None, list, "List of read IDs to load, or file containing one read ID per line"),
+#("read_index", None, str, "File containing a mapping of read IDs to filenames"),
+#("recursive", None, bool, "Recursively search 'paths' for fast5, slow5, or pod5 files"),
+#("read_count", None, int, "Maximum number of reads to load"),
+#("load_signal", False, bool, "Must be set to true to load signal from FAST5/SLOW5/POD5"),
+
 class ReadIndex:
-    def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False):
-        #self.suffix_re = re.compile(suffix_regex)
-        self.index_filename = index_filename
+    #def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False):
+    def __init__(self, *args, **kwargs):
+        self.conf, self.prms = config._init_group("read_index", *args, **kwargs)
+
         self.file_info = dict()
         self.read_files = None
         self.index_files = set()
         self.base_paths = set()
 
-        if file_paths is not None:
-            self.load_paths(file_paths, recursive)
-
-        self._load_filter(read_filter)
-        self.load_index_file(index_filename)
-
         self._default_model = None
         self.infile = None
         self.infile_name = None
         self.prev_read = None
+        self._load_filter(self.prms.read_filter)
+
+        self.load_index_file(self.prms.read_index)
+
+        if self.prms.paths is not None and self.prms.load_signal:
+            self.load_paths(self.prms.paths)
 
     @property
     def default_model(self):
@@ -55,7 +64,8 @@ class ReadIndex:
         return len(self.file_info) > 0
     
     def subset(self, read_ids):
-        ret = ReadIndex(read_filter=read_ids)
+        ret = ReadIndex(read_count=self.prms.read_count, load_signal=self.prms.load_signal, read_filter=read_ids)                        
+
         if self.read_files is not None:
             ret.load_index_df(self.read_files.reset_index())
         ret.file_info = self.file_info
@@ -64,12 +74,15 @@ class ReadIndex:
 
     def load_index_file(self, fname=None):
         if fname is None or len(fname) == 0:
-            if self.index_filename is None or len(self.index_filename) == 0:
+            if self.prms.read_index is None or len(self.prms.read_index) == 0:
                 return
-            fname = self.index_filename
+            fname = self.prms.read_index
 
         if fname in self.index_files:
             return
+        
+        sys.stderr.write(f"Loading read index '{fname}'\n")
+
         self.index_files.add(fname)
 
         read_files = None
@@ -113,32 +126,79 @@ class ReadIndex:
             filenames = filenames[~filenames.index.isin(self.read_files.index)]
             self.read_files = pd.concat([self.read_files, filenames]).sort_index()
 
-    def load_paths(self, paths, recursive):
+    def build_index(self, root, out_fname):
+        files = list(self.iter_dir(root))
+        if len(files) == 1: return
+
+        sys.stderr.write(f"Writing read index to '{out_fname}'\n")
+        index_dfs = list()
+
+        for fname in files:
+            infile = self._get_reader(fname)(fname)
+            sys.stderr.write(f"Indexing '{fname}'\n")
+            index_dfs.append(pd.DataFrame({
+                "read_id"  : infile.read_ids,
+                "filename" : fname
+            }))
+            infile.close()
+        df = pd.concat(index_dfs)
+        self.load_index_df(df)
+        df.to_csv(out_fname, sep="\t", index=False)
+            
+    def iter_dir(self, path):
+        if self.prms.recursive:
+            for root, dirs, files in os.walk(path):
+                for fname in files:
+                    if self._is_read_file(fname):
+                        yield os.path.join(root, fname)
+        else:
+            for fname in os.listdir(path):
+                if self._is_read_file(fname):
+                    yield os.path.join(path, fname)
+
+    def load_paths(self, paths):
+        if paths is None:                             
+            paths = self.prms.paths                   
+                                              
+        if paths is None or not self.prms.load_signal:
+            return                                    
+
+
+
         if isinstance(paths, str):
             paths = [paths]
 
         for path in paths:
             path = path.strip()
 
-            if (path, recursive) in self.base_paths:
+            if path in self.base_paths:
                 continue
-            self.base_paths.add((path, recursive))
+            self.base_paths.add(path)
 
             if not os.path.exists(path):
-                raise ValueError("Error: \"%s\" does not exist\n" % path)
+                sys.stderr.write("Error: \"%s\" does not exist\n" % path)
+                continue
 
             isdir = os.path.isdir(path)
 
-            #Recursive directory search 
-            if isdir and recursive:
-                for root, dirs, files in os.walk(path):
-                    for fname in files:
-                        self._add_read_file(os.path.join(root, fname))
+            if isdir and self.prms.read_index is None:
+                fname = os.path.join(path, self.prms.default_read_index)
+                if os.path.exists(fname):
+                    self.load_index_file(fname)
+                else:
+                    self.build_index(path, fname)
+
+            if isdir:
+                for fname in self.iter_dir(path):
+                    self._add_read_file(fname)
+                #for root, dirs, files in os.walk(path):
+                #    for fname in files:
+                #        self._add_read_file(os.path.join(root, fname))
 
             #Non-recursive directory search 
-            elif isdir and not recursive:
-                for fname in os.listdir(path):
-                    self._add_read_file(os.path.join(path, fname))
+            #elif isdir and not recursive:
+            #    for fname in os.listdir(path):
+            #        self._add_read_file(os.path.join(path, fname))
 
             #Read fast5 name directly
             elif self._is_read_file(path):
@@ -175,21 +235,24 @@ class ReadIndex:
             raise IndexError("Must provide read index TSV file for random access over multiple files")
 
         return filename
+    
+    def _get_reader(self, fname):
+        return FILE_READERS[fname.split(".")[-1]]
 
     def _add_read_file(self, path):
         if not self._is_read_file(path):
             return False
 
         fname = os.path.basename(path)
-        Reader = FILE_READERS[fname.split(".")[-1]]
+        Reader = self._get_reader(fname)
         self.file_info[fname] = (Reader, path)
 
-        if Reader != Fast5Reader:
-            self._open(fname)
-            self.load_index_df(pd.DataFrame({
-                "read_id"  : self.infile.read_ids,
-                "filename" : fname
-            }))
+        #if Reader != Fast5Reader:
+        #    self._open(fname)
+        #    self.load_index_df(pd.DataFrame({
+        #        "read_id"  : self.infile.read_ids,
+        #        "filename" : fname
+        #    }))
 
         return True
 
@@ -215,11 +278,18 @@ class ReadIndex:
     def __getitem__(self, read_id):
         if self.prev_read is not None and self.prev_read.id == read_id: 
             return self.prev_read
+        read = None
+
         if self.has_signal:
-            filename = self.get_read_file(read_id)
-            self._open(filename)
-            read = self.infile[read_id]
-        else:
+            try:
+                filename = self.get_read_file(read_id)
+                self._open(filename)
+                read = self.infile[read_id]
+            except Exception as e:
+                sys.stderr.write(f"Warning: failed to open read {read_id} ({e})\n")
+                read = None
+
+        if read is None:
             read = ReadBuffer(read_id, 0, 0, 0, [])
 
         self.prev_read = read
@@ -227,7 +297,7 @@ class ReadIndex:
 
     @property
     def has_signal(self):
-        return len(self.file_info) > 0
+        return self.prms.load_signal and len(self.file_info) > 0
         #return self.read_files is not None
     
     def __iter__(self):
@@ -245,21 +315,31 @@ class ReadIndex:
         if self.infile is not None:
             self.infile.close()
 
-class Fast5Reader:
+class ReaderBase:
+    def __init__(self):
+        self._read_ids = None
+
+    @property
+    def read_ids(self):
+        if self._read_ids is None:
+            self._read_ids = self.get_read_ids()
+        return self._read_ids
+
+    def __contains__(self, read_id):
+        return read_id in self.read_ids
+
+class Fast5Reader(ReaderBase):
     #def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False):
     def __init__(self, filename):
+        ReaderBase.__init__(self)
         self.infile = get_fast5_file(filename, mode="r")
 
     def __getitem__(self, read_id):
         f5 = self.infile.get_read(read_id)
         return self._dict_to_read(f5)
 
-    @property
-    def read_ids(self):
+    def get_read_ids(self):
         return self.infile.get_read_ids()
-
-    def __contains__(self, read_id):
-        return read_id in self.read_ids
     
     def _dict_to_read(self, f5):
         channel = f5.get_channel_info()
@@ -301,20 +381,22 @@ class Fast5Reader:
     def close(self):
         self.infile.close()
 
-class Pod5Reader:
+class Pod5Reader(ReaderBase):
     def __init__(self, filename):
+        ReaderBase.__init__(self)
         self.infile = pod5.Reader(filename)
-        self._read_ids = None
 
     def __contains__(self, read_id):
         return read_id in self.read_ids
 
-    @property
-    def read_ids(self):
-        if self._read_ids is None:
-            read_ids = self.infile.read_table.read_pandas()["read_id"]
-            self._read_ids = read_ids.apply(lambda r: str(UUID(bytes=r)))
-        return self._read_ids
+    def get_run_info(self):
+        info = self.infile.run_info_table.read_pandas()
+        info = info.iloc[0]
+        return info["flow_cell_product_code"].upper(), info["sequencing_kit"].upper()
+
+    def get_read_ids(self):
+        read_ids = self.infile.read_table.read_pandas()["read_id"]
+        return read_ids.apply(lambda r: str(UUID(bytes=r)))
 
     def __getitem__(self, read_id):
         r = next(self.infile.reads(selection=[read_id]))
@@ -329,15 +411,21 @@ class Pod5Reader:
     def close(self):
         self.infile.close()
 
-class Slow5Reader:
+class Slow5Reader(ReaderBase):
+    #def __init__(self, file_paths=None, read_filter=None, index_filename=None, recursive=False):
     def __init__(self, filename):
+        ReaderBase.__init__(self)
         self.infile = pyslow5.Open(filename, mode="r")
 
     def __contains__(self, read_id):
         return read_id in self.read_ids
 
-    @property
-    def read_ids(self):
+    def get_run_info(self):
+        flowcell = self.infile.get_header_value("flow_cell_product_code")
+        kit = self.infile.get_header_value("sequencing_kit")
+        return flowcell.upper(), kit.upper()
+
+    def get_read_ids(self):
         return self.infile.get_read_ids()[0]
 
     def _dict_to_read(self, d):

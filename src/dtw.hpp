@@ -315,7 +315,7 @@ class BandedDTW {
     //const PyArray<float> &qry_vals_;
     const ProcessedRead &qry_vals_;
     size_t event_start_, event_end_;
-    const std::vector<KmerType> &ref_vals_;
+    const std::vector<KmerType> ref_vals_;
     const PyArray<Coord> &ll_;
 
     const ModelType model_;
@@ -546,7 +546,7 @@ class BandedDTW {
         return DtwDF(path_, qry_vals_, ref_size());
     }
 
-    void fill_aln(Alignment<ModelType> &aln) {
+    void fill_aln(Alignment<ModelType> &aln, bool events) {
         aln.dtw = AlnDF(aln.seq.mpos);
         auto &dtw = aln.dtw;
 
@@ -570,7 +570,54 @@ class BandedDTW {
         dtw.current[i] = evt.mean;
         dtw.current_sd[i] = evt.stdv;
 
+        if (events) {
+            dtw.events = count_events();
+        }
     }
+
+    ValArray<float> count_events() {
+        i32 i = 0, prev_ref = -1, prev_evt = -1;
+        ValArray<float> ret(ref_size());
+        float evt_count = 0, skip_count = 0;
+        bool first = true;
+        for (auto itr = path_.rbegin(); itr != path_.rend(); itr++) {
+            if (!first && itr->ref > prev_ref) {
+                if (itr->qry == prev_evt) {
+                    skip_count += 1;
+                } else if (skip_count == 0) {
+                    assert(i < ref_size());
+
+                    ret[i++] = evt_count;
+                } else {
+                    float count = evt_count / (skip_count + 1);
+                    for (auto j = 0; j < skip_count+1; j++) {
+                        assert(i < ref_size());
+                        ret[i++] = count;
+                    }
+                    skip_count = 0;
+                }
+                evt_count = 1;
+            } else {
+                evt_count += 1;
+                first = false;
+            }
+            prev_ref = itr->ref;
+            prev_evt = itr->qry;
+        }
+
+        if (path_.front().qry == prev_evt) {
+            float count = evt_count / (skip_count + 1);
+            for (auto j = 0; j < skip_count+1; j++) {
+                assert(i < ref_size());
+                ret[i++] = count;                    
+            }                                        
+        } else {
+            assert(i < ref_size());
+            ret[i] = evt_count;
+        }
+        return ret;
+    }
+
 
     float score() {
         return score_sum_;
@@ -686,6 +733,7 @@ class BandedDTW {
         PY_BANDED_DTW_METH(mean_score)
         PY_BANDED_DTW_METH(get_flat_mat)
         PY_BANDED_DTW_METH(fill_aln)
+        PY_BANDED_DTW_METH(count_events)
 
         c.def_property_readonly("ll", [](BandedDTW<ModelType> &d) -> pybind11::array_t<Coord> {
              return pybind11::array_t<Coord>(d.ll_.size(), d.ll_.data);
