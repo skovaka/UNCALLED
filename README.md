@@ -16,6 +16,8 @@ Sam Kovaka, Yunfan Fan, Bohan Ni, Winston Timp, Michael C. Schatz \
 Nature Biotechnology (2020)
 ](https://www.nature.com/articles/s41587-020-0731-9)
 
+For **Uncalled4**, a highly accurate end-to-end nanopore signal aligner and analysis tool, please see the [`uncalled4`](https://github.com/skovaka/UNCALLED/tree/uncalled4) branch or the [UNCALLED homepage](https://skovaka.github.io/UNCALLED/)
+
 ## Installation
 
 ```
