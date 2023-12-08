@@ -154,7 +154,11 @@ class Trackplot:
         #self.fig.update_traces(xaxis="x3")
 
     def _bases(self, row, layer):
-        bases = self.tracks.layers["seq","base"].droplevel(["aln.track", "aln.id"]).sort_index()
+        bases = self.tracks.layers["seq","base"].droplevel(["aln.track", "aln.id"])
+        rev = ~self.tracks.layers["seq","fwd"].to_numpy()
+        bases[rev] = bases[rev] ^ 3
+        bases.sort_index(inplace=True)
+        
         bases = bases.loc[~bases.index.duplicated()]
         coords = bases.index
         bases = bases.to_numpy().reshape((1,len(bases)))

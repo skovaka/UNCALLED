@@ -476,9 +476,9 @@ class Tracks:
         else:
             out = self.inputs[0]
 
-        sd = aln.dtw.current_sd.to_numpy()
-        mask = (sd >= 0) & (sd <= self.prms.max_sd)
-        aln.dtw.mask(mask)
+        #sd = aln.dtw.current_sd.to_numpy()
+        #mask = (sd >= 0) & (sd <= self.prms.max_sd)
+        #aln.dtw.mask(mask)
 
         out.write_alignment(aln)
 
@@ -1011,13 +1011,14 @@ class Tracks:
         layer_rows = list()
         min_pos = np.inf
         max_pos = -np.inf
+        print("ALN", self.coords)
         for a in alns:
             if a is None: continue
             assert(a.seq.name == ref_name)
             min_pos = min(min_pos, a.seq.coord.get_start())
             max_pos = max(max_pos, a.seq.coord.get_end())
             aln_rows.append(a.attrs())
-            layer_rows.append(a.to_pandas(self.prms.layers, index=["aln.track", "aln.id", "seq.pos", "seq.fwd"]))
+            layer_rows.append(a.to_pandas(self.prms.layers, index=["aln.track", "aln.id", "seq.pos", "seq.fwd"]), self.coords)
 
         aln_df = pd.DataFrame(aln_rows, columns=aln_rows[0]._fields).set_index(["track", "id"]).sort_index()
         layer_df = pd.concat(layer_rows).sort_index()

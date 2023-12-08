@@ -439,7 +439,7 @@ class BAM(TrackIO):
 
             track_alns[self.track_in.name].append(aln.attrs())
 
-            l = aln.to_pandas(layers, index=index)
+            l = aln.to_pandas(layers, index=index, bounds=coords)
             track_layers[self.track_in.name].append(l)
 
         track_alns = {

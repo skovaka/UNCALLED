@@ -390,7 +390,7 @@ class Alignment:
             df = df.instance
         self.instance.set_moves(df)
 
-    def to_pandas(self, layers=None, index=None, join_index=True):
+    def to_pandas(self, layers=None, index=None, join_index=True, bounds=None):
         vals = dict()
 
         layers = parse_layers(layers)
@@ -399,8 +399,10 @@ class Alignment:
             #layers = layers.union(index)
             layers = layers.append(index)
 
-
         idx = self.seq.mpos#.expand().to_numpy()
+        if bounds is not None:
+            pos = self.seq.pos
+            idx = idx[(pos >= bounds.start) & (pos < bounds.end)]
 
         for name in layers.unique(0):
             _,group_layers = layers.get_loc_level(name)
