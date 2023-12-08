@@ -109,12 +109,15 @@ Convert between signal alignment file formats
 ```
 usage: uncalled convert [-h] [--bam-in BAM_IN | --eventalign-in [EVENTALIGN_IN]
                         | --tombo-in TOMBO_IN]                                                   
-                        [--eventalign-out [EVENTALIGN_OUT] | --tsv-out
-                        [TSV_OUT]] [--tsv-cols TSV_COLS] [--eventalign-flags EVENTALIGN_FLAGS]
+                        [--eventalign-out [EVENTALIGN_OUT] | --tsv-out [TSV_OUT] | 
+                        --m6anet-out [M6ANET_OUT]] [--tsv-cols TSV_COLS] 
+                        [--eventalign-flags EVENTALIGN_FLAGS]
                         [--mask-skips [MASK_SKIPS]] [--reads READS [READS ...]]          
                         [-l READ_FILTER] [-x READ_INDEX] [-r] [--rna] [-R REF_BOUNDS] [-f] [-a]
                         ref_index       
 ```
+
+Generally only one `--*-in` and one `--*-out` option should be specified, with the exception of `--bam-out` where a conventional `--bam-in` file should be provided as a template for BAM output. If converting eventalign to BAM, the `--bam-in` file should be the exact same used to guide eventalign in the same sorting order. `--m6anet-out` is an experimental option which efficently implements [m6anet](https://m6anet.readthedocs.io/en/latest/) `dataprep` for sorted Uncalled4 BAM files. 
                                                                                               
 ## DTW Visualization
 

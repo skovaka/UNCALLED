@@ -57,7 +57,6 @@ class Trackplot:
                     ref_layers.append(layer)
                     ref_stats.update(["median","stdv","q5","q25","q75","q95"])
             elif panel in REFSTAT_PANELS:
-                print(layer)
                 spl = layer.split(".")
                 ref_layers.append(".".join(spl[:-1]))
                 ref_stats.add(spl[-1])

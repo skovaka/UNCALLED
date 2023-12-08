@@ -61,9 +61,6 @@ class Dotplot:
         t0 = time.time()
         #for read_id, aln in self.tracks.iter_reads(return_tracks=True):
         for read_id, tracks in self.tracks.iter_reads(return_tracks=True):
-            #print([a for a in aln])
-            #print(aln.to_pandas(["dtw"]))
-            #print(read_id, aln)
             yield read_id, self._plot(read_id, tracks)
             t0 = time.time()
 
@@ -112,10 +109,8 @@ class Dotplot:
         moves_plotted = False
 
         active_tracks = tracks.alignments.index.unique("track")
-        print(tracks.alignments)
 
         for i,track in enumerate(tracks.alns):
-            print(track.name)
             if track.name not in active_tracks: continue
 
             track_hover = list()
