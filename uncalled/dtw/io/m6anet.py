@@ -88,6 +88,8 @@ class M6anet(TrackIO):
     def write_alignment(self, aln):
         sam_start = (aln.sam.reference_id, aln.sam.reference_start)
 
+        if not aln.seq.fwd: return
+
         if self.transcript_id != aln.seq.name and self.transcript_id != None:
             self.write_transcript()
 
