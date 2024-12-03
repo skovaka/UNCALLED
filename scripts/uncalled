@@ -304,9 +304,9 @@ def sim_cmd(args):
 
 #TODO fix
 def list_ports_cmd(args):
-    log_re = re.compile("^([0-9\-]+ [0-9:]+).+ :.+instance_started.+")
-    port_re = re.compile("grpc_port = (\d+)")
-    device_re = re.compile("(device_id|instance) = ([^\s,]+)")
+    log_re = re.compile(r"^([0-9\-]+ [0-9:]+).+ :.+instance_started.+")
+    port_re = re.compile(r"grpc_port = (\d+)")
+    device_re = re.compile(r"(device_id|instance) = ([^\s,]+)")
 
     fnames = os.listdir(args.log_dir)
     log_fnames = list(sorted( (f for f in fnames if f.startswith("mk_manager_svc")) ))

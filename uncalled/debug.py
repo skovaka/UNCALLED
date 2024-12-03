@@ -20,7 +20,7 @@ MAX_CHUNK_DEF = 3
 
 #Cigar parsing
 CIG_OPS_STR = "MIDNSHP=X"
-CIG_RE = re.compile("(\d+)(["+CIG_OPS_STR+"])")
+CIG_RE = re.compile(r"(\d+)(["+CIG_OPS_STR+"])")
 CIG_OPS = set(CIG_OPS_STR)
 CIG_INCR_ALL = {'M','=', 'X'}
 CIG_INCR_RD = CIG_INCR_ALL | {'I','S'}
